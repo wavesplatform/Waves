@@ -84,8 +84,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
   override def isValid(db: DBSet) =
     if (!Crypto.isValidAddress(recipient.getAddress)) {
-      //CHECK IF RECIPIENT IS VALID ADDRESS
-      ValidationResult.INVALID_ADDRESS
+      ValidationResult.INVALID_ADDRESS //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (this.sender.getBalance(1, db).compareTo(this.amount.add(this.fee)) == -1) {
       ValidationResult.NO_BALANCE //CHECK IF SENDER HAS ENOUGH MONEY
     } else if (!Arrays.equals(this.sender.getLastReference(db), this.reference)) {

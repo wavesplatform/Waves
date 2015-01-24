@@ -39,7 +39,7 @@ object Crypto {
 			
 			//CHECK BYTES
 			if(addressBytes.length != Account.ADDRESS_LENGTH) false
-			else if(addressBytes.head != ADDRESS_VERSION) false
+			//else if(addressBytes.head != ADDRESS_VERSION) false    todo:???
 			else {
 				val checkSum = addressBytes.takeRight(4)
 

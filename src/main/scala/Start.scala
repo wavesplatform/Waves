@@ -37,7 +37,6 @@ object Start {
     Thread.sleep(10000)
 
     (1 to Int.MaxValue).foreach { _ =>
-      Thread.sleep(60000) // too short delays causes bug, see comments in PaymentTransaction
       val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size - 1)
       val senderAddress = GenesisBlockParams.ipoMembers(rndIdx)
       val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx + 1)
@@ -50,6 +49,7 @@ object Start {
 
       val (tx, valRes) = Controller.sendPayment(senderAcc.get, recipientAcc, amt, fee)
       println(s"Payment created: $tx, validationResult: $valRes")
+      Thread.sleep(120000) // too short delays causes bug, see comments in PaymentTransaction
     }
   }
 }

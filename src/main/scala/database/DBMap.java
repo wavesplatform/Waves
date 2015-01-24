@@ -42,7 +42,7 @@ public abstract class DBMap<T, U> extends Observable {
 	    this.map = this.getMap(database);
 	    
 	    //CREATE INDEXES
-	    this.indexes = new HashMap<Integer, NavigableSet<Tuple2<?, T>>>();
+	    this.indexes = new HashMap<>();
 	    this.createIndexes(database);
 	}
 	

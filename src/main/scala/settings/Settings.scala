@@ -3,14 +3,10 @@ package settings
 import java.io.File
 import java.net.InetAddress
 import java.util
-
-import org.json.simple.JSONArray
-import org.json.simple.JSONObject
-import org.json.simple.JSONValue
-
 import network.Peer
+import play.api.libs.json.Json
 import scala.util.Try
-import scala.collection.JavaConversions._
+
 
 
 object Settings {
@@ -34,7 +30,7 @@ object Settings {
 	private lazy val settingsJSONTry = Try{
 			val jsonString = scala.io.Source.fromFile("settings.json").mkString
 			//CREATE JSON OBJECT
-			JSONValue.parse(jsonString).asInstanceOf[JSONObject]
+			Json.parse(jsonString)
 	}
 
 	settingsJSONTry.recover{case _:Throwable =>
@@ -45,65 +41,30 @@ object Settings {
 
 	private lazy val settingsJSON = settingsJSONTry.get
 
-	def getKnownPeers = Try{
-			//GET PEERS FROM JSON
-		settingsJSON.get("knownpeers").asInstanceOf[util.ArrayList[_]].flatMap{addr =>
-				val address = InetAddress.getByName(addr.asInstanceOf[String])
+	lazy val getKnownPeers = Try{
+		(settingsJSON \ "knownpeers").as[List[String]].flatMap{addr =>
+				val address = InetAddress.getByName(addr)
 				if (address == InetAddress.getLocalHost) None else Some(new Peer(address))
 			}
 		}.getOrElse(Seq[Peer]())
 
-	def getMaxConnections = settingsJSON.containsKey("maxconnections") match {
-		case true =>  settingsJSON.get("maxconnections").asInstanceOf[Long].intValue()
-		case false => DEFAULT_MAX_CONNECTIONS
-	}
-	
-	def getMinConnections = settingsJSON.containsKey("minconnections") match {
-		case true => settingsJSON.get("minconnections").asInstanceOf[Long].intValue()
-		case false => DEFAULT_MIN_CONNECTIONS
-	}
+	lazy val getMaxConnections = (settingsJSON \ "maxconnections").asOpt[Int].getOrElse(DEFAULT_MAX_CONNECTIONS)
 
-	def getConnectionTimeout = settingsJSON.containsKey("connectiontimeout") match {
-		case true =>  settingsJSON.get("connectiontimeout").asInstanceOf[Long].intValue()
-		case false => DEFAULT_CONNECTION_TIMEOUT
-	}
+	lazy val getMinConnections = (settingsJSON \ "minconnections").asOpt[Int].getOrElse(DEFAULT_MIN_CONNECTIONS)
 
-	def getRpcPort = settingsJSON.containsKey("rpcport") match {
-		case true =>  settingsJSON.get("rpcport").asInstanceOf[Long].intValue()
-		case false => DEFAULT_RPC_PORT
-	}
+	lazy val getConnectionTimeout = (settingsJSON \ "connectiontimeout").asOpt[Int].getOrElse(DEFAULT_CONNECTION_TIMEOUT)
 
-	def getRpcAllowed:Seq[String] = {
-		settingsJSON.containsKey("rpcallowed") match{
-			case true => Try {
-				settingsJSON.get("rpcallowed").asInstanceOf[util.ArrayList[_]].map(_.asInstanceOf[String])
-			}.getOrElse(Seq[String]())
-			case false => DEFAULT_RPC_ALLOWED.split("")
-		}
-	}
-	
-	def getWalletDir = settingsJSON.containsKey("walletdir") match {
-		case true =>  settingsJSON.get("walletdir").asInstanceOf[String]
-		case false => DEFAULT_WALLET_DIR
-	}
-	
-	def getDataDir = settingsJSON.containsKey("datadir") match {
-		case true =>  settingsJSON.get("datadir").asInstanceOf[String]
-		case false => DEFAULT_DATA_DIR
-	}
-	
-	def getPingInterval = settingsJSON.containsKey("pinginterval") match {
-		case true =>  settingsJSON.get("pinginterval").asInstanceOf[Long].intValue()
-		case false => DEFAULT_PING_INTERVAL
-	}
+	lazy val getRpcPort = (settingsJSON \ "rpcport").asOpt[Int].getOrElse(DEFAULT_RPC_PORT)
 
-	def isGeneratorKeyCachingEnabled = settingsJSON.containsKey("generatorkeycaching") match {
-		case true =>  settingsJSON.get("generatorkeycaching").asInstanceOf[Boolean]
-		case false => DEFAULT_GENERATOR_KEY_CACHING
-	}
+	lazy val getRpcAllowed:Seq[String] = (settingsJSON \ "rpcallowed").asOpt[List[String]].getOrElse(DEFAULT_RPC_ALLOWED.split(""))
 
-	def getMaxBytePerFee = settingsJSON.containsKey("maxbyteperfee") match {
-		case true =>  settingsJSON.get("maxbyteperfee").asInstanceOf[Long].intValue()
-		case false => DEFAULT_MAX_BYTE_PER_FEE
-	}
+	lazy val getWalletDir = (settingsJSON \"walletdir").asOpt[String].getOrElse(DEFAULT_WALLET_DIR)
+
+	lazy val getDataDir = (settingsJSON \ "datadir").asOpt[String].getOrElse(DEFAULT_DATA_DIR)
+
+	lazy val getPingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DEFAULT_PING_INTERVAL)
+
+	lazy val isGeneratorKeyCachingEnabled = (settingsJSON \ "generatorkeycaching").asOpt[Boolean].getOrElse(DEFAULT_GENERATOR_KEY_CACHING)
+
+	lazy val maxBytePerFee = (settingsJSON \"maxbyteperfee").asOpt[Int].getOrElse(DEFAULT_MAX_BYTE_PER_FEE)
 }

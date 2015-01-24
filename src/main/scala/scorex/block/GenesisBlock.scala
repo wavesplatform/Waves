@@ -21,20 +21,21 @@ object GenesisBlockParams{
 	val genesisGenerator = new PublicKeyAccount(Array[Byte](1,1,1,1,1,1,1,1))
 	
 	val ipoMembers = List(
-		"2UyntBprhFgZPJ1tCtKBAwryiSnDSk9Xmh8",
-		"Y2BXLjiAhPUMSo8iBbDEhv81VwKnytTXsH",
-		"a8zcZPAj4HJjNLCmfRPVxurcB4REj8YNse",
-		"hWUV4cjcGPgKjaNuRWAYyFMDZKadSPuwfP",
-		"2etPX8BRivVTqr3vBvaCBeebhhGipbuzBNW",
-		"dNKdbrqeykhxsnUpLjFTDHtTWHquiCcBGe",
-		"5MkGmznxmA1Jm2F5KtxYVaf2Bfa6sy2XS1",
-		"2Cqn5vN5iv7jDMehTiXTv3SGpxrCDAkAnBT",
-		"2ihjht1NWTv2T8nKDMzx2RMmp7ZDEchXJus",
-		"2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPNKr"
+		"2UyntBprhFgZPJ1tCtKBAwryiSnDUphTaSm",
+		"Y2BXLjiAhPUMSo8iBbDEhv81VwKq7s3cdR",
+		"a8zcZPAj4HJjNLCmfRPVxurcB4RGnLrCRz",
+		"hWUV4cjcGPgKjaNuRWAYyFMDZKafdF2zDy",
+		"2etPX8BRivVTqr3vBvaCBeebhhGirkBBzMq",
+		"dNKdbrqeykhxsnUpLjFTDHtTWHqwsviHYP",
+		"5MkGmznxmA1Jm2F5KtxYVaf2Bfa94H8enJ",
+		"2Cqn5vN5iv7jDMehTiXTv3SGpxrCFJGfhWA",
+		"2ihjht1NWTv2T8nKDMzx2RMmp7ZDGnJnmi1",
+		"2kx3DyWJpYYfLErWpRMLHwkL1ZGyMPejCmu"
 	)
 
 	val genesisTransactions = ipoMembers.map{addr =>
-		new GenesisTransaction(new Account(addr), new BigDecimal("1000000000").setScale(8), genesisTimestamp)
+		val recipient = new Account(addr)
+		new GenesisTransaction(recipient, new BigDecimal("1000000000").setScale(8), genesisTimestamp)
 	}
 
 	lazy val generatorSignature = {
