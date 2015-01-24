@@ -21,7 +21,7 @@ case class TransactionMessage(transaction: Transaction, mbSender: Option[Connect
 object TransactionMessage {
   def apply(data: Array[Byte]): TransactionMessage = {
     //PARSE TRANSACTION
-    val transaction = TransactionFactory.getInstance().parse(data)
+    val transaction = TransactionFactory.parse(data)
     new TransactionMessage(transaction)
   }
 }

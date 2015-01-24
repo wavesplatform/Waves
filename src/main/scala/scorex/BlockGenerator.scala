@@ -11,6 +11,7 @@ import com.google.common.primitives.Bytes
 import com.google.common.primitives.Longs
 import controller.Controller
 import database.DBSet
+import scorex.transaction.Transaction.ValidationResult
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.collection.concurrent.TrieMap
@@ -151,7 +152,7 @@ object BlockGenerator extends Thread {
     val newBlockDb = db.fork()
 
     //ORDER TRANSACTIONS BY FEE PER BYTE
-    val orderedTransactions = db.getTransactionMap.getValues.toSeq.sortBy(_.feePerByte())
+    val orderedTransactions = db.getTransactionMap.getValues.toSeq.sortBy(_.feePerByte)
 
     /* warning: simplification here!
         QORA does break after first transaction matched conditions then repeat cycle
@@ -159,8 +160,8 @@ object BlockGenerator extends Thread {
      */
     val (_, transactions) = orderedTransactions.foldLeft((0, List[Transaction]())) {
       case ((totalBytes, filteredTxs), tx) =>
-        if (tx.getTimestamp <= stub.timestamp && tx.getDeadline > stub.timestamp
-          && tx.isValid(newBlockDb) == Transaction.VALIDATE_OKE
+        if (tx.timestamp <= stub.timestamp && tx.deadline > stub.timestamp
+          && tx.isValid(newBlockDb) == ValidationResult.VALIDATE_OKE
           && totalBytes + tx.getDataLength <= Block.MAX_TRANSACTION_BYTES) {
 
           tx.process(newBlockDb)
@@ -169,8 +170,9 @@ object BlockGenerator extends Thread {
     }
 
     val data = transactions.foldLeft(stub.generatorSignature) { case (bytes, tx) =>
-      Bytes.concat(bytes, tx.getSignature);
+      Bytes.concat(bytes, tx.signature);
     }
+
     val transactionsSingature = Crypto.sign(account, data)
 
     Block(stub, transactions, transactionsSingature)

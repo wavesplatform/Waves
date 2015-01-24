@@ -87,7 +87,7 @@ public class TransactionDatabase extends Observable implements Observer {
 		{
 			if(this.transactionMap.containsKey(signature))
 			{
-				return TransactionFactory.getInstance().parse(this.transactionMap.get(signature));
+				return TransactionFactory.parse(this.transactionMap.get(signature));
 			}
 			else
 			{
@@ -110,7 +110,7 @@ public class TransactionDatabase extends Observable implements Observer {
 	{
 		try
 		{			
-			this.transactionMap.put(transaction.getSignature(), transaction.toBytes());
+			this.transactionMap.put(transaction.signature(), transaction.toBytes());
 			
 			//COMMIT
 			if(this.databaseSet != null)
@@ -127,7 +127,7 @@ public class TransactionDatabase extends Observable implements Observer {
 	public void remove(Transaction transaction)
 	{
 		//REMOVE TRANSACTION FROM 0 CONFIRMS
-		this.transactionMap.remove(transaction.getSignature());
+		this.transactionMap.remove(transaction.signature());
 		
 		//COMMIT
 		if(this.databaseSet != null)
@@ -138,7 +138,7 @@ public class TransactionDatabase extends Observable implements Observer {
 	
 	public boolean contains(Transaction transaction) 
 	{
-		if(this.transactionMap.containsKey(transaction.getSignature()))
+		if(this.transactionMap.containsKey(transaction.signature()))
 		{
 			return true;
 		}
@@ -165,7 +165,7 @@ public class TransactionDatabase extends Observable implements Observer {
 			for(Transaction transaction: this.getTransactions())
 			{
 				//CHECK IF DEADLINE PASSED
-				if(transaction.getDeadline() < NTP.getTime())
+				if(transaction.deadline() < NTP.getTime())
 				{
 					this.remove(transaction);
 					

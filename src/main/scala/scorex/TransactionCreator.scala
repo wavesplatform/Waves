@@ -7,6 +7,9 @@ import scorex.account.Account
 import scorex.account.PrivateKeyAccount
 import scorex.account.PublicKeyAccount
 import scorex.block.Block
+import scorex.transaction.Transaction.ValidationResult
+import scorex.transaction.Transaction.ValidationResult
+import scorex.transaction.Transaction.ValidationResult.ValidationResult
 import scorex.transaction._
 import utils.Pair
 import database.DBSet
@@ -41,11 +44,11 @@ class TransactionCreator {
 		val accountTransactions = DBSet.getInstance().getTransactionMap.getTransactions.filter{
 			transaction =>
 				Controller.getAccounts.contains(transaction.getCreator)
-		}.sortBy(_.getTimestamp)
+		}.sortBy(_.timestamp)
 			
 		//VALIDATE AND PROCESS THOSE TRANSACTIONS IN FORK
 		accountTransactions foreach {transaction =>
-			if(transaction.isValid(this.fork) == Transaction.VALIDATE_OKE && transaction.isSignatureValid){
+			if(transaction.isValid(this.fork) == ValidationResult.VALIDATE_OKE && transaction.isSignatureValid){
 				transaction.process(this.fork)
 			}else{
 				DBSet.getInstance().getTransactionMap.delete(transaction) //THE TRANSACTION BECAME INVALID LET
@@ -62,12 +65,12 @@ class TransactionCreator {
 		this.afterCreate(payment)
 	}
 	
-	private def afterCreate(transaction: Transaction): Pair[Transaction, Integer] = {
+	private def afterCreate(transaction: Transaction): (Transaction, ValidationResult) = {
 		val valid = transaction.isValid(this.fork) //CHECK IF PAYMENT VALID
-		if(valid == Transaction.VALIDATE_OKE){
+		if(valid == ValidationResult.VALIDATE_OKE){
 			transaction.process(this.fork)
 			Controller.onTransactionCreate(transaction)
 		}
-		new Pair[Transaction, Integer](transaction, valid)
+		transaction -> valid
 	}
 }

@@ -48,7 +48,7 @@ object BlockChain {
     def recursiveExtraction(block: Block, accTransactions: List[Transaction], depth: Int): (Block, List[Transaction]) = {
       val txs = accTransactions ++ block.transactions.filter { transaction =>
         (account == null || transaction.isInvolved(account)) &&
-          (txType == -1 || transaction.getType == txType)
+          (txType == -1 || transaction.transactionType.id == txType)
       }
 
       Option(block.getChild).isDefined &&

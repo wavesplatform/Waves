@@ -85,41 +85,11 @@ public class PaymentResource
 			}
 				
 			//SEND PAYMENT
-			Pair<Transaction, Integer> result = Controller.sendPayment(account, new Account(recipient), bdAmount, bdFee);
+			scala.Tuple2<Transaction, scala.Enumeration.Value> result = Controller.sendPayment(account, new Account(recipient), bdAmount, bdFee);
 				
-			switch(result.getB())
-			{
-			case Transaction.VALIDATE_OKE:
-				
-				return result.getA().toJson().toJSONString();
-			
-			case Transaction.INVALID_NAME_LENGTH:
-				
-				throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_INVALID_NAME_LENGTH);	
-			
-			case Transaction.INVALID_VALUE_LENGTH:
-				
-				throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_INVALID_VALUE_LENGTH);	
-				
-			case Transaction.INVALID_ADDRESS:
-					
-				throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_INVALID_RECIPIENT);
-					
-			case Transaction.NAME_ALREADY_REGISTRED:
-				
-				throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_NAME_ALREADY_EXISTS);
-			
-			case Transaction.NEGATIVE_FEE:
-					
-				throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_INVALID_FEE);
-					
-			case Transaction.NO_BALANCE:	
-					
-				throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_NO_BALANCE);
-			
-			default:
-				
-				throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_UNKNOWN);	
+			switch(result._2().id()){
+				case 1: return result._1().toJson().toString();
+				default: throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_UNKNOWN);
 			}
 		}
 		catch(NullPointerException | ClassCastException e)

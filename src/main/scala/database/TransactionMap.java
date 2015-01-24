@@ -60,7 +60,7 @@ public class TransactionMap extends DBMap<byte[], Transaction> implements Observ
 		createIndex(TIMESTAMP_INDEX, heightIndex, descendingHeightIndex, new Fun.Function2<Long, byte[], Transaction>() {
 		   	@Override
 		    public Long run(byte[] key, Transaction value) {
-		   		return value.getTimestamp();
+		   		return value.timestamp();
 		    }
 		});
 	}
@@ -107,9 +107,9 @@ public class TransactionMap extends DBMap<byte[], Transaction> implements Observ
 			for(Transaction transaction: this.getValues())
 			{
 				//CHECK IF DEADLINE PASSED
-				if(transaction.getDeadline() < NTP.getTime())
+				if(transaction.deadline() < NTP.getTime())
 				{
-					this.delete(transaction.getSignature());
+					this.delete(transaction.signature());
 					
 					//NOTIFY
 					/*this.setChanged();
@@ -120,7 +120,7 @@ public class TransactionMap extends DBMap<byte[], Transaction> implements Observ
 	}
 
 	public void add(Transaction transaction) {
-		this.set(transaction.getSignature(), transaction);
+		this.set(transaction.signature(), transaction);
 	}
 
 	public List<Transaction> getTransactions() {
@@ -128,10 +128,10 @@ public class TransactionMap extends DBMap<byte[], Transaction> implements Observ
 	}
 
 	public void delete(Transaction transaction) {
-		this.delete(transaction.getSignature());		
+		this.delete(transaction.signature());
 	}
 
 	public boolean contains(Transaction transaction) {
-		return this.contains(transaction.getSignature());
+		return this.contains(transaction.signature());
 	}
 }

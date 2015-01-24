@@ -151,7 +151,7 @@ public class TransactionsResource {
 			throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_TRANSACTION_NO_EXISTS);
 		}
 		
-		return transaction.toJson().toJSONString();
+		return transaction.toJson().toString();
 	}
 	
 	@SuppressWarnings("unchecked")

@@ -48,8 +48,8 @@ object Start {
       val amt = new java.math.BigDecimal(Random.nextInt(100000))
       val fee = new java.math.BigDecimal(1 + Random.nextInt(5))
 
-      val tx = Controller.sendPayment(senderAcc.get, recipientAcc, amt, fee).getA
-      println(s"Payment created: $tx")
+      val (tx, valRes) = Controller.sendPayment(senderAcc.get, recipientAcc, amt, fee)
+      println(s"Payment created: $tx, validationResult: $valRes")
     }
   }
 }

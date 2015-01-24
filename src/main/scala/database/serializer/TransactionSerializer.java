@@ -29,7 +29,7 @@ public class TransactionSerializer implements Serializer<Transaction>, Serializa
         in.readFully(bytes);
         try 
         {
-        	return TransactionFactory.getInstance().parse(bytes);
+        	return TransactionFactory.parse(bytes);
 		} 
         catch (Exception e) 
         {

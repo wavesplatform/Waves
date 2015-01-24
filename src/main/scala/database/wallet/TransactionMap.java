@@ -60,7 +60,7 @@ public class TransactionMap extends DBMap<Tuple2<String, String>, Transaction>
 		createIndex(TIMESTAMP_INDEX, timestampIndex, descendingTimestampIndex, new Fun.Function2<Long, Tuple2<String, String>, Transaction>() {
 		   	@Override
 		    public Long run(Tuple2<String, String> key, Transaction value) {
-		   		return value.getTimestamp();
+		   		return value.timestamp();
 		    }
 		});
 		
@@ -208,7 +208,7 @@ public class TransactionMap extends DBMap<Tuple2<String, String>, Transaction>
 	
 	public void delete(Account account, Transaction transaction)
 	{
-		this.delete(new Tuple2<String, String>(account.getAddress(), new String(transaction.getSignature())));
+		this.delete(new Tuple2<String, String>(account.getAddress(), new String(transaction.signature())));
 	}
 	
 	public void deleteAll(List<Account> accounts)
@@ -221,7 +221,7 @@ public class TransactionMap extends DBMap<Tuple2<String, String>, Transaction>
 	
 	public boolean add(Account account, Transaction transaction)
 	{
-		return this.set(new Tuple2<String, String>(account.getAddress(), new String(transaction.getSignature())), transaction);
+		return this.set(new Tuple2<String, String>(account.getAddress(), new String(transaction.signature())), transaction);
 	}
 	
 	public void addAll(Map<Account, List<Transaction>> transactions)

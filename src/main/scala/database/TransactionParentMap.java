@@ -67,6 +67,6 @@ public class TransactionParentMap extends DBMap<byte[], byte[]>
 	
 	public void set(Transaction child, Block parent)
 	{
-		this.set(child.getSignature(), parent.signature());
+		this.set(child.signature(), parent.signature());
 	}
 }

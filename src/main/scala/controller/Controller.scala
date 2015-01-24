@@ -14,6 +14,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.crypto.Curve25519Impl
 import scorex.transaction.Transaction
+import scorex.transaction.Transaction.TransactionType
 import scorex.wallet.Wallet
 import settings.Settings
 import utils.ObserverMessage
@@ -203,7 +204,7 @@ object Controller extends Observable {
 
       case TransactionMessage(transaction, Some(sender), _) =>
         //CHECK IF SIGNATURE IS VALID OR GENESIS TRANSACTION
-        if (!transaction.isSignatureValid || transaction.getType == Transaction.GENESIS_TRANSACTION) {
+        if (!transaction.isSignatureValid || transaction.transactionType == TransactionType.GENESIS_TRANSACTION) {
           //DISHONEST PEER
           Network.onError(sender)
         } else if (transaction.hasMinimumFee && transaction.hasMinimumFeePerByte) {

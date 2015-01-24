@@ -16,6 +16,7 @@ import scorex.crypto.Base58
 import scorex.crypto.Crypto
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.Transaction
+import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.TransactionFactory
 
 import com.google.common.primitives.Bytes
@@ -100,7 +101,7 @@ object Block {
         val transactionLengthBytes = Arrays.copyOfRange(data, pos, pos + TRANSACTION_SIZE_LENGTH)
         val transactionLength = Ints.fromByteArray(transactionLengthBytes)
         val transactionBytes = Arrays.copyOfRange(data, pos + TRANSACTION_SIZE_LENGTH, pos + TRANSACTION_SIZE_LENGTH + transactionLength)
-        val transaction = TransactionFactory.getInstance().parse(transactionBytes)
+        val transaction = TransactionFactory.parse(transactionBytes)
 
         (position + TRANSACTION_SIZE_LENGTH + transactionLength, transaction :: list)
       }
@@ -121,10 +122,10 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
 
   //GETTERS/SETTERS
 
-  def getTotalFee() = transactions.foldLeft(BigDecimal.ZERO.setScale(8)) { case (fee, tx) => fee.add(tx.getFee)}
+  def getTotalFee() = transactions.foldLeft(BigDecimal.ZERO.setScale(8)) { case (fee, tx) => fee.add(tx.fee)}
 
 
-  def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.getSignature.sameElements(signature))
+  def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
 
   def getParent(): Block = getParent(DBSet.getInstance())
 
@@ -194,7 +195,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
 
     //VALIDATE TRANSACTIONS SIGNATURE
     lazy val txsSignature = transactions.foldLeft(generatorSignature) { case (sig, tx) =>
-      Bytes.concat(sig, tx.getSignature)
+      Bytes.concat(sig, tx.signature)
     }
 
     Crypto.verify(generator.getPublicKey, generatorSignature, blockSignature) &&
@@ -245,8 +246,8 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
         val fork = db.fork()
         transactions.forall { transaction =>
           !transaction.isInstanceOf[GenesisTransaction] &&
-            transaction.isValid(fork) == Transaction.VALIDATE_OKE &&
-            transaction.getTimestamp < timestamp && transaction.getDeadline >= timestamp
+            transaction.isValid(fork) == ValidationResult.VALIDATE_OKE &&
+            transaction.timestamp < timestamp && transaction.deadline >= timestamp
           //todo: investigate why it was in original source && transaction.process(fork)
         }
       }

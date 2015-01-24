@@ -52,7 +52,8 @@ object Crypto {
 			}
 		}.getOrElse(false)
 
-	
+
+	//todo: return Try instead of unwrapping it
 	def sign(account:PrivateKeyAccount, message:Array[Byte]) = {
 		val keyPair = account.getKeyPair
 		Try(Curve25519Impl.sign(keyPair.getA, keyPair.getB, message)).getOrElse(Array.fill(64)(0: Byte))

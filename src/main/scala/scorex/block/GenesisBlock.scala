@@ -11,6 +11,7 @@ import com.google.common.primitives.{Ints, Bytes, Longs}
 
 
 import database.DBSet
+import scorex.transaction.Transaction.ValidationResult
 
 object GenesisBlockParams{
 	val genesisVersion = 1
@@ -76,5 +77,5 @@ object GenesisBlock extends Block(version = GenesisBlockParams.genesisVersion,
 	}
 	
 	override def isValid(db:DBSet) =
-		(db.getBlockMap.getLastBlock == null) && transactions.forall(_.isValid(db) == Transaction.VALIDATE_OKE)
+		(db.getBlockMap.getLastBlock == null) && transactions.forall(_.isValid(db) == ValidationResult.VALIDATE_OKE)
 }
