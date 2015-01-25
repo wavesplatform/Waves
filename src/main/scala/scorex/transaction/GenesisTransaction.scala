@@ -16,7 +16,7 @@ import com.google.common.primitives.Longs
 import database.DBSet
 import scorex.transaction.Transaction.TransactionType
 
-class GenesisTransaction(recipient: Account, amount: BigDecimal, timestamp: Long)
+case class GenesisTransaction(recipient: Account, amount: BigDecimal, timestamp: Long)
   extends Transaction(TransactionType.GENESIS_TRANSACTION, BigDecimal.ZERO, timestamp, new Array[Byte](0),
     GenesisTransaction.generateSignature(recipient, amount, timestamp)) {
 
@@ -128,6 +128,6 @@ object GenesisTransaction {
     val amountBytes = Arrays.copyOfRange(data, position, position + AMOUNT_LENGTH)
     val amount = new BigDecimal(new BigInteger(amountBytes), 8)
 
-    new GenesisTransaction(recipient, amount, timestamp)
+    GenesisTransaction(recipient, amount, timestamp)
   }
 }
