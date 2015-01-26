@@ -34,7 +34,7 @@ object Start {
 
     //require(Controller.getPrivateKeyAccounts().nonEmpty)
 
-    Thread.sleep(10000)
+    Thread.sleep(15000)
 
     (1 to Int.MaxValue).foreach { _ =>
       val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size - 1)

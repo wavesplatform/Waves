@@ -22,7 +22,7 @@ import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 
 
-class Wallet extends Observable with Observer {
+object Wallet extends Observable with Observer {
 	val STATUS_UNLOCKED = 1
 	val STATUS_LOCKED = 0
 	
@@ -36,7 +36,7 @@ class Wallet extends Observable with Observer {
 	//GETTERS/SETTERS
 	
 	
-	def version() = database.getVersion()
+	def version() = database.getVersion
 
 	
 	def isUnlocked() = secureDatabase != null
@@ -119,7 +119,6 @@ class Wallet extends Observable with Observer {
 	    //SCAN TRANSACTIONS
 	    if(sync) synchronize()
 
-	    
 	    //COMMIT
 	    commit()
 	    

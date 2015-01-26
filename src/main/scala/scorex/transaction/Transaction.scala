@@ -20,7 +20,7 @@ abstract class Transaction(val transactionType: TransactionType.Value,
 
   lazy val deadline = timestamp + (1000 * 60 * 60 * 24) //24HOUR DEADLINE TO INCLUDE TRANSACTION IN BLOCK
 
-  lazy val feePerByte = fee.divide(new BigDecimal(this.getDataLength()), MathContext.DECIMAL32)
+  lazy val feePerByte = fee.divide(new BigDecimal(dataLength), MathContext.DECIMAL32)
 
   lazy val hasMinimumFee = fee.compareTo(MINIMUM_FEE) >= 0
 
@@ -45,7 +45,7 @@ abstract class Transaction(val transactionType: TransactionType.Value,
 
   def toBytes(): Array[Byte]
 
-  def getDataLength(): Int
+  val dataLength: Int
 
   //VALIDATE
 

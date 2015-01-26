@@ -147,8 +147,6 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
 
   //PARSE/CONVERT
 
-
-  @SuppressWarnings(Array("unchecked"))
   def toJson() = {
     //todo: make it array not string
     val transactionsArray = JSONArray.toJSONString(transactions.map(tx => tx.toJson()))
@@ -175,14 +173,14 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
     val generatorBytes = Bytes.ensureCapacity(generator.getPublicKey, GENERATOR_LENGTH, 0)
     val transactionCountBytes = Ints.toByteArray(transactions.size)
     val transactionBytes = transactions.foldLeft(Array[Byte]()) { case (txBytes, tx) =>
-      Bytes.concat(txBytes, Ints.toByteArray(tx.getDataLength), tx.toBytes)
+      Bytes.concat(txBytes, Ints.toByteArray(tx.dataLength), tx.toBytes)
     }
 
     Bytes.concat(versionBytes, timestampBytes, referenceBytes, baseTargetBytes, generatorBytes, transactionsSignature,
       generatorSignature, transactionCountBytes, transactionBytes)
   }
 
-  def getDataLength() = transactions.foldLeft(BASE_LENGTH) { case (len, tx) => len + 4 + tx.getDataLength}
+  def getDataLength() = transactions.foldLeft(BASE_LENGTH) { case (len, tx) => len + 4 + tx.dataLength}
 
   //VALIDATE
 

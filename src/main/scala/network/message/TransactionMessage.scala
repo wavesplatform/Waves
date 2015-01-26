@@ -14,7 +14,7 @@ case class TransactionMessage(transaction: Transaction, mbSender: Option[Connect
     Bytes.concat(super.toBytes(), generateChecksum(data), data)
   }
 
-  override protected def getDataLength() = transaction.getDataLength
+  override protected def getDataLength() = transaction.dataLength
 }
 
 

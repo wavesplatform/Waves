@@ -41,14 +41,14 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TypeId), TYPE_LENGTH, 0)
 
     //WRITE TIMESTAMP
-    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(this.timestamp), TIMESTAMP_LENGTH, 0)
+    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
 
     //WRITE AMOUNT
-    val amountBytes = this.amount.unscaledValue().toByteArray
+    val amountBytes = amount.unscaledValue().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
 
     //WRITE FEE
-    val feeBytes = this.fee.unscaledValue().toByteArray
+    val feeBytes = fee.unscaledValue().toByteArray
     val feeFill = new Array[Byte](FEE_LENGTH - feeBytes.length)
 
     Bytes.concat(typeBytes, timestampBytes, reference, sender.getPublicKey,
@@ -57,7 +57,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     )
   }
 
-  override def getDataLength() = TYPE_LENGTH + BASE_LENGTH
+  override lazy val dataLength = TYPE_LENGTH + BASE_LENGTH
 
   //VALIDATE
 
@@ -66,34 +66,34 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TypeId), TYPE_LENGTH, 0)
 
     //WRITE TIMESTAMP
-    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(this.timestamp), TIMESTAMP_LENGTH, 0)
+    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
 
     //WRITE AMOUNT
-    val amountBytes = this.amount.unscaledValue().toByteArray
+    val amountBytes = amount.unscaledValue().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
 
     //WRITE FEE
-    val feeBytes = this.fee.unscaledValue().toByteArray
+    val feeBytes = fee.unscaledValue().toByteArray
     val feeFill = new Array[Byte](FEE_LENGTH - feeBytes.length)
 
-    val data = Bytes.concat(typeBytes, timestampBytes, this.reference, this.sender.getPublicKey,
-      Base58.decode(this.recipient.getAddress), Bytes.concat(amountFill, amountBytes), Bytes.concat(feeFill, feeBytes))
+    val data = Bytes.concat(typeBytes, timestampBytes, reference, sender.getPublicKey,
+      Base58.decode(recipient.getAddress), Bytes.concat(amountFill, amountBytes), Bytes.concat(feeFill, feeBytes))
 
-    Crypto.verify(this.sender.getPublicKey, this.signature, data)
+    Crypto.verify(sender.getPublicKey, signature, data)
   }
 
   override def isValid(db: DBSet) =
     if (!Crypto.isValidAddress(recipient.getAddress)) {
       ValidationResult.INVALID_ADDRESS //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (this.sender.getBalance(1, db).compareTo(this.amount.add(this.fee)) == -1) {
+    } else if (sender.getBalance(1, db).compareTo(amount.add(fee)) == -1) {
       ValidationResult.NO_BALANCE //CHECK IF SENDER HAS ENOUGH MONEY
-    } else if (!Arrays.equals(this.sender.getLastReference(db), this.reference)) {
+    } else if (!Arrays.equals(sender.getLastReference(db), reference)) {
       ValidationResult.INVALID_REFERENCE //CHECK IF REFERENCE IS OKE
       //todo: causes network stuck if one account sumbits two txs to be included into one block with older tx fee
       //todo: more than newer's one
-    } else if (this.amount.compareTo(BigDecimal.ZERO) <= 0) {
+    } else if (amount.compareTo(BigDecimal.ZERO) <= 0) {
       ValidationResult.NEGATIVE_AMOUNT //CHECK IF AMOUNT IS POSITIVE
-    } else if (this.fee.compareTo(BigDecimal.ZERO) <= 0) {
+    } else if (fee.compareTo(BigDecimal.ZERO) <= 0) {
       ValidationResult.NEGATIVE_FEE //CHECK IF FEE IS POSITIVE
     } else ValidationResult.VALIDATE_OKE
 
@@ -102,37 +102,37 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
   override def process(db: DBSet) {
     //UPDATE SENDER
-    this.sender.setConfirmedBalance(this.sender.getConfirmedBalance(db).subtract(this.amount).subtract(this.fee), db)
+    sender.setConfirmedBalance(sender.getConfirmedBalance(db).subtract(amount).subtract(fee), db)
 
     //UPDATE RECIPIENT
-    this.recipient.setConfirmedBalance(this.recipient.getConfirmedBalance(db).add(this.amount), db)
+    recipient.setConfirmedBalance(recipient.getConfirmedBalance(db).add(amount), db)
 
     //UPDATE REFERENCE OF SENDER
-    this.sender.setLastReference(this.signature, db)
+    sender.setLastReference(signature, db)
 
     //UPDATE REFERENCE OF RECIPIENT
-    if (Arrays.equals(this.recipient.getLastReference(db), new Array[Byte](0))) {
-      this.recipient.setLastReference(this.signature, db)
+    if (Arrays.equals(recipient.getLastReference(db), new Array[Byte](0))) {
+      recipient.setLastReference(signature, db)
     }
   }
 
   override def orphan(db: DBSet) {
     //UPDATE SENDER
-    this.sender.setConfirmedBalance(this.sender.getConfirmedBalance(db).add(this.amount).add(this.fee), db)
+    sender.setConfirmedBalance(sender.getConfirmedBalance(db).add(amount).add(fee), db)
 
     //UPDATE RECIPIENT
-    this.recipient.setConfirmedBalance(this.recipient.getConfirmedBalance(db).subtract(this.amount), db)
+    recipient.setConfirmedBalance(recipient.getConfirmedBalance(db).subtract(amount), db)
 
     //UPDATE REFERENCE OF SENDER
-    this.sender.setLastReference(this.reference, db)
+    sender.setLastReference(reference, db)
 
     ///UPDATE REFERENCE OF RECIPIENT
-    if (Arrays.equals(this.recipient.getLastReference(db), this.signature)) {
-      this.recipient.removeReference(db)
+    if (Arrays.equals(recipient.getLastReference(db), signature)) {
+      recipient.removeReference(db)
     }
   }
 
-  override def getCreator() = this.sender
+  override def getCreator() = sender
 
   override def getInvolvedAccounts() = List(sender, recipient)
 

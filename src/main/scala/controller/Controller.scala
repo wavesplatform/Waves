@@ -47,7 +47,7 @@ object Controller extends Observable {
     new ApiService()
   }
 
-  private val wallet = new Wallet()
+  private val wallet = Wallet
   private val transactionCreator = new TransactionCreator()
 
   private val peerHeight = TrieMap[ConnectedPeer, Integer]()

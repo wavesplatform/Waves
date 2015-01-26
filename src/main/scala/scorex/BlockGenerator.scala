@@ -47,13 +47,12 @@ object BlockGenerator extends Thread {
 
   def getUnconfirmedTransactions = DBSet.getInstance().getTransactionMap.getValues.toList.asJava //todo: fix after Controller rewriting
 
-  private def getKnownAccounts = this.synchronized(Controller.getPrivateKeyAccounts) //todo: fix
+  private def getKnownAccounts = this.synchronized(Controller.getPrivateKeyAccounts()) //todo: fix
 
   override def run() {
     while (true) {
       //CHECK IF WE ARE UPTODATE
       if (!Controller.isUpToDate()) Controller.update()
-
 
       //CHECK IF WE HAVE CONNECTIONS
       if (Controller.getStatus == Controller.STATUS_OKE) {
@@ -162,10 +161,10 @@ object BlockGenerator extends Thread {
       case ((totalBytes, filteredTxs), tx) =>
         if (tx.timestamp <= stub.timestamp && tx.deadline > stub.timestamp
           && tx.isValid(newBlockDb) == ValidationResult.VALIDATE_OKE
-          && totalBytes + tx.getDataLength <= Block.MAX_TRANSACTION_BYTES) {
+          && totalBytes + tx.dataLength <= Block.MAX_TRANSACTION_BYTES) {
 
           tx.process(newBlockDb)
-          (totalBytes + tx.getDataLength, tx :: filteredTxs)
+          (totalBytes + tx.dataLength, tx :: filteredTxs)
         } else (totalBytes, filteredTxs)
     }
 

@@ -16,7 +16,7 @@ import com.google.common.primitives.Longs
 import database.DBSet
 import scorex.transaction.Transaction.TransactionType
 
-case class GenesisTransaction(recipient: Account, amount: BigDecimal, timestamp: Long)
+case class GenesisTransaction(recipient: Account, amount: BigDecimal, override val timestamp: Long)
   extends Transaction(TransactionType.GENESIS_TRANSACTION, BigDecimal.ZERO, timestamp, new Array[Byte](0),
     GenesisTransaction.generateSignature(recipient, amount, timestamp)) {
 
@@ -24,20 +24,25 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, timestamp:
   import GenesisTransaction._
 
   override def toJson() =
-    getJsonBase() ++ Json.obj("recipient" -> recipient.getAddress(), "amount" -> amount.toPlainString())
+    getJsonBase() ++ Json.obj("recipient" -> recipient.getAddress, "amount" -> amount.toPlainString)
 
   override def toBytes() = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GENESIS_TRANSACTION.id), TYPE_LENGTH, 0)
 
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
 
-    val amountBytes = amount.unscaledValue().toByteArray()
+    val amountBytes = amount.unscaledValue().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
-    Bytes.concat(typeBytes, timestampBytes, amountBytes,
-      Base58.decode(recipient.getAddress()), Bytes.concat(amountFill, amountBytes))
+
+    val rcpBytes = Base58.decode(recipient.getAddress)
+    require(rcpBytes.length==Account.ADDRESS_LENGTH)
+
+    val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, Bytes.concat(amountFill, amountBytes))
+    require(res.length == dataLength)
+    res
   }
 
-  override def getDataLength() = TYPE_LENGTH + BASE_LENGTH
+  override lazy val dataLength = TYPE_LENGTH + BASE_LENGTH
 
 
   //VALIDATE
@@ -80,11 +85,8 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, timestamp:
 
   override def isInvolved(account: Account) = recipient.getAddress.equals(account.getAddress)
 
-  override def getAmount(account: Account) = {
-    if (recipient.getAddress.equals(account.getAddress)) {
-      amount
-    } else BigDecimal.ZERO
-  }
+  override def getAmount(account: Account) =
+    if (recipient.getAddress.equals(account.getAddress)) amount else BigDecimal.ZERO
 }
 
 
