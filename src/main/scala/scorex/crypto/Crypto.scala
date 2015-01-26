@@ -54,11 +54,10 @@ object Crypto {
 
 
 	//todo: return Try instead of unwrapping it
-	def sign(account:PrivateKeyAccount, message:Array[Byte]) = {
-		val keyPair = account.getKeyPair
-		Try(Curve25519Impl.sign(keyPair.getA, keyPair.getB, message)).getOrElse(Array.fill(64)(0: Byte))
-	}
-	
+	def sign(account:PrivateKeyAccount, message:Array[Byte]) =
+		Try(Curve25519Impl.sign(account.privateKey, account.publicKey, message))
+			.getOrElse(Array.fill(64)(0: Byte))
+
 	def verify(publicKey:Array[Byte], signature:Array[Byte], message:Array[Byte]) =
 		Try(Curve25519Impl.verify(signature, message, publicKey)).getOrElse(false)
 }

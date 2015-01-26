@@ -136,12 +136,12 @@ public class TransactionMap extends DBMap<Tuple2<String, String>, Transaction>
 		{
 			//GET ALL TRANSACTIONS THAT BELONG TO THAT ADDRESS
 			/*Map<Tuple2<String, String>, Transaction> accountTransactions = ((BTreeMap) this.map).subMap(
-					Fun.t2(null, account.getAddress()),
-					Fun.t2(Fun.HI(), account.getAddress()));*/
+					Fun.t2(null, account.address()),
+					Fun.t2(Fun.HI(), account.address()));*/
 			
 			Map<Tuple2<String, String>, Transaction> accountTransactions = ((BTreeMap) this.map).subMap(
-					Fun.t2(account.getAddress(), null),
-					Fun.t2(account.getAddress(), Fun.HI()));
+					Fun.t2(account.address(), null),
+					Fun.t2(account.address(), Fun.HI()));
 			
 			//GET ITERATOR
 			Iterator<Transaction> iterator = accountTransactions.values().iterator();
@@ -196,8 +196,8 @@ public class TransactionMap extends DBMap<Tuple2<String, String>, Transaction>
 	{
 		//GET ALL TRANSACTIONS THAT BELONG TO THAT ADDRESS
 		Map<Tuple2<String, String>, Transaction> accountTransactions = ((BTreeMap) this.map).subMap(
-				Fun.t2(account.getAddress(), null),
-				Fun.t2(account.getAddress(), Fun.HI()));
+				Fun.t2(account.address(), null),
+				Fun.t2(account.address(), Fun.HI()));
 		
 		//DELETE TRANSACTIONS
 		for(Tuple2<String, String> key: accountTransactions.keySet())
@@ -208,7 +208,7 @@ public class TransactionMap extends DBMap<Tuple2<String, String>, Transaction>
 	
 	public void delete(Account account, Transaction transaction)
 	{
-		this.delete(new Tuple2<String, String>(account.getAddress(), new String(transaction.signature())));
+		this.delete(new Tuple2<String, String>(account.address(), new String(transaction.signature())));
 	}
 	
 	public void deleteAll(List<Account> accounts)
@@ -221,7 +221,7 @@ public class TransactionMap extends DBMap<Tuple2<String, String>, Transaction>
 	
 	public boolean add(Account account, Transaction transaction)
 	{
-		return this.set(new Tuple2<String, String>(account.getAddress(), new String(transaction.signature())), transaction);
+		return this.set(new Tuple2<String, String>(account.address(), new String(transaction.signature())), transaction);
 	}
 	
 	public void addAll(Map<Account, List<Transaction>> transactions)

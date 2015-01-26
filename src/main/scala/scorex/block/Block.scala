@@ -155,7 +155,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       "reference" -> Base58.encode(reference),
       "timestamp" -> timestamp,
       "generatingBalance" -> generatingBalance,
-      "generator" -> generator.getAddress,
+      "generator" -> generator.address,
       "fee" -> getTotalFee().toPlainString,
       "transactionsSignature" -> Base58.encode(transactionsSignature),
       "generatorSignature" -> Base58.encode(generatorSignature),
@@ -170,7 +170,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0)
     val referenceBytes = Bytes.ensureCapacity(reference, REFERENCE_LENGTH, 0)
     val baseTargetBytes = Longs.toByteArray(generatingBalance)
-    val generatorBytes = Bytes.ensureCapacity(generator.getPublicKey, GENERATOR_LENGTH, 0)
+    val generatorBytes = Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0)
     val transactionCountBytes = Ints.toByteArray(transactions.size)
     val transactionBytes = transactions.foldLeft(Array[Byte]()) { case (txBytes, tx) =>
       Bytes.concat(txBytes, Ints.toByteArray(tx.dataLength), tx.toBytes)
@@ -187,7 +187,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
   def isSignatureValid() = {
     val generatorSignature = Arrays.copyOfRange(reference, 0, GENERATOR_SIGNATURE_LENGTH)
     val baseTargetBytes = Longs.toByteArray(generatingBalance)
-    val generatorBytes = Bytes.ensureCapacity(generator.getPublicKey, GENERATOR_LENGTH, 0)
+    val generatorBytes = Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0)
 
     val blockSignature = Bytes.concat(generatorSignature, baseTargetBytes, generatorBytes)
 
@@ -196,9 +196,9 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       Bytes.concat(sig, tx.signature)
     }
 
-    Crypto.verify(generator.getPublicKey, generatorSignature, blockSignature) &&
+    Crypto.verify(generator.publicKey, generatorSignature, blockSignature) &&
       transactions.forall(_.isSignatureValid) &&
-      Crypto.verify(this.generator.getPublicKey, transactionsSignature, txsSignature)
+      Crypto.verify(this.generator.publicKey, transactionsSignature, txsSignature)
   }
 
   def isValid(): Boolean = isValid(DBSet.getInstance())

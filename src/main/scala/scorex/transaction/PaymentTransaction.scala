@@ -31,8 +31,8 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   import Transaction._
 
   override def toJson() = getJsonBase() ++ Json.obj(
-    "sender" -> sender.getAddress,
-    "recipient" -> recipient.getAddress,
+    "sender" -> sender.address,
+    "recipient" -> recipient.address,
     "amount" -> amount.toPlainString
   )
 
@@ -51,8 +51,8 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     val feeBytes = fee.unscaledValue().toByteArray
     val feeFill = new Array[Byte](FEE_LENGTH - feeBytes.length)
 
-    Bytes.concat(typeBytes, timestampBytes, reference, sender.getPublicKey,
-      Base58.decode(recipient.getAddress), Bytes.concat(amountFill, amountBytes),
+    Bytes.concat(typeBytes, timestampBytes, reference, sender.publicKey,
+      Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes),
       Bytes.concat(feeFill, feeBytes, signature)
     )
   }
@@ -76,14 +76,14 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     val feeBytes = fee.unscaledValue().toByteArray
     val feeFill = new Array[Byte](FEE_LENGTH - feeBytes.length)
 
-    val data = Bytes.concat(typeBytes, timestampBytes, reference, sender.getPublicKey,
-      Base58.decode(recipient.getAddress), Bytes.concat(amountFill, amountBytes), Bytes.concat(feeFill, feeBytes))
+    val data = Bytes.concat(typeBytes, timestampBytes, reference, sender.publicKey,
+      Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes), Bytes.concat(feeFill, feeBytes))
 
-    Crypto.verify(sender.getPublicKey, signature, data)
+    Crypto.verify(sender.publicKey, signature, data)
   }
 
   override def isValid(db: DBSet) =
-    if (!Crypto.isValidAddress(recipient.getAddress)) {
+    if (!Crypto.isValidAddress(recipient.address)) {
       ValidationResult.INVALID_ADDRESS //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (sender.getBalance(1, db).compareTo(amount.add(fee)) == -1) {
       ValidationResult.NO_BALANCE //CHECK IF SENDER HAS ENOUGH MONEY
@@ -137,19 +137,19 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   override def getInvolvedAccounts() = List(sender, recipient)
 
   override def isInvolved(account: Account) = {
-    val address = account.getAddress
-    address.equals(sender.getAddress) || address.equals(recipient.getAddress)
+    val address = account.address
+    address.equals(sender.address) || address.equals(recipient.address)
   }
 
   override def getAmount(account: Account) = {
-    val address = account.getAddress
+    val address = account.address
 
     //CHECK OF BOTH SENDER AND RECIPIENT
-    if (address.equals(sender.getAddress) && address.equals(recipient.getAddress)) {
+    if (address.equals(sender.address) && address.equals(recipient.address)) {
       BigDecimal.ZERO.setScale(8).subtract(fee)
-    } else if (address.equals(sender.getAddress)) {
+    } else if (address.equals(sender.address)) {
       BigDecimal.ZERO.setScale(8).subtract(amount).subtract(fee)
-    } else if (address.equals(recipient.getAddress)) {
+    } else if (address.equals(recipient.address)) {
       amount
     } else {
       BigDecimal.ZERO
@@ -235,8 +235,8 @@ object PaymentTransaction {
     val data = Bytes.concat(typeBytes,
       timestampBytes,
       sender.getLastReference(db),
-      sender.getPublicKey,
-      Base58.decode(recipient.getAddress), //todo: possible exception here
+      sender.publicKey,
+      Base58.decode(recipient.address), //todo: possible exception here
       Bytes.concat(amountFill, amountBytes),
       Bytes.concat(feeFill, feeBytes))
 

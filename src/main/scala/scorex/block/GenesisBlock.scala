@@ -39,7 +39,7 @@ object GenesisBlockParams {
     val versionBytes = Ints.toByteArray(genesisVersion)
     val referenceBytes = Bytes.ensureCapacity(genesisReference, 64, 0)
     val generatingBalanceBytes = Longs.toByteArray(generatingBalance)
-    val generatorBytes = Bytes.ensureCapacity(genesisGenerator.getPublicKey, 32, 0)
+    val generatorBytes = Bytes.ensureCapacity(genesisGenerator.publicKey, 32, 0)
 
     val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
     //DIGEST
@@ -65,7 +65,7 @@ object GenesisBlock extends Block(version = GenesisBlockParams.genesisVersion,
     val versionBytes = Bytes.ensureCapacity(Longs.toByteArray(version), 4, 0)
     val referenceBytes = Bytes.ensureCapacity(reference, 64, 0)
     val generatingBalanceBytes = Bytes.ensureCapacity(Longs.toByteArray(generatingBalance), 8, 0)
-    val generatorBytes = Bytes.ensureCapacity(generator.getPublicKey, 32, 0)
+    val generatorBytes = Bytes.ensureCapacity(generator.publicKey, 32, 0)
 
     val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
     val digest0 = Crypto.sha256(data)

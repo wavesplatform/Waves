@@ -168,8 +168,8 @@ public class BlockMap extends DBMap<Tuple2<String, String>, Block>
 		try
 		{
 			Map<Tuple2<String, String>, Block> accountBlocks = ((BTreeMap) this.map).subMap(
-					Fun.t2(account.getAddress(), null),
-					Fun.t2(account.getAddress(), Fun.HI()));
+					Fun.t2(account.address(), null),
+					Fun.t2(account.address(), Fun.HI()));
 			
 			//GET ITERATOR
 			Iterator<Block> iterator = accountBlocks.values().iterator();
@@ -221,8 +221,8 @@ public class BlockMap extends DBMap<Tuple2<String, String>, Block>
 	{
 		//GET ALL TRANSACTIONS THAT BELONG TO THAT ADDRESS
 		Map<Tuple2<String, String>, Block> accountBlocks = ((BTreeMap) this.map).subMap(
-				Fun.t2(account.getAddress(), null),
-				Fun.t2(account.getAddress(), Fun.HI()));
+				Fun.t2(account.address(), null),
+				Fun.t2(account.address(), Fun.HI()));
 		
 		//DELETE TRANSACTIONS
 		for(Tuple2<String, String> key: accountBlocks.keySet())
@@ -233,7 +233,7 @@ public class BlockMap extends DBMap<Tuple2<String, String>, Block>
 	
 	public void delete(Block block)
 	{
-		this.delete(new Tuple2<String, String>(block.generator().getAddress(), new String(block.signature())));
+		this.delete(new Tuple2<String, String>(block.generator().address(), new String(block.signature())));
 	}
 	
 	public void deleteAll(List<Account> accounts)
@@ -246,7 +246,7 @@ public class BlockMap extends DBMap<Tuple2<String, String>, Block>
 	
 	public boolean add(Block block)
 	{
-		return this.set(new Tuple2<String, String>(block.generator().getAddress(), new String(block.signature())), block);
+		return this.set(new Tuple2<String, String>(block.generator().address(), new String(block.signature())), block);
 	}
 	
 	public void addAll(Map<Account, List<Block>> blocks)

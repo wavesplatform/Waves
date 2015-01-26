@@ -50,16 +50,16 @@ public class ReferenceMap extends DBMap<String, byte[]>
 
 	public byte[] get(Account account) 
 	{
-		return this.get(account.getAddress());
+		return this.get(account.address());
 	}
 	
 	public void set(Account account, byte[] reference)
 	{
-		this.set(account.getAddress(), reference);
+		this.set(account.address(), reference);
 	}
 	
 	public void delete(Account account)
 	{
-		this.delete(account.getAddress());
+		this.delete(account.address());
 	}
 }

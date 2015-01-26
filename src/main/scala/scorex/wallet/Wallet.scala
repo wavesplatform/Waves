@@ -146,7 +146,7 @@ object Wallet extends Observable with Observer {
 	    val account = new PrivateKeyAccount(accountSeed)
 	    
 	    //CHECK IF ACCOUNT ALREADY EXISTS
-	    if(!this.accountExists(account.getAddress))
+	    if(!this.accountExists(account.address))
 	    {	    
 	    	//ADD TO DATABASE
 		    this.secureDatabase.getAccountSeedMap.add(account)
@@ -161,7 +161,7 @@ object Wallet extends Observable with Observer {
 		    this.notifyObservers(new ObserverMessage(ObserverMessage.ADD_ACCOUNT_TYPE, account))
 	    }
 	    
-	    account.getAddress
+	    account.address
 	}
 	
 	def generateAccountSeed(seed:Array[Byte], nonce:Int) = {
@@ -316,7 +316,7 @@ object Wallet extends Observable with Observer {
 			val account = new PrivateKeyAccount(accountSeed)
 
 			//CHECK IF ACCOUNT ALREADY EXISTS
-			if (!this.accountExists(account.getAddress)) {
+			if (!this.accountExists(account.address)) {
 				//ADD TO DATABASE
 				this.secureDatabase.getAccountSeedMap().add(account)
 				this.database.getAccountMap().add(account)
@@ -325,7 +325,7 @@ object Wallet extends Observable with Observer {
 				this.synchronize
 
 				//RETURN
-				account.getAddress
+				account.address
 			} else {
 				""
 			}
@@ -335,7 +335,7 @@ object Wallet extends Observable with Observer {
 	def exportAccountSeed(address:String):Option[Array[Byte]] =
 		//CHECK IF WALLET IS OPEN
 		if(!this.isUnlocked()) None
-		else getPrivateKeyAccount(address).map(_.getSeed)
+		else getPrivateKeyAccount(address).map(_.seed)
 
 
 	def exportSeed():Array[Byte] = {
@@ -381,7 +381,7 @@ object Wallet extends Observable with Observer {
 						//ADD TO ACCOUNT TRANSACTIONS
 						if (!database.getTransactionMap().add(account, transaction)) {
 							//UPDATE UNCONFIRMED BALANCE
-							val unconfirmedBalance = this.getUnconfirmedBalance(account.getAddress()).add(transaction.getAmount(account))
+							val unconfirmedBalance = this.getUnconfirmedBalance(account.address).add(transaction.getAmount(account))
 							database.getAccountMap().update(account, unconfirmedBalance)
 						}
 					}
@@ -404,7 +404,7 @@ object Wallet extends Observable with Observer {
 						database.getTransactionMap().delete(account, transaction)
 
 						//UPDATE UNCONFIRMED BALANCE
-						val unconfirmedBalance = this.getUnconfirmedBalance(account.getAddress()).subtract(transaction.getAmount(account))
+						val unconfirmedBalance = this.getUnconfirmedBalance(account.address).subtract(transaction.getAmount(account))
 						database.getAccountMap().update(account, unconfirmedBalance)
 					}
 				}
@@ -427,12 +427,12 @@ object Wallet extends Observable with Observer {
 			database.setLastBlockSignature(block.signature)
 
 			//CHECK IF WE ARE GENERATOR
-			if (accountExists(block.generator.getAddress)) {
+			if (accountExists(block.generator.address)) {
 				//ADD BLOCK
 				database.getBlockMap().add(block)
 
 				//KEEP TRACK OF UNCONFIRMED BALANCE
-				val unconfirmedBalance = getUnconfirmedBalance(block.generator.getAddress).add(block.getTotalFee)
+				val unconfirmedBalance = getUnconfirmedBalance(block.generator.address).add(block.getTotalFee)
 				database.getAccountMap().update(block.generator, unconfirmedBalance)
 			}
 		}
@@ -442,12 +442,12 @@ object Wallet extends Observable with Observer {
 		//CHECK IF WALLET IS OPEN
 		if(exists()) {
 			//CHECK IF WE ARE GENERATOR
-			if (accountExists(block.generator.getAddress)) {
+			if (accountExists(block.generator.address)) {
 				//DELETE BLOCK
 				database.getBlockMap.delete(block)
 
 				//KEEP TRACK OF UNCONFIRMED BALANCE
-				val unconfirmedBalance = getUnconfirmedBalance(block.generator.getAddress).subtract(block.getTotalFee)
+				val unconfirmedBalance = getUnconfirmedBalance(block.generator.address).subtract(block.getTotalFee)
 				database.getAccountMap.update(block.generator, unconfirmedBalance)
 			}
 		}

@@ -24,7 +24,7 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
   import GenesisTransaction._
 
   override def toJson() =
-    getJsonBase() ++ Json.obj("recipient" -> recipient.getAddress, "amount" -> amount.toPlainString)
+    getJsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toPlainString)
 
   override def toBytes() = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GENESIS_TRANSACTION.id), TYPE_LENGTH, 0)
@@ -34,7 +34,7 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
     val amountBytes = amount.unscaledValue().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
 
-    val rcpBytes = Base58.decode(recipient.getAddress)
+    val rcpBytes = Base58.decode(recipient.address)
     require(rcpBytes.length==Account.ADDRESS_LENGTH)
 
     val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, Bytes.concat(amountFill, amountBytes))
@@ -53,7 +53,7 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
     val amountBytes = amount.unscaledValue().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
     val data = Bytes.concat(typeBytes, timestampBytes,
-      Base58.decode(recipient.getAddress), Bytes.concat(amountFill, amountBytes))
+      Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes))
     val digest = Crypto.sha256(data)
 
     Bytes.concat(digest, digest).sameElements(signature)
@@ -62,7 +62,7 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
   override def isValid(db: DBSet) =
     if (amount.compareTo(BigDecimal.ZERO) == -1) {
       ValidationResult.NEGATIVE_AMOUNT
-    } else if (!Crypto.isValidAddress(recipient.getAddress)) {
+    } else if (!Crypto.isValidAddress(recipient.address)) {
       ValidationResult.INVALID_ADDRESS
     } else ValidationResult.VALIDATE_OKE
 
@@ -83,10 +83,10 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
 
   override def getInvolvedAccounts() = List(recipient)
 
-  override def isInvolved(account: Account) = recipient.getAddress.equals(account.getAddress)
+  override def isInvolved(account: Account) = recipient.address.equals(account.address)
 
   override def getAmount(account: Account) =
-    if (recipient.getAddress.equals(account.getAddress)) amount else BigDecimal.ZERO
+    if (recipient.address.equals(account.address)) amount else BigDecimal.ZERO
 }
 
 
@@ -105,7 +105,7 @@ object GenesisTransaction {
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
 
     val data = Bytes.concat(typeBytes, timestampBytes,
-      Base58.decode(recipient.getAddress), Bytes.concat(amountFill, amountBytes))
+      Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes))
 
     val digest = Crypto.sha256(data)
     Bytes.concat(digest, digest)

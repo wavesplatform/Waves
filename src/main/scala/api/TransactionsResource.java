@@ -86,7 +86,7 @@ public class TransactionsResource {
 			}
 			
 			JSONObject accountTransactionsJSON = new JSONObject();
-			accountTransactionsJSON.put("account", account.getAddress());
+			accountTransactionsJSON.put("account", account.address());
 			accountTransactionsJSON.put("transactions", transactionsJSON);
 			orderedTransactionsJSON.add(accountTransactionsJSON);		
 		}

@@ -29,7 +29,7 @@ public class AddressesResource
 {
 	@SuppressWarnings("unchecked")
 	@GET
-	public String getAddresses()
+	public String addresses()
 	{
 		//CHECK IF WALLET EXISTS
 		if(!Controller.doesWalletExists())
@@ -44,7 +44,7 @@ public class AddressesResource
 		JSONArray addresses = new JSONArray();
 		for(Account account: accounts)
 		{
-			addresses.add(account.getAddress());
+			addresses.add(account.address());
 		}
 		
 		//RETURN
@@ -263,7 +263,7 @@ public class AddressesResource
 		
 		JSONObject signatureJSON = new JSONObject();
 		signatureJSON.put("message", x);
-		signatureJSON.put("publickey", Base58.encode(account.getPublicKey()));
+		signatureJSON.put("publickey", Base58.encode(account.publicKey()));
 		signatureJSON.put("signature", Base58.encode(Crypto.sign(account, x.getBytes(StandardCharsets.UTF_8))));
 				
 		return signatureJSON.toJSONString();
@@ -312,7 +312,7 @@ public class AddressesResource
 			PublicKeyAccount account = new PublicKeyAccount(publicKeyBytes);
 			
 			//CHECK IF ADDRESS MATCHES
-			if(!account.getAddress().equals(address))
+			if(!account.address().equals(address))
 			{
 				return String.valueOf(false);
 			}

@@ -61,7 +61,7 @@ class TransactionCreator {
 		this.checkUpdate()
 		val time = NTP.getTime
 		val signature = PaymentTransaction.generateSignature(this.fork, sender, recipient, amount, fee, time)
-		val payment = new PaymentTransaction(new PublicKeyAccount(sender.getPublicKey), recipient, amount, fee, time, sender.getLastReference(this.fork), signature)
+		val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sender.getLastReference(this.fork), signature)
 		this.afterCreate(payment)
 	}
 	

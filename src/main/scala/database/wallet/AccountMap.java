@@ -70,7 +70,7 @@ public class AccountMap extends Observable {
 		{
 			for(Account account: this.accounts)
 			{
-				if(account.getAddress().equals(address))
+				if(account.address().equals(address))
 				{
 					return account;
 				}
@@ -92,7 +92,7 @@ public class AccountMap extends Observable {
 	
 	public void add(Account account)
 	{
-		this.addressMap.put(account.getAddress(), account.getConfirmedBalance());
+		this.addressMap.put(account.address(), account.getConfirmedBalance());
 		
 		if(this.accounts == null)
 		{
@@ -112,7 +112,7 @@ public class AccountMap extends Observable {
 	
 	public void update(Account account, BigDecimal unconfirmedBalance) 
 	{		
-		this.addressMap.put(account.getAddress(), unconfirmedBalance);	
+		this.addressMap.put(account.address(), unconfirmedBalance);	
 		
 		this.notifyObservers(new ObserverMessage(ObserverMessage.ADD_ACCOUNT_TYPE, account));
 		
@@ -120,7 +120,7 @@ public class AccountMap extends Observable {
 	
 	public void delete(Account account)
 	{
-		this.addressMap.remove(account.getAddress());
+		this.addressMap.remove(account.address());
 		
 		if(this.accounts == null)
 		{

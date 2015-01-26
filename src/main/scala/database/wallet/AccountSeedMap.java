@@ -68,7 +68,7 @@ public class AccountSeedMap {
 		{
 			for(PrivateKeyAccount privateKeyAccount: this.privateKeyAccounts)
 			{
-				if(privateKeyAccount.getAddress().equals(address))
+				if(privateKeyAccount.address().equals(address))
 				{
 					return privateKeyAccount;
 				}
@@ -80,7 +80,7 @@ public class AccountSeedMap {
 	
 	public void add(PrivateKeyAccount account)
 	{
-		this.accountSeedsSet.add(account.getSeed());
+		this.accountSeedsSet.add(account.seed());
 		
 		if(this.privateKeyAccounts == null)
 		{
@@ -95,7 +95,7 @@ public class AccountSeedMap {
 	
 	public void delete(PrivateKeyAccount account)
 	{
-		this.accountSeedsSet.remove(account.getSeed());
+		this.accountSeedsSet.remove(account.seed());
 		
 		if(this.privateKeyAccounts == null)
 		{

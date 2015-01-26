@@ -138,7 +138,7 @@ object BlockGenerator extends Thread {
     val baseTargetBytes = Bytes.ensureCapacity(baseTargetBytesRaw, Block.GENERATING_BALANCE_LENGTH, 0)
 
     //WRITE GENERATOR
-    val generatorBytes = Bytes.ensureCapacity(account.getPublicKey, Block.GENERATOR_LENGTH, 0)
+    val generatorBytes = Bytes.ensureCapacity(account.publicKey, Block.GENERATOR_LENGTH, 0)
 
     //CALC SIGNATURE OF NEWBLOCKHEADER
     Crypto.sign(account, Bytes.concat(generatorSignature, baseTargetBytes, generatorBytes))

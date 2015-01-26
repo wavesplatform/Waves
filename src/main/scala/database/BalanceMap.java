@@ -127,8 +127,8 @@ public class BalanceMap extends DBMap<Tuple2<String, Long>, BigDecimal>
 		
 		//FILTER ALL KEYS
 		Collection keys = ((BTreeMap<Tuple2, BigDecimal>) map).subMap(
-				Fun.t2(account.getAddress(), null),
-				Fun.t2(account.getAddress(), Fun.HI())).keySet();
+				Fun.t2(account.address(), null),
+				Fun.t2(account.address(), Fun.HI())).keySet();
 		
 		//RETURN
 		return new SortableList<Tuple2<String, Long>, BigDecimal>(this, keys);
