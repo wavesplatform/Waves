@@ -46,21 +46,6 @@ public class ApiErrorFactory
 	//TRANSACTIONS
 	public static final int ERROR_TRANSACTION_NO_EXISTS = 311;
 	
-	//NAMING
-	public static final int ERROR_NAME_NO_EXISTS = 401;
-	public static final int ERROR_NAME_ALREADY_EXISTS = 402;
-	public static final int ERROR_NAME_ALREADY_FOR_SALE = 403;
-	public static final int ERROR_NAME_NOT_LOWER_CASE = 404;
-	public static final int ERROR_NAME_SALE_NO_EXISTS = 410;
-	public static final int ERROR_BUYER_ALREADY_OWNER = 411;
-	
-	//POLLS
-	public static final int ERROR_POLL_NO_EXISTS = 501;
-	public static final int ERROR_POLL_ALREADY_EXISTS = 502;
-	public static final int ERROR_DUPLICATE_OPTION = 503;
-	public static final int ERROR_POLL_OPTION_NO_EXISTS = 504;
-	public static final int ERROR_ALREADY_VOTED_FOR_THAT_OPTION = 505;
-	
 	private static ApiErrorFactory  instance;
 	
 	public static ApiErrorFactory  getInstance()
@@ -77,7 +62,7 @@ public class ApiErrorFactory
 	
 	public ApiErrorFactory()
 	{
-		this.errorMessages = new HashMap<Integer, String>();
+		this.errorMessages = new HashMap<>();
 		
 		//COMMON
 		this.errorMessages.put(ERROR_UNKNOWN, "unknown error");
@@ -114,21 +99,6 @@ public class ApiErrorFactory
 		
 		//TRANSACTIONS
 		this.errorMessages.put(ERROR_TRANSACTION_NO_EXISTS, "transactions does not exist");
-		
-		//NAMING
-		this.errorMessages.put(ERROR_NAME_NO_EXISTS, "name does not exist");
-		this.errorMessages.put(ERROR_NAME_ALREADY_EXISTS, "name already exists");
-		this.errorMessages.put(ERROR_NAME_ALREADY_FOR_SALE, "name already for sale");
-		this.errorMessages.put(ERROR_NAME_NOT_LOWER_CASE, "name must be lower case");
-		this.errorMessages.put(ERROR_NAME_SALE_NO_EXISTS, "namesale does not exist");
-		this.errorMessages.put(ERROR_BUYER_ALREADY_OWNER, "buyer is already owner");
-		
-		//POLLS
-		this.errorMessages.put(ERROR_POLL_NO_EXISTS, "poll does not exist");
-		this.errorMessages.put(ERROR_POLL_ALREADY_EXISTS, "poll already exists");
-		this.errorMessages.put(ERROR_DUPLICATE_OPTION, "not all options are unique");
-		this.errorMessages.put(ERROR_POLL_OPTION_NO_EXISTS, "option does not exist");
-		this.errorMessages.put(ERROR_ALREADY_VOTED_FOR_THAT_OPTION, "already voted for that option");
 	}
 	
 	@SuppressWarnings("unchecked")
