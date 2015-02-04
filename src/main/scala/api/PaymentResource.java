@@ -1,5 +1,6 @@
 package api;
 
+/*
 import java.math.BigDecimal;
 
 import javax.ws.rs.Consumes;
@@ -100,3 +101,4 @@ public class PaymentResource
 		}
 	}
 }
+  */

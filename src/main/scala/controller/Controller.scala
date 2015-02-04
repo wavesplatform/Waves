@@ -4,7 +4,9 @@ import java.math.BigDecimal
 import java.util.Observable
 import java.util.Observer
 import java.util.logging.Logger
-import api.ApiService
+import akka.actor.{ActorSystem, Props}
+import akka.io.IO
+import api.AddressHttpServiceActor
 import scorex.BlockChain
 import scorex.BlockGenerator
 import scorex.Synchronizer
@@ -17,6 +19,7 @@ import scorex.transaction.Transaction
 import scorex.transaction.Transaction.TransactionType
 import scorex.wallet.Wallet
 import settings.Settings
+import spray.can.Http
 import utils.ObserverMessage
 import database.DBSet
 import network.{PeerManager, ConnectedPeer, Network, Peer}
@@ -40,13 +43,6 @@ object Controller extends Observable {
 
   private val blockChain = BlockChain
 
-  private val rpcService = {
-    if (!Network.isPortAvailable(Settings.getRpcPort))
-      throw new Exception("Rpc port " + Settings.getRpcPort + " already in use!")
-
-    new ApiService()
-  }
-
   private val wallet = Wallet
   private val transactionCreator = new TransactionCreator()
 
@@ -58,10 +54,13 @@ object Controller extends Observable {
   def init() {
     //OPENING DATABASES
     DBSet.getInstance()
-    if (DBSet.getInstance().getBlockMap.isProcessing)
-      throw new Exception("The application was not closed correctly!")
+    require(!DBSet.getInstance().getBlockMap.isProcessing, "The application was not closed correctly!")
+    require(Network.isPortAvailable(Settings.getRpcPort), "Rpc port " + Settings.getRpcPort + " already in use!")
 
-    this.rpcService.start()
+    implicit val actorSystem = ActorSystem()
+    val httpServiceActor = actorSystem.actorOf(Props[AddressHttpServiceActor], "http-service")
+    val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = Settings.getRpcPort)
+    IO(Http) ! bindCommand
 
     //START BLOCKGENERATOR
     BlockGenerator.start()

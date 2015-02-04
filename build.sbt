@@ -19,10 +19,11 @@ resolvers ++= Seq("Sonatype Snapshots" at "http://oss.sonatype.org/content/repos
                   "localrepo" at "file://" + file("repo").getAbsolutePath)
 
 libraryDependencies ++= Seq(
+  "com.yandex.yoctodb" % "yoctodb-core" % "0.0.4",
   "commons-net" % "commons-net" % "3.3",
   "ch.qos.logback"  %  "logback-classic"   % "1.1.2",
   "com.typesafe.play" %% "play-json" % "2.3.4",
-  "com.typesafe.akka" % "akka-actor_2.10" % "2.3.6",
+  "com.typesafe.akka" %% "akka-actor" % "2.3.9",
   "io.spray" %% "spray-routing" % "1.3.2",
   "io.spray" %% "spray-can" % "1.3.2",
   "io.spray" %% "spray-http" % "1.3.2",
@@ -49,4 +50,5 @@ importRun := {
 }
 
 seq(SbtStartScript.startScriptForClassesSettings:_*)
+
 

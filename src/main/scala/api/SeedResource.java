@@ -1,5 +1,8 @@
 package api;
 
+/*
+
+
 import java.security.SecureRandom;
 import java.util.Random;
 
@@ -38,3 +41,5 @@ public class SeedResource
 		return jsonObject.toJSONString();
 	}
 }
+
+*/

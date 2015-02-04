@@ -41,13 +41,13 @@ object Start {
       val senderAddress = GenesisBlockParams.ipoMembers(rndIdx)
       val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx + 1)
 
-      val senderAcc = Controller.getPrivateKeyAccountByAddress(senderAddress)
-      val recipientAcc = Controller.getAccountByAddress(recipientAddress)
+      val senderAcc = Controller.getPrivateKeyAccountByAddress(senderAddress).get
+      val recipientAcc = Controller.getAccountByAddress(recipientAddress).get
 
       val amt = new java.math.BigDecimal(Random.nextInt(100000))
       val fee = new java.math.BigDecimal(1 + Random.nextInt(5))
 
-      val (tx, valRes) = Controller.sendPayment(senderAcc.get, recipientAcc, amt, fee)
+      val (tx, valRes) = Controller.sendPayment(senderAcc, recipientAcc, amt, fee)
       println(s"Payment created: $tx, validationResult: $valRes")
       Thread.sleep(120000) // too short delays causes bug, see comments in PaymentTransaction
     }

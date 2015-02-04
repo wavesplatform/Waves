@@ -1,5 +1,6 @@
 package api;
 
+/*
 import java.util.List;
 
 import javax.ws.rs.GET;
@@ -238,3 +239,4 @@ public class BlocksResource
 	}
 	
 }
+  */

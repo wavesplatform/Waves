@@ -42,12 +42,12 @@ object Wallet extends Observable with Observer {
 	def isUnlocked() = secureDatabase != null
 
 	
-	def getAccounts() = database.getAccountMap().getAccounts
+	def getAccounts():List[Account] = database.getAccountMap().getAccounts.toList
 	
 	def accountExists(address:String) = database.getAccountMap().exists(address)
 
 	
-	def getAccount(address:String) = database.getAccountMap().getAccount(address)
+	def getAccount(address:String) = Option(database.getAccountMap().getAccount(address))
 
 	
 	def getUnconfirmedBalance(address:String) = database.getAccountMap.getUnconfirmedBalance(address)
