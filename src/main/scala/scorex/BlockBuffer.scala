@@ -66,7 +66,7 @@ class BlockBuffer(signatures:List[Array[Byte]], peer:ConnectedPeer) extends Thre
 		if(!blocks.containsKey(signature)) loadBlock(signature)
 
 		//GET BLOCK
-		blocks.get(signature).poll(Settings.getConnectionTimeout, TimeUnit.MILLISECONDS)
+		blocks.get(signature).poll(Settings.connectionTimeout, TimeUnit.MILLISECONDS)
 	}
 	
 	def stopThread(){

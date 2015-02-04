@@ -55,11 +55,11 @@ object Controller extends Observable {
     //OPENING DATABASES
     DBSet.getInstance()
     require(!DBSet.getInstance().getBlockMap.isProcessing, "The application was not closed correctly!")
-    require(Network.isPortAvailable(Settings.getRpcPort), "Rpc port " + Settings.getRpcPort + " already in use!")
+    require(Network.isPortAvailable(Settings.rpcPort), "Rpc port " + Settings.rpcPort + " already in use!")
 
     implicit val actorSystem = ActorSystem()
     val httpServiceActor = actorSystem.actorOf(Props[AddressHttpServiceActor], "http-service")
-    val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = Settings.getRpcPort)
+    val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = Settings.rpcPort)
     IO(Http) ! bindCommand
 
     //START BLOCKGENERATOR

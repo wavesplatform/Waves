@@ -12,7 +12,7 @@ import settings.Settings;
 
 public class WalletDatabase implements IDB
 {
-	private static final File WALLET_FILE = new File(Settings.getWalletDir(), "wallet.dat");
+	private static final File WALLET_FILE = new File(Settings.walletDir(), "wallet.dat");
 	
 	private static final String VERSION = "version";
 	private static final String LAST_BLOCK = "lastBlock";

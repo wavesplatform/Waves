@@ -1,13 +1,9 @@
 package settings
 
-import java.io.File
 import java.net.InetAddress
-import java.util
 import network.Peer
 import play.api.libs.json.Json
 import scala.util.Try
-
-
 
 object Settings {
 
@@ -41,28 +37,28 @@ object Settings {
 
 	private lazy val settingsJSON = settingsJSONTry.get
 
-	lazy val getKnownPeers = Try{
+	lazy val knownPeers = Try{
 		(settingsJSON \ "knownpeers").as[List[String]].flatMap{addr =>
 				val address = InetAddress.getByName(addr)
 				if (address == InetAddress.getLocalHost) None else Some(new Peer(address))
 			}
 		}.getOrElse(Seq[Peer]())
 
-	lazy val getMaxConnections = (settingsJSON \ "maxconnections").asOpt[Int].getOrElse(DEFAULT_MAX_CONNECTIONS)
+	lazy val maxConnections = (settingsJSON \ "maxconnections").asOpt[Int].getOrElse(DEFAULT_MAX_CONNECTIONS)
 
-	lazy val getMinConnections = (settingsJSON \ "minconnections").asOpt[Int].getOrElse(DEFAULT_MIN_CONNECTIONS)
+	lazy val minConnections = (settingsJSON \ "minconnections").asOpt[Int].getOrElse(DEFAULT_MIN_CONNECTIONS)
 
-	lazy val getConnectionTimeout = (settingsJSON \ "connectiontimeout").asOpt[Int].getOrElse(DEFAULT_CONNECTION_TIMEOUT)
+	lazy val connectionTimeout = (settingsJSON \ "connectiontimeout").asOpt[Int].getOrElse(DEFAULT_CONNECTION_TIMEOUT)
 
-	lazy val getRpcPort = (settingsJSON \ "rpcport").asOpt[Int].getOrElse(DEFAULT_RPC_PORT)
+	lazy val rpcPort = (settingsJSON \ "rpcport").asOpt[Int].getOrElse(DEFAULT_RPC_PORT)
 
-	lazy val getRpcAllowed:Seq[String] = (settingsJSON \ "rpcallowed").asOpt[List[String]].getOrElse(DEFAULT_RPC_ALLOWED.split(""))
+	lazy val rpcAllowed:Seq[String] = (settingsJSON \ "rpcallowed").asOpt[List[String]].getOrElse(DEFAULT_RPC_ALLOWED.split(""))
 
-	lazy val getWalletDir = (settingsJSON \"walletdir").asOpt[String].getOrElse(DEFAULT_WALLET_DIR)
+	lazy val walletDir = (settingsJSON \"walletdir").asOpt[String].getOrElse(DEFAULT_WALLET_DIR)
 
-	lazy val getDataDir = (settingsJSON \ "datadir").asOpt[String].getOrElse(DEFAULT_DATA_DIR)
+	lazy val dataDir = (settingsJSON \ "datadir").asOpt[String].getOrElse(DEFAULT_DATA_DIR)
 
-	lazy val getPingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DEFAULT_PING_INTERVAL)
+	lazy val pingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DEFAULT_PING_INTERVAL)
 
 	lazy val isGeneratorKeyCachingEnabled = (settingsJSON \ "generatorkeycaching").asOpt[Boolean].getOrElse(DEFAULT_GENERATOR_KEY_CACHING)
 

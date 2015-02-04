@@ -25,7 +25,7 @@ object ApiClient {
 				command.substring((method + " " + path + " ").length())
 			} else ""
 
-			val url = new URL("http://127.0.0.1:" + Settings.getRpcPort + "/" + path)
+			val url = new URL("http://127.0.0.1:" + Settings.rpcPort + "/" + path)
 			val connection = url.openConnection().asInstanceOf[HttpURLConnection]
 			connection.setRequestMethod(method)
 

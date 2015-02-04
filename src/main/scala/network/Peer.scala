@@ -103,7 +103,7 @@ case class ConnectedPeer(socket: Socket,
       Failure(new Exception("FAILED TO SEND MESSAGE"))
     }else {
       Try {
-        val response = blockingQueue.poll(Settings.getConnectionTimeout, TimeUnit.MILLISECONDS)
+        val response = blockingQueue.poll(Settings.connectionTimeout, TimeUnit.MILLISECONDS)
         messages.remove(id)
 
         response

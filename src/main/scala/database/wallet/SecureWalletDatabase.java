@@ -11,7 +11,7 @@ import settings.Settings;
 
 public class SecureWalletDatabase 
 {
-	private static final File SECURE_WALLET_FILE = new File(Settings.getWalletDir(), "wallet.s.dat");
+	private static final File SECURE_WALLET_FILE = new File(Settings.walletDir(), "wallet.s.dat");
 	
 	private static final String SEED = "seed";
 	private static final String NONCE = "nonce";

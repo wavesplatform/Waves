@@ -34,7 +34,7 @@ public class DBSet implements Observer, IDB {
 		if(instance == null)
 		{
 			//OPEN DB
-			File dbFile = new File(Settings.getDataDir(), "data.dat");
+			File dbFile = new File(Settings.dataDir(), "data.dat");
 			dbFile.getParentFile().mkdirs();
 			
 			//CREATE DATABASE	

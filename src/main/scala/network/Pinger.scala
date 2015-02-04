@@ -24,7 +24,7 @@ class Pinger(peer: ConnectedPeer) extends Thread {
           isRunning = false
       }
 
-      Try(Thread.sleep(Settings.getPingInterval))
+      Try(Thread.sleep(Settings.pingInterval))
     }
   }
 

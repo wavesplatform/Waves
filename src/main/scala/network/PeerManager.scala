@@ -15,7 +15,7 @@ object PeerManager {
 		val knownPeers = DBSet.getInstance().getPeerMap.getKnownPeers(DATABASE_PEERS_AMOUNT)
 		Logger.getGlobal.info("Peers retrieved from database : " + knownPeers.size)
 		if(knownPeers.size() < DATABASE_PEERS_AMOUNT) {
-			val settingsPeers = Settings.getKnownPeers
+			val settingsPeers = Settings.knownPeers
 			settingsPeers.addAll(knownPeers)
 			Logger.getGlobal.info("Peers retrieved after settings : " + settingsPeers.size())
 			settingsPeers.toList
@@ -23,7 +23,7 @@ object PeerManager {
 	}
 	
 	def addPeer(peer:Peer){
-		if(!Settings.getKnownPeers.exists(_.address == peer.address)) {
+		if(!Settings.knownPeers.exists(_.address == peer.address)) {
 			DBSet.getInstance().getPeerMap.addPeer(peer)
 		}
 	}
