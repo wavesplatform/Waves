@@ -4,8 +4,8 @@ import java.nio.charset.StandardCharsets
 
 import akka.actor.Actor
 import controller.Controller
-import play.api.libs.json.Json
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount, Account}
+import play.api.libs.json.{JsObject, Json}
+import scorex.account.{PublicKeyAccount, Account}
 import scorex.crypto.{Base58, Crypto}
 import spray.routing.HttpService
 
@@ -14,6 +14,7 @@ import scala.util.{Success, Failure, Try}
 
 class AddressHttpServiceActor extends Actor with AddressHttpService {
   override def actorRefFactory = context
+
   override def receive = runRoute(route)
 }
 
@@ -28,6 +29,14 @@ trait AddressHttpService extends HttpService {
         "balance" -> new Account(address).getBalance(confirmations).toPlainString
       )
     }
+
+  private def walletJsonError(): Option[JsObject] = {
+    if (!Controller.doesWalletExists) {
+      Some(ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS))
+    } else if (!Controller.isWalletUnlocked) {
+      Some(ApiError.toJson(ApiError.ERROR_WALLET_LOCKED))
+    } else None
+  }
 
   lazy val route =
     path("/") {
@@ -51,35 +60,28 @@ trait AddressHttpService extends HttpService {
     } ~ path("seed" / Segment) { case address =>
       get {
         //CHECK IF WALLET EXISTS
-        val jsRes = if (!Controller.doesWalletExists) {
-          ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS)
-        } else if (!Controller.isWalletUnlocked) {
-          ApiError.toJson(ApiError.ERROR_WALLET_LOCKED)
-        } else if (!Crypto.isValidAddress(address)) {
-          ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
-        } else {
-          Controller.getAccountByAddress(address) match {
-            case None => ApiError.toJson(ApiError.ERROR_WALLET_ADDRESS_NO_EXISTS)
-            case Some(account) =>
-              Controller.exportAccountSeed(address) match {
-                case None => ApiError.toJson(ApiError.ERROR_WALLET_SEED_EXPORT_FAILED)
-                case Some(seed) =>
-                  Json.obj("address" -> address, "seed" -> Base58.encode(seed))
-              }
+        val jsRes = walletJsonError().getOrElse {
+          if (!Crypto.isValidAddress(address)) {
+            ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
+          } else {
+            Controller.getAccountByAddress(address) match {
+              case None => ApiError.toJson(ApiError.ERROR_WALLET_ADDRESS_NO_EXISTS)
+              case Some(account) =>
+                Controller.exportAccountSeed(address) match {
+                  case None => ApiError.toJson(ApiError.ERROR_WALLET_SEED_EXPORT_FAILED)
+                  case Some(seed) =>
+                    Json.obj("address" -> address, "seed" -> Base58.encode(seed))
+                }
+            }
           }
         }
         complete(Json.stringify(jsRes))
       }
     } ~ path("new") {
       get {
-        val jsRes = if (!Controller.doesWalletExists) {
-          ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS)
-        } else if (!Controller.isWalletUnlocked) {
-          ApiError.toJson(ApiError.ERROR_WALLET_LOCKED)
-        } else {
-          Json.obj("address" -> Controller.generateNewAccount)
+        complete {
+          walletJsonError().getOrElse(Json.obj("address" -> Controller.generateNewAccount())).toString()
         }
-        complete(Json.stringify(jsRes))
       }
     } ~ path("balance" / Segment / IntNumber) { case (address, confirmations) =>
       get {
@@ -103,27 +105,19 @@ trait AddressHttpService extends HttpService {
         }
         complete(Json.stringify(jsRes))
       }
-    } ~ path ("/"){
+    } ~ path("/") {
       post {
         entity(as[String]) { seed =>
-          if(seed.isEmpty){
-            val jsRes = if (!Controller.doesWalletExists) {
-              ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS)
-            } else if (!Controller.isWalletUnlocked) {
-              ApiError.toJson(ApiError.ERROR_WALLET_LOCKED)
-            } else{
+          if (seed.isEmpty) {
+            val jsRes = walletJsonError().getOrElse {
               Json.obj("address" -> Controller.generateNewAccount)
             }
             complete(Json.stringify(jsRes))
-          }else{
-            val jsRes = if (!Controller.doesWalletExists) {
-              ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS)
-            } else if (!Controller.isWalletUnlocked) {
-              ApiError.toJson(ApiError.ERROR_WALLET_LOCKED)
-            } else {
+          } else {
+            val jsRes = walletJsonError().getOrElse {
               //DECODE SEED
-              Try(Base58.decode(seed)).toOption.flatMap{seedBytes =>
-                if(seedBytes != null && seedBytes.size == 32){
+              Try(Base58.decode(seed)).toOption.flatMap { seedBytes =>
+                if (seedBytes != null && seedBytes.size == 32) {
                   Some(Json.obj("address" -> Controller.importAccountSeed(seedBytes)))
                 } else None
               }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_SEED))
@@ -132,8 +126,8 @@ trait AddressHttpService extends HttpService {
           }
         }
       }
-    } ~ path ("verify" / Segment){ case address =>
-      post{
+    } ~ path("verify" / Segment) { case address =>
+      post {
         entity(as[String]) { jsText =>
           val jsRes = Try {
             val js = Json.parse(jsText)
@@ -143,9 +137,9 @@ trait AddressHttpService extends HttpService {
 
             if (!Crypto.isValidAddress(address)) {
               ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
-            }else{
+            } else {
               //DECODE SIGNATURE
-              (Try (Base58.decode(signature)), Try (Base58.decode(pubKey))) match{
+              (Try(Base58.decode(signature)), Try(Base58.decode(pubKey))) match {
                 case (Failure(_), _) => ApiError.toJson(ApiError.ERROR_INVALID_SIGNATURE)
                 case (_, Failure(_)) => ApiError.toJson(ApiError.ERROR_INVALID_PUBLIC_KEY)
                 case (Success(signatureBytes), Success(pubKeyBytes)) =>
@@ -159,16 +153,13 @@ trait AddressHttpService extends HttpService {
           complete(Json.stringify(jsRes))
         }
       }
-    } ~ path ("sign" / Segment){ case address =>
-        post {
-          entity(as[String]) { message =>
-            val jsRes = if (!Controller.doesWalletExists) {
-              ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS)
-            } else if (!Controller.isWalletUnlocked) {
-              ApiError.toJson(ApiError.ERROR_WALLET_LOCKED)
-            } else if(!Crypto.isValidAddress(address)){
+    } ~ path("sign" / Segment) { case address =>
+      post {
+        entity(as[String]) { message =>
+          val jsRes = walletJsonError().getOrElse {
+            if (!Crypto.isValidAddress(address)) {
               ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
-            }else {
+            } else {
               Controller.getPrivateKeyAccountByAddress(address) match {
                 case None => ApiError.toJson(ApiError.ERROR_WALLET_ADDRESS_NO_EXISTS)
                 case Some(account) =>
@@ -177,23 +168,22 @@ trait AddressHttpService extends HttpService {
                     "signature" -> Base58.encode(Crypto.sign(account, message.getBytes(StandardCharsets.UTF_8))))
               }
             }
-            complete(jsRes.toString())
           }
+          complete(jsRes.toString())
         }
-    } ~ path ("/" / Segment) { case address =>
-        delete {
-          val jsRes = if (!Controller.doesWalletExists) {
-            ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS)
-          } else if (!Controller.isWalletUnlocked) {
-            ApiError.toJson(ApiError.ERROR_WALLET_LOCKED)
-          }else if(!Crypto.isValidAddress(address)){
+      }
+    } ~ path("/" / Segment) { case address =>
+      delete {
+        val jsRes = walletJsonError().getOrElse {
+          if (!Crypto.isValidAddress(address)) {
             ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
-          }else {
+          } else {
             val deleted = Controller.getPrivateKeyAccountByAddress(address).exists(account =>
               Controller.deleteAccount(account))
             Json.obj("deleted" -> deleted)
           }
-          complete(jsRes.toString())
         }
+        complete(jsRes.toString())
+      }
     }
 }
