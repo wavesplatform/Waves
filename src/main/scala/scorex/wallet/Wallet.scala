@@ -75,9 +75,9 @@ object Wallet extends Observable with Observer {
 		else database.getTransactionMap.get(account, limit)
 
 	
-	def getLastBlocks() =
-		if(!this.exists()) List[utils.Pair[Account, Block]]().asJava
-		else database.getBlockMap.get(getAccounts())
+	def getLastBlocks():Seq[(Account, Block)] =
+		if(!this.exists()) List()
+		else database.getBlockMap.get(getAccounts()).map(pair => pair.getA -> pair.getB).toList
 
 
 	def getLastBlocks(account:Account) =

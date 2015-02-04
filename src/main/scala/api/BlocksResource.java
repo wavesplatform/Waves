@@ -25,27 +25,7 @@ import database.DBSet;
 @Produces(MediaType.APPLICATION_JSON)
 public class BlocksResource 
 {
-	@SuppressWarnings("unchecked")
-	@GET
-	public String getBlocks()
-	{
-		//CHECK IF WALLET EXISTS
-		if(!Controller.doesWalletExists())
-		{
-			throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_WALLET_NO_EXISTS);
-		}
-		
-		List<Pair<Account, Block>> blocks = Controller.getLastBlocks();
-		JSONArray array = new JSONArray();
-		
-		for(Pair<Account, Block> block: blocks)
-		{
-			array.add(block.getB().toJson());
-		}
-		
-		return array.toJSONString();
-	}
-	
+
 	@SuppressWarnings("unchecked")
 	@GET
 	@Path("/address/{address}")	

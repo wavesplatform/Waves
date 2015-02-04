@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import akka.actor.Actor
 import controller.Controller
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.Json
 import scorex.account.{PublicKeyAccount, Account}
 import scorex.crypto.{Base58, Crypto}
 import spray.routing.HttpService
@@ -18,7 +18,7 @@ class AddressHttpServiceActor extends Actor with AddressHttpService {
   override def receive = runRoute(route)
 }
 
-trait AddressHttpService extends HttpService {
+trait AddressHttpService extends HttpService with CommonApifunctions {
   private def balanceJson(address: String, confirmations: Int) =
     if (!Crypto.isValidAddress(address)) {
       ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
@@ -29,14 +29,6 @@ trait AddressHttpService extends HttpService {
         "balance" -> new Account(address).getBalance(confirmations).toPlainString
       )
     }
-
-  private def walletJsonError(): Option[JsObject] = {
-    if (!Controller.doesWalletExists) {
-      Some(ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS))
-    } else if (!Controller.isWalletUnlocked) {
-      Some(ApiError.toJson(ApiError.ERROR_WALLET_LOCKED))
-    } else None
-  }
 
   lazy val route =
     path("/") {
@@ -60,7 +52,7 @@ trait AddressHttpService extends HttpService {
     } ~ path("seed" / Segment) { case address =>
       get {
         //CHECK IF WALLET EXISTS
-        val jsRes = walletJsonError().getOrElse {
+        val jsRes = walletNotExistsOrLocked().getOrElse {
           if (!Crypto.isValidAddress(address)) {
             ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
           } else {
@@ -80,7 +72,7 @@ trait AddressHttpService extends HttpService {
     } ~ path("new") {
       get {
         complete {
-          walletJsonError().getOrElse(Json.obj("address" -> Controller.generateNewAccount())).toString()
+          walletNotExistsOrLocked().getOrElse(Json.obj("address" -> Controller.generateNewAccount())).toString()
         }
       }
     } ~ path("balance" / Segment / IntNumber) { case (address, confirmations) =>
@@ -109,12 +101,12 @@ trait AddressHttpService extends HttpService {
       post {
         entity(as[String]) { seed =>
           if (seed.isEmpty) {
-            val jsRes = walletJsonError().getOrElse {
+            val jsRes = walletNotExistsOrLocked().getOrElse {
               Json.obj("address" -> Controller.generateNewAccount)
             }
             complete(Json.stringify(jsRes))
           } else {
-            val jsRes = walletJsonError().getOrElse {
+            val jsRes = walletNotExistsOrLocked().getOrElse {
               //DECODE SEED
               Try(Base58.decode(seed)).toOption.flatMap { seedBytes =>
                 if (seedBytes != null && seedBytes.size == 32) {
@@ -156,7 +148,7 @@ trait AddressHttpService extends HttpService {
     } ~ path("sign" / Segment) { case address =>
       post {
         entity(as[String]) { message =>
-          val jsRes = walletJsonError().getOrElse {
+          val jsRes = walletNotExistsOrLocked().getOrElse {
             if (!Crypto.isValidAddress(address)) {
               ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
             } else {
@@ -174,7 +166,7 @@ trait AddressHttpService extends HttpService {
       }
     } ~ path("/" / Segment) { case address =>
       delete {
-        val jsRes = walletJsonError().getOrElse {
+        val jsRes = walletNotExistsOrLocked().getOrElse {
           if (!Crypto.isValidAddress(address)) {
             ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
           } else {

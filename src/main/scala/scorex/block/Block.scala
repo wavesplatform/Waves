@@ -3,12 +3,9 @@ package scorex.block
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.Arrays
-
-
+import play.api.libs.json.{Json, JsArray, JsObject}
 import ntp.NTP
 
-import org.json.simple.JSONArray
-import org.json.simple.JSONObject
 
 import scorex.BlockGenerator
 import scorex.account.PublicKeyAccount
@@ -147,11 +144,8 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
 
   //PARSE/CONVERT
 
-  def toJson() = {
-    //todo: make it array not string
-    val transactionsArray = JSONArray.toJSONString(transactions.map(tx => tx.toJson()))
-
-    val fields = Map("version"->version,
+  def toJson():JsObject =
+    Json.obj("version"->version,
       "reference" -> Base58.encode(reference),
       "timestamp" -> timestamp,
       "generatingBalance" -> generatingBalance,
@@ -160,10 +154,8 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       "transactionsSignature" -> Base58.encode(transactionsSignature),
       "generatorSignature" -> Base58.encode(generatorSignature),
       "signature" -> Base58.encode(signature),
-      "transactions" -> transactionsArray
+      "transactions" -> JsArray(transactions.map(_.toJson()))
     )
-    new JSONObject(fields)
-  }
 
   def toBytes = {
     val versionBytes = Ints.toByteArray(version)

@@ -4,9 +4,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
-import org.json.simple.JSONArray
-import org.json.simple.JSONObject
-import org.json.simple.JSONValue
+import play.libs.Json
 import settings.Settings
 import scala.util.Try
 
@@ -45,11 +43,7 @@ object ApiClient {
 			val br = new BufferedReader(isReader)
 			val result = br.readLine()
 
-			JSONValue.parse(result) match {
-				case jarr: JSONArray => jarr.toJSONString
-				case jo: JSONObject  => jo.toJSONString
-				case _ => result
-			}
+			Try(Json.parse(result)).map(_.toString).getOrElse(result)
 		}.getOrElse("Invalid command! \n Type help to get a list of commands.")
 	}
 }
