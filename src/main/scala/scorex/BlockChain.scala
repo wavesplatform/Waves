@@ -29,7 +29,7 @@ object BlockChain {
     } else List[Array[Byte]]()
   }
 
-  def getBlock(header: Array[Byte]) = DBSet.getInstance().getBlockMap.get(header)
+  def getBlock(header: Array[Byte]) = Option(DBSet.getInstance().getBlockMap.get(header))
 
   def isNewBlockValid(block: Block) =
     block != GenesisBlock &&

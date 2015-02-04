@@ -184,7 +184,7 @@ object Controller extends Observable {
         sender.sendMessage(SignaturesMessage(headers, mbId = id))
 
       case GetBlockMessage(signature, Some(sender), id: Some[_]) =>
-        val block = blockChain.getBlock(signature)
+        val block = blockChain.getBlock(signature).get
         sender.sendMessage(BlockMessage(block.getHeight(), block, mbId = id))
 
       case BlockMessage(height, block, Some(sender), _) =>

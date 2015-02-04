@@ -58,47 +58,7 @@ public class BlocksResource
 		
 		return array.toJSONString();
 	}
-	
-	@GET
-	@Path("/{signature}")	
-	public String getBlock(@PathParam("signature") String signature)
-	{
-		//DECODE SIGNATURE
-		byte[] signatureBytes;
-		try
-		{
-			signatureBytes = Base58.decode(signature);
-		}
-		catch(Exception e)
-		{
-			throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_INVALID_SIGNATURE);
-		}
-				
-		Block block = Controller.getBlock(signatureBytes);
-				
-		//CHECK IF BLOCK EXISTS
-		if(block == null)
-		{
-			throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_BLOCK_NO_EXISTS);
-		}
-		
-		return block.toJson().toJSONString();
-	}
-	
-	@GET
-	@Path("/first")	
-	public String getFirstBlock()
-	{
-		return GenesisBlock.toJson().toJSONString();
-	}
-	
-	@GET
-	@Path("/last")	
-	public String getLastBlock()
-	{
-		return Controller.getLastBlock().toJson().toJSONString();
-	}
-	
+
 	@GET
 	@Path("/child/{signature}")	
 	public String getChild(@PathParam("signature") String signature)
