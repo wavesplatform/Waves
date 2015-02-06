@@ -12,17 +12,6 @@ import scala.util.Try
 
 trait BlocksHttpService extends HttpService with CommonApifunctions {
 
-  def withBlock(encodedSignature: String)(action: Block => JsObject): JsObject =
-    Try {
-      Base58.decode(encodedSignature)
-    }.toOption.map { signature =>
-      Controller.block(signature) match {
-        case Some(block) => action(block)
-        case None => ApiError.toJson(ApiError.ERROR_BLOCK_NO_EXISTS)
-      }
-    }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_SIGNATURE))
-
-
   lazy val route =
     path("/") {
       get {
@@ -83,7 +72,10 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         }
     } ~ path("address" / Segment) { case address =>
       get {
-        complete("")
+        val jsRes = withAccount(address){account =>
+          Json.arr(Controller.lastBlocks(account).map(_.toJson()))
+        }
+        complete(jsRes.toString())
       }
     }
 }

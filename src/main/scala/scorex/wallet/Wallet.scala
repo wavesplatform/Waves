@@ -81,8 +81,8 @@ object Wallet extends Observable with Observer {
 
 
 	def getLastBlocks(account:Account) =
-		if(!this.exists()) List[Block]().asJava
-		else database.getBlockMap.get(account)
+		if(!this.exists()) List[Block]()
+		else database.getBlockMap.get(account).toList
 
 	//CREATE
 	

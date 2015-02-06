@@ -332,7 +332,7 @@ object Controller extends Observable {
 
   def lastBlocks() = wallet.getLastBlocks()
 
-  def lastBlocks(account: Account) = wallet.getLastBlocks(account)
+  def lastBlocks(account: Account):List[Block] = wallet.getLastBlocks(account)
 
   def onDatabaseCommit() = wallet.commit()
 
