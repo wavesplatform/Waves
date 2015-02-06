@@ -52,21 +52,12 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
     } ~ path("seed" / Segment) { case address =>
       get {
         //CHECK IF WALLET EXISTS
-        val jsRes = walletNotExistsOrLocked().getOrElse {
-          if (!Crypto.isValidAddress(address)) {
-            ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
-          } else {
-            Controller.accountByAddress(address) match {
-              case None => ApiError.toJson(ApiError.ERROR_WALLET_ADDRESS_NO_EXISTS)
-              case Some(account) =>
-                Controller.exportAccountSeed(address) match {
+        val jsRes = withAccount(address){account =>
+                Controller.exportAccountSeed(account.address) match {
                   case None => ApiError.toJson(ApiError.ERROR_WALLET_SEED_EXPORT_FAILED)
-                  case Some(seed) =>
-                    Json.obj("address" -> address, "seed" -> Base58.encode(seed))
+                  case Some(seed) => Json.obj("address" -> address, "seed" -> Base58.encode(seed))
                 }
             }
-          }
-        }
         complete(Json.stringify(jsRes))
       }
     } ~ path("new") {
