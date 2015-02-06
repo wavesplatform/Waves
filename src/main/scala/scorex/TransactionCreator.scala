@@ -24,7 +24,7 @@ class TransactionCreator {
 		//CHECK IF WE ALREADY HAVE A FORK
 		Option(lastBlock) match {
 			case None => updateFork() 
-			case Some(_) => if(this.lastBlock.signature.sameElements(Controller.getLastBlock.signature))
+			case Some(_) => if(this.lastBlock.signature.sameElements(Controller.lastBlock.signature))
 				{
 					updateFork()
 				}
@@ -37,13 +37,13 @@ class TransactionCreator {
 		this.fork = DBSet.getInstance().fork()
 		
 		//UPDATE LAST BLOCK
-		this.lastBlock = Controller.getLastBlock
+		this.lastBlock = Controller.lastBlock
 			
 		//SCAN UNCONFIRMED TRANSACTIONS FOR TRANSACTIONS WHERE ACCOUNT IS CREATOR OF
 		//& SORT THEM BY TIMESTAMP
 		val accountTransactions = DBSet.getInstance().getTransactionMap.getTransactions.filter{
 			transaction =>
-				Controller.getAccounts.contains(transaction.getCreator)
+				Controller.accounts.contains(transaction.getCreator)
 		}.sortBy(_.timestamp)
 			
 		//VALIDATE AND PROCESS THOSE TRANSACTIONS IN FORK

@@ -47,7 +47,7 @@ object BlockGenerator extends Thread {
 
   def getUnconfirmedTransactions = DBSet.getInstance().getTransactionMap.getValues.toList.asJava //todo: fix after Controller rewriting
 
-  private def getKnownAccounts = this.synchronized(Controller.getPrivateKeyAccounts()) //todo: fix
+  private def getKnownAccounts = this.synchronized(Controller.privateKeyAccounts()) //todo: fix
 
   override def run() {
     while (true) {

@@ -14,7 +14,7 @@ class Account(val address:String) {
 
 	//BALANCE
 
-	def unconfirmedBalance() = Controller.getUnconfirmedBalance(address)
+	def unconfirmedBalance() = Controller.unconfirmedBalance(address)
 
 	def getConfirmedBalance():BigDecimal = getConfirmedBalance(DBSet.getInstance())
 

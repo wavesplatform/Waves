@@ -41,8 +41,8 @@ object Start {
       val senderAddress = GenesisBlockParams.ipoMembers(rndIdx)
       val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx + 1)
 
-      val senderAcc = Controller.getPrivateKeyAccountByAddress(senderAddress).get
-      val recipientAcc = Controller.getAccountByAddress(recipientAddress).get
+      val senderAcc = Controller.privateKeyAccountByAddress(senderAddress).get
+      val recipientAcc = Controller.accountByAddress(recipientAddress).get
 
       val amt = new java.math.BigDecimal(Random.nextInt(100000))
       val fee = new java.math.BigDecimal(1 + Random.nextInt(5))

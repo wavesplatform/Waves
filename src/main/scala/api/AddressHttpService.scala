@@ -38,7 +38,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
           ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS)
         } else {
           //GET ACCOUNTS
-          val accounts = Controller.getAccounts()
+          val accounts = Controller.accounts()
           val addresses = accounts.map(_.address)
           Json.arr(addresses)
         }
@@ -56,7 +56,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
           if (!Crypto.isValidAddress(address)) {
             ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
           } else {
-            Controller.getAccountByAddress(address) match {
+            Controller.accountByAddress(address) match {
               case None => ApiError.toJson(ApiError.ERROR_WALLET_ADDRESS_NO_EXISTS)
               case Some(account) =>
                 Controller.exportAccountSeed(address) match {
@@ -152,7 +152,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
             if (!Crypto.isValidAddress(address)) {
               ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
             } else {
-              Controller.getPrivateKeyAccountByAddress(address) match {
+              Controller.privateKeyAccountByAddress(address) match {
                 case None => ApiError.toJson(ApiError.ERROR_WALLET_ADDRESS_NO_EXISTS)
                 case Some(account) =>
                   Json.obj("message" -> message,
@@ -170,7 +170,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
           if (!Crypto.isValidAddress(address)) {
             ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
           } else {
-            val deleted = Controller.getPrivateKeyAccountByAddress(address).exists(account =>
+            val deleted = Controller.privateKeyAccountByAddress(address).exists(account =>
               Controller.deleteAccount(account))
             Json.obj("deleted" -> deleted)
           }

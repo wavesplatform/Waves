@@ -287,17 +287,17 @@ object Controller extends Observable {
 
   def recoverWallet(seed: Array[Byte], password: String, amount: Int) = wallet.create(seed, password, amount, true)
 
-  def getAccounts() = wallet.getAccounts()
+  def accounts() = wallet.getAccounts()
 
-  def getPrivateKeyAccounts() = wallet.getprivateKeyAccounts()
+  def privateKeyAccounts() = wallet.getprivateKeyAccounts()
 
   def generateNewAccount() = wallet.generateNewAccount()
 
-  def getPrivateKeyAccountByAddress(address: String) = wallet.getPrivateKeyAccount(address)
+  def privateKeyAccountByAddress(address: String) = wallet.getPrivateKeyAccount(address)
 
-  def getAccountByAddress(address: String) = wallet.getAccount(address)
+  def accountByAddress(address: String) = wallet.getAccount(address)
 
-  def getUnconfirmedBalance(address: String) = wallet.getUnconfirmedBalance(address)
+  def unconfirmedBalance(address: String) = wallet.getUnconfirmedBalance(address)
 
   def addWalletListener(o: Observer) = wallet.addObserver(o)
 
@@ -318,7 +318,7 @@ object Controller extends Observable {
 
   def unlockWallet(password: String) = wallet.unlock(password)
 
-  def getLastTransactions(limit: Int) = wallet.getLastTransactions(limit)
+  def lastTransactions(limit: Int) = wallet.getLastTransactions(limit)
 
   def getTransaction(signature: Array[Byte]) = {
     //CHECK IF IN BLOCK
@@ -328,21 +328,21 @@ object Controller extends Observable {
     }
   }
 
-  def getLastTransactions(account: Account, limit: Int) = wallet.getLastTransactions(account, limit)
+  def lastTransactions(account: Account, limit: Int) = wallet.getLastTransactions(account, limit)
 
-  def getLastBlocks() = wallet.getLastBlocks()
+  def lastBlocks() = wallet.getLastBlocks()
 
-  def getLastBlocks(account: Account) = wallet.getLastBlocks(account)
+  def lastBlocks(account: Account) = wallet.getLastBlocks(account)
 
   def onDatabaseCommit() = wallet.commit()
 
   //BLOCKCHAIN
 
-  def getHeight() = blockChain.getHeight
+  def height() = blockChain.getHeight.toInt
 
-  def getLastBlock() = blockChain.getLastBlock
+  def lastBlock() = blockChain.getLastBlock
 
-  def getBlock(header: Array[Byte]) = blockChain.getBlock(header)
+  def block(header: Array[Byte]) = blockChain.getBlock(header)
 
 
   def scanTransactions(block: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) = {
@@ -351,11 +351,11 @@ object Controller extends Observable {
   }
 
 
-  def getNextBlockGeneratingBalance =
+  def nextBlockGeneratingBalance() =
     BlockGenerator.getNextBlockGeneratingBalance(DBSet.getInstance(), DBSet.getInstance().getBlockMap.getLastBlock)
 
 
-  def getNextBlockGeneratingBalance(parent: Block) =
+  def nextBlockGeneratingBalance(parent: Block) =
     BlockGenerator.getNextBlockGeneratingBalance(DBSet.getInstance(), parent)
 
 
