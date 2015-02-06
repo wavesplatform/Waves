@@ -32,7 +32,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
 
   lazy val adressesRouting =
     pathPrefix("addresses") {
-      path("/") {
+      path("") {
         get {
           //CHECK IF WALLET EXISTS
           val jsRes = if (!Controller.doesWalletExists) {
@@ -89,7 +89,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
           }
           complete(Json.stringify(jsRes))
         }
-      } ~ path("/") {
+      } ~ pathSuffix( Slash ) {
         post {
           entity(as[String]) { seed =>
             if (seed.isEmpty) {
@@ -156,7 +156,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
             complete(jsRes.toString())
           }
         }
-      } ~ path("/" / Segment) { case address =>
+      } ~ path("" / Segment) { case address =>  //todo: fix routing to that
         delete {
           val jsRes = walletNotExistsOrLocked().getOrElse {
             if (!Crypto.isValidAddress(address)) {

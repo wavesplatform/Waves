@@ -12,7 +12,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
 
   lazy val blocksRouting =
     pathPrefix("blocks") {
-      path("/") {
+      path("") {
         get {
           complete(walletNotExists().getOrElse(JsArray(Controller.lastBlocks().map(_._2.toJson()))).toString())
         }
