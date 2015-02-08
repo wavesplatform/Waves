@@ -16,7 +16,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         get {
           complete(walletNotExists().getOrElse(JsArray(Controller.lastBlocks().map(_._2.toJson()))).toString())
         }
-      } ~ path("/" / Segment) { case encodedSignature =>
+      } ~ path("signature" / Segment) { case encodedSignature =>
         get {
           complete(withBlock(encodedSignature)(_.toJson()).toString())
         }
