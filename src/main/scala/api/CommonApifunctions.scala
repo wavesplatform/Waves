@@ -5,9 +5,7 @@ import play.api.libs.json.{JsValue, JsObject}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.{Crypto, Base58}
-
 import scala.util.Try
-
 
 trait CommonApifunctions {
 

@@ -1,7 +1,6 @@
 package api
 
 import java.nio.charset.StandardCharsets
-import akka.actor.Actor
 import controller.Controller
 import play.api.libs.json.Json
 import scorex.account.{PublicKeyAccount, Account}
