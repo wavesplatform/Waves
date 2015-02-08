@@ -9,15 +9,6 @@ import scorex.crypto.{Base58, Crypto}
 import spray.routing.HttpService
 import scala.util.{Success, Failure, Try}
 
-
-class AddressHttpServiceActor extends Actor
-  with AddressHttpService
-  with BlocksHttpService {
-
-  override def actorRefFactory = context
-  override def receive = runRoute(adressesRouting ~ blocksRouting)
-}
-
 trait AddressHttpService extends HttpService with CommonApifunctions {
   private def balanceJson(address: String, confirmations: Int) =
     if (!Crypto.isValidAddress(address)) {
@@ -89,7 +80,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
           }
           complete(Json.stringify(jsRes))
         }
-      } ~ pathSuffix( Slash ) {
+      } ~ path("") {
         post {
           entity(as[String]) { seed =>
             if (seed.isEmpty) {
@@ -156,7 +147,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
             complete(jsRes.toString())
           }
         }
-      } ~ path("" / Segment) { case address =>  //todo: fix routing to that
+      } ~ path("address" / Segment) { case address =>  //todo: fix routing to that
         delete {
           val jsRes = walletNotExistsOrLocked().getOrElse {
             if (!Crypto.isValidAddress(address)) {

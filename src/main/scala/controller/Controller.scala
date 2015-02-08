@@ -6,7 +6,7 @@ import java.util.Observer
 import java.util.logging.Logger
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
-import api.AddressHttpServiceActor
+import api.HttpServiceActor
 import scorex.BlockChain
 import scorex.BlockGenerator
 import scorex.Synchronizer
@@ -58,7 +58,7 @@ object Controller extends Observable {
     require(Network.isPortAvailable(Settings.rpcPort), "Rpc port " + Settings.rpcPort + " already in use!")
 
     implicit val actorSystem = ActorSystem()
-    val httpServiceActor = actorSystem.actorOf(Props[AddressHttpServiceActor], "http-service")
+    val httpServiceActor = actorSystem.actorOf(Props[HttpServiceActor], "http-service")
     val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = Settings.rpcPort)
     IO(Http) ! bindCommand
 
