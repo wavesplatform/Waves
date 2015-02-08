@@ -2,8 +2,6 @@
 
 rm -rf data/
 
-rm nohup.out
-
 sbt clean
 
 sbt compile
