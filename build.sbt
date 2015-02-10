@@ -47,6 +47,6 @@ importRun := {
     val one = (runMain in Compile).fullInput("migration.ImportUtils").evaluated
 }
 
-seq(SbtStartScript.startScriptForClassesSettings:_*)
+Seq(SbtStartScript.startScriptForClassesSettings:_*)
 
 
