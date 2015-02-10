@@ -296,9 +296,7 @@ public class RIPEMD160 {
  
 	public int[] intdigest() {
 		int[] res = new int[5];
-		for (int i = 0; i < 5; i++) {
-			res[i] = MDbuf[i];
-		}
+		System.arraycopy(MDbuf, 0, res, 0, 5);
 		return res;
 	}
  
