@@ -46,10 +46,7 @@ object Controller extends Observable {
   private val wallet = Wallet
   private val transactionCreator = new TransactionCreator()
 
-  private val peerHeight = TrieMap[ConnectedPeer, Integer]()
-
-  def getPeerHeights = peerHeight.asJava //todo: remove
-
+  val peerHeights = TrieMap[ConnectedPeer, Int]()
 
   def init() {
     //OPENING DATABASES
@@ -133,7 +130,7 @@ object Controller extends Observable {
 
   //NETWORK
 
-  def getActivePeers = Network.getActiveConnections()
+  def activePeers() = Network.getActiveConnections()
 
 
   def onConnect(peer: ConnectedPeer) {
@@ -153,9 +150,9 @@ object Controller extends Observable {
   }
 
   def onDisconnect(peer: ConnectedPeer) {
-    peerHeight.remove(peer)
+    peerHeights.remove(peer)
 
-    if (peerHeight.isEmpty) {
+    if (peerHeights.isEmpty) {
       //UPDATE STATUS
       status = STATUS_NO_CONNECTIONS
 
@@ -177,7 +174,7 @@ object Controller extends Observable {
       case GetPeersMessage(Some(sender), id: Some[_]) =>
         sender.sendMessage(PeersMessage(PeerManager.getKnownPeers, mbId = id))
 
-      case VersionMessage(height, Some(sender), _) => peerHeight.put(sender, height)
+      case VersionMessage(height, Some(sender), _) => peerHeights.put(sender, height)
 
       case GetSignaturesMessage(parent, Some(sender), id: Some[_]) =>
         val headers = blockChain.getSignatures(parent)
@@ -199,7 +196,7 @@ object Controller extends Observable {
           //BROADCAST
           Network.broadcast(message, List(sender))
 
-        } else peerHeight.put(sender, height)
+        } else peerHeights.put(sender, height)
 
       case TransactionMessage(transaction, Some(sender), _) =>
         //CHECK IF SIGNATURE IS VALID OR GENESIS TRANSACTION
@@ -235,7 +232,7 @@ object Controller extends Observable {
 
   //SYNCHRONIZE
 
-  def isUpToDate() = peerHeight.isEmpty || getMaxPeerHeight() <= blockChain.getHeight
+  def isUpToDate() = peerHeights.isEmpty || maxPeerHeight() <= blockChain.getHeight
 
   def update() {
     //UPDATE STATUS
@@ -248,7 +245,7 @@ object Controller extends Observable {
     //WHILE NOT UPTODATE
     while (!isUpToDate()) {
       //START UPDATE FROM HIGHEST HEIGHT PEER
-      val peer = getMaxHeightPeer()
+      val peer = maxHeightPeer()
 
       //SYNCHRONIZE FROM PEER
       Try(Synchronizer.synchronize(peer)).recover { case e: Exception =>
@@ -257,8 +254,7 @@ object Controller extends Observable {
       }
     }
 
-
-    if (peerHeight.isEmpty) {
+    if (peerHeights.isEmpty) {
       //UPDATE STATUS
       this.status = STATUS_NO_CONNECTIONS
 
@@ -275,9 +271,9 @@ object Controller extends Observable {
     }
   }
 
-  private def getMaxHeightPeer() = peerHeight.maxBy(_._2)._1
+  private def maxHeightPeer() = peerHeights.maxBy(_._2)._1
 
-  private def getMaxPeerHeight() = peerHeight.maxBy(_._2)._2
+  private def maxPeerHeight() = peerHeights.maxBy(_._2)._2
 
   //WALLET
 

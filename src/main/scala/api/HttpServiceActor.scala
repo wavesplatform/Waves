@@ -7,8 +7,8 @@ class HttpServiceActor extends Actor
   with BlocksHttpService
   with ScorexHttpService
   with SeedHttpService
+  with PeersHttpService
  {
-
   override def actorRefFactory = context
-  override def receive = runRoute(adressesRouting ~ blocksRouting ~ scorexRouting ~ seedRouting)
+  override def receive = runRoute(adressesRouting ~ blocksRouting ~ scorexRouting ~ seedRouting ~ peersRouting)
 }
