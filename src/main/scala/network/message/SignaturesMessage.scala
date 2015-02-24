@@ -1,13 +1,13 @@
 package network.message
 
 import java.util.Arrays
-import com.google.common.primitives.Bytes
-import com.google.common.primitives.Ints
+
+import com.google.common.primitives.{Bytes, Ints}
 import network.ConnectedPeer
 
 case class SignaturesMessage(signatures: Seq[Array[Byte]], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
 
-  import SignaturesMessage._
+  import network.message.SignaturesMessage._
 
   override val messageType = Message.SIGNATURES_TYPE
 

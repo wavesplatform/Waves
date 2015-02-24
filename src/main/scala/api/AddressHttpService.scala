@@ -1,33 +1,24 @@
 package api
 
 import java.nio.charset.StandardCharsets
+
 import database.PrunableBlockchainStorage
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.crypto.{Base58, Crypto}
 import scorex.wallet.Wallet
 import spray.routing.HttpService
-import scala.util.{Success, Failure, Try}
+
+import scala.util.{Failure, Success, Try}
 
 
 trait AddressHttpService extends HttpService with CommonApifunctions {
-
-  private def balanceJson(address: String, confirmations: Int) =
-    if (!Crypto.isValidAddress(address)) {
-      ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
-    } else {
-      Json.obj(
-        "address" -> address,
-        "confirmations" -> confirmations,
-        "balance" -> PrunableBlockchainStorage.balance(address, 0, confirmations)
-      )
-    }
 
   lazy val adressesRouting =
     pathPrefix("addresses") {
       path("") {
         get {
-          complete{
+          complete {
             val jsRes = if (!Wallet.isUnlocked()) {
               ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS)
             } else {
@@ -40,14 +31,14 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
         }
       } ~ path("validate" / Segment) { case address =>
         get {
-          complete{
+          complete {
             val jsRes = Json.obj("address" -> address, "valid" -> Crypto.isValidAddress(address))
             Json.stringify(jsRes)
           }
         }
       } ~ path("seed" / Segment) { case address =>
         get {
-          complete{
+          complete {
             //CHECK IF WALLET EXISTS
             val jsRes = withAccount(address) { account =>
               Wallet.exportAccountSeed(account.address) match {
@@ -61,8 +52,8 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
       } ~ path("new") {
         get {
           complete {
-            walletNotExistsOrLocked().getOrElse{
-              Wallet.generateNewAccount() match{
+            walletNotExistsOrLocked().getOrElse {
+              Wallet.generateNewAccount() match {
                 case Some(pka) => Json.obj("address" -> pka.address)
                 case None => ApiError.toJson(ApiError.ERROR_UNKNOWN)
               }
@@ -72,21 +63,21 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
         }
       } ~ path("balance" / Segment / IntNumber) { case (address, confirmations) =>
         get {
-          complete{
+          complete {
             val jsRes = balanceJson(address, confirmations)
             Json.stringify(jsRes)
           }
         }
       } ~ path("balance" / Segment) { case address =>
         get {
-          complete{
+          complete {
             val jsRes = balanceJson(address, 1)
             Json.stringify(jsRes)
           }
         }
       } ~ path("generatingbalance" / Segment) { case address =>
         get {
-          complete{
+          complete {
             val jsRes = if (!Crypto.isValidAddress(address)) {
               ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
             } else {
@@ -101,10 +92,10 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
       } ~ path("") {
         post {
           entity(as[String]) { seed =>
-            complete{
+            complete {
               val jsRes = if (seed.isEmpty) {
                 walletNotExistsOrLocked().getOrElse {
-                  Wallet.generateNewAccount() match{
+                  Wallet.generateNewAccount() match {
                     case Some(pka) => Json.obj("address" -> pka.address)
                     case None => ApiError.toJson(ApiError.ERROR_UNKNOWN)
                   }
@@ -126,7 +117,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
       } ~ path("verify" / Segment) { case address =>
         post {
           entity(as[String]) { jsText =>
-            complete{
+            complete {
               val jsRes = Try {
                 val js = Json.parse(jsText)
                 val msg = (js \ "message").as[String]
@@ -155,7 +146,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
       } ~ path("sign" / Segment) { case address =>
         post {
           entity(as[String]) { message =>
-            complete{
+            complete {
               val jsRes = walletNotExistsOrLocked().getOrElse {
                 if (!Crypto.isValidAddress(address)) {
                   ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
@@ -173,9 +164,9 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
             }
           }
         }
-      } ~ path("address" / Segment) { case address =>  //todo: fix routing to that
+      } ~ path("address" / Segment) { case address => //todo: fix routing to that
         delete {
-          complete{
+          complete {
             val jsRes = walletNotExistsOrLocked().getOrElse {
               if (!Crypto.isValidAddress(address)) {
                 ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
@@ -189,5 +180,16 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
           }
         }
       }
+    }
+
+  private def balanceJson(address: String, confirmations: Int) =
+    if (!Crypto.isValidAddress(address)) {
+      ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
+    } else {
+      Json.obj(
+        "address" -> address,
+        "confirmations" -> confirmations,
+        "balance" -> PrunableBlockchainStorage.balance(address, 0, confirmations)
+      )
     }
 }

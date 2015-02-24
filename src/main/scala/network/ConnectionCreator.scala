@@ -1,9 +1,11 @@
 package network
 
 import java.util.logging.Logger
+
 import network.message.{GetPeersMessage, PeersMessage}
 import settings.Settings
-import scala.util.{Random, Failure, Success}
+
+import scala.util.{Failure, Random, Success}
 
 class ConnectionCreator(callback: ConnectionCallback) extends Thread {
 

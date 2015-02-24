@@ -1,8 +1,8 @@
 package network.message
 
+import com.google.common.primitives.Bytes
 import network.ConnectedPeer
 import scorex.transaction.Transaction
-import com.google.common.primitives.Bytes
 
 case class TransactionMessage(transaction: Transaction, mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
 

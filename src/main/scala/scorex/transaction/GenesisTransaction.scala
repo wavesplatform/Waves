@@ -1,17 +1,12 @@
 package scorex.transaction
 
-import java.math.BigDecimal
-import java.math.BigInteger
+import java.math.{BigDecimal, BigInteger}
 import java.util.Arrays
+
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
-
 import scorex.account.Account
-import scorex.crypto.Base58
-import scorex.crypto.Crypto
-
-import com.google.common.primitives.Bytes
-import com.google.common.primitives.Ints
-import com.google.common.primitives.Longs
+import scorex.crypto.{Base58, Crypto}
 import scorex.transaction.Transaction.TransactionType
 
 
@@ -19,8 +14,8 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
   extends Transaction(TransactionType.GENESIS_TRANSACTION, BigDecimal.ZERO, timestamp,
     GenesisTransaction.generateSignature(recipient, amount, timestamp)) {
 
-  import Transaction._
-  import GenesisTransaction._
+  import scorex.transaction.GenesisTransaction._
+  import scorex.transaction.Transaction._
 
   override def toJson() =
     getJsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toPlainString)
@@ -34,7 +29,7 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
 
     val rcpBytes = Base58.decode(recipient.address)
-    require(rcpBytes.length==Account.ADDRESS_LENGTH)
+    require(rcpBytes.length == Account.ADDRESS_LENGTH)
 
     val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, Bytes.concat(amountFill, amountBytes))
     require(res.length == dataLength)
@@ -86,7 +81,8 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
 
 
 object GenesisTransaction {
-  import Transaction._
+
+  import scorex.transaction.Transaction._
 
   private val RECIPIENT_LENGTH = Account.ADDRESS_LENGTH
   private val BASE_LENGTH = TIMESTAMP_LENGTH + RECIPIENT_LENGTH + AMOUNT_LENGTH

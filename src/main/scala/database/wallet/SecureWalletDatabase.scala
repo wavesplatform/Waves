@@ -2,16 +2,16 @@ package database.wallet
 
 import java.io.File
 
-import org.mapdb.DBMaker
-import org.mapdb.Serializer
+import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
 import settings.Settings
+
 import scala.collection.JavaConversions._
 
 
 class SecureWalletDatabase(password: String) {
 
-  import SecureWalletDatabase._
+  import database.wallet.SecureWalletDatabase._
 
   //OPEN WALLET
   SECURE_WALLET_FILE.getParentFile.mkdirs()
@@ -28,7 +28,7 @@ class SecureWalletDatabase(password: String) {
 
   def addAccount(account: PrivateKeyAccount) = {
     val address = account.address
-    if(!accountsMap.containsKey(address)){
+    if (!accountsMap.containsKey(address)) {
       accountsMap.put(address, account)
       database.commit()
       true
@@ -36,19 +36,20 @@ class SecureWalletDatabase(password: String) {
   }
 
   def accounts() = accountsMap.values().toSeq
-  def account(address:String) = Option(accountsMap.get(address))
+
+  def account(address: String) = Option(accountsMap.get(address))
 
   def setSeed(seed: Array[Byte]) = database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY)
 
   def getSeed(): Array[Byte] = database.getAtomicVar(SEED).get()
 
-  def setNonce(nonce: Int) = database.getAtomicInteger(NONCE).set(nonce)
-
   def getNonce(): Int = database.getAtomicInteger(NONCE).intValue()
+
+  def setNonce(nonce: Int) = database.getAtomicInteger(NONCE).set(nonce)
 
   def getAndIncrementNonce(): Int = database.getAtomicInteger(NONCE).getAndIncrement()
 
-  def delete(account: PrivateKeyAccount){
+  def delete(account: PrivateKeyAccount) {
     accountsMap.remove(account.address)
   }
 

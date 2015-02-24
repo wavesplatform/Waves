@@ -1,47 +1,45 @@
 package controller
 
 import java.util.logging.Logger
+
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.io.IO
 import api.HttpServiceActor
-import database.{UnconfirmedTransactionsDatabaseImpl, PrunableBlockchainStorage}
+import database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
+import network.message._
+import network.{ConnectedPeer, Network, Peer, PeerManager}
 import scorex._
-import scorex.account.Account
-import scorex.account.PrivateKeyAccount
-import scorex.block.{GenesisBlock, Block}
+import scorex.account.{Account, PrivateKeyAccount}
+import scorex.block.{Block, GenesisBlock}
 import scorex.transaction.Transaction
 import scorex.transaction.Transaction.TransactionType
 import scorex.wallet.Wallet
 import settings.Settings
 import spray.can.Http
-import network.{PeerManager, ConnectedPeer, Network, Peer}
-import network.message._
+
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 object Controller {
 
   val STATUS_NO_CONNECTIONS = 0
   val STATUS_SYNCHRONIZING = 1
   val STATUS_OKE = 2
-
+  val peerHeights = TrieMap[ConnectedPeer, Int]()
+  private val transactionCreator = new TransactionCreator()
   //todo: avoid var
   private var status = STATUS_NO_CONNECTIONS
+  private var blockActorRef: ActorRef = _
+  private var isStopping = false
 
   def getStatus = status
-
-  private val transactionCreator = new TransactionCreator()
-
-  val peerHeights = TrieMap[ConnectedPeer, Int]()
-
-  private var blockActorRef:ActorRef = _
 
   def init() {
     //OPENING DATABASES
     require(Network.isPortAvailable(Settings.rpcPort), "Rpc port " + Settings.rpcPort + " already in use!")
 
-    if (PrunableBlockchainStorage.isEmpty()){
+    if (PrunableBlockchainStorage.isEmpty()) {
       GenesisBlock.process()
       PrunableBlockchainStorage.appendBlock(GenesisBlock)
     }
@@ -68,8 +66,6 @@ object Controller {
     actorSystem.scheduler.schedule(2.seconds, 500.milliseconds)(blockGenerator ! TryToGenerateBlock)
   }
 
-  private var isStopping = false
-
   def stopAll() = {
     //PREVENT MULTIPLE CALLS
     if (!isStopping) {
@@ -90,6 +86,31 @@ object Controller {
 
   //NETWORK
 
+  def update() {
+    //UPDATE STATUS
+    status = STATUS_SYNCHRONIZING
+
+    //WHILE NOT UPTODATE
+    while (!isUpToDate()) {
+      val peer = maxHeightPeer()
+      blockActorRef ! Synchronize(peer)
+    }
+
+    if (peerHeights.isEmpty) {
+      //UPDATE STATUS
+      this.status = STATUS_NO_CONNECTIONS
+    } else {
+      //UPDATE STATUS
+      this.status = STATUS_OKE
+    }
+  }
+
+  def isUpToDate() = peerHeights.isEmpty || maxPeerHeight() <= PrunableBlockchainStorage.height()
+
+  private def maxPeerHeight() = peerHeights.maxBy(_._2)._2
+
+  private def maxHeightPeer() = peerHeights.maxBy(_._2)._1
+
   def activePeers() = Network.getActiveConnections()
 
   def onConnect(peer: ConnectedPeer) {
@@ -104,6 +125,10 @@ object Controller {
     }
   }
 
+  def onError(peer: ConnectedPeer) = onDisconnect(peer)
+
+  //SYNCHRONIZE
+
   def onDisconnect(peer: ConnectedPeer) {
     peerHeights.remove(peer)
 
@@ -112,8 +137,6 @@ object Controller {
       status = STATUS_NO_CONNECTIONS
     }
   }
-
-  def onError(peer: ConnectedPeer) = onDisconnect(peer)
 
   //SYNCHRONIZED DO NOT PROCESSS MESSAGES SIMULTANEOUSLY
   def onMessage(message: Message) = this.synchronized {
@@ -161,54 +184,20 @@ object Controller {
     Network.broadcast(message, List[Peer]())
   }
 
-  private def broadcastTransaction(transaction: Transaction) {
-    val message = TransactionMessage(transaction)
-    Network.broadcast(message, List[Peer]())
-  }
-
-  //SYNCHRONIZE
-
-  def isUpToDate() = peerHeights.isEmpty || maxPeerHeight() <= PrunableBlockchainStorage.height()
-
-  def update() {
-    //UPDATE STATUS
-    status = STATUS_SYNCHRONIZING
-
-    //WHILE NOT UPTODATE
-    while (!isUpToDate()) {
-      val peer = maxHeightPeer()
-      blockActorRef ! Synchronize(peer)
-    }
-
-    if (peerHeights.isEmpty) {
-      //UPDATE STATUS
-      this.status = STATUS_NO_CONNECTIONS
-    } else {
-      //UPDATE STATUS
-      this.status = STATUS_OKE
-    }
-  }
-
-  private def maxHeightPeer() = peerHeights.maxBy(_._2)._1
-
-  private def maxPeerHeight() = peerHeights.maxBy(_._2)._2
+  def createWallet(seed: Array[Byte], password: String, amount: Int) = Wallet.create(seed, password, amount, false)
 
   //WALLET
 
-  def createWallet(seed: Array[Byte], password: String, amount: Int) = Wallet.create(seed, password, amount, false)
-
   def recoverWallet(seed: Array[Byte], password: String, amount: Int) = Wallet.create(seed, password, amount, true)
-
-  //BLOCKCHAIN
 
   def scanTransactions(block: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) =
     PrunableBlockchainStorage.scanTransactions(block, blockLimit, transactionLimit, txType, service, account)
 
+  //BLOCKCHAIN
+
   def nextBlockGeneratingBalance() = BlockGenerator.getNextBlockGeneratingBalance(PrunableBlockchainStorage.lastBlock)
 
   def nextBlockGeneratingBalance(parent: Block) = BlockGenerator.getNextBlockGeneratingBalance(parent)
-
-  //FORGE
 
   def newBlockGenerated(newBlock: Block) = {
     val valid = Block.isNewBlockValid(newBlock)
@@ -216,7 +205,7 @@ object Controller {
     valid
   }
 
-  //TRANSACTIONS
+  //FORGE
 
   def onTransactionCreate(transaction: Transaction) {
     //ADD TO UNCONFIRMED TRANSACTIONS
@@ -224,6 +213,13 @@ object Controller {
 
     //BROADCAST
     this.broadcastTransaction(transaction)
+  }
+
+  //TRANSACTIONS
+
+  private def broadcastTransaction(transaction: Transaction) {
+    val message = TransactionMessage(transaction)
+    Network.broadcast(message, List[Peer]())
   }
 
   def sendPayment(sender: PrivateKeyAccount, recipient: Account, amount: BigDecimal, fee: BigDecimal) =

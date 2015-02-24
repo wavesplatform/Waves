@@ -1,24 +1,22 @@
 package scorex.block
 
-import database.{UnconfirmedTransactionsDatabaseImpl, PrunableBlockchainStorage}
-import ntp.NTP
 import java.util.Arrays
-import play.api.libs.json.{Json, JsArray, JsObject}
+
+import com.google.common.primitives.{Bytes, Ints, Longs}
+import database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
+import ntp.NTP
+import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.BlockGenerator
 import scorex.account.PublicKeyAccount
-import scorex.crypto.Base58
-import scorex.crypto.Crypto
-import scorex.transaction.GenesisTransaction
-import scorex.transaction.Transaction
+import scorex.crypto.{Base58, Crypto}
+import scorex.transaction.{GenesisTransaction, Transaction}
 import scorex.transaction.Transaction.ValidationResult
-import com.google.common.primitives.Bytes
-import com.google.common.primitives.Ints
-import com.google.common.primitives.Longs
+
 import scala.util.Try
 
 
 object Block {
-  
+
   val MAX_BLOCK_BYTES = 1048576
   val VERSION_LENGTH = 4
   val REFERENCE_LENGTH = 128
@@ -26,7 +24,7 @@ object Block {
   val GENERATING_BALANCE_LENGTH = 8
   val GENERATOR_LENGTH = 32
   val GENERATOR_SIGNATURE_LENGTH = 64
-  
+
   private[block] val TRANSACTIONS_SIGNATURE_LENGTH = 64
   private[block] val TRANSACTIONS_COUNT_LENGTH = 4
   private[block] val TRANSACTION_SIZE_LENGTH = 4
@@ -34,7 +32,7 @@ object Block {
     GENERATOR_LENGTH + TRANSACTIONS_SIGNATURE_LENGTH + GENERATOR_SIGNATURE_LENGTH + TRANSACTIONS_COUNT_LENGTH
   val MAX_TRANSACTION_BYTES = MAX_BLOCK_BYTES - BASE_LENGTH
 
-  def apply(stub:BlockStub, transactions: List[Transaction], transactionsSignature: Array[Byte]):Block =
+  def apply(stub: BlockStub, transactions: List[Transaction], transactionsSignature: Array[Byte]): Block =
     Block(stub.version, stub.reference, stub.timestamp,
       stub.generatingBalance, stub.generator, stub.generatorSignature,
       transactions, transactionsSignature)
@@ -78,9 +76,9 @@ object Block {
     val generatorSignature = Arrays.copyOfRange(data, position, position + GENERATOR_SIGNATURE_LENGTH)
     position += GENERATOR_SIGNATURE_LENGTH
 
-    if (GenesisBlockParams.generatorSignature.sameElements(generatorSignature)){
+    if (GenesisBlockParams.generatorSignature.sameElements(generatorSignature)) {
       GenesisBlock
-    }else {
+    } else {
 
       //READ TRANSACTIONS COUNT
       val transactionCountBytes = Arrays.copyOfRange(data, position, position + TRANSACTIONS_COUNT_LENGTH)
@@ -101,6 +99,7 @@ object Block {
   }
 
   def isNewBlockValid(block: Block) = true
+
   /*
     todo: uncomment fix
 
@@ -112,15 +111,16 @@ object Block {
 }
 
 case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
-                 generator: PublicKeyAccount, generatorSignature: Array[Byte])
+                     generator: PublicKeyAccount, generatorSignature: Array[Byte])
 
 case class Block(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
-                 generator: PublicKeyAccount, generatorSignature:  Array[Byte],
-                 transactions:  List[Transaction], transactionsSignature:  Array[Byte]){
-  import Block._
+                 generator: PublicKeyAccount, generatorSignature: Array[Byte],
+                 transactions: List[Transaction], transactionsSignature: Array[Byte]) {
+
+  import scorex.block.Block._
 
   def totalFee() = transactions.foldLeft(BigDecimal(0).setScale(8)) { case (fee, tx) => fee + tx.fee}
-  
+
   def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
 
   def parent(): Option[Block] = PrunableBlockchainStorage.parent(this)
@@ -128,11 +128,11 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
   def child(): Option[Block] = PrunableBlockchainStorage.child(this)
 
   def height(): Option[Int] = PrunableBlockchainStorage.heightOf(this)
-  
+
   lazy val signature = Bytes.concat(generatorSignature, transactionsSignature)
 
-  def toJson():JsObject =
-    Json.obj("version"->version,
+  def toJson(): JsObject =
+    Json.obj("version" -> version,
       "reference" -> Base58.encode(reference),
       "timestamp" -> timestamp,
       "generatingBalance" -> generatingBalance,
@@ -159,7 +159,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       generatorSignature, transactionCountBytes, transactionBytes)
   }
 
-  def dataLength() = transactions.foldLeft(BASE_LENGTH) {case (len, tx) => len + 4 + tx.dataLength}
+  def dataLength() = transactions.foldLeft(BASE_LENGTH) { case (len, tx) => len + 4 + tx.dataLength}
 
   //VALIDATE
 
@@ -225,7 +225,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       }
     }
   }
-  
+
   def process() {
     transactions.foreach { transaction =>
       transaction.process()

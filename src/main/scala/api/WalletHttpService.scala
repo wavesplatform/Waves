@@ -5,6 +5,7 @@ import play.api.libs.json.Json
 import scorex.crypto.Base58
 import scorex.wallet.Wallet
 import spray.routing.HttpService
+
 import scala.util.{Success, Try}
 
 
@@ -60,7 +61,8 @@ trait WalletHttpService extends HttpService with CommonApifunctions {
                 }
               }
             }.getOrElse(ApiError.toJson(ApiError.ERROR_JSON)).toString()
-          }}
+          }
+          }
         }
       }
     }

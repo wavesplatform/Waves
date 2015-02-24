@@ -7,8 +7,9 @@ import scorex.account.Account
 import scorex.block.GenesisBlockParams
 import scorex.crypto.Base58
 import scorex.wallet.Wallet
+
 import scala.io.StdIn
-import scala.util.{Random, Failure, Try}
+import scala.util.{Failure, Random, Try}
 
 object Start {
 

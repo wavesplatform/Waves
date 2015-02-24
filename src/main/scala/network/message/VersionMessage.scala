@@ -1,7 +1,6 @@
 package network.message
 
-import com.google.common.primitives.Bytes
-import com.google.common.primitives.Ints
+import com.google.common.primitives.{Bytes, Ints}
 import network.ConnectedPeer
 
 case class VersionMessage(height: Int, mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {

@@ -1,22 +1,32 @@
 package scorex.block
 
 import java.math.BigDecimal
+
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import database.PrunableBlockchainStorage
-import scorex.account.Account
-import scorex.account.PublicKeyAccount
+import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.Crypto
 import scorex.transaction.GenesisTransaction
-import com.google.common.primitives.{Ints, Bytes, Longs}
 import scorex.transaction.Transaction.ValidationResult
 
 
 object GenesisBlockParams {
+  lazy val generatorSignature = {
+    val versionBytes = Ints.toByteArray(genesisVersion)
+    val referenceBytes = Bytes.ensureCapacity(genesisReference, 64, 0)
+    val generatingBalanceBytes = Longs.toByteArray(generatingBalance)
+    val generatorBytes = Bytes.ensureCapacity(genesisGenerator.publicKey, 32, 0)
+
+    val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
+    //DIGEST
+    val digest = Crypto.sha256(data)
+    Bytes.concat(digest, digest)
+  }
   val genesisVersion = 1
   val genesisReference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
   val genesisTimestamp = System.currentTimeMillis - 1000 * 60 * 60
   val generatingBalance = 10000000
   val genesisGenerator = new PublicKeyAccount(Array[Byte](1, 1, 1, 1, 1, 1, 1, 1))
-
   val ipoMembers = List(
     "2UyntBprhFgZPJ1tCtKBAwryiSnDSk9Xmh8",
     "Y2BXLjiAhPUMSo8iBbDEhv81VwKnytTXsH",
@@ -29,22 +39,9 @@ object GenesisBlockParams {
     "2ihjht1NWTv2T8nKDMzx2RMmp7ZDEchXJus",
     "2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPNKr"
   )
-
   val genesisTransactions = ipoMembers.map { addr =>
     val recipient = new Account(addr)
     GenesisTransaction(recipient, new BigDecimal("1000000000").setScale(8), genesisTimestamp)
-  }
-
-  lazy val generatorSignature = {
-    val versionBytes = Ints.toByteArray(genesisVersion)
-    val referenceBytes = Bytes.ensureCapacity(genesisReference, 64, 0)
-    val generatingBalanceBytes = Longs.toByteArray(generatingBalance)
-    val generatorBytes = Bytes.ensureCapacity(genesisGenerator.publicKey, 32, 0)
-
-    val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
-    //DIGEST
-    val digest = Crypto.sha256(data)
-    Bytes.concat(digest, digest)
   }
 }
 

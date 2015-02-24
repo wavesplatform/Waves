@@ -2,13 +2,13 @@ package network.message
 
 import java.net.InetAddress
 import java.util
-import com.google.common.primitives.Bytes
-import com.google.common.primitives.Ints
+
+import com.google.common.primitives.{Bytes, Ints}
 import network.{ConnectedPeer, Peer}
 
 case class PeersMessage(peers: Seq[Peer], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
 
-  import PeersMessage._
+  import network.message.PeersMessage._
 
   override val messageType = Message.PEERS_TYPE
 

@@ -1,7 +1,8 @@
 package network
 
-import settings.Settings
 import network.message.PingMessage
+import settings.Settings
+
 import scala.util.{Random, Success, Try}
 
 
@@ -33,6 +34,8 @@ class Pinger(peer: ConnectedPeer) extends Thread {
       isRunning = false
       interrupt()
       join()
-    }catch{case t:Throwable => }
+    } catch {
+      case t: Throwable =>
+    }
   }
 }

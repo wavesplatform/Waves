@@ -1,20 +1,15 @@
 package api
 
-import controller.Controller
 import database.PrunableBlockchainStorage
-import play.api.libs.json.{JsValue, JsObject}
+import play.api.libs.json.{JsObject, JsValue}
 import scorex.account.Account
 import scorex.block.Block
-import scorex.crypto.{Crypto, Base58}
+import scorex.crypto.{Base58, Crypto}
 import scorex.wallet.Wallet
+
 import scala.util.Try
 
 trait CommonApifunctions {
-
-  protected[api] def walletNotExistsOrLocked(): Option[JsObject] =
-    if (!Wallet.isUnlocked()) {
-      Some(ApiError.toJson(ApiError.ERROR_WALLET_LOCKED))
-    } else None
 
   protected[api] def walletExists(): Option[JsObject] =
     if (Wallet.isUnlocked()) {
@@ -42,4 +37,9 @@ trait CommonApifunctions {
         }
       }
     }
+
+  protected[api] def walletNotExistsOrLocked(): Option[JsObject] =
+    if (!Wallet.isUnlocked()) {
+      Some(ApiError.toJson(ApiError.ERROR_WALLET_LOCKED))
+    } else None
 }

@@ -2,39 +2,26 @@ package network
 
 import java.io.DataInputStream
 import java.net.{InetAddress, Socket}
-import java.util.Collections
-import java.util.HashMap
-import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.BlockingQueue
-import java.util.concurrent.TimeUnit
+import java.util.{Collections, HashMap}
+import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue, TimeUnit}
 import java.util.logging.Logger
 
-import settings.Settings
 import network.message.Message
+import settings.Settings
 
-import scala.util.{Failure, Success, Try, Random}
+import scala.util.{Failure, Success, Try}
 
 
 case class ConnectedPeer(socket: Socket,
                          callback: ConnectionCallback) extends Peer(socket.getInetAddress) {
 
   override val address = socket.getInetAddress
-
-
-  private val messages = Collections.synchronizedMap(new HashMap[Integer, BlockingQueue[Message]]())
-
   val out = socket.getOutputStream
+  val pinger = new Pinger(this)
 
 
   callback.onConnect(this)
-
-  val pinger = new Pinger(this)
-
-  def getPing() = pinger.getPing
-
   val self = this
-
-
   val listener = new Thread() {
     override def run() {
       try {
@@ -67,6 +54,29 @@ case class ConnectedPeer(socket: Socket,
       }
     }
   }
+  private val messages = Collections.synchronizedMap(new HashMap[Integer, BlockingQueue[Message]]())
+
+  def getPing() = pinger.getPing
+
+  def getResponse(message: Message): Try[Message] = {
+    require(message.mbId.isDefined)
+    val id = message.mbId.get
+
+    //PUT QUEUE INTO MAP SO WE KNOW WE ARE WAITING FOR A RESPONSE
+    val blockingQueue = new ArrayBlockingQueue[Message](1)
+    messages.put(id, blockingQueue)
+
+    if (!sendMessage(message)) {
+      Failure(new Exception("FAILED TO SEND MESSAGE"))
+    } else {
+      Try {
+        val response = blockingQueue.poll(Settings.connectionTimeout, TimeUnit.MILLISECONDS)
+        messages.remove(id)
+
+        response
+      }
+    }
+  }
 
   def sendMessage(message: Message): Boolean = {
     try {
@@ -88,26 +98,6 @@ case class ConnectedPeer(socket: Socket,
     } catch {
       case t: Throwable => callback.onError(this)
         false
-    }
-  }
-
-  def getResponse(message: Message): Try[Message] = {
-    require(message.mbId.isDefined)
-    val id = message.mbId.get
-
-    //PUT QUEUE INTO MAP SO WE KNOW WE ARE WAITING FOR A RESPONSE
-    val blockingQueue = new ArrayBlockingQueue[Message](1)
-    messages.put(id, blockingQueue)
-
-    if (!sendMessage(message)){
-      Failure(new Exception("FAILED TO SEND MESSAGE"))
-    }else {
-      Try {
-        val response = blockingQueue.poll(Settings.connectionTimeout, TimeUnit.MILLISECONDS)
-        messages.remove(id)
-
-        response
-      }
     }
   }
 

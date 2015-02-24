@@ -2,17 +2,12 @@ package scorex.transaction
 
 import java.util.Arrays
 
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import database.PrunableBlockchainStorage
 import play.api.libs.json.Json
-
-import scorex.account.{PublicKeyAccount, Account, PrivateKeyAccount}
-import scorex.crypto.Base58
-import scorex.crypto.Crypto
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.{Base58, Crypto}
 import scorex.transaction.Transaction.TransactionType
-
-import com.google.common.primitives.Bytes
-import com.google.common.primitives.Ints
-import com.google.common.primitives.Longs
 
 case class PaymentTransaction(sender: PublicKeyAccount,
                               recipient: Account,
@@ -22,8 +17,10 @@ case class PaymentTransaction(sender: PublicKeyAccount,
                               override val signature: Array[Byte])
   extends Transaction(TransactionType.PAYMENT_TRANSACTION, fee, timestamp, signature) {
 
-  import PaymentTransaction._
-  import Transaction._
+  import scorex.transaction.PaymentTransaction._
+  import scorex.transaction.Transaction._
+
+  override lazy val dataLength = TYPE_LENGTH + BASE_LENGTH
 
   override def toJson() = getJsonBase() ++ Json.obj(
     "sender" -> sender.address,
@@ -51,8 +48,6 @@ case class PaymentTransaction(sender: PublicKeyAccount,
       Bytes.concat(feeFill, feeBytes, signature)
     )
   }
-
-  override lazy val dataLength = TYPE_LENGTH + BASE_LENGTH
 
   override def isSignatureValid() = {
     //WRITE TYPE
@@ -116,7 +111,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
 object PaymentTransaction {
 
-  import Transaction._
+  import scorex.transaction.Transaction._
 
   private val SENDER_LENGTH = 32
   private val RECIPIENT_LENGTH = Account.ADDRESS_LENGTH

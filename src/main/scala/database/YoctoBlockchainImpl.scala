@@ -1,17 +1,17 @@
 package database
 
 import java.io.{File, FileOutputStream}
-import java.util.concurrent.atomic.AtomicInteger
+
 import com.yandex.yoctodb.DatabaseFormat
 import com.yandex.yoctodb.immutable.Database
 import com.yandex.yoctodb.mutable.DocumentBuilder
-import com.yandex.yoctodb.query.{DocumentProcessor, QueryBuilder}
 import com.yandex.yoctodb.query.QueryBuilder._
+import com.yandex.yoctodb.query.{DocumentProcessor, QueryBuilder}
 import com.yandex.yoctodb.util.UnsignedByteArrays
 import scorex.account.Account
 import scorex.block.Block
-import scorex.transaction.{Transaction, GenesisTransaction, PaymentTransaction}
-import com.google.common.primitives.Bytes
+import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
+
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -21,26 +21,22 @@ class YoctoBlockchainImpl extends BlockChain {
   val signaturesIndex = TrieMap[Int, Array[Byte]]()
   val blocksIndex = TrieMap[Int, Block]()
 
-  override def height(): Int = signaturesIndex.size
-
-  private def filename(height:Int) = s"/tmp/block-${height+1}"
-
   //todo: block fees
   override def appendBlock(block: Block): BlockChain = {
     val dbBuilder = DatabaseFormat.getCurrent.newDatabaseBuilder()
 
-    block.transactions.foreach{tx =>
+    block.transactions.foreach { tx =>
       val db0 = DatabaseFormat.getCurrent.newDocumentBuilder()
 
       val documentBuilder = tx match {
-        case ptx:PaymentTransaction =>
+        case ptx: PaymentTransaction =>
           db0.withField("account", tx.getCreator().get.address, DocumentBuilder.IndexOption.FILTERABLE)
             .withField("account", ptx.recipient.address, DocumentBuilder.IndexOption.FILTERABLE)
             .withPayload(ptx.toBytes())
 
-        case gtx:GenesisTransaction =>
+        case gtx: GenesisTransaction =>
           db0.withField("account", gtx.recipient.address, DocumentBuilder.IndexOption.FILTERABLE)
-              .withPayload(gtx.toBytes())
+            .withPayload(gtx.toBytes())
 
         case _ => throw new RuntimeException(s"Serialization not implemented for $tx")
       }
@@ -63,8 +59,8 @@ class YoctoBlockchainImpl extends BlockChain {
 
   override def contains(block: Block): Boolean = signaturesIndex.exists(_._2.sameElements(block.signature))
 
-  override def balance(address: String, fromHeight:Int, confirmations:Int): BigDecimal = {
-    val dbs = (1 to height()).toSeq.map{h =>
+  override def balance(address: String, fromHeight: Int, confirmations: Int): BigDecimal = {
+    val dbs = (1 to height()).toSeq.map { h =>
       DatabaseFormat.getCurrent
         .getDatabaseReader
         .from(new File(filename(h)), false)
@@ -89,8 +85,12 @@ class YoctoBlockchainImpl extends BlockChain {
       }
     })
 
-    seq.reduce(_+_)
+    seq.reduce(_ + _)
   }
+
+  override def height(): Int = signaturesIndex.size
+
+  private def filename(height: Int) = s"/tmp/block-${height + 1}"
 
   override def heightOf(blockSignature: Array[Byte]): Option[Int] = ???
 
@@ -105,5 +105,3 @@ class YoctoBlockchainImpl extends BlockChain {
 
   override def generatedBy(account: Account): Seq[Block] = ???
 }
-
-

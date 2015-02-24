@@ -1,6 +1,6 @@
 package scorex.crypto
 
-import Crypto._
+import scorex.crypto.Crypto._
 
 /*
 sign & verify functions defined in the same way as in Nxt
@@ -35,13 +35,13 @@ object Curve25519Impl {
     require(signature.length == 64)
     require(publicKey.length == 32)
 
-    val v  = new Array[Byte](32)
-    val h  = new Array[Byte](32)
+    val v = new Array[Byte](32)
+    val h = new Array[Byte](32)
 
     System.arraycopy(signature, 0, v, 0, 32)
     System.arraycopy(signature, 32, h, 0, 32)
 
-    val Y  = new Array[Byte](32)
+    val Y = new Array[Byte](32)
     Curve25519.verify(Y, v, h, publicKey)
 
     val m = sha256(message)

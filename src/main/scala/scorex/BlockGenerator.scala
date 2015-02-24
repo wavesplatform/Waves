@@ -1,18 +1,18 @@
 package scorex
 
 import akka.actor.Actor
+import com.google.common.primitives.{Bytes, Longs}
+import controller.Controller
+import database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import ntp.NTP
 import scorex.account.PrivateKeyAccount
-import scorex.block.{BlockStub, Block}
+import scorex.block.{Block, BlockStub}
 import scorex.crypto.Crypto
 import scorex.transaction.Transaction
-import com.google.common.primitives.Bytes
-import com.google.common.primitives.Longs
-import controller.Controller
-import database.{UnconfirmedTransactionsDatabaseImpl, PrunableBlockchainStorage}
 import scorex.transaction.Transaction.ValidationResult
 import scorex.wallet.Wallet
 import settings.Settings
+
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 
@@ -20,7 +20,7 @@ case object TryToGenerateBlock
 
 class BlockGenerator extends Actor {
 
-  import BlockGenerator._
+  import scorex.BlockGenerator._
 
   override def receive = {
     case TryToGenerateBlock =>
@@ -28,7 +28,7 @@ class BlockGenerator extends Actor {
 
       //CHECK IF WE HAVE CONNECTIONS
       if (Controller.getStatus == Controller.STATUS_OKE
-        ||(Controller.getStatus == Controller.STATUS_NO_CONNECTIONS && Settings.offlineGeneration)) {
+        || (Controller.getStatus == Controller.STATUS_NO_CONNECTIONS && Settings.offlineGeneration)) {
         val blocks = TrieMap[PrivateKeyAccount, BlockStub]()
 
         //GENERATE NEW BLOCKS
@@ -62,6 +62,32 @@ object BlockGenerator {
   val MIN_BLOCK_TIME = 1 * 60
   val MAX_BLOCK_TIME = 5 * 60
 
+  def getNextBlockGeneratingBalance(block: Block) = {
+    if (block.height().get % RETARGET == 0) {
+      //GET FIRST BLOCK OF TARGET
+      val firstBlock = (1 to RETARGET - 1).foldLeft(block) { case (bl, _) => bl.parent().get}
+
+      //CALCULATE THE GENERATING TIME FOR LAST 10 BLOCKS
+      val generatingTime = block.timestamp - firstBlock.timestamp
+
+      //CALCULATE EXPECTED FORGING TIME
+      val expectedGeneratingTime = getBlockTime(block.generatingBalance) * RETARGET * 1000
+
+      //CALCULATE MULTIPLIER
+      val multiplier = expectedGeneratingTime / generatingTime.toDouble
+
+      //CALCULATE NEW GENERATING BALANCE
+      val generatingBalance = (block.generatingBalance * multiplier).toLong
+      minMaxBalance(generatingBalance)
+    } else block.generatingBalance
+  }
+
+  def getBaseTarget(generatingBalance: Long) = minMaxBalance(generatingBalance) * getBlockTime(generatingBalance)
+
+  def getBlockTime(generatingBalance: Long) = {
+    val percentageOfTotal = minMaxBalance(generatingBalance) / MAX_BALANCE.toDouble
+    (MIN_BLOCK_TIME + ((MAX_BLOCK_TIME - MIN_BLOCK_TIME) * (1 - percentageOfTotal))).toLong
+  }
 
   private[BlockGenerator] def generateNextBlock(account: PrivateKeyAccount, block: Block) = {
     require(account.generatingBalance > BigDecimal(0), "Zero generating balance in generateNextBlock")
@@ -106,7 +132,6 @@ object BlockGenerator {
     Crypto.sign(account, Bytes.concat(generatorSignature, baseTargetBytes, generatorBytes))
   }
 
-
   private def formBlock(stub: BlockStub, account: PrivateKeyAccount): Block = {
 
     //ORDER TRANSACTIONS BY FEE PER BYTE
@@ -134,33 +159,6 @@ object BlockGenerator {
     val transactionsSingature = Crypto.sign(account, data)
 
     Block(stub, transactions, transactionsSingature)
-  }
-
-  def getNextBlockGeneratingBalance(block: Block) = {
-    if (block.height().get % RETARGET == 0) {
-      //GET FIRST BLOCK OF TARGET
-      val firstBlock = (1 to RETARGET - 1).foldLeft(block) { case (bl, _) => bl.parent().get}
-
-      //CALCULATE THE GENERATING TIME FOR LAST 10 BLOCKS
-      val generatingTime = block.timestamp - firstBlock.timestamp
-
-      //CALCULATE EXPECTED FORGING TIME
-      val expectedGeneratingTime = getBlockTime(block.generatingBalance) * RETARGET * 1000
-
-      //CALCULATE MULTIPLIER
-      val multiplier = expectedGeneratingTime / generatingTime.toDouble
-
-      //CALCULATE NEW GENERATING BALANCE
-      val generatingBalance = (block.generatingBalance * multiplier).toLong
-      minMaxBalance(generatingBalance)
-    } else block.generatingBalance
-  }
-
-  def getBaseTarget(generatingBalance: Long) = minMaxBalance(generatingBalance) * getBlockTime(generatingBalance)
-
-  def getBlockTime(generatingBalance: Long) = {
-    val percentageOfTotal = minMaxBalance(generatingBalance) / MAX_BALANCE.toDouble
-    (MIN_BLOCK_TIME + ((MAX_BLOCK_TIME - MIN_BLOCK_TIME) * (1 - percentageOfTotal))).toLong
   }
 
   private def minMaxBalance(generatingBalance: Long) =

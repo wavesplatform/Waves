@@ -2,7 +2,9 @@ package ntp
 
 import java.net.InetAddress
 import java.util.logging.Logger
+
 import org.apache.commons.net.ntp.NTPUDPClient
+
 import scala.util.Try
 
 

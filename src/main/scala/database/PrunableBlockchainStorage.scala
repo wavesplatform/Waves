@@ -8,9 +8,8 @@ import scorex.transaction.Transaction
 
 
 object PrunableBlockchainStorage extends BlockChain {
-  var snapshot:Option[Snapshot] = None
-
-  val chainAfterSnapshot:AtomicReference[BlockChain] = new AtomicReference(new YoctoBlockchainImpl)
+  val chainAfterSnapshot: AtomicReference[BlockChain] = new AtomicReference(new YoctoBlockchainImpl)
+  var snapshot: Option[Snapshot] = None
 
   override def height(): Int = chainAfterSnapshot.get().height()
 
@@ -32,7 +31,7 @@ object PrunableBlockchainStorage extends BlockChain {
 
   override def contains(block: Block): Boolean = chainAfterSnapshot.get().contains(block)
 
-  override def balance(address: String, fromHeight: Int, confirmations:Int): BigDecimal = {
+  override def balance(address: String, fromHeight: Int, confirmations: Int): BigDecimal = {
     chainAfterSnapshot.get().balance(address, fromHeight, confirmations)
   }
 
@@ -42,5 +41,5 @@ object PrunableBlockchainStorage extends BlockChain {
 
   override def blockByHeader(signature: Array[Byte]): Option[Block] = chainAfterSnapshot.get().blockByHeader(signature)
 
-  def generatedBy(account:Account):Seq[Block] = chainAfterSnapshot.get().generatedBy(account)
+  def generatedBy(account: Account): Seq[Block] = chainAfterSnapshot.get().generatedBy(account)
 }

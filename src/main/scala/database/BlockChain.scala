@@ -1,7 +1,7 @@
 package database
 
 import scorex.account.Account
-import scorex.block.{GenesisBlock, Block}
+import scorex.block.{Block, GenesisBlock}
 import scorex.transaction.Transaction
 import settings.Settings
 
@@ -28,7 +28,7 @@ trait BlockChain extends StateQuery {
 
   def discardBlock(): BlockChain
 
-  def lastBlock:Block = blockAt(height()).get
+  def lastBlock: Block = blockAt(height()).get
 
   def confirmations(tx: Transaction): Option[Int]
 

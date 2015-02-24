@@ -6,7 +6,7 @@ import scorex.account.Account
 import scorex.wallet.Wallet
 import spray.routing.HttpService
 
-import scala.util.{Success, Failure, Try}
+import scala.util.{Failure, Success, Try}
 
 
 trait PaymentHttpService extends HttpService with CommonApifunctions {
@@ -14,7 +14,7 @@ trait PaymentHttpService extends HttpService with CommonApifunctions {
     path("payment") {
       post {
         entity(as[String]) { body => complete {
-          walletNotExistsOrLocked().getOrElse{
+          walletNotExistsOrLocked().getOrElse {
             Try(Json.parse(body)).map { js =>
               (Try(BigDecimal((js \ "amount").as[String]).setScale(8)),
                 Try(BigDecimal((js \ "fee").as[String]).setScale(8)),

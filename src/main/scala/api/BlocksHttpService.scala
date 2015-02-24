@@ -2,10 +2,11 @@ package api
 
 import controller.Controller
 import database.PrunableBlockchainStorage
-import play.api.libs.json.{Json, JsArray}
+import play.api.libs.json.Json
 import scorex.BlockGenerator
 import scorex.block.GenesisBlock
 import spray.routing.HttpService
+
 import scala.util.Try
 
 
@@ -31,13 +32,15 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         }
       } ~ path("height" / Segment) { case encodedSignature =>
         get {
-          complete{withBlock(encodedSignature) { block =>
-            Json.obj("height" -> block.height())
-          }.toString()}
+          complete {
+            withBlock(encodedSignature) { block =>
+              Json.obj("height" -> block.height())
+            }.toString()
+          }
         }
       } ~ path("time") {
         get {
-          complete{
+          complete {
             val block = PrunableBlockchainStorage.lastBlock
             val timePerBlock = BlockGenerator.getBlockTime(block.generatingBalance)
             Json.obj("time" -> timePerBlock).toString()
@@ -45,7 +48,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         }
       } ~ path("time" / Segment) { case generatingBalance =>
         get {
-          complete{
+          complete {
             val jsRes = Try {
               val timePerBlock = BlockGenerator.getBlockTime(generatingBalance.toLong)
               Json.obj("time" -> timePerBlock)
@@ -55,7 +58,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         }
       } ~ path("generatingbalance") {
         get {
-          complete{
+          complete {
             val generatingBalance = Controller.nextBlockGeneratingBalance()
             Json.obj("generatingbalance" -> generatingBalance).toString()
           }

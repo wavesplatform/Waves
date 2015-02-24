@@ -2,12 +2,12 @@ package scorex.wallet
 
 import java.util.concurrent.atomic.AtomicReference
 import java.util.logging.Logger
-import com.google.common.primitives.Bytes
-import com.google.common.primitives.Ints
-import controller.Controller
+
+import com.google.common.primitives.{Bytes, Ints}
 import database.wallet.SecureWalletDatabase
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.Crypto
+
 import scala.util.Try
 
 
@@ -17,18 +17,10 @@ object Wallet {
 
   private val secureDatabaseRef: AtomicReference[Option[SecureWalletDatabase]] = new AtomicReference(None)
 
-  private def secureDb() = secureDatabaseRef.get()
-
-  def isUnlocked() = secureDb().isDefined
-
   def privateKeyAccounts() = secureDatabaseRef.get match {
     case None => Seq[PrivateKeyAccount]()
     case Some(secureDatabase) => secureDatabase.accounts()
   }
-
-  def privateKeyAccount(address: String) = secureDb().flatMap(_.account(address))
-
-  //CREATE
 
   def create(seed: Array[Byte], password: String, depth: Int, synchronize: Boolean): Boolean = {
     //OPEN SECURE WALLET
@@ -76,10 +68,16 @@ object Wallet {
     account
   }
 
+  //CREATE
+
   def generateAccountSeed(seed: Array[Byte], nonce: Int) = {
     val nonceBytes = Ints.toByteArray(nonce)
     val accountSeed = Bytes.concat(nonceBytes, seed, nonceBytes)
     Crypto.doubleSha256(accountSeed)
+  }
+
+  def commit() {
+    secureDb().map(_.commit())
   }
 
   //DELETE
@@ -96,7 +94,7 @@ object Wallet {
     }
   }
 
-  //UNLOCK
+  def isUnlocked() = secureDb().isDefined
 
   def unlock(password: String): Boolean = {
     if (isUnlocked()) {
@@ -108,14 +106,13 @@ object Wallet {
     }
   }
 
+  //UNLOCK
+
   def lock() = secureDb().map { db =>
     db.commit()
     db.close()
     secureDatabaseRef.set(None)
   }.isDefined
-
-
-  //IMPORT/EXPORT
 
   def importAccountSeed(accountSeed: Array[Byte]): Option[String] = secureDb().flatMap { db =>
     if (accountSeed.length != 32) {
@@ -126,15 +123,18 @@ object Wallet {
     }
   }
 
+
+  //IMPORT/EXPORT
+
+  private def secureDb() = secureDatabaseRef.get()
+
   def exportAccountSeed(address: String): Option[Array[Byte]] = privateKeyAccount(address).map(_.seed)
+
+  def privateKeyAccount(address: String) = secureDb().flatMap(_.account(address))
 
   def exportSeed(): Option[Array[Byte]] = secureDb().map(_.getSeed())
 
   def close() {
     secureDb().map(_.close())
-  }
-
-  def commit() {
-    secureDb().map(_.commit())
   }
 }

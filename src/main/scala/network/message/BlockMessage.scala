@@ -1,14 +1,14 @@
 package network.message
 
 import java.util.Arrays
+
+import com.google.common.primitives.{Bytes, Ints}
 import network.ConnectedPeer
 import scorex.block.Block
-import com.google.common.primitives.Bytes
-import com.google.common.primitives.Ints
 
 case class BlockMessage(height: Int, block: Block, mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
 
-  import BlockMessage._
+  import network.message.BlockMessage._
 
 
   override val messageType = Message.BLOCK_TYPE
