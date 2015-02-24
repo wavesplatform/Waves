@@ -3,18 +3,14 @@ package network
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.util.Collections
-import java.util.Observable
-import java.util.Observer
 import java.util.TreeSet
 import java.util.logging.Logger
-
-import utils.ObserverMessage
 import controller.Controller
 import network.message._
 
 import scala.util.Try
 
-object Network extends Observable with ConnectionCallback {
+object Network extends ConnectionCallback {
 
 	val PORT = 9084
 	
@@ -52,13 +48,6 @@ object Network extends Observable with ConnectionCallback {
 		
 		//PASS TO CONTROLLER
 		Controller.onConnect(peer)
-		
-		//NOTIFY OBSERVERS
-		setChanged()
-		notifyObservers(new ObserverMessage(ObserverMessage.ADD_PEER_TYPE, peer))		
-		
-		setChanged()
-		notifyObservers(new ObserverMessage(ObserverMessage.LIST_PEER_TYPE, connectedPeers))		
 	}
 
 	override def onDisconnect(peer:ConnectedPeer) {
@@ -75,13 +64,6 @@ object Network extends Observable with ConnectionCallback {
 		
 		//CLOSE CONNECTION IF STILL ACTIVE
 		peer.close()
-		
-		//NOTIFY OBSERVERS
-		setChanged()
-		notifyObservers(new ObserverMessage(ObserverMessage.REMOVE_PEER_TYPE, peer))		
-		
-		setChanged()
-		notifyObservers(new ObserverMessage(ObserverMessage.LIST_PEER_TYPE, connectedPeers))		
 	}
 	
 	override def onError(peer:ConnectedPeer) {
@@ -101,13 +83,6 @@ object Network extends Observable with ConnectionCallback {
 		
 		//CLOSE CONNECTION IF STILL ACTIVE
 		peer.close()
-					
-		//NOTIFY OBSERVERS
-		setChanged()
-		notifyObservers(new ObserverMessage(ObserverMessage.REMOVE_PEER_TYPE, peer))		
-		
-		setChanged()
-		notifyObservers(new ObserverMessage(ObserverMessage.LIST_PEER_TYPE, connectedPeers))		
 	}
 	
 	override def isConnectedTo(address:InetAddress) = connectedPeers.exists(_.address.equals(address))
@@ -159,13 +134,6 @@ object Network extends Observable with ConnectionCallback {
 		}.recover{case t:Throwable => t.printStackTrace()}
 		
 		Logger.getGlobal().info("Broadcasting end")
-	}
-	
-	override def addObserver(o:Observer) {
-		super.addObserver(o)
-		
-		//SEND CONNECTEDPEERS ON REGISTER
-		o.update(this, new ObserverMessage(ObserverMessage.LIST_PEER_TYPE, connectedPeers))
 	}
 	
 	def isPortAvailable(port:Int) = Try(new ServerSocket(port).close()).isSuccess

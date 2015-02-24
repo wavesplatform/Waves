@@ -1,36 +1,26 @@
 package controller
 
-import java.math.BigDecimal
-import java.util.Observable
-import java.util.Observer
 import java.util.logging.Logger
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.io.IO
 import api.HttpServiceActor
-import scorex.BlockChain
-import scorex.BlockGenerator
-import scorex.Synchronizer
-import scorex.TransactionCreator
+import database.{UnconfirmedTransactionsDatabaseImpl, PrunableBlockchainStorage}
+import scorex._
 import scorex.account.Account
 import scorex.account.PrivateKeyAccount
-import scorex.block.Block
-import scorex.crypto.Curve25519Impl
+import scorex.block.{GenesisBlock, Block}
 import scorex.transaction.Transaction
 import scorex.transaction.Transaction.TransactionType
 import scorex.wallet.Wallet
 import settings.Settings
 import spray.can.Http
-import utils.ObserverMessage
-import database.DBSet
 import network.{PeerManager, ConnectedPeer, Network, Peer}
 import network.message._
-
 import scala.collection.concurrent.TrieMap
-import scala.collection.JavaConverters._
-import scala.util.Try
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
-
-object Controller extends Observable {
+object Controller {
 
   val STATUS_NO_CONNECTIONS = 0
   val STATUS_SYNCHRONIZING = 1
@@ -41,26 +31,31 @@ object Controller extends Observable {
 
   def getStatus = status
 
-  private val blockChain = BlockChain
-
-  private val wallet = Wallet
   private val transactionCreator = new TransactionCreator()
 
   val peerHeights = TrieMap[ConnectedPeer, Int]()
 
+  private var blockActorRef:ActorRef = _
+
   def init() {
     //OPENING DATABASES
-    DBSet.getInstance()
-    require(!DBSet.getInstance().getBlockMap.isProcessing, "The application was not closed correctly!")
     require(Network.isPortAvailable(Settings.rpcPort), "Rpc port " + Settings.rpcPort + " already in use!")
 
-    implicit val actorSystem = ActorSystem()
+    if (PrunableBlockchainStorage.isEmpty()){
+      GenesisBlock.process()
+      PrunableBlockchainStorage.appendBlock(GenesisBlock)
+    }
+
+    require(PrunableBlockchainStorage.height() >= 1)
+
+    implicit val actorSystem = ActorSystem("lagonaki")
     val httpServiceActor = actorSystem.actorOf(Props[HttpServiceActor], "http-service")
     val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = Settings.rpcPort)
     IO(Http) ! bindCommand
 
-    //START BLOCKGENERATOR
-    BlockGenerator.start()
+    blockActorRef = actorSystem.actorOf(Props[BlockActor])
+
+    val blockGenerator = actorSystem.actorOf(Props[BlockGenerator])
 
     //CLOSE ON UNEXPECTED SHUTDOWN
     Runtime.getRuntime.addShutdownHook(new Thread() {
@@ -69,35 +64,8 @@ object Controller extends Observable {
       }
     })
 
-    //REGISTER DATABASE OBSERVER
-    this.addObserver(DBSet.getInstance().getTransactionMap)
-    this.addObserver(DBSet.getInstance())
-  }
-
-  override def addObserver(o: Observer) {
-    //ADD OBSERVER TO SYNCHRONIZER
-    //this.synchronizer.addObserver(o)
-    DBSet.getInstance().getBlockMap.addObserver(o)
-
-    //ADD OBSERVER TO BLOCKGENERATOR
-    //this.blockGenerator.addObserver(o)
-    DBSet.getInstance().getTransactionMap.addObserver(o)
-
-    //ADD OBSERVER TO BALANCES
-    DBSet.getInstance().getBalanceMap.addObserver(o)
-
-    //ADD OBSERVER TO CONTROLLER
-    super.addObserver(o)
-    o.update(this, new ObserverMessage(ObserverMessage.NETWORK_STATUS, status))
-  }
-
-  override def deleteObserver(o: Observer) {
-    DBSet.getInstance().getBlockMap.deleteObserver(o)
-    super.deleteObserver(o)
-  }
-
-  def deleteWalletObserver(o: Observer) {
-    wallet.deleteObserver(o)
+    update()
+    actorSystem.scheduler.schedule(2.seconds, 500.milliseconds)(blockGenerator ! TryToGenerateBlock)
   }
 
   private var isStopping = false
@@ -111,17 +79,9 @@ object Controller extends Observable {
       Logger.getGlobal.info("Stopping message processor")
       Network.stop()
 
-      //STOP BLOCK PROCESSOR
-      Logger.getGlobal.info("Stopping block processor")
-      Synchronizer.stop()
-
-      //CLOSE DATABABASE
-      Logger.getGlobal.info("Closing database")
-      DBSet.getInstance().close()
-
       //CLOSE WALLET
       Logger.getGlobal.info("Closing wallet")
-      wallet.close()
+      Wallet.close()
 
       //FORCE CLOSE
       System.exit(0)
@@ -132,9 +92,8 @@ object Controller extends Observable {
 
   def activePeers() = Network.getActiveConnections()
 
-
   def onConnect(peer: ConnectedPeer) {
-    val height = blockChain.getHeight
+    val height = PrunableBlockchainStorage.height()
 
     //SEND VERSION MESSAGE
     peer.sendMessage(VersionMessage(height))
@@ -142,10 +101,6 @@ object Controller extends Observable {
     if (this.status == STATUS_NO_CONNECTIONS) {
       //UPDATE STATUS
       this.status = STATUS_OKE
-
-      //NOTIFY
-      this.setChanged()
-      this.notifyObservers(new ObserverMessage(ObserverMessage.NETWORK_STATUS, this.status))
     }
   }
 
@@ -155,10 +110,6 @@ object Controller extends Observable {
     if (peerHeights.isEmpty) {
       //UPDATE STATUS
       status = STATUS_NO_CONNECTIONS
-
-      //NOTIFY
-      setChanged()
-      notifyObservers(new ObserverMessage(ObserverMessage.NETWORK_STATUS, status))
     }
   }
 
@@ -177,25 +128,18 @@ object Controller extends Observable {
       case VersionMessage(height, Some(sender), _) => peerHeights.put(sender, height)
 
       case GetSignaturesMessage(parent, Some(sender), id: Some[_]) =>
-        val headers = blockChain.getSignatures(parent)
+        val headers = PrunableBlockchainStorage.getSignatures(parent)
         sender.sendMessage(SignaturesMessage(headers, mbId = id))
 
       case GetBlockMessage(signature, Some(sender), id: Some[_]) =>
-        val block = blockChain.getBlock(signature).get
-        sender.sendMessage(BlockMessage(block.getHeight(), block, mbId = id))
+        val block = PrunableBlockchainStorage.blockByHeader(signature).get
+        sender.sendMessage(BlockMessage(block.height().get, block, mbId = id))
 
       case BlockMessage(height, block, Some(sender), _) =>
         require(block != null)
 
-        if (blockChain.isNewBlockValid(block)) {
-          Logger.getGlobal.info("received new valid block")
-
-          //PROCESS
-          Synchronizer.process(block)
-
-          //BROADCAST
-          Network.broadcast(message, List(sender))
-
+        if (Block.isNewBlockValid(block)) {
+          blockActorRef ! NewBlock(block, Some(sender))
         } else peerHeights.put(sender, height)
 
       case TransactionMessage(transaction, Some(sender), _) =>
@@ -204,11 +148,7 @@ object Controller extends Observable {
           //DISHONEST PEER
           Network.onError(sender)
         } else if (transaction.hasMinimumFee && transaction.hasMinimumFeePerByte) {
-          //ADD TO UNCONFIRMED TRANSACTIONS
-          BlockGenerator.addUnconfirmedTransaction(transaction)
-
-          setChanged()
-          notifyObservers(new ObserverMessage(ObserverMessage.ADD_TRANSACTION_TYPE, transaction))
+          UnconfirmedTransactionsDatabaseImpl.put(transaction)
 
           //BROADCAST
           Network.broadcast(message, List(sender))
@@ -216,12 +156,8 @@ object Controller extends Observable {
     }
   }
 
-  def addActivePeersObserver(o: Observer) = Network.addObserver(o)
-
-  def removeActivePeersObserver(o: Observer) = Network.deleteObserver(o)
-
   def broadcastBlock(newBlock: Block) {
-    val message = BlockMessage(newBlock.getHeight(), newBlock)
+    val message = BlockMessage(newBlock.height().get, newBlock)
     Network.broadcast(message, List[Peer]())
   }
 
@@ -232,42 +168,24 @@ object Controller extends Observable {
 
   //SYNCHRONIZE
 
-  def isUpToDate() = peerHeights.isEmpty || maxPeerHeight() <= blockChain.getHeight
+  def isUpToDate() = peerHeights.isEmpty || maxPeerHeight() <= PrunableBlockchainStorage.height()
 
   def update() {
     //UPDATE STATUS
-    this.status = STATUS_SYNCHRONIZING
-
-    //NOTIFY
-    this.setChanged()
-    this.notifyObservers(new ObserverMessage(ObserverMessage.NETWORK_STATUS, this.status))
+    status = STATUS_SYNCHRONIZING
 
     //WHILE NOT UPTODATE
     while (!isUpToDate()) {
-      //START UPDATE FROM HIGHEST HEIGHT PEER
       val peer = maxHeightPeer()
-
-      //SYNCHRONIZE FROM PEER
-      Try(Synchronizer.synchronize(peer)).recover { case e: Exception =>
-        e.printStackTrace()
-        Network.onError(peer)
-      }
+      blockActorRef ! Synchronize(peer)
     }
 
     if (peerHeights.isEmpty) {
       //UPDATE STATUS
       this.status = STATUS_NO_CONNECTIONS
-
-      //NOTIFY
-      this.setChanged()
-      this.notifyObservers(new ObserverMessage(ObserverMessage.NETWORK_STATUS, this.status))
     } else {
       //UPDATE STATUS
       this.status = STATUS_OKE
-
-      //NOTIFY
-      this.setChanged()
-      this.notifyObservers(new ObserverMessage(ObserverMessage.NETWORK_STATUS, this.status))
     }
   }
 
@@ -277,116 +195,32 @@ object Controller extends Observable {
 
   //WALLET
 
-  def doesWalletExists() = wallet.exists()
+  def createWallet(seed: Array[Byte], password: String, amount: Int) = Wallet.create(seed, password, amount, false)
 
-  def createWallet(seed: Array[Byte], password: String, amount: Int) = wallet.create(seed, password, amount, false)
-
-  def recoverWallet(seed: Array[Byte], password: String, amount: Int) = wallet.create(seed, password, amount, true)
-
-  def accounts() = wallet.getAccounts()
-
-  def privateKeyAccounts() = wallet.getprivateKeyAccounts()
-
-  def generateNewAccount() = wallet.generateNewAccount()
-
-  def privateKeyAccountByAddress(address: String) = wallet.getPrivateKeyAccount(address)
-
-  def accountByAddress(address: String) = wallet.getAccount(address)
-
-  def unconfirmedBalance(address: String) = wallet.getUnconfirmedBalance(address)
-
-  def addWalletListener(o: Observer) = wallet.addObserver(o)
-
-  def importAccountSeed(accountSeed: Array[Byte]) = wallet.importAccountSeed(accountSeed)
-
-  def exportAccountSeed(address: String) = wallet.exportAccountSeed(address)
-
-  def exportSeed() = wallet.exportSeed()
-
-
-  def deleteAccount(account: PrivateKeyAccount) = wallet.deleteAccount(account)
-
-  def synchronizeWallet() = wallet.synchronize()
-
-  def isWalletUnlocked() = wallet.isUnlocked()
-
-  def lockWallet = wallet.lock()
-
-  def unlockWallet(password: String) = wallet.unlock(password)
-
-  def lastTransactions(limit: Int) = wallet.getLastTransactions(limit)
-
-  def getTransaction(signature: Array[Byte]) = {
-    //CHECK IF IN BLOCK
-    Option(DBSet.getInstance().getTransactionParentMap.getParent(signature)) match {
-      case Some(block) => block.getTransaction(signature).get
-      case None => DBSet.getInstance().getTransactionMap().get(signature)
-    }
-  }
-
-  def lastTransactions(account: Account, limit: Int) = wallet.getLastTransactions(account, limit)
-
-  def lastBlocks() = wallet.getLastBlocks()
-
-  def lastBlocks(account: Account):List[Block] = wallet.getLastBlocks(account)
-
-  def onDatabaseCommit() = wallet.commit()
+  def recoverWallet(seed: Array[Byte], password: String, amount: Int) = Wallet.create(seed, password, amount, true)
 
   //BLOCKCHAIN
 
-  def height() = blockChain.getHeight.toInt
+  def scanTransactions(block: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) =
+    PrunableBlockchainStorage.scanTransactions(block, blockLimit, transactionLimit, txType, service, account)
 
-  def lastBlock() = blockChain.getLastBlock
+  def nextBlockGeneratingBalance() = BlockGenerator.getNextBlockGeneratingBalance(PrunableBlockchainStorage.lastBlock)
 
-  def block(header: Array[Byte]) = blockChain.getBlock(header)
-
-
-  def scanTransactions(block: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) = {
-    val t = blockChain.scanTransactions(block, blockLimit, transactionLimit, txType, service, account)
-    new utils.Pair(t._1, t._2.asJava) //todo:fix
-  }
-
-
-  def nextBlockGeneratingBalance() =
-    BlockGenerator.getNextBlockGeneratingBalance(DBSet.getInstance(), DBSet.getInstance().getBlockMap.getLastBlock)
-
-
-  def nextBlockGeneratingBalance(parent: Block) =
-    BlockGenerator.getNextBlockGeneratingBalance(DBSet.getInstance(), parent)
-
+  def nextBlockGeneratingBalance(parent: Block) = BlockGenerator.getNextBlockGeneratingBalance(parent)
 
   //FORGE
 
-  def newBlockGenerated(newBlock: Block) =
-    if (Synchronizer.process(newBlock)) {
-      //add to the blockchain
-      Logger.getGlobal.info(s"Block generated $newBlock (height: ${newBlock.getHeight()}) with ${newBlock.transactions.size} transactions inside, going to broadcast it")
-      broadcastBlock(newBlock)
-      true
-    } else false
-
-
-  def getUnconfirmedTransactions = BlockGenerator.getUnconfirmedTransactions
-
-  //BALANCES
-
-  def getBalances(key: Long) = DBSet.getInstance().getBalanceMap().getBalancesSortableList(key)
-
-
-  def getBalances(account: Account) = DBSet.getInstance().getBalanceMap().getBalancesSortableList(account)
+  def newBlockGenerated(newBlock: Block) = {
+    val valid = Block.isNewBlockValid(newBlock)
+    if (valid) blockActorRef ! NewBlock(newBlock, None)
+    valid
+  }
 
   //TRANSACTIONS
 
   def onTransactionCreate(transaction: Transaction) {
     //ADD TO UNCONFIRMED TRANSACTIONS
-    BlockGenerator.addUnconfirmedTransaction(transaction)
-
-    //NOTIFY OBSERVERS
-    this.setChanged()
-    this.notifyObservers(new ObserverMessage(ObserverMessage.LIST_TRANSACTION_TYPE, DBSet.getInstance().getTransactionMap.getValues))
-
-    this.setChanged()
-    this.notifyObservers(new ObserverMessage(ObserverMessage.ADD_TRANSACTION_TYPE, transaction))
+    UnconfirmedTransactionsDatabaseImpl.put(transaction)
 
     //BROADCAST
     this.broadcastTransaction(transaction)

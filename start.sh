@@ -8,4 +8,4 @@ sbt compile
 
 sbt start-script
 
-sh -c 'target/start scorex.main.Start'
+sh -c 'target/start scorex.Start'

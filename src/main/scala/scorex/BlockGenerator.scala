@@ -1,7 +1,6 @@
 package scorex
 
-import java.math.BigDecimal
-import java.math.BigInteger
+import akka.actor.Actor
 import ntp.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.block.{BlockStub, Block}
@@ -10,131 +9,94 @@ import scorex.transaction.Transaction
 import com.google.common.primitives.Bytes
 import com.google.common.primitives.Longs
 import controller.Controller
-import database.DBSet
+import database.{UnconfirmedTransactionsDatabaseImpl, PrunableBlockchainStorage}
 import scorex.transaction.Transaction.ValidationResult
+import scorex.wallet.Wallet
+import settings.Settings
 import scala.collection.JavaConversions._
-import scala.collection.JavaConverters._
 import scala.collection.concurrent.TrieMap
 
+case object TryToGenerateBlock
 
-/**
- * Scala version of QORA's BlockGenerator
- *
- * There's one behavioral difference from original logic, please see comments to the
- * addUnconfirmedTransactions method. But it should be compatible with QORA.
- *
- *
- * kushti
- */
+class BlockGenerator extends Actor {
 
-// TODO: make code more functional, i.e. get off of mutable variables, while(true) etc
+  import BlockGenerator._
 
-object BlockGenerator extends Thread {
+  override def receive = {
+    case TryToGenerateBlock =>
+      if (!Controller.isUpToDate()) Controller.update()
+
+      //CHECK IF WE HAVE CONNECTIONS
+      if (Controller.getStatus == Controller.STATUS_OKE
+        ||(Controller.getStatus == Controller.STATUS_NO_CONNECTIONS && Settings.offlineGeneration)) {
+        val blocks = TrieMap[PrivateKeyAccount, BlockStub]()
+
+        //GENERATE NEW BLOCKS
+        Wallet.privateKeyAccounts().foreach { account =>
+          if (account.generatingBalance >= BigDecimal(1)) {
+            //CHECK IF BLOCK FROM USER ALREADY EXISTS USE MAP ACCOUNT BLOCK EASY
+            if (!blocks.containsKey(account)) {
+              //GENERATE NEW BLOCK FOR USER
+              blocks += account -> generateNextBlock(account, PrunableBlockchainStorage.lastBlock)
+            }
+          }
+        }
+
+        blocks.exists { case (account, blockStub) =>
+          if (blockStub.timestamp <= NTP.getTime) {
+            val block = formBlock(blockStub, account)
+            if (block.transactions.nonEmpty) {
+              println("Non-empty block: " + block)
+            }
+            Controller.newBlockGenerated(block)
+          } else false
+        }
+      }
+  }
+}
+
+object BlockGenerator {
   val RETARGET = 10
   val MIN_BALANCE = 1L
   val MAX_BALANCE = 10000000000L
   val MIN_BLOCK_TIME = 1 * 60
   val MAX_BLOCK_TIME = 5 * 60
 
-  private val blocks = TrieMap[PrivateKeyAccount, BlockStub]()
-  private var solvingBlock: Block = _
 
-  def addUnconfirmedTransaction(transaction: Transaction): Unit =
-    addUnconfirmedTransaction(DBSet.getInstance(), transaction)
+  private[BlockGenerator] def generateNextBlock(account: PrivateKeyAccount, block: Block) = {
+    require(account.generatingBalance > BigDecimal(0), "Zero generating balance in generateNextBlock")
 
-  def addUnconfirmedTransaction(db: DBSet, transaction: Transaction): Unit =
-    db.getTransactionMap.add(transaction)
 
-  def getUnconfirmedTransactions = DBSet.getInstance().getTransactionMap.getValues.toList.asJava //todo: fix after Controller rewriting
-
-  private def getKnownAccounts = this.synchronized(Controller.privateKeyAccounts()) //todo: fix
-
-  override def run() {
-    while (true) {
-      //CHECK IF WE ARE UPTODATE
-      if (!Controller.isUpToDate()) Controller.update()
-
-      //CHECK IF WE HAVE CONNECTIONS
-      if (Controller.getStatus == Controller.STATUS_OKE) {
-        val lastBlockSignature = DBSet.getInstance().getBlockMap.getLastBlockSignature
-
-        //CHECK IF DIFFERENT FOR CURRENT SOLVING BLOCK
-        if (this.solvingBlock == null || !this.solvingBlock.signature.sameElements(lastBlockSignature)) {
-          //SET NEW BLOCK TO SOLVE
-          this.solvingBlock = DBSet.getInstance().getBlockMap.getLastBlock
-
-          //RESET BLOCKS
-          this.blocks.clear()
-        }
-
-        //GENERATE NEW BLOCKS
-        if (Controller.doesWalletExists()) {
-          getKnownAccounts foreach { account =>
-            if (account.getGeneratingBalance.compareTo(BigDecimal.ONE) >= 0) {
-              //CHECK IF BLOCK FROM USER ALREADY EXISTS USE MAP ACCOUNT BLOCK EASY
-              if (!blocks.containsKey(account)) {
-                //GENERATE NEW BLOCK FOR USER
-                blocks += account -> generateNextBlock(DBSet.getInstance(), account, solvingBlock)
-              }
-            }
-          }
-        }
-
-        //IS VALID BLOCK FOUND?
-        val validBlockFound = this.blocks.exists { case (account, blockStub) =>
-          if (blockStub.timestamp <= NTP.getTime) {
-            val block = formBlock(blockStub, DBSet.getInstance(), account)
-            if(block.transactions.nonEmpty){
-              println("Non-empty block: " + block)
-            }
-            Controller.newBlockGenerated(block)
-          } else false
-        }
-
-        if (!validBlockFound) Thread.sleep(100)
-      } else {
-        Thread.sleep(100)
-      }
-    }
-  }
-
-  def generateNextBlock(db: DBSet, account: PrivateKeyAccount, block: Block) = {
-    //CHECK IF ACCOUNT HAS BALANCE - but already checked before call (kushti)
-    require(account.getGeneratingBalance(db) != BigDecimal.ZERO, "Zero balance in generateNextBlock")
-
-    val signature = this.calculateSignature(db, block, account)
+    val signature = calculateSignature(block, account)
     val hash = Crypto.sha256(signature)
-    val hashValue = new BigInteger(1, hash)
+    val hashValue = BigInt(1, hash)
 
     //CALCULATE ACCOUNT TARGET
     val targetBytes = Array.fill(32)(Byte.MaxValue)
-    val baseTarget = BigInteger.valueOf(getBaseTarget(getNextBlockGeneratingBalance(db, block)))
-    val target = new BigInteger(1, targetBytes)
-      .divide(baseTarget)
-      .multiply(account.getGeneratingBalance(db).toBigInteger) //MULTIPLY TARGET BY USER BALANCE
+    val baseTarget = BigInt(getBaseTarget(getNextBlockGeneratingBalance(block)))
+    //MULTIPLY TARGET BY USER BALANCE
+    val target = BigInt(1, targetBytes) / baseTarget * account.generatingBalance.toBigInt()
 
 
     //CALCULATE GUESSES
-    val guesses = hashValue.divide(target).add(BigInteger.ONE)
+    val guesses = hashValue / target + 1
 
     //CALCULATE TIMESTAMP
-    val timestampRaw = guesses.multiply(BigInteger.valueOf(1000)).add(BigInteger.valueOf(block.timestamp))
+    val timestampRaw = guesses * 1000 + block.timestamp
 
     //CHECK IF NOT HIGHER THAN MAX LONG VALUE
-    val timestamp = (if (timestampRaw.compareTo(BigInteger.valueOf(Long.MaxValue)) == 1)
-      BigInteger.valueOf(Long.MaxValue)
-    else timestampRaw).longValue()
+    val timestamp = if (timestampRaw > Long.MaxValue) Long.MaxValue else timestampRaw.longValue()
 
     val version = 1
-    BlockStub(version, block.signature, timestamp, getNextBlockGeneratingBalance(db, block), account, signature)
+    BlockStub(version, block.signature, timestamp, getNextBlockGeneratingBalance(block), account, signature)
   }
 
-  def calculateSignature(db: DBSet, solvingBlock: Block, account: PrivateKeyAccount) = {
+  private def calculateSignature(solvingBlock: Block, account: PrivateKeyAccount) = {
     //WRITE PARENT GENERATOR SIGNATURE
     val generatorSignature = Bytes.ensureCapacity(solvingBlock.generatorSignature, Block.GENERATOR_SIGNATURE_LENGTH, 0)
 
     //WRITE GENERATING BALANCE
-    val baseTargetBytesRaw = Longs.toByteArray(getNextBlockGeneratingBalance(db, solvingBlock))
+    val baseTargetBytesRaw = Longs.toByteArray(getNextBlockGeneratingBalance(solvingBlock))
     val baseTargetBytes = Bytes.ensureCapacity(baseTargetBytesRaw, Block.GENERATING_BALANCE_LENGTH, 0)
 
     //WRITE GENERATOR
@@ -145,13 +107,10 @@ object BlockGenerator extends Thread {
   }
 
 
-
-  def formBlock(stub: BlockStub, db: DBSet, account: PrivateKeyAccount): Block = {
-    //CREATE FORK OF GIVEN DATABASE
-    val newBlockDb = db.fork()
+  private def formBlock(stub: BlockStub, account: PrivateKeyAccount): Block = {
 
     //ORDER TRANSACTIONS BY FEE PER BYTE
-    val orderedTransactions = db.getTransactionMap.getValues.toSeq.sortBy(_.feePerByte)
+    val orderedTransactions = UnconfirmedTransactionsDatabaseImpl.getAll().sortBy(_.feePerByte)
 
     /* warning: simplification here!
         QORA does break after first transaction matched conditions then repeat cycle
@@ -160,10 +119,10 @@ object BlockGenerator extends Thread {
     val (_, transactions) = orderedTransactions.foldLeft((0, List[Transaction]())) {
       case ((totalBytes, filteredTxs), tx) =>
         if (tx.timestamp <= stub.timestamp && tx.deadline > stub.timestamp
-          && tx.isValid(newBlockDb) == ValidationResult.VALIDATE_OKE
+          && tx.isValid() == ValidationResult.VALIDATE_OKE
           && totalBytes + tx.dataLength <= Block.MAX_TRANSACTION_BYTES) {
 
-          tx.process(newBlockDb)
+          tx.process()
           (totalBytes + tx.dataLength, tx :: filteredTxs)
         } else (totalBytes, filteredTxs)
     }
@@ -177,10 +136,10 @@ object BlockGenerator extends Thread {
     Block(stub, transactions, transactionsSingature)
   }
 
-  def getNextBlockGeneratingBalance(db: DBSet, block: Block) = {
-    if (block.getHeight(db) % RETARGET == 0) {
+  def getNextBlockGeneratingBalance(block: Block) = {
+    if (block.height().get % RETARGET == 0) {
       //GET FIRST BLOCK OF TARGET
-      val firstBlock = (1 to RETARGET - 1).foldLeft(block) { case (bl, _) => bl.getParent(db)}
+      val firstBlock = (1 to RETARGET - 1).foldLeft(block) { case (bl, _) => bl.parent().get}
 
       //CALCULATE THE GENERATING TIME FOR LAST 10 BLOCKS
       val generatingTime = block.timestamp - firstBlock.timestamp
@@ -204,7 +163,7 @@ object BlockGenerator extends Thread {
     (MIN_BLOCK_TIME + ((MAX_BLOCK_TIME - MIN_BLOCK_TIME) * (1 - percentageOfTotal))).toLong
   }
 
-  def minMaxBalance(generatingBalance: Long) =
+  private def minMaxBalance(generatingBalance: Long) =
     if (generatingBalance < MIN_BALANCE) MIN_BALANCE
     else if (generatingBalance > MAX_BALANCE) MAX_BALANCE
     else generatingBalance

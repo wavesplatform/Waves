@@ -1,6 +1,7 @@
 package api
 
 import controller.Controller
+import database.PrunableBlockchainStorage
 import play.api.libs.json.{Json, JsArray}
 import scorex.BlockGenerator
 import scorex.block.GenesisBlock
@@ -12,11 +13,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
 
   lazy val blocksRouting =
     pathPrefix("blocks") {
-      path("") {
-        get {
-          complete(walletNotExists().getOrElse(JsArray(Controller.lastBlocks().map(_._2.toJson()))).toString())
-        }
-      } ~ path("signature" / Segment) { case encodedSignature =>
+      path("signature" / Segment) { case encodedSignature =>
         get {
           complete(withBlock(encodedSignature)(_.toJson()).toString())
         }
@@ -26,55 +23,58 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         }
       } ~ path("last") {
         get {
-          complete(Controller.lastBlock().toJson().toString())
+          complete(PrunableBlockchainStorage.lastBlock.toJson().toString())
         }
       } ~ path("height") {
         get {
-          complete(Json.obj("height" -> Controller.height()).toString())
+          complete(Json.obj("height" -> PrunableBlockchainStorage.height()).toString())
         }
       } ~ path("height" / Segment) { case encodedSignature =>
         get {
-          val jsRes = withBlock(encodedSignature) { block =>
-            Json.obj("height" -> block.getHeight())
-          }
-          complete(jsRes.toString())
+          complete{withBlock(encodedSignature) { block =>
+            Json.obj("height" -> block.height())
+          }.toString()}
         }
       } ~ path("time") {
         get {
-          val block = Controller.lastBlock()
-          val timePerBlock = BlockGenerator.getBlockTime(block.generatingBalance)
-          complete(Json.obj("time" -> timePerBlock).toString())
+          complete{
+            val block = PrunableBlockchainStorage.lastBlock
+            val timePerBlock = BlockGenerator.getBlockTime(block.generatingBalance)
+            Json.obj("time" -> timePerBlock).toString()
+          }
         }
       } ~ path("time" / Segment) { case generatingBalance =>
         get {
-          val jsRes = Try {
-            val timePerBlock = BlockGenerator.getBlockTime(generatingBalance.toLong)
-            Json.obj("time" -> timePerBlock)
-          }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_NOT_NUMBER))
-          complete(jsRes.toString())
+          complete{
+            val jsRes = Try {
+              val timePerBlock = BlockGenerator.getBlockTime(generatingBalance.toLong)
+              Json.obj("time" -> timePerBlock)
+            }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_NOT_NUMBER))
+            jsRes.toString()
+          }
         }
       } ~ path("generatingbalance") {
         get {
-          val generatingBalance = Controller.nextBlockGeneratingBalance()
-          complete(Json.obj("generatingbalance" -> generatingBalance).toString())
+          complete{
+            val generatingBalance = Controller.nextBlockGeneratingBalance()
+            Json.obj("generatingbalance" -> generatingBalance).toString()
+          }
         }
       } ~ path("generatingbalance" / Segment) { case encodedSignature =>
         get {
-          val jsRes = withBlock(encodedSignature) { block =>
+          complete(withBlock(encodedSignature) { block =>
             Json.obj("generatingbalance" -> block.generatingBalance)
-          }
-          complete(jsRes.toString())
+          }.toString())
         }
       } ~ path("child" / Segment) { case encodedSignature =>
         get {
-          complete(withBlock(encodedSignature)(_.getChild().toJson()).toString())
+          complete(withBlock(encodedSignature)(_.child().get.toJson()).toString())
         }
       } ~ path("address" / Segment) { case address =>
         get {
-          val jsRes = withAccount(address) { account =>
-            Json.arr(Controller.lastBlocks(account).map(_.toJson()))
-          }
-          complete(jsRes.toString())
+          complete(withAccount(address) { account =>
+            Json.arr(PrunableBlockchainStorage.generatedBy(account).map(_.toJson()))
+          }.toString())
         }
       }
     }

@@ -5,7 +5,7 @@ import com.google.common.primitives.Bytes
 import com.google.common.primitives.Ints
 import network.ConnectedPeer
 
-case class SignaturesMessage(signatures: List[Array[Byte]], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
+case class SignaturesMessage(signatures: Seq[Array[Byte]], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
 
   import SignaturesMessage._
 

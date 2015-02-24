@@ -1,12 +1,12 @@
 package scorex.block
 
 import java.math.BigDecimal
+import database.PrunableBlockchainStorage
 import scorex.account.Account
 import scorex.account.PublicKeyAccount
 import scorex.crypto.Crypto
 import scorex.transaction.GenesisTransaction
 import com.google.common.primitives.{Ints, Bytes, Longs}
-import database.DBSet
 import scorex.transaction.Transaction.ValidationResult
 
 
@@ -57,7 +57,7 @@ object GenesisBlock extends Block(version = GenesisBlockParams.genesisVersion,
   transactions = GenesisBlockParams.genesisTransactions,
   transactionsSignature = GenesisBlockParams.generatorSignature) {
 
-  override def getParent() = null
+  override def parent() = null
 
   //SIGNATURE
 
@@ -74,6 +74,6 @@ object GenesisBlock extends Block(version = GenesisBlockParams.genesisVersion,
     digest.sameElements(generatorSignature) && digest.sameElements(transactionsSignature)
   }
 
-  override def isValid(db: DBSet) =
-    (db.getBlockMap.getLastBlock == null) && transactions.forall(_.isValid(db) == ValidationResult.VALIDATE_OKE)
+  override def isValid() =
+    PrunableBlockchainStorage.isEmpty() && transactions.forall(_.isValid() == ValidationResult.VALIDATE_OKE)
 }

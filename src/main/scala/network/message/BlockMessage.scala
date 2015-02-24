@@ -15,13 +15,13 @@ case class BlockMessage(height: Int, block: Block, mbSender: Option[ConnectedPee
 
 
   override def toBytes() = {
-    val heightBytes = Ints.toByteArray(block.getHeight())
+    val heightBytes = Ints.toByteArray(block.height().get)
     val blockBytes = block.toBytes
     val data = Bytes.concat(heightBytes, blockBytes)
     Bytes.concat(super.toBytes(), this.generateChecksum(data), data)
   }
 
-  override protected def getDataLength() = HEIGHT_LENGTH + block.getDataLength()
+  override protected def getDataLength() = HEIGHT_LENGTH + block.dataLength()
 }
 
 

@@ -4,9 +4,10 @@
 	],
   	"walletdir" : "/home/kushti/scala/scorex/wallet",
 	"minconnections": 10,
-	"generatorkeycaching": true,
 	"rpcallowed":[
 		"127.0.0.1",
 		"123.123.123.123"
-	]
+	],
+  	"max-rollback" : 100,
+  	"offline-generation" : true
 }

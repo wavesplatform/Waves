@@ -1,8 +1,6 @@
 package scorex.transaction
 
-import java.math.BigDecimal
-import java.math.MathContext
-import database.DBSet
+import database.PrunableBlockchainStorage
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Account
 import scorex.crypto.Base58
@@ -13,29 +11,27 @@ import Transaction._
 abstract class Transaction(val transactionType: TransactionType.Value,
                            val fee: BigDecimal,
                            val timestamp: Long,
-                           val reference: Array[Byte],
                            val signature: Array[Byte]) {
 
   val TypeId = transactionType.id
 
   lazy val deadline = timestamp + (1000 * 60 * 60 * 24) //24HOUR DEADLINE TO INCLUDE TRANSACTION IN BLOCK
 
-  lazy val feePerByte = fee.divide(new BigDecimal(dataLength), MathContext.DECIMAL32)
+  lazy val feePerByte = fee / BigDecimal(dataLength)
 
-  lazy val hasMinimumFee = fee.compareTo(MINIMUM_FEE) >= 0
+  lazy val hasMinimumFee = fee >= MINIMUM_FEE
 
   lazy val hasMinimumFeePerByte = {
-    val minFeePerByte = BigDecimal.ONE.divide(BigDecimal.valueOf(Settings.maxBytePerFee), MathContext.DECIMAL32)
-    feePerByte.compareTo(minFeePerByte) >= 0
+    val minFeePerByte = BigDecimal(1) / BigDecimal.valueOf(Settings.maxBytePerFee)
+    feePerByte >= minFeePerByte
   }
 
   //PARSE/CONVERT
 
   protected def getJsonBase() = {
     Json.obj("type" -> transactionType.id,
-      "fee" -> fee.toPlainString,
+      "fee" -> fee,
       "timestamp" -> timestamp,
-      "reference" -> Base58.encode(this.reference),
       "signature" -> Base58.encode(this.signature),
       "confirmations" -> getConfirmations()
     )
@@ -51,19 +47,13 @@ abstract class Transaction(val transactionType: TransactionType.Value,
 
   def isSignatureValid(): Boolean
 
-  def isValid(): ValidationResult.Value = isValid(DBSet.getInstance())
+  def isValid(): ValidationResult.Value
 
-  def isValid(db: DBSet): ValidationResult.Value
+  def process(): Unit  //todo: remove
 
-  def process(): Unit = process(DBSet.getInstance())
+  def orphan(): Unit   //todo: remove
 
-  def process(db: DBSet): Unit
-
-  def orphan(): Unit = orphan(DBSet.getInstance())
-
-  def orphan(db: DBSet): Unit
-
-  def getCreator(): Account
+  def getCreator(): Option[Account]
 
   def getInvolvedAccounts(): List[Account]
 
@@ -76,21 +66,9 @@ abstract class Transaction(val transactionType: TransactionType.Value,
     case _ => false
   }
 
-  def isConfirmed(): Boolean = isConfirmed(DBSet.getInstance())
+  def isConfirmed(): Boolean = PrunableBlockchainStorage.confirmations(this).isDefined
 
-  def isConfirmed(db: DBSet): Boolean = DBSet.getInstance().getTransactionMap.contains(this)
-
-  def getConfirmations() = {
-    //CHECK IF IN TRANSACTIONDATABASE
-    if (DBSet.getInstance().getTransactionMap().contains(this)) {
-      0
-    } else {
-      //CALCULATE CONFIRMATIONS
-      val lastBlockHeight = DBSet.getInstance().getHeightMap().get(DBSet.getInstance().getBlockMap().getLastBlockSignature())
-      val transactionBlockHeight = DBSet.getInstance().getHeightMap().get(DBSet.getInstance().getTransactionParentMap().getParent(this.signature))
-      1 + lastBlockHeight - transactionBlockHeight
-    }
-  }
+  def getConfirmations() = PrunableBlockchainStorage.confirmations(this)
 }
 
 object Transaction {
@@ -103,7 +81,6 @@ object Transaction {
     val NEGATIVE_AMOUNT = Value(3)
     val NEGATIVE_FEE = Value(4)
     val NO_BALANCE = Value(5)
-    val INVALID_REFERENCE = Value(6)
   }
 
   //TYPES
@@ -115,9 +92,24 @@ object Transaction {
   }
 
   //MINIMUM FEE
-  val MINIMUM_FEE = BigDecimal.ONE
+  val MINIMUM_FEE = BigDecimal(1)
 
   //PROPERTIES LENGTH
-  val TYPE_LENGTH = 4
+  val TYPE_LENGTH = 1
   val TIMESTAMP_LENGTH = 8
+  val AMOUNT_LENGTH = 8
+
+  def fromBytes(data:Array[Byte]):Transaction = {
+    val txType = data.head
+
+    txType match{
+      case i:Byte if i == TransactionType.GENESIS_TRANSACTION.id =>
+        GenesisTransaction.Parse(data.tail)
+
+      case i:Byte if i == TransactionType.PAYMENT_TRANSACTION.id =>
+        PaymentTransaction.Parse(data.tail)
+
+      case _ => throw new Exception(s"Invalid transaction type: $txType")
+    }
+  }
 }

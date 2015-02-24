@@ -20,8 +20,9 @@ object Settings {
 	//DATA
 	private val DEFAULT_DATA_DIR = "data"
 	private val DEFAULT_WALLET_DIR = "wallet"
-	private val DEFAULT_GENERATOR_KEY_CACHING = false
 	private val DEFAULT_MAX_BYTE_PER_FEE = 512
+
+	val MaxBlocksChunks = 500
 
 	private lazy val settingsJSONTry = Try{
 			val jsonString = scala.io.Source.fromFile("settings.json").mkString
@@ -60,7 +61,7 @@ object Settings {
 
 	lazy val pingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DEFAULT_PING_INTERVAL)
 
-	lazy val isGeneratorKeyCachingEnabled = (settingsJSON \ "generatorkeycaching").asOpt[Boolean].getOrElse(DEFAULT_GENERATOR_KEY_CACHING)
-
 	lazy val maxBytePerFee = (settingsJSON \"maxbyteperfee").asOpt[Int].getOrElse(DEFAULT_MAX_BYTE_PER_FEE)
+
+	lazy val offlineGeneration = (settingsJSON \ "offline-generation").asOpt[Boolean].getOrElse(false)
 }

@@ -8,7 +8,6 @@ import java.io.Serializable;
 import org.mapdb.Serializer;
 
 import scorex.transaction.Transaction;
-import scorex.transaction.TransactionFactory;
 
 public class TransactionSerializer implements Serializer<Transaction>, Serializable
 {
@@ -29,7 +28,7 @@ public class TransactionSerializer implements Serializer<Transaction>, Serializa
         in.readFully(bytes);
         try
         {
-        	return TransactionFactory.parse(bytes);
+        	return Transaction.fromBytes(bytes);
 		} 
         catch (Exception e) 
         {

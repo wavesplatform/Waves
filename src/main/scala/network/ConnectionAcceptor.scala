@@ -1,13 +1,11 @@
 package network
 
 import java.net.ServerSocket
-import java.net.Socket
 import java.util.logging.Logger
-
 import settings.Settings
 
-class ConnectionAcceptor(callback: ConnectionCallback) extends Thread {
 
+class ConnectionAcceptor(callback: ConnectionCallback) extends Thread {
 
   override def run() {
     var socket: ServerSocket = null

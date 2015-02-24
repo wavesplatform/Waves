@@ -1,8 +1,12 @@
-package scorex.main
+package scorex
 
 import api.ApiClient
 import controller.Controller
+import database.wallet.SecureWalletDatabase
+import scorex.account.Account
 import scorex.block.GenesisBlockParams
+import scorex.crypto.Base58
+import scorex.wallet.Wallet
 import scala.io.StdIn
 import scala.util.{Random, Failure, Try}
 
@@ -30,19 +34,22 @@ object Start {
 
 
   def testingScript(): Unit = {
-    Controller.unlockWallet("cookies")
 
-    //require(Controller.getPrivateKeyAccounts().nonEmpty)
+    Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", 10, false)
+    //require(Wallet.unlock("cookies"))
 
-    Thread.sleep(15000)
+    require(SecureWalletDatabase.exists())
+    require(Wallet.privateKeyAccounts().nonEmpty)
+
+
 
     (1 to Int.MaxValue).foreach { _ =>
       val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size - 1)
       val senderAddress = GenesisBlockParams.ipoMembers(rndIdx)
       val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx + 1)
 
-      val senderAcc = Controller.privateKeyAccountByAddress(senderAddress).get
-      val recipientAcc = Controller.accountByAddress(recipientAddress).get
+      val senderAcc = Wallet.privateKeyAccount(senderAddress).get
+      val recipientAcc = new Account(recipientAddress)
 
       val amt = new java.math.BigDecimal(Random.nextInt(100000))
       val fee = new java.math.BigDecimal(1 + Random.nextInt(5))

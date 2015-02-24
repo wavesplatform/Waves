@@ -1,12 +1,9 @@
 package scorex.block
 
-import java.math.BigDecimal
-import java.math.BigInteger
+import database.{UnconfirmedTransactionsDatabaseImpl, PrunableBlockchainStorage}
+import ntp.NTP
 import java.util.Arrays
 import play.api.libs.json.{Json, JsArray, JsObject}
-import ntp.NTP
-
-
 import scorex.BlockGenerator
 import scorex.account.PublicKeyAccount
 import scorex.crypto.Base58
@@ -14,19 +11,14 @@ import scorex.crypto.Crypto
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.Transaction
 import scorex.transaction.Transaction.ValidationResult
-import scorex.transaction.TransactionFactory
-
 import com.google.common.primitives.Bytes
 import com.google.common.primitives.Ints
 import com.google.common.primitives.Longs
-
-import database.DBSet
-
 import scala.util.Try
-import scala.collection.JavaConversions._
-import scala.collection.JavaConverters._
+
 
 object Block {
+  
   val MAX_BLOCK_BYTES = 1048576
   val VERSION_LENGTH = 4
   val REFERENCE_LENGTH = 128
@@ -34,6 +26,7 @@ object Block {
   val GENERATING_BALANCE_LENGTH = 8
   val GENERATOR_LENGTH = 32
   val GENERATOR_SIGNATURE_LENGTH = 64
+  
   private[block] val TRANSACTIONS_SIGNATURE_LENGTH = 64
   private[block] val TRANSACTIONS_COUNT_LENGTH = 4
   private[block] val TRANSACTION_SIZE_LENGTH = 4
@@ -98,7 +91,7 @@ object Block {
         val transactionLengthBytes = Arrays.copyOfRange(data, pos, pos + TRANSACTION_SIZE_LENGTH)
         val transactionLength = Ints.fromByteArray(transactionLengthBytes)
         val transactionBytes = Arrays.copyOfRange(data, pos + TRANSACTION_SIZE_LENGTH, pos + TRANSACTION_SIZE_LENGTH + transactionLength)
-        val transaction = TransactionFactory.parse(transactionBytes)
+        val transaction = Transaction.fromBytes(transactionBytes)
 
         (position + TRANSACTION_SIZE_LENGTH + transactionLength, transaction :: list)
       }
@@ -106,6 +99,16 @@ object Block {
       new Block(version, reference, timestamp, generatingBalance, generator, generatorSignature, transactions, transactionsSignature)
     }
   }
+
+  def isNewBlockValid(block: Block) = true
+  /*
+    todo: uncomment fix
+
+    block != GenesisBlock &&
+      block.isSignatureValid() &&
+      PrunableBlockchainStorage.lastBlock.signature.sameElements(block.reference) &&
+      block.isValid()
+      */
 }
 
 case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
@@ -114,35 +117,19 @@ case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long, gene
 case class Block(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
                  generator: PublicKeyAccount, generatorSignature:  Array[Byte],
                  transactions:  List[Transaction], transactionsSignature:  Array[Byte]){
-
   import Block._
 
-  //GETTERS/SETTERS
-
-  def getTotalFee() = transactions.foldLeft(BigDecimal.ZERO.setScale(8)) { case (fee, tx) => fee.add(tx.fee)}
-
-
+  def totalFee() = transactions.foldLeft(BigDecimal(0).setScale(8)) { case (fee, tx) => fee + tx.fee}
+  
   def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
 
-  def getParent(): Block = getParent(DBSet.getInstance())
+  def parent(): Option[Block] = PrunableBlockchainStorage.parent(this)
 
-  def transactionsAsJava = transactions.asJava
+  def child(): Option[Block] = PrunableBlockchainStorage.child(this)
 
-  def getParent(db: DBSet): Block = db.getBlockMap().get(this.reference)
-
-
-  def getChild(): Block = getChild(DBSet.getInstance())
-
-
-  def getChild(db: DBSet): Block = db.getChildMap().get(this)
-
-  def getHeight(): Int = getHeight(DBSet.getInstance())
-
-  def getHeight(db: DBSet): Int = db.getHeightMap().get(this)
-
-  lazy val signature = Bytes.concat(this.generatorSignature, this.transactionsSignature)
-
-  //PARSE/CONVERT
+  def height(): Option[Int] = PrunableBlockchainStorage.heightOf(this)
+  
+  lazy val signature = Bytes.concat(generatorSignature, transactionsSignature)
 
   def toJson():JsObject =
     Json.obj("version"->version,
@@ -150,14 +137,14 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       "timestamp" -> timestamp,
       "generatingBalance" -> generatingBalance,
       "generator" -> generator.address,
-      "fee" -> getTotalFee().toPlainString,
+      "fee" -> totalFee(),
       "transactionsSignature" -> Base58.encode(transactionsSignature),
       "generatorSignature" -> Base58.encode(generatorSignature),
       "signature" -> Base58.encode(signature),
       "transactions" -> JsArray(transactions.map(_.toJson()))
     )
 
-  def toBytes = {
+  def toBytes() = {
     val versionBytes = Ints.toByteArray(version)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0)
     val referenceBytes = Bytes.ensureCapacity(reference, REFERENCE_LENGTH, 0)
@@ -165,14 +152,14 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
     val generatorBytes = Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0)
     val transactionCountBytes = Ints.toByteArray(transactions.size)
     val transactionBytes = transactions.foldLeft(Array[Byte]()) { case (txBytes, tx) =>
-      Bytes.concat(txBytes, Ints.toByteArray(tx.dataLength), tx.toBytes)
+      Bytes.concat(txBytes, Ints.toByteArray(tx.dataLength), tx.toBytes())
     }
 
     Bytes.concat(versionBytes, timestampBytes, referenceBytes, baseTargetBytes, generatorBytes, transactionsSignature,
       generatorSignature, transactionCountBytes, transactionBytes)
   }
 
-  def getDataLength() = transactions.foldLeft(BASE_LENGTH) { case (len, tx) => len + 4 + tx.dataLength}
+  def dataLength() = transactions.foldLeft(BASE_LENGTH) {case (len, tx) => len + 4 + tx.dataLength}
 
   //VALIDATE
 
@@ -184,29 +171,27 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
     val blockSignature = Bytes.concat(generatorSignature, baseTargetBytes, generatorBytes)
 
     //VALIDATE TRANSACTIONS SIGNATURE
-    lazy val txsSignature = transactions.foldLeft(generatorSignature) { case (sig, tx) =>
+    val txsSignature = transactions.foldLeft(generatorSignature) { case (sig, tx) =>
       Bytes.concat(sig, tx.signature)
     }
 
     Crypto.verify(generator.publicKey, generatorSignature, blockSignature) &&
-      transactions.forall(_.isSignatureValid) &&
-      Crypto.verify(this.generator.publicKey, transactionsSignature, txsSignature)
+      Crypto.verify(generator.publicKey, transactionsSignature, txsSignature) &&
+      transactions.forall(_.isSignatureValid())
   }
 
-  def isValid(): Boolean = isValid(DBSet.getInstance())
 
-
-  def isValid(db: DBSet): Boolean = {
+  def isValid(): Boolean = {
     //CHECK IF PARENT EXISTS
-    if (this.reference == null || this.getParent(db) == null) {
+    if (reference == null || parent().isEmpty) {
       false
-    } else if (this.timestamp - 500 > NTP.getTime || this.timestamp < this.getParent(db).timestamp) {
+    } else if (timestamp - 500 > NTP.getTime || this.timestamp < parent().get.timestamp) {
       //CHECK IF TIMESTAMP IS VALID -500 MS ERROR MARGIN TIME
       false
-    } else if (this.timestamp % 1000 != this.getParent(db).timestamp % 1000) {
+    } else if (timestamp % 1000 != parent().get.timestamp % 1000) {
       //CHECK IF TIMESTAMP REST SAME AS PARENT TIMESTAMP REST
       false
-    } else if (this.generatingBalance != BlockGenerator.getNextBlockGeneratingBalance(db, this.getParent(db))) {
+    } else if (generatingBalance != BlockGenerator.getNextBlockGeneratingBalance(parent().get)) {
       //CHECK IF GENERATING BALANCE IS CORRECT
       false
     } else {
@@ -214,105 +199,42 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       val targetBytes = Array.fill(32)(Byte.MaxValue)
 
       //DIVIDE TARGET BY BASE TARGET
-      val baseTarget = BigInteger.valueOf(BlockGenerator.getBaseTarget(this.generatingBalance))
-      val target0 = new BigInteger(1, targetBytes)
-        .divide(baseTarget)
-        .multiply(generator.getGeneratingBalance(db).toBigInteger)
+      val baseTarget = BigInt(BlockGenerator.getBaseTarget(generatingBalance))
+      val genBalance = PrunableBlockchainStorage.generationBalance(generator.address).toBigInt()
+      val target0 = BigInt(1, targetBytes) / baseTarget * genBalance
 
       //MULTIPLE TARGET BY GUESSES
-      val guesses = (timestamp - getParent(db).timestamp) / 1000
-      val lowerTarget = target0.multiply(BigInteger.valueOf(guesses - 1))
-      val target = target0.multiply(BigInteger.valueOf(guesses))
+      val guesses = (timestamp - parent().get.timestamp) / 1000
+      val lowerTarget = target0 * BigInt(guesses - 1)
+      val target = target0 * BigInt(guesses)
 
       //CONVERT HIT TO BIGINT
-      val hit = new BigInteger(1, Crypto.sha256(generatorSignature))
+      val hit = BigInt(1, Crypto.sha256(generatorSignature))
 
-      if (hit.compareTo(target) >= 0) {
+      if (hit >= target) {
         false
-      } else if (hit.compareTo(lowerTarget) < 0) {
+      } else if (hit < lowerTarget) {
         //CHECK IF FIRST BLOCK OF USER
         false
       } else {
-        val fork = db.fork()
         transactions.forall { transaction =>
           !transaction.isInstanceOf[GenesisTransaction] &&
-            transaction.isValid(fork) == ValidationResult.VALIDATE_OKE &&
+            transaction.isValid() == ValidationResult.VALIDATE_OKE &&
             transaction.timestamp < timestamp && transaction.deadline >= timestamp
-          //todo: investigate why it was in original source && transaction.process(fork)
         }
       }
     }
   }
-
-  //PROCESS/ORPHAN
-
-  def process(): Unit = process(DBSet.getInstance())
-
-  def process(db: DBSet) {
-    //PROCESS TRANSACTIONS
+  
+  def process() {
     transactions.foreach { transaction =>
-      //PROCESS
-      transaction.process(db)
-
-      //SET PARENT
-      db.getTransactionParentMap.set(transaction, this)
-
-      //REMOVE FROM UNCONFIRMED DATABASE
-      db.getTransactionMap.delete(transaction)
+      transaction.process()
+      UnconfirmedTransactionsDatabaseImpl.remove(transaction)
     }
-
-    //PROCESS FEE
-    val blockFee = this.getTotalFee()
-    if (blockFee.compareTo(BigDecimal.ZERO) == 1) {
-      //UPDATE GENERATOR BALANCE WITH FEE
-      generator.setConfirmedBalance(generator.getConfirmedBalance(db).add(blockFee), db)
-    }
-
-    val parent = this.getParent(db)
-    if (parent != null) {
-      //SET AS CHILD OF PARENT
-      db.getChildMap.set(parent, this)
-
-      //SET BLOCK HEIGHT
-      val height = parent.getHeight(db) + 1
-      db.getHeightMap.set(this, height)
-    } else {
-      //IF NO PARENT HEIGHT IS 1
-      db.getHeightMap.set(this, 1)
-    }
-
-    //ADD TO DB
-    db.getBlockMap.add(this)
-
-    //UPDATE LAST BLOCK
-    db.getBlockMap.setLastBlock(this)
   }
 
-  def orphan(): Unit = orphan(DBSet.getInstance())
-
-
-  def orphan(db: DBSet) {
-    //ORPHAN TRANSACTIONS
-    orphanTransactions(transactions, db)
-
-    //REMOVE FEE
-    val blockFee = getTotalFee()
-    if (blockFee.compareTo(BigDecimal.ZERO) == 1) {
-      //UPDATE GENERATOR BALANCE WITH FEE
-      generator.setConfirmedBalance(generator.getConfirmedBalance(db).subtract(blockFee), db)
-    }
-
-    //DELETE BLOCK FROM DB
-    db.getBlockMap.delete(this)
-
-    //SET PARENT AS LAST BLOCK
-    db.getBlockMap.setLastBlock(getParent(db))
-
-    //ADD ORPHANED TRANASCTIONS BACK TO DATABASE
-    transactions.foreach(tx => db.getTransactionMap.add(tx))
+  def rollback() {
+    transactions.reverseIterator.foreach(_.orphan())
+    transactions.foreach(UnconfirmedTransactionsDatabaseImpl.put)
   }
-
-  private def orphanTransactions(transactions: List[Transaction], db: DBSet) =
-  //ORPHAN ALL TRANSACTIONS IN DB BACK TO FRONT
-    transactions.reverseIterator.foreach(_.orphan(db))
 }

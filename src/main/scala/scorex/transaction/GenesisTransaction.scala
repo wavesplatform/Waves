@@ -12,12 +12,11 @@ import scorex.crypto.Crypto
 import com.google.common.primitives.Bytes
 import com.google.common.primitives.Ints
 import com.google.common.primitives.Longs
-
-import database.DBSet
 import scorex.transaction.Transaction.TransactionType
 
+
 case class GenesisTransaction(recipient: Account, amount: BigDecimal, override val timestamp: Long)
-  extends Transaction(TransactionType.GENESIS_TRANSACTION, BigDecimal.ZERO, timestamp, new Array[Byte](0),
+  extends Transaction(TransactionType.GENESIS_TRANSACTION, BigDecimal.ZERO, timestamp,
     GenesisTransaction.generateSignature(recipient, amount, timestamp)) {
 
   import Transaction._
@@ -27,7 +26,7 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
     getJsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toPlainString)
 
   override def toBytes() = {
-    val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GENESIS_TRANSACTION.id), TYPE_LENGTH, 0)
+    val typeBytes = Array(TransactionType.GENESIS_TRANSACTION.id.toByte)
 
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
 
@@ -59,7 +58,7 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
     Bytes.concat(digest, digest).sameElements(signature)
   }
 
-  override def isValid(db: DBSet) =
+  override def isValid() =
     if (amount.compareTo(BigDecimal.ZERO) == -1) {
       ValidationResult.NEGATIVE_AMOUNT
     } else if (!Crypto.isValidAddress(recipient.address)) {
@@ -69,17 +68,13 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
 
   //PROCESS/ORPHAN
 
-  override def process(db: DBSet) {
-    recipient.setConfirmedBalance(amount, db) //UPDATE BALANCE
-    recipient.setLastReference(signature, db) //SET AS REFERENCE
+  override def process() {
   }
 
-  override def orphan(db: DBSet) = {
-    recipient.setConfirmedBalance(BigDecimal.ZERO, db) //UNDO BALANCE
-    recipient.removeReference(db) //UNDO REFERENCE
+  override def orphan() = {
   }
 
-  override def getCreator(): Account = null //todo: Option
+  override def getCreator(): Option[Account] = None
 
   override def getInvolvedAccounts() = List(recipient)
 
@@ -91,11 +86,9 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
 
 
 object GenesisTransaction {
-
   import Transaction._
 
   private val RECIPIENT_LENGTH = Account.ADDRESS_LENGTH
-  private val AMOUNT_LENGTH = 8
   private val BASE_LENGTH = TIMESTAMP_LENGTH + RECIPIENT_LENGTH + AMOUNT_LENGTH
 
   def generateSignature(recipient: Account, amount: BigDecimal, timestamp: Long) = {

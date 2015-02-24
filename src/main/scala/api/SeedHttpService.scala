@@ -15,7 +15,7 @@ trait SeedHttpService extends HttpService with CommonApifunctions {
   }
 
   lazy val seedRouting =
-      path("seed"./) {
+      path("seed"./ ) {
         get(complete (seed(32)))
       } ~ path("seed" / IntNumber) {case length =>
         get(complete (seed(length)))
