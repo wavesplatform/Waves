@@ -9,7 +9,7 @@ import scorex.crypto.Crypto
 
 trait Message {
 
-import network.message.Message._._
+import network.message.Message._
 
   val messageType: Int
   val mbSender: Option[ConnectedPeer]
