@@ -1,6 +1,6 @@
 package api
 
-import database.UnconfirmedTransactionsDatabaseImpl
+import database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import play.api.libs.json.Json
 import scorex.crypto.Base58
 import spray.routing.HttpService
@@ -25,18 +25,20 @@ trait TransactionsHttpService extends HttpService with CommonApifunctions {
             Json.arr(UnconfirmedTransactionsDatabaseImpl.getAll().map(_.toJson())).toString()
           }
         }
-      } /*~ path("address" / Segment) {case address =>
+      } ~ path("address" / Segment) {case address =>
         get {
           complete {
-
+            val txs = PrunableBlockchainStorage.accountTransactions(address)
+            Json.arr(txs.map(_.toJson())).toString()
           }
         }
       } ~ path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
         get {
           complete {
-
+            val txs = PrunableBlockchainStorage.accountTransactions(address).takeRight(limit)
+            Json.arr(txs.map(_.toJson())).toString()
           }
         }
-      }   */
+      }
     }
 }
