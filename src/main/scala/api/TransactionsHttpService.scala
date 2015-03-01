@@ -4,6 +4,7 @@ import database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import play.api.libs.json.Json
 import scorex.crypto.Base58
 import spray.routing.HttpService
+
 import scala.util.Try
 
 
@@ -11,12 +12,12 @@ trait TransactionsHttpService extends HttpService with CommonApifunctions {
 
   lazy val transactionsRouting =
     pathPrefix("transactions") {
-      path("signature" / Segment) {case signature =>
+      path("signature" / Segment) { case signature =>
         get {
-          complete{
-            Try(Base58.decode(signature)).map{signatureBytes =>
+          complete {
+            Try(Base58.decode(signature)).map { signatureBytes =>
               ??? //todo: implement?
-            }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_SIGNATURE)).toString
+            }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_SIGNATURE)).toString()
           }
         }
       } ~ path("unconfirmed") {
@@ -25,7 +26,7 @@ trait TransactionsHttpService extends HttpService with CommonApifunctions {
             Json.arr(UnconfirmedTransactionsDatabaseImpl.getAll().map(_.toJson())).toString()
           }
         }
-      } ~ path("address" / Segment) {case address =>
+      } ~ path("address" / Segment) { case address =>
         get {
           complete {
             val txs = PrunableBlockchainStorage.accountTransactions(address)

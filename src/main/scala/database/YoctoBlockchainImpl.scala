@@ -2,6 +2,7 @@ package database
 
 import java.io.{File, FileOutputStream}
 import java.nio.ByteBuffer
+
 import com.yandex.yoctodb.DatabaseFormat
 import com.yandex.yoctodb.immutable.Database
 import com.yandex.yoctodb.mutable.DocumentBuilder
@@ -11,6 +12,7 @@ import com.yandex.yoctodb.util.UnsignedByteArrays
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
+
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -59,21 +61,6 @@ class YoctoBlockchainImpl extends BlockChain {
 
   override def contains(block: Block): Boolean = signaturesIndex.exists(_._2.sameElements(block.signature))
 
-  private def compositeDb() = {
-    val dbs = (1 to height()).toSeq.map { h =>
-      DatabaseFormat.getCurrent
-        .getDatabaseReader
-        .from(new File(filename(h)), false)
-    }
-    DatabaseFormat.getCurrent.getDatabaseReader.composite(dbs)
-  }
-
-  private def transactionFromByteBuffer(bb:ByteBuffer):Transaction = {
-    val ba = new Array[Byte](bb.remaining())
-    bb.get(ba)
-    Transaction.fromBytes(ba)
-  }
-
   override def accountTransactions(account: Account): Seq[Transaction] = {
     val chainDb = compositeDb()
     val q1 = select().where(QueryBuilder.eq("account", UnsignedByteArrays.from(account.address)))
@@ -111,9 +98,24 @@ class YoctoBlockchainImpl extends BlockChain {
     seq.reduce(_ + _)
   }
 
+  private def compositeDb() = {
+    val dbs = (1 to height()).toSeq.map { h =>
+      DatabaseFormat.getCurrent
+        .getDatabaseReader
+        .from(new File(filename(h)), false)
+    }
+    DatabaseFormat.getCurrent.getDatabaseReader.composite(dbs)
+  }
+
   override def height(): Int = signaturesIndex.size
 
   private def filename(height: Int) = s"/tmp/block-${height + 1}"
+
+  private def transactionFromByteBuffer(bb: ByteBuffer): Transaction = {
+    val ba = new Array[Byte](bb.remaining())
+    bb.get(ba)
+    Transaction.fromBytes(ba)
+  }
 
   override def heightOf(blockSignature: Array[Byte]): Option[Int] = ???
 

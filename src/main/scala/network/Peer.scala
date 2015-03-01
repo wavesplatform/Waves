@@ -2,9 +2,9 @@ package network
 
 import java.io.DataInputStream
 import java.net.{InetAddress, Socket}
-import java.util.{Collections, HashMap}
 import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue, TimeUnit}
 import java.util.logging.Logger
+import java.util.{Collections, HashMap}
 
 import network.message.Message
 import settings.Settings

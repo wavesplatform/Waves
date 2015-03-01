@@ -9,8 +9,8 @@ import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.BlockGenerator
 import scorex.account.PublicKeyAccount
 import scorex.crypto.{Base58, Crypto}
-import scorex.transaction.{GenesisTransaction, Transaction}
 import scorex.transaction.Transaction.ValidationResult
+import scorex.transaction.{GenesisTransaction, Transaction}
 
 import scala.util.Try
 

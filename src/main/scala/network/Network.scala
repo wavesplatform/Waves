@@ -1,8 +1,8 @@
 package network
 
 import java.net.{InetAddress, ServerSocket}
-import java.util.{Collections, TreeSet}
 import java.util.logging.Logger
+import java.util.{Collections, TreeSet}
 
 import controller.Controller
 import network.message._

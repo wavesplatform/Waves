@@ -13,7 +13,8 @@ abstract class Transaction(val transactionType: TransactionType.Value,
                            val timestamp: Long,
                            val signature: Array[Byte]) {
 
-  lazy val deadline = timestamp + (1000 * 60 * 60 * 24) //24HOUR DEADLINE TO INCLUDE TRANSACTION IN BLOCK
+  lazy val deadline = timestamp + (1000 * 60 * 60 * 24)
+  //24HOUR DEADLINE TO INCLUDE TRANSACTION IN BLOCK
   lazy val feePerByte = fee / BigDecimal(dataLength)
   lazy val hasMinimumFee = fee >= MINIMUM_FEE
   lazy val hasMinimumFeePerByte = {
@@ -88,6 +89,7 @@ object Transaction {
       case _ => throw new Exception(s"Invalid transaction type: $txType")
     }
   }
+
   object ValidationResult extends Enumeration {
     type ValidationResult = Value
 
@@ -105,4 +107,5 @@ object Transaction {
     val GENESIS_TRANSACTION = Value(1)
     val PAYMENT_TRANSACTION = Value(2)
   }
+
 }

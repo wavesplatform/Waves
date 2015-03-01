@@ -94,8 +94,6 @@ object Wallet {
     }
   }
 
-  def isUnlocked() = secureDb().isDefined
-
   def unlock(password: String): Boolean = {
     if (isUnlocked()) {
       false
@@ -106,13 +104,20 @@ object Wallet {
     }
   }
 
+  def isUnlocked() = secureDb().isDefined
+
   //UNLOCK
+
+  private def secureDb() = secureDatabaseRef.get()
 
   def lock() = secureDb().map { db =>
     db.commit()
     db.close()
     secureDatabaseRef.set(None)
   }.isDefined
+
+
+  //IMPORT/EXPORT
 
   def importAccountSeed(accountSeed: Array[Byte]): Option[String] = secureDb().flatMap { db =>
     if (accountSeed.length != 32) {
@@ -122,11 +127,6 @@ object Wallet {
       if (db.addAccount(account)) Some(account.address) else None
     }
   }
-
-
-  //IMPORT/EXPORT
-
-  private def secureDb() = secureDatabaseRef.get()
 
   def exportAccountSeed(address: String): Option[Array[Byte]] = privateKeyAccount(address).map(_.seed)
 

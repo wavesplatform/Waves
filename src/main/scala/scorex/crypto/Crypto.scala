@@ -28,10 +28,6 @@ object Crypto {
     Base58.encode(withoutChecksum ++ checkSum.take(4))
   }
 
-  def doubleSha256(input: Array[Byte]) = sha256(sha256(input))
-
-  def sha256(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
-
   def isValidAddress(address: String) =
     Try {
       //BASE 58 DECODE
@@ -52,6 +48,9 @@ object Crypto {
       }
     }.getOrElse(false)
 
+  def doubleSha256(input: Array[Byte]) = sha256(sha256(input))
+
+  def sha256(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
 
   //todo: return Try instead of unwrapping it
   def sign(account: PrivateKeyAccount, message: Array[Byte]) =
