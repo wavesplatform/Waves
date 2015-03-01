@@ -3,6 +3,8 @@ package database
 import java.io.File
 
 import org.mapdb.DBMaker
+import scorex.account.Account
+import scorex.transaction.Transaction
 
 class Snapshot(height: Int) extends StateQuery {
   private val database = DBMaker.newFileDB(new File(s"/tmp/snapshot$height"))
@@ -17,4 +19,6 @@ class Snapshot(height: Int) extends StateQuery {
 
   override def balance(address: String, fromHeight: Int, confirmations: Int): BigDecimal =
     Option(balancesMap.get(address)).getOrElse(BigDecimal(0))
+
+  override def accountTransactions(account: Account): Seq[Transaction] = ??? //todo: implement
 }

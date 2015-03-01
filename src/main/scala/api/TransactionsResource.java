@@ -2,32 +2,6 @@ package api;
 
 /*
 
-todo: rewrite into Scala
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.JSONValue;
-
-import controller.Controller;
-import scorex.account.Account;
-import scorex.block.Block;
-import scorex.crypto.Base58;
-import scorex.crypto.Crypto;
-import scorex.transaction.Transaction;
-import utils.Pair;
-
 @Path("transactions")
 @Produces(MediaType.APPLICATION_JSON)
 public class TransactionsResource {
@@ -52,52 +26,7 @@ public class TransactionsResource {
 		return this.getTransactions(address);
 	}
 	
-	@SuppressWarnings("unchecked")
-	@GET
-	@Path("limit/{limit}")
-	public String getTransactionsLimited(@PathParam("limit") int limit)
-	{
-		//CHECK IF WALLET EXISTS
-		if(!Controller.doesWalletExists())
-		{
-			throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_WALLET_NO_EXISTS);
-		}
-		
-		//GET TRANSACTIONS
-		List<Pair<Account, Transaction>> transactions = Controller.getLastTransactions(limit);
-		
-		//ORGANIZE TRANSACTIONS
-		Map<Account, List<Transaction>> orderedTransactions = new HashMap<Account, List<Transaction>>();
-		for(Pair<Account, Transaction> transaction: transactions)
-		{
-			if(!orderedTransactions.containsKey(transaction.getA()))
-			{
-				orderedTransactions.put(transaction.getA(), new ArrayList<Transaction>());
-			}
-			
-			orderedTransactions.get(transaction.getA()).add(transaction.getB());
-		}
-		
-		//CREATE JSON OBJECT
-		JSONArray orderedTransactionsJSON = new JSONArray();
-		
-		for(Account account: orderedTransactions.keySet())
-		{
-			JSONArray transactionsJSON = new JSONArray();
-			for(Transaction transaction: orderedTransactions.get(account))
-			{
-				transactionsJSON.add(transaction.toJson());
-			}
-			
-			JSONObject accountTransactionsJSON = new JSONObject();
-			accountTransactionsJSON.put("account", account.address());
-			accountTransactionsJSON.put("transactions", transactionsJSON);
-			orderedTransactionsJSON.add(accountTransactionsJSON);		
-		}
-		
-		return orderedTransactionsJSON.toJSONString();
-	}
-	
+
 	@SuppressWarnings("unchecked")
 	@GET
 	@Path("address/{address}/limit/{limit}")
@@ -135,17 +64,7 @@ public class TransactionsResource {
 	@Path("signature/{signature}")
 	public String getTransactionsBySignature(@PathParam("signature") String signature) throws Exception
 	{
-		//DECODE SIGNATURE
-		byte[] signatureBytes;
-		try
-		{
-			signatureBytes = Base58.decode(signature);
-		}
-		catch(Exception e)
-		{
-			throw ApiErrorFactory.getInstance().createError(ApiErrorFactory.ERROR_INVALID_SIGNATURE);
-		}
-		
+
 		//GET TRANSACTION
 		Transaction transaction = Controller.getTransaction(signatureBytes);
 		
@@ -158,22 +77,7 @@ public class TransactionsResource {
 		return transaction.toJson().toString();
 	}
 	
-	@SuppressWarnings("unchecked")
-	@GET
-	@Path("/network")
-	public String getNetworkTransactions()
-	{
-		List<Transaction> transactions = Controller.getUnconfirmedTransactions();
-		JSONArray array = new JSONArray();
-		
-		for(Transaction transaction: transactions)
-		{
-			array.add(transaction.toJson());
-		}
-		
-		return array.toJSONString();
-	}
-	
+
 	@SuppressWarnings("unchecked")
 	@POST
 	@Path("/scan")

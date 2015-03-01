@@ -42,4 +42,8 @@ object PrunableBlockchainStorage extends BlockChain {
   override def blockByHeader(signature: Array[Byte]): Option[Block] = chainAfterSnapshot.get().blockByHeader(signature)
 
   def generatedBy(account: Account): Seq[Block] = chainAfterSnapshot.get().generatedBy(account)
+
+  override def accountTransactions(account: Account): Seq[Transaction] =
+    chainAfterSnapshot.get().accountTransactions(account)
+
 }
