@@ -102,10 +102,6 @@ case class PaymentTransaction(sender: PublicKeyAccount,
       amount
     } else BigDecimal(0)
   }
-
-  override def process(): Unit = {}
-
-  override def orphan(): Unit = {}
 }
 
 

@@ -38,10 +38,9 @@ trait BlockChain extends StateQuery {
 
   def generatedBy(account: Account): Seq[Block]
 
-  def scanTransactions(block: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) = {
 
-    //todo: don't pass nullable at all
-    val startBlock = Option(block).orElse(Some(GenesisBlock)).get
+  //todo: remove that probably unused code?
+  def scanTransactions(startBlock: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) = {
 
     @tailrec
     def recursiveExtraction(block: Block, accTransactions: List[Transaction], depth: Int): (Block, List[Transaction]) = {

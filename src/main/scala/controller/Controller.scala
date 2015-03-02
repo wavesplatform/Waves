@@ -28,7 +28,8 @@ object Controller {
   val STATUS_OKE = 2
   val peerHeights = TrieMap[ConnectedPeer, Int]()
   private val transactionCreator = new TransactionCreator()
-  //todo: avoid var
+
+  //todo: avoid vars
   private var status = STATUS_NO_CONNECTIONS
   private var blockActorRef: ActorRef = _
   private var isStopping = false
@@ -190,6 +191,7 @@ object Controller {
 
   def recoverWallet(seed: Array[Byte], password: String, amount: Int) = Wallet.create(seed, password, amount, true)
 
+  //todo: remove that probably unused code?
   def scanTransactions(block: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) =
     PrunableBlockchainStorage.scanTransactions(block, blockLimit, transactionLimit, txType, service, account)
 

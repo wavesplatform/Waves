@@ -36,10 +36,6 @@ abstract class Transaction(val transactionType: TransactionType.Value,
 
   def isValid(): ValidationResult.Value
 
-  def process(): Unit //todo: remove
-
-  def orphan(): Unit //todo: remove
-
   def getCreator(): Option[Account]
 
   def getInvolvedAccounts(): List[Account]

@@ -60,15 +60,6 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
       ValidationResult.INVALID_ADDRESS
     } else ValidationResult.VALIDATE_OKE
 
-
-  //PROCESS/ORPHAN
-
-  override def process() {
-  }
-
-  override def orphan() = {
-  }
-
   override def getCreator(): Option[Account] = None
 
   override def getInvolvedAccounts() = List(recipient)

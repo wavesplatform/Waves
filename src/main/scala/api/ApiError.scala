@@ -19,11 +19,7 @@ object ApiError extends Enumeration {
   val ERROR_INVALID_SENDER = Value(106, "invalid sender")
   val ERROR_INVALID_RECIPIENT = Value(107, "invalid recipient")
   val ERROR_INVALID_PUBLIC_KEY = Value(108, "invalid public key")
-  val ERROR_INVALID_DATA = Value(109, "invalid data")
-  //todo: is it being used?
-  val ERROR_INVALID_DATA_LENGTH = Value(110, "invalid data length")
-  //todo: is it being used?
-  val ERROR_INVALID_NOT_NUMBER = Value(111, "argument is not a number") //todo: is it being used?
+  val ERROR_INVALID_NOT_NUMBER = Value(109, "argument is not a number")
 
   //WALLET
   val ERROR_WALLET_NO_EXISTS = Value(201, "wallet does not exist")

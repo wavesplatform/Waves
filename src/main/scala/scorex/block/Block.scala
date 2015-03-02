@@ -101,7 +101,7 @@ object Block {
   def isNewBlockValid(block: Block) = true
 
   /*
-    todo: uncomment fix
+    todo: uncomment & fix
 
     block != GenesisBlock &&
       block.isSignatureValid() &&

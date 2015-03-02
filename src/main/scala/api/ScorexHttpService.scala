@@ -2,6 +2,7 @@ package api
 
 import controller.Controller
 import play.api.libs.json.Json
+import settings.Settings
 import spray.routing.HttpService
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -22,8 +23,7 @@ trait ScorexHttpService extends HttpService with CommonApifunctions {
       } ~ path("isuptodate") {
         get(complete(Json.obj("status" -> Controller.isUpToDate()).toString()))
       } ~ path("version") {
-        //todo: pull version string out of here
-        get(complete(Json.obj("version" -> "Lagonaki v. 0.9").toString()))
+        get(complete(Json.obj("version" -> Settings.Release).toString()))
       }
     }
 }

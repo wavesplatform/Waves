@@ -9,6 +9,8 @@ import scala.util.Try
 
 object Settings {
 
+  val Release = "Lagonaki Release v. 0.9"
+
   lazy val knownPeers = Try {
     (settingsJSON \ "knownpeers").as[List[String]].flatMap { addr =>
       val address = InetAddress.getByName(addr)

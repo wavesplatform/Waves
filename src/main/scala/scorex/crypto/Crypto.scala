@@ -53,10 +53,10 @@ object Crypto {
   def sha256(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
 
   //todo: return Try instead of unwrapping it
-  def sign(account: PrivateKeyAccount, message: Array[Byte]) =
+  def sign(account: PrivateKeyAccount, message: Array[Byte]):Array[Byte] =
     Try(Curve25519Impl.sign(account.privateKey, account.publicKey, message))
       .getOrElse(Array.fill(64)(0: Byte))
 
-  def verify(publicKey: Array[Byte], signature: Array[Byte], message: Array[Byte]) =
+  def verify(publicKey: Array[Byte], signature: Array[Byte], message: Array[Byte]):Boolean =
     Try(Curve25519Impl.verify(signature, message, publicKey)).getOrElse(false)
 }
