@@ -1,7 +1,7 @@
 package database
 
 import scorex.account.Account
-import scorex.block.{Block, GenesisBlock}
+import scorex.block.Block
 import scorex.transaction.Transaction
 import settings.Settings
 

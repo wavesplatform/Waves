@@ -9,8 +9,6 @@ import scala.util.Try
 
 object Settings {
 
-  val Release = "Lagonaki Release v. 0.9"
-
   lazy val knownPeers = Try {
     (settingsJSON \ "knownpeers").as[List[String]].flatMap { addr =>
       val address = InetAddress.getByName(addr)
@@ -27,18 +25,19 @@ object Settings {
   lazy val pingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DEFAULT_PING_INTERVAL)
   lazy val maxBytePerFee = (settingsJSON \ "maxbyteperfee").asOpt[Int].getOrElse(DEFAULT_MAX_BYTE_PER_FEE)
   lazy val offlineGeneration = (settingsJSON \ "offline-generation").asOpt[Boolean].getOrElse(false)
+  private lazy val settingsJSONTry = Try {
+    val jsonString = scala.io.Source.fromFile("settings.json").mkString
+    //CREATE JSON OBJECT
+    Json.parse(jsonString)
+  }
 
   settingsJSONTry.recover { case _: Throwable =>
     //STOP
     System.out.println("ERROR reading settings.json, closing")
     System.exit(0)
   }
-  private lazy val settingsJSONTry = Try {
-    val jsonString = scala.io.Source.fromFile("settings.json").mkString
-    //CREATE JSON OBJECT
-    Json.parse(jsonString)
-  }
   private lazy val settingsJSON = settingsJSONTry.get
+  val Release = "Lagonaki Release v. 0.9"
   val MaxBlocksChunks = 500
   //NETWORK
   private val DEFAULT_MIN_CONNECTIONS = 5

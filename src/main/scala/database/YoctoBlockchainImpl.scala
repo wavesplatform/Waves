@@ -77,6 +77,25 @@ class YoctoBlockchainImpl extends BlockChain {
     seq.toSeq
   }
 
+  private def compositeDb() = {
+    val dbs = (1 to height()).toSeq.map { h =>
+      DatabaseFormat.getCurrent
+        .getDatabaseReader
+        .from(new File(filename(h)), false)
+    }
+    DatabaseFormat.getCurrent.getDatabaseReader.composite(dbs)
+  }
+
+  override def height(): Int = signaturesIndex.size
+
+  private def filename(height: Int) = s"/tmp/block-${height + 1}"
+
+  private def transactionFromByteBuffer(bb: ByteBuffer): Transaction = {
+    val ba = new Array[Byte](bb.remaining())
+    bb.get(ba)
+    Transaction.fromBytes(ba)
+  }
+
   //todo: fromHeight & confirmations parameters ignored now
   override def balance(address: String, fromHeight: Int, confirmations: Int): BigDecimal = {
     val chainDb = compositeDb()
@@ -96,25 +115,6 @@ class YoctoBlockchainImpl extends BlockChain {
     })
 
     seq.reduce(_ + _)
-  }
-
-  private def compositeDb() = {
-    val dbs = (1 to height()).toSeq.map { h =>
-      DatabaseFormat.getCurrent
-        .getDatabaseReader
-        .from(new File(filename(h)), false)
-    }
-    DatabaseFormat.getCurrent.getDatabaseReader.composite(dbs)
-  }
-
-  override def height(): Int = signaturesIndex.size
-
-  private def filename(height: Int) = s"/tmp/block-${height + 1}"
-
-  private def transactionFromByteBuffer(bb: ByteBuffer): Transaction = {
-    val ba = new Array[Byte](bb.remaining())
-    bb.get(ba)
-    Transaction.fromBytes(ba)
   }
 
   override def heightOf(blockSignature: Array[Byte]): Option[Int] = ???
