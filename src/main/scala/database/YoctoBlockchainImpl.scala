@@ -27,7 +27,9 @@ class YoctoBlockchainImpl extends BlockChain {
   override def appendBlock(block: Block): BlockChain = {
     val dbBuilder = DatabaseFormat.getCurrent.newDatabaseBuilder()
 
-    block.transactions.foreach { tx =>
+    val blockTransactions = block.transactions
+
+    blockTransactions.foreach { tx =>
       val db0 = DatabaseFormat.getCurrent.newDocumentBuilder()
 
       val documentBuilder = tx match {

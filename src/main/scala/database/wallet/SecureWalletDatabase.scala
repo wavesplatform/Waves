@@ -11,7 +11,7 @@ import scala.collection.JavaConversions._
 
 class SecureWalletDatabase(password: String) {
 
-  import database.wallet.SecureWalletDatabase._
+  import SecureWalletDatabase.{SECURE_WALLET_FILE, SEED, NONCE}
 
   //OPEN WALLET
   SECURE_WALLET_FILE.getParentFile.mkdirs()
@@ -41,9 +41,9 @@ class SecureWalletDatabase(password: String) {
 
   def setSeed(seed: Array[Byte]) = database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY)
 
-  def getSeed(): Array[Byte] = database.getAtomicVar(SEED).get()
+  def seed(): Array[Byte] = database.getAtomicVar(SEED).get()
 
-  def getNonce(): Int = database.getAtomicInteger(NONCE).intValue()
+  def nonce(): Int = database.getAtomicInteger(NONCE).intValue()
 
   def setNonce(nonce: Int) = database.getAtomicInteger(NONCE).set(nonce)
 
