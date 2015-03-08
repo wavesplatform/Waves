@@ -39,7 +39,7 @@ trait BlockChain extends StateQuery {
   def generatedBy(account: Account): Seq[Block]
 
 
-  //todo: remove that probably unused code?
+  //todo: remove the unused code?
   def scanTransactions(startBlock: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) = {
 
     @tailrec
