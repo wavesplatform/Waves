@@ -38,28 +38,6 @@ trait BlockChain extends StateQuery {
 
   def generatedBy(account: Account): Seq[Block]
 
-
-  //todo: remove the unused code?
-  def scanTransactions(startBlock: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) = {
-
-    @tailrec
-    def recursiveExtraction(block: Block, accTransactions: List[Transaction], depth: Int): (Block, List[Transaction]) = {
-      val txs = accTransactions ++ block.transactions.filter { transaction =>
-        (account == null || transaction.isInvolved(account)) &&
-          (txType == -1 || transaction.transactionType.id == txType)
-      }
-
-      block.child().isDefined &&
-        (txs.size < transactionLimit || transactionLimit == -1) &&
-        (depth < blockLimit || blockLimit == -1) match {
-        case true => recursiveExtraction(block.child().get, txs, depth + 1)
-        case false => block -> txs
-      }
-    }
-
-    recursiveExtraction(startBlock, List(), 0)
-  }
-
   def getSignatures(parentSignature: Array[Byte]): Seq[Array[Byte]] =
     heightOf(parentSignature).map { h =>
       (h + 1).to(Math.max(height(), h + Settings.MaxBlocksChunks)).flatMap(blockAt).map(_.signature)
