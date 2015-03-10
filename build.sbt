@@ -15,8 +15,7 @@ resolvers ++= Seq("Sonatype Releases" at "http://oss.sonatype.org/content/reposi
 
 libraryDependencies ++= Seq(
   "com.yandex.yoctodb" % "yoctodb-core" % "0.0.4",
-  "commons-net" % "commons-net" % "3.3",
-  "ch.qos.logback"  %  "logback-classic"   % "1.1.2",
+  "org.mapdb" % "mapdb" % "1.0.6",
   "com.typesafe.play" %% "play-json" % "2.3.4",
   "com.typesafe.akka" %% "akka-actor" % "2.3.9",
   "io.spray" %% "spray-routing" % "1.3.2",
@@ -24,11 +23,9 @@ libraryDependencies ++= Seq(
   "io.spray" %% "spray-http" % "1.3.2",
   "io.spray" %% "spray-httpx" % "1.3.2",
   "io.spray" %% "spray-util" % "1.3.2",
-  "io.spray" %% "spray-client" % "1.3.2",
-  "org.mapdb" % "mapdb" % "1.0.6",
   "com.google.guava" % "guava" % "15.0",
-  "org.eclipse.jetty" % "jetty-server" % "9.2.6.v20141205",
-  "org.eclipse.jetty" % "jetty-servlet" % "9.2.6.v20141205"
+  "commons-net" % "commons-net" % "3.3",
+  "ch.qos.logback"  %  "logback-classic"   % "1.1.2"
 )
 
 
