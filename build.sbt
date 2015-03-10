@@ -8,15 +8,10 @@ name := "scorex"
 
 version := "0.1"
 
-scalaVersion := "2.11.4"
+scalaVersion := "2.11.6"
 
-javaOptions in run += "-Djava.library.path=lib"
-
-resolvers ++= Seq("Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
-                  "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases/",
-                  "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/",
-                  "for eu.piotrbuda - scalawebsocket_2.10" at "http://dev.nightlabs.org/maven-repository/repo/",
-                  "localrepo" at "file://" + file("repo").getAbsolutePath)
+resolvers ++= Seq("Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases/",
+                  "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/")
 
 libraryDependencies ++= Seq(
   "com.yandex.yoctodb" % "yoctodb-core" % "0.0.4",
