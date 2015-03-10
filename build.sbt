@@ -28,11 +28,7 @@ libraryDependencies ++= Seq(
   "org.mapdb" % "mapdb" % "1.0.6",
   "com.google.guava" % "guava" % "15.0",
   "org.eclipse.jetty" % "jetty-server" % "9.2.6.v20141205",
-  "org.eclipse.jetty" % "jetty-servlet" % "9.2.6.v20141205",
-  "org.glassfish.jersey.containers" % "jersey-container-servlet-core" % "2.14",
-  "org.glassfish.jersey.core" % "jersey-server" % "2.14",
-  "commons-net" % "commons-net" % "3.3",
-  "javax.ws.rs" % "javax.ws.rs-api" % "2.0.1"
+  "org.eclipse.jetty" % "jetty-servlet" % "9.2.6.v20141205"
 )
 
 
