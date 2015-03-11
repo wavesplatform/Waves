@@ -171,7 +171,7 @@ object PaymentTransaction {
     val data = Bytes.concat(typeBytes,
       timestampBytes,
       sender.publicKey,
-      Base58.decode(recipient.address), //todo: possible exception here
+      Base58.decode(recipient.address),
       Bytes.concat(amountFill, amountBytes),
       Bytes.concat(feeFill, feeBytes))
 

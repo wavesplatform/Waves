@@ -189,16 +189,10 @@ object Controller {
     Wallet.create(seed, password, amount, synchronize = false)
 
   //WALLET
-
   def recoverWallet(seed: Array[Byte], password: String, amount: Int) =
     Wallet.create(seed, password, amount, synchronize = true)
 
-  //todo: remove that probably unused code?
-  def scanTransactions(block: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) =
-    PrunableBlockchainStorage.scanTransactions(block, blockLimit, transactionLimit, txType, service, account)
-
   //BLOCKCHAIN
-
   def nextBlockGeneratingBalance() = BlockGenerator.getNextBlockGeneratingBalance(PrunableBlockchainStorage.lastBlock)
 
   def nextBlockGeneratingBalance(parent: Block) = BlockGenerator.getNextBlockGeneratingBalance(parent)
@@ -210,7 +204,6 @@ object Controller {
   }
 
   //FORGE
-
   def onTransactionCreate(transaction: Transaction) {
     //ADD TO UNCONFIRMED TRANSACTIONS
     UnconfirmedTransactionsDatabaseImpl.put(transaction)
@@ -220,7 +213,6 @@ object Controller {
   }
 
   //TRANSACTIONS
-
   private def broadcastTransaction(transaction: Transaction) {
     val message = TransactionMessage(transaction)
     Network.broadcast(message, List[Peer]())

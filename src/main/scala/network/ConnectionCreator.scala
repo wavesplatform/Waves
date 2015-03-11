@@ -33,10 +33,11 @@ class ConnectionCreator(callback: ConnectionCallback) extends Thread {
         //CHECK IF WE STILL NEED NEW CONNECTIONS
         if (Settings.minConnections >= callback.activeConnections.size) {
           //avoids Exception when adding new elements
-          callback.activeConnections.foreach { peer =>
+          callback.activeConnections().foreach { peer =>
 
             //CHECK IF WE ALREADY HAVE MAX CONNECTIONS
             if (Settings.maxConnections > callback.activeConnections.size) {
+              require(peer != null)
               //ASK PEER FOR PEERS
               peer.getResponse(GetPeersMessage(mbId = Some(Random.nextInt(1000000) + 1))) match {
                 case Success(PeersMessage(peers, _, _)) =>

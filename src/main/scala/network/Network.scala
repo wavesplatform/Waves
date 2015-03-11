@@ -1,12 +1,14 @@
 package network
 
 import java.net.{InetAddress, ServerSocket}
+import java.util
 import java.util.logging.Logger
 import java.util.{Collections, TreeSet}
 
 import controller.Controller
 import network.message._
 
+import scala.collection.JavaConversions._
 import scala.util.Try
 
 object Network extends ConnectionCallback {
@@ -15,7 +17,7 @@ object Network extends ConnectionCallback {
 
   private val MAX_HANDLED_MESSAGES_SIZE = 10000
 
-  private val connectedPeers = scala.collection.mutable.Buffer[ConnectedPeer]()
+  private val connectedPeers = Collections.synchronizedList(new util.ArrayList[ConnectedPeer]())
 
   private val handledMessages = Collections.synchronizedSortedSet(new TreeSet[String]())
 
@@ -29,9 +31,7 @@ object Network extends ConnectionCallback {
     Logger.getGlobal.info("Connection successfull : " + peer.address)
 
     //ADD TO CONNECTED PEERS
-    connectedPeers.synchronized {
-      connectedPeers += peer
-    }
+    connectedPeers += peer
 
     //ADD TO WHITELIST
     PeerManager.addPeer(peer)
@@ -45,9 +45,7 @@ object Network extends ConnectionCallback {
     Logger.getGlobal.info("Connection close : " + peer.address)
 
     //REMOVE FROM CONNECTED PEERS
-    connectedPeers.synchronized {
-      connectedPeers -= peer
-    }
+    connectedPeers -= peer
 
     //PASS TO CONTROLLER
     Controller.onDisconnect(peer)
@@ -61,9 +59,7 @@ object Network extends ConnectionCallback {
     Logger.getGlobal.warning("Connection error : " + peer.address)
 
     //REMOVE FROM CONNECTED PEERS
-    connectedPeers.synchronized {
-      connectedPeers -= peer
-    }
+    connectedPeers -= peer
 
     //ADD TO BLACKLIST
     PeerManager.blacklistPeer(peer)
