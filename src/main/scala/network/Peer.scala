@@ -13,8 +13,7 @@ import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
 
-case class ConnectedPeer(socket: Socket,
-                         callback: ConnectionCallback) extends Peer(socket.getInetAddress) {
+case class ConnectedPeer(socket: Socket, callback: ConnectionCallback) extends Peer(socket.getInetAddress) {
 
   private val messages = TrieMap[Integer, BlockingQueue[Message]]()
 
@@ -113,6 +112,8 @@ case class ConnectedPeer(socket: Socket,
       if (socket != null && socket.isConnected) socket.close()
     }
   }
+
+  override def hashCode(): Int = super.hashCode()
 }
 
 
@@ -125,4 +126,6 @@ class Peer(val address: InetAddress) {
     case Success(cp) => Some(cp)
     case Failure(_) => Logger.getGlobal.info("Failed to connect to : " + address); None
   }
+
+  override def hashCode(): Int = address.hashCode()
 }
