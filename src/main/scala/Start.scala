@@ -35,14 +35,11 @@ object Start {
 
 
   def testingScript(): Unit = {
-
-    Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", 10, false)
+    Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", 10, synchronize = false)
     //require(Wallet.unlock("cookies"))
 
     require(SecureWalletDatabase.exists())
     require(Wallet.privateKeyAccounts().nonEmpty)
-
-
 
     (1 to Int.MaxValue).foreach { _ =>
       val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size - 1)

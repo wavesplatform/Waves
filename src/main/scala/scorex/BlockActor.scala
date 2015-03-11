@@ -53,7 +53,7 @@ class BlockActor extends Actor {
         val message = GetBlockMessage(signature, mbId = Some(Random.nextInt(1000000) + 1))
 
         peer.getResponse(message).map { case BlockMessage(_, block, _, _) =>
-          if (block.isSignatureValid()) {
+          if (block.isSignatureValid) {
             PrunableBlockchainStorage.appendBlock(block)
             self ! BlocksDownload(signatures.tail, peer)
           } else {
@@ -137,6 +137,16 @@ class BlockActor extends Actor {
     if (headers.nonEmpty && headers.size < amount) addNextHeaders(headers) else headers
   }
 
+  private def getBlockSignatures(header: Array[Byte], peer: ConnectedPeer): Seq[Array[Byte]] = {
+    ///CREATE MESSAGE
+    val message = GetSignaturesMessage(header, mbId = Some(Random.nextInt(1000000) + 1))
+
+    peer.getResponse(message) match {
+      case Success(SignaturesMessage(signatures, _, _)) => signatures
+      case _ => Logger.getGlobal.info("Wrong message or failure instead of signatures"); Seq()
+    }
+  }
+
   private def getBlocks(signatures: Seq[Array[Byte]], peer: ConnectedPeer) = signatures.map(getBlock(peer))
 
   private def getBlock(peer: ConnectedPeer)(signature: Array[Byte]) = {
@@ -145,7 +155,7 @@ class BlockActor extends Actor {
 
     //SEND MESSAGE TO PEER
     peer.getResponse(message) match {
-      case Success(BlockMessage(_, block, _, _)) if block.isSignatureValid() => block
+      case Success(BlockMessage(_, block, _, _)) if block.isSignatureValid => block
       case _ => throw new Exception("Can't get new block")
     }
   }
@@ -174,16 +184,6 @@ class BlockActor extends Actor {
     } match {
       case Some(commonBlockHeader) => PrunableBlockchainStorage.blockByHeader(commonBlockHeader).get
       case None => block
-    }
-  }
-
-  private def getBlockSignatures(header: Array[Byte], peer: ConnectedPeer): Seq[Array[Byte]] = {
-    ///CREATE MESSAGE
-    val message = GetSignaturesMessage(header, mbId = Some(Random.nextInt(1000000) + 1))
-
-    peer.getResponse(message) match {
-      case Success(SignaturesMessage(signatures, _, _)) => signatures
-      case _ => Logger.getGlobal.info("Wrong message or failure instead of signatures"); Seq()
     }
   }
 }

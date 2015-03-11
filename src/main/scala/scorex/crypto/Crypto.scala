@@ -6,12 +6,13 @@ import scorex.account.{Account, PrivateKeyAccount}
 
 import scala.util.Try
 
+/*
+sign & verify functions defined in the same way as in Nxt
+ */
 
 object Crypto {
 
   val ADDRESS_VERSION: Byte = 58
-
-  def createKeyPair(seed: Array[Byte]) = Curve25519Impl.createKeyPair(seed)
 
   def getAddress(publicKey: Array[Byte]) = {
     //SHA256 PUBLICKEY FOR PROTECTION THEN RIPEMD160 TO CREATE A SHORTER ADDRESS
@@ -53,10 +54,49 @@ object Crypto {
   def sha256(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
 
   //todo: return Try instead of unwrapping it
-  def sign(account: PrivateKeyAccount, message: Array[Byte]):Array[Byte] =
-    Try(Curve25519Impl.sign(account.privateKey, account.publicKey, message))
+  def sign(account: PrivateKeyAccount, message: Array[Byte]): Array[Byte] =
+    Try(sign(account.privateKey, account.publicKey, message))
       .getOrElse(Array.fill(64)(0: Byte))
 
-  def verify(publicKey: Array[Byte], signature: Array[Byte], message: Array[Byte]):Boolean =
-    Try(Curve25519Impl.verify(signature, message, publicKey)).getOrElse(false)
+  def sign(privateKey: Array[Byte], publicKey: Array[Byte], message: Array[Byte]): Array[Byte] = {
+    require(privateKey.length == 32)
+    require(publicKey.length == 32)
+
+    val m = sha256(message)
+    val x = sha256(m ++ privateKey)
+
+    val Y = new Array[Byte](32)
+    Curve25519.keygen(Y, null, x)
+    val h = sha256(m ++ Y)
+
+    val v = new Array[Byte](32)
+    Curve25519.sign(v, h, x, privateKey)
+    v ++ h
+  }
+
+  def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = {
+    val privateKey = new Array[Byte](32)
+    val publicKey = new Array[Byte](32)
+    Curve25519.keygen(publicKey, privateKey, seed)
+    privateKey -> publicKey
+  }
+
+  def verify(signature: Array[Byte], message: Array[Byte], publicKey: Array[Byte]): Boolean = Try {
+    require(signature.length == 64)
+    require(publicKey.length == 32)
+
+    val v = new Array[Byte](32)
+    val h = new Array[Byte](32)
+
+    System.arraycopy(signature, 0, v, 0, 32)
+    System.arraycopy(signature, 32, h, 0, 32)
+
+    val Y = new Array[Byte](32)
+    Curve25519.verify(Y, v, h, publicKey)
+
+    val m = sha256(message)
+    val h2 = sha256(m ++ Y)
+
+    h.sameElements(h2)
+  }.getOrElse(false)
 }

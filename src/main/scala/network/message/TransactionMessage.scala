@@ -9,7 +9,7 @@ case class TransactionMessage(transaction: Transaction, mbSender: Option[Connect
   override val messageType = Message.TRANSACTION_TYPE
 
   override def toBytes() = {
-    val data = transaction.toBytes
+    val data = transaction.toBytes()
     Bytes.concat(super.toBytes(), generateChecksum(data), data)
   }
 

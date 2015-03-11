@@ -51,10 +51,10 @@ object Wallet {
 
   def generateNewAccount(): Option[PrivateKeyAccount] = secureDb().map { db =>
     //READ SEED
-    val seed = db.getSeed
+    val seed = db.getSeed()
 
     //READ NONCE
-    val nonce = db.getAndIncrementNonce
+    val nonce = db.getAndIncrementNonce()
 
     //GENERATE ACCOUNT SEED
     val accountSeed = generateAccountSeed(seed, nonce)
@@ -83,7 +83,7 @@ object Wallet {
   //DELETE
   def deleteAccount(account: PrivateKeyAccount) = {
     //CHECK IF WALLET IS OPEN
-    if (!isUnlocked()) {
+    if (!isUnlocked) {
       false
     } else {
       //DELETE FROM DATABASE
@@ -94,8 +94,10 @@ object Wallet {
     }
   }
 
+  def isUnlocked = secureDb().isDefined
+
   def unlock(password: String): Boolean = {
-    if (isUnlocked()) {
+    if (isUnlocked) {
       false
     } else {
       Try {
@@ -104,20 +106,13 @@ object Wallet {
     }
   }
 
-  def isUnlocked() = secureDb().isDefined
-
   //UNLOCK
-
-  private def secureDb() = secureDatabaseRef.get()
 
   def lock() = secureDb().map { db =>
     db.commit()
     db.close()
     secureDatabaseRef.set(None)
   }.isDefined
-
-
-  //IMPORT/EXPORT
 
   def importAccountSeed(accountSeed: Array[Byte]): Option[String] = secureDb().flatMap { db =>
     if (accountSeed.length != 32) {
@@ -128,11 +123,16 @@ object Wallet {
     }
   }
 
+
+  //IMPORT/EXPORT
+
   def exportAccountSeed(address: String): Option[Array[Byte]] = privateKeyAccount(address).map(_.seed)
 
   def privateKeyAccount(address: String) = secureDb().flatMap(_.account(address))
 
   def exportSeed(): Option[Array[Byte]] = secureDb().map(_.getSeed())
+
+  private def secureDb() = secureDatabaseRef.get()
 
   def close() {
     secureDb().map(_.close())

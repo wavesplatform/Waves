@@ -112,7 +112,7 @@ object Controller {
 
   private def maxHeightPeer() = peerHeights.maxBy(_._2)._1
 
-  def activePeers() = Network.getActiveConnections()
+  def activePeers() = Network.activeConnections()
 
   def onConnect(peer: ConnectedPeer) {
     val height = PrunableBlockchainStorage.height()
@@ -185,11 +185,13 @@ object Controller {
     Network.broadcast(message, List[Peer]())
   }
 
-  def createWallet(seed: Array[Byte], password: String, amount: Int) = Wallet.create(seed, password, amount, false)
+  def createWallet(seed: Array[Byte], password: String, amount: Int) =
+    Wallet.create(seed, password, amount, synchronize = false)
 
   //WALLET
 
-  def recoverWallet(seed: Array[Byte], password: String, amount: Int) = Wallet.create(seed, password, amount, true)
+  def recoverWallet(seed: Array[Byte], password: String, amount: Int) =
+    Wallet.create(seed, password, amount, synchronize = true)
 
   //todo: remove that probably unused code?
   def scanTransactions(block: Block, blockLimit: Int, transactionLimit: Int, txType: Int, service: Int, account: Account) =

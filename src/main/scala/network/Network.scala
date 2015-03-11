@@ -79,7 +79,7 @@ object Network extends ConnectionCallback {
 
   override def isConnectedTo(address: InetAddress) = connectedPeers.exists(_.address.equals(address))
 
-  override def getActiveConnections() = connectedPeers
+  override def activeConnections() = connectedPeers
 
   def broadcast(message: Message, exclude: List[Peer]) {
     Logger.getGlobal.info("Broadcasting")
@@ -90,7 +90,7 @@ object Network extends ConnectionCallback {
       }
     }.recover { case t: Throwable => t.printStackTrace()}
 
-    Logger.getGlobal().info("Broadcasting end")
+    Logger.getGlobal.info("Broadcasting end")
   }
 
   def isPortAvailable(port: Int) = Try(new ServerSocket(port).close()).isSuccess
@@ -108,10 +108,10 @@ object Network extends ConnectionCallback {
       case _: TransactionMessage | _: BlockMessage =>
         handledMessages.synchronized {
           //CHECK IF NOT HANDLED ALREADY
-          if (handledMessages.contains(new String(message.getHash))) return
+          if (handledMessages.contains(new String(message.hash()))) return
 
           //ADD TO HANDLED MESSAGES
-          addHandledMessage(message.getHash())
+          addHandledMessage(message.hash())
         }
       case _ =>
     }

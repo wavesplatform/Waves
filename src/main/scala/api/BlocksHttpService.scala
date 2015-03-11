@@ -16,15 +16,15 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
     pathPrefix("blocks") {
       path("signature" / Segment) { case encodedSignature =>
         get {
-          complete(withBlock(encodedSignature)(_.toJson()).toString())
+          complete(withBlock(encodedSignature)(_.toJson).toString())
         }
       } ~ path("first") {
         get {
-          complete(GenesisBlock.toJson().toString())
+          complete(GenesisBlock.toJson.toString())
         }
       } ~ path("last") {
         get {
-          complete(PrunableBlockchainStorage.lastBlock.toJson().toString())
+          complete(PrunableBlockchainStorage.lastBlock.toJson.toString())
         }
       } ~ path("height") {
         get {
@@ -71,12 +71,12 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         }
       } ~ path("child" / Segment) { case encodedSignature =>
         get {
-          complete(withBlock(encodedSignature)(_.child().get.toJson()).toString())
+          complete(withBlock(encodedSignature)(_.child().get.toJson).toString())
         }
       } ~ path("address" / Segment) { case address =>
         get {
           complete(withAccount(address) { account =>
-            Json.arr(PrunableBlockchainStorage.generatedBy(account).map(_.toJson()))
+            Json.arr(PrunableBlockchainStorage.generatedBy(account).map(_.toJson))
           }.toString())
         }
       }

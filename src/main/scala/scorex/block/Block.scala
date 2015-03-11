@@ -131,7 +131,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
 
   lazy val signature = Bytes.concat(generatorSignature, transactionsSignature)
 
-  def toJson(): JsObject =
+  def toJson: JsObject =
     Json.obj("version" -> version,
       "reference" -> Base58.encode(reference),
       "timestamp" -> timestamp,
@@ -144,7 +144,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       "transactions" -> JsArray(transactions.map(_.toJson()))
     )
 
-  def toBytes() = {
+  def toBytes = {
     val versionBytes = Ints.toByteArray(version)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0)
     val referenceBytes = Bytes.ensureCapacity(reference, REFERENCE_LENGTH, 0)
@@ -163,7 +163,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
 
   //VALIDATE
 
-  def isSignatureValid() = {
+  def isSignatureValid = {
     val generatorSignature = Arrays.copyOfRange(reference, 0, GENERATOR_SIGNATURE_LENGTH)
     val baseTargetBytes = Longs.toByteArray(generatingBalance)
     val generatorBytes = Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0)
@@ -228,13 +228,11 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
 
   def process() {
     transactions.foreach { transaction =>
-      transaction.process()
       UnconfirmedTransactionsDatabaseImpl.remove(transaction)
     }
   }
 
   def rollback() {
-    transactions.reverseIterator.foreach(_.orphan())
     transactions.foreach(UnconfirmedTransactionsDatabaseImpl.put)
   }
 }

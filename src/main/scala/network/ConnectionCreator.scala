@@ -13,11 +13,11 @@ class ConnectionCreator(callback: ConnectionCallback) extends Thread {
     try {
       while (true) {
         //CHECK IF WE NEED NEW CONNECTIONS
-        if (Settings.minConnections >= callback.getActiveConnections.size) {
+        if (Settings.minConnections >= callback.activeConnections.size) {
           //GET LIST OF KNOWN PEERS
           PeerManager.getKnownPeers.foreach { peer =>
             //CHECK IF WE ALREADY HAVE MAX CONNECTIONS
-            if (Settings.maxConnections > callback.getActiveConnections.size) {
+            if (Settings.maxConnections > callback.activeConnections.size) {
               //CHECK IF ALREADY CONNECTED TO PEER
               if (!callback.isConnectedTo(peer.address)) {
                 //CHECK IF SOCKET IS NOT LOCALHOST
@@ -31,18 +31,18 @@ class ConnectionCreator(callback: ConnectionCallback) extends Thread {
         }
 
         //CHECK IF WE STILL NEED NEW CONNECTIONS
-        if (Settings.minConnections >= callback.getActiveConnections.size) {
+        if (Settings.minConnections >= callback.activeConnections.size) {
           //avoids Exception when adding new elements
-          callback.getActiveConnections.foreach { peer =>
+          callback.activeConnections.foreach { peer =>
 
             //CHECK IF WE ALREADY HAVE MAX CONNECTIONS
-            if (Settings.maxConnections > callback.getActiveConnections.size) {
+            if (Settings.maxConnections > callback.activeConnections.size) {
               //ASK PEER FOR PEERS
               peer.getResponse(GetPeersMessage(mbId = Some(Random.nextInt(1000000) + 1))) match {
                 case Success(PeersMessage(peers, _, _)) =>
                   peers.foreach { newPeer =>
                     //CHECK IF WE ALREADY HAVE MAX CONNECTIONS
-                    if (Settings.maxConnections > callback.getActiveConnections.size) {
+                    if (Settings.maxConnections > callback.activeConnections.size) {
                       //CHECK IF THAT PEER IS NOT BLACKLISTED
                       if (!PeerManager.isBlacklisted(newPeer)) {
                         //CHECK IF CONNECTED

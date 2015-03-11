@@ -9,10 +9,11 @@ import scorex.wallet.Wallet
 
 import scala.util.Try
 
+
 trait CommonApifunctions {
 
   protected[api] def walletExists(): Option[JsObject] =
-    if (Wallet.isUnlocked()) {
+    if (Wallet.isUnlocked) {
       Some(ApiError.toJson(ApiError.ERROR_WALLET_ALREADY_EXISTS))
     } else None
 
@@ -39,7 +40,7 @@ trait CommonApifunctions {
     }
 
   protected[api] def walletNotExistsOrLocked(): Option[JsObject] =
-    if (!Wallet.isUnlocked()) {
+    if (!Wallet.isUnlocked) {
       Some(ApiError.toJson(ApiError.ERROR_WALLET_LOCKED))
     } else None
 }

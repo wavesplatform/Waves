@@ -19,7 +19,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
       path("") {
         get {
           complete {
-            val jsRes = if (!Wallet.isUnlocked()) {
+            val jsRes = if (!Wallet.isUnlocked) {
               ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS)
             } else {
               //GET ACCOUNTS

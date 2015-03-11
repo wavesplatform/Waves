@@ -19,7 +19,6 @@ class TransactionCreator {
   private def afterCreate(transaction: Transaction): (Transaction, ValidationResult) = {
     val valid = transaction.isValid() //CHECK IF PAYMENT VALID
     if (valid == ValidationResult.VALIDATE_OKE) {
-      transaction.process()
       Controller.onTransactionCreate(transaction)
     }
     transaction -> valid

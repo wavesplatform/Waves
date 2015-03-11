@@ -15,7 +15,7 @@ class ConnectionAcceptor(callback: ConnectionCallback) extends Thread {
         if (socket == null) socket = new ServerSocket(Network.PORT)
 
         //CHECK IF WE HAVE MAX CONNECTIONS CONNECTIONS
-        if (Settings.maxConnections <= callback.getActiveConnections.size) {
+        if (Settings.maxConnections <= callback.activeConnections.size) {
           //IF SOCKET IS OPEN CLOSE IT
           if (!socket.isClosed) socket.close()
           Thread.sleep(100)

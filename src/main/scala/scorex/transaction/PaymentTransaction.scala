@@ -57,11 +57,11 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
 
     //WRITE AMOUNT
-    val amountBytes = amount.toBigInt.toByteArray
+    val amountBytes = amount.toBigInt().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
 
     //WRITE FEE
-    val feeBytes = fee.toBigInt.toByteArray
+    val feeBytes = fee.toBigInt().toByteArray
     val feeFill = new Array[Byte](FEE_LENGTH - feeBytes.length)
 
     val data = Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
@@ -161,11 +161,11 @@ object PaymentTransaction {
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
 
     //WRITE AMOUNT
-    val amountBytes = amount.toBigInt.toByteArray
+    val amountBytes = amount.toBigInt().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
 
     //WRITE FEE
-    val feeBytes = fee.toBigInt.toByteArray
+    val feeBytes = fee.toBigInt().toByteArray
     val feeFill = new Array[Byte](FEE_LENGTH - feeBytes.length)
 
     val data = Bytes.concat(typeBytes,

@@ -19,7 +19,7 @@ trait Message {
   def hasId() = mbId.isDefined
 
 
-  def getHash() = Crypto.sha256(toBytes())
+  def hash() = Crypto.sha256(toBytes())
 
 
   def toBytes() = {

@@ -15,7 +15,7 @@ trait ConnectionCallback {
 
   def isConnectedTo(peer: Peer): Boolean
 
-  def getActiveConnections: Seq[ConnectedPeer]
+  def activeConnections(): Seq[ConnectedPeer]
 
   def onMessage(message: Message): Unit
 }

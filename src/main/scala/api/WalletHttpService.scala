@@ -15,7 +15,7 @@ trait WalletHttpService extends HttpService with CommonApifunctions {
     pathPrefix("wallet") {
       path("") {
         get {
-          complete(Json.obj("unlocked" -> Wallet.isUnlocked()).toString())
+          complete(Json.obj("unlocked" -> Wallet.isUnlocked).toString())
         }
       } ~ path("seed") {
         get {
@@ -67,5 +67,4 @@ trait WalletHttpService extends HttpService with CommonApifunctions {
       }
     }
   }
-
 }

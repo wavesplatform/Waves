@@ -147,7 +147,6 @@ object BlockGenerator {
           && tx.isValid() == ValidationResult.VALIDATE_OKE
           && totalBytes + tx.dataLength <= Block.MAX_TRANSACTION_BYTES) {
 
-          tx.process()
           (totalBytes + tx.dataLength, tx :: filteredTxs)
         } else (totalBytes, filteredTxs)
     }
