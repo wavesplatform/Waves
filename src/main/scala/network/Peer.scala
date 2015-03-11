@@ -9,20 +9,24 @@ import java.util.{Collections, HashMap}
 import network.message.Message
 import settings.Settings
 
+import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
 
 case class ConnectedPeer(socket: Socket,
                          callback: ConnectionCallback) extends Peer(socket.getInetAddress) {
 
+  private val messages = TrieMap[Integer, BlockingQueue[Message]]()
+
   override val address = socket.getInetAddress
-  val out = socket.getOutputStream
-  val pinger = new Pinger(this)
+
+  private val out = socket.getOutputStream
+  private val pinger = new Pinger(this)
 
 
   callback.onConnect(this)
-  val self = this
-  val listener = new Thread() {
+  private val self = this
+  private val listener = new Thread() {
     override def run() {
       try {
         val in = new DataInputStream(socket.getInputStream)
@@ -40,7 +44,7 @@ case class ConnectedPeer(socket: Socket,
 
             //CHECK IF WE ARE WAITING FOR A MESSAGE WITH THAT ID
             message.mbId match {
-              case Some(id) if messages.containsKey(id) => messages.get(id).add(message)
+              case Some(id) if messages.contains(id) => messages(id).add(message)
               case _ => callback.onMessage(message)
             }
           } else {
@@ -54,7 +58,7 @@ case class ConnectedPeer(socket: Socket,
       }
     }
   }
-  private val messages = Collections.synchronizedMap(new HashMap[Integer, BlockingQueue[Message]]())
+
 
   def getPing() = pinger.getPing
 
@@ -72,7 +76,6 @@ case class ConnectedPeer(socket: Socket,
       Try {
         val response = blockingQueue.poll(Settings.connectionTimeout, TimeUnit.MILLISECONDS)
         messages.remove(id)
-
         response
       }
     }
