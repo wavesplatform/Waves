@@ -51,8 +51,6 @@ object Crypto {
 
   def doubleSha256(input: Array[Byte]) = sha256(sha256(input))
 
-  def sha256(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
-
   //todo: return Try instead of unwrapping it
   def sign(account: PrivateKeyAccount, message: Array[Byte]): Array[Byte] =
     Try(sign(account.privateKey, account.publicKey, message))
@@ -73,6 +71,8 @@ object Crypto {
     Curve25519.sign(v, h, x, privateKey)
     v ++ h
   }
+
+  def sha256(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
 
   def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = {
     val privateKey = new Array[Byte](32)

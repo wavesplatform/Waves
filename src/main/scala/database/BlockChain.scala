@@ -5,8 +5,6 @@ import scorex.block.Block
 import scorex.transaction.Transaction
 import settings.Settings
 
-import scala.annotation.tailrec
-
 trait BlockChain extends StateQuery {
   def height(): Int
 

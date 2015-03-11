@@ -4,7 +4,6 @@ import java.io.DataInputStream
 import java.net.{InetAddress, Socket}
 import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue, TimeUnit}
 import java.util.logging.Logger
-import java.util.{Collections, HashMap}
 
 import network.message.Message
 import settings.Settings
@@ -15,10 +14,8 @@ import scala.util.{Failure, Success, Try}
 
 case class ConnectedPeer(socket: Socket, callback: ConnectionCallback) extends Peer(socket.getInetAddress) {
 
-  private val messages = TrieMap[Integer, BlockingQueue[Message]]()
-
   override val address = socket.getInetAddress
-
+  private val messages = TrieMap[Integer, BlockingQueue[Message]]()
   private val out = socket.getOutputStream
   private val pinger = new Pinger(this)
 
