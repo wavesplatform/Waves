@@ -133,14 +133,9 @@ object BlockGenerator {
   }
 
   private def formBlock(stub: BlockStub, account: PrivateKeyAccount): Block = {
-
     //ORDER TRANSACTIONS BY FEE PER BYTE
     val orderedTransactions = UnconfirmedTransactionsDatabaseImpl.getAll().sortBy(_.feePerByte)
 
-    /* warning: simplification here!
-        QORA does break after first transaction matched conditions then repeat cycle
-        (while orderedTransactions contains transactions to process)
-     */
     val (_, transactions) = orderedTransactions.foldLeft((0, List[Transaction]())) {
       case ((totalBytes, filteredTxs), tx) =>
         if (tx.timestamp <= stub.timestamp && tx.deadline > stub.timestamp
