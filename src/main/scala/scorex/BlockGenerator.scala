@@ -8,8 +8,6 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.crypto.Crypto
 import scorex.database.PrunableBlockchainStorage
-import scorex.transaction.Transaction
-import scorex.transaction.Transaction.ValidationResult
 import scorex.wallet.Wallet
 import settings.Settings
 

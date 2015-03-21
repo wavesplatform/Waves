@@ -1,8 +1,10 @@
 package scorex.network
 
 import java.util.logging.Logger
-import scorex.network.message.{PeersMessage, GetPeersMessage}
+
+import scorex.network.message.{GetPeersMessage, PeersMessage}
 import settings.Settings
+
 import scala.util.{Failure, Random, Success}
 
 

@@ -7,7 +7,7 @@ import scorex.network.ConnectedPeer
 
 case class SignaturesMessage(signatures: Seq[Array[Byte]], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
 
-  import SignaturesMessage._
+  import scorex.network.message.SignaturesMessage._
 
   override val messageType = Message.SIGNATURES_TYPE
 

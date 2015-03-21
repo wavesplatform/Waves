@@ -9,7 +9,7 @@ import scorex.network.ConnectedPeer
 
 trait Message {
 
-  import Message._
+  import scorex.network.message.Message._
 
   val messageType: Int
   val mbSender: Option[ConnectedPeer]

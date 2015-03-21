@@ -9,8 +9,8 @@ import scorex._
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, GenesisBlock}
 import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
-import scorex.network.{Network, Peer, ConnectedPeer, PeerManager}
 import scorex.network.message._
+import scorex.network.{ConnectedPeer, Network, Peer, PeerManager}
 import scorex.transaction.Transaction
 import scorex.transaction.Transaction.TransactionType
 import scorex.wallet.Wallet

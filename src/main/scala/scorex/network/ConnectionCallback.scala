@@ -1,6 +1,7 @@
 package scorex.network
 
 import java.net.InetAddress
+
 import scorex.network.message.Message
 
 trait ConnectionCallback {

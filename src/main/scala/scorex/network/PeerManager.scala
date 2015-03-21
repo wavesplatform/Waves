@@ -2,6 +2,7 @@ package scorex.network
 
 import java.net.InetAddress
 import java.util.logging.Logger
+
 import scorex.database.PeerDatabaseImpl
 import settings.Settings
 

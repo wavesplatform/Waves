@@ -1,6 +1,7 @@
 package settings
 
 import java.net.InetAddress
+
 import play.api.libs.json.Json
 import scorex.network.Peer
 

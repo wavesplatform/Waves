@@ -8,7 +8,7 @@ import scorex.network.{ConnectedPeer, Peer}
 
 case class PeersMessage(peers: Seq[Peer], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
 
-  import PeersMessage._
+  import scorex.network.message.PeersMessage._
 
   override val messageType = Message.PEERS_TYPE
 

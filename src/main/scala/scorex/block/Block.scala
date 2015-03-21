@@ -1,18 +1,18 @@
 package scorex.block
 
-import ntp.NTP
-import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
-import scala.util.Try
 import java.util.Arrays
-import com.google.common.primitives.{Bytes, Ints, Longs}
-import play.api.libs.json.{JsArray, JsObject, Json}
 
+import com.google.common.primitives.{Bytes, Ints, Longs}
+import ntp.NTP
+import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.BlockGenerator
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.{Base58, Crypto}
+import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
 
+import scala.util.Try
 
 
 object Block {
@@ -132,7 +132,7 @@ object Block {
       PrunableBlockchainStorage.lastBlock.signature.sameElements(block.reference) &&
       block.isValid()
 
-    if(!result) println(s"not valid block! $notGenesis $signatureValid $linkExists $blockValid")
+    if (!result) println(s"not valid block! $notGenesis $signatureValid $linkExists $blockValid")
     result
   }
 

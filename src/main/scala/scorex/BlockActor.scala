@@ -1,15 +1,16 @@
 package scorex
 
-import scorex.network.{Network, ConnectedPeer}
+import java.util.logging.Logger
+
+import akka.actor.Actor
+import scorex.block.Block
+import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import scorex.network.message._
+import scorex.network.{ConnectedPeer, Network}
+import settings.Settings
 
 import scala.annotation.tailrec
 import scala.util.{Random, Success}
-import java.util.logging.Logger
-import akka.actor.Actor
-import scorex.block.Block
-import scorex.database.{UnconfirmedTransactionsDatabaseImpl, PrunableBlockchainStorage}
-import settings.Settings
 
 
 case class Synchronize(peer: ConnectedPeer)
@@ -137,16 +138,6 @@ class BlockActor extends Actor {
     if (headers.nonEmpty && headers.size < amount) addNextHeaders(headers) else headers
   }
 
-  private def getBlockSignatures(header: Array[Byte], peer: ConnectedPeer): Seq[Array[Byte]] = {
-    ///CREATE MESSAGE
-    val message = GetSignaturesMessage(header, mbId = Some(Random.nextInt(1000000) + 1))
-
-    peer.getResponse(message) match {
-      case Success(SignaturesMessage(signatures, _, _)) => signatures
-      case _ => Logger.getGlobal.info("Wrong message or failure instead of signatures"); Seq()
-    }
-  }
-
   private def getBlocks(signatures: Seq[Array[Byte]], peer: ConnectedPeer) = signatures.map(getBlock(peer))
 
   private def getBlock(peer: ConnectedPeer)(signature: Array[Byte]) = {
@@ -184,6 +175,16 @@ class BlockActor extends Actor {
     } match {
       case Some(commonBlockHeader) => PrunableBlockchainStorage.blockByHeader(commonBlockHeader).get
       case None => block
+    }
+  }
+
+  private def getBlockSignatures(header: Array[Byte], peer: ConnectedPeer): Seq[Array[Byte]] = {
+    ///CREATE MESSAGE
+    val message = GetSignaturesMessage(header, mbId = Some(Random.nextInt(1000000) + 1))
+
+    peer.getResponse(message) match {
+      case Success(SignaturesMessage(signatures, _, _)) => signatures
+      case _ => Logger.getGlobal.info("Wrong message or failure instead of signatures"); Seq()
     }
   }
 }

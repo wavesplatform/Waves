@@ -11,7 +11,7 @@ import scala.collection.JavaConversions._
 
 class SecureWalletDatabase(password: String) {
 
-  import SecureWalletDatabase.{NONCE, SECURE_WALLET_FILE, SEED}
+  import scorex.database.wallet.SecureWalletDatabase.{NONCE, SECURE_WALLET_FILE, SEED}
 
   //OPEN WALLET
   SECURE_WALLET_FILE.getParentFile.mkdirs()

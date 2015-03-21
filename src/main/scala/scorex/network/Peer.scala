@@ -4,6 +4,7 @@ import java.io.DataInputStream
 import java.net.{InetAddress, Socket}
 import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue, TimeUnit}
 import java.util.logging.Logger
+
 import scorex.network.message.Message
 import settings.Settings
 

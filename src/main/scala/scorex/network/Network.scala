@@ -6,8 +6,8 @@ import java.util.logging.Logger
 import java.util.{Collections, TreeSet}
 
 import controller.Controller
-
 import scorex.network.message._
+
 import scala.collection.JavaConversions._
 import scala.util.Try
 

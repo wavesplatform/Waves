@@ -7,7 +7,8 @@ import scorex.block.Block
 import scorex.network.ConnectedPeer
 
 case class BlockMessage(height: Int, block: Block, mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
-  import BlockMessage._
+
+  import scorex.network.message.BlockMessage._
 
   override val messageType = Message.BLOCK_TYPE
 
