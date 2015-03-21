@@ -1,8 +1,8 @@
 package api
 
-import database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import play.api.libs.json.Json
 import scorex.crypto.Base58
+import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import spray.routing.HttpService
 
 import scala.util.Try

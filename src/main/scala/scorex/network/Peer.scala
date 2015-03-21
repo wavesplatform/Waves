@@ -1,11 +1,10 @@
-package network
+package scorex.network
 
 import java.io.DataInputStream
 import java.net.{InetAddress, Socket}
 import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue, TimeUnit}
 import java.util.logging.Logger
-
-import network.message.Message
+import scorex.network.message.Message
 import settings.Settings
 
 import scala.collection.concurrent.TrieMap

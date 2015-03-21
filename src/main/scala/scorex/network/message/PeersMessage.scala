@@ -1,14 +1,14 @@
-package network.message
+package scorex.network.message
 
 import java.net.InetAddress
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import network.{ConnectedPeer, Peer}
+import scorex.network.{ConnectedPeer, Peer}
 
 case class PeersMessage(peers: Seq[Peer], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
 
-  import network.message.PeersMessage._
+  import PeersMessage._
 
   override val messageType = Message.PEERS_TYPE
 

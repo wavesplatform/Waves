@@ -1,9 +1,8 @@
-package network
+package scorex.network
 
 import java.net.InetAddress
 import java.util.logging.Logger
-
-import database.PeerDatabaseImpl
+import scorex.database.PeerDatabaseImpl
 import settings.Settings
 
 import scala.collection.JavaConversions._

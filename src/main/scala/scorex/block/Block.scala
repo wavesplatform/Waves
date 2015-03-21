@@ -1,18 +1,18 @@
 package scorex.block
 
-import java.util.Arrays
-
-import com.google.common.primitives.{Bytes, Ints, Longs}
-import database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import ntp.NTP
+import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
+import scala.util.Try
+import java.util.Arrays
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsArray, JsObject, Json}
+
 import scorex.BlockGenerator
-import scorex.account.PublicKeyAccount
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.{Base58, Crypto}
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
 
-import scala.util.Try
 
 
 object Block {
@@ -36,6 +36,30 @@ object Block {
     Block(stub.version, stub.reference, stub.timestamp,
       stub.generatingBalance, stub.generator, stub.generatorSignature,
       transactions, transactionsSignature)
+
+
+  def apply(stub: BlockStub, account: PrivateKeyAccount): Block = {
+    //ORDER TRANSACTIONS BY FEE PER BYTE
+    val orderedTransactions = UnconfirmedTransactionsDatabaseImpl.getAll().sortBy(_.feePerByte)
+
+    val (_, transactions) = orderedTransactions.foldLeft((0, List[Transaction]())) {
+      case ((totalBytes, filteredTxs), tx) =>
+        if (tx.timestamp <= stub.timestamp && tx.deadline > stub.timestamp
+          && tx.isValid() == ValidationResult.VALIDATE_OKE
+          && totalBytes + tx.dataLength <= Block.MAX_TRANSACTION_BYTES) {
+
+          (totalBytes + tx.dataLength, tx :: filteredTxs)
+        } else (totalBytes, filteredTxs)
+    }
+
+    val txSigsBytes = transactions.foldLeft(stub.generatorSignature) { case (bytes, tx) =>
+      Bytes.concat(bytes, tx.signature);
+    }
+
+    val transactionsSingature = Crypto.sign(account, txSigsBytes)
+
+    Block(stub, transactions, transactionsSingature)
+  }
 
   def parse(data: Array[Byte]): Try[Block] = Try {
     //CHECK IF WE HAVE MINIMUM BLOCK LENGTH
@@ -67,7 +91,6 @@ object Block {
     val generator = new PublicKeyAccount(generatorBytes)
     position += GENERATOR_LENGTH
 
-
     //READ TRANSACTION SIGNATURE
     val transactionsSignature = Arrays.copyOfRange(data, position, position + TRANSACTIONS_SIGNATURE_LENGTH)
     position += TRANSACTIONS_SIGNATURE_LENGTH
@@ -98,7 +121,20 @@ object Block {
     }
   }
 
-  def isNewBlockValid(block: Block) = true
+  def isNewBlockValid(block: Block) = {
+    val notGenesis = block != GenesisBlock
+    val signatureValid = block.isSignatureValid()
+    val linkExists = PrunableBlockchainStorage.lastBlock.signature.sameElements(block.reference)
+    val blockValid = block.isValid()
+
+    val result = block != GenesisBlock &&
+      block.isSignatureValid() &&
+      PrunableBlockchainStorage.lastBlock.signature.sameElements(block.reference) &&
+      block.isValid()
+
+    if(!result) println(s"not valid block! $notGenesis $signatureValid $linkExists $blockValid")
+    result
+  }
 
   /*
     todo: uncomment & fix
@@ -163,7 +199,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
 
   //VALIDATE
 
-  def isSignatureValid = {
+  def isSignatureValid() = {
     val generatorSignature = Arrays.copyOfRange(reference, 0, GENERATOR_SIGNATURE_LENGTH)
     val baseTargetBytes = Longs.toByteArray(generatingBalance)
     val generatorBytes = Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0)

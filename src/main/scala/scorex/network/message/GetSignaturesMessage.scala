@@ -1,7 +1,7 @@
-package network.message
+package scorex.network.message
 
 import com.google.common.primitives.Bytes
-import network.ConnectedPeer
+import scorex.network.ConnectedPeer
 
 case class GetSignaturesMessage(parent: Array[Byte], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
 

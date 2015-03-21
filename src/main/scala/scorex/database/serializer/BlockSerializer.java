@@ -1,4 +1,4 @@
-package database.serializer;
+package scorex.database.serializer;
 
 import org.mapdb.Serializer;
 import scorex.block.Block;

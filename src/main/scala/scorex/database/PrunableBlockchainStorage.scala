@@ -1,4 +1,4 @@
-package database
+package scorex.database
 
 import java.util.concurrent.atomic.AtomicReference
 

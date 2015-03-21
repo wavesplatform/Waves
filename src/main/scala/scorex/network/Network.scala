@@ -1,4 +1,4 @@
-package network
+package scorex.network
 
 import java.net.{InetAddress, ServerSocket}
 import java.util
@@ -6,8 +6,8 @@ import java.util.logging.Logger
 import java.util.{Collections, TreeSet}
 
 import controller.Controller
-import network.message._
 
+import scorex.network.message._
 import scala.collection.JavaConversions._
 import scala.util.Try
 

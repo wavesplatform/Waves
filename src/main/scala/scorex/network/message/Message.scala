@@ -1,15 +1,15 @@
-package network.message
+package scorex.network.message
 
 import java.io.DataInputStream
 import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints}
-import network.ConnectedPeer
 import scorex.crypto.Crypto
+import scorex.network.ConnectedPeer
 
 trait Message {
 
-  import network.message.Message._
+  import Message._
 
   val messageType: Int
   val mbSender: Option[ConnectedPeer]

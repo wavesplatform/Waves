@@ -1,16 +1,16 @@
 package scorex
 
-import java.util.logging.Logger
-
-import akka.actor.Actor
-import database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
-import network.message._
-import network.{ConnectedPeer, Network}
-import scorex.block.Block
-import settings.Settings
+import scorex.network.{Network, ConnectedPeer}
+import scorex.network.message._
 
 import scala.annotation.tailrec
 import scala.util.{Random, Success}
+import java.util.logging.Logger
+import akka.actor.Actor
+import scorex.block.Block
+import scorex.database.{UnconfirmedTransactionsDatabaseImpl, PrunableBlockchainStorage}
+import settings.Settings
+
 
 case class Synchronize(peer: ConnectedPeer)
 

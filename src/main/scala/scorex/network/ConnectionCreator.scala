@@ -1,11 +1,10 @@
-package network
+package scorex.network
 
 import java.util.logging.Logger
-
-import network.message.{GetPeersMessage, PeersMessage}
+import scorex.network.message.{PeersMessage, GetPeersMessage}
 import settings.Settings
-
 import scala.util.{Failure, Random, Success}
+
 
 class ConnectionCreator(callback: ConnectionCallback) extends Thread {
 

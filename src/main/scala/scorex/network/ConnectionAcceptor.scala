@@ -1,4 +1,4 @@
-package network
+package scorex.network
 
 import java.net.ServerSocket
 import java.util.logging.Logger

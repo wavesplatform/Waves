@@ -1,8 +1,7 @@
-package network
+package scorex.network
 
 import java.net.InetAddress
-
-import network.message.Message
+import scorex.network.message.Message
 
 trait ConnectionCallback {
   def onConnect(peer: ConnectedPeer): Unit

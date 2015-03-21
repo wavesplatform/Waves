@@ -1,4 +1,4 @@
-package database
+package scorex.database
 
 import java.io.{File, FileOutputStream}
 import java.nio.ByteBuffer
@@ -86,7 +86,6 @@ class YoctoBlockchainImpl extends BlockChain {
     val q1 = select().where(QueryBuilder.eq("account", UnsignedByteArrays.from(address)))
 
     //todo: concurrency problems with mutable.Buffer?
-
     val seq = mutable.Buffer[BigDecimal]()
 
     chainDb.execute(q1, new DocumentProcessor {
@@ -97,7 +96,7 @@ class YoctoBlockchainImpl extends BlockChain {
       }
     })
 
-    seq.reduce(_ + _)
+    seq.sum
   }
 
   private def compositeDb() = {

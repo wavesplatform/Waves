@@ -1,6 +1,6 @@
-package network
+package scorex.network
 
-import network.message.PingMessage
+import scorex.network.message.PingMessage
 import settings.Settings
 
 import scala.util.{Random, Success, Try}

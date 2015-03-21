@@ -1,13 +1,13 @@
-package network.message
+package scorex.network.message
 
 import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints}
-import network.ConnectedPeer
+import scorex.network.ConnectedPeer
 
 case class SignaturesMessage(signatures: Seq[Array[Byte]], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
 
-  import network.message.SignaturesMessage._
+  import SignaturesMessage._
 
   override val messageType = Message.SIGNATURES_TYPE
 

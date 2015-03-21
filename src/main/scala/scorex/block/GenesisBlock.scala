@@ -3,9 +3,9 @@ package scorex.block
 import java.math.BigDecimal
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import database.PrunableBlockchainStorage
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.Crypto
+import scorex.database.PrunableBlockchainStorage
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.Transaction.ValidationResult
 
@@ -54,7 +54,7 @@ object GenesisBlock extends Block(version = GenesisBlockParams.genesisVersion,
   transactions = GenesisBlockParams.genesisTransactions,
   transactionsSignature = GenesisBlockParams.generatorSignature) {
 
-  override def parent() = null
+  override def parent() = null                //todo: avoid null
 
   //SIGNATURE
 

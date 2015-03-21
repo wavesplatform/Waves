@@ -4,9 +4,9 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.logging.Logger
 
 import com.google.common.primitives.{Bytes, Ints}
-import database.wallet.SecureWalletDatabase
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.Crypto
+import scorex.database.wallet.SecureWalletDatabase
 
 import scala.util.Try
 

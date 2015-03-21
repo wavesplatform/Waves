@@ -1,9 +1,8 @@
 package settings
 
 import java.net.InetAddress
-
-import network.Peer
 import play.api.libs.json.Json
+import scorex.network.Peer
 
 import scala.util.Try
 

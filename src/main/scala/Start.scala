@@ -2,10 +2,10 @@ package scorex
 
 import api.ApiClient
 import controller.Controller
-import database.wallet.SecureWalletDatabase
 import scorex.account.Account
 import scorex.block.GenesisBlockParams
 import scorex.crypto.Base58
+import scorex.database.wallet.SecureWalletDatabase
 import scorex.wallet.Wallet
 
 import scala.io.StdIn

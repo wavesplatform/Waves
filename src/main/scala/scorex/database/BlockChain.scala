@@ -1,4 +1,4 @@
-package database
+package scorex.database
 
 import scorex.account.Account
 import scorex.block.Block

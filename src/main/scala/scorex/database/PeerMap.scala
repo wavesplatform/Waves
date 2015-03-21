@@ -1,8 +1,8 @@
-package database
+package scorex.database
 
 import java.net.InetAddress
 
-import network.Peer
+import scorex.network.Peer
 
 import scala.collection.mutable
 

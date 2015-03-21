@@ -1,18 +1,15 @@
-package network.message
+package scorex.network.message
 
 import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints}
-import network.ConnectedPeer
 import scorex.block.Block
+import scorex.network.ConnectedPeer
 
 case class BlockMessage(height: Int, block: Block, mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
-
-  import network.message.BlockMessage._
-
+  import BlockMessage._
 
   override val messageType = Message.BLOCK_TYPE
-
 
   override def toBytes() = {
     val heightBytes = Ints.toByteArray(block.height().get)

@@ -5,12 +5,12 @@ import java.util.logging.Logger
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.io.IO
 import api.HttpServiceActor
-import database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
-import network.message._
-import network.{ConnectedPeer, Network, Peer, PeerManager}
 import scorex._
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, GenesisBlock}
+import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
+import scorex.network.{Network, Peer, ConnectedPeer, PeerManager}
+import scorex.network.message._
 import scorex.transaction.Transaction
 import scorex.transaction.Transaction.TransactionType
 import scorex.wallet.Wallet

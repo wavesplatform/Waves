@@ -1,7 +1,7 @@
 package scorex.account
 
-import database.PrunableBlockchainStorage
 import scorex.crypto.Crypto
+import scorex.database.PrunableBlockchainStorage
 
 case class PrivateKeyAccount(seed: Array[Byte], privateKey: Array[Byte], override val publicKey: Array[Byte])
   extends PublicKeyAccount(publicKey) {

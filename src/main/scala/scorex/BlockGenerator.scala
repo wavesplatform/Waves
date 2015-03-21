@@ -3,11 +3,11 @@ package scorex
 import akka.actor.Actor
 import com.google.common.primitives.{Bytes, Longs}
 import controller.Controller
-import database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import ntp.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.crypto.Crypto
+import scorex.database.PrunableBlockchainStorage
 import scorex.transaction.Transaction
 import scorex.transaction.Transaction.ValidationResult
 import scorex.wallet.Wallet
@@ -44,7 +44,7 @@ class BlockGenerator extends Actor {
 
         blocks.exists { case (account, blockStub) =>
           if (blockStub.timestamp <= NTP.getTime) {
-            val block = formBlock(blockStub, account)
+            val block = Block(blockStub, account)
             if (block.transactions.nonEmpty) {
               println("Non-empty block: " + block)
             }
@@ -92,7 +92,6 @@ object BlockGenerator {
   private[BlockGenerator] def generateNextBlock(account: PrivateKeyAccount, block: Block) = {
     require(account.generatingBalance > BigDecimal(0), "Zero generating balance in generateNextBlock")
 
-
     val signature = calculateSignature(block, account)
     val hash = Crypto.sha256(signature)
     val hashValue = BigInt(1, hash)
@@ -102,7 +101,6 @@ object BlockGenerator {
     val baseTarget = BigInt(getBaseTarget(getNextBlockGeneratingBalance(block)))
     //MULTIPLY TARGET BY USER BALANCE
     val target = BigInt(1, targetBytes) / baseTarget * account.generatingBalance.toBigInt()
-
 
     //CALCULATE GUESSES
     val guesses = hashValue / target + 1
@@ -130,29 +128,6 @@ object BlockGenerator {
 
     //CALC SIGNATURE OF NEWBLOCKHEADER
     Crypto.sign(account, Bytes.concat(generatorSignature, baseTargetBytes, generatorBytes))
-  }
-
-  private def formBlock(stub: BlockStub, account: PrivateKeyAccount): Block = {
-    //ORDER TRANSACTIONS BY FEE PER BYTE
-    val orderedTransactions = UnconfirmedTransactionsDatabaseImpl.getAll().sortBy(_.feePerByte)
-
-    val (_, transactions) = orderedTransactions.foldLeft((0, List[Transaction]())) {
-      case ((totalBytes, filteredTxs), tx) =>
-        if (tx.timestamp <= stub.timestamp && tx.deadline > stub.timestamp
-          && tx.isValid() == ValidationResult.VALIDATE_OKE
-          && totalBytes + tx.dataLength <= Block.MAX_TRANSACTION_BYTES) {
-
-          (totalBytes + tx.dataLength, tx :: filteredTxs)
-        } else (totalBytes, filteredTxs)
-    }
-
-    val data = transactions.foldLeft(stub.generatorSignature) { case (bytes, tx) =>
-      Bytes.concat(bytes, tx.signature);
-    }
-
-    val transactionsSingature = Crypto.sign(account, data)
-
-    Block(stub, transactions, transactionsSingature)
   }
 
   private def minMaxBalance(generatingBalance: Long) =

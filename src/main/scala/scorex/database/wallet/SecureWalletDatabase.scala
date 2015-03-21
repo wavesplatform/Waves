@@ -1,4 +1,4 @@
-package database.wallet
+package scorex.database.wallet
 
 import java.io.File
 

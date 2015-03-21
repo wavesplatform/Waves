@@ -1,10 +1,10 @@
 package api
 
-import database.PrunableBlockchainStorage
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.{Base58, Crypto}
+import scorex.database.PrunableBlockchainStorage
 import scorex.wallet.Wallet
 
 import scala.util.Try

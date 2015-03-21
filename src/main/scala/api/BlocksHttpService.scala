@@ -1,10 +1,10 @@
 package api
 
 import controller.Controller
-import database.PrunableBlockchainStorage
 import play.api.libs.json.Json
 import scorex.BlockGenerator
 import scorex.block.GenesisBlock
+import scorex.database.PrunableBlockchainStorage
 import spray.routing.HttpService
 
 import scala.util.Try
