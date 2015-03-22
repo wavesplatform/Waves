@@ -1,7 +1,6 @@
 package scorex
 
 import akka.actor.Actor
-import com.google.common.primitives.{Bytes, Longs}
 import controller.Controller
 import ntp.NTP
 import scorex.account.PrivateKeyAccount
@@ -90,7 +89,7 @@ object BlockGenerator {
   private[BlockGenerator] def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block) = {
     require(account.generatingBalance > BigDecimal(0), "Zero generating balance in generateNextBlock")
 
-    val signature = calculateSignature(lastBlock, account)
+    val signature = Block.calculateSignature(lastBlock, account)
     val hash = Crypto.sha256(signature)
     val hashValue = BigInt(1, hash)
 
@@ -110,21 +109,6 @@ object BlockGenerator {
     val timestamp = if (timestampRaw > Long.MaxValue) Long.MaxValue else timestampRaw.longValue()
 
     BlockStub(Block.Version, lastBlock.signature, timestamp, getNextBlockGeneratingBalance(lastBlock), account, signature)
-  }
-
-  private def calculateSignature(solvingBlock: Block, account: PrivateKeyAccount) = {
-    //WRITE PARENT GENERATOR SIGNATURE
-    val generatorSignature = Bytes.ensureCapacity(solvingBlock.generatorSignature, Block.GENERATOR_SIGNATURE_LENGTH, 0)
-
-    //WRITE GENERATING BALANCE
-    val baseTargetBytesRaw = Longs.toByteArray(getNextBlockGeneratingBalance(solvingBlock))
-    val baseTargetBytes = Bytes.ensureCapacity(baseTargetBytesRaw, Block.GENERATING_BALANCE_LENGTH, 0)
-
-    //WRITE GENERATOR
-    val generatorBytes = Bytes.ensureCapacity(account.publicKey, Block.GENERATOR_LENGTH, 0)
-
-    //CALC SIGNATURE OF NEWBLOCKHEADER
-    Crypto.sign(account, Bytes.concat(generatorSignature, baseTargetBytes, generatorBytes))
   }
 
   private def minMaxBalance(generatingBalance: Long) =

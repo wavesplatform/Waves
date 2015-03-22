@@ -48,7 +48,6 @@ class YoctoBlockchainImpl extends BlockChain {
       dbBuilder.merge(documentBuilder)
     }
 
-
     val h = height() + 1
     val os = new FileOutputStream(filename(h))
     dbBuilder.buildWritable().writeTo(os)

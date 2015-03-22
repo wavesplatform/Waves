@@ -21,7 +21,8 @@ object GenesisBlockParams {
     //DIGEST
     val digest = Crypto.sha256(data)
     Bytes.concat(digest, digest)
-  }
+  }.ensuring(sig => sig.size == Block.GENERATOR_SIGNATURE_LENGTH)
+
   val genesisVersion = 1
   val genesisReference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
   val genesisTimestamp = System.currentTimeMillis - 1000 * 60 * 60
