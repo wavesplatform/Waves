@@ -14,9 +14,138 @@ import scorex.transaction.{GenesisTransaction, Transaction}
 
 import scala.util.Try
 
+case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
+                     generator: PublicKeyAccount, generatorSignature: Array[Byte]) {
+  require(reference.length == Block.REFERENCE_LENGTH)
+  require(generatingBalance > 0)
+}
+
+case class Block(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
+                 generator: PublicKeyAccount, generatorSignature: Array[Byte],
+                 transactions: List[Transaction], transactionsSignature: Array[Byte]) {
+
+  import scorex.block.Block._
+
+  def totalFee() = transactions.foldLeft(BigDecimal(0).setScale(8)) { case (fee, tx) => fee + tx.fee}
+
+  def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
+
+  def parent(): Option[Block] = PrunableBlockchainStorage.parent(this)
+
+  def child(): Option[Block] = PrunableBlockchainStorage.child(this)
+
+  def height(): Option[Int] = PrunableBlockchainStorage.heightOf(this)
+
+  lazy val signature = Bytes.concat(generatorSignature, transactionsSignature)
+
+  def toJson: JsObject =
+    Json.obj("version" -> version,
+      "reference" -> Base58.encode(reference),
+      "timestamp" -> timestamp,
+      "generatingBalance" -> generatingBalance,
+      "generator" -> generator.address,
+      "fee" -> totalFee(),
+      "transactionsSignature" -> Base58.encode(transactionsSignature),
+      "generatorSignature" -> Base58.encode(generatorSignature),
+      "signature" -> Base58.encode(signature),
+      "transactions" -> JsArray(transactions.map(_.toJson()))
+    )
+
+  def toBytes = {
+    val versionBytes = Ints.toByteArray(version)
+    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0)
+    val referenceBytes = Bytes.ensureCapacity(reference, REFERENCE_LENGTH, 0)
+    val baseTargetBytes = Longs.toByteArray(generatingBalance)
+    val generatorBytes = Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0)
+    val transactionCountBytes = Ints.toByteArray(transactions.size)
+    val transactionBytes = transactions.foldLeft(Array[Byte]()) { case (txBytes, tx) =>
+      Bytes.concat(txBytes, Ints.toByteArray(tx.dataLength), tx.toBytes())
+    }
+
+    Bytes.concat(versionBytes, timestampBytes, referenceBytes, baseTargetBytes, generatorBytes, transactionsSignature,
+      generatorSignature, transactionCountBytes, transactionBytes)
+  }
+
+  def dataLength() = transactions.foldLeft(BASE_LENGTH) { case (len, tx) => len + 4 + tx.dataLength}
+
+  //VALIDATE
+
+  def isSignatureValid() = {
+    val generatorSignature = Arrays.copyOfRange(reference, 0, GENERATOR_SIGNATURE_LENGTH)
+    val baseTargetBytes = Longs.toByteArray(generatingBalance)
+    val generatorBytes = Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0)
+
+    val blockSignature = Bytes.concat(generatorSignature, baseTargetBytes, generatorBytes)
+
+    //VALIDATE TRANSACTIONS SIGNATURE
+    val txsSignature = transactions.foldLeft(generatorSignature) { case (sig, tx) =>
+      Bytes.concat(sig, tx.signature)
+    }
+
+    Crypto.verify(generator.publicKey, generatorSignature, blockSignature) &&
+      Crypto.verify(generator.publicKey, transactionsSignature, txsSignature) &&
+      transactions.forall(_.isSignatureValid())
+  }
+
+
+  def isValid(): Boolean = {
+    //CHECK IF PARENT EXISTS
+    if (reference == null || parent().isEmpty) {
+      false
+    } else if (timestamp - 500 > NTP.getTime || this.timestamp < parent().get.timestamp) {
+      //CHECK IF TIMESTAMP IS VALID -500 MS ERROR MARGIN TIME
+      false
+    } else if (timestamp % 1000 != parent().get.timestamp % 1000) {
+      //CHECK IF TIMESTAMP REST SAME AS PARENT TIMESTAMP REST
+      false
+    } else if (generatingBalance != BlockGenerator.getNextBlockGeneratingBalance(parent().get)) {
+      //CHECK IF GENERATING BALANCE IS CORRECT
+      false
+    } else {
+      //CREATE TARGET
+      val targetBytes = Array.fill(32)(Byte.MaxValue)
+
+      //DIVIDE TARGET BY BASE TARGET
+      val baseTarget = BigInt(BlockGenerator.getBaseTarget(generatingBalance))
+      val genBalance = PrunableBlockchainStorage.generationBalance(generator.address).toBigInt()
+      val target0 = BigInt(1, targetBytes) / baseTarget * genBalance
+
+      //MULTIPLE TARGET BY GUESSES
+      val guesses = (timestamp - parent().get.timestamp) / 1000
+      val lowerTarget = target0 * BigInt(guesses - 1)
+      val target = target0 * BigInt(guesses)
+
+      //CONVERT HIT TO BIGINT
+      val hit = BigInt(1, Crypto.sha256(generatorSignature))
+
+      if (hit >= target) {
+        false
+      } else if (hit < lowerTarget) {
+        //CHECK IF FIRST BLOCK OF USER
+        false
+      } else {
+        transactions.forall { transaction =>
+          !transaction.isInstanceOf[GenesisTransaction] &&
+            transaction.isValid() == ValidationResult.VALIDATE_OKE &&
+            transaction.timestamp < timestamp && transaction.deadline >= timestamp
+        }
+      }
+    }
+  }
+
+  def process() {
+    transactions.foreach { transaction =>
+      UnconfirmedTransactionsDatabaseImpl.remove(transaction)
+    }
+  }
+
+  def rollback() {
+    transactions.foreach(UnconfirmedTransactionsDatabaseImpl.put)
+  }
+}
+
 
 object Block {
-
   val MAX_BLOCK_BYTES = 1048576
   val VERSION_LENGTH = 4
   val REFERENCE_LENGTH = 128
@@ -144,131 +273,4 @@ object Block {
       PrunableBlockchainStorage.lastBlock.signature.sameElements(block.reference) &&
       block.isValid()
       */
-}
-
-case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
-                     generator: PublicKeyAccount, generatorSignature: Array[Byte])
-
-case class Block(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
-                 generator: PublicKeyAccount, generatorSignature: Array[Byte],
-                 transactions: List[Transaction], transactionsSignature: Array[Byte]) {
-
-  import scorex.block.Block._
-
-  def totalFee() = transactions.foldLeft(BigDecimal(0).setScale(8)) { case (fee, tx) => fee + tx.fee}
-
-  def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
-
-  def parent(): Option[Block] = PrunableBlockchainStorage.parent(this)
-
-  def child(): Option[Block] = PrunableBlockchainStorage.child(this)
-
-  def height(): Option[Int] = PrunableBlockchainStorage.heightOf(this)
-
-  lazy val signature = Bytes.concat(generatorSignature, transactionsSignature)
-
-  def toJson: JsObject =
-    Json.obj("version" -> version,
-      "reference" -> Base58.encode(reference),
-      "timestamp" -> timestamp,
-      "generatingBalance" -> generatingBalance,
-      "generator" -> generator.address,
-      "fee" -> totalFee(),
-      "transactionsSignature" -> Base58.encode(transactionsSignature),
-      "generatorSignature" -> Base58.encode(generatorSignature),
-      "signature" -> Base58.encode(signature),
-      "transactions" -> JsArray(transactions.map(_.toJson()))
-    )
-
-  def toBytes = {
-    val versionBytes = Ints.toByteArray(version)
-    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0)
-    val referenceBytes = Bytes.ensureCapacity(reference, REFERENCE_LENGTH, 0)
-    val baseTargetBytes = Longs.toByteArray(generatingBalance)
-    val generatorBytes = Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0)
-    val transactionCountBytes = Ints.toByteArray(transactions.size)
-    val transactionBytes = transactions.foldLeft(Array[Byte]()) { case (txBytes, tx) =>
-      Bytes.concat(txBytes, Ints.toByteArray(tx.dataLength), tx.toBytes())
-    }
-
-    Bytes.concat(versionBytes, timestampBytes, referenceBytes, baseTargetBytes, generatorBytes, transactionsSignature,
-      generatorSignature, transactionCountBytes, transactionBytes)
-  }
-
-  def dataLength() = transactions.foldLeft(BASE_LENGTH) { case (len, tx) => len + 4 + tx.dataLength}
-
-  //VALIDATE
-
-  def isSignatureValid() = {
-    val generatorSignature = Arrays.copyOfRange(reference, 0, GENERATOR_SIGNATURE_LENGTH)
-    val baseTargetBytes = Longs.toByteArray(generatingBalance)
-    val generatorBytes = Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0)
-
-    val blockSignature = Bytes.concat(generatorSignature, baseTargetBytes, generatorBytes)
-
-    //VALIDATE TRANSACTIONS SIGNATURE
-    val txsSignature = transactions.foldLeft(generatorSignature) { case (sig, tx) =>
-      Bytes.concat(sig, tx.signature)
-    }
-
-    Crypto.verify(generator.publicKey, generatorSignature, blockSignature) &&
-      Crypto.verify(generator.publicKey, transactionsSignature, txsSignature) &&
-      transactions.forall(_.isSignatureValid())
-  }
-
-
-  def isValid(): Boolean = {
-    //CHECK IF PARENT EXISTS
-    if (reference == null || parent().isEmpty) {
-      false
-    } else if (timestamp - 500 > NTP.getTime || this.timestamp < parent().get.timestamp) {
-      //CHECK IF TIMESTAMP IS VALID -500 MS ERROR MARGIN TIME
-      false
-    } else if (timestamp % 1000 != parent().get.timestamp % 1000) {
-      //CHECK IF TIMESTAMP REST SAME AS PARENT TIMESTAMP REST
-      false
-    } else if (generatingBalance != BlockGenerator.getNextBlockGeneratingBalance(parent().get)) {
-      //CHECK IF GENERATING BALANCE IS CORRECT
-      false
-    } else {
-      //CREATE TARGET
-      val targetBytes = Array.fill(32)(Byte.MaxValue)
-
-      //DIVIDE TARGET BY BASE TARGET
-      val baseTarget = BigInt(BlockGenerator.getBaseTarget(generatingBalance))
-      val genBalance = PrunableBlockchainStorage.generationBalance(generator.address).toBigInt()
-      val target0 = BigInt(1, targetBytes) / baseTarget * genBalance
-
-      //MULTIPLE TARGET BY GUESSES
-      val guesses = (timestamp - parent().get.timestamp) / 1000
-      val lowerTarget = target0 * BigInt(guesses - 1)
-      val target = target0 * BigInt(guesses)
-
-      //CONVERT HIT TO BIGINT
-      val hit = BigInt(1, Crypto.sha256(generatorSignature))
-
-      if (hit >= target) {
-        false
-      } else if (hit < lowerTarget) {
-        //CHECK IF FIRST BLOCK OF USER
-        false
-      } else {
-        transactions.forall { transaction =>
-          !transaction.isInstanceOf[GenesisTransaction] &&
-            transaction.isValid() == ValidationResult.VALIDATE_OKE &&
-            transaction.timestamp < timestamp && transaction.deadline >= timestamp
-        }
-      }
-    }
-  }
-
-  def process() {
-    transactions.foreach { transaction =>
-      UnconfirmedTransactionsDatabaseImpl.remove(transaction)
-    }
-  }
-
-  def rollback() {
-    transactions.foreach(UnconfirmedTransactionsDatabaseImpl.put)
-  }
 }
