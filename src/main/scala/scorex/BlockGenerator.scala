@@ -87,16 +87,16 @@ object BlockGenerator {
     (MIN_BLOCK_TIME + ((MAX_BLOCK_TIME - MIN_BLOCK_TIME) * (1 - percentageOfTotal))).toLong
   }
 
-  private[BlockGenerator] def generateNextBlock(account: PrivateKeyAccount, block: Block) = {
+  private[BlockGenerator] def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block) = {
     require(account.generatingBalance > BigDecimal(0), "Zero generating balance in generateNextBlock")
 
-    val signature = calculateSignature(block, account)
+    val signature = calculateSignature(lastBlock, account)
     val hash = Crypto.sha256(signature)
     val hashValue = BigInt(1, hash)
 
     //CALCULATE ACCOUNT TARGET
     val targetBytes = Array.fill(32)(Byte.MaxValue)
-    val baseTarget = BigInt(getBaseTarget(getNextBlockGeneratingBalance(block)))
+    val baseTarget = BigInt(getBaseTarget(getNextBlockGeneratingBalance(lastBlock)))
     //MULTIPLY TARGET BY USER BALANCE
     val target = BigInt(1, targetBytes) / baseTarget * account.generatingBalance.toBigInt()
 
@@ -104,13 +104,12 @@ object BlockGenerator {
     val guesses = hashValue / target + 1
 
     //CALCULATE TIMESTAMP
-    val timestampRaw = guesses * 1000 + block.timestamp
+    val timestampRaw = guesses * 1000 + lastBlock.timestamp
 
     //CHECK IF NOT HIGHER THAN MAX LONG VALUE
     val timestamp = if (timestampRaw > Long.MaxValue) Long.MaxValue else timestampRaw.longValue()
 
-    val version = 1
-    BlockStub(version, block.signature, timestamp, getNextBlockGeneratingBalance(block), account, signature)
+    BlockStub(Block.Version, lastBlock.signature, timestamp, getNextBlockGeneratingBalance(lastBlock), account, signature)
   }
 
   private def calculateSignature(solvingBlock: Block, account: PrivateKeyAccount) = {

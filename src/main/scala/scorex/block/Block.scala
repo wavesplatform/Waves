@@ -146,6 +146,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
 
 
 object Block {
+  val Version = 1
   val MAX_BLOCK_BYTES = 1048576
   val VERSION_LENGTH = 4
   val REFERENCE_LENGTH = 128
