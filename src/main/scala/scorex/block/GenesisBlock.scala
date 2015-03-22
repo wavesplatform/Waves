@@ -54,7 +54,7 @@ object GenesisBlock extends Block(version = GenesisBlockParams.genesisVersion,
   transactions = GenesisBlockParams.genesisTransactions,
   transactionsSignature = GenesisBlockParams.generatorSignature) {
 
-  override def parent() = null //todo: avoid null
+  override def parent() = None
 
   //SIGNATURE
 
