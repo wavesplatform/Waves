@@ -14,7 +14,7 @@ trait BlockChain extends StateQuery {
 
   def heightOf(blockSignature: Array[Byte]): Option[Int]
 
-  def parent(block: Block): Option[Block] = heightOf(block).flatMap(h => blockAt(h - 1))
+  def parent(block: Block): Option[Block] = heightOf(block.reference).flatMap(blockAt)
 
   def child(block: Block): Option[Block]
 

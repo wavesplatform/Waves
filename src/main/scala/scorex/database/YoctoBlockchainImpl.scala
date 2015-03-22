@@ -118,7 +118,7 @@ class YoctoBlockchainImpl extends BlockChain {
     Transaction.fromBytes(ba)
   }
 
-  override def heightOf(blockSignature: Array[Byte]): Option[Int] = ???
+  override def heightOf(blockSignature: Array[Byte]): Option[Int] = signaturesIndex.find(_._2==blockSignature).map(_._1)
 
   override def blockByHeader(signature: Array[Byte]): Option[Block] =
     signaturesIndex.find(_._2.sameElements(signature)).map(_._1).map(h => blocksIndex(h))
