@@ -25,7 +25,9 @@ libraryDependencies ++= Seq(
   "io.spray" %% "spray-util" % "1.3.2",
   "com.google.guava" % "guava" % "15.0",
   "commons-net" % "commons-net" % "3.3",
-  "ch.qos.logback"  %  "logback-classic"   % "1.1.2"
+  "ch.qos.logback"  %  "logback-classic"   % "1.1.2",
+  //dependencies for testing:
+  "org.scalatest" %% "scalatest" % "2.2.4" % "test"
 )
 
 
