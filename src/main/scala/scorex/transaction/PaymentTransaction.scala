@@ -67,7 +67,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     val data = Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
       Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes), Bytes.concat(feeFill, feeBytes))
 
-    Crypto.verify(sender.publicKey, signature, data)
+    Crypto.verify(signature, data, sender.publicKey)
   }
 
   override def isValid() =
