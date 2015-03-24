@@ -11,7 +11,6 @@ import scorex.crypto.{Base58, Crypto}
 import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
-
 import scala.util.Try
 
 case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
@@ -71,7 +70,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
   //VALIDATE
 
   def isSignatureValid() = {
-    val generatorSignature = this.generatorSignature //Arrays.copyOfRange(reference, 0, GENERATOR_SIGNATURE_LENGTH) todo: ???
+    val generatorSignature = Arrays.copyOfRange(reference, 0, GENERATOR_SIGNATURE_LENGTH) //todo: ???
     val baseTargetBytes = Longs.toByteArray(generatingBalance).ensuring(_.size == Block.GENERATING_BALANCE_LENGTH)
 
     require(generator.publicKey.size == GENERATOR_LENGTH)
@@ -82,11 +81,10 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       Bytes.concat(sig, tx.signature)
     }
 
-    // todo: fix signature validation!
+    // todo: fix block signature validation!
     // Crypto.verify(generatorSignature, blockSignature, generator.publicKey) &&
-       //Crypto.verify(transactionsSignature, txsSignature, generator.publicKey) &&
-         // transactions.forall(_.isSignatureValid())
-    true
+       Crypto.verify(transactionsSignature, txsSignature, generator.publicKey) &&
+        transactions.forall(_.isSignatureValid())
   }
 
 
@@ -168,7 +166,6 @@ object Block {
     Block(stub.version, stub.reference, stub.timestamp,
       stub.generatingBalance, stub.generator, stub.generatorSignature,
       transactions, transactionsSignature)
-
 
   def apply(stub: BlockStub, account: PrivateKeyAccount): Block = {
     //ORDER TRANSACTIONS BY FEE PER BYTE
