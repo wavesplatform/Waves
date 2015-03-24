@@ -134,7 +134,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
                     case (Success(signatureBytes), Success(pubKeyBytes)) =>
                       val account = new PublicKeyAccount(pubKeyBytes)
                       val isValid = account.address == address &&
-                        Crypto.verify(pubKeyBytes, signatureBytes, msg.getBytes(StandardCharsets.UTF_8))
+                        Crypto.verify(signatureBytes, msg.getBytes(StandardCharsets.UTF_8), pubKeyBytes)
                       Json.obj("valid" -> isValid)
                   }
                 }
