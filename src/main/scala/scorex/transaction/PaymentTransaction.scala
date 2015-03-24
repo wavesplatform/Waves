@@ -50,23 +50,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   }
 
   override def isSignatureValid() = {
-    //WRITE TYPE
-    val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TypeId), TYPE_LENGTH, 0)
-
-    //WRITE TIMESTAMP
-    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
-
-    //WRITE AMOUNT
-    val amountBytes = amount.toBigInt().toByteArray
-    val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
-
-    //WRITE FEE
-    val feeBytes = fee.toBigInt().toByteArray
-    val feeFill = new Array[Byte](FEE_LENGTH - feeBytes.length)
-
-    val data = Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
-      Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes), Bytes.concat(feeFill, feeBytes))
-
+    val data = signatureData(sender, recipient, amount, fee, timestamp)
     Crypto.verify(signature, data, sender.publicKey)
   }
 
@@ -152,8 +136,9 @@ object PaymentTransaction {
     new PaymentTransaction(sender, recipient, amount, fee, timestamp, signatureBytes)
   }
 
-  def generateSignature(sender: PrivateKeyAccount, recipient: Account,
-                        amount: BigDecimal, fee: BigDecimal, timestamp: Long): Array[Byte] = {
+
+  private def signatureData(sender: PublicKeyAccount, recipient: Account,
+                            amount: BigDecimal, fee: BigDecimal, timestamp: Long):Array[Byte] = {
     //WRITE TYPE
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.PAYMENT_TRANSACTION.id), TYPE_LENGTH, 0)
 
@@ -168,13 +153,12 @@ object PaymentTransaction {
     val feeBytes = fee.toBigInt().toByteArray
     val feeFill = new Array[Byte](FEE_LENGTH - feeBytes.length)
 
-    val data = Bytes.concat(typeBytes,
-      timestampBytes,
-      sender.publicKey,
-      Base58.decode(recipient.address),
-      Bytes.concat(amountFill, amountBytes),
-      Bytes.concat(feeFill, feeBytes))
+    Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
+      Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes), Bytes.concat(feeFill, feeBytes))
+  }
 
-    Crypto.sign(sender, data)
+  def generateSignature(sender: PrivateKeyAccount, recipient: Account,
+                        amount: BigDecimal, fee: BigDecimal, timestamp: Long): Array[Byte] = {
+    Crypto.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
   }
 }

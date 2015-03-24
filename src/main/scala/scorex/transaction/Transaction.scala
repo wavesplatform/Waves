@@ -21,6 +21,7 @@ abstract class Transaction(val transactionType: TransactionType.Value,
     val minFeePerByte = BigDecimal(1) / BigDecimal.valueOf(Settings.maxBytePerFee)
     feePerByte >= minFeePerByte
   }
+
   val TypeId = transactionType.id
 
   //PARSE/CONVERT
