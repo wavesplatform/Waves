@@ -22,6 +22,7 @@ case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long, gene
 case class Block(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
                  generator: PublicKeyAccount, generatorSignature: Array[Byte],
                  transactions: List[Transaction], transactionsSignature: Array[Byte]) {
+
   import scorex.block.Block._
 
   def totalFee() = transactions.foldLeft(BigDecimal(0).setScale(8)) { case (fee, tx) => fee + tx.fee}
@@ -81,10 +82,9 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       Bytes.concat(sig, tx.signature)
     }
 
-    // todo: fix block signature validation!
-     Crypto.verify(generatorSignature, blockSignature, generator.publicKey) &&
-       Crypto.verify(transactionsSignature, txsSignature, generator.publicKey) &&
-        transactions.forall(_.isSignatureValid())
+    Crypto.verify(generatorSignature, blockSignature, generator.publicKey) &&
+      Crypto.verify(transactionsSignature, txsSignature, generator.publicKey) &&
+      transactions.forall(_.isSignatureValid())
   }
 
 
