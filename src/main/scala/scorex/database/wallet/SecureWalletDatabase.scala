@@ -7,6 +7,7 @@ import scorex.account.PrivateKeyAccount
 import settings.Settings
 
 import scala.collection.JavaConversions._
+import scala.util.Try
 
 
 class SecureWalletDatabase(password: String) {
@@ -18,7 +19,6 @@ class SecureWalletDatabase(password: String) {
 
   private val database = DBMaker.newFileDB(SECURE_WALLET_FILE)
     .encryptionEnable(password)
-    .closeOnJvmShutdown()
     .cacheSize(2048)
     .checksumEnable()
     .mmapFileEnableIfSupported()
@@ -39,7 +39,9 @@ class SecureWalletDatabase(password: String) {
 
   def account(address: String) = Option(accountsMap.get(address))
 
-  def setSeed(seed: Array[Byte]) = database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY)
+  def setSeed(seed: Array[Byte]): Unit = {
+    Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY)).getOrElse(database.getAtomicVar(SEED).set(seed))
+  }
 
   def seed(): Array[Byte] = database.getAtomicVar(SEED).get()
 
@@ -55,7 +57,7 @@ class SecureWalletDatabase(password: String) {
 
   def commit() = database.commit()
 
-  def close() {
+  def close() = this.synchronized {
     if (!database.isClosed) {
       database.commit()
       database.close()

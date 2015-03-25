@@ -32,9 +32,10 @@ object Controller {
   //todo: avoid vars
   private var status = STATUS_NO_CONNECTIONS
   private var blockActorRef: ActorRef = _
-  private var isStopping = false
 
   def getStatus = status
+
+  private implicit lazy val actorSystem = ActorSystem("lagonaki")
 
   def init() {
     //OPENING DATABASES
@@ -47,7 +48,7 @@ object Controller {
 
     require(PrunableBlockchainStorage.height() >= 1)
 
-    implicit val actorSystem = ActorSystem("lagonaki")
+
     val httpServiceActor = actorSystem.actorOf(Props[HttpServiceActor], "http-service")
     val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = Settings.rpcPort)
     IO(Http) ! bindCommand
@@ -67,22 +68,19 @@ object Controller {
     actorSystem.scheduler.schedule(2.seconds, 500.milliseconds)(blockGenerator ! TryToGenerateBlock)
   }
 
-  def stopAll() = {
-    //PREVENT MULTIPLE CALLS
-    if (!isStopping) {
-      isStopping = true
+  def stopAll() = this.synchronized {
+    Logger.getGlobal.info("Stopping block generator")
+    actorSystem.shutdown()
 
-      //STOP MESSAGE PROCESSOR
-      Logger.getGlobal.info("Stopping message processor")
-      Network.stop()
+    Logger.getGlobal.info("Stopping message processor")
+    Network.stop()
 
-      //CLOSE WALLET
-      Logger.getGlobal.info("Closing wallet")
-      Wallet.close()
+    //CLOSE WALLET
+    Logger.getGlobal.info("Closing wallet")
+    Wallet.close()
 
-      //FORCE CLOSE
-      System.exit(0)
-    }
+    //FORCE CLOSE
+    System.exit(0)
   }
 
   //NETWORK

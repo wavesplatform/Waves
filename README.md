@@ -1,6 +1,12 @@
 Scorex - Lagonaki Release
 =========================
 
+Motivation
+----------
+
+Features
+--------
+
 Installation
 ------------
 
