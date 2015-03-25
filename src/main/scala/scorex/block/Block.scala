@@ -22,7 +22,6 @@ case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long, gene
 case class Block(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
                  generator: PublicKeyAccount, generatorSignature: Array[Byte],
                  transactions: List[Transaction], transactionsSignature: Array[Byte]) {
-
   import scorex.block.Block._
 
   def totalFee() = transactions.foldLeft(BigDecimal(0).setScale(8)) { case (fee, tx) => fee + tx.fee}
@@ -70,11 +69,12 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
   //VALIDATE
 
   def isSignatureValid() = {
-    val generatorSignature = Arrays.copyOfRange(reference, 0, GENERATOR_SIGNATURE_LENGTH) //todo: ???
     val baseTargetBytes = Longs.toByteArray(generatingBalance).ensuring(_.size == Block.GENERATING_BALANCE_LENGTH)
 
     require(generator.publicKey.size == GENERATOR_LENGTH)
-    val blockSignature = Bytes.concat(generatorSignature, baseTargetBytes, generator.publicKey)
+    val blockSignature = Bytes.concat(Arrays.copyOfRange(reference, 0, GENERATOR_SIGNATURE_LENGTH),
+      baseTargetBytes,
+      generator.publicKey)
 
     //VALIDATE TRANSACTIONS SIGNATURE
     val txsSignature = transactions.foldLeft(generatorSignature) { case (sig, tx) =>
@@ -82,7 +82,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
     }
 
     // todo: fix block signature validation!
-    // Crypto.verify(generatorSignature, blockSignature, generator.publicKey) &&
+     Crypto.verify(generatorSignature, blockSignature, generator.publicKey) &&
        Crypto.verify(transactionsSignature, txsSignature, generator.publicKey) &&
         transactions.forall(_.isSignatureValid())
   }
