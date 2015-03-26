@@ -11,7 +11,7 @@ import com.yandex.yoctodb.query.{DocumentProcessor, QueryBuilder}
 import com.yandex.yoctodb.util.UnsignedByteArrays
 import scorex.account.Account
 import scorex.block.Block
-import scorex.transaction.{FeeTransaction, GenesisTransaction, PaymentTransaction, Transaction}
+import scorex.transaction._
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
@@ -52,7 +52,7 @@ class YoctoBlockchainImpl extends BlockChain {
 
     val feeTx = feeTransaction(block)
     val feeDoc = DatabaseFormat.getCurrent.newDocumentBuilder()
-      .withField("account", feeTx.account.address, DocumentBuilder.IndexOption.FILTERABLE)
+      .withField("account", feeTx.recipient.address, DocumentBuilder.IndexOption.FILTERABLE)
       .withPayload(feeTx.toBytes())
     dbBuilder.merge(feeDoc)
 
@@ -74,7 +74,7 @@ class YoctoBlockchainImpl extends BlockChain {
     val chainDb = compositeDb()
     val q1 = select().where(QueryBuilder.eq("account", UnsignedByteArrays.from(account.address)))
 
-    val seq = mutable.Buffer[Transaction]()
+    val seq = mutable.Buffer[PreTransaction]()
 
     chainDb.execute(q1, new DocumentProcessor {
       override def process(i: Int, database: Database): Boolean = {
@@ -83,7 +83,10 @@ class YoctoBlockchainImpl extends BlockChain {
       }
     })
 
-    seq.toSeq
+    seq.flatMap {
+      case t: Transaction => Some(t)
+      case _ => None
+    }.toSeq
   }
 
   private def compositeDb() = {
@@ -99,14 +102,13 @@ class YoctoBlockchainImpl extends BlockChain {
 
   private def filename(height: Int) = s"/tmp/block-${height + 1}"
 
-  private def transactionFromByteBuffer(bb: ByteBuffer): Transaction = {
+  private def transactionFromByteBuffer(bb: ByteBuffer): PreTransaction = {
     val ba = new Array[Byte](bb.remaining())
     bb.get(ba)
-    Transaction.fromBytes(ba)
+    PreTransaction.fromBytes(ba)
   }
 
   //todo: fromHeight & confirmations parameters ignored now
-  //todo: include block rewards
   override def balance(address: String, fromHeight: Int, confirmations: Int): BigDecimal = {
     val chainDb = compositeDb()
 

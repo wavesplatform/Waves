@@ -94,7 +94,6 @@ object PaymentTransaction {
   import scorex.transaction.Transaction._
 
   private val SENDER_LENGTH = 32
-  private val RECIPIENT_LENGTH = Account.ADDRESS_LENGTH
   private val FEE_LENGTH = 8
   private val SIGNATURE_LENGTH = 64
   private val BASE_LENGTH = TIMESTAMP_LENGTH + SENDER_LENGTH + RECIPIENT_LENGTH + AMOUNT_LENGTH + FEE_LENGTH + SIGNATURE_LENGTH

@@ -9,11 +9,11 @@ import settings.Settings
 
 
 abstract class Transaction(val transactionType: TransactionType.Value,
-                           val recipient: Account,
-                           val amount:BigDecimal,
+                           override val recipient: Account,
+                           override val amount:BigDecimal,
                            val fee: BigDecimal,
                            val timestamp: Long,
-                           val signature: Array[Byte]) {
+                           val signature: Array[Byte]) extends PreTransaction(recipient, amount) {
 
   lazy val deadline = timestamp + (1000 * 60 * 60 * 24)
   //24HOUR DEADLINE TO INCLUDE TRANSACTION IN BLOCK
@@ -45,8 +45,6 @@ abstract class Transaction(val transactionType: TransactionType.Value,
 
   def isInvolved(account: Account): Boolean
 
-  def getAmount(account: Account): BigDecimal
-
   override def equals(other: Any) = other match {
     case tx: Transaction => signature.sameElements(tx.signature)
     case _ => false
@@ -71,23 +69,10 @@ object Transaction {
   //MINIMUM FEE
   val MINIMUM_FEE = BigDecimal(1)
   //PROPERTIES LENGTH
+  val RECIPIENT_LENGTH = Account.ADDRESS_LENGTH
   val TYPE_LENGTH = 1
   val TIMESTAMP_LENGTH = 8
   val AMOUNT_LENGTH = 8
-
-  def fromBytes(data: Array[Byte]): Transaction = {
-    val txType = data.head
-
-    txType match {
-      case i: Byte if i == TransactionType.GENESIS_TRANSACTION.id =>
-        GenesisTransaction.Parse(data.tail)
-
-      case i: Byte if i == TransactionType.PAYMENT_TRANSACTION.id =>
-        PaymentTransaction.Parse(data.tail)
-
-      case _ => throw new Exception(s"Invalid transaction type: $txType")
-    }
-  }
 
   object ValidationResult extends Enumeration {
     type ValidationResult = Value
@@ -107,4 +92,18 @@ object Transaction {
     val PAYMENT_TRANSACTION = Value(2)
   }
 
+  def fromBytes(data: Array[Byte]): Transaction = {
+    val txType = data.head
+
+    txType match {
+
+      case i: Byte if i == TransactionType.GENESIS_TRANSACTION.id =>
+        GenesisTransaction.Parse(data.tail)
+
+      case i: Byte if i == TransactionType.PAYMENT_TRANSACTION.id =>
+        PaymentTransaction.Parse(data.tail)
+
+      case _ => throw new Exception(s"Invalid transaction type: $txType")
+    }
+  }
 }
