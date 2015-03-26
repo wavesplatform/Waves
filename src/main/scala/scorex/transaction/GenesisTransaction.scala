@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import java.math.{BigDecimal, BigInteger}
+import java.math.BigInteger
 import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
@@ -10,22 +10,22 @@ import scorex.crypto.{Base58, Crypto}
 import scorex.transaction.Transaction.TransactionType
 
 
-case class GenesisTransaction(recipient: Account, amount: BigDecimal, override val timestamp: Long)
-  extends Transaction(TransactionType.GENESIS_TRANSACTION, BigDecimal.ZERO, timestamp,
+case class GenesisTransaction(recipient: Account, override val amount: BigDecimal, override val timestamp: Long)
+  extends Transaction(TransactionType.GENESIS_TRANSACTION, amount, BigDecimal.apply(0), timestamp,
     GenesisTransaction.generateSignature(recipient, amount, timestamp)) {
 
   import scorex.transaction.GenesisTransaction._
   import scorex.transaction.Transaction._
 
   override def toJson() =
-    getJsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toPlainString)
+    getJsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toString())
 
   override def toBytes() = {
     val typeBytes = Array(TransactionType.GENESIS_TRANSACTION.id.toByte)
 
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
 
-    val amountBytes = amount.unscaledValue().toByteArray
+    val amountBytes = amount.bigDecimal.unscaledValue().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
 
     val rcpBytes = Base58.decode(recipient.address)
@@ -44,7 +44,7 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
   def isSignatureValid() = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GENESIS_TRANSACTION.id), TYPE_LENGTH, 0)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
-    val amountBytes = amount.unscaledValue().toByteArray
+    val amountBytes = amount.bigDecimal.unscaledValue().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
     val data = Bytes.concat(typeBytes, timestampBytes,
       Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes))
@@ -54,7 +54,7 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
   }
 
   override def isValid() =
-    if (amount.compareTo(BigDecimal.ZERO) == -1) {
+    if (amount < BigDecimal(0)) {
       ValidationResult.NEGATIVE_AMOUNT
     } else if (!Crypto.isValidAddress(recipient.address)) {
       ValidationResult.INVALID_ADDRESS
@@ -66,8 +66,8 @@ case class GenesisTransaction(recipient: Account, amount: BigDecimal, override v
 
   override def isInvolved(account: Account) = recipient.address.equals(account.address)
 
-  override def getAmount(account: Account) =
-    if (recipient.address.equals(account.address)) amount else BigDecimal.ZERO
+  override def getAmount(account: Account):BigDecimal =
+    if (recipient.address.equals(account.address)) amount else 0
 }
 
 
@@ -81,7 +81,7 @@ object GenesisTransaction {
   def generateSignature(recipient: Account, amount: BigDecimal, timestamp: Long) = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GENESIS_TRANSACTION.id), TYPE_LENGTH, 0)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
-    val amountBytes = amount.unscaledValue().toByteArray
+    val amountBytes = amount.bigDecimal.unscaledValue().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
 
     val data = Bytes.concat(typeBytes, timestampBytes,
@@ -108,7 +108,7 @@ object GenesisTransaction {
 
     //READ AMOUNT
     val amountBytes = Arrays.copyOfRange(data, position, position + AMOUNT_LENGTH)
-    val amount = new BigDecimal(new BigInteger(amountBytes), 8)
+    val amount = BigDecimal(new BigInteger(amountBytes), 8)
 
     GenesisTransaction(recipient, amount, timestamp)
   }

@@ -11,11 +11,11 @@ import scorex.transaction.Transaction.TransactionType
 
 case class PaymentTransaction(sender: PublicKeyAccount,
                               recipient: Account,
-                              amount: BigDecimal,
+                              override val amount: BigDecimal,
                               override val fee: BigDecimal,
                               override val timestamp: Long,
                               override val signature: Array[Byte])
-  extends Transaction(TransactionType.PAYMENT_TRANSACTION, fee, timestamp, signature) {
+  extends Transaction(TransactionType.PAYMENT_TRANSACTION, amount, fee, timestamp, signature) {
 
   import scorex.transaction.PaymentTransaction._
   import scorex.transaction.Transaction._
