@@ -136,9 +136,13 @@ object PaymentTransaction {
     new PaymentTransaction(sender, recipient, amount, fee, timestamp, signatureBytes)
   }
 
+  def generateSignature(sender: PrivateKeyAccount, recipient: Account,
+                        amount: BigDecimal, fee: BigDecimal, timestamp: Long): Array[Byte] = {
+    Crypto.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
+  }
 
   private def signatureData(sender: PublicKeyAccount, recipient: Account,
-                            amount: BigDecimal, fee: BigDecimal, timestamp: Long):Array[Byte] = {
+                            amount: BigDecimal, fee: BigDecimal, timestamp: Long): Array[Byte] = {
     //WRITE TYPE
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.PAYMENT_TRANSACTION.id), TYPE_LENGTH, 0)
 
@@ -155,10 +159,5 @@ object PaymentTransaction {
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
       Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes), Bytes.concat(feeFill, feeBytes))
-  }
-
-  def generateSignature(sender: PrivateKeyAccount, recipient: Account,
-                        amount: BigDecimal, fee: BigDecimal, timestamp: Long): Array[Byte] = {
-    Crypto.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
   }
 }

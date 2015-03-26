@@ -23,19 +23,17 @@ import scala.concurrent.duration._
 
 object Controller {
 
+  private implicit lazy val actorSystem = ActorSystem("lagonaki")
   val STATUS_NO_CONNECTIONS = 0
   val STATUS_SYNCHRONIZING = 1
   val STATUS_OKE = 2
   val peerHeights = TrieMap[ConnectedPeer, Int]()
   private val transactionCreator = new TransactionCreator()
-
   //todo: avoid vars
   private var status = STATUS_NO_CONNECTIONS
   private var blockActorRef: ActorRef = _
 
   def getStatus = status
-
-  private implicit lazy val actorSystem = ActorSystem("lagonaki")
 
   def init() {
     //OPENING DATABASES

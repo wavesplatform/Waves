@@ -80,6 +80,8 @@ object Wallet {
     secureDb().map(_.commit())
   }
 
+  private def secureDb() = secureDatabaseRef.get()
+
   //DELETE
   def deleteAccount(account: PrivateKeyAccount) = {
     //CHECK IF WALLET IS OPEN
@@ -96,6 +98,8 @@ object Wallet {
 
   def isUnlocked = secureDb().isDefined
 
+  //UNLOCK
+
   def unlock(password: String): Boolean = {
     if (isUnlocked) {
       false
@@ -106,15 +110,11 @@ object Wallet {
     }
   }
 
-  //UNLOCK
-
   def lock() = secureDb().map { db =>
     db.commit()
     db.close()
     secureDatabaseRef.set(None)
   }.isDefined
-
-  private def secureDb() = secureDatabaseRef.get()
 
 
   //IMPORT/EXPORT

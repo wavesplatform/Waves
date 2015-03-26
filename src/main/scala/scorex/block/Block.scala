@@ -11,6 +11,7 @@ import scorex.crypto.{Base58, Crypto}
 import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
+
 import scala.util.Try
 
 case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long, generatingBalance: Long,
