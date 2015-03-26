@@ -35,4 +35,5 @@ object ApiError extends Enumeration {
   val ERROR_TRANSACTION_NO_EXISTS = Value(311, "transactions does not exist")
 
   def toJson(error: ApiError.Value) = Json.obj("error" -> error.id, "message" -> error.toString)
+  def toJson(t:Throwable) = Json.obj("error" -> ERROR_UNKNOWN.id, "message" -> t.getMessage)
 }

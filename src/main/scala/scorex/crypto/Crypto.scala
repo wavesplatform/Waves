@@ -53,10 +53,8 @@ object Crypto {
 
   def sha256(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
 
-  //todo: return Try instead of unwrapping it
   def sign(account: PrivateKeyAccount, message: Array[Byte]): Array[Byte] =
-    Try(sign(account.privateKey, account.publicKey, message))
-      .getOrElse(Array.fill(64)(0: Byte))
+    Try(sign(account.privateKey, account.publicKey, message)).ensuring(_.isSuccess).get
 
   def sign(privateKey: Array[Byte], publicKey: Array[Byte], message: Array[Byte]): Array[Byte] = {
     require(privateKey.length == 32)

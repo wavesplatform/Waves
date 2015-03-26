@@ -154,9 +154,13 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
                   Wallet.privateKeyAccount(address) match {
                     case None => ApiError.toJson(ApiError.ERROR_WALLET_ADDRESS_NO_EXISTS)
                     case Some(account) =>
-                      Json.obj("message" -> message,
-                        "publickey" -> Base58.encode(account.publicKey),
-                        "signature" -> Base58.encode(Crypto.sign(account, message.getBytes(StandardCharsets.UTF_8))))
+                      Try(Crypto.sign(account, message.getBytes(StandardCharsets.UTF_8))) match{
+                        case Success(signature) =>
+                          Json.obj("message" -> message,
+                            "publickey" -> Base58.encode(account.publicKey),
+                            "signature" -> Base58.encode(signature))
+                        case Failure(t) => ApiError.toJson(t)
+                      }
                   }
                 }
               }
