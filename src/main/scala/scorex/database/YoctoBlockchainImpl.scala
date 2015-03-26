@@ -11,7 +11,7 @@ import com.yandex.yoctodb.query.{DocumentProcessor, QueryBuilder}
 import com.yandex.yoctodb.util.UnsignedByteArrays
 import scorex.account.Account
 import scorex.block.Block
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
+import scorex.transaction.{FeeTransaction, GenesisTransaction, PaymentTransaction, Transaction}
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
@@ -23,30 +23,38 @@ class YoctoBlockchainImpl extends BlockChain {
   val signaturesIndex = TrieMap[Int, Array[Byte]]()
   val blocksIndex = TrieMap[Int, Block]()
 
-  //todo: block fees
+  private def feeTransaction(block: Block): FeeTransaction =
+    FeeTransaction(block.generator, block.transactions.map(_.fee).sum)
+
   override def appendBlock(block: Block): BlockChain = {
     val dbBuilder = DatabaseFormat.getCurrent.newDatabaseBuilder()
 
     val blockTransactions = block.transactions
 
     blockTransactions.foreach { tx =>
-      val db0 = DatabaseFormat.getCurrent.newDocumentBuilder()
+      val txPreDocument = DatabaseFormat.getCurrent.newDocumentBuilder()
 
-      val documentBuilder = tx match {
+      val txDocument = tx match {
         case ptx: PaymentTransaction =>
-          db0.withField("account", tx.getCreator().get.address, DocumentBuilder.IndexOption.FILTERABLE)
+          txPreDocument.withField("account", tx.getCreator().get.address, DocumentBuilder.IndexOption.FILTERABLE)
             .withField("account", ptx.recipient.address, DocumentBuilder.IndexOption.FILTERABLE)
             .withPayload(ptx.toBytes())
 
         case gtx: GenesisTransaction =>
-          db0.withField("account", gtx.recipient.address, DocumentBuilder.IndexOption.FILTERABLE)
+          txPreDocument.withField("account", gtx.recipient.address, DocumentBuilder.IndexOption.FILTERABLE)
             .withPayload(gtx.toBytes())
 
         case _ => throw new RuntimeException(s"Serialization not implemented for $tx")
       }
 
-      dbBuilder.merge(documentBuilder)
+      dbBuilder.merge(txDocument)
     }
+
+    val feeTx = feeTransaction(block)
+    val feeDoc = DatabaseFormat.getCurrent.newDocumentBuilder()
+      .withField("account", feeTx.account.address, DocumentBuilder.IndexOption.FILTERABLE)
+      .withPayload(feeTx.toBytes())
+    dbBuilder.merge(feeDoc)
 
     val h = height() + 1
     val os = new FileOutputStream(filename(h))
@@ -98,6 +106,7 @@ class YoctoBlockchainImpl extends BlockChain {
   }
 
   //todo: fromHeight & confirmations parameters ignored now
+  //todo: include block rewards
   override def balance(address: String, fromHeight: Int, confirmations: Int): BigDecimal = {
     val chainDb = compositeDb()
 
