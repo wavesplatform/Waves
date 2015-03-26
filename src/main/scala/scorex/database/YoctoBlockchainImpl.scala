@@ -133,11 +133,15 @@ class YoctoBlockchainImpl extends BlockChain {
   override def blockByHeader(signature: Array[Byte]): Option[Block] =
     signaturesIndex.find(_._2.sameElements(signature)).map(_._1).map(h => blocksIndex(h))
 
+  //todo: implement
   override def confirmations(tx: Transaction): Option[Int] = ???
 
+  //todo: implement
   override def discardBlock(): BlockChain = ???
 
+  //todo: implement
   override def child(block: Block): Option[Block] = ???
 
+  //todo: implement
   override def generatedBy(account: Account): Seq[Block] = ???
 }
