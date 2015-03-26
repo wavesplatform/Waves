@@ -6,7 +6,7 @@ import scorex.crypto.Crypto
 
 import scala.util.Random
 
-class CryptoSpec extends FunSuite {
+class CryptoSpecification extends FunSuite {
 
   test("sign then verify") {
     val acc = new PrivateKeyAccount(Random.nextString(20).getBytes)

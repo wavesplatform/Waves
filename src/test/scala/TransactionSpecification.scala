@@ -6,7 +6,7 @@ import scorex.transaction.PaymentTransaction
 
 import scala.util.Random
 
-class TransactionSpec extends FunSuite {
+class TransactionSpecification extends FunSuite {
 
   test("tx construction") {
     val sender = new PrivateKeyAccount(Random.nextString(32).getBytes)
