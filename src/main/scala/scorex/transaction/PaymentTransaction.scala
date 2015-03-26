@@ -10,12 +10,12 @@ import scorex.database.PrunableBlockchainStorage
 import scorex.transaction.Transaction.TransactionType
 
 case class PaymentTransaction(sender: PublicKeyAccount,
-                              recipient: Account,
+                              override val recipient: Account,
                               override val amount: BigDecimal,
                               override val fee: BigDecimal,
                               override val timestamp: Long,
                               override val signature: Array[Byte])
-  extends Transaction(TransactionType.PAYMENT_TRANSACTION, amount, fee, timestamp, signature) {
+  extends Transaction(TransactionType.PAYMENT_TRANSACTION, recipient, amount, fee, timestamp, signature) {
 
   import scorex.transaction.PaymentTransaction._
   import scorex.transaction.Transaction._

@@ -9,6 +9,7 @@ import settings.Settings
 
 
 abstract class Transaction(val transactionType: TransactionType.Value,
+                           val recipient: Account,
                            val amount:BigDecimal,
                            val fee: BigDecimal,
                            val timestamp: Long,

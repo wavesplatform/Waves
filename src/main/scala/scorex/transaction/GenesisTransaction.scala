@@ -10,8 +10,10 @@ import scorex.crypto.{Base58, Crypto}
 import scorex.transaction.Transaction.TransactionType
 
 
-case class GenesisTransaction(recipient: Account, override val amount: BigDecimal, override val timestamp: Long)
-  extends Transaction(TransactionType.GENESIS_TRANSACTION, amount, BigDecimal.apply(0), timestamp,
+case class GenesisTransaction(override val recipient: Account,
+                              override val amount: BigDecimal,
+                              override val timestamp: Long)
+  extends Transaction(TransactionType.GENESIS_TRANSACTION, recipient, amount, BigDecimal.apply(0), timestamp,
     GenesisTransaction.generateSignature(recipient, amount, timestamp)) {
 
   import scorex.transaction.GenesisTransaction._
