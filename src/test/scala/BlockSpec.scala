@@ -6,6 +6,6 @@ import scorex.block.Block
 class BlockSpec extends FunSuite {
 
   test("block"){
-    // val bl = Block()
+    fail("not implemented")
   }
 }
