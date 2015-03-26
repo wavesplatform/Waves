@@ -34,7 +34,7 @@ class ConnectionCreator(callback: ConnectionCallback) extends Thread {
         //CHECK IF WE STILL NEED NEW CONNECTIONS
         if (Settings.minConnections >= callback.activeConnections.size) {
           //avoids Exception when adding new elements
-          callback.activeConnections().foreach { peer => //todo: ConcurrentModificationException possible here
+          callback.activeConnections().foreach { peer =>
 
             //CHECK IF WE ALREADY HAVE MAX CONNECTIONS
             if (Settings.maxConnections > callback.activeConnections.size) {

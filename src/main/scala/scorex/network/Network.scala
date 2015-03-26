@@ -9,6 +9,7 @@ import controller.Controller
 import scorex.network.message._
 
 import scala.collection.JavaConversions._
+import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
 object Network extends ConnectionCallback {
@@ -17,7 +18,7 @@ object Network extends ConnectionCallback {
 
   private val MAX_HANDLED_MESSAGES_SIZE = 10000
 
-  private val connectedPeers = Collections.synchronizedList(new util.ArrayList[ConnectedPeer]())
+  private val connectedPeers = TrieMap[ConnectedPeer, ConnectionCallback]()
 
   private val handledMessages = Collections.synchronizedSortedSet(new TreeSet[String]())
 
@@ -31,7 +32,7 @@ object Network extends ConnectionCallback {
     Logger.getGlobal.info("Connection successfull : " + peer.address)
 
     //ADD TO CONNECTED PEERS
-    connectedPeers += peer
+    connectedPeers += peer -> peer.callback
 
     //ADD TO WHITELIST
     PeerManager.addPeer(peer)
@@ -73,15 +74,15 @@ object Network extends ConnectionCallback {
 
   override def isConnectedTo(peer: Peer) = isConnectedTo(peer.address)
 
-  override def isConnectedTo(address: InetAddress) = connectedPeers.exists(_.address.equals(address))
+  override def isConnectedTo(address: InetAddress) = connectedPeers.keys.exists(_.address.equals(address))
 
-  override def activeConnections() = connectedPeers
+  override def activeConnections() = connectedPeers.keys.toSeq
 
   def broadcast(message: Message, exclude: List[Peer]) {
     Logger.getGlobal.info("Broadcasting")
 
     Try {
-      connectedPeers.foreach { peer =>
+      connectedPeers.keys.foreach { peer =>
         if (peer != null && !exclude.contains(peer)) peer.sendMessage(message)
       }
     }.recover { case t: Throwable => t.printStackTrace()}
