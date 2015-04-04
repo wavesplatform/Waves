@@ -13,7 +13,7 @@ import scorex.network.message.Message
 import scorex.network.message._
 import scorex.transaction.Transaction.TransactionType
 import scala.collection.mutable
-import scala.util.Random
+import scala.util.{Success, Failure, Random}
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -100,26 +100,27 @@ class PeerConnectionHandler(networkController: ActorRef,
       connection ! Close
 
     case Received(data) =>
-      if (data.length <= Message.MAGIC_LENGTH || !data.take(Message.MAGIC_LENGTH).sameElements(Message.MAGIC)) {
-        Logger.getGlobal.info(s"Corrupted data from: " + remote)
-        connection ! Close
-        //context stop self
-      } else {
-        val message = Message(data.drop(Message.MAGIC_LENGTH).toByteBuffer)
-        Logger.getGlobal.info("received message " + message.messageType + " from " + remote)
+      Message.parse(data.toByteBuffer) match{
+        case Failure(e) =>
+          Logger.getGlobal.info(s"Corrupted data from: " + remote + " : " + e.getMessage)
+          connection ! Close
+          //context stop self
 
-        //CHECK IF WE ARE WAITING FOR A MESSAGE WITH THAT ID
-        message.mbId match {
-          case Some(id) => if (!idsAwait.contains(id)) {
-            Logger.getGlobal.info(s"Corrupted data (wrong id) from: " + remote)
-            //connection ! Close   todo:fix
-          } else {
-            idsAwait -= id
+        case Success(message) =>
+          Logger.getGlobal.info("received message " + message.messageType + " from " + remote)
+
+          //CHECK IF WE ARE WAITING FOR A MESSAGE WITH THAT ID
+          message.mbId match {
+            case Some(id) => if (!idsAwait.contains(id)) {
+              Logger.getGlobal.info(s"Corrupted data (wrong id) from: " + remote)
+              //connection ! Close   todo:fix
+            } else {
+              idsAwait -= id
+            }
+            case _ =>
           }
-          case _ =>
-        }
 
-        handleMessage(message)
+          handleMessage(message)
       }
 
     case cc: ConnectionClosed =>

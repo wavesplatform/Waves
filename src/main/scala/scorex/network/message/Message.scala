@@ -2,9 +2,10 @@ package scorex.network.message
 
 import java.nio.ByteBuffer
 import java.util.Arrays
-import akka.util.ByteIterator
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.crypto.Crypto
+
+import scala.util.Try
 
 abstract class Message {
   import scorex.network.message.Message._
@@ -65,8 +66,12 @@ object Message {
   val TRANSACTION_TYPE = 8
   val PING_TYPE = 9
 
-  //todo:check, test
-  def apply(bytes: ByteBuffer): Message = {
+  def parse(bytes: ByteBuffer): Try[Message] = Try {
+    val magic = new Array[Byte](MESSAGE_LENGTH)
+    bytes.get(magic)
+
+    if (!magic.sameElements(Message.MAGIC)) throw new Exception("wrong magic")
+
     val msgType = bytes.getInt
 
     val hasId = bytes.get
@@ -78,7 +83,8 @@ object Message {
     val data = Array.fill(length)(0: Byte)
     if (length > 0) {
       //READ CHECKSUM
-      val checksum = bytes.get(new Array[Byte](Message.CHECKSUM_LENGTH)).array()
+      val checksum = new Array[Byte](Message.CHECKSUM_LENGTH)
+      bytes.get(checksum)
 
       //READ DATA
       bytes.get(data)
