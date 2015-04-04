@@ -1,9 +1,9 @@
 package scorex.network.message
 
 import com.google.common.primitives.Bytes
-import scorex.network.ConnectedPeer
 
-case class GetBlockMessage(signature: Array[Byte], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
+
+case class GetBlockMessage(signature: Array[Byte], mbId: Option[Int] = None) extends Message {
 
   override val messageType = Message.GET_BLOCK_TYPE
 

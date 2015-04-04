@@ -168,7 +168,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
             }
           }
         }
-      } ~ path("address" / Segment) { case address => //todo: fix routing to that
+      } ~ path("address" / Segment) { case address => //todo: fix routing to that?
         delete {
           complete {
             val jsRes = walletNotExistsOrLocked().getOrElse {

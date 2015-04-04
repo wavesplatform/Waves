@@ -5,7 +5,6 @@ import java.util.Arrays
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import ntp.NTP
 import play.api.libs.json.{JsArray, JsObject, Json}
-import scorex.BlockGenerator
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.{Base58, Crypto}
 import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}

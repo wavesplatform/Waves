@@ -1,7 +1,7 @@
 {
 	"knownpeers":[
       "5.9.86.168",
-	  "127.0.0.1"
+      "127.0.0.1"
 	],
   	"walletdir" : "/home/kushti/scala/scorex/wallet",
 	"minconnections": 10,

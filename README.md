@@ -35,7 +35,13 @@ Install SBT(Scala Build Tool):
 & run start.sh script!
 
 
+Current Limitations
+-------------------
+
 todo: current glitches / limitations list
+
+API
+---
 todo: API description
 
 

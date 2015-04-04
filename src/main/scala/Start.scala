@@ -35,7 +35,7 @@ object Start {
 
 
   def testingScript(): Unit = {
-    Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", 10, synchronize = false)
+    Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", 10)
     //require(Wallet.unlock("cookies"))
 
     require(SecureWalletDatabase.exists())

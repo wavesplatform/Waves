@@ -1,35 +1,50 @@
 package scorex.database
 
-import java.net.InetAddress
-
-import scorex.network.Peer
-
+import java.net.InetSocketAddress
 import scala.collection.mutable
 
 
 trait PeerDatabase {
-  def addPeer(p: Peer)
+  def addConnectedPeer(peer: InetSocketAddress):Unit
+  def removeConnectedPeer(peer: InetSocketAddress):Unit
+  def allConnectedPeers(peer: InetSocketAddress):Seq[InetSocketAddress]
 
-  def blacklistPeer(p: Peer)
+  def addKnownPeer(peer: InetSocketAddress)
+  def knownPeers(): Seq[InetSocketAddress]
 
-  def knownPeers(): Seq[Peer]
-
-  def isBlacklisted(address: InetAddress): Boolean
+  def blacklistPeer(peer: InetSocketAddress)
+  def isBlacklisted(address: InetSocketAddress): Boolean
 }
 
-
+//todo: persistence of known & blacklisted peers
 object PeerDatabaseImpl extends PeerDatabase {
-  val whitelist = mutable.Buffer[Peer]()
-  val blacklist = mutable.Buffer[Peer]()
+  private val connected = mutable.Buffer[InetSocketAddress]()
+  private val whitelist = mutable.Buffer[InetSocketAddress]()
+  private val blacklist = mutable.Buffer[InetSocketAddress]()
 
-  override def addPeer(peer: Peer): Unit = whitelist += peer
+  override def addConnectedPeer(peer: InetSocketAddress) = connected.synchronized(
+    connected += peer
+  )
 
-  override def blacklistPeer(peer: Peer): Unit = {
+  override def removeConnectedPeer(peer: InetSocketAddress) = connected.synchronized(
+    connected -= peer
+  )
+
+  override def allConnectedPeers(peer: InetSocketAddress) = connected.synchronized(
+    connected.toSeq
+  )
+
+  override def addKnownPeer(peer: InetSocketAddress): Unit = whitelist.synchronized {
+    whitelist += peer
+  }
+
+  override def blacklistPeer(peer: InetSocketAddress): Unit = this.synchronized {
     whitelist -= peer
     blacklist += peer
   }
 
-  override def isBlacklisted(address: InetAddress): Boolean = blacklist.exists(_.address == address)
+  override def isBlacklisted(address: InetSocketAddress): Boolean =
+    blacklist.synchronized(blacklist.contains(address))
 
-  override def knownPeers(): Seq[Peer] = whitelist.toSeq
+  override def knownPeers(): Seq[InetSocketAddress] = whitelist.synchronized(whitelist.toSeq)
 }

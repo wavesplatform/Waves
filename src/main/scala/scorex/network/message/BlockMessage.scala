@@ -1,12 +1,11 @@
 package scorex.network.message
 
 import java.util.Arrays
-
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.block.Block
-import scorex.network.ConnectedPeer
 
-case class BlockMessage(height: Int, block: Block, mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
+
+case class BlockMessage(height: Int, block: Block, mbId: Option[Int] = None) extends Message {
 
   import scorex.network.message.BlockMessage._
 

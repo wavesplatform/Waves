@@ -1,56 +1,47 @@
-package scorex
+package scorex.block
 
 import akka.actor.Actor
-import controller.Controller
 import ntp.NTP
 import scorex.account.PrivateKeyAccount
-import scorex.block.{Block, BlockStub}
 import scorex.crypto.Crypto
 import scorex.database.PrunableBlockchainStorage
 import scorex.wallet.Wallet
-import settings.Settings
-
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 
-case object TryToGenerateBlock
 
 class BlockGenerator extends Actor {
-
-  import scorex.BlockGenerator._
+  import scorex.block.BlockGenerator._
 
   override def receive = {
     case TryToGenerateBlock =>
-      if (!Controller.isUpToDate()) Controller.update()
+      val blockchainController = sender()
 
-      //CHECK IF WE HAVE CONNECTIONS
-      if (Controller.getStatus == Controller.STATUS_OKE
-        || (Controller.getStatus == Controller.STATUS_NO_CONNECTIONS && Settings.offlineGeneration)) {
-        val blocks = TrieMap[PrivateKeyAccount, BlockStub]()
+      val blocks = TrieMap[PrivateKeyAccount, BlockStub]()
 
-        //GENERATE NEW BLOCKS
-        Wallet.privateKeyAccounts().foreach { account =>
-          if (account.generatingBalance >= BigDecimal(1)) {
-            //CHECK IF BLOCK FROM USER ALREADY EXISTS USE MAP ACCOUNT BLOCK EASY
-            if (!blocks.containsKey(account)) {
-              //GENERATE NEW BLOCK FOR USER
-              blocks += account -> generateNextBlock(account, PrunableBlockchainStorage.lastBlock)
-            }
+      Wallet.privateKeyAccounts().foreach { account =>
+        if (account.generatingBalance >= BigDecimal(1)) {
+          //CHECK IF BLOCK FROM USER ALREADY EXISTS USE MAP ACCOUNT BLOCK EASY
+          if (!blocks.containsKey(account)) {
+            //GENERATE NEW BLOCK FOR USER
+            blocks += account -> generateNextBlock(account, PrunableBlockchainStorage.lastBlock)
           }
         }
+      }
 
-        blocks.exists { case (account, blockStub) =>
-          if (blockStub.timestamp <= NTP.getTime) {
-            val block = Block(blockStub, account)
-            if (block.transactions.nonEmpty) {
-              println("Non-empty block: " + block)
-            }
-            Controller.newBlockGenerated(block)
-          } else false
-        }
+      blocks.exists { case (account, blockStub) =>
+        if (blockStub.timestamp <= NTP.getTime) {
+          val block = Block(blockStub, account)
+          if (block.transactions.nonEmpty) {
+            println("Non-empty block: " + block)
+          }
+          blockchainController ! NewBlock(block, None)
+          true
+        } else false
       }
   }
 }
+
 
 object BlockGenerator {
   val RETARGET = 10
@@ -58,6 +49,8 @@ object BlockGenerator {
   val MAX_BALANCE = 10000000000L
   val MIN_BLOCK_TIME = 1 * 60
   val MAX_BLOCK_TIME = 5 * 60
+
+  case object TryToGenerateBlock
 
   def getNextBlockGeneratingBalance(block: Block) = {
     if (block.height().get % RETARGET == 0) {

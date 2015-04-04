@@ -1,37 +1,49 @@
 package scorex.network
 
-import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.util.logging.Logger
-
 import scorex.database.PeerDatabaseImpl
 import settings.Settings
-
 import scala.collection.JavaConversions._
+import scala.util.Random
 
 object PeerManager {
 
   private val DATABASE_PEERS_AMOUNT = 1000
 
-  def getKnownPeers: List[Peer] = {
+  def knownPeers(): Seq[InetSocketAddress] = {
     val knownPeers = PeerDatabaseImpl.knownPeers()
-    Logger.getGlobal.info("Peers retrieved from database : " + knownPeers.size)
+    Logger.getGlobal.info("Peers retrieved from database : " + knownPeers)
     if (knownPeers.size < DATABASE_PEERS_AMOUNT) {
-      val settingsPeers = Settings.knownPeers
-      settingsPeers.addAll(knownPeers)
-      Logger.getGlobal.info("Peers retrieved after settings : " + settingsPeers.size)
-      settingsPeers.toList
-    } else knownPeers.toList
+      val allPeers = Settings.knownPeers ++ knownPeers
+      Logger.getGlobal.info("Peers retrieved after settings : " + allPeers)
+      allPeers
+    } else knownPeers
   }
 
-  def addPeer(peer: Peer) {
-    if (!Settings.knownPeers.exists(_.address == peer.address)) {
-      PeerDatabaseImpl.addPeer(peer)
-    }
+  def peerConnected(peer:InetSocketAddress):Unit = {
+    addPeer(peer)
+    PeerDatabaseImpl.addConnectedPeer(peer)
   }
 
-  def blacklistPeer(peer: Peer) = PeerDatabaseImpl.blacklistPeer(peer)
+  def peerDisconnected(peer:InetSocketAddress):Unit =
+    PeerDatabaseImpl.removeConnectedPeer(peer)
 
-  def isBlacklisted(address: InetAddress) = PeerDatabaseImpl.isBlacklisted(address)
 
-  def isBlacklisted(peer: Peer) = PeerDatabaseImpl.isBlacklisted(peer.address)
+  def randomPeer(): InetSocketAddress = {
+    val peers = knownPeers()
+    peers(Random.nextInt(peers.size))
+  }
+
+  def addPeer(peer: InetSocketAddress):Unit = {
+    //require(peer.getPort == Settings.Port)
+    if (!Settings.knownPeers.contains(peer)) PeerDatabaseImpl.addKnownPeer(peer)
+  }
+
+  def blacklistPeer(peer: InetSocketAddress) = {
+    PeerDatabaseImpl.removeConnectedPeer(peer)
+    PeerDatabaseImpl.blacklistPeer(peer)
+  }
+
+  def isBlacklisted(address: InetSocketAddress) = PeerDatabaseImpl.isBlacklisted(address)
 }

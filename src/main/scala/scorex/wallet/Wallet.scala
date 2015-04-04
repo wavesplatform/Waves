@@ -22,15 +22,15 @@ object Wallet {
     case Some(secureDatabase) => secureDatabase.accounts()
   }
 
-  def create(seed: Array[Byte], password: String, depth: Int, synchronize: Boolean): Boolean = {
+  def create(seed: Array[Byte], password: String, depth: Int): Boolean = {
     //OPEN SECURE WALLET
     val secureDatabase = new SecureWalletDatabase(password)
 
     //CREATE
-    create(secureDatabase, seed, depth, synchronize)
+    create(secureDatabase, seed, depth)
   }
 
-  def create(secureDatabase: SecureWalletDatabase, seed: Array[Byte], depth: Int, sync: Boolean): Boolean = {
+  def create(secureDatabase: SecureWalletDatabase, seed: Array[Byte], depth: Int): Boolean = {
     //CREATE SECURE WALLET
     secureDatabaseRef.set(Some(secureDatabase))
 

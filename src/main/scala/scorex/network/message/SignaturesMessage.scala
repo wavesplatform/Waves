@@ -1,11 +1,10 @@
 package scorex.network.message
 
 import java.util.Arrays
-
 import com.google.common.primitives.{Bytes, Ints}
-import scorex.network.ConnectedPeer
 
-case class SignaturesMessage(signatures: Seq[Array[Byte]], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
+
+case class SignaturesMessage(signatures: Seq[Array[Byte]], mbId: Option[Int] = None) extends Message {
 
   import scorex.network.message.SignaturesMessage._
 

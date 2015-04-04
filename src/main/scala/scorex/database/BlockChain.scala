@@ -40,4 +40,10 @@ trait BlockChain extends StateQuery {
     heightOf(parentSignature).map { h =>
       (h + 1).to(Math.max(height(), h + Settings.MaxBlocksChunks)).flatMap(blockAt).map(_.signature)
     }.getOrElse(Seq())
+
+  def lastSignatures():Seq[Array[Byte]] = {
+    height().to(height() - Settings.maxRollback, -1).flatMap{h =>
+      blockAt(h).map(_.signature)
+    }
+  }
 }

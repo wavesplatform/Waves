@@ -1,10 +1,9 @@
 package scorex.network.message
 
 import com.google.common.primitives.Bytes
-import scorex.network.ConnectedPeer
 import scorex.transaction.Transaction
 
-case class TransactionMessage(transaction: Transaction, mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
+case class TransactionMessage(transaction: Transaction, mbId: Option[Int] = None) extends Message {
 
   override val messageType = Message.TRANSACTION_TYPE
 

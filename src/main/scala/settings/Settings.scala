@@ -1,22 +1,19 @@
 package settings
 
-import java.net.InetAddress
-
+import java.net.{InetSocketAddress, InetAddress}
 import play.api.libs.json.Json
-import scorex.network.Peer
-
 import scala.util.Try
 
 object Settings {
+  lazy val Port = 9084
 
   lazy val knownPeers = Try {
     (settingsJSON \ "knownpeers").as[List[String]].flatMap { addr =>
-      val address = InetAddress.getByName(addr)
-      if (address == InetAddress.getLocalHost) None else Some(new Peer(address))
+      val inetAddress = InetAddress.getByName(addr)
+      if (inetAddress == InetAddress.getLocalHost) None else Some(new InetSocketAddress(inetAddress, Port))
     }
-  }.getOrElse(Seq[Peer]())
+  }.getOrElse(Seq[InetSocketAddress]())
   lazy val maxConnections = (settingsJSON \ "maxconnections").asOpt[Int].getOrElse(DEFAULT_MAX_CONNECTIONS)
-  lazy val minConnections = (settingsJSON \ "minconnections").asOpt[Int].getOrElse(DEFAULT_MIN_CONNECTIONS)
   lazy val connectionTimeout = (settingsJSON \ "connectiontimeout").asOpt[Int].getOrElse(DEFAULT_CONNECTION_TIMEOUT)
   lazy val rpcPort = (settingsJSON \ "rpcport").asOpt[Int].getOrElse(DEFAULT_RPC_PORT)
   lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcallowed").asOpt[List[String]].getOrElse(DEFAULT_RPC_ALLOWED.split(""))
@@ -30,6 +27,9 @@ object Settings {
     //CREATE JSON OBJECT
     Json.parse(jsonString)
   }
+  //BLOCKCHAIN
+  val maxRollback = 100
+
 
   settingsJSONTry.recover { case _: Throwable =>
     //STOP
@@ -38,9 +38,8 @@ object Settings {
   }
   private lazy val settingsJSON = settingsJSONTry.get
   val Release = "Lagonaki Release v. 0.9"
-  val MaxBlocksChunks = 500
+  val MaxBlocksChunks = 200
   //NETWORK
-  private val DEFAULT_MIN_CONNECTIONS = 5
   private val DEFAULT_MAX_CONNECTIONS = 20
   private val DEFAULT_CONNECTION_TIMEOUT = 60000
   private val DEFAULT_PING_INTERVAL = 30000

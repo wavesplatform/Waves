@@ -1,16 +1,18 @@
 package api
 
+import akka.util.Timeout
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.{Base58, Crypto}
 import scorex.database.PrunableBlockchainStorage
 import scorex.wallet.Wallet
-
+import scala.concurrent.duration._
 import scala.util.Try
 
 
 trait CommonApifunctions {
+  implicit val timeout = Timeout(5.seconds)
 
   protected[api] def walletExists(): Option[JsObject] =
     if (Wallet.isUnlocked) {

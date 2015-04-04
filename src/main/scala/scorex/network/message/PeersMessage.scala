@@ -1,12 +1,12 @@
 package scorex.network.message
 
-import java.net.InetAddress
+import java.net.{InetSocketAddress, InetAddress}
 import java.util
-
 import com.google.common.primitives.{Bytes, Ints}
-import scorex.network.{ConnectedPeer, Peer}
+import settings.Settings
 
-case class PeersMessage(peers: Seq[Peer], mbSender: Option[ConnectedPeer] = None, mbId: Option[Int] = None) extends Message {
+
+case class PeersMessage(peers: Seq[InetSocketAddress], mbId: Option[Int] = None) extends Message {
 
   import scorex.network.message.PeersMessage._
 
@@ -18,7 +18,7 @@ case class PeersMessage(peers: Seq[Peer], mbSender: Option[ConnectedPeer] = None
 
     //WRITE PEERS
     val data = peers.foldLeft(lengthBytes) { case (bytes, peer) =>
-      Bytes.concat(bytes, peer.address.getAddress)
+      Bytes.concat(bytes, peer.getAddress.getAddress)
     }
 
     //ADD CHECKSUM
@@ -46,9 +46,8 @@ object PeersMessage {
       val position = lengthBytes.length + (i * ADDRESS_LENGTH)
       val addressBytes = util.Arrays.copyOfRange(data, position, position + ADDRESS_LENGTH)
       val address = InetAddress.getByAddress(addressBytes)
-      new Peer(address)
+      new InetSocketAddress(address, Settings.Port)
     }
-
 
     new PeersMessage(peers)
   }

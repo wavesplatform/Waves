@@ -2,8 +2,7 @@ package api
 
 import controller.Controller
 import play.api.libs.json.Json
-import scorex.BlockGenerator
-import scorex.block.GenesisBlock
+import scorex.block.{BlockGenerator, GenesisBlock}
 import scorex.database.PrunableBlockchainStorage
 import spray.routing.HttpService
 
