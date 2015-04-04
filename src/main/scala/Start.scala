@@ -17,7 +17,7 @@ object Start {
     if (!args.contains("-cli")) {
       Try {
         Controller.init() //STARTING NETWORK/BLOCKCHAIN/RPC
-        Thread.sleep(5000)
+        Thread.sleep(10000)
         testingScript()
       } match {
         case Failure(e) =>
