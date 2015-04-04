@@ -77,11 +77,15 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   override def receive = {
     case PingRemote =>
-      self ! PingMessage(mbId = Some(Random.nextInt(100000000) + 1))
+      val id = Random.nextInt(100000000) + 1
+      idsAwait += id
+      self ! PingMessage(mbId = Some(id))
 
     case SendHeight =>
+      val id = Random.nextInt(100000000) + 1
+      idsAwait += id
       val height = PrunableBlockchainStorage.height()
-      self ! HeightMessage(height, Some(Random.nextInt(100000000) + 1))
+      self ! HeightMessage(height, Some(id))
 
     case msg: Message =>
       self ! ByteString(msg.toBytes())
@@ -102,13 +106,13 @@ class PeerConnectionHandler(networkController: ActorRef,
         //context stop self
       } else {
         val message = Message(data.drop(Message.MAGIC_LENGTH).toByteBuffer)
-        Logger.getGlobal.finest("received message " + message.messageType + " from " + remote)
+        Logger.getGlobal.info("received message " + message.messageType + " from " + remote)
 
         //CHECK IF WE ARE WAITING FOR A MESSAGE WITH THAT ID
         message.mbId match {
           case Some(id) => if (!idsAwait.contains(id)) {
             Logger.getGlobal.info(s"Corrupted data (wrong id) from: " + remote)
-            connection ! Close
+            //connection ! Close   todo:fix
           } else {
             idsAwait -= id
           }
@@ -118,9 +122,9 @@ class PeerConnectionHandler(networkController: ActorRef,
         handleMessage(message)
       }
 
-    case _: ConnectionClosed =>
+    case cc: ConnectionClosed =>
       networkController ! NetworkController.PeerDisconnected(remote)
-      Logger.getGlobal.info("Connection closed to : " + remote)
+      Logger.getGlobal.info("Connection closed to : " + remote + ": "+cc.getErrorCause)
 
     case CloseConnection =>
       Logger.getGlobal.info(s"Enforced to abort communication with: " + remote)

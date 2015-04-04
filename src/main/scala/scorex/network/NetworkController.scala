@@ -25,6 +25,7 @@ class NetworkController extends Actor {
   //todo: longest chain rule doesn't make sense for proof-of-stake at all and probably dangerous!
   //todo: so should be replaced with cumulative difficulty (aka maxvalid function)
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerData]()
+  private val connectingPeers = mutable.Buffer[InetSocketAddress]()
 
   private def maxPeerHeight() = Try(connectedPeers.maxBy(_._2.height)._2.height).toOption.flatten
 
@@ -49,23 +50,18 @@ class NetworkController extends Actor {
     case CheckPeers =>
       if (connectedPeers.size < Settings.maxConnections) {
         val peer = PeerManager.randomPeer()
-        if (!connectedPeers.contains(peer)) {
+        if (!connectedPeers.contains(peer) && !connectingPeers.contains(peer)) {
+          connectingPeers += peer
           IO(Tcp) ! Connect(peer) //todo: connection timeout
         }
       }
 
-    case AskForPeers =>
-      val handlers = connectedPeers.values.toList
-      if (handlers.nonEmpty) {
-        val randomHandler = handlers(Random.nextInt(handlers.size)).handler
-        randomHandler ! GetPeersMessage(mbId = Some(Random.nextInt(5000000)))
-      }
-
-    case c@Connected(remote, local) if remote.getPort == Settings.Port =>
+    case c@Connected(remote, local) =>
       Logger.getGlobal.info(s"Connected to $remote")
+      connectingPeers -= remote
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], self, connection, remote))
-      connection ! Register(handler)    //todo: keepOpenOnPeerClosed param?
+      connection ! Register(handler)
       connectedPeers += remote -> PeerData(handler, None)
       PeerManager.peerConnected(remote)
 
@@ -86,6 +82,13 @@ class NetworkController extends Actor {
     case PeerDisconnected(remote) =>
       connectedPeers -= remote
       PeerManager.peerDisconnected(remote)
+
+    case AskForPeers =>
+      val handlers = connectedPeers.values.toList
+      if (handlers.nonEmpty) {
+        val randomHandler = handlers(Random.nextInt(handlers.size)).handler
+        randomHandler ! GetPeersMessage(mbId = Some(Random.nextInt(5000000)))
+      }
 
     case BroadcastMessage(message, exceptOf) =>
       Logger.getGlobal.info(s"Broadcasting message $message")

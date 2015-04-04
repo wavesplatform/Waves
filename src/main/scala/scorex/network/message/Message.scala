@@ -65,7 +65,7 @@ object Message {
   val TRANSACTION_TYPE = 8
   val PING_TYPE = 9
 
-  //todo:check
+  //todo:check, test
   def apply(bytes: ByteBuffer): Message = {
     val msgType = bytes.getInt
 
