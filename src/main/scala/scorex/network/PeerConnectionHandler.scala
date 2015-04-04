@@ -38,6 +38,9 @@ class PeerConnectionHandler(networkController: ActorRef,
       case GetPeersMessage(idOpt: Some[Int]) =>
         self ! PeersMessage(PeerManager.knownPeers(), idOpt)
 
+      case PeersMessage(peers, _) =>
+        println("got peers: " + peers) //todo:handling
+
       case HeightMessage(height, _) => networkController ! UpdateHeight(remote, height)
 
       case SignaturesMessage(possibleParents, idOpt: Some[Int]) =>

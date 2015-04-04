@@ -116,6 +116,12 @@ class NetworkController extends Actor {
         self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
       }
 
+    case UpdateHeight(remote, h) =>
+      connectedPeers.get(remote).map{peerData =>
+        connectedPeers.put(remote, peerData.copy(height = Some(h)))
+        Logger.getGlobal.info(s"Height updated for $remote: $h")
+      }
+
     case a:Any => Logger.getGlobal.warning(s"NetworkController: got something strange $a")
   }
 }
