@@ -26,14 +26,14 @@ class NetworkController extends Actor {
   //todo: so should be replaced with cumulative difficulty (aka maxvalid function)
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerData]()
 
-  private def maxPeerHeight() = Try(connectedPeers.maxBy(_._2.height)._2.height).toOption
+  private def maxPeerHeight() = Try(connectedPeers.maxBy(_._2.height)._2.height).toOption.flatten
 
   private def maxHeightHandler() = Try(connectedPeers.maxBy(_._2.height)._2.handler).toOption
 
   //todo: a bit stupid workaround, consider more elegant solution for circular linking
   private var blockchainControllerOpt: Option[ActorRef] = None
 
-  IO(Tcp) ! Bind(self, new InetSocketAddress("localhost", Settings.Port))
+  IO(Tcp) ! Bind(self, new InetSocketAddress(Settings.Port))
 
   override def receive = {
     case b@Bound(localAddress) =>
@@ -66,7 +66,7 @@ class NetworkController extends Actor {
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], self, connection, remote))
       connection ! Register(handler)    //todo: keepOpenOnPeerClosed param?
-      connectedPeers += remote -> PeerData(handler, 1)
+      connectedPeers += remote -> PeerData(handler, None)
       PeerManager.peerConnected(remote)
 
     case CommandFailed(c: Connect) =>
@@ -129,7 +129,7 @@ object NetworkController {
 
   case object GetMaxHeight
 
-  case class PeerData(handler: ActorRef, height: Int)
+  case class PeerData(handler: ActorRef, height: Option[Int])
 
   //todo: add ping value?
 

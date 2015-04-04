@@ -7,7 +7,6 @@ import scorex.block.GenesisBlockParams
 import scorex.crypto.Base58
 import scorex.database.wallet.SecureWalletDatabase
 import scorex.wallet.Wallet
-
 import scala.io.StdIn
 import scala.util.{Failure, Random, Try}
 
@@ -17,7 +16,6 @@ object Start {
     if (!args.contains("-cli")) {
       Try {
         Controller.init() //STARTING NETWORK/BLOCKCHAIN/RPC
-        Thread.sleep(10000)
         testingScript()
       } match {
         case Failure(e) =>
