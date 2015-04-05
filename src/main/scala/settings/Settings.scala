@@ -7,15 +7,16 @@ import scala.util.Try
 object Settings {
   val Release = "Lagonaki Release v. 0.9"
 
+  var filename = "settings.json"
+
   lazy val Port = 9084
 
   private lazy val settingsJSON = Try {
-    val jsonString = scala.io.Source.fromFile("settings.json").mkString
-    //CREATE JSON OBJECT
+    val jsonString = scala.io.Source.fromFile(filename).mkString
     Json.parse(jsonString)
   }.getOrElse {
     System.out.println("ERROR reading settings.json, closing")
-    System.exit(0)
+    System.exit(10)
     Json.obj()
   }
 
@@ -34,6 +35,7 @@ object Settings {
   lazy val pingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DEFAULT_PING_INTERVAL)
   lazy val maxBytePerFee = (settingsJSON \ "maxbyteperfee").asOpt[Int].getOrElse(DEFAULT_MAX_BYTE_PER_FEE)
   lazy val offlineGeneration = (settingsJSON \ "offline-generation").asOpt[Boolean].getOrElse(false)
+  lazy val bindAddress = (settingsJSON \ "bindAddress").asOpt[String].getOrElse(DEFAULT_BIND_ADDRESS)
 
   //BLOCKCHAIN
   lazy val maxRollback = 100
@@ -44,6 +46,7 @@ object Settings {
   private val DEFAULT_MAX_CONNECTIONS = 20
   private val DEFAULT_CONNECTION_TIMEOUT = 60000
   private val DEFAULT_PING_INTERVAL = 30000
+  private val DEFAULT_BIND_ADDRESS = "127.0.0.1"
 
   //RPC
   private val DEFAULT_RPC_PORT = 9085

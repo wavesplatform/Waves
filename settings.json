@@ -1,10 +1,12 @@
 {
+    "bindAddress" : "127.0.0.1",
 	"knownpeers":[
-      "5.9.86.168",
-      "127.0.0.1"
+      "5.9.86.168"
 	],
-  	"walletdir" : "/home/kushti/scala/scorex/wallet",
+  	"walletdir" : "/tmp/wallet",
+    "datadir" : "/tmp/data",
 	"minconnections": 10,
+    "rpcport" : 9085,
 	"rpcallowed":[
 		"127.0.0.1",
 		"123.123.123.123"

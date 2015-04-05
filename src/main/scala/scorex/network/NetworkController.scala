@@ -33,7 +33,7 @@ class NetworkController extends Actor {
   //todo: a bit stupid workaround, consider more elegant solution for circular linking
   private var blockchainControllerOpt: Option[ActorRef] = None
 
-  IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName("127.0.0.2"), Settings.Port))
+  IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(Settings.bindAddress), Settings.Port))
 
   private def updateHeight(remote:InetSocketAddress, height:Int) = {
     val prevBestHeight = maxPeerHeight().getOrElse(0)
