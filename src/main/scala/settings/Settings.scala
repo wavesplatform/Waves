@@ -5,6 +5,8 @@ import play.api.libs.json.Json
 import scala.util.Try
 
 object Settings {
+  val Release = "Lagonaki Release v. 0.9"
+
   lazy val Port = 9084
 
   lazy val knownPeers = Try {
@@ -27,8 +29,9 @@ object Settings {
     //CREATE JSON OBJECT
     Json.parse(jsonString)
   }
+
   //BLOCKCHAIN
-  val maxRollback = 100
+  lazy val maxRollback = 100
 
 
   settingsJSONTry.recover { case _: Throwable =>
@@ -37,17 +40,20 @@ object Settings {
     System.exit(0)
   }
   private lazy val settingsJSON = settingsJSONTry.get
-  val Release = "Lagonaki Release v. 0.9"
   val MaxBlocksChunks = 200
+
   //NETWORK
   private val DEFAULT_MAX_CONNECTIONS = 20
   private val DEFAULT_CONNECTION_TIMEOUT = 60000
   private val DEFAULT_PING_INTERVAL = 30000
+
   //RPC
   private val DEFAULT_RPC_PORT = 9085
   private val DEFAULT_RPC_ALLOWED = "127.0.0.1"
-  //DATA
+
+  //FOLDERS
   private val DEFAULT_DATA_DIR = "data"
   private val DEFAULT_WALLET_DIR = "wallet"
+
   private val DEFAULT_MAX_BYTE_PER_FEE = 512
 }
