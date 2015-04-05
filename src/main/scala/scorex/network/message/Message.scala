@@ -11,24 +11,13 @@ abstract class Message {
   import scorex.network.message.Message._
 
   val messageType: Int
-  val mbId: Option[Int]
-
-  def hasId() = mbId.isDefined
 
   def hash() = Crypto.sha256(toBytes())
 
   def toBytes() = {
     // MESSAGE TYPE
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(messageType), TYPE_LENGTH, 0)
-
-    //ID
-    val idBytes = mbId.map { id =>
-      val hasIdBytes = Array(1: Byte)
-      val idBytes = Bytes.ensureCapacity(Ints.toByteArray(id), ID_LENGTH, 0)
-      Bytes.concat(hasIdBytes, idBytes)
-    }.getOrElse(Array(0: Byte))
-
-    Bytes.concat(MAGIC, typeBytes, idBytes, Ints.toByteArray(this.getDataLength()))
+    Bytes.concat(MAGIC, typeBytes, Ints.toByteArray(this.getDataLength()))
   }
 
   protected def getDataLength() = 0
@@ -38,11 +27,11 @@ abstract class Message {
 }
 
 
-case class PingMessage(mbId: Option[Int] = None) extends Message {
+case object PingMessage extends Message {
   override val messageType = Message.PING_TYPE
 }
 
-case class GetPeersMessage(mbId: Option[Int] = None) extends Message {
+case object GetPeersMessage extends Message {
   override val messageType = Message.GET_PEERS_TYPE
 }
 
@@ -52,7 +41,6 @@ object Message {
   val MAGIC_LENGTH = MAGIC.length
 
   val TYPE_LENGTH = 4
-  val ID_LENGTH = 4
   val MESSAGE_LENGTH = 4
   val CHECKSUM_LENGTH = 4
 
@@ -74,10 +62,6 @@ object Message {
 
     val msgType = bytes.getInt
 
-    val hasId = bytes.get
-
-    val idOpt = if (hasId == 1) Some(bytes.getInt) else None
-
     val length = bytes.getInt
 
     val data = Array.fill(length)(0: Byte)
@@ -98,8 +82,8 @@ object Message {
 
     //todo: id for all?
     msgType match {
-      case Message.PING_TYPE => PingMessage(idOpt)
-      case Message.GET_PEERS_TYPE => GetPeersMessage(idOpt)
+      case Message.PING_TYPE => PingMessage
+      case Message.GET_PEERS_TYPE => GetPeersMessage
       case Message.PEERS_TYPE => PeersMessage(data)
       case Message.VERSION_TYPE => HeightMessage(data)
       case Message.SIGNATURES_TYPE => SignaturesMessage(data)

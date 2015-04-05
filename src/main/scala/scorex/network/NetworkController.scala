@@ -101,7 +101,7 @@ class NetworkController extends Actor {
       val handlers = connectedPeers.values.toList
       if (handlers.nonEmpty) {
         val randomHandler = handlers(Random.nextInt(handlers.size)).handler
-        randomHandler ! GetPeersMessage(mbId = Some(Random.nextInt(5000000)))
+        randomHandler ! GetPeersMessage
       }
 
     case BroadcastMessage(message, exceptOf) =>

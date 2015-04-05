@@ -12,8 +12,7 @@ import scorex.network.NetworkController.UpdateHeight
 import scorex.network.message.Message
 import scorex.network.message._
 import scorex.transaction.Transaction.TransactionType
-import scala.collection.mutable
-import scala.util.{Success, Failure, Random}
+import scala.util.{Success, Failure}
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -24,8 +23,6 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   import PeerConnectionHandler._
 
-  val idsAwait = mutable.Buffer[Int]()
-
   var best = false
 
   context watch connection
@@ -35,17 +32,17 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   def handleMessage(message: Message) = {
     message match {
-      case PingMessage(idOpt) => self ! PingMessage(idOpt)
+      case PingMessage => self ! PingMessage
 
-      case GetPeersMessage(idOpt) =>
-        self ! PeersMessage(PeerManager.knownPeers(), idOpt)
+      case GetPeersMessage =>
+        self ! PeersMessage(PeerManager.knownPeers())
 
-      case PeersMessage(peers, _) =>
+      case PeersMessage(peers) =>
         println("got peers: " + peers) //todo:handling
 
-      case HeightMessage(height, _) => networkController ! UpdateHeight(remote, height)
+      case HeightMessage(height) => networkController ! UpdateHeight(remote, height)
 
-      case SignaturesMessage(signaturesGot, idOpt) =>
+      case SignaturesMessage(signaturesGot) =>
         best match {
           case true =>
             val lastLocalSignature = PrunableBlockchainStorage.lastBlock.signature
@@ -60,19 +57,19 @@ class PeerConnectionHandler(networkController: ActorRef,
             signaturesGot.exists { parent =>
               val headers = PrunableBlockchainStorage.getSignatures(parent)
               if (headers.size > 0) {
-                self ! SignaturesMessage(Seq(parent) ++ headers, idOpt)
+                self ! SignaturesMessage(Seq(parent) ++ headers)
                 true
               } else false
             }
         }
 
-      case GetBlockMessage(signature, idOpt) =>
+      case GetBlockMessage(signature) =>
         PrunableBlockchainStorage.blockByHeader(signature) match {
-          case Some(block) => self ! BlockMessage(block.height().get, block, idOpt)
+          case Some(block) => self ! BlockMessage(block.height().get, block)
           case None => self ! Blacklist
         }
 
-      case BlockMessage(height, block, _) =>
+      case BlockMessage(height, block) =>
         require(block != null)
         Logger.getGlobal.info(s"Got block, height $height , local height: " + PrunableBlockchainStorage.height())
 
@@ -80,7 +77,7 @@ class PeerConnectionHandler(networkController: ActorRef,
           networkController ! NewBlock(block, Some(remote))
         } else networkController ! UpdateHeight(remote, height)
 
-      case TransactionMessage(transaction, _) =>
+      case TransactionMessage(transaction) =>
         //CHECK IF SIGNATURE IS VALID OR GENESIS TRANSACTION
         if (!transaction.isSignatureValid || transaction.transactionType == TransactionType.GENESIS_TRANSACTION) {
           self ! Blacklist
@@ -94,19 +91,11 @@ class PeerConnectionHandler(networkController: ActorRef,
   }
 
   override def receive = {
-    case PingRemote =>
-      val id = Random.nextInt(100000000) + 1
-      idsAwait += id
-      self ! PingMessage(mbId = Some(id))
+    case PingRemote => self ! PingMessage
 
-    case SendHeight =>
-      val id = Random.nextInt(100000000) + 1
-      idsAwait += id
-      val height = PrunableBlockchainStorage.height()
-      self ! HeightMessage(height, Some(id))
+    case SendHeight => self ! HeightMessage(PrunableBlockchainStorage.height())
 
-    case msg: Message =>
-      self ! ByteString(msg.toBytes())
+    case msg: Message => self ! ByteString(msg.toBytes())
 
     case data: ByteString =>
       connection ! Write(data)
@@ -126,17 +115,6 @@ class PeerConnectionHandler(networkController: ActorRef,
 
         case Success(message) =>
           Logger.getGlobal.info("received message " + message.messageType + " from " + remote)
-
-          //CHECK IF WE ARE WAITING FOR A MESSAGE WITH THAT ID
-          message.mbId match {
-            case Some(id) => if (!idsAwait.contains(id)) {
-              Logger.getGlobal.info(s"Corrupted data (wrong id) from: " + remote)
-              //connection ! Close   todo:fix
-            } else {
-              idsAwait -= id
-            }
-            case _ =>
-          }
 
           handleMessage(message)
       }

@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Ints}
 
 //todo: longest chain rule doesn't make sense for proof-of-stake at all and probably dangerous!
 //todo: so should be replaced with cumulative difficulty (aka maxvalid function)
-case class HeightMessage(height: Int, mbId: Option[Int] = None) extends Message {
+case class HeightMessage(height: Int) extends Message {
 
   override val messageType = Message.VERSION_TYPE
 

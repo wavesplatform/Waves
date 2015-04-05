@@ -3,22 +3,14 @@ package scorex.network.message
 import com.google.common.primitives.Bytes
 
 
-case class GetBlockMessage(signature: Array[Byte], mbId: Option[Int] = None) extends Message {
+case class GetBlockMessage(signature: Array[Byte]) extends Message {
+  private val GET_BLOCK_LENGTH = 128
+
+  require(signature.length == GET_BLOCK_LENGTH, "Data does not match length")
 
   override val messageType = Message.GET_BLOCK_TYPE
 
   override def toBytes() = Bytes.concat(super.toBytes(), generateChecksum(signature), signature)
 
-  override def getDataLength() = GetBlockMessage.GET_BLOCK_LENGTH
-}
-
-object GetBlockMessage {
-  private val GET_BLOCK_LENGTH = 128
-
-  def apply(data: Array[Byte]): GetBlockMessage = {
-    //CHECK IF DATA MATCHES LENGTH
-    require(data.length == GET_BLOCK_LENGTH, "Data does not match length")
-
-    new GetBlockMessage(data)
-  }
+  override def getDataLength() = GET_BLOCK_LENGTH
 }

@@ -3,7 +3,7 @@ package scorex.network.message
 import com.google.common.primitives.Bytes
 import scorex.transaction.Transaction
 
-case class TransactionMessage(transaction: Transaction, mbId: Option[Int] = None) extends Message {
+case class TransactionMessage(transaction: Transaction) extends Message {
 
   override val messageType = Message.TRANSACTION_TYPE
 

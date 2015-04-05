@@ -11,11 +11,10 @@ class MessageSpecification extends FunSuite {
   test("ping message roundtrip"){
     val rnd = Random.nextInt()
 
-    val msg = PingMessage(Some(rnd))
+    val msg = PingMessage
     val parsedTry = Message.parse(ByteBuffer.wrap(msg.toBytes()))
 
     assert(parsedTry.isSuccess)
-    assert(parsedTry.get.mbId.get == rnd)
   }
 }
 

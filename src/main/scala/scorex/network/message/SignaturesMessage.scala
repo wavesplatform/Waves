@@ -4,7 +4,7 @@ import java.util.Arrays
 import com.google.common.primitives.{Bytes, Ints}
 
 
-case class SignaturesMessage(signatures: Seq[Array[Byte]], mbId: Option[Int] = None) extends Message {
+case class SignaturesMessage(signatures: Seq[Array[Byte]]) extends Message {
 
   import scorex.network.message.SignaturesMessage._
 

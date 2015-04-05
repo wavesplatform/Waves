@@ -6,7 +6,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import settings.Settings
 
 
-case class PeersMessage(peers: Seq[InetSocketAddress], mbId: Option[Int] = None) extends Message {
+case class PeersMessage(peers: Seq[InetSocketAddress]) extends Message {
 
   import scorex.network.message.PeersMessage._
 

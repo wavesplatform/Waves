@@ -5,7 +5,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import scorex.block.Block
 
 
-case class BlockMessage(height: Int, block: Block, mbId: Option[Int] = None) extends Message {
+case class BlockMessage(height: Int, block: Block) extends Message {
 
   import scorex.network.message.BlockMessage._
 
