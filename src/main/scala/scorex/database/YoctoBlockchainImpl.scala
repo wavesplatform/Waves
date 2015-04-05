@@ -12,6 +12,7 @@ import com.yandex.yoctodb.util.UnsignedByteArrays
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction._
+import settings.Settings
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
@@ -100,7 +101,7 @@ class YoctoBlockchainImpl extends BlockChain {
 
   override def height(): Int = signaturesIndex.size
 
-  private def filename(height: Int) = s"/tmp/block-${height + 1}"
+  private def filename(height: Int) = Settings.dataDir + s"/block-${height + 1}"
 
   private def transactionFromByteBuffer(bb: ByteBuffer): PreTransaction = {
     val ba = new Array[Byte](bb.remaining())

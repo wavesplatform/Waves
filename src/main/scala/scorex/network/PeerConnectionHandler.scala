@@ -26,6 +26,8 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   val idsAwait = mutable.Buffer[Int]()
 
+  var best = false
+
   context watch connection
 
   context.system.scheduler.schedule(500.millis, 2.seconds)(self ! PingRemote)
@@ -43,14 +45,24 @@ class PeerConnectionHandler(networkController: ActorRef,
 
       case HeightMessage(height, _) => networkController ! UpdateHeight(remote, height)
 
-      case SignaturesMessage(possibleParents, idOpt: Some[Int]) =>
-        possibleParents.exists { parent =>
-          val headers = PrunableBlockchainStorage.getSignatures(parent)
-          if(headers.size > 0) {
-            self ! SignaturesMessage(headers, idOpt)
-            true
-          } else false
+      case SignaturesMessage(signaturesGot, idOpt: Some[Int]) =>
+        best match {
+          case true =>
+            val lastLocalSignature = PrunableBlockchainStorage.lastBlock.signature
+            signaturesGot.dropWhile(_ != lastLocalSignature).foreach { sig =>
+              self ! GetBlockMessage(sig)
+            }
+
+          case false => //todo: check
+            signaturesGot.exists { parent =>
+              val headers = PrunableBlockchainStorage.getSignatures(parent)
+              if (headers.size > 0) {
+                self ! SignaturesMessage(headers, idOpt)
+                true
+              } else false
+            }
         }
+
 
       case GetBlockMessage(signature, idOpt: Some[Int]) =>
         PrunableBlockchainStorage.blockByHeader(signature) match {
@@ -74,7 +86,7 @@ class PeerConnectionHandler(networkController: ActorRef,
           networkController ! NetworkController.BroadcastMessage(message, List(remote))
         }
 
-      case a:Any => Logger.getGlobal.warning(s"PeerConnectionHandler: got something strange $a")
+      case a: Any => Logger.getGlobal.warning(s"PeerConnectionHandler: got something strange $a")
     }
   }
 
@@ -103,11 +115,11 @@ class PeerConnectionHandler(networkController: ActorRef,
       connection ! Close
 
     case Received(data) =>
-      Message.parse(data.toByteBuffer) match{
+      Message.parse(data.toByteBuffer) match {
         case Failure(e) =>
           Logger.getGlobal.info(s"Corrupted data from: " + remote + " : " + e.getMessage)
           connection ! Close
-          //context stop self
+        //context stop self
 
         case Success(message) =>
           Logger.getGlobal.info("received message " + message.messageType + " from " + remote)
@@ -128,7 +140,7 @@ class PeerConnectionHandler(networkController: ActorRef,
 
     case cc: ConnectionClosed =>
       networkController ! NetworkController.PeerDisconnected(remote)
-      Logger.getGlobal.info("Connection closed to : " + remote + ": "+cc.getErrorCause)
+      Logger.getGlobal.info("Connection closed to : " + remote + ": " + cc.getErrorCause)
 
     case CloseConnection =>
       Logger.getGlobal.info(s"Enforced to abort communication with: " + remote)
@@ -138,6 +150,8 @@ class PeerConnectionHandler(networkController: ActorRef,
       Logger.getGlobal.info(s"Going to blacklist " + remote)
       PeerManager.blacklistPeer(remote)
       connection ! Close
+
+    case BestPeer(peer, better) => best = better && (peer == remote)
   }
 }
 
@@ -150,4 +164,7 @@ object PeerConnectionHandler {
   case object CloseConnection
 
   case object Blacklist
+
+  case class BestPeer(remote: InetSocketAddress, betterThanLocal: Boolean)
+
 }

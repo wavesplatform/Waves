@@ -1,6 +1,6 @@
 package scorex.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import java.util.logging.Logger
 import akka.actor.{ActorRef, Props, Actor}
 import akka.io.Tcp._
@@ -28,13 +28,27 @@ class NetworkController extends Actor {
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
 
   private def maxPeerHeight() = Try(connectedPeers.maxBy(_._2.height)._2.height).toOption.flatten
-
   private def maxHeightHandler() = Try(connectedPeers.maxBy(_._2.height)._2.handler).toOption
 
   //todo: a bit stupid workaround, consider more elegant solution for circular linking
   private var blockchainControllerOpt: Option[ActorRef] = None
 
-  IO(Tcp) ! Bind(self, new InetSocketAddress(Settings.Port))
+  IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName("127.0.0.2"), Settings.Port))
+
+  private def updateHeight(remote:InetSocketAddress, height:Int) = {
+    val prevBestHeight = maxPeerHeight().getOrElse(0)
+
+    connectedPeers.get(remote).map{peerData =>
+      connectedPeers.put(remote, peerData.copy(height = Some(height)))
+      Logger.getGlobal.info(s"Height updated for $remote: $height")
+    }
+
+    if(height > prevBestHeight){
+      connectedPeers.foreach{case (_, PeerData(handler, _)) =>
+          handler ! PeerConnectionHandler.BestPeer(remote, height > PrunableBlockchainStorage.height())
+      }
+    }
+  }
 
   override def receive = {
     case b@Bound(localAddress) =>
@@ -116,11 +130,7 @@ class NetworkController extends Actor {
         self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
       }
 
-    case UpdateHeight(remote, h) =>
-      connectedPeers.get(remote).map{peerData =>
-        connectedPeers.put(remote, peerData.copy(height = Some(h)))
-        Logger.getGlobal.info(s"Height updated for $remote: $h")
-      }
+    case UpdateHeight(remote, h) => updateHeight(remote, h)
 
     case a:Any => Logger.getGlobal.warning(s"NetworkController: got something strange $a")
   }
@@ -149,7 +159,6 @@ object NetworkController {
   case class SendMessageToBestPeer(message: Message)
 
   case class BroadcastMessage(message: Message, exceptOf: List[InetSocketAddress] = List())
-
 }
 
 
