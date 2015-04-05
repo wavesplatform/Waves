@@ -9,6 +9,16 @@ object Settings {
 
   lazy val Port = 9084
 
+  private lazy val settingsJSON = Try {
+    val jsonString = scala.io.Source.fromFile("settings.json").mkString
+    //CREATE JSON OBJECT
+    Json.parse(jsonString)
+  }.getOrElse {
+    System.out.println("ERROR reading settings.json, closing")
+    System.exit(0)
+    Json.obj()
+  }
+
   lazy val knownPeers = Try {
     (settingsJSON \ "knownpeers").as[List[String]].flatMap { addr =>
       val inetAddress = InetAddress.getByName(addr)
@@ -24,22 +34,10 @@ object Settings {
   lazy val pingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DEFAULT_PING_INTERVAL)
   lazy val maxBytePerFee = (settingsJSON \ "maxbyteperfee").asOpt[Int].getOrElse(DEFAULT_MAX_BYTE_PER_FEE)
   lazy val offlineGeneration = (settingsJSON \ "offline-generation").asOpt[Boolean].getOrElse(false)
-  private lazy val settingsJSONTry = Try {
-    val jsonString = scala.io.Source.fromFile("settings.json").mkString
-    //CREATE JSON OBJECT
-    Json.parse(jsonString)
-  }
 
   //BLOCKCHAIN
   lazy val maxRollback = 100
 
-
-  settingsJSONTry.recover { case _: Throwable =>
-    //STOP
-    System.out.println("ERROR reading settings.json, closing")
-    System.exit(0)
-  }
-  private lazy val settingsJSON = settingsJSONTry.get
   val MaxBlocksChunks = 200
 
   //NETWORK
