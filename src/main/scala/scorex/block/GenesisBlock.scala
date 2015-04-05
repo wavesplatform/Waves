@@ -3,6 +3,7 @@ package scorex.block
 import java.math.BigDecimal
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import org.joda.time.DateTime
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.Crypto
 import scorex.database.PrunableBlockchainStorage
@@ -25,7 +26,7 @@ object GenesisBlockParams {
 
   val genesisVersion = 1
   val genesisReference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
-  val genesisTimestamp = System.currentTimeMillis - 1000 * 60 * 60
+  val genesisTimestamp = new DateTime(2015, 4, 5, 1, 30).getMillis
   val generatingBalance = 10000000
   val genesisGenerator = new PublicKeyAccount(Array[Byte](1, 1, 1, 1, 1, 1, 1, 1))
   val ipoMembers = List(

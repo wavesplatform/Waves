@@ -76,7 +76,7 @@ object Message {
 
     val hasId = bytes.get
 
-    val id = if (hasId == 1) Some(bytes.getInt) else None
+    val idOpt = if (hasId == 1) Some(bytes.getInt) else None
 
     val length = bytes.getInt
 
@@ -98,8 +98,8 @@ object Message {
 
     //todo: id for all?
     msgType match {
-      case Message.PING_TYPE => PingMessage(id)
-      case Message.GET_PEERS_TYPE => GetPeersMessage(id)
+      case Message.PING_TYPE => PingMessage(idOpt)
+      case Message.GET_PEERS_TYPE => GetPeersMessage(idOpt)
       case Message.PEERS_TYPE => PeersMessage(data)
       case Message.VERSION_TYPE => HeightMessage(data)
       case Message.SIGNATURES_TYPE => SignaturesMessage(data)

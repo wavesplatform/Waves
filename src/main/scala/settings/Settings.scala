@@ -20,6 +20,12 @@ object Settings {
     Json.obj()
   }
 
+  private def directoryEnsuring(dirPath:String):Boolean = {
+    val f = new java.io.File(dirPath)
+    f.mkdirs()
+    f.exists()
+  }
+
   lazy val knownPeers = Try {
     (settingsJSON \ "knownpeers").as[List[String]].flatMap { addr =>
       val inetAddress = InetAddress.getByName(addr)
@@ -30,12 +36,20 @@ object Settings {
   lazy val connectionTimeout = (settingsJSON \ "connectiontimeout").asOpt[Int].getOrElse(DEFAULT_CONNECTION_TIMEOUT)
   lazy val rpcPort = (settingsJSON \ "rpcport").asOpt[Int].getOrElse(DEFAULT_RPC_PORT)
   lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcallowed").asOpt[List[String]].getOrElse(DEFAULT_RPC_ALLOWED.split(""))
-  lazy val walletDir = (settingsJSON \ "walletdir").asOpt[String].getOrElse(DEFAULT_WALLET_DIR)
-  lazy val dataDir = (settingsJSON \ "datadir").asOpt[String].getOrElse(DEFAULT_DATA_DIR)
   lazy val pingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DEFAULT_PING_INTERVAL)
   lazy val maxBytePerFee = (settingsJSON \ "maxbyteperfee").asOpt[Int].getOrElse(DEFAULT_MAX_BYTE_PER_FEE)
   lazy val offlineGeneration = (settingsJSON \ "offline-generation").asOpt[Boolean].getOrElse(false)
   lazy val bindAddress = (settingsJSON \ "bindAddress").asOpt[String].getOrElse(DEFAULT_BIND_ADDRESS)
+
+  lazy val walletDir = (settingsJSON \ "walletdir")
+    .asOpt[String]
+    .getOrElse(DEFAULT_WALLET_DIR)
+    .ensuring(path => directoryEnsuring(path))
+
+  lazy val dataDir = (settingsJSON \ "datadir")
+    .asOpt[String]
+    .getOrElse(DEFAULT_DATA_DIR)
+    .ensuring(path => directoryEnsuring(path))
 
   //BLOCKCHAIN
   lazy val maxRollback = 100

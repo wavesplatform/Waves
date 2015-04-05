@@ -30,14 +30,14 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   context watch connection
 
-  context.system.scheduler.schedule(500.millis, 2.seconds)(self ! PingRemote)
+  context.system.scheduler.schedule(500.millis, 3.seconds)(self ! PingRemote)
   context.system.scheduler.schedule(1.second, 15.seconds)(self ! SendHeight)
 
   def handleMessage(message: Message) = {
     message match {
-      case PingMessage(id: Some[_]) => self ! PingMessage(mbId = id)
+      case PingMessage(idOpt) => self ! PingMessage(idOpt)
 
-      case GetPeersMessage(idOpt: Some[Int]) =>
+      case GetPeersMessage(idOpt) =>
         self ! PeersMessage(PeerManager.knownPeers(), idOpt)
 
       case PeersMessage(peers, _) =>
@@ -45,26 +45,28 @@ class PeerConnectionHandler(networkController: ActorRef,
 
       case HeightMessage(height, _) => networkController ! UpdateHeight(remote, height)
 
-      case SignaturesMessage(signaturesGot, idOpt: Some[Int]) =>
+      case SignaturesMessage(signaturesGot, idOpt) =>
         best match {
           case true =>
             val lastLocalSignature = PrunableBlockchainStorage.lastBlock.signature
-            signaturesGot.dropWhile(_ != lastLocalSignature).foreach { sig =>
-              self ! GetBlockMessage(sig)
+            signaturesGot.foldLeft(false){case (found, sig) =>
+              if(found){
+                self ! GetBlockMessage(sig)
+                found
+              }else if(sig.sameElements(lastLocalSignature)) true else false
             }
 
           case false => //todo: check
             signaturesGot.exists { parent =>
               val headers = PrunableBlockchainStorage.getSignatures(parent)
               if (headers.size > 0) {
-                self ! SignaturesMessage(headers, idOpt)
+                self ! SignaturesMessage(Seq(parent) ++ headers, idOpt)
                 true
               } else false
             }
         }
 
-
-      case GetBlockMessage(signature, idOpt: Some[Int]) =>
+      case GetBlockMessage(signature, idOpt) =>
         PrunableBlockchainStorage.blockByHeader(signature) match {
           case Some(block) => self ! BlockMessage(block.height().get, block, idOpt)
           case None => self ! Blacklist
@@ -72,6 +74,7 @@ class PeerConnectionHandler(networkController: ActorRef,
 
       case BlockMessage(height, block, _) =>
         require(block != null)
+        Logger.getGlobal.info(s"Got block, height $height , local height: " + PrunableBlockchainStorage.height())
 
         if (Block.isNewBlockValid(block)) {
           networkController ! NewBlock(block, Some(remote))
@@ -148,8 +151,8 @@ class PeerConnectionHandler(networkController: ActorRef,
 
     case Blacklist =>
       Logger.getGlobal.info(s"Going to blacklist " + remote)
-      PeerManager.blacklistPeer(remote)
-      connection ! Close
+    //  PeerManager.blacklistPeer(remote)
+    //  connection ! Close
 
     case BestPeer(peer, better) => best = better && (peer == remote)
   }

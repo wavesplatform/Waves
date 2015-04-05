@@ -13,7 +13,6 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction._
 import settings.Settings
-
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -21,8 +20,8 @@ import scala.collection.mutable
 
 class YoctoBlockchainImpl extends BlockChain {
 
-  val signaturesIndex = TrieMap[Int, Array[Byte]]()
-  val blocksIndex = TrieMap[Int, Block]()
+  private val signaturesIndex = TrieMap[Int, Array[Byte]]()
+  private val blocksIndex = TrieMap[Int, Block]()
 
   private def feeTransaction(block: Block): FeeTransaction =
     FeeTransaction(block.generator, block.transactions.map(_.fee).sum)
@@ -63,7 +62,7 @@ class YoctoBlockchainImpl extends BlockChain {
     signaturesIndex += h -> block.signature
     blocksIndex += h -> block
     this
-  }
+  }.ensuring(_ => signaturesIndex.size == blocksIndex.size)
 
   override def heightOf(block: Block): Option[Int] = signaturesIndex.find(_._2.sameElements(block.signature)).map(_._1)
 
@@ -129,7 +128,8 @@ class YoctoBlockchainImpl extends BlockChain {
     seq.sum
   }
 
-  override def heightOf(blockSignature: Array[Byte]): Option[Int] = signaturesIndex.find(_._2 == blockSignature).map(_._1)
+  override def heightOf(blockSignature: Array[Byte]): Option[Int] =
+    signaturesIndex.find(_._2.sameElements(blockSignature)).map(_._1)
 
   override def blockByHeader(signature: Array[Byte]): Option[Block] =
     signaturesIndex.find(_._2.sameElements(signature)).map(_._1).map(h => blocksIndex(h))

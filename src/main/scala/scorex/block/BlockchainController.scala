@@ -25,7 +25,7 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
   private val blockGenerator = context.actorOf(Props[BlockGenerator])
 
   override def preStart() = {
-    context.system.scheduler.schedule(500.millis, 500.millis)(self ! CheckState)
+    context.system.scheduler.schedule(1.second, 2.seconds)(self ! CheckState)
     context.system.scheduler.schedule(500.millis, 1.second)(networkController ! GetMaxChainScore)
   }
 

@@ -92,7 +92,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
     //CHECK IF PARENT EXISTS
     if (reference == null || parent().isEmpty) {
       false
-    } else if (timestamp - 500 > NTP.getTime || this.timestamp < parent().get.timestamp) {
+    } else if (this.timestamp < parent().get.timestamp) {
       //CHECK IF TIMESTAMP IS VALID -500 MS ERROR MARGIN TIME
       false
     } else if (timestamp % 1000 != parent().get.timestamp % 1000) {
