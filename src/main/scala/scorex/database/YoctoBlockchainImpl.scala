@@ -137,8 +137,13 @@ class YoctoBlockchainImpl extends BlockChain {
   //todo: implement
   override def confirmations(tx: Transaction): Option[Int] = ???
 
-  //todo: implement
-  override def discardBlock(): BlockChain = ???
+  override def discardBlock(): BlockChain = {
+    require(height() > 1, "Chain is empty or contains genesis block only")
+    val key = height()
+    signaturesIndex -= key
+    blocksIndex -= key
+    this
+  }.ensuring(_ => signaturesIndex.size == blocksIndex.size)
 
   //todo: implement
   override def child(block: Block): Option[Block] = ???
