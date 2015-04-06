@@ -111,6 +111,8 @@ class PeerConnectionHandler(networkController: ActorRef,
           (!flags.sigsAwait, flags.copy(sigsAwait = true))
         case _:GetBlockMessage =>
           (!flags.blockAwait, flags.copy(blockAwait = true))
+        case _ =>
+          (true, flags)
       }
       if(sendFlag) {
         self ! ByteString(msg.toBytes())
