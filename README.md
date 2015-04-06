@@ -1,6 +1,8 @@
 Scorex - Lagonaki Release
 =========================
 
+**It's the buggy as hell pre-release version! So better wait until release!**
+
 Motivation
 ----------
 
