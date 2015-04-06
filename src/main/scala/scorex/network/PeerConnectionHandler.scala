@@ -25,9 +25,9 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   private var best = false
 
-  private case class MessagesWithoutReply(pingAwait:Boolean, peersAwait:Boolean, sigsAwait:Boolean, blockAwait:Boolean)
+  private case class MessagesWithoutReply(pingAwait:Boolean, peersAwait:Boolean, sigsAwait:Boolean)
 
-  private var flags = MessagesWithoutReply(pingAwait = false, peersAwait = false, sigsAwait = false, blockAwait = false)
+  private var flags = MessagesWithoutReply(pingAwait = false, peersAwait = false, sigsAwait = false)
 
   context watch connection
 
@@ -77,7 +77,6 @@ class PeerConnectionHandler(networkController: ActorRef,
       case BlockMessage(height, block) =>
         require(block != null)
         Logger.getGlobal.info(s"Got block, height $height , local height: " + PrunableBlockchainStorage.height())
-        if(height == PrunableBlockchainStorage.height() + 1) flags.copy(blockAwait = false)
 
         if (Block.isNewBlockValid(block)) {
           networkController ! NewBlock(block, Some(remote))
@@ -107,10 +106,8 @@ class PeerConnectionHandler(networkController: ActorRef,
           (!flags.pingAwait, flags.copy(pingAwait = true))
         case GetPeersMessage =>
           (!flags.peersAwait, flags.copy(peersAwait = true))
-        case _:GetSignaturesMessage =>
-          (!flags.sigsAwait, flags.copy(sigsAwait = true))
-        case _:GetBlockMessage =>
-          (!flags.blockAwait, flags.copy(blockAwait = true))
+        //case _:GetSignaturesMessage =>
+          //(!flags.sigsAwait, flags.copy(sigsAwait = true))
         case _ =>
           (true, flags)
       }

@@ -9,8 +9,6 @@ abstract class SignaturesSeqMessage extends Message {
 
   val signatures: Seq[Array[Byte]]
 
-  override val messageType = Message.SIGNATURES_TYPE
-
   override def toBytes() = {
     val length = signatures.size
     val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DATA_LENGTH, 0)
@@ -50,6 +48,7 @@ object SignaturesSeqMessage {
 
 
 case class GetSignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage{
+  override val messageType = Message.GET_SIGNATURES_TYPE
   def this(data: Array[Byte]) = this(SignaturesSeqMessage.parse(data))
 }
 
@@ -59,6 +58,7 @@ object GetSignaturesMessage{
 
 
 case class SignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage{
+  override val messageType = Message.SIGNATURES_TYPE
   def this(data: Array[Byte]) = this(SignaturesSeqMessage.parse(data))
 }
 
