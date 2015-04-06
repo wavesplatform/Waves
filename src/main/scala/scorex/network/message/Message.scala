@@ -86,6 +86,7 @@ object Message {
       case Message.GET_PEERS_TYPE => GetPeersMessage
       case Message.PEERS_TYPE => PeersMessage(data)
       case Message.VERSION_TYPE => HeightMessage(data)
+      case Message.GET_SIGNATURES_TYPE => GetSignaturesMessage(data)
       case Message.SIGNATURES_TYPE => SignaturesMessage(data)
       case Message.GET_BLOCK_TYPE => GetBlockMessage(data)
       case Message.BLOCK_TYPE => BlockMessage(data)

@@ -5,7 +5,7 @@ import java.util.logging.Logger
 import akka.actor.{Props, ActorRef, Actor}
 import scorex.database.PrunableBlockchainStorage
 import scorex.network.NetworkController
-import scorex.network.message.{BlockMessage, SignaturesMessage}
+import scorex.network.message.{GetSignaturesMessage, BlockMessage}
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -35,7 +35,7 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
         case Status.Offline =>
 
         case Status.Syncing =>
-          val msg = SignaturesMessage(PrunableBlockchainStorage.lastSignatures())
+          val msg = GetSignaturesMessage(PrunableBlockchainStorage.lastSignatures())
           networkController ! NetworkController.SendMessageToBestPeer(msg)
 
         case Status.Generating =>

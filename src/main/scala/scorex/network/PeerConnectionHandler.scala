@@ -23,44 +23,49 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   import PeerConnectionHandler._
 
-  var best = false
+  private var best = false
+
+  private case class MessagesWithoutReply(pingAwait:Boolean, peersAwait:Boolean, sigsAwait:Boolean, blockAwait:Boolean)
+
+  private var flags = MessagesWithoutReply(pingAwait = false, peersAwait = false, sigsAwait = false, blockAwait = false)
 
   context watch connection
 
   context.system.scheduler.schedule(500.millis, 3.seconds)(self ! PingRemote)
   context.system.scheduler.schedule(1.second, 15.seconds)(self ! SendHeight)
 
-  def handleMessage(message: Message) = {
+  private def handleMessage(message: Message) = {
     message match {
-      case PingMessage => self ! PingMessage
+      case PingMessage =>
+        flags.copy(pingAwait = false)
+        self ! PingMessage
 
       case GetPeersMessage =>
         self ! PeersMessage(PeerManager.knownPeers())
 
       case PeersMessage(peers) =>
+        flags.copy(peersAwait = false)
         println("got peers: " + peers) //todo:handling
 
       case HeightMessage(height) => networkController ! UpdateHeight(remote, height)
 
-      case SignaturesMessage(signaturesGot) =>
-        best match {
-          case true =>
-            val lastLocalSignature = PrunableBlockchainStorage.lastBlock.signature
-            signaturesGot.foldLeft(false){case (found, sig) =>
-              if(found){
-                self ! GetBlockMessage(sig)
-                found
-              }else if(sig.sameElements(lastLocalSignature)) true else false
-            }
+      case GetSignaturesMessage(signaturesGot) =>
+        signaturesGot.exists { parent =>
+          val headers = PrunableBlockchainStorage.getSignatures(parent)
+          if (headers.size > 0) {
+            self ! SignaturesMessage(Seq(parent) ++ headers)
+            true
+          } else false
+        }
 
-          case false => //todo: check
-            signaturesGot.exists { parent =>
-              val headers = PrunableBlockchainStorage.getSignatures(parent)
-              if (headers.size > 0) {
-                self ! SignaturesMessage(Seq(parent) ++ headers)
-                true
-              } else false
-            }
+      case SignaturesMessage(signaturesGot) =>
+        flags.copy(sigsAwait = false)
+        val lastLocalSignature = PrunableBlockchainStorage.lastBlock.signature
+        signaturesGot.foldLeft(false) { case (found, sig) =>
+          if (found) {
+            self ! GetBlockMessage(sig)
+            found
+          } else if (sig.sameElements(lastLocalSignature)) true else false
         }
 
       case GetBlockMessage(signature) =>
@@ -72,6 +77,7 @@ class PeerConnectionHandler(networkController: ActorRef,
       case BlockMessage(height, block) =>
         require(block != null)
         Logger.getGlobal.info(s"Got block, height $height , local height: " + PrunableBlockchainStorage.height())
+        if(height == PrunableBlockchainStorage.height() + 1) flags.copy(blockAwait = false)
 
         if (Block.isNewBlockValid(block)) {
           networkController ! NewBlock(block, Some(remote))
@@ -95,7 +101,21 @@ class PeerConnectionHandler(networkController: ActorRef,
 
     case SendHeight => self ! HeightMessage(PrunableBlockchainStorage.height())
 
-    case msg: Message => self ! ByteString(msg.toBytes())
+    case msg: Message =>
+      val (sendFlag, newFlags) = msg match{
+        case PingMessage =>
+          (!flags.pingAwait, flags.copy(pingAwait = true))
+        case GetPeersMessage =>
+          (!flags.peersAwait, flags.copy(peersAwait = true))
+        case _:GetSignaturesMessage =>
+          (!flags.sigsAwait, flags.copy(sigsAwait = true))
+        case _:GetBlockMessage =>
+          (!flags.blockAwait, flags.copy(blockAwait = true))
+      }
+      if(sendFlag) {
+        self ! ByteString(msg.toBytes())
+        flags = newFlags
+      }
 
     case data: ByteString =>
       connection ! Write(data)
@@ -132,7 +152,7 @@ class PeerConnectionHandler(networkController: ActorRef,
     //  PeerManager.blacklistPeer(remote)
     //  connection ! Close
 
-    case BestPeer(peer, better) => best = better && (peer == remote)
+    case BestPeer(peer, betterThanLocal) => best = betterThanLocal && (peer == remote)
   }
 }
 

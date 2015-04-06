@@ -4,9 +4,10 @@ import java.util.Arrays
 import com.google.common.primitives.{Bytes, Ints}
 
 
-case class SignaturesMessage(signatures: Seq[Array[Byte]]) extends Message {
+abstract class SignaturesSeqMessage extends Message {
+  import SignaturesSeqMessage._
 
-  import scorex.network.message.SignaturesMessage._
+  val signatures: Seq[Array[Byte]]
 
   override val messageType = Message.SIGNATURES_TYPE
 
@@ -24,12 +25,12 @@ case class SignaturesMessage(signatures: Seq[Array[Byte]]) extends Message {
   override def getDataLength() = DATA_LENGTH + (signatures.size * SIGNATURE_LENGTH)
 }
 
+object SignaturesSeqMessage {
 
-object SignaturesMessage {
   private val SIGNATURE_LENGTH = 128
   private val DATA_LENGTH = 4
 
-  def apply(data: Array[Byte]): SignaturesMessage = {
+  def parse(data: Array[Byte]) = {
     //READ LENGTH
     val lengthBytes = Arrays.copyOfRange(data, 0, DATA_LENGTH)
     val length = Ints.fromByteArray(lengthBytes)
@@ -39,10 +40,28 @@ object SignaturesMessage {
       throw new Exception("Data does not match length")
 
     //CREATE HEADERS LIST
-    val headers = (0 to length - 1).map { i =>
+    (0 to length - 1).map { i =>
       val position = DATA_LENGTH + (i * SIGNATURE_LENGTH)
       Arrays.copyOfRange(data, position, position + SIGNATURE_LENGTH)
-    }
-    new SignaturesMessage(headers.toList)
+    }.toSeq
   }
+}
+
+
+
+case class GetSignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage{
+  def this(data: Array[Byte]) = this(SignaturesSeqMessage.parse(data))
+}
+
+object GetSignaturesMessage{
+  def apply(data: Array[Byte]) = new GetSignaturesMessage(data)
+}
+
+
+case class SignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage{
+  def this(data: Array[Byte]) = this(SignaturesSeqMessage.parse(data))
+}
+
+object SignaturesMessage{
+  def apply(data: Array[Byte]) = new SignaturesMessage(data)
 }
