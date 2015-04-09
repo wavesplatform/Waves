@@ -37,5 +37,5 @@ class TransactionSpecification extends FunSuite {
 
     assert(tx.isSignatureValid())
   }
-  
+
 }

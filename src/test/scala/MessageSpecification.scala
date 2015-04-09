@@ -8,7 +8,7 @@ import scorex.network.message.{Message, PingMessage}
 import scala.util.Random
 
 class MessageSpecification extends FunSuite {
-  test("ping message roundtrip"){
+  test("ping message roundtrip") {
     val rnd = Random.nextInt()
 
     val msg = PingMessage
