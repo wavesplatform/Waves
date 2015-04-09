@@ -3,6 +3,9 @@ package settings
 import java.net.{InetSocketAddress, InetAddress}
 import play.api.libs.json.Json
 import scala.util.Try
+import org.slf4j.LoggerFactory
+import ch.qos.logback.core.util.StatusPrinter
+import ch.qos.logback.classic.LoggerContext
 
 object Settings {
   val Release = "Lagonaki Release v. 0.9"
@@ -15,7 +18,8 @@ object Settings {
     val jsonString = scala.io.Source.fromFile(filename).mkString
     Json.parse(jsonString)
   }.getOrElse {
-    System.out.println("ERROR reading settings.json, closing")
+    logger.info("ERROR reading settings.json, closing")
+    //catch error?
     System.exit(10)
     Json.obj()
   }
