@@ -72,10 +72,6 @@ object Controller {
       TransactionCreator.createPayment(sender, recipient, amount, fee)
     }
 
-  def createWallet(seed: Array[Byte], password: String, amount: Int) = Wallet.create(seed, password, amount)
-
-  def recoverWallet(seed: Array[Byte], password: String, amount: Int) = Wallet.create(seed, password, amount)
-
   def nextBlockGeneratingBalance() = BlockGenerator.getNextBlockGeneratingBalance(PrunableBlockchainStorage.lastBlock)
 
   def nextBlockGeneratingBalance(parent: Block) = BlockGenerator.getNextBlockGeneratingBalance(parent)

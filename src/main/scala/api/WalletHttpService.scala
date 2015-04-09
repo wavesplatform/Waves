@@ -53,8 +53,8 @@ trait WalletHttpService extends HttpService with CommonApifunctions {
                   case Success(seedBytes) if seedBytes.length == 32 =>
                     if (amount < 1) ApiError.toJson(ApiError.ERROR_INVALID_AMOUNT)
                     else {
-                      val res = if (recover) Controller.recoverWallet(seedBytes, password, amount)
-                      else Controller.createWallet(seedBytes, password, amount)
+                      val res = if (recover) Wallet.create(seedBytes, password, amount)
+                      else Wallet.create(seedBytes, password, amount)
                       Json.obj("success" -> res)
                     }
                   case _ => ApiError.toJson(ApiError.ERROR_INVALID_SEED)
