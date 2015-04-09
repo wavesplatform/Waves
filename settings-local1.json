@@ -1,0 +1,16 @@
+{
+    "bindAddress" : "127.0.0.1",
+	"knownpeers":[
+      "127.0.0.1"
+	],
+  	"walletdir" : "/tmp/wallet1",
+    "datadir" : "/tmp/data1",
+	"minconnections": 10,
+    "rpcport" : 9085,
+	"rpcallowed":[
+		"127.0.0.1",
+		"123.123.123.123"
+	],
+  	"max-rollback" : 100,
+  	"offline-generation" : true
+}
