@@ -6,11 +6,13 @@ import scorex.account.PrivateKeyAccount
 import scorex.crypto.Crypto
 import scorex.database.PrunableBlockchainStorage
 import scorex.wallet.Wallet
+
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 
 
 class BlockGenerator extends Actor {
+
   import scorex.block.BlockGenerator._
 
   override def receive = {
@@ -55,7 +57,7 @@ object BlockGenerator {
   def getNextBlockGeneratingBalance(block: Block) = {
     if (block.height().get % RETARGET == 0) {
       //GET FIRST BLOCK OF TARGET
-      val firstBlock = (1 to RETARGET - 1).foldLeft(block) { case (bl, _) => bl.parent().get}
+      val firstBlock = (1 to RETARGET - 1).foldLeft(block) { case (bl, _) => bl.parent().get }
 
       //CALCULATE THE GENERATING TIME FOR LAST 10 BLOCKS
       val generatingTime = block.timestamp - firstBlock.timestamp

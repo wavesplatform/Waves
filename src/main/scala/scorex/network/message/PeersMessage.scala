@@ -1,7 +1,8 @@
 package scorex.network.message
 
-import java.net.{InetSocketAddress, InetAddress}
+import java.net.{InetAddress, InetSocketAddress}
 import java.util
+
 import com.google.common.primitives.{Bytes, Ints}
 import settings.Settings
 

@@ -2,9 +2,10 @@ package scorex.network
 
 import java.net.InetSocketAddress
 import java.util.logging.Logger
+
 import scorex.database.PeerDatabaseImpl
 import settings.Settings
-import scala.collection.JavaConversions._
+
 import scala.util.Random
 
 object PeerManager {
@@ -21,12 +22,12 @@ object PeerManager {
     } else knownPeers
   }
 
-  def peerConnected(peer:InetSocketAddress):Unit = {
+  def peerConnected(peer: InetSocketAddress): Unit = {
     addPeer(peer)
     PeerDatabaseImpl.addConnectedPeer(peer)
   }
 
-  def peerDisconnected(peer:InetSocketAddress):Unit =
+  def peerDisconnected(peer: InetSocketAddress): Unit =
     PeerDatabaseImpl.removeConnectedPeer(peer)
 
 
@@ -35,7 +36,7 @@ object PeerManager {
     peers(Random.nextInt(peers.size))
   }
 
-  def addPeer(peer: InetSocketAddress):Unit = {
+  def addPeer(peer: InetSocketAddress): Unit = {
     //require(peer.getPort == Settings.Port)
     if (!Settings.knownPeers.contains(peer)) PeerDatabaseImpl.addKnownPeer(peer)
   }

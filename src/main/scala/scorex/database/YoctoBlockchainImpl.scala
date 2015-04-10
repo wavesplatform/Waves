@@ -13,6 +13,7 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction._
 import settings.Settings
+
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable

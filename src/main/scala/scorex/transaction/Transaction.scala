@@ -10,7 +10,7 @@ import settings.Settings
 
 abstract class Transaction(val transactionType: TransactionType.Value,
                            override val recipient: Account,
-                           override val amount:BigDecimal,
+                           override val amount: BigDecimal,
                            val fee: BigDecimal,
                            val timestamp: Long,
                            val signature: Array[Byte]) extends PreTransaction(recipient, amount) {

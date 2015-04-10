@@ -3,7 +3,6 @@ package scorex.block
 import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import ntp.NTP
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.{Base58, Crypto}
@@ -25,7 +24,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
 
   import scorex.block.Block._
 
-  def totalFee() = transactions.foldLeft(BigDecimal(0).setScale(8)) { case (fee, tx) => fee + tx.fee}
+  def totalFee() = transactions.foldLeft(BigDecimal(0).setScale(8)) { case (fee, tx) => fee + tx.fee }
 
   def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
 
@@ -65,7 +64,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
       generatorSignature, transactionCountBytes, transactionBytes)
   }
 
-  def dataLength() = transactions.foldLeft(BASE_LENGTH) { case (len, tx) => len + 4 + tx.dataLength}
+  def dataLength() = transactions.foldLeft(BASE_LENGTH) { case (len, tx) => len + 4 + tx.dataLength }
 
   //VALIDATE
 

@@ -1,6 +1,5 @@
 package api
 
-import controller.Controller
 import play.api.libs.json.Json
 import scorex.crypto.Base58
 import scorex.wallet.Wallet

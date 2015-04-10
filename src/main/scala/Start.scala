@@ -8,6 +8,7 @@ import scorex.crypto.Base58
 import scorex.database.wallet.SecureWalletDatabase
 import scorex.wallet.Wallet
 import settings.Settings
+
 import scala.io.StdIn
 import scala.util.{Failure, Random, Try}
 
@@ -16,7 +17,7 @@ object Start {
   def main(args: Array[String]) {
     if (!args.contains("-cli")) {
       Try {
-        if(args.size > 0) Settings.filename = args(0)
+        if (args.size > 0) Settings.filename = args(0)
         Controller.init() //STARTING NETWORK/BLOCKCHAIN/RPC
         testingScript()
       } match {

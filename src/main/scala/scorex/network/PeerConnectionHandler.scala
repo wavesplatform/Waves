@@ -2,19 +2,19 @@ package scorex.network
 
 import java.net.InetSocketAddress
 import java.util.logging.Logger
+
 import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
-import scorex.block.NewBlock
-import scorex.block.Block
-import scorex.database.{UnconfirmedTransactionsDatabaseImpl, PrunableBlockchainStorage}
+import scorex.block.{Block, NewBlock}
+import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
 import scorex.network.NetworkController.UpdateHeight
-import scorex.network.message.Message
-import scorex.network.message._
+import scorex.network.message.{Message, _}
 import scorex.transaction.Transaction.TransactionType
-import scala.util.{Success, Failure}
-import scala.concurrent.duration._
+
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 
 class PeerConnectionHandler(networkController: ActorRef,
@@ -25,7 +25,7 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   private var best = false
 
-  private case class MessagesWithoutReply(pingAwait:Boolean, peersAwait:Boolean, sigsAwait:Boolean)
+  private case class MessagesWithoutReply(pingAwait: Boolean, peersAwait: Boolean, sigsAwait: Boolean)
 
   private var flags = MessagesWithoutReply(pingAwait = false, peersAwait = false, sigsAwait = false)
 
@@ -101,17 +101,17 @@ class PeerConnectionHandler(networkController: ActorRef,
     case SendHeight => self ! HeightMessage(PrunableBlockchainStorage.height())
 
     case msg: Message =>
-      val (sendFlag, newFlags) = msg match{
+      val (sendFlag, newFlags) = msg match {
         case PingMessage =>
           (!flags.pingAwait, flags.copy(pingAwait = true))
         case GetPeersMessage =>
           (!flags.peersAwait, flags.copy(peersAwait = true))
         //case _:GetSignaturesMessage =>
-          //(!flags.sigsAwait, flags.copy(sigsAwait = true))
+        //(!flags.sigsAwait, flags.copy(sigsAwait = true))
         case _ =>
           (true, flags)
       }
-      if(sendFlag) {
+      if (sendFlag) {
         self ! ByteString(msg.toBytes())
         flags = newFlags
       }

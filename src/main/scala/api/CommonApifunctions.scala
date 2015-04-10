@@ -7,6 +7,7 @@ import scorex.block.Block
 import scorex.crypto.{Base58, Crypto}
 import scorex.database.PrunableBlockchainStorage
 import scorex.wallet.Wallet
+
 import scala.concurrent.duration._
 import scala.util.Try
 

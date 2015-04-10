@@ -8,7 +8,7 @@ import scorex.account.Account
 import scorex.crypto.Base58
 import scorex.transaction.Transaction._
 
-abstract class PreTransaction(val recipient: Account, val amount:BigDecimal){
+abstract class PreTransaction(val recipient: Account, val amount: BigDecimal) {
   def getAmount(account: Account): BigDecimal
 }
 
@@ -29,19 +29,20 @@ object PreTransaction {
 
     val FEE_PRETRANSACTION = Value(0)
   }
+
 }
 
 
 //virtual transaction type not stated explicitly, used for storing block rewards into the database
-case class FeeTransaction(override val recipient: Account, override val amount:BigDecimal)
-  extends PreTransaction(recipient, amount){
+case class FeeTransaction(override val recipient: Account, override val amount: BigDecimal)
+  extends PreTransaction(recipient, amount) {
 
   def getAmount(account: Account): BigDecimal = account.address == recipient.address match {
-    case true  => amount
+    case true => amount
     case false => 0
   }
 
-  def toBytes():Array[Byte] = {
+  def toBytes(): Array[Byte] = {
     val amountBytes = amount.bigDecimal.unscaledValue().toByteArray
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
     Bytes.concat(amountFill, amountBytes)

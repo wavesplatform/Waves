@@ -2,12 +2,14 @@ package scorex.network.message
 
 import java.nio.ByteBuffer
 import java.util.Arrays
+
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.crypto.Crypto
 
 import scala.util.Try
 
 abstract class Message {
+
   import scorex.network.message.Message._
 
   val messageType: Int

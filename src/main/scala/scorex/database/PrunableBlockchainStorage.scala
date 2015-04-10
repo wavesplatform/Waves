@@ -1,6 +1,7 @@
 package scorex.database
 
 import java.util.concurrent.atomic.AtomicReference
+
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.Transaction

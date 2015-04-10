@@ -2,17 +2,19 @@ package scorex.block
 
 import java.net.InetSocketAddress
 import java.util.logging.Logger
-import akka.actor.{Props, ActorRef, Actor}
+
+import akka.actor.{Actor, ActorRef, Props}
 import scorex.database.PrunableBlockchainStorage
 import scorex.network.NetworkController
-import scorex.network.message.{GetSignaturesMessage, BlockMessage}
-import scala.concurrent.duration._
+import scorex.network.message.{BlockMessage, GetSignaturesMessage}
+
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 
 case class Synchronize(peer: InetSocketAddress)
 
-case class NewBlock(block: Block, sender:Option[InetSocketAddress])
+case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 
 case class BlocksDownload(signatures: List[Array[Byte]], peer: InetSocketAddress)
 
@@ -58,7 +60,7 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
         block.process()
         PrunableBlockchainStorage.appendBlock(block)
         val height = PrunableBlockchainStorage.height()
-        val exceptOf = remoteOpt.map(r=> List(r)).getOrElse(List())
+        val exceptOf = remoteOpt.map(r => List(r)).getOrElse(List())
         networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block), exceptOf)
       } else {
         Logger.getGlobal.warning(s"Non-valid block: $block from $remoteOpt")
@@ -66,7 +68,7 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
 
     case GetStatus => sender() ! Status.replicate(status)
 
-    case a:Any => Logger.getGlobal.warning(s"BlockchainController: got something strange $a")
+    case a: Any => Logger.getGlobal.warning(s"BlockchainController: got something strange $a")
   }
 }
 
@@ -87,6 +89,7 @@ object BlockchainController {
   case class MaxChainScore(scoreOpt: Option[Int])
 
   case object GetStatus
+
 }
 
 

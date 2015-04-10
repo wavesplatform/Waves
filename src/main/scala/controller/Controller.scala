@@ -1,15 +1,16 @@
 package controller
 
 import java.util.logging.Logger
+
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import api.HttpServiceActor
 import scorex.account.{Account, PrivateKeyAccount}
-import scorex.block.{Block, BlockGenerator, GenesisBlock, BlockchainController}
+import scorex.block.{Block, BlockGenerator, BlockchainController, GenesisBlock}
 import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
-import scorex.network.message._
 import scorex.network.NetworkController
-import scorex.transaction.{TransactionCreator, Transaction}
+import scorex.network.message._
+import scorex.transaction.{Transaction, TransactionCreator}
 import scorex.wallet.Wallet
 import settings.Settings
 import spray.can.Http

@@ -1,10 +1,12 @@
 package scorex.network.message
 
 import java.util.Arrays
+
 import com.google.common.primitives.{Bytes, Ints}
 
 
 abstract class SignaturesSeqMessage extends Message {
+
   import SignaturesSeqMessage._
 
   val signatures: Seq[Array[Byte]]
@@ -14,7 +16,7 @@ abstract class SignaturesSeqMessage extends Message {
     val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DATA_LENGTH, 0)
 
     //WRITE SIGNATURES
-    val data = signatures.foldLeft(lengthBytes) { case (bytes, header) => Bytes.concat(bytes, header)}
+    val data = signatures.foldLeft(lengthBytes) { case (bytes, header) => Bytes.concat(bytes, header) }
 
     //ADD CHECKSUM
     Bytes.concat(super.toBytes(), generateChecksum(data), data)
@@ -46,22 +48,23 @@ object SignaturesSeqMessage {
 }
 
 
-
-case class GetSignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage{
+case class GetSignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage {
   override val messageType = Message.GET_SIGNATURES_TYPE
+
   def this(data: Array[Byte]) = this(SignaturesSeqMessage.parse(data))
 }
 
-object GetSignaturesMessage{
+object GetSignaturesMessage {
   def apply(data: Array[Byte]) = new GetSignaturesMessage(data)
 }
 
 
-case class SignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage{
+case class SignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage {
   override val messageType = Message.SIGNATURES_TYPE
+
   def this(data: Array[Byte]) = this(SignaturesSeqMessage.parse(data))
 }
 
-object SignaturesMessage{
+object SignaturesMessage {
   def apply(data: Array[Byte]) = new SignaturesMessage(data)
 }

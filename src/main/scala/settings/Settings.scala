@@ -1,11 +1,11 @@
 package settings
 
-import java.net.{InetSocketAddress, InetAddress}
-import play.api.libs.json.Json
-import scala.util.Try
+import java.net.{InetAddress, InetSocketAddress}
+
 import org.slf4j.LoggerFactory
-import ch.qos.logback.core.util.StatusPrinter
-import ch.qos.logback.classic.LoggerContext
+import play.api.libs.json.Json
+
+import scala.util.Try
 
 object Settings {
   def logger = LoggerFactory.getLogger(this.getClass)
@@ -26,7 +26,7 @@ object Settings {
     Json.obj()
   }
 
-  private def directoryEnsuring(dirPath:String):Boolean = {
+  private def directoryEnsuring(dirPath: String): Boolean = {
     val f = new java.io.File(dirPath)
     f.mkdirs()
     f.exists()
