@@ -47,8 +47,6 @@ object Start {
       s"(${Wallet.privateKeyAccounts().size}) : "
       + Wallet.privateKeyAccounts().mkString(" "))
 
-    //require(Wallet.unlock("cookies"))
-
     require(Wallet.exists())
     require(Wallet.privateKeyAccounts().nonEmpty)
 
@@ -65,7 +63,7 @@ object Start {
 
       val (tx, valRes) = Controller.sendPayment(senderAcc, recipientAcc, amt, fee)
       println(s"Payment created: $tx, validationResult: $valRes")
-      Thread.sleep(20000) // too short delays causes bug, see comments in PaymentTransaction
+      Thread.sleep(20000)
     }
   }
 }
