@@ -1,5 +1,6 @@
 package scorex
 
+import java.util.logging.Logger
 import api.ApiClient
 import controller.Controller
 import scorex.account.Account
@@ -17,7 +18,7 @@ object Start {
   def main(args: Array[String]) {
     if (!args.contains("-cli")) {
       Try {
-        if (args.size > 0) Settings.filename = args(0)
+        if (args.length > 0) Settings.filename = args(0)
         Controller.init() //STARTING NETWORK/BLOCKCHAIN/RPC
         testingScript()
       } match {
@@ -37,7 +38,18 @@ object Start {
 
 
   def testingScript(): Unit = {
-    Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", 10)
+    val NumOfAccounts = 10
+
+    Random.setSeed(System.currentTimeMillis())
+
+    Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", NumOfAccounts)
+    Wallet.privateKeyAccounts().flatMap { acc =>
+      if (Random.nextBoolean()) Some(acc) else None
+    }.map(Wallet.deleteAccount)
+    Logger.getGlobal.info("Executing testing scenario with accounts" +
+      s"(${Wallet.privateKeyAccounts().size}) : "
+      + Wallet.privateKeyAccounts().mkString(" "))
+
     //require(Wallet.unlock("cookies"))
 
     require(SecureWalletDatabase.exists())
