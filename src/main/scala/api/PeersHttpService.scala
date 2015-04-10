@@ -7,8 +7,8 @@ import controller.Controller
 import play.api.libs.json.Json
 import scorex.block.BlockchainController
 import scorex.network.NetworkController
+import scorex.network.NetworkController.PeerData
 import spray.routing.HttpService
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
@@ -20,7 +20,8 @@ trait PeersHttpService extends HttpService with CommonApifunctions {
         get {
           onComplete {
             (Controller.networkController ? NetworkController.GetPeers).map { peers =>
-              Json.obj("peers" -> Json.arr(peers.asInstanceOf[Set[InetSocketAddress]].map(_.getHostName))).toString()
+              Json.obj("peers" -> Json.arr(peers.asInstanceOf[Map[InetSocketAddress, PeerData]]
+                                                .map(_._1.getAddress.toString))).toString()
             }
           } {
             case Success(value) => complete(value)
