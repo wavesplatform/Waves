@@ -60,12 +60,13 @@ class PeerConnectionHandler(networkController: ActorRef,
 
       case SignaturesMessage(signaturesGot) =>
         flags.copy(sigsAwait = false)
-        val lastLocalSignature = PrunableBlockchainStorage.lastBlock.signature
-        signaturesGot.foldLeft(false) { case (found, sig) =>
-          if (found) {
-            self ! GetBlockMessage(sig)
-            found
-          } else if (sig.sameElements(lastLocalSignature)) true else false
+        val common = signaturesGot.head
+        require(PrunableBlockchainStorage.contains(common))
+
+        PrunableBlockchainStorage.removeAfter(common)
+
+        signaturesGot.tail.foreach { case sig =>
+          self ! GetBlockMessage(sig)
         }
 
       case GetBlockMessage(signature) =>
