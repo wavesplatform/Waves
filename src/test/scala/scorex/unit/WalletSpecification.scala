@@ -11,12 +11,18 @@ class WalletSpecification extends FunSuite {
 
   //todo: double creation test - check for null after reopening
 
+  test("double creation"){
+    Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", 10, wf)
+    Wallet.close()
+    Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", 10, wf)
+    assert(Wallet.privateKeyAccounts().head.address != null)
+  }
+
   test("wallet deletion") {
     val size0 = 10
     Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", 10, wf)
     assert(Wallet.privateKeyAccounts().size == size0)
 
-    println(Wallet.privateKeyAccounts().mkString(" : "))
     val head = Wallet.privateKeyAccounts().head
     assert(head != null)
     Wallet.deleteAccount(head)
@@ -24,6 +30,8 @@ class WalletSpecification extends FunSuite {
 
     Wallet.deleteAccount(Wallet.privateKeyAccounts().head)
     assert(Wallet.privateKeyAccounts().size == size0 - 2)
+
+    println(Wallet.privateKeyAccounts().mkString(" : "))
   }
 
 }
