@@ -39,8 +39,6 @@ object Start {
   def testingScript(): Unit = {
     val NumOfAccounts = 10
 
-    Random.setSeed(System.currentTimeMillis())
-
     Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", NumOfAccounts)
     Wallet.privateKeyAccounts().flatMap { acc =>
       if (Random.nextBoolean()) Some(acc) else None
@@ -55,11 +53,11 @@ object Start {
     require(Wallet.privateKeyAccounts().nonEmpty)
 
     (1 to Int.MaxValue).foreach { _ =>
-      val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size - 1)
-      val senderAddress = GenesisBlockParams.ipoMembers(rndIdx)
-      val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx + 1)
+      val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size)
+      val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx)
 
-      val senderAcc = Wallet.privateKeyAccount(senderAddress).get
+      val pkAccs = Wallet.privateKeyAccounts()
+      val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val recipientAcc = new Account(recipientAddress)
 
       val amt = new java.math.BigDecimal(Random.nextInt(100000))
