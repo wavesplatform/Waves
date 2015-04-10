@@ -67,7 +67,7 @@ object Start {
 
       val (tx, valRes) = Controller.sendPayment(senderAcc, recipientAcc, amt, fee)
       println(s"Payment created: $tx, validationResult: $valRes")
-      Thread.sleep(120000) // too short delays causes bug, see comments in PaymentTransaction
+      Thread.sleep(20000) // too short delays causes bug, see comments in PaymentTransaction
     }
   }
 }

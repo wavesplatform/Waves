@@ -26,7 +26,7 @@ object GenesisBlockParams {
 
   val genesisVersion = 1
   val genesisReference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
-  val genesisTimestamp = new DateTime(2015, 4, 6, 1, 10).getMillis
+  val genesisTimestamp = new DateTime(2015, 4, 10, 0, 10).getMillis
   val generatingBalance = 10000000
   val genesisGenerator = new PublicKeyAccount(Array[Byte](1, 1, 1, 1, 1, 1, 1, 1))
   val ipoMembers = List(

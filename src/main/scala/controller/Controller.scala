@@ -46,7 +46,7 @@ object Controller {
     Logger.getGlobal.info("Stopping message processor")
     networkController ! NetworkController.ShutdownNetwork
 
-    Logger.getGlobal.info("Stopping block generator")
+    Logger.getGlobal.info("Stopping actors (incl. block generator)")
     actorSystem.shutdown()
 
     //CLOSE WALLET
