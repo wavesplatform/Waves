@@ -10,14 +10,13 @@ import scala.collection.JavaConversions._
 import scala.util.Try
 
 
-class SecureWalletDatabase(password: String) {
+class SecureWalletDatabase(password: String, file: File = SecureWalletDatabase.SECURE_WALLET_FILE) {
 
-  import scorex.database.wallet.SecureWalletDatabase.{NONCE, SECURE_WALLET_FILE, SEED}
+  import scorex.database.wallet.SecureWalletDatabase.{NONCE, SEED}
 
-  //OPEN WALLET
-  SECURE_WALLET_FILE.getParentFile.mkdirs()
+  file.getParentFile.mkdirs()
 
-  private val database = DBMaker.newFileDB(SECURE_WALLET_FILE)
+  private val database = DBMaker.newFileDB(file)
     .encryptionEnable(password)
     .cacheSize(2048)
     .checksumEnable()
@@ -53,6 +52,7 @@ class SecureWalletDatabase(password: String) {
 
   def delete(account: PrivateKeyAccount) {
     accountsMap.remove(account.address)
+    database.commit()
   }
 
   def commit() = database.commit()
