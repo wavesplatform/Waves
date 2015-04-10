@@ -1,4 +1,4 @@
-package scorex.test
+package scorex.unit
 
 import org.scalatest.FunSuite
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}

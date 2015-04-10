@@ -1,4 +1,4 @@
-package scorex.test
+package scorex.unit
 
 import java.nio.ByteBuffer
 
