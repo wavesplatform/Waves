@@ -142,6 +142,7 @@ class YoctoBlockchainImpl extends BlockChain {
     val key = height()
     signaturesIndex -= key
     blocksIndex -= key
+    new File(filename(key)).delete()
     this
   }.ensuring(_ => signaturesIndex.size == blocksIndex.size)
 
