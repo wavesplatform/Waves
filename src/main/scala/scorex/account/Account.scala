@@ -5,7 +5,6 @@ class Account(val address: String) {
 
   override def toString = address
 
-  //EQUALS
   override def equals(b: Any) = b match {
     case a: Account => a.address == address
     case _ => false

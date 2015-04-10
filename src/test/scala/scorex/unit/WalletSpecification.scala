@@ -22,7 +22,6 @@ class WalletSpecification extends FunSuite {
     assert(Wallet.privateKeyAccounts().size == size0)
 
     val head = Wallet.privateKeyAccounts().head
-    assert(head != null)
     Wallet.deleteAccount(head)
     assert(Wallet.privateKeyAccounts().size == size0 - 1)
 
@@ -30,6 +29,10 @@ class WalletSpecification extends FunSuite {
     assert(Wallet.privateKeyAccounts().size == size0 - 2)
 
     println(Wallet.privateKeyAccounts().mkString(" : "))
+
+    Wallet.privateKeyAccounts().foreach(Wallet.deleteAccount)
+
+    assert(Wallet.privateKeyAccounts().size == 0)
   }
 
 }

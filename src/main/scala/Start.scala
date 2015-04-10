@@ -40,9 +40,7 @@ object Start {
     val NumOfAccounts = 10
 
     Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", NumOfAccounts)
-    Wallet.privateKeyAccounts().flatMap { acc =>
-      if (Random.nextBoolean()) Some(acc) else None
-    }.map(Wallet.deleteAccount)
+    Wallet.privateKeyAccounts().take(5).foreach(Wallet.deleteAccount)
     Logger.getGlobal.info("Executing testing scenario with accounts" +
       s"(${Wallet.privateKeyAccounts().size}) : "
       + Wallet.privateKeyAccounts().mkString(" "))
