@@ -69,7 +69,9 @@ class YoctoBlockchainImpl extends BlockChain {
 
   override def blockAt(height: Int): Option[Block] = blocksIndex.get(height)
 
-  override def contains(block: Block): Boolean = signaturesIndex.exists(_._2.sameElements(block.signature))
+  override def contains(block: Block): Boolean = contains(block.signature)
+
+  override def contains(signature:Array[Byte]): Boolean = signaturesIndex.exists(_._2.sameElements(signature))
 
   override def accountTransactions(account: Account): Seq[Transaction] = {
     val chainDb = compositeDb()

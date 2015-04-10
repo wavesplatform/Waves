@@ -22,6 +22,8 @@ trait BlockChain extends StateQuery {
 
   def contains(block: Block): Boolean
 
+  def contains(signature: Array[Byte]): Boolean
+
   def appendBlock(block: Block): BlockChain
 
   def discardBlock(): BlockChain

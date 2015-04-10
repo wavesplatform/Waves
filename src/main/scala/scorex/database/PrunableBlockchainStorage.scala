@@ -31,6 +31,8 @@ object PrunableBlockchainStorage extends BlockChain {
 
   override def contains(block: Block): Boolean = chainAfterSnapshot.get().contains(block)
 
+  override def contains(signature: Array[Byte]): Boolean = chainAfterSnapshot.get().contains(signature)
+
   override def balance(address: String, fromHeight: Int, confirmations: Int): BigDecimal = {
     chainAfterSnapshot.get().balance(address, fromHeight, confirmations)
   }
