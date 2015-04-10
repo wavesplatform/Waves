@@ -6,7 +6,6 @@ import controller.Controller
 import scorex.account.Account
 import scorex.block.GenesisBlockParams
 import scorex.crypto.Base58
-import scorex.database.wallet.SecureWalletDatabase
 import scorex.wallet.Wallet
 import settings.Settings
 
@@ -52,7 +51,7 @@ object Start {
 
     //require(Wallet.unlock("cookies"))
 
-    require(SecureWalletDatabase.exists())
+    require(Wallet.exists())
     require(Wallet.privateKeyAccounts().nonEmpty)
 
     (1 to Int.MaxValue).foreach { _ =>

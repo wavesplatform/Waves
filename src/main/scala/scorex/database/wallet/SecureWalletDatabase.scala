@@ -10,7 +10,7 @@ import scala.collection.JavaConversions._
 import scala.util.Try
 
 
-class SecureWalletDatabase(password: String, file: File = SecureWalletDatabase.SECURE_WALLET_FILE) {
+class SecureWalletDatabase(password: String, file: File) {
 
   import scorex.database.wallet.SecureWalletDatabase.{NONCE, SEED}
 
@@ -66,9 +66,6 @@ class SecureWalletDatabase(password: String, file: File = SecureWalletDatabase.S
 }
 
 object SecureWalletDatabase {
-  private val SECURE_WALLET_FILE = new File(Settings.walletDir, "wallet.s.dat")
   private val SEED = "seed"
   private val NONCE = "nonce"
-
-  def exists() = SECURE_WALLET_FILE.exists()
 }

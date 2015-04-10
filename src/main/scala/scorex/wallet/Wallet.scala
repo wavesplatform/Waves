@@ -6,11 +6,17 @@ import com.google.common.primitives.{Bytes, Ints}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.Crypto
 import scorex.database.wallet.SecureWalletDatabase
+import settings.Settings
 import scala.util.Try
+import java.io.File
 
 
 //todo: the Wallet object is not thread-safe at all, fix!
 object Wallet {
+  val SettingsWalletFile = new File(Settings.walletDir, "wallet.s.dat")
+
+  private var walletFile:File = SettingsWalletFile
+
   private var secureDatabaseOpt: Option[SecureWalletDatabase] = None
 
   def privateKeyAccounts() = secureDatabaseOpt match {
@@ -18,9 +24,16 @@ object Wallet {
     case Some(secureDatabase) => secureDatabase.accounts()
   }
 
-  def create(seed: Array[Byte], password: String, depth: Int): Boolean = {
+  def create(seed: Array[Byte],
+             password: String,
+             depth: Int,
+             customWalletFile:File = walletFile): Boolean = {
+
+    if(customWalletFile != walletFile) walletFile = customWalletFile
+
+
     //OPEN SECURE WALLET
-    val secureDatabase = new SecureWalletDatabase(password)
+    val secureDatabase = new SecureWalletDatabase(password, walletFile)
 
     //CREATE
     create(secureDatabase, seed, depth)
@@ -74,13 +87,10 @@ object Wallet {
   }
 
   def deleteAccount(account: PrivateKeyAccount) = {
-    //CHECK IF WALLET IS OPEN
     if (!isUnlocked) {
       false
     } else {
-      //DELETE FROM DATABASE
       secureDatabaseOpt.get.delete(account)
-      //RETURN
       true
     }
   }
@@ -92,7 +102,7 @@ object Wallet {
       false
     } else {
       Try {
-        secureDatabaseOpt = Some(new SecureWalletDatabase(password))
+        secureDatabaseOpt = Some(new SecureWalletDatabase(password, walletFile))
       }.toOption.isDefined
     }
   }
@@ -124,4 +134,6 @@ object Wallet {
   def close() {
     secureDatabaseOpt.map(_.close())
   }
+
+  def exists() = walletFile.exists()
 }
