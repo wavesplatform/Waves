@@ -2,19 +2,20 @@ package scorex.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.util.logging.Logger
-import akka.actor.{ActorRef, Props, Actor}
+
+import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
-import akka.io.{Tcp, IO}
+import akka.io.{IO, Tcp}
+import scorex.block.BlockchainController.GetMaxChainScore
+import scorex.block.{BlockchainController, NewBlock}
 import scorex.database.PrunableBlockchainStorage
-import scorex.block.{NewBlock, BlockchainController}
-import BlockchainController.GetMaxChainScore
-import scorex.network.message.Message
-import scorex.network.message._
+import scorex.network.message.{Message, _}
 import settings.Settings
+
 import scala.collection.mutable
-import scala.util.{Try, Random}
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.{Random, Try}
 
 class NetworkController extends Actor {
 
@@ -28,6 +29,7 @@ class NetworkController extends Actor {
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
 
   private def maxPeerHeight() = Try(connectedPeers.maxBy(_._2.height)._2.height).toOption.flatten
+
   private def maxHeightHandler() = Try(connectedPeers.maxBy(_._2.height)._2.handler).toOption
 
   //todo: a bit stupid workaround, consider more elegant solution for circular linking
@@ -35,17 +37,17 @@ class NetworkController extends Actor {
 
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(Settings.bindAddress), Settings.Port))
 
-  private def updateHeight(remote:InetSocketAddress, height:Int) = {
+  private def updateHeight(remote: InetSocketAddress, height: Int) = {
     val prevBestHeight = maxPeerHeight().getOrElse(0)
 
-    connectedPeers.get(remote).map{peerData =>
+    connectedPeers.get(remote).foreach { peerData =>
       connectedPeers.put(remote, peerData.copy(height = Some(height)))
       Logger.getGlobal.info(s"Height updated for $remote: $height")
     }
 
-    if(height > prevBestHeight){
-      connectedPeers.foreach{case (_, PeerData(handler, _)) =>
-          handler ! PeerConnectionHandler.BestPeer(remote, height > PrunableBlockchainStorage.height())
+    if (height > prevBestHeight) {
+      connectedPeers.foreach { case (_, PeerData(handler, _)) =>
+        handler ! PeerConnectionHandler.BestPeer(remote, height > PrunableBlockchainStorage.height())
       }
     }
   }
@@ -112,7 +114,7 @@ class NetworkController extends Actor {
       Logger.getGlobal.info("Broadcasting end")
 
     case SendMessageToBestPeer(message) =>
-      maxHeightHandler().map { handler =>
+      maxHeightHandler().foreach { handler =>
         Logger.getGlobal.info(s"Sending $message to a best peer")
         handler ! message
       }
@@ -120,11 +122,11 @@ class NetworkController extends Actor {
     case GetPeers => sender() ! connectedPeers.toMap
 
     case GetMaxChainScore =>
-      if(blockchainControllerOpt.isEmpty) blockchainControllerOpt = Some(sender())
+      if (blockchainControllerOpt.isEmpty) blockchainControllerOpt = Some(sender())
       sender() ! BlockchainController.MaxChainScore(maxPeerHeight())
 
     case NewBlock(block, Some(sndr)) =>
-      blockchainControllerOpt.map { blockchainController =>
+      blockchainControllerOpt.foreach { blockchainController =>
         blockchainController ! NewBlock(block, Some(sndr))
         val height = PrunableBlockchainStorage.height()
         self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
@@ -132,7 +134,7 @@ class NetworkController extends Actor {
 
     case UpdateHeight(remote, h) => updateHeight(remote, h)
 
-    case a:Any => Logger.getGlobal.warning(s"NetworkController: got something strange $a")
+    case a: Any => Logger.getGlobal.warning(s"NetworkController: got something strange $a")
   }
 }
 
@@ -159,6 +161,5 @@ object NetworkController {
   case class SendMessageToBestPeer(message: Message)
 
   case class BroadcastMessage(message: Message, exceptOf: List[InetSocketAddress] = List())
+
 }
-
-
