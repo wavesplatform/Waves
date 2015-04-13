@@ -1,7 +1,6 @@
-package scorex.database
+package scorex.database.blockchain
 
 import java.io.File
-
 import org.mapdb.DBMaker
 import scorex.account.Account
 import scorex.transaction.Transaction
@@ -17,7 +16,7 @@ class Snapshot(height: Int) extends StateQuery {
   private val snapshotHeight = database.getAtomicInteger("height")
   private val balancesMap = database.createHashMap("balances").makeOrGet[String, BigDecimal]()
 
-  override def balance(address: String, fromHeight: Int, confirmations: Int): BigDecimal =
+  override def balance(address: String, confirmations: Int): BigDecimal =
     Option(balancesMap.get(address)).getOrElse(BigDecimal(0))
 
   override def accountTransactions(account: Account): Seq[Transaction] = ??? //todo: implement

@@ -6,7 +6,8 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.{Base58, Crypto}
-import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
+import scorex.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
 

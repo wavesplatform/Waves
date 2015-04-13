@@ -7,7 +7,8 @@ import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
 import scorex.block.{Block, NewBlock}
-import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
+import scorex.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.NetworkController.UpdateHeight
 import scorex.network.message.{Message, _}
 import scorex.transaction.Transaction.TransactionType

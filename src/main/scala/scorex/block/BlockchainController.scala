@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.util.logging.Logger
 
 import akka.actor.{Actor, ActorRef, Props}
-import scorex.database.PrunableBlockchainStorage
+import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.NetworkController
 import scorex.network.message.{BlockMessage, GetSignaturesMessage}
 

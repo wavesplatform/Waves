@@ -7,7 +7,8 @@ import akka.io.IO
 import api.http.HttpServiceActor
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockGenerator, BlockchainController, GenesisBlock}
-import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}
+import scorex.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.NetworkController
 import scorex.network.message._
 import scorex.transaction.{Transaction, TransactionCreator}

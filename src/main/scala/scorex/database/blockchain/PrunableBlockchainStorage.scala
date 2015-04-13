@@ -1,4 +1,4 @@
-package scorex.database
+package scorex.database.blockchain
 
 import scorex.account.Account
 import scorex.block.Block
@@ -32,8 +32,8 @@ object PrunableBlockchainStorage extends BlockChain {
 
   override def contains(signature: Array[Byte]): Boolean = chainAfterSnapshot.contains(signature)
 
-  override def balance(address: String, fromHeight: Int, confirmations: Int): BigDecimal = {
-    chainAfterSnapshot.balance(address, fromHeight, confirmations)
+  override def balance(address: String, confirmations: Int): BigDecimal = {
+    chainAfterSnapshot.balance(address, confirmations)
   }
 
   override def child(block: Block): Option[Block] = chainAfterSnapshot.child(block)

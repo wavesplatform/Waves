@@ -3,7 +3,7 @@ package api.http
 import controller.Controller
 import play.api.libs.json.Json
 import scorex.block.{BlockGenerator, GenesisBlock}
-import scorex.database.PrunableBlockchainStorage
+import scorex.database.blockchain.PrunableBlockchainStorage
 import spray.routing.HttpService
 
 import scala.util.Try

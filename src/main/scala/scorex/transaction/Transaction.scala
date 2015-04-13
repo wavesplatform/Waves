@@ -3,7 +3,7 @@ package scorex.transaction
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Account
 import scorex.crypto.Base58
-import scorex.database.PrunableBlockchainStorage
+import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.Transaction._
 import settings.Settings
 

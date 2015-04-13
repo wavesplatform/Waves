@@ -1,4 +1,4 @@
-package scorex.database
+package scorex.database.blockchain
 
 import java.io.{File, FileOutputStream}
 import java.nio.ByteBuffer
@@ -111,8 +111,8 @@ class YoctoBlockchainImpl extends BlockChain {
     PreTransaction.fromBytes(ba)
   }
 
-  //todo: fromHeight & confirmations parameters ignored now
-  override def balance(address: String, fromHeight: Int, confirmations: Int): BigDecimal = {
+  //todo: confirmations parameters ignored now
+  override def balance(address: String, confirmations: Int): BigDecimal = {
     val chainDb = compositeDb()
 
     val q1 = select().where(QueryBuilder.eq("account", UnsignedByteArrays.from(address)))

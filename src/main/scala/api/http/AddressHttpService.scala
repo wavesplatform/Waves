@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.crypto.{Base58, Crypto}
-import scorex.database.PrunableBlockchainStorage
+import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.wallet.Wallet
 import spray.routing.HttpService
 
@@ -193,7 +193,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
       Json.obj(
         "address" -> address,
         "confirmations" -> confirmations,
-        "balance" -> PrunableBlockchainStorage.balance(address, 0, confirmations)
+        "balance" -> PrunableBlockchainStorage.balance(address, confirmations)
       )
     }
 }

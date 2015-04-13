@@ -4,7 +4,7 @@ import akka.actor.Actor
 import ntp.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.Crypto
-import scorex.database.PrunableBlockchainStorage
+import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.wallet.Wallet
 
 import scala.collection.JavaConversions._

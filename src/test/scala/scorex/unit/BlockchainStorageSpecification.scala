@@ -2,7 +2,7 @@ package scorex.unit
 
 import org.scalatest.FunSuite
 import scorex.block.GenesisBlock
-import scorex.database.PrunableBlockchainStorage
+import scorex.database.blockchain.PrunableBlockchainStorage
 
 class BlockchainStorageSpecification extends FunSuite {
 

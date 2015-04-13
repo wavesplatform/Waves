@@ -1,4 +1,4 @@
-package scorex.database
+package scorex.database.blockchain
 
 import scorex.account.Account
 import scorex.block.Block

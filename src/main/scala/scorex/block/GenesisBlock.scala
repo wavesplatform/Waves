@@ -6,7 +6,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import org.joda.time.DateTime
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.Crypto
-import scorex.database.PrunableBlockchainStorage
+import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.Transaction.ValidationResult
 
@@ -19,14 +19,13 @@ object GenesisBlockParams {
     val generatorBytes = Bytes.ensureCapacity(genesisGenerator.publicKey, 32, 0)
 
     val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
-    //DIGEST
     val digest = Crypto.sha256(data)
     Bytes.concat(digest, digest)
   }.ensuring(sig => sig.size == Block.GENERATOR_SIGNATURE_LENGTH)
 
   val genesisVersion = 1
   val genesisReference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
-  val genesisTimestamp = new DateTime(2015, 4, 10, 0, 10).getMillis
+  val genesisTimestamp = new DateTime(2015, 4, 13, 10, 35).getMillis
   val generatingBalance = 10000000
   val genesisGenerator = new PublicKeyAccount(Array[Byte](1, 1, 1, 1, 1, 1, 1, 1))
   val ipoMembers = List(

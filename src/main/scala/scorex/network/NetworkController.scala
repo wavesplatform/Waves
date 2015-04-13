@@ -8,7 +8,7 @@ import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import scorex.block.BlockchainController.GetMaxChainScore
 import scorex.block.{BlockchainController, NewBlock}
-import scorex.database.PrunableBlockchainStorage
+import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.message.{Message, _}
 import settings.Settings
 
