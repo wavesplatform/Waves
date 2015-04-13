@@ -256,8 +256,8 @@ object Block {
     val baseTargetBytes = Longs.toByteArray(BlockGenerator.getNextBlockGeneratingBalance(solvingBlock)).ensuring(_.size == Block.GENERATING_BALANCE_LENGTH)
 
     //CALC SIGNATURE OF NEWBLOCKHEADER
-    require(generatorSignature.size == Block.GENERATOR_SIGNATURE_LENGTH)
-    require(account.publicKey.size == Block.GENERATOR_LENGTH)
+    require(generatorSignature.length == Block.GENERATOR_SIGNATURE_LENGTH)
+    require(account.publicKey.length == Block.GENERATOR_LENGTH)
     Crypto.sign(account, Bytes.concat(generatorSignature, baseTargetBytes, account.publicKey))
   }
 }

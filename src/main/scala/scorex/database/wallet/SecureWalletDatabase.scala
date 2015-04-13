@@ -7,6 +7,7 @@ import scorex.account.PrivateKeyAccount
 import settings.Settings
 
 import scala.collection.JavaConversions._
+import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
 
@@ -14,29 +15,36 @@ class SecureWalletDatabase(password: String, file: File) {
 
   import scorex.database.wallet.SecureWalletDatabase.{NONCE, SEED}
 
-  file.getParentFile.mkdirs()
+  //create parent folders then check their existence
+  file.getParentFile.mkdirs().ensuring(file.getParentFile.exists())
 
-  private val database = DBMaker.newFileDB(file)
+  private lazy val database = DBMaker.newFileDB(file)
     .encryptionEnable(password)
     .cacheSize(2048)
     .checksumEnable()
     .mmapFileEnableIfSupported()
     .make()
 
-  private val accountsMap = database.createHashMap("accounts").makeOrGet[String, PrivateKeyAccount]()
+  private lazy val accountsPersistence = database.createHashSet("accounts").makeOrGet[Array[Byte]]()
+
+  private lazy val accountsCache:TrieMap[String, PrivateKeyAccount] = {
+    val accs = accountsPersistence.map(seed => new PrivateKeyAccount(seed))
+    TrieMap(accs.map(acc => acc.address -> acc).toSeq :_*)
+  }
 
   def addAccount(account: PrivateKeyAccount) = {
     val address = account.address
-    if (!accountsMap.containsKey(address)) {
-      accountsMap.put(address, account)
+    if (!accountsCache.containsKey(address)) {
+      accountsCache += account.address -> account
+      accountsPersistence.add(account.seed)
       database.commit()
       true
     } else false
   }
 
-  def accounts() = accountsMap.values().toSeq
+  def accounts() = accountsCache.values.toSeq
 
-  def account(address: String) = Option(accountsMap.get(address))
+  def account(address: String) = Option(accountsCache.get(address))
 
   def setSeed(seed: Array[Byte]): Unit = {
     Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY)).getOrElse(database.getAtomicVar(SEED).set(seed))
@@ -51,8 +59,9 @@ class SecureWalletDatabase(password: String, file: File) {
   def getAndIncrementNonce(): Int = database.getAtomicInteger(NONCE).getAndIncrement()
 
   def delete(account: PrivateKeyAccount) {
-    accountsMap.remove(account.address)
+    accountsPersistence.remove(account.seed)
     database.commit()
+    accountsCache -= account.address
   }
 
   def commit() = database.commit()
@@ -61,6 +70,7 @@ class SecureWalletDatabase(password: String, file: File) {
     if (!database.isClosed) {
       database.commit()
       database.close()
+      accountsCache.clear()
     }
   }
 }

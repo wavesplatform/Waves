@@ -13,7 +13,7 @@ import java.io.File
 
 //todo: the Wallet object is not thread-safe at all, fix!
 object Wallet {
-  val SettingsWalletFile = new File(Settings.walletDir, "wallet.s.dat")
+  private val SettingsWalletFile = new File(Settings.walletDir, "wallet.s.dat")
 
   private var walletFile:File = SettingsWalletFile
 
@@ -109,9 +109,6 @@ object Wallet {
     secureDatabaseOpt = None
     secureDatabaseOpt
   }.isDefined
-
-
-  //IMPORT/EXPORT
 
   def importAccountSeed(accountSeed: Array[Byte]): Option[String] = secureDatabaseOpt.flatMap { db =>
     if (accountSeed.length != 32) {
