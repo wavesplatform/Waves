@@ -9,6 +9,7 @@ import scorex.wallet.Wallet
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
+import scala.util.Random
 
 
 class BlockGenerator extends Actor {
@@ -31,15 +32,16 @@ class BlockGenerator extends Actor {
         }
       }
 
-      blocks.exists { case (account, blockStub) =>
-        if (blockStub.timestamp <= NTP.getTime) {
-          val block = Block(blockStub, account)
-          if (block.transactions.nonEmpty) {
-            println("Non-empty block: " + block)
-          }
-          blockchainController ! NewBlock(block, None)
-          true
-        } else false
+      val generators = blocks.keys.toIndexedSeq
+      val randomGen = generators(Random.nextInt(generators.size))
+      val blockStub = blocks(randomGen)
+
+      if (blockStub.timestamp <= NTP.getTime) {
+        val block = Block(blockStub, randomGen)
+        if (block.transactions.nonEmpty) {
+          println("Non-empty block: " + block)
+        }
+        blockchainController ! NewBlock(block, None)
       }
   }
 }
@@ -54,7 +56,7 @@ object BlockGenerator {
 
   case object TryToGenerateBlock
 
-  def getNextBlockGeneratingBalance(block: Block) = {
+  def getNextBlockGeneratingBalance(block: Block): Long = {
     if (block.height().get % RETARGET == 0) {
       //GET FIRST BLOCK OF TARGET
       val firstBlock = (1 to RETARGET - 1).foldLeft(block) { case (bl, _) => bl.parent().get }
@@ -74,9 +76,9 @@ object BlockGenerator {
     } else block.generatingBalance
   }
 
-  def getBaseTarget(generatingBalance: Long) = minMaxBalance(generatingBalance) * getBlockTime(generatingBalance)
+  def getBaseTarget(generatingBalance: Long): Long = minMaxBalance(generatingBalance) * getBlockTime(generatingBalance)
 
-  def getBlockTime(generatingBalance: Long) = {
+  def getBlockTime(generatingBalance: Long): Long = {
     val percentageOfTotal = minMaxBalance(generatingBalance) / MAX_BALANCE.toDouble
     (MIN_BLOCK_TIME + ((MAX_BLOCK_TIME - MIN_BLOCK_TIME) * (1 - percentageOfTotal))).toLong
   }
