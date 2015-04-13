@@ -128,8 +128,9 @@ object Wallet {
 
   def exportSeed(): Option[Array[Byte]] = secureDatabaseOpt.map(_.seed())
 
-  def close() {
+  def close() = this.synchronized {
     secureDatabaseOpt.foreach(_.close())
+    secureDatabaseOpt = None
   }
 
   def exists() = walletFile.exists()

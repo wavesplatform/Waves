@@ -50,18 +50,13 @@ abstract class Transaction(val transactionType: TransactionType.Value,
     case _ => false
   }
 
-  def isConfirmed(): Boolean = PrunableBlockchainStorage.confirmations(this).isDefined
-
   protected def getJsonBase() = {
     Json.obj("type" -> transactionType.id,
       "fee" -> fee,
       "timestamp" -> timestamp,
-      "signature" -> Base58.encode(this.signature),
-      "confirmations" -> getConfirmations()
+      "signature" -> Base58.encode(this.signature)
     )
   }
-
-  def getConfirmations() = PrunableBlockchainStorage.confirmations(this)
 }
 
 object Transaction {
