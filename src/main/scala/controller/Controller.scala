@@ -59,10 +59,7 @@ object Controller {
 
   //FORGE
   def onTransactionCreate(transaction: Transaction) {
-    //ADD TO UNCONFIRMED TRANSACTIONS
     UnconfirmedTransactionsDatabaseImpl.put(transaction)
-
-    //BROADCAST
     networkController ! NetworkController.BroadcastMessage(TransactionMessage(transaction))
   }
 
