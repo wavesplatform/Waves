@@ -132,15 +132,9 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long, generati
     }
   }
 
-  def process() {
-    transactions.foreach { transaction =>
-      UnconfirmedTransactionsDatabaseImpl.remove(transaction)
-    }
-  }
+  def process() = transactions.foreach(UnconfirmedTransactionsDatabaseImpl.remove)
 
-  def rollback() {
-    transactions.foreach(UnconfirmedTransactionsDatabaseImpl.put)
-  }
+  def rollback() = transactions.foreach(UnconfirmedTransactionsDatabaseImpl.put)
 }
 
 
