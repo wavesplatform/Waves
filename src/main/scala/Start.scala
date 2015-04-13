@@ -28,7 +28,7 @@ object Start {
         case _ =>
       }
     } else {
-      println("Welcome to the client...")
+      println("Welcome to the Score command-line client...")
       Iterator.continually(StdIn.readLine()).takeWhile(!_.equals("quit")).foreach { command =>
         println(s"[$command RESULT] " + ApiClient.executeCommand(command))
       }
@@ -40,7 +40,7 @@ object Start {
     val NumOfAccounts = 10
 
     Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", NumOfAccounts)
-    Wallet.privateKeyAccounts().take(5).foreach(Wallet.deleteAccount)
+    Wallet.privateKeyAccounts().takeRight(5).foreach(Wallet.deleteAccount)
     Logger.getGlobal.info("Executing testing scenario with accounts" +
       s"(${Wallet.privateKeyAccounts().size}) : "
       + Wallet.privateKeyAccounts().mkString(" "))

@@ -152,8 +152,6 @@ object NetworkController {
 
   case class PeerData(handler: ActorRef, height: Option[Int])
 
-  //todo: add ping value?
-
   case class PeerDisconnected(address: InetSocketAddress)
 
   case class UpdateHeight(remote: InetSocketAddress, height: Int)

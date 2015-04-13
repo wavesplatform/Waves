@@ -82,7 +82,6 @@ object Message {
       if (!checksum.sameElements(digest)) throw new Exception("Invalid data checksum length=" + length)
     }
 
-    //todo: id for all?
     msgType match {
       case Message.PING_TYPE => PingMessage
       case Message.GET_PEERS_TYPE => GetPeersMessage

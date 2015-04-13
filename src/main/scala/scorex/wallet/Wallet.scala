@@ -31,11 +31,8 @@ object Wallet {
 
     if(customWalletFile != walletFile) walletFile = customWalletFile
 
-
-    //OPEN SECURE WALLET
     val secureDatabase = new SecureWalletDatabase(password, walletFile)
 
-    //CREATE
     create(secureDatabase, seed, depth)
   }
 
@@ -52,9 +49,7 @@ object Wallet {
     //CREATE ACCOUNTS
     (1 to depth).foreach(_ => generateNewAccount())
 
-    //COMMIT
     commit()
-
     true
   }
 
@@ -103,6 +98,7 @@ object Wallet {
     } else {
       Try {
         secureDatabaseOpt = Some(new SecureWalletDatabase(password, walletFile))
+        secureDatabaseOpt
       }.toOption.isDefined
     }
   }
@@ -111,6 +107,7 @@ object Wallet {
     db.commit()
     db.close()
     secureDatabaseOpt = None
+    secureDatabaseOpt
   }.isDefined
 
 
@@ -132,7 +129,7 @@ object Wallet {
   def exportSeed(): Option[Array[Byte]] = secureDatabaseOpt.map(_.seed())
 
   def close() {
-    secureDatabaseOpt.map(_.close())
+    secureDatabaseOpt.foreach(_.close())
   }
 
   def exists() = walletFile.exists()

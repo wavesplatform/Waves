@@ -92,18 +92,13 @@ object Transaction {
     val PAYMENT_TRANSACTION = Value(2)
   }
 
-  def fromBytes(data: Array[Byte]): Transaction = {
-    val txType = data.head
+  def fromBytes(data: Array[Byte]): Transaction = data.head match {
+    case txType: Byte if txType == TransactionType.GENESIS_TRANSACTION.id =>
+      GenesisTransaction.Parse(data.tail)
 
-    txType match {
+    case txType: Byte if txType == TransactionType.PAYMENT_TRANSACTION.id =>
+      PaymentTransaction.Parse(data.tail)
 
-      case i: Byte if i == TransactionType.GENESIS_TRANSACTION.id =>
-        GenesisTransaction.Parse(data.tail)
-
-      case i: Byte if i == TransactionType.PAYMENT_TRANSACTION.id =>
-        PaymentTransaction.Parse(data.tail)
-
-      case _ => throw new Exception(s"Invalid transaction type: $txType")
-    }
+    case txType => throw new Exception(s"Invalid transaction type: $txType")
   }
 }
