@@ -1,4 +1,4 @@
-package api
+package api.http
 
 import java.nio.charset.StandardCharsets
 

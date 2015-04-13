@@ -1,4 +1,4 @@
-package api
+package api.http
 
 import play.api.libs.json.Json
 import scorex.crypto.Base58

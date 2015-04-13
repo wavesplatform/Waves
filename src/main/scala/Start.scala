@@ -1,7 +1,7 @@
 package scorex
 
 import java.util.logging.Logger
-import api.ApiClient
+import api.http.ApiClient
 import controller.Controller
 import scorex.account.Account
 import scorex.block.GenesisBlockParams

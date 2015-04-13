@@ -44,7 +44,7 @@ class SecureWalletDatabase(password: String, file: File) {
 
   def accounts() = accountsCache.values.toSeq
 
-  def account(address: String) = Option(accountsCache.get(address))
+  def account(address: String) = accountsCache.get(address)
 
   def setSeed(seed: Array[Byte]): Unit = {
     Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY)).getOrElse(database.getAtomicVar(SEED).set(seed))

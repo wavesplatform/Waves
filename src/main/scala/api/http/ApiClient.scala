@@ -1,4 +1,4 @@
-package api
+package api.http
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.net.{HttpURLConnection, URL}

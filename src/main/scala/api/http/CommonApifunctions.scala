@@ -1,4 +1,4 @@
-package api
+package api.http
 
 import akka.util.Timeout
 import play.api.libs.json.{JsObject, JsValue}

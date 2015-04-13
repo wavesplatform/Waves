@@ -4,7 +4,7 @@ import java.util.logging.Logger
 
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
-import api.HttpServiceActor
+import api.http.HttpServiceActor
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockGenerator, BlockchainController, GenesisBlock}
 import scorex.database.{PrunableBlockchainStorage, UnconfirmedTransactionsDatabaseImpl}

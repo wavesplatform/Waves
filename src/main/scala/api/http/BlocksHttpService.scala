@@ -1,4 +1,4 @@
-package api
+package api.http
 
 import controller.Controller
 import play.api.libs.json.Json

@@ -1,4 +1,4 @@
-package api
+package api.http
 
 import akka.pattern.ask
 import controller.Controller
