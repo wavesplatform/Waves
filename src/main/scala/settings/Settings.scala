@@ -7,10 +7,12 @@ import play.api.libs.json.Json
 
 import scala.util.Try
 
+/*
+ Changeable settings here
+ */
+
 object Settings {
   def logger = LoggerFactory.getLogger(this.getClass)
-
-  val Release = "Lagonaki Release v. 0.9"
 
   var filename = "settings.json"
 
