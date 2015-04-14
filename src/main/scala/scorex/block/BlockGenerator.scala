@@ -7,7 +7,6 @@ import scorex.crypto.Crypto
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.wallet.Wallet
 
-import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.util.Random
 
@@ -20,27 +19,19 @@ class BlockGenerator extends Actor {
     case TryToGenerateBlock =>
       val blockchainController = sender()
 
-      val blocks = TrieMap[PrivateKeyAccount, BlockStub]()
-
-      Wallet.privateKeyAccounts().foreach { account =>
+      val blockStubs = Wallet.privateKeyAccounts().foldLeft(TrieMap[PrivateKeyAccount, BlockStub]()) { case (bm, account) =>
         if (account.generatingBalance >= BigDecimal(1)) {
-          //CHECK IF BLOCK FROM USER ALREADY EXISTS USE MAP ACCOUNT BLOCK EASY
-          if (!blocks.containsKey(account)) {
-            //GENERATE NEW BLOCK FOR USER
-            blocks += account -> generateNextBlock(account, PrunableBlockchainStorage.lastBlock)
-          }
+          bm += account -> generateNextBlock(account, PrunableBlockchainStorage.lastBlock)
         }
+        bm
       }
 
-      val generators = blocks.keys.toIndexedSeq
+      val generators = blockStubs.keys.toIndexedSeq
       val randomGen = generators(Random.nextInt(generators.size))
-      val blockStub = blocks(randomGen)
+      val blockStub = blockStubs(randomGen)
 
       if (blockStub.timestamp <= NTP.getTime) {
         val block = Block(blockStub, randomGen)
-        if (block.transactions.nonEmpty) {
-          println("Non-empty block: " + block)
-        }
         blockchainController ! NewBlock(block, None)
       }
   }
