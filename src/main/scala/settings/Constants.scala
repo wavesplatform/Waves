@@ -1,10 +1,14 @@
 package settings
 
+import scorex.consensus.qora.QoraBlockGenerationData
+
 /*
   System constants here.
  */
 
 object Constants {
+  type ConsensusInjectedBlockPart = QoraBlockGenerationData
+  
   val Product = "Scorex"
   val Release = "Lagonaki"
   val Version = (0,0,2)

@@ -6,10 +6,6 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.{BlockStub, Block}
 import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.Crypto
-import scorex.database.blockchain.PrunableBlockchainStorage
-import scorex.wallet.Wallet
-import scala.collection.concurrent.TrieMap
-import scala.util.Random
 
 
 object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
@@ -18,21 +14,6 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
     private val MAX_BALANCE = 10000000000L
     private val MIN_BLOCK_TIME = 1 * 60
     private val MAX_BLOCK_TIME = 5 * 60
-
-    def generateBlock(): Option[Block] = {
-      val blockStubs = Wallet.privateKeyAccounts().foldLeft(TrieMap[PrivateKeyAccount, BlockStub]()) { case (bm, account) =>
-        if (account.generatingBalance >= BigDecimal(1)) {
-          bm += account -> generateNextBlock(account, PrunableBlockchainStorage.lastBlock)
-        }
-        bm
-      }
-
-      val generators = blockStubs.keys.toIndexedSeq
-      val randomGen = generators(Random.nextInt(generators.size))
-      val blockStub = blockStubs(randomGen)
-
-      if (blockStub.timestamp <= NTP.getTime) Some(Block(blockStub, randomGen)) else None
-    }
 
     def getNextBlockGeneratingBalance(block: Block): Long = {
       if (block.height().get % RETARGET == 0) {
@@ -71,7 +52,7 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
       Crypto.sign(account, Bytes.concat(generatorSignature, genBalanceBytes, account.publicKey))
     }
 
-    private def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block) = {
+    override protected def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block):Option[BlockStub] = {
       require(account.generatingBalance > BigDecimal(0), "Zero generating balance in generateNextBlock")
 
       val signature = calculateSignature(lastBlock, account)
@@ -93,8 +74,10 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
       //CHECK IF NOT HIGHER THAN MAX LONG VALUE
       val timestamp = if (timestampRaw > Long.MaxValue) Long.MaxValue else timestampRaw.longValue()
 
-      BlockStub(Block.Version, lastBlock.signature, timestamp, account,
-        new QoraBlockGenerationData(getNextBlockGeneratingBalance(lastBlock),  signature))
+      if (timestamp <= NTP.getTime) {
+        Some(BlockStub(Block.Version, lastBlock.signature, timestamp, account,
+          new QoraBlockGenerationData(getNextBlockGeneratingBalance(lastBlock),  signature)))
+      } else None
     }
 
     private def minMaxBalance(generatingBalance: Long) =

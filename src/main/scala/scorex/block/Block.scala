@@ -10,15 +10,16 @@ import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
+import settings.Constants
 import scala.util.Try
 
 case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long,
-                     generator: PublicKeyAccount, generationData: QoraBlockGenerationData) {
+                     generator: PublicKeyAccount, generationData: Constants.ConsensusInjectedBlockPart) {
   require(reference.length == Block.REFERENCE_LENGTH)
 }
 
 case class Block(version: Int, reference: Array[Byte], timestamp: Long,
-                 generator: PublicKeyAccount, generationData: QoraBlockGenerationData,
+                 generator: PublicKeyAccount, generationData: Constants.ConsensusInjectedBlockPart,
                  transactions: List[Transaction], transactionsSignature: Array[Byte]) {
 
   import scorex.block.Block._
