@@ -5,30 +5,33 @@ import java.util
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.Json
 import scorex.block.{Block, GenesisBlockParams}
+import scorex.consensus.BlockGenerationData
 import scorex.crypto.{Crypto, Base58}
 import scorex.database.blockchain.PrunableBlockchainStorage
 
 
-class QoraBlockGenerationData(val generatingBalance: Long,
-                          val generatorSignature: Array[Byte]) {
+class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignature: Array[Byte])
+  extends BlockGenerationData {
+
   import QoraBlockGenerationData._
+
   require(generatingBalance > 0)
 
-  def toBytes: Array[Byte] = Bytes.concat(
+  override def toBytes: Array[Byte] = Bytes.concat(
     Longs.toByteArray(generatingBalance),
     generatorSignature
   ).ensuring(_.length == GENERATION_DATA_LENGTH)
 
-  def toJson = Json.obj(
+  override def toJson = Json.obj(
     "generatingBalance" -> generatingBalance,
     "generatorSignature" -> Base58.encode(generatorSignature)
   )
 
-  def signature() = generatorSignature
+  override def signature() = generatorSignature
 
-  def isGenesis = GenesisBlockParams.generatorSignature.sameElements(generatorSignature)
+  override def isGenesis = GenesisBlockParams.generatorSignature.sameElements(generatorSignature)
 
-  def isValid(block: Block): Boolean = {
+  override def isValid(block: Block): Boolean = {
     if (generatingBalance != QoraBlockGenerationFunctions.getNextBlockGeneratingBalance(block.parent().get)) {
       //CHECK IF GENERATING BALANCE IS CORRECT
       false
@@ -57,7 +60,7 @@ class QoraBlockGenerationData(val generatingBalance: Long,
     }
   }
 
-  def isSignatureValid(block:Block):Boolean = {
+  override def isSignatureValid(block:Block):Boolean = {
     val generatingBalanceBytes = Longs.toByteArray(generatingBalance).ensuring(_.size == GENERATING_BALANCE_LENGTH)
 
     val blockSignature = Bytes.concat(util.Arrays.copyOfRange(block.reference, 0, GENERATOR_SIGNATURE_LENGTH),

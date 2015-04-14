@@ -4,6 +4,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import ntp.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.block.{BlockStub, Block}
+import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.Crypto
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.wallet.Wallet
@@ -11,12 +12,12 @@ import scala.collection.concurrent.TrieMap
 import scala.util.Random
 
 
-object QoraBlockGenerationFunctions {
-    val RETARGET = 10
-    val MIN_BALANCE = 1L
-    val MAX_BALANCE = 10000000000L
-    val MIN_BLOCK_TIME = 1 * 60
-    val MAX_BLOCK_TIME = 5 * 60
+object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
+    private val RETARGET = 10
+    private val MIN_BALANCE = 1L
+    private val MAX_BALANCE = 10000000000L
+    private val MIN_BLOCK_TIME = 1 * 60
+    private val MAX_BLOCK_TIME = 5 * 60
 
     def generateBlock(): Option[Block] = {
       val blockStubs = Wallet.privateKeyAccounts().foldLeft(TrieMap[PrivateKeyAccount, BlockStub]()) { case (bm, account) =>
