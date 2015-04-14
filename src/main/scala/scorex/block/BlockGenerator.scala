@@ -1,6 +1,7 @@
 package scorex.block
 
 import akka.actor.Actor
+import com.google.common.primitives.{Bytes, Longs}
 import ntp.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.Crypto
@@ -19,19 +20,7 @@ class BlockGenerator extends Actor {
     case TryToGenerateBlock =>
       val blockchainController = sender()
 
-      val blockStubs = Wallet.privateKeyAccounts().foldLeft(TrieMap[PrivateKeyAccount, BlockStub]()) { case (bm, account) =>
-        if (account.generatingBalance >= BigDecimal(1)) {
-          bm += account -> generateNextBlock(account, PrunableBlockchainStorage.lastBlock)
-        }
-        bm
-      }
-
-      val generators = blockStubs.keys.toIndexedSeq
-      val randomGen = generators(Random.nextInt(generators.size))
-      val blockStub = blockStubs(randomGen)
-
-      if (blockStub.timestamp <= NTP.getTime) {
-        val block = Block(blockStub, randomGen)
+      BlockGenerator.generateBlock().foreach { block =>
         blockchainController ! NewBlock(block, None)
       }
   }
@@ -47,6 +36,21 @@ object BlockGenerator {
 
   case object TryToGenerateBlock
 
+  def generateBlock(): Option[Block] = {
+    val blockStubs = Wallet.privateKeyAccounts().foldLeft(TrieMap[PrivateKeyAccount, BlockStub]()) { case (bm, account) =>
+      if (account.generatingBalance >= BigDecimal(1)) {
+        bm += account -> generateNextBlock(account, PrunableBlockchainStorage.lastBlock)
+      }
+      bm
+    }
+
+    val generators = blockStubs.keys.toIndexedSeq
+    val randomGen = generators(Random.nextInt(generators.size))
+    val blockStub = blockStubs(randomGen)
+
+    if (blockStub.timestamp <= NTP.getTime) Some(Block(blockStub, randomGen)) else None
+  }
+
   def getNextBlockGeneratingBalance(block: Block): Long = {
     if (block.height().get % RETARGET == 0) {
       //GET FIRST BLOCK OF TARGET
@@ -56,15 +60,15 @@ object BlockGenerator {
       val generatingTime = block.timestamp - firstBlock.timestamp
 
       //CALCULATE EXPECTED FORGING TIME
-      val expectedGeneratingTime = getBlockTime(block.generatingBalance) * RETARGET * 1000
+      val expectedGeneratingTime = getBlockTime(block.generationData.generatingBalance) * RETARGET * 1000
 
       //CALCULATE MULTIPLIER
       val multiplier = expectedGeneratingTime / generatingTime.toDouble
 
       //CALCULATE NEW GENERATING BALANCE
-      val generatingBalance = (block.generatingBalance * multiplier).toLong
+      val generatingBalance = (block.generationData.generatingBalance * multiplier).toLong
       minMaxBalance(generatingBalance)
-    } else block.generatingBalance
+    } else block.generationData.generatingBalance
   }
 
   def getBaseTarget(generatingBalance: Long): Long = minMaxBalance(generatingBalance) * getBlockTime(generatingBalance)
@@ -74,10 +78,20 @@ object BlockGenerator {
     (MIN_BLOCK_TIME + ((MAX_BLOCK_TIME - MIN_BLOCK_TIME) * (1 - percentageOfTotal))).toLong
   }
 
+  private def calculateSignature(solvingBlock: Block, account: PrivateKeyAccount) = {
+    //PARENT GENERATOR SIGNATURE
+    val generatorSignature = solvingBlock.generationData.generatorSignature
+
+    val genBalanceBytes = Longs.toByteArray(BlockGenerator.getNextBlockGeneratingBalance(solvingBlock))
+
+    require(account.publicKey.length == Block.GENERATOR_LENGTH)
+    Crypto.sign(account, Bytes.concat(generatorSignature, genBalanceBytes, account.publicKey))
+  }
+
   private[BlockGenerator] def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block) = {
     require(account.generatingBalance > BigDecimal(0), "Zero generating balance in generateNextBlock")
 
-    val signature = Block.calculateSignature(lastBlock, account)
+    val signature = calculateSignature(lastBlock, account)
     val hash = Crypto.sha256(signature)
     val hashValue = BigInt(1, hash)
 
@@ -96,7 +110,8 @@ object BlockGenerator {
     //CHECK IF NOT HIGHER THAN MAX LONG VALUE
     val timestamp = if (timestampRaw > Long.MaxValue) Long.MaxValue else timestampRaw.longValue()
 
-    BlockStub(Block.Version, lastBlock.signature, timestamp, getNextBlockGeneratingBalance(lastBlock), account, signature)
+    BlockStub(Block.Version, lastBlock.signature, timestamp, account,
+      new BlockGenerationData(getNextBlockGeneratingBalance(lastBlock),  signature))
   }
 
   private def minMaxBalance(generatingBalance: Long) =

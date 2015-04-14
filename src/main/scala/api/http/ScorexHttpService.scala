@@ -4,7 +4,7 @@ import akka.pattern.ask
 import controller.Controller
 import play.api.libs.json.Json
 import scorex.block.BlockchainController
-import settings.Settings
+import settings.{Constants, Settings}
 import spray.routing.HttpService
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -33,7 +33,7 @@ trait ScorexHttpService extends HttpService with CommonApifunctions {
           }
         }
       } ~ path("version") {
-        get(complete(Json.obj("version" -> Settings.Release).toString()))
+        get(complete(Json.obj("version" -> Constants.AgentName).toString()))
       }
     }
 }

@@ -41,7 +41,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         get {
           complete {
             val block = PrunableBlockchainStorage.lastBlock
-            val timePerBlock = BlockGenerator.getBlockTime(block.generatingBalance)
+            val timePerBlock = BlockGenerator.getBlockTime(block.generationData.generatingBalance)
             Json.obj("time" -> timePerBlock).toString()
           }
         }
@@ -65,7 +65,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
       } ~ path("generatingbalance" / Segment) { case encodedSignature =>
         get {
           complete(withBlock(encodedSignature) { block =>
-            Json.obj("generatingbalance" -> block.generatingBalance)
+            Json.obj("generatingbalance" -> block.generationData.generatingBalance)
           }.toString())
         }
       } ~ path("child" / Segment) { case encodedSignature =>

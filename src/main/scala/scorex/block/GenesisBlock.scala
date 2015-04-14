@@ -21,7 +21,7 @@ object GenesisBlockParams {
     val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
     val digest = Crypto.sha256(data)
     Bytes.concat(digest, digest)
-  }.ensuring(sig => sig.size == Block.GENERATOR_SIGNATURE_LENGTH)
+  }.ensuring(sig => sig.size == BlockGenerationData.GENERATOR_SIGNATURE_LENGTH)
 
   val genesisVersion = 1
   val genesisReference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
@@ -49,27 +49,24 @@ object GenesisBlockParams {
 object GenesisBlock extends Block(version = GenesisBlockParams.genesisVersion,
   reference = GenesisBlockParams.genesisReference,
   timestamp = GenesisBlockParams.genesisTimestamp,
-  generatingBalance = GenesisBlockParams.generatingBalance,
   generator = GenesisBlockParams.genesisGenerator,
-  generatorSignature = GenesisBlockParams.generatorSignature,
+  new BlockGenerationData(GenesisBlockParams.generatingBalance, GenesisBlockParams.generatorSignature),
   transactions = GenesisBlockParams.genesisTransactions,
   transactionsSignature = GenesisBlockParams.generatorSignature) {
 
   override def parent() = None
 
-  //SIGNATURE
-
   override def isSignatureValid() = {
     val versionBytes = Bytes.ensureCapacity(Longs.toByteArray(version), 4, 0)
     val referenceBytes = Bytes.ensureCapacity(reference, 64, 0)
-    val generatingBalanceBytes = Bytes.ensureCapacity(Longs.toByteArray(generatingBalance), 8, 0)
+    val generatingBalanceBytes = Bytes.ensureCapacity(Longs.toByteArray(generationData.generatingBalance), 8, 0)
     val generatorBytes = Bytes.ensureCapacity(generator.publicKey, 32, 0)
 
     val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
     val digest0 = Crypto.sha256(data)
     val digest = Bytes.concat(digest0, digest0)
 
-    digest.sameElements(generatorSignature) && digest.sameElements(transactionsSignature)
+    digest.sameElements(generationData.generatorSignature) && digest.sameElements(transactionsSignature)
   }
 
   override def isValid() =
