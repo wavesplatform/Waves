@@ -7,6 +7,7 @@ import akka.io.IO
 import api.http.HttpServiceActor
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockGenerator, BlockchainController, GenesisBlock}
+import scorex.consensus.qora.QoraBlockGenerationFunctions
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.NetworkController
@@ -71,5 +72,5 @@ object Controller {
       TransactionCreator.createPayment(sender, recipient, amount, fee)
     }
 
-  def nextBlockGeneratingBalance() = BlockGenerator.getNextBlockGeneratingBalance(PrunableBlockchainStorage.lastBlock)
+  def nextBlockGeneratingBalance() = QoraBlockGenerationFunctions.getNextBlockGeneratingBalance(PrunableBlockchainStorage.lastBlock)
 }

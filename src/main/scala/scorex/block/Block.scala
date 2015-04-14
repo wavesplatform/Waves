@@ -1,96 +1,24 @@
 package scorex.block
 
 import java.util.Arrays
-
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.consensus.qora.{QoraBlockGenerationData}
 import scorex.crypto.{Base58, Crypto}
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
-
 import scala.util.Try
 
-class BlockGenerationData(val generatingBalance: Long,
-                          val generatorSignature: Array[Byte]) {
-  import BlockGenerationData._
-  require(generatingBalance > 0)
-
-  def toBytes: Array[Byte] = Bytes.concat(
-    Longs.toByteArray(generatingBalance),
-    generatorSignature
-  ).ensuring(_.length == GENERATION_DATA_LENGTH)
-
-  def toJson = Json.obj(
-    "generatingBalance" -> generatingBalance,
-    "generatorSignature" -> Base58.encode(generatorSignature)
-  )
-
-  def signature() = generatorSignature
-
-  def isGenesis = GenesisBlockParams.generatorSignature.sameElements(generatorSignature)
-
-  def isBlockValidAgainstGenerationData(block: Block): Boolean = {
-    if (generatingBalance != BlockGenerator.getNextBlockGeneratingBalance(block.parent().get)) {
-      //CHECK IF GENERATING BALANCE IS CORRECT
-      false
-    } else {
-      //CREATE TARGET
-      val targetBytes = Array.fill(32)(Byte.MaxValue)
-
-      //DIVIDE TARGET BY BASE TARGET
-      val baseTarget = BigInt(BlockGenerator.getBaseTarget(generatingBalance))
-      val genBalance = PrunableBlockchainStorage.generationBalance(block.generator.address).toBigInt()
-      val target0 = BigInt(1, targetBytes) / baseTarget * genBalance
-
-      //MULTIPLE TARGET BY GUESSES
-      val guesses = (block.timestamp - block.parent().get.timestamp) / 1000
-      val lowerTarget = target0 * BigInt(guesses - 1)
-      val target = target0 * BigInt(guesses)
-
-      //CONVERT HIT TO BIGINT
-      val hit = BigInt(1, Crypto.sha256(generatorSignature))
-
-      if (hit >= target) {
-        false
-      } else if (hit < lowerTarget) {
-        false
-      } else true
-    }
-  }
-
-  def isSignatureValid(block:Block):Boolean = {
-    val generatingBalanceBytes = Longs.toByteArray(generatingBalance).ensuring(_.size == GENERATING_BALANCE_LENGTH)
-
-    val blockSignature = Bytes.concat(Arrays.copyOfRange(block.reference, 0, GENERATOR_SIGNATURE_LENGTH),
-      generatingBalanceBytes,
-      block.generator.publicKey)
-
-    Crypto.verify(signature(), blockSignature, block.generator.publicKey)
-  }
-}
-
-object BlockGenerationData {
-  val GENERATING_BALANCE_LENGTH = 8
-  val GENERATOR_SIGNATURE_LENGTH = 64
-  val GENERATION_DATA_LENGTH = GENERATING_BALANCE_LENGTH + GENERATOR_SIGNATURE_LENGTH
-
-  def parse(bytes:Array[Byte]):BlockGenerationData = {
-    val generatingBalance = Longs.fromByteArray(bytes.take(GENERATING_BALANCE_LENGTH))
-    val generatorSignature = bytes.drop(GENERATING_BALANCE_LENGTH)
-    new BlockGenerationData(generatingBalance, generatorSignature)
-  }
-}
-
 case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long,
-                     generator: PublicKeyAccount, generationData: BlockGenerationData) {
+                     generator: PublicKeyAccount, generationData: QoraBlockGenerationData) {
   require(reference.length == Block.REFERENCE_LENGTH)
 }
 
 case class Block(version: Int, reference: Array[Byte], timestamp: Long,
-                 generator: PublicKeyAccount, generationData: BlockGenerationData,
+                 generator: PublicKeyAccount, generationData: QoraBlockGenerationData,
                  transactions: List[Transaction], transactionsSignature: Array[Byte]) {
 
   import scorex.block.Block._
@@ -158,7 +86,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long,
       //CHECK IF TIMESTAMP REST SAME AS PARENT TIMESTAMP REST
       false
     } else {
-      generationData.isBlockValidAgainstGenerationData(this) &&
+      generationData.isValid(this) &&
       transactions.forall { transaction =>
         !transaction.isInstanceOf[GenesisTransaction] &&
           transaction.isValid() == ValidationResult.VALIDATE_OKE &&
@@ -185,7 +113,7 @@ object Block {
   private[block] val TRANSACTIONS_COUNT_LENGTH = 4
   private[block] val TRANSACTION_SIZE_LENGTH = 4
   private[block] val BASE_LENGTH = VERSION_LENGTH + REFERENCE_LENGTH + TIMESTAMP_LENGTH +
-    GENERATOR_LENGTH + BlockGenerationData.GENERATION_DATA_LENGTH +
+    GENERATOR_LENGTH + QoraBlockGenerationData.GENERATION_DATA_LENGTH +
     TRANSACTIONS_SIGNATURE_LENGTH + TRANSACTIONS_COUNT_LENGTH
   val MAX_TRANSACTION_BYTES = MAX_BLOCK_BYTES - BASE_LENGTH
 
@@ -241,9 +169,9 @@ object Block {
     position += GENERATOR_LENGTH
 
 
-    val generationDatabytes = Arrays.copyOfRange(data, position, position + BlockGenerationData.GENERATION_DATA_LENGTH)
-    val generationData = BlockGenerationData.parse(generationDatabytes)
-    position += BlockGenerationData.GENERATION_DATA_LENGTH
+    val generationDatabytes = Arrays.copyOfRange(data, position, position + QoraBlockGenerationData.GENERATION_DATA_LENGTH)
+    val generationData = QoraBlockGenerationData.parse(generationDatabytes)
+    position += QoraBlockGenerationData.GENERATION_DATA_LENGTH
 
 
     //READ TRANSACTION SIGNATURE

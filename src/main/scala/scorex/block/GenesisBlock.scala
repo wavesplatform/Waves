@@ -5,6 +5,7 @@ import java.math.BigDecimal
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import org.joda.time.DateTime
 import scorex.account.{Account, PublicKeyAccount}
+import scorex.consensus.qora.QoraBlockGenerationData
 import scorex.crypto.Crypto
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.GenesisTransaction
@@ -21,7 +22,7 @@ object GenesisBlockParams {
     val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
     val digest = Crypto.sha256(data)
     Bytes.concat(digest, digest)
-  }.ensuring(sig => sig.size == BlockGenerationData.GENERATOR_SIGNATURE_LENGTH)
+  }.ensuring(sig => sig.size == QoraBlockGenerationData.GENERATOR_SIGNATURE_LENGTH)
 
   val genesisVersion = 1
   val genesisReference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
@@ -50,7 +51,7 @@ object GenesisBlock extends Block(version = GenesisBlockParams.genesisVersion,
   reference = GenesisBlockParams.genesisReference,
   timestamp = GenesisBlockParams.genesisTimestamp,
   generator = GenesisBlockParams.genesisGenerator,
-  new BlockGenerationData(GenesisBlockParams.generatingBalance, GenesisBlockParams.generatorSignature),
+  new QoraBlockGenerationData(GenesisBlockParams.generatingBalance, GenesisBlockParams.generatorSignature),
   transactions = GenesisBlockParams.genesisTransactions,
   transactionsSignature = GenesisBlockParams.generatorSignature) {
 

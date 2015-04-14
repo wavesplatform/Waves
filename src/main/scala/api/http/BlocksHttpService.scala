@@ -2,7 +2,8 @@ package api.http
 
 import controller.Controller
 import play.api.libs.json.Json
-import scorex.block.{BlockGenerator, GenesisBlock}
+import scorex.block.GenesisBlock
+import scorex.consensus.qora.QoraBlockGenerationFunctions
 import scorex.database.blockchain.PrunableBlockchainStorage
 import spray.routing.HttpService
 
@@ -41,7 +42,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         get {
           complete {
             val block = PrunableBlockchainStorage.lastBlock
-            val timePerBlock = BlockGenerator.getBlockTime(block.generationData.generatingBalance)
+            val timePerBlock = QoraBlockGenerationFunctions.getBlockTime(block.generationData.generatingBalance)
             Json.obj("time" -> timePerBlock).toString()
           }
         }
@@ -49,7 +50,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         get {
           complete {
             val jsRes = Try {
-              val timePerBlock = BlockGenerator.getBlockTime(generatingBalance.toLong)
+              val timePerBlock = QoraBlockGenerationFunctions.getBlockTime(generatingBalance.toLong)
               Json.obj("time" -> timePerBlock)
             }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_NOT_NUMBER))
             jsRes.toString()
