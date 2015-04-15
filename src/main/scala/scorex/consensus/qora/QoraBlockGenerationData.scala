@@ -69,6 +69,8 @@ class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignatur
 
     Crypto.verify(signature(), blockSignature, block.generator.publicKey)
   }
+
+  override def blockScore() = BigInt(1)
 }
 
 

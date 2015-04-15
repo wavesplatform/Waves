@@ -26,4 +26,6 @@ class NxtBlockGenerationData(val baseTarget: Long, val generatorSignature: Array
   override def isSignatureValid(block: Block): Boolean = ???
 
   override def isValid(block: Block): Boolean = ???
+
+  override def blockScore() = BigInt("18446744073709551616") / baseTarget
 }
