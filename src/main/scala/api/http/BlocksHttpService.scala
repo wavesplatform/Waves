@@ -2,9 +2,10 @@ package api.http
 
 import controller.Controller
 import play.api.libs.json.Json
-import scorex.block.GenesisBlock
+
 import scorex.consensus.qora.QoraBlockGenerationFunctions
 import scorex.database.blockchain.PrunableBlockchainStorage
+import settings.Constants
 import spray.routing.HttpService
 
 import scala.util.Try
@@ -20,7 +21,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         }
       } ~ path("first") {
         get {
-          complete(GenesisBlock.toJson.toString())
+          complete(Constants.ConsensusAlgo.genesisBlock.toJson.toString())
         }
       } ~ path("last") {
         get {
@@ -38,7 +39,20 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
             }.toString()
           }
         }
-      } ~ path("time") {
+      } ~ path("child" / Segment) { case encodedSignature =>
+        get {
+          complete(withBlock(encodedSignature)(_.child().get.toJson).toString())
+        }
+      } ~ path("address" / Segment) { case address =>
+        get {
+          complete(withAccount(address) { account =>
+            Json.arr(PrunableBlockchainStorage.generatedBy(account).map(_.toJson))
+          }.toString())
+        }
+      }
+
+      /* todo: consider how to obtain consensus-specific data via API, commented out for now
+      ~ path("time") {
         get {
           complete {
             val block = PrunableBlockchainStorage.lastBlock
@@ -69,16 +83,6 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
             Json.obj("generatingbalance" -> block.generationData.generatingBalance)
           }.toString())
         }
-      } ~ path("child" / Segment) { case encodedSignature =>
-        get {
-          complete(withBlock(encodedSignature)(_.child().get.toJson).toString())
-        }
-      } ~ path("address" / Segment) { case address =>
-        get {
-          complete(withAccount(address) { account =>
-            Json.arr(PrunableBlockchainStorage.generatedBy(account).map(_.toJson))
-          }.toString())
-        }
-      }
+      } */
     }
 }

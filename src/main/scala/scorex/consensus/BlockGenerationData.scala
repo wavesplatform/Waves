@@ -10,7 +10,7 @@ trait BlockGenerationData {
 
   def isGenesis: Boolean
 
-  def signature: Array[Byte]
+  def signature(): Array[Byte]
 
   def isValid(block: Block): Boolean
 

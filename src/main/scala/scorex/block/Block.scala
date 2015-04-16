@@ -4,7 +4,7 @@ import java.util.Arrays
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.consensus.qora.{QoraBlockGenerationData}
+import scorex.consensus.qora.{QoraBlockGenerationDataParser, QoraBlockGenerationData}
 import scorex.crypto.{Base58, Crypto}
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
@@ -14,12 +14,12 @@ import settings.Constants
 import scala.util.Try
 
 case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long,
-                     generator: PublicKeyAccount, generationData: Constants.ConsensusInjectedBlockPart) {
+                     generator: PublicKeyAccount, generationData: Constants.ConsensusAlgo.kernelData) {
   require(reference.length == Block.REFERENCE_LENGTH)
 }
 
 case class Block(version: Int, reference: Array[Byte], timestamp: Long,
-                 generator: PublicKeyAccount, generationData: Constants.ConsensusInjectedBlockPart,
+                 generator: PublicKeyAccount, generationData: Constants.ConsensusAlgo.kernelData,
                  transactions: List[Transaction], transactionsSignature: Array[Byte]) {
 
   import scorex.block.Block._
@@ -103,6 +103,9 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long,
 
 
 object Block {
+  import Constants.ConsensusAlgo
+  import ConsensusAlgo.kernelDataParser.GENERATION_DATA_LENGTH
+
   val Version = 1
   val MAX_BLOCK_BYTES = 261120 //255 kb
   val VERSION_LENGTH = 4
@@ -114,7 +117,7 @@ object Block {
   private[block] val TRANSACTIONS_COUNT_LENGTH = 4
   private[block] val TRANSACTION_SIZE_LENGTH = 4
   private[block] val BASE_LENGTH = VERSION_LENGTH + REFERENCE_LENGTH + TIMESTAMP_LENGTH +
-    GENERATOR_LENGTH + QoraBlockGenerationData.GENERATION_DATA_LENGTH +
+    GENERATOR_LENGTH + GENERATION_DATA_LENGTH +
     TRANSACTIONS_SIGNATURE_LENGTH + TRANSACTIONS_COUNT_LENGTH
   val MAX_TRANSACTION_BYTES = MAX_BLOCK_BYTES - BASE_LENGTH
 
@@ -170,9 +173,9 @@ object Block {
     position += GENERATOR_LENGTH
 
 
-    val generationDatabytes = Arrays.copyOfRange(data, position, position + QoraBlockGenerationData.GENERATION_DATA_LENGTH)
-    val generationData = QoraBlockGenerationData.parse(generationDatabytes)
-    position += QoraBlockGenerationData.GENERATION_DATA_LENGTH
+    val generationDatabytes = Arrays.copyOfRange(data, position, position + GENERATION_DATA_LENGTH)
+    val generationData: ConsensusAlgo.kernelData = ConsensusAlgo.kernelDataParser.parse(generationDatabytes)
+    position += GENERATION_DATA_LENGTH
 
 
     //READ TRANSACTION SIGNATURE
@@ -180,7 +183,7 @@ object Block {
     position += TRANSACTIONS_SIGNATURE_LENGTH
 
     if (generationData.isGenesis) {
-      GenesisBlock
+      ConsensusAlgo.genesisBlock
     } else {
 
       //READ TRANSACTIONS COUNT
@@ -202,7 +205,7 @@ object Block {
   }
 
   def isNewBlockValid(block: Block) =
-    block != GenesisBlock &&
+    block != ConsensusAlgo.genesisBlock &&
       block.isSignatureValid() &&
       PrunableBlockchainStorage.lastBlock.signature.sameElements(block.reference) &&
       block.isValid()

@@ -4,16 +4,17 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.Json
-import scorex.block.{Block, GenesisBlockParams}
-import scorex.consensus.BlockGenerationData
+import scorex.block.{QoraGenesisBlockGenerationData, Block, QoraGenesisBlock}
+import scorex.consensus.{BlockGenerationDataParser, BlockGenerationData}
 import scorex.crypto.{Crypto, Base58}
 import scorex.database.blockchain.PrunableBlockchainStorage
+import settings.Constants
 
 
 class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignature: Array[Byte])
   extends BlockGenerationData {
 
-  import QoraBlockGenerationData._
+  import QoraBlockGenerationDataParser._
 
   require(generatingBalance > 0)
 
@@ -29,7 +30,7 @@ class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignatur
 
   override def signature() = generatorSignature
 
-  override def isGenesis = GenesisBlockParams.generatorSignature.sameElements(generatorSignature)
+  override def isGenesis = QoraGenesisBlockGenerationData.generatorSignature.sameElements(generatorSignature)
 
   override def isValid(block: Block): Boolean = {
     if (generatingBalance != QoraBlockGenerationFunctions.getNextBlockGeneratingBalance(block.parent().get)) {
@@ -71,17 +72,4 @@ class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignatur
   }
 
   override def blockScore() = BigInt(1)
-}
-
-
-object QoraBlockGenerationData {
-  val GENERATING_BALANCE_LENGTH = 8
-  val GENERATOR_SIGNATURE_LENGTH = 64
-  val GENERATION_DATA_LENGTH = GENERATING_BALANCE_LENGTH + GENERATOR_SIGNATURE_LENGTH
-
-  def parse(bytes:Array[Byte]):QoraBlockGenerationData = {
-    val generatingBalance = Longs.fromByteArray(bytes.take(GENERATING_BALANCE_LENGTH))
-    val generatorSignature = bytes.drop(GENERATING_BALANCE_LENGTH)
-    new QoraBlockGenerationData(generatingBalance, generatorSignature)
-  }
 }

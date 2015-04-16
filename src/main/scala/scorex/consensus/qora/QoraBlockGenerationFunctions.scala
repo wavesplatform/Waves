@@ -6,8 +6,9 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.Crypto
+import settings.Constants
 
-
+//a lot of asInstanceOf[QoraBlockGenerationData] in the code, not type-safe
 object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
   private val RETARGET = 10
   private val MIN_BALANCE = 1L
@@ -39,9 +40,15 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
 
     if (timestamp <= NTP.getTime) {
       Some(BlockStub(Block.Version, lastBlock.signature, timestamp, account,
-        new QoraBlockGenerationData(getNextBlockGeneratingBalance(lastBlock), signature)))
+        new QoraBlockGenerationData(getNextBlockGeneratingBalance(lastBlock), signature).asInstanceOf[Constants.ConsensusAlgo.kernelData]))
     } else None
   }
+
+  private def blockGeneratingBalance(block:Block) =
+    block.generationData.asInstanceOf[QoraBlockGenerationData].generatingBalance
+
+  private def blockGeneratorSignature(block:Block) =
+    block.generationData.asInstanceOf[QoraBlockGenerationData].generatorSignature
 
   def getNextBlockGeneratingBalance(block: Block): Long = {
     if (block.height().get % RETARGET == 0) {
@@ -52,15 +59,15 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
       val generatingTime = block.timestamp - firstBlock.timestamp
 
       //CALCULATE EXPECTED FORGING TIME
-      val expectedGeneratingTime = getBlockTime(block.generationData.generatingBalance) * RETARGET * 1000
+      val expectedGeneratingTime = getBlockTime(blockGeneratingBalance(block)) * RETARGET * 1000
 
       //CALCULATE MULTIPLIER
       val multiplier = expectedGeneratingTime / generatingTime.toDouble
 
       //CALCULATE NEW GENERATING BALANCE
-      val generatingBalance = (block.generationData.generatingBalance * multiplier).toLong
+      val generatingBalance = (blockGeneratingBalance(block) * multiplier).toLong
       minMaxBalance(generatingBalance)
-    } else block.generationData.generatingBalance
+    } else blockGeneratingBalance(block)
   }
 
   def getBaseTarget(generatingBalance: Long): Long = minMaxBalance(generatingBalance) * getBlockTime(generatingBalance)
@@ -72,7 +79,7 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
 
   private def calculateSignature(solvingBlock: Block, account: PrivateKeyAccount) = {
     //PARENT GENERATOR SIGNATURE
-    val generatorSignature = solvingBlock.generationData.generatorSignature
+    val generatorSignature = blockGeneratorSignature(solvingBlock)
 
     val genBalanceBytes = Longs.toByteArray(getNextBlockGeneratingBalance(solvingBlock))
 

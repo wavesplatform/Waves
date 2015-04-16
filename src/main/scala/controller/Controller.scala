@@ -14,7 +14,7 @@ import scorex.network.NetworkController
 import scorex.network.message._
 import scorex.transaction.{Transaction, TransactionCreator}
 import scorex.wallet.Wallet
-import settings.Settings
+import settings.{Constants, Settings}
 import spray.can.Http
 
 
@@ -26,8 +26,9 @@ object Controller {
 
   def init() {
     if (PrunableBlockchainStorage.isEmpty()) {
-      GenesisBlock.process()
-      PrunableBlockchainStorage.appendBlock(GenesisBlock)
+      val genesisBlock = Constants.ConsensusAlgo.genesisBlock
+      genesisBlock.process()
+      PrunableBlockchainStorage.appendBlock(genesisBlock)
     }.ensuring(PrunableBlockchainStorage.height() >= 1)
 
     val httpServiceActor = actorSystem.actorOf(Props[HttpServiceActor], "http-service")

@@ -1,34 +1,24 @@
 package scorex.block
 
 import java.math.BigDecimal
-
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import org.joda.time.DateTime
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.consensus.qora.QoraBlockGenerationData
+import scorex.consensus.BlockGenerationData
+import scorex.consensus.qora.{QoraBlockGenerationDataParser, QoraBlockGenerationData}
 import scorex.crypto.Crypto
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.Transaction.ValidationResult
+import settings.Constants
+import Constants.ConsensusAlgo.kernelData
 
 
 object GenesisBlockParams {
-  lazy val generatorSignature = {
-    val versionBytes = Ints.toByteArray(genesisVersion)
-    val referenceBytes = Bytes.ensureCapacity(genesisReference, 64, 0)
-    val generatingBalanceBytes = Longs.toByteArray(generatingBalance)
-    val generatorBytes = Bytes.ensureCapacity(genesisGenerator.publicKey, 32, 0)
+  val version = 1
+  val reference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
+  val generator = new PublicKeyAccount(Array[Byte](1, 1, 1, 1, 1, 1, 1, 1))
 
-    val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
-    val digest = Crypto.sha256(data)
-    Bytes.concat(digest, digest)
-  }.ensuring(sig => sig.size == QoraBlockGenerationData.GENERATOR_SIGNATURE_LENGTH)
-
-  val genesisVersion = 1
-  val genesisReference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
-  val genesisTimestamp = new DateTime(2015, 4, 13, 10, 35).getMillis
-  val generatingBalance = 10000000
-  val genesisGenerator = new PublicKeyAccount(Array[Byte](1, 1, 1, 1, 1, 1, 1, 1))
   val ipoMembers = List(
     "2UyntBprhFgZPJ1tCtKBAwryiSnDSk9Xmh8",
     "Y2BXLjiAhPUMSo8iBbDEhv81VwKnytTXsH",
@@ -41,35 +31,47 @@ object GenesisBlockParams {
     "2ihjht1NWTv2T8nKDMzx2RMmp7ZDEchXJus",
     "2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPNKr"
   )
-  val genesisTransactions = ipoMembers.map { addr =>
+
+  def transactions(timestamp:Long) = ipoMembers.map { addr =>
     val recipient = new Account(addr)
-    GenesisTransaction(recipient, new BigDecimal("1000000000").setScale(8), genesisTimestamp)
+    GenesisTransaction(recipient, new BigDecimal("1000000000").setScale(8), timestamp)
   }
 }
 
-object GenesisBlock extends Block(version = GenesisBlockParams.genesisVersion,
-  reference = GenesisBlockParams.genesisReference,
-  timestamp = GenesisBlockParams.genesisTimestamp,
-  generator = GenesisBlockParams.genesisGenerator,
-  new QoraBlockGenerationData(GenesisBlockParams.generatingBalance, GenesisBlockParams.generatorSignature),
-  transactions = GenesisBlockParams.genesisTransactions,
-  transactionsSignature = GenesisBlockParams.generatorSignature) {
+
+abstract class GenesisBlock(override val generationData: kernelData, override val timestamp:Long)
+  extends Block(version = GenesisBlockParams.version, reference = GenesisBlockParams.reference, timestamp,
+    generator = GenesisBlockParams.generator, generationData,
+    GenesisBlockParams.transactions(timestamp), generationData.signature()) {
 
   override def parent() = None
-
-  override def isSignatureValid() = {
-    val versionBytes = Bytes.ensureCapacity(Longs.toByteArray(version), 4, 0)
-    val referenceBytes = Bytes.ensureCapacity(reference, 64, 0)
-    val generatingBalanceBytes = Bytes.ensureCapacity(Longs.toByteArray(generationData.generatingBalance), 8, 0)
-    val generatorBytes = Bytes.ensureCapacity(generator.publicKey, 32, 0)
-
-    val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
-    val digest0 = Crypto.sha256(data)
-    val digest = Bytes.concat(digest0, digest0)
-
-    digest.sameElements(generationData.generatorSignature) && digest.sameElements(transactionsSignature)
-  }
 
   override def isValid() =
     PrunableBlockchainStorage.isEmpty() && transactions.forall(_.isValid() == ValidationResult.VALIDATE_OKE)
 }
+
+
+
+
+object QoraGenesisBlockGenerationData {
+  val generatingBalance = 10000000
+
+  lazy val generatorSignature = {
+    val versionBytes = Ints.toByteArray(GenesisBlockParams.version)
+    val referenceBytes = Bytes.ensureCapacity(GenesisBlockParams.reference, 64, 0)
+    val generatingBalanceBytes = Longs.toByteArray(generatingBalance)
+    val generatorBytes = Bytes.ensureCapacity(GenesisBlockParams.generator.publicKey, 32, 0)
+
+    val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
+    val digest = Crypto.sha256(data)
+    Bytes.concat(digest, digest)
+  }.ensuring(sig => sig.size == QoraBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)
+
+  val generationData = new QoraBlockGenerationData(generatingBalance, generatorSignature)
+}
+
+object NxtGenesisBlock extends GenesisBlock(???, ???)
+
+object QoraGenesisBlock extends GenesisBlock(
+  QoraGenesisBlockGenerationData.generationData.asInstanceOf[Constants.ConsensusAlgo.kernelData],
+  new DateTime(2015, 4, 13, 10, 35).getMillis)
