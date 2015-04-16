@@ -5,6 +5,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import org.joda.time.DateTime
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.consensus.BlockGenerationData
+import scorex.consensus.nxt.NxtBlockGenerationData
 import scorex.consensus.qora.{QoraBlockGenerationDataParser, QoraBlockGenerationData}
 import scorex.crypto.Crypto
 import scorex.database.blockchain.PrunableBlockchainStorage
@@ -70,7 +71,9 @@ object QoraGenesisBlockGenerationData {
   val generationData = new QoraBlockGenerationData(generatingBalance, generatorSignature)
 }
 
-object NxtGenesisBlock extends GenesisBlock(???, ???)
+object NxtGenesisBlock extends GenesisBlock(
+  new NxtBlockGenerationData(153722867, Array.fill(32)(0:Byte)).asInstanceOf[Constants.ConsensusAlgo.kernelData],
+  new DateTime(2015, 4, 13, 10, 35).getMillis)
 
 object QoraGenesisBlock extends GenesisBlock(
   QoraGenesisBlockGenerationData.generationData.asInstanceOf[Constants.ConsensusAlgo.kernelData],
