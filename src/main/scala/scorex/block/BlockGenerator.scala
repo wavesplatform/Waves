@@ -1,7 +1,7 @@
 package scorex.block
 
 import akka.actor.Actor
-import scorex.consensus.qora.QoraBlockGenerationFunctions
+import settings.Constants
 
 class BlockGenerator extends Actor {
 
@@ -11,7 +11,7 @@ class BlockGenerator extends Actor {
     case TryToGenerateBlock =>
       val blockchainController = sender()
 
-      QoraBlockGenerationFunctions.generateBlock().foreach { block =>
+       Constants.ConsensusAlgo.consensusFunctions.generateBlock().foreach { block =>
         blockchainController ! NewBlock(block, None)
       }
   }

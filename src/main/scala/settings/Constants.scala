@@ -1,6 +1,6 @@
 package settings
 
-import scorex.consensus.{ConsensusModule, ConsensusModuleQora}
+import scorex.consensus._
 
 /*
   System constants here.

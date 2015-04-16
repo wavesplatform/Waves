@@ -83,10 +83,10 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long,
     } else if (this.timestamp < parent().get.timestamp) {
       //CHECK IF TIMESTAMP IS VALID -500 MS ERROR MARGIN TIME
       false
-    } else if (timestamp % 1000 != parent().get.timestamp % 1000) {
+    } /* else if (timestamp % 1000 != parent().get.timestamp % 1000) {
       //CHECK IF TIMESTAMP REST SAME AS PARENT TIMESTAMP REST
       false
-    } else {
+    }*/ else {
       generationData.isValid(this) &&
       transactions.forall { transaction =>
         !transaction.isInstanceOf[GenesisTransaction] &&
@@ -109,7 +109,7 @@ object Block {
   val Version = 1
   val MAX_BLOCK_BYTES = 261120 //255 kb
   val VERSION_LENGTH = 4
-  val REFERENCE_LENGTH = 128
+  val REFERENCE_LENGTH = 64 + Constants.ConsensusAlgo.KERNEL_SIGNATURE_LENGTH
   val TIMESTAMP_LENGTH = 8
   val GENERATOR_LENGTH = 32
 

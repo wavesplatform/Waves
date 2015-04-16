@@ -7,32 +7,38 @@ import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.Crypto
 import settings.Constants
 
+import scala.util.Random
+
 object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
-  private val AvgFrequency = 60 //the algo's goal is 1 block per minute in average
+  private val AvgFrequency = 3 //60 - the algo's goal is 1 block per minute in average
 
   override protected def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block): Option[BlockStub] = {
     val lastBlockKernelData = lastBlock.generationData.asInstanceOf[NxtBlockGenerationData]
     val lastBlockTime = lastBlock.timestamp
 
-    if(hit(lastBlockKernelData, account) < target(lastBlockKernelData, lastBlockTime, account)){
+    val h = hit(lastBlockKernelData, account)
+    val t = target(lastBlockKernelData, lastBlockTime, account)
 
+    val eta = (NTP.getTime - lastBlock.timestamp)/1000
+    println(s"hit: $h, target: $t, generating ${h < t}, eta $eta, account balance: ${account.generatingBalance}")
+    if (h < t) {
       val ts = NTP.getTime
       val btg = baseTarget(lastBlockKernelData, lastBlockTime, ts)
-      val gs = generatorSignature(lastBlockKernelData.generatorSignature, account)
+      val gs = generatorSignature(lastBlockKernelData, account)
       Some(BlockStub(Block.Version, lastBlock.signature, ts, account,
-                      new NxtBlockGenerationData(btg, gs).asInstanceOf[Constants.ConsensusAlgo.kernelData]))
+        new NxtBlockGenerationData(btg, gs).asInstanceOf[Constants.ConsensusAlgo.kernelData]))
     } else None
   }
 
-  private def generatorSignature(lastBlockGeneratorSignature:Array[Byte], generator: PrivateKeyAccount) =
-    Crypto.sha256(lastBlockGeneratorSignature ++ generator.publicKey)
+  private def generatorSignature(lastBlockData: NxtBlockGenerationData, generator: PrivateKeyAccount) =
+    Crypto.sha256(lastBlockData.generatorSignature ++ generator.publicKey)
 
   private def hit(lastBlockData: NxtBlockGenerationData, generator: PrivateKeyAccount): BigInt =
-    BigInt(1, generatorSignature(lastBlockData.generatorSignature, generator).take(8))
+    BigInt(1, generatorSignature(lastBlockData, generator).take(8))
 
   private def baseTarget(lastBlockData: NxtBlockGenerationData,
                          lastBlockTimestamp: Long,
-                         currentTime:Long): Long = {
+                         currentTime: Long): Long = {
     val eta = (currentTime - lastBlockTimestamp) / 1000 //in seconds
     val prevBt = BigInt(lastBlockData.baseTarget)
     val t = bound(prevBt * eta / AvgFrequency, prevBt / 2, prevBt * 2)
@@ -41,7 +47,7 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
 
   private def target(lastBlockData: NxtBlockGenerationData, lastBlockTimestamp: Long, generator: PrivateKeyAccount): BigInt = {
     val eta = (NTP.getTime - lastBlockTimestamp) / 1000 //in seconds
-    val effBalance:BigDecimal = 10000000// generator.generatingBalance
+    val effBalance: BigDecimal = 10000000 // generator.generatingBalance
     (lastBlockData.baseTarget * eta * effBalance).toBigInt()
   }
 

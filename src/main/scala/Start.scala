@@ -49,6 +49,7 @@ object Start {
     require(Wallet.privateKeyAccounts().nonEmpty)
 
     (1 to Int.MaxValue).foreach { _ =>
+      Thread.sleep(20000)
       val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size)
       val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx)
 
@@ -61,7 +62,6 @@ object Start {
 
       val (tx, valRes) = Controller.sendPayment(senderAcc, recipientAcc, amt, fee)
       println(s"Payment created: $tx, validationResult: $valRes")
-      Thread.sleep(20000)
     }
   }
 }

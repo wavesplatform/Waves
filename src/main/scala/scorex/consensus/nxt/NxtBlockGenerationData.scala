@@ -22,11 +22,12 @@ class NxtBlockGenerationData(val baseTarget: Long, val generatorSignature: Array
   override def isGenesis: Boolean = baseTarget == NxtGenesisBlockGenerationData.InitialBaseTarget &&
     generatorSignature.sameElements(NxtGenesisBlockGenerationData.InitialGenerationSignature)
 
-  override def signature(): Array[Byte] = generatorSignature
+  override def signature(): Array[Byte] = generatorSignature.ensuring(_.length == NxtBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)
 
-  override def isSignatureValid(block: Block): Boolean = ???
-
-  override def isValid(block: Block): Boolean = ???
+  //todo: implement sig checking!
+  override def isSignatureValid(block: Block): Boolean = true
+  //todo: implement valid checking!
+  override def isValid(block: Block): Boolean = true
 
   override def blockScore() = BigInt("18446744073709551616") / baseTarget
 }
