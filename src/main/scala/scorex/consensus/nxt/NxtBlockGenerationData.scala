@@ -2,7 +2,7 @@ package scorex.consensus.nxt
 
 import com.google.common.primitives.{Longs, Bytes}
 import play.api.libs.json.{Json, JsObject}
-import scorex.block.Block
+import scorex.block.{NxtGenesisBlockGenerationData, Block}
 import scorex.consensus.BlockGenerationData
 import scorex.crypto.Base58
 
@@ -19,7 +19,8 @@ class NxtBlockGenerationData(val baseTarget: Long, val generatorSignature: Array
     "generatorSignature" -> Base58.encode(generatorSignature)
   )
 
-  override def isGenesis: Boolean = ???
+  override def isGenesis: Boolean = baseTarget == NxtGenesisBlockGenerationData.InitialBaseTarget &&
+    generatorSignature.sameElements(NxtGenesisBlockGenerationData.InitialGenerationSignature)
 
   override def signature(): Array[Byte] = generatorSignature
 
