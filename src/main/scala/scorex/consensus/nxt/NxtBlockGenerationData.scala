@@ -21,7 +21,7 @@ class NxtBlockGenerationData(val baseTarget: Long, val generatorSignature: Array
 
   override def isGenesis: Boolean = ???
 
-  override def signature: Array[Byte] = ???
+  override def signature(): Array[Byte] = generatorSignature
 
   override def isSignatureValid(block: Block): Boolean = ???
 

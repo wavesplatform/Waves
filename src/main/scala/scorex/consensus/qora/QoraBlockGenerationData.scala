@@ -1,14 +1,12 @@
 package scorex.consensus.qora
 
 import java.util
-
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.Json
-import scorex.block.{QoraGenesisBlockGenerationData, Block, QoraGenesisBlock}
-import scorex.consensus.{BlockGenerationDataParser, BlockGenerationData}
+import scorex.block.{QoraGenesisBlockGenerationData, Block}
+import scorex.consensus.BlockGenerationData
 import scorex.crypto.{Crypto, Base58}
 import scorex.database.blockchain.PrunableBlockchainStorage
-import settings.Constants
 
 
 class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignature: Array[Byte])
