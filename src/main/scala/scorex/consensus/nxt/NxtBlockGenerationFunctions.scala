@@ -4,14 +4,25 @@ import ntp.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
-import scorex.crypto.{Base58, Crypto}
-
-import scala.util.Random
+import scorex.crypto.Crypto
+import settings.Constants
 
 object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
   private val AvgFrequency = 60 //the algo's goal is 1 block per minute in average
 
-  override protected def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block): Option[BlockStub] = ???
+  override protected def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block): Option[BlockStub] = {
+    val lastBlockKernelData = lastBlock.generationData.asInstanceOf[NxtBlockGenerationData]
+    val lastBlockTime = lastBlock.timestamp
+
+    if(hit(lastBlockKernelData, account) < target(lastBlockKernelData, lastBlockTime, account)){
+
+      val ts = NTP.getTime
+      val btg = baseTarget(lastBlockKernelData, lastBlockTime, ts)
+      val gs = generatorSignature(lastBlockKernelData.generatorSignature, account)
+      Some(BlockStub(Block.Version, lastBlock.signature, ts, account,
+                      new NxtBlockGenerationData(btg, gs).asInstanceOf[Constants.ConsensusAlgo.kernelData]))
+    } else None
+  }
 
   private def generatorSignature(lastBlockGeneratorSignature:Array[Byte], generator: PrivateKeyAccount) =
     Crypto.sha256(lastBlockGeneratorSignature ++ generator.publicKey)
@@ -19,8 +30,10 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
   private def hit(lastBlockData: NxtBlockGenerationData, generator: PrivateKeyAccount): BigInt =
     BigInt(1, generatorSignature(lastBlockData.generatorSignature, generator).take(8))
 
-  private def baseTarget(lastBlockData: NxtBlockGenerationData, lastBlockTimestamp: Long): Long = {
-    val eta = (NTP.getTime - lastBlockTimestamp) / 1000 //in seconds
+  private def baseTarget(lastBlockData: NxtBlockGenerationData,
+                         lastBlockTimestamp: Long,
+                         currentTime:Long): Long = {
+    val eta = (currentTime - lastBlockTimestamp) / 1000 //in seconds
     val prevBt = BigInt(lastBlockData.baseTarget)
     val t = bound(prevBt * eta / AvgFrequency, prevBt / 2, prevBt * 2)
     bound(t, 1, Long.MaxValue).toLong
