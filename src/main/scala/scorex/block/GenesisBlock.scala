@@ -68,11 +68,18 @@ object QoraGenesisBlockGenerationData {
     Bytes.concat(digest, digest)
   }.ensuring(sig => sig.size == QoraBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)
 
-  val generationData = new QoraBlockGenerationData(generatingBalance, generatorSignature)
+  lazy val generationData = new QoraBlockGenerationData(generatingBalance, generatorSignature)
+}
+
+object NxtGenesisBlockGenerationData {
+  val InitialGenerationSignature = Array.fill(32)(0:Byte)
+  val InitialBaseTarget:Long = 153722867
+  lazy val generationData = new NxtBlockGenerationData(NxtGenesisBlockGenerationData.InitialBaseTarget,
+                                                        NxtGenesisBlockGenerationData.InitialGenerationSignature)
 }
 
 object NxtGenesisBlock extends GenesisBlock(
-  new NxtBlockGenerationData(153722867, Array.fill(32)(0:Byte)).asInstanceOf[Constants.ConsensusAlgo.kernelData],
+  NxtGenesisBlockGenerationData.generationData.asInstanceOf[Constants.ConsensusAlgo.kernelData],
   new DateTime(2015, 4, 13, 10, 35).getMillis)
 
 object QoraGenesisBlock extends GenesisBlock(
