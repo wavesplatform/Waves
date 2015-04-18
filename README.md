@@ -14,7 +14,7 @@ Installation
 
 * Ubuntu Server
 
-Install Oracle Java7 JDK:
+Install Oracle Java8 JDK:
 
 `echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list`
 
@@ -24,7 +24,7 @@ Install Oracle Java7 JDK:
 
 `apt-get update`
 
-`apt-get install oracle-java7-installer`
+`apt-get install oracle-java8-installer`
 
 and agree with license terms
 
