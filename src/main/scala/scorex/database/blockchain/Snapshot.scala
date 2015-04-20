@@ -20,4 +20,6 @@ class Snapshot(height: Int) extends StateQuery {
     Option(balancesMap.get(address)).getOrElse(BigDecimal(0))
 
   override def accountTransactions(account: Account): Seq[Transaction] = ??? //todo: implement
+  override def watchAccountTransactions(account: Account): Unit = ???
+  override def stopWatchingAccountTransactions(account: Account): Unit = ???
 }

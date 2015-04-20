@@ -46,4 +46,8 @@ object PrunableBlockchainStorage extends BlockChain {
 
   override def accountTransactions(account: Account): Seq[Transaction] =
     chainAfterSnapshot.accountTransactions(account)
+
+  override def watchAccountTransactions(account: Account): Unit = ???
+
+  override def stopWatchingAccountTransactions(account: Account): Unit = ???
 }

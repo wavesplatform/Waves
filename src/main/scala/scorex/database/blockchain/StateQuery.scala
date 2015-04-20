@@ -19,6 +19,8 @@ trait StateQuery {
     }
   }
 
+  def watchAccountTransactions(account: Account)
+  def stopWatchingAccountTransactions(account: Account)
   def accountTransactions(account: Account): Seq[Transaction]
 
   def generationBalance(address: String): BigDecimal = balance(address, 50)

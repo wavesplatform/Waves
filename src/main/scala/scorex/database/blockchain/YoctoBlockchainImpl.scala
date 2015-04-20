@@ -154,4 +154,8 @@ class YoctoBlockchainImpl extends BlockChain {
 
   //todo: implement
   override def generatedBy(account: Account): Seq[Block] = ???
+
+  override def watchAccountTransactions(account: Account): Unit = ???
+
+  override def stopWatchingAccountTransactions(account: Account): Unit = ???
 }

@@ -21,7 +21,10 @@ class InternalState {
     .mmapFileEnableIfSupported()
     .make()
 
-  database.rollback()
+  database.rollback() //initial rollback
+
+  private val balances = database.createHashMap("balances").makeOrGet[String, Long]()
+
 
 //  Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY)).getOrElse(database.getAtomicVar(SEED).set(seed))
 
