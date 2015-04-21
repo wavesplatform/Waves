@@ -41,10 +41,6 @@ abstract class Transaction(val transactionType: TransactionType.Value,
 
   def getCreator(): Option[Account]
 
-  def getInvolvedAccounts(): List[Account]
-
-  def isInvolved(account: Account): Boolean
-
   override def equals(other: Any) = other match {
     case tx: Transaction => signature.sameElements(tx.signature)
     case _ => false

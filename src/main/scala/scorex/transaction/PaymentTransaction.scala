@@ -65,17 +65,9 @@ case class PaymentTransaction(sender: PublicKeyAccount,
       ValidationResult.NEGATIVE_FEE //CHECK IF FEE IS POSITIVE
     } else ValidationResult.VALIDATE_OKE
 
-
   override def getCreator() = Some(sender)
 
-  override def getInvolvedAccounts() = List(sender, recipient)
-
-  override def isInvolved(account: Account) = {
-    val address = account.address
-    address.equals(sender.address) || address.equals(recipient.address)
-  }
-
-  override def getAmount(account: Account) = {
+  override def involvedAmount(account: Account) = {
     val address = account.address
 
     if (address.equals(sender.address) && address.equals(recipient.address)) {

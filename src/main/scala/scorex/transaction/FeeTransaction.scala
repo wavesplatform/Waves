@@ -9,7 +9,7 @@ import scorex.crypto.Base58
 import scorex.transaction.Transaction._
 
 abstract class PreTransaction(val recipient: Account, val amount: BigDecimal) {
-  def getAmount(account: Account): BigDecimal
+  def involvedAmount(account: Account): BigDecimal
 }
 
 object PreTransaction {
@@ -37,7 +37,7 @@ object PreTransaction {
 case class FeeTransaction(override val recipient: Account, override val amount: BigDecimal)
   extends PreTransaction(recipient, amount) {
 
-  def getAmount(account: Account): BigDecimal = account.address == recipient.address match {
+  def involvedAmount(account: Account): BigDecimal = account.address == recipient.address match {
     case true => amount
     case false => 0
   }

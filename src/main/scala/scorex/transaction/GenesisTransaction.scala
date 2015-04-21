@@ -64,11 +64,7 @@ case class GenesisTransaction(override val recipient: Account,
 
   override def getCreator(): Option[Account] = None
 
-  override def getInvolvedAccounts() = List(recipient)
-
-  override def isInvolved(account: Account) = recipient.address.equals(account.address)
-
-  override def getAmount(account: Account): BigDecimal =
+  override def involvedAmount(account: Account): BigDecimal =
     if (recipient.address.equals(account.address)) amount else 0
 }
 
