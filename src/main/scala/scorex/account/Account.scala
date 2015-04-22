@@ -1,7 +1,7 @@
 package scorex.account
 
 
-class Account(val address: String) {
+class Account(val address: String) extends Serializable {
 
   override def toString = address
 

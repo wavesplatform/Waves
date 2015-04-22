@@ -30,8 +30,6 @@ trait BlockChain {
 
   def lastBlock: Block = blockAt(height()).get
 
-  def confirmations(tx: Transaction): Option[Int]
-
   def confirmations(block: Block): Option[Int] = heightOf(block).map(height() - _)
 
   def blockByHeader(signature: Array[Byte]): Option[Block]

@@ -10,8 +10,8 @@ import scorex.transaction.Transaction
  * Facade to both blockchain & internal state implementations
  */
 object PrunableBlockchainStorage extends BlockChain with StateQuery {
-  private val chain = new BlockchainImpl
-  private val state = new InternalState
+  private val chain = new BlockchainImpl()
+  private val state = new InternalState()
 
   override def height(): Int = chain.height()
 
@@ -39,8 +39,6 @@ object PrunableBlockchainStorage extends BlockChain with StateQuery {
   override def contains(signature: Array[Byte]): Boolean = chain.contains(signature)
 
   override def child(block: Block): Option[Block] = chain.child(block)
-
-  override def confirmations(tx: Transaction): Option[Int] = chain.confirmations(tx)
 
   override def blockByHeader(signature: Array[Byte]): Option[Block] = chain.blockByHeader(signature)
 
