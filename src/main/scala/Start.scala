@@ -8,7 +8,6 @@ import scorex.block.GenesisBlockParams
 import scorex.crypto.Base58
 import scorex.wallet.Wallet
 import settings.Settings
-
 import scala.io.StdIn
 import scala.util.{Failure, Random, Try}
 
@@ -26,6 +25,7 @@ object Start {
           println("STARTUP ERROR: " + e.getMessage)
           System.exit(0) // force all threads shutdown
         case _ =>
+          System.exit(0) // force all threads shutdown
       }
     } else {
       println("Welcome to the Score command-line client...")
@@ -53,7 +53,7 @@ object Start {
       val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size)
       val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx)
 
-      val pkAccs = Wallet.privateKeyAccounts()
+      val pkAccs = Wallet.privateKeyAccounts().ensuring(_.size > 0)
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val recipientAcc = new Account(recipientAddress)
 
