@@ -57,7 +57,7 @@ object Controller {
     Wallet.close()
 
     //FORCE CLOSE
-    System.exit(0)
+    System.exit(10)
   }
 
   //FORGE

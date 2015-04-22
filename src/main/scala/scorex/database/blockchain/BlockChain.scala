@@ -2,7 +2,6 @@ package scorex.database.blockchain
 
 import scorex.account.Account
 import scorex.block.Block
-import scorex.transaction.Transaction
 import settings.Settings
 
 trait BlockChain {
@@ -53,4 +52,7 @@ trait BlockChain {
 
   def removeAfter(signature: Array[Byte]) = while (!lastSignature().sameElements(signature)) discardBlock()
 
+  def score = (1 to height()).foldLeft(0: BigInt) { case (score, h) =>
+    score + blockAt(h).map(_.generationData.blockScore()).getOrElse(0: BigInt)
+  }
 }

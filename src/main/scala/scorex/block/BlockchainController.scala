@@ -24,7 +24,7 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
 
   private var status = Status.Offline
 
-  private val blockGenerator = context.actorOf(Props[BlockGenerator])
+  private lazy val blockGenerator = context.actorOf(Props[BlockGenerator])
 
   override def preStart() = {
     context.system.scheduler.schedule(1.second, 2.seconds)(self ! CheckState)
@@ -46,11 +46,9 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
 
     case MaxChainScore(scoreOpt) => scoreOpt match {
       case Some(maxScore) =>
-        if (maxScore > PrunableBlockchainStorage.height()) {
-          status = Status.Syncing
-        } else {
-          status = Status.Generating
-        }
+        if (maxScore > PrunableBlockchainStorage.score) status = Status.Syncing
+        else status = Status.Generating
+
       case None => status = Status.Offline
     }
 
@@ -86,7 +84,7 @@ object BlockchainController {
 
   case object GetMaxChainScore
 
-  case class MaxChainScore(scoreOpt: Option[Int])
+  case class MaxChainScore(scoreOpt: Option[BigInt])
 
   case object GetStatus
 

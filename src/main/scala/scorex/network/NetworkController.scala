@@ -28,26 +28,26 @@ class NetworkController extends Actor {
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerData]()
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
 
-  private def maxPeerHeight() = Try(connectedPeers.maxBy(_._2.height)._2.height).toOption.flatten
+  private def maxPeerScore() = Try(connectedPeers.maxBy(_._2.blockchainScore)._2.blockchainScore).toOption.flatten
 
-  private def maxHeightHandler() = Try(connectedPeers.maxBy(_._2.height)._2.handler).toOption
+  private def maxHeightHandler() = Try(connectedPeers.maxBy(_._2.blockchainScore)._2.handler).toOption
 
   //todo: a bit stupid workaround, consider more elegant solution for circular linking
   private var blockchainControllerOpt: Option[ActorRef] = None
 
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(Settings.bindAddress), Settings.Port))
 
-  private def updateHeight(remote: InetSocketAddress, height: Int) = {
-    val prevBestHeight = maxPeerHeight().getOrElse(0)
+  private def updateScore(remote: InetSocketAddress, score: BigInt) = {
+    val prevBestScore = maxPeerScore().getOrElse(0:BigInt)
 
     connectedPeers.get(remote).foreach { peerData =>
-      connectedPeers.put(remote, peerData.copy(height = Some(height)))
-      Logger.getGlobal.info(s"Height updated for $remote: $height")
+      connectedPeers.put(remote, peerData.copy(blockchainScore = Some(score)))
+      Logger.getGlobal.info(s"Score updated for $remote: $score")
     }
 
-    if (height > prevBestHeight) {
+    if (score > prevBestScore) {
       connectedPeers.foreach { case (_, PeerData(handler, _)) =>
-        handler ! PeerConnectionHandler.BestPeer(remote, height > PrunableBlockchainStorage.height())
+        handler ! PeerConnectionHandler.BestPeer(remote, score > PrunableBlockchainStorage.height())
       }
     }
   }
@@ -123,7 +123,7 @@ class NetworkController extends Actor {
 
     case GetMaxChainScore =>
       if (blockchainControllerOpt.isEmpty) blockchainControllerOpt = Some(sender())
-      sender() ! BlockchainController.MaxChainScore(maxPeerHeight())
+      sender() ! BlockchainController.MaxChainScore(maxPeerScore())
 
     case NewBlock(block, Some(sndr)) =>
       blockchainControllerOpt.foreach { blockchainController =>
@@ -132,7 +132,7 @@ class NetworkController extends Actor {
         self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
       }
 
-    case UpdateHeight(remote, h) => updateHeight(remote, h)
+    case UpdateBlockchainScore(remote, score) => updateScore(remote, score)
 
     case a: Any => Logger.getGlobal.warning(s"NetworkController: got something strange $a")
   }
@@ -148,13 +148,13 @@ object NetworkController {
 
   case object GetPeers
 
-  case object GetMaxHeight
+  case object GetMaxBlockchainScore
 
-  case class PeerData(handler: ActorRef, height: Option[Int])
+  case class PeerData(handler: ActorRef, blockchainScore: Option[BigInt])
 
   case class PeerDisconnected(address: InetSocketAddress)
 
-  case class UpdateHeight(remote: InetSocketAddress, height: Int)
+  case class UpdateBlockchainScore(remote: InetSocketAddress, score: BigInt)
 
   case class SendMessageToBestPeer(message: Message)
 

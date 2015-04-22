@@ -9,7 +9,7 @@ import akka.util.ByteString
 import scorex.block.{Block, NewBlock}
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
-import scorex.network.NetworkController.UpdateHeight
+import scorex.network.NetworkController.UpdateBlockchainScore
 import scorex.network.message.{Message, _}
 import scorex.transaction.Transaction.TransactionType
 
@@ -48,7 +48,7 @@ class PeerConnectionHandler(networkController: ActorRef,
         flags.copy(peersAwait = false)
         println("got peers: " + peers) //todo:handling
 
-      case HeightMessage(height) => networkController ! UpdateHeight(remote, height)
+      case ScoreMessage(score) => networkController ! UpdateBlockchainScore(remote, score)
 
       case GetSignaturesMessage(signaturesGot) =>
         signaturesGot.exists { parent =>
@@ -82,7 +82,7 @@ class PeerConnectionHandler(networkController: ActorRef,
 
         if (Block.isNewBlockValid(block)) {
           networkController ! NewBlock(block, Some(remote))
-        } else networkController ! UpdateHeight(remote, height)
+        } else networkController ! UpdateBlockchainScore(remote, height)
 
       case TransactionMessage(transaction) =>
         //CHECK IF SIGNATURE IS VALID OR GENESIS TRANSACTION
@@ -100,7 +100,7 @@ class PeerConnectionHandler(networkController: ActorRef,
   override def receive = {
     case PingRemote => self ! PingMessage
 
-    case SendHeight => self ! HeightMessage(PrunableBlockchainStorage.height())
+    case SendHeight => self ! ScoreMessage(PrunableBlockchainStorage.score)
 
     case msg: Message =>
       val (sendFlag, newFlags) = msg match {

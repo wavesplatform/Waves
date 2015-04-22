@@ -10,7 +10,7 @@ import settings.Constants
 import scala.util.Random
 
 object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
-  private val AvgFrequency = 3 //60 - the algo's goal is 1 block per minute in average
+  val AvgFrequency = 2 //60 - the algo's goal is 1 block per minute in average
 
   override protected def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block): Option[BlockStub] = {
     val lastBlockKernelData = lastBlock.generationData.asInstanceOf[NxtBlockGenerationData]
