@@ -135,7 +135,7 @@ class PeerConnectionHandler(networkController: ActorRef,
         //context stop self
 
         case Success(message) =>
-          Logger.getGlobal.info("received message " + message.messageType + " from " + remote)
+          Logger.getGlobal.info("received message " + message.getClass.getSimpleName + " from " + remote)
 
           handleMessage(message)
       }
