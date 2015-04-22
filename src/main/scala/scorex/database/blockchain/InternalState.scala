@@ -51,9 +51,9 @@ class InternalState extends StateQuery {
 
         //update balances sheet
         val acc = accOpt.getOrElse(forger)
-        val currentBalance = Option(balances.get()).getOrElse(BigDecimal(0))
-        val newBalance = (if (!reversal) currentBalance + delta else currentBalance - delta).ensuring(_ >= 0)
-        balances.put(acc, newBalance)
+        val currentBalance = Option(balances.get(acc)).getOrElse(BigDecimal(0))
+        val newBalance = if (!reversal) currentBalance + delta else currentBalance - delta
+        balances.put(acc, newBalance).ensuring(newBalance >= 0 )
       }
     }
     val newHeight = (if (!reversal) stateHeight() + 1 else stateHeight() - 1).ensuring(_ > 0)
