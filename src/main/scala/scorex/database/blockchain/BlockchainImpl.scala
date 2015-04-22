@@ -8,7 +8,7 @@ import settings.Settings
 import scala.collection.concurrent.TrieMap
 
 
-class YoctoBlockchainImpl extends BlockChain {
+class BlockchainImpl extends BlockChain {
 
   private val signaturesIndex = TrieMap[Int, Array[Byte]]()
   private val blocksIndex = TrieMap[Int, Block]()

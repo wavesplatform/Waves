@@ -10,7 +10,7 @@ import scorex.transaction.Transaction
  * Facade to both blockchain & internal state implementations
  */
 object PrunableBlockchainStorage extends BlockChain with StateQuery {
-  private val chain = new YoctoBlockchainImpl
+  private val chain = new BlockchainImpl
   private val state = new InternalState
 
   override def height(): Int = chain.height()
