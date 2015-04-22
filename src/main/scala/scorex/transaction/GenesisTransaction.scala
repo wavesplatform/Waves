@@ -66,6 +66,8 @@ case class GenesisTransaction(override val recipient: Account,
 
   override def involvedAmount(account: Account): BigDecimal =
     if (recipient.address.equals(account.address)) amount else 0
+
+  override def balanceChanges(): Map[Option[Account], BigDecimal] = Map(Some(recipient) -> amount)
 }
 
 

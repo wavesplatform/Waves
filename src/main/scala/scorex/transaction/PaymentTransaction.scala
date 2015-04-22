@@ -78,6 +78,9 @@ case class PaymentTransaction(sender: PublicKeyAccount,
       amount
     } else BigDecimal(0)
   }
+
+  override def balanceChanges(): Map[Option[Account], BigDecimal] =
+    Map(Some(sender) -> -amount, Some(recipient) -> amount, None -> fee)
 }
 
 

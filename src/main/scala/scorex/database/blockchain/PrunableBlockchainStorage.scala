@@ -6,48 +6,53 @@ import scorex.transaction.Transaction
 
 //todo: object isn't thread-safe!
 
-object PrunableBlockchainStorage extends BlockChain {
-  private var chainAfterSnapshot: BlockChain = new YoctoBlockchainImpl
-  private var snapshot: Option[Snapshot] = None
+/**
+ * Facade to both blockchain & internal state implementations
+ */
+object PrunableBlockchainStorage extends BlockChain with StateQuery {
+  private val chain = new YoctoBlockchainImpl
+  private val state = new InternalState
 
-  override def height(): Int = chainAfterSnapshot.height()
+  override def height(): Int = chain.height()
 
   override def appendBlock(block: Block): BlockChain = {
-    chainAfterSnapshot = chainAfterSnapshot.appendBlock(block)
-    chainAfterSnapshot
+    state.appendBlock(block)
+    chain.appendBlock(block)
+    chain
   }
 
   override def discardBlock(): BlockChain = {
-    chainAfterSnapshot = chainAfterSnapshot.discardBlock()
-    chainAfterSnapshot
+    state.discardBlock(chain.lastBlock)
+    chain.discardBlock()
+    chain
   }
 
-  override def heightOf(block: Block): Option[Int] = chainAfterSnapshot.heightOf(block)
+  //chain functions
+  override def heightOf(block: Block): Option[Int] = chain.heightOf(block)
 
-  override def heightOf(blockSignature: Array[Byte]): Option[Int] = chainAfterSnapshot.heightOf(blockSignature)
+  override def heightOf(blockSignature: Array[Byte]): Option[Int] = chain.heightOf(blockSignature)
 
-  override def blockAt(height: Int): Option[Block] = chainAfterSnapshot.blockAt(height)
+  override def blockAt(height: Int): Option[Block] = chain.blockAt(height)
 
-  override def contains(block: Block): Boolean = chainAfterSnapshot.contains(block)
+  override def contains(block: Block): Boolean = chain.contains(block)
 
-  override def contains(signature: Array[Byte]): Boolean = chainAfterSnapshot.contains(signature)
+  override def contains(signature: Array[Byte]): Boolean = chain.contains(signature)
 
-  override def balance(address: String, confirmations: Int): BigDecimal = {
-    chainAfterSnapshot.balance(address, confirmations)
-  }
+  override def child(block: Block): Option[Block] = chain.child(block)
 
-  override def child(block: Block): Option[Block] = chainAfterSnapshot.child(block)
+  override def confirmations(tx: Transaction): Option[Int] = chain.confirmations(tx)
 
-  override def confirmations(tx: Transaction): Option[Int] = chainAfterSnapshot.confirmations(tx)
+  override def blockByHeader(signature: Array[Byte]): Option[Block] = chain.blockByHeader(signature)
 
-  override def blockByHeader(signature: Array[Byte]): Option[Block] = chainAfterSnapshot.blockByHeader(signature)
+  def generatedBy(account: Account): Seq[Block] = chain.generatedBy(account)
 
-  def generatedBy(account: Account): Seq[Block] = chainAfterSnapshot.generatedBy(account)
+  //state functions
 
-  override def accountTransactions(account: Account): Seq[Transaction] =
-    chainAfterSnapshot.accountTransactions(account)
+  override def balance(address: String, confirmations: Int): BigDecimal = state.balance(address, confirmations)
 
-  override def watchAccountTransactions(account: Account): Unit = ???
+  override def accountTransactions(account: Account): Seq[Transaction] = state.accountTransactions(account)
 
-  override def stopWatchingAccountTransactions(account: Account): Unit = ???
+  override def watchAccountTransactions(account: Account): Unit = state.watchAccountTransactions(account)
+
+  override def stopWatchingAccountTransactions(account: Account): Unit = state.stopWatchingAccountTransactions(account)
 }

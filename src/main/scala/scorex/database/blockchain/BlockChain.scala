@@ -5,7 +5,7 @@ import scorex.block.Block
 import scorex.transaction.Transaction
 import settings.Settings
 
-trait BlockChain extends StateQuery {
+trait BlockChain {
   def height(): Int
 
   def isEmpty(): Boolean = height() == 0
