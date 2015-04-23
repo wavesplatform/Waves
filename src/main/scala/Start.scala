@@ -18,6 +18,7 @@ object Start {
       Try {
         if (args.length > 0) Settings.filename = args(0)
         Controller.init() //STARTING NETWORK/BLOCKCHAIN/RPC
+        Thread.sleep(5000)
         testingScript()
       } match {
         case Failure(e) =>
@@ -39,8 +40,13 @@ object Start {
   def testingScript(): Unit = {
     val NumOfAccounts = 10
 
-    Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", NumOfAccounts)
-    Wallet.privateKeyAccounts().takeRight(5).foreach(Wallet.deleteAccount)
+    Logger.getGlobal.info("Going to execute testing scenario")
+
+    Try {
+      Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", NumOfAccounts)
+      Wallet.privateKeyAccounts().takeRight(5).foreach(Wallet.deleteAccount)
+    }.ensuring(_.isSuccess)
+
     Logger.getGlobal.info("Executing testing scenario with accounts" +
       s"(${Wallet.privateKeyAccounts().size}) : "
       + Wallet.privateKeyAccounts().mkString(" "))

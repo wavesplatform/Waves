@@ -32,8 +32,8 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   context watch connection
 
-  context.system.scheduler.schedule(500.millis, 3.seconds)(self ! PingRemote)
-  context.system.scheduler.schedule(1.second, 15.seconds)(self ! SendHeight)
+  context.system.scheduler.schedule(500.millis, 5.seconds)(self ! PingRemote)
+  context.system.scheduler.schedule(1.second, 15.seconds)(self ! SendBlockchainScore)
 
   private def handleMessage(message: Message) = {
     message match {
@@ -100,7 +100,7 @@ class PeerConnectionHandler(networkController: ActorRef,
   override def receive = {
     case PingRemote => self ! PingMessage
 
-    case SendHeight => self ! ScoreMessage(PrunableBlockchainStorage.score)
+    case SendBlockchainScore => self ! ScoreMessage(PrunableBlockchainStorage.score)
 
     case msg: Message =>
       val (sendFlag, newFlags) = msg match {
@@ -161,7 +161,7 @@ object PeerConnectionHandler {
 
   case object PingRemote
 
-  case object SendHeight
+  case object SendBlockchainScore
 
   case object CloseConnection
 

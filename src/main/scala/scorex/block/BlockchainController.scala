@@ -7,6 +7,7 @@ import akka.actor.{Actor, ActorRef, Props}
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.NetworkController
 import scorex.network.message.{BlockMessage, GetSignaturesMessage}
+import settings.Constants
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -24,8 +25,6 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
 
   private var status = Status.Offline
 
-  private lazy val blockGenerator = context.actorOf(Props[BlockGenerator])
-
   override def preStart() = {
     context.system.scheduler.schedule(1.second, 2.seconds)(self ! CheckState)
     context.system.scheduler.schedule(500.millis, 1.second)(networkController ! GetMaxChainScore)
@@ -41,7 +40,10 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
           networkController ! NetworkController.SendMessageToBestPeer(msg)
 
         case Status.Generating =>
-          blockGenerator ! BlockGenerator.TryToGenerateBlock
+          println("Trying to generate new block")
+          Constants.ConsensusAlgo.consensusFunctions.generateBlock().foreach { block =>
+            self ! NewBlock(block, None)
+          }
       }
 
     case MaxChainScore(scoreOpt) => scoreOpt match {
