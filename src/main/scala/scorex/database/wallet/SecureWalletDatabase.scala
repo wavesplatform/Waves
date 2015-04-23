@@ -19,8 +19,8 @@ class SecureWalletDatabase(password: String, file: File) {
 
   private lazy val database = DBMaker.newFileDB(file)
     .encryptionEnable(password)
-    .cacheSize(2048)
     .checksumEnable()
+    .closeOnJvmShutdown()
     .mmapFileEnableIfSupported()
     .make()
 

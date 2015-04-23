@@ -20,7 +20,7 @@ object Start {
       Try {
         if (args.length > 0) Settings.filename = args(0)
         Controller.init() //STARTING NETWORK/BLOCKCHAIN/RPC
-        Thread.sleep(5000)
+        Thread.sleep(1000)
         testingScript()
       } match {
         case Failure(e) =>
