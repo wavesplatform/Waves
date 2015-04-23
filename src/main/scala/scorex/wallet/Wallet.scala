@@ -19,10 +19,7 @@ object Wallet {
 
   private var secureDatabaseOpt: Option[SecureWalletDatabase] = None
 
-  def privateKeyAccounts() = secureDatabaseOpt match {
-    case None => Seq[PrivateKeyAccount]()
-    case Some(secureDatabase) => secureDatabase.accounts()
-  }
+  def privateKeyAccounts():Seq[PrivateKeyAccount] = secureDatabaseOpt.map(_.accounts()).getOrElse(Seq())
 
   def create(seed: Array[Byte],
              password: String,
