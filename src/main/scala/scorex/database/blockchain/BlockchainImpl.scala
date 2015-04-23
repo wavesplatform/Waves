@@ -1,13 +1,15 @@
 package scorex.database.blockchain
 
 import java.io.DataInputStream
+
 import com.google.common.primitives.Ints
 import org.mapdb.DBMaker
 import scorex.account.Account
 import scorex.block.Block
 import settings.Settings
-import scala.reflect.io.File
+
 import scala.collection.JavaConversions._
+import scala.reflect.io.File
 import scala.util.Try
 
 // todo: syncing issues
@@ -21,7 +23,7 @@ class BlockchainImpl extends BlockChain {
   private val signaturesIndex = database.createTreeMap("signatures").makeOrGet[Int, Array[Byte]]()
 
   //if there are some uncommited changes from last run, discard'em
-  if(signaturesIndex.size() > 0) database.rollback()
+  if (signaturesIndex.size() > 0) database.rollback()
 
   private def blockFile(height: Int) = File(Settings.dataDir + s"/block-$height")
 
@@ -43,7 +45,7 @@ class BlockchainImpl extends BlockChain {
   override def discardBlock(): BlockChain = {
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
-    Try(blockFile(h).delete())  //todo: write msg to log if problems with deleting
+    Try(blockFile(h).delete()) //todo: write msg to log if problems with deleting
     signaturesIndex.remove(h)
     database.commit()
     this
@@ -61,12 +63,12 @@ class BlockchainImpl extends BlockChain {
       val bytes = new Array[Byte](sz)
       is.read(bytes)
       Block.parse(bytes).toOption
-    }finally is.close()
+    } finally is.close()
   }
 
   override def contains(block: Block): Boolean = contains(block.signature)
 
-  override def contains(signature:Array[Byte]): Boolean = signaturesIndex.exists(_._2.sameElements(signature))
+  override def contains(signature: Array[Byte]): Boolean = signaturesIndex.exists(_._2.sameElements(signature))
 
   override def height(): Int = Option(signaturesIndex.size).getOrElse(0)
 

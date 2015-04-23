@@ -1,6 +1,7 @@
 package scorex.database.blockchain
 
 import java.io.File
+
 import org.mapdb.DBMaker
 import scorex.account.Account
 import scorex.transaction.Transaction
@@ -19,7 +20,10 @@ class Snapshot(height: Int) extends StateQuery {
   override def balance(address: String, confirmations: Int): BigDecimal =
     Option(balancesMap.get(address)).getOrElse(BigDecimal(0))
 
-  override def accountTransactions(account: Account): Seq[Transaction] = ??? //todo: implement
+  override def accountTransactions(account: Account): Seq[Transaction] = ???
+
+  //todo: implement
   override def watchAccountTransactions(account: Account): Unit = ???
+
   override def stopWatchingAccountTransactions(account: Account): Unit = ???
 }

@@ -7,8 +7,6 @@ import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.Crypto
 import settings.Constants
 
-import scala.util.Random
-
 object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
   val AvgFrequency = 2 //60 - the algo's goal is 1 block per minute in average
 
@@ -19,7 +17,7 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
     val h = hit(lastBlockKernelData, account)
     val t = target(lastBlockKernelData, lastBlockTime, account)
 
-    val eta = (NTP.getTime - lastBlock.timestamp)/1000
+    val eta = (NTP.getTime - lastBlock.timestamp) / 1000
     println(s"hit: $h, target: $t, generating ${h < t}, eta $eta, account balance: ${account.generatingBalance}")
     if (h < t) {
       val ts = NTP.getTime

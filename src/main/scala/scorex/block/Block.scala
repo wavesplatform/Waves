@@ -1,16 +1,17 @@
 package scorex.block
 
 import java.util.Arrays
+
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.consensus.qora.{QoraBlockGenerationDataParser, QoraBlockGenerationData}
 import scorex.crypto.{Base58, Crypto}
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
 import settings.Constants
+
 import scala.util.Try
 
 case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long,
@@ -86,13 +87,14 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long,
     } /* else if (timestamp % 1000 != parent().get.timestamp % 1000) {
       //CHECK IF TIMESTAMP REST SAME AS PARENT TIMESTAMP REST
       false
-    }*/ else {
+    }*/
+    else {
       generationData.isValid(this) &&
-      transactions.forall { transaction =>
-        !transaction.isInstanceOf[GenesisTransaction] &&
-          transaction.isValid() == ValidationResult.VALIDATE_OKE &&
-          transaction.timestamp < timestamp && transaction.deadline >= timestamp
-      }
+        transactions.forall { transaction =>
+          !transaction.isInstanceOf[GenesisTransaction] &&
+            transaction.isValid() == ValidationResult.VALIDATE_OKE &&
+            transaction.timestamp < timestamp && transaction.deadline >= timestamp
+        }
     }
   }
 
@@ -103,11 +105,13 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long,
 
 
 object Block {
+
   import Constants.ConsensusAlgo
   import ConsensusAlgo.kernelDataParser.GENERATION_DATA_LENGTH
 
   val Version = 1
-  val MAX_BLOCK_BYTES = 261120 //255 kb
+  val MAX_BLOCK_BYTES = 261120
+  //255 kb
   val VERSION_LENGTH = 4
   val REFERENCE_LENGTH = 64 + Constants.ConsensusAlgo.KERNEL_SIGNATURE_LENGTH
   val TIMESTAMP_LENGTH = 8

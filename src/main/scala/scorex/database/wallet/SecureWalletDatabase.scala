@@ -4,7 +4,6 @@ import java.io.File
 
 import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
-import settings.Settings
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
@@ -27,9 +26,9 @@ class SecureWalletDatabase(password: String, file: File) {
 
   private lazy val accountsPersistence = database.createHashSet("accounts").makeOrGet[Array[Byte]]()
 
-  private lazy val accountsCache:TrieMap[String, PrivateKeyAccount] = {
+  private lazy val accountsCache: TrieMap[String, PrivateKeyAccount] = {
     val accs = accountsPersistence.map(seed => new PrivateKeyAccount(seed))
-    TrieMap(accs.map(acc => acc.address -> acc).toSeq :_*)
+    TrieMap(accs.map(acc => acc.address -> acc).toSeq: _*)
   }
 
   def addAccount(account: PrivateKeyAccount) = {

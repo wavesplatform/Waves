@@ -38,7 +38,7 @@ class NetworkController extends Actor {
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(Settings.bindAddress), Settings.Port))
 
   private def updateScore(remote: InetSocketAddress, score: BigInt) = {
-    val prevBestScore = maxPeerScore().getOrElse(0:BigInt)
+    val prevBestScore = maxPeerScore().getOrElse(0: BigInt)
 
     connectedPeers.get(remote).foreach { peerData =>
       connectedPeers.put(remote, peerData.copy(blockchainScore = Some(score)))

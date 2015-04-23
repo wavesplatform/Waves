@@ -1,14 +1,9 @@
 package api.http
 
-import controller.Controller
 import play.api.libs.json.Json
-
-import scorex.consensus.qora.QoraBlockGenerationFunctions
 import scorex.database.blockchain.PrunableBlockchainStorage
 import settings.Constants
 import spray.routing.HttpService
-
-import scala.util.Try
 
 
 trait BlocksHttpService extends HttpService with CommonApifunctions {

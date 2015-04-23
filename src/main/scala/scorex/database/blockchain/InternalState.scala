@@ -42,9 +42,9 @@ class InternalState extends StateQuery {
       val changes = tx.balanceChanges()
       changes.foreach { case (accOpt, delta) =>
         //check whether account is watched, add tx to its txs list if so
-        accOpt.foreach{acc =>
+        accOpt.foreach { acc =>
           val atxs = accountTransactions.get(acc)
-          if(atxs != null){
+          if (atxs != null) {
             accountTransactions.put(acc, tx :: atxs)
           }
         }
@@ -53,7 +53,7 @@ class InternalState extends StateQuery {
         val acc = accOpt.getOrElse(forger)
         val currentBalance = Option(balances.get(acc)).getOrElse(BigDecimal(0))
         val newBalance = if (!reversal) currentBalance + delta else currentBalance - delta
-        balances.put(acc, newBalance).ensuring(newBalance >= 0 )
+        balances.put(acc, newBalance).ensuring(newBalance >= 0)
       }
     }
     val newHeight = (if (!reversal) stateHeight() + 1 else stateHeight() - 1).ensuring(_ > 0)

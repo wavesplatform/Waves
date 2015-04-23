@@ -44,10 +44,10 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
     } else None
   }
 
-  private def blockGeneratingBalance(block:Block) =
+  private def blockGeneratingBalance(block: Block) =
     block.generationData.asInstanceOf[QoraBlockGenerationData].generatingBalance
 
-  private def blockGeneratorSignature(block:Block) =
+  private def blockGeneratorSignature(block: Block) =
     block.generationData.asInstanceOf[QoraBlockGenerationData].generatorSignature
 
   def getNextBlockGeneratingBalance(block: Block): Long = {

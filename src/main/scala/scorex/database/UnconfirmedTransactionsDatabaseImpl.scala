@@ -1,6 +1,7 @@
 package scorex.database
 
 import scorex.transaction.Transaction
+
 import scala.collection.concurrent.TrieMap
 
 

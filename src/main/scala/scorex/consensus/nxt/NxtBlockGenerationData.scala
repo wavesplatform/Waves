@@ -1,8 +1,8 @@
 package scorex.consensus.nxt
 
-import com.google.common.primitives.{Longs, Bytes}
-import play.api.libs.json.{Json, JsObject}
-import scorex.block.{NxtGenesisBlockGenerationData, Block}
+import com.google.common.primitives.{Bytes, Longs}
+import play.api.libs.json.{JsObject, Json}
+import scorex.block.{Block, NxtGenesisBlockGenerationData}
 import scorex.consensus.BlockGenerationData
 import scorex.crypto.Base58
 
@@ -26,6 +26,7 @@ class NxtBlockGenerationData(val baseTarget: Long, val generatorSignature: Array
 
   //todo: implement sig checking!
   override def isSignatureValid(block: Block): Boolean = true
+
   //todo: implement valid checking!
   override def isValid(block: Block): Boolean = true
 

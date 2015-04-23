@@ -6,7 +6,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import api.http.HttpServiceActor
 import scorex.account.{Account, PrivateKeyAccount}
-import scorex.block.{Block, BlockGenerator, BlockchainController, GenesisBlock}
+import scorex.block.BlockchainController
 import scorex.consensus.qora.QoraBlockGenerationFunctions
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage

@@ -1,18 +1,18 @@
 package scorex.block
 
 import java.math.BigDecimal
+
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import org.joda.time.DateTime
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.consensus.BlockGenerationData
 import scorex.consensus.nxt.NxtBlockGenerationData
-import scorex.consensus.qora.{QoraBlockGenerationDataParser, QoraBlockGenerationData}
+import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataParser}
 import scorex.crypto.Crypto
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.Transaction.ValidationResult
 import settings.Constants
-import Constants.ConsensusAlgo.kernelData
+import settings.Constants.ConsensusAlgo.kernelData
 
 
 object GenesisBlockParams {
@@ -33,14 +33,14 @@ object GenesisBlockParams {
     "2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPNKr"
   )
 
-  def transactions(timestamp:Long) = ipoMembers.map { addr =>
+  def transactions(timestamp: Long) = ipoMembers.map { addr =>
     val recipient = new Account(addr)
     GenesisTransaction(recipient, new BigDecimal("1000000000").setScale(8), timestamp)
   }
 }
 
 
-abstract class GenesisBlock(override val generationData: kernelData, override val timestamp:Long)
+abstract class GenesisBlock(override val generationData: kernelData, override val timestamp: Long)
   extends Block(version = GenesisBlockParams.version, reference = GenesisBlockParams.reference, timestamp,
     generator = GenesisBlockParams.generator, generationData,
     GenesisBlockParams.transactions(timestamp), Array.fill(64)(0)) {
@@ -50,8 +50,6 @@ abstract class GenesisBlock(override val generationData: kernelData, override va
   override def isValid() =
     PrunableBlockchainStorage.isEmpty() && transactions.forall(_.isValid() == ValidationResult.VALIDATE_OKE)
 }
-
-
 
 
 object QoraGenesisBlockGenerationData {
@@ -72,15 +70,16 @@ object QoraGenesisBlockGenerationData {
 }
 
 object NxtGenesisBlockGenerationData {
-  val InitialGenerationSignature = Array.fill(32)(0:Byte)
-  val InitialBaseTarget:Long = 153722867 * 10 //Nxt's initial base target * 10, as 10 bln tokens total instead of 1
+  val InitialGenerationSignature = Array.fill(32)(0: Byte)
+  val InitialBaseTarget: Long = 153722867 * 10
+  //Nxt's initial base target * 10, as 10 bln tokens total instead of 1
   lazy val generationData = new NxtBlockGenerationData(NxtGenesisBlockGenerationData.InitialBaseTarget,
-                                                        NxtGenesisBlockGenerationData.InitialGenerationSignature)
+    NxtGenesisBlockGenerationData.InitialGenerationSignature)
 }
 
 object NxtGenesisBlock extends GenesisBlock(
   NxtGenesisBlockGenerationData.generationData.asInstanceOf[Constants.ConsensusAlgo.kernelData],
-  new DateTime(2015, 4, 13, 10, 35).getMillis){
+  new DateTime(2015, 4, 13, 10, 35).getMillis) {
 
   require(signature.length == 96)
 }

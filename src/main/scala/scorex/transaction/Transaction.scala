@@ -3,8 +3,7 @@ package scorex.transaction
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Account
 import scorex.crypto.Base58
-import scorex.transaction.Transaction.ValidationResult
-import scorex.transaction.Transaction._
+import scorex.transaction.Transaction.{ValidationResult, _}
 import settings.Settings
 
 
@@ -13,7 +12,7 @@ abstract class Transaction(val transactionType: TransactionType.Value,
                            val amount: BigDecimal,
                            val fee: BigDecimal,
                            val timestamp: Long,
-                           val signature: Array[Byte]){
+                           val signature: Array[Byte]) {
 
   lazy val deadline = timestamp + (1000 * 60 * 60 * 24)
   //24HOUR DEADLINE TO INCLUDE TRANSACTION IN BLOCK
@@ -44,7 +43,7 @@ abstract class Transaction(val transactionType: TransactionType.Value,
   def involvedAmount(account: Account): BigDecimal
 
   //if key is None then balance change is going to block forger
-  def balanceChanges():Map[Option[Account], BigDecimal]
+  def balanceChanges(): Map[Option[Account], BigDecimal]
 
   override def equals(other: Any) = other match {
     case tx: Transaction => signature.sameElements(tx.signature)

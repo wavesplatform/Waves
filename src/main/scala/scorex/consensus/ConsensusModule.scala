@@ -1,7 +1,7 @@
 package scorex.consensus
 
-import scorex.block.{QoraGenesisBlock, NxtGenesisBlock, GenesisBlock}
-import scorex.consensus.nxt.{NxtBlockGenerationDataParser, NxtBlockGenerationFunctions, NxtBlockGenerationData}
+import scorex.block.{GenesisBlock, NxtGenesisBlock, QoraGenesisBlock}
+import scorex.consensus.nxt.{NxtBlockGenerationData, NxtBlockGenerationDataParser, NxtBlockGenerationFunctions}
 import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataParser, QoraBlockGenerationFunctions}
 
 //consensus-related
@@ -9,12 +9,12 @@ import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataPa
 trait ConsensusModule {
   type kernelData <: BlockGenerationData
 
-  val KERNEL_SIGNATURE_LENGTH:Int
+  val KERNEL_SIGNATURE_LENGTH: Int
 
   val consensusFunctions: BlockGenerationFunctions
   val kernelDataParser: BlockGenerationDataParser[kernelData]
 
-  val genesisBlock:GenesisBlock
+  val genesisBlock: GenesisBlock
 }
 
 object ConsensusModuleQora extends ConsensusModule {

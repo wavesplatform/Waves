@@ -1,11 +1,12 @@
 package scorex.consensus.qora
 
 import java.util
+
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.Json
-import scorex.block.{QoraGenesisBlockGenerationData, Block}
+import scorex.block.{Block, QoraGenesisBlockGenerationData}
 import scorex.consensus.BlockGenerationData
-import scorex.crypto.{Crypto, Base58}
+import scorex.crypto.{Base58, Crypto}
 import scorex.database.blockchain.PrunableBlockchainStorage
 
 
@@ -59,7 +60,7 @@ class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignatur
     }
   }
 
-  override def isSignatureValid(block:Block):Boolean = {
+  override def isSignatureValid(block: Block): Boolean = {
     val generatingBalanceBytes = Longs.toByteArray(generatingBalance).ensuring(_.size == GENERATING_BALANCE_LENGTH)
 
     val blockSignature = Bytes.concat(util.Arrays.copyOfRange(block.reference, 0, GENERATOR_SIGNATURE_LENGTH),

@@ -1,6 +1,7 @@
 package scorex
 
 import java.util.logging.Logger
+
 import api.http.ApiClient
 import controller.Controller
 import scorex.account.Account
@@ -8,6 +9,7 @@ import scorex.block.GenesisBlockParams
 import scorex.crypto.Base58
 import scorex.wallet.Wallet
 import settings.Settings
+
 import scala.io.StdIn
 import scala.util.{Failure, Random, Try}
 

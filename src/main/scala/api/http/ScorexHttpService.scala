@@ -4,7 +4,7 @@ import akka.pattern.ask
 import controller.Controller
 import play.api.libs.json.Json
 import scorex.block.BlockchainController
-import settings.{Constants, Settings}
+import settings.Constants
 import spray.routing.HttpService
 
 import scala.concurrent.ExecutionContext.Implicits.global

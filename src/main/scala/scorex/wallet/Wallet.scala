@@ -1,5 +1,6 @@
 package scorex.wallet
 
+import java.io.File
 import java.util.logging.Logger
 
 import com.google.common.primitives.{Bytes, Ints}
@@ -7,26 +8,26 @@ import scorex.account.PrivateKeyAccount
 import scorex.crypto.Crypto
 import scorex.database.wallet.SecureWalletDatabase
 import settings.Settings
+
 import scala.util.Try
-import java.io.File
 
 
 //todo: the Wallet object is not thread-safe at all, fix!
 object Wallet {
   private val SettingsWalletFile = new File(Settings.walletDir, "wallet.s.dat")
 
-  private var walletFile:File = SettingsWalletFile
+  private var walletFile: File = SettingsWalletFile
 
   private var secureDatabaseOpt: Option[SecureWalletDatabase] = None
 
-  def privateKeyAccounts():Seq[PrivateKeyAccount] = secureDatabaseOpt.map(_.accounts()).getOrElse(Seq())
+  def privateKeyAccounts(): Seq[PrivateKeyAccount] = secureDatabaseOpt.map(_.accounts()).getOrElse(Seq())
 
   def create(seed: Array[Byte],
              password: String,
              depth: Int,
-             customWalletFile:File = walletFile): Boolean = {
+             customWalletFile: File = walletFile): Boolean = {
 
-    if(customWalletFile != walletFile) walletFile = customWalletFile
+    if (customWalletFile != walletFile) walletFile = customWalletFile
 
     val secureDatabase = new SecureWalletDatabase(password, walletFile)
 
