@@ -71,7 +71,7 @@ object Wallet {
     }
   }
 
-  def generateAccountSeed(seed: Array[Byte], nonce: Int):Array[Byte] = {
+  def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] = {
     val nonceBytes = Ints.toByteArray(nonce)
     val accountSeed = Bytes.concat(nonceBytes, seed, nonceBytes)
     Crypto.doubleSha256(accountSeed)
