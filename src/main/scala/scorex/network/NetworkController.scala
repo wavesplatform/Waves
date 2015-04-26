@@ -23,8 +23,6 @@ class NetworkController extends Actor {
 
   private implicit val system = context.system
 
-  //todo: longest chain rule doesn't make sense for proof-of-stake at all and probably dangerous!
-  //todo: so should be replaced with cumulative difficulty (aka maxvalid function)
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerData]()
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
 
