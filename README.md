@@ -42,6 +42,12 @@ Current Limitations
 
 todo: current glitches / limitations list
 
+Contributions
+-------------
+
+Contributions are welcome!
+
+
 API
 ---
 todo: API description
