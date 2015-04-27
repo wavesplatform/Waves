@@ -1,13 +1,7 @@
 #!/bin/sh
 
-rm -rf target/
-
-sbt clean
-
-sbt compile
-
-sbt start-script
+./recompile.sh
 
 cp settings.json target
 
-sh -c 'target/start scorex.Start'
+target/start scorex.Start
