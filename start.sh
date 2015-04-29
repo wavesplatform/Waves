@@ -2,6 +2,6 @@
 
 ./recompile.sh
 
-cp settings.json target
+cp settings.json target/scala-2.11
 
-target/start scorex.Start
+java -jar target/scala-2.11/scorex.jar

@@ -34,7 +34,19 @@ Install SBT(Scala Build Tool):
 `apt-get update`
 `apt-get install sbt`
 
-& run start.sh script!
+Run
+---
+
+Run start.sh script to connect to the network, but network is down now :)
+
+Another option is to run one or two peers on the local machine:
+ 
+ todo: finish
+ 
+*  
+ 
+
+* 
 
 
 Current Limitations

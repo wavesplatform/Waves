@@ -6,4 +6,4 @@ sbt clean
 
 sbt compile
 
-sbt start-script
+sbt assembly

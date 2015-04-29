@@ -1,7 +1,3 @@
-import com.typesafe.sbt.SbtStartScript
-
-import SbtStartScript.StartScriptKeys._
-
 organization := "com.consensusresearch"
 
 name := "scorex"
@@ -35,4 +31,9 @@ importRun := {
     val one = (runMain in Compile).fullInput("migration.ImportUtils").evaluated
 }
 
-Seq(SbtStartScript.startScriptForClassesSettings:_*)
+
+assemblyJarName in assembly := "scorex.jar"
+
+test in assembly := {}
+
+mainClass in assembly := Some("scorex.Start")
