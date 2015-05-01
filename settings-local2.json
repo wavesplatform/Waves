@@ -6,7 +6,7 @@
   	"walletdir" : "/tmp/wallet2",
     "datadir" : "/tmp/data2",
 	"minconnections": 10,
-    "rpcport" : 9085,
+    "rpcport" : 9086,
 	"rpcallowed":[
 		"127.0.0.1",
 		"123.123.123.123"
