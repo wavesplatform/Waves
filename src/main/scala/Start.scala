@@ -7,6 +7,7 @@ import controller.Controller
 import scorex.account.Account
 import scorex.block.GenesisBlockParams
 import scorex.crypto.Base58
+import scorex.transaction.TransactionCreator
 import scorex.wallet.Wallet
 import settings.Settings
 
@@ -68,7 +69,7 @@ object Start {
       val amt = new java.math.BigDecimal(Random.nextInt(100000))
       val fee = new java.math.BigDecimal(1 + Random.nextInt(5))
 
-      val (tx, valRes) = Controller.sendPayment(senderAcc, recipientAcc, amt, fee)
+      val (tx, valRes) = TransactionCreator.createPayment(senderAcc, recipientAcc, amt, fee)
       println(s"Payment created: $tx, validationResult: $valRes")
     }
   }

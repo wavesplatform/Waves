@@ -3,6 +3,7 @@ package api.http
 import controller.Controller
 import play.api.libs.json.Json
 import scorex.account.Account
+import scorex.transaction.TransactionCreator
 import scorex.wallet.Wallet
 import spray.routing.HttpService
 
@@ -25,7 +26,7 @@ trait PaymentHttpService extends HttpService with CommonApifunctions {
                 case (_, _, Failure(_), _) => ApiError.toJson(ApiError.ERROR_INVALID_SENDER)
                 case (_, _, _, Failure(_)) => ApiError.toJson(ApiError.ERROR_INVALID_RECIPIENT)
                 case (Success(amount), Success(fee), Success(Some(sender)), Success(recipient)) =>
-                  Controller.sendPayment(sender, new Account(recipient), amount, fee)
+                  TransactionCreator.createPayment(sender, new Account(recipient), amount, fee)
                 //todo: create json
               }
             }.getOrElse(ApiError.toJson(ApiError.ERROR_JSON))

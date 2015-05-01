@@ -1,18 +1,15 @@
 package controller
 
 import java.util.logging.Logger
-
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import api.http.HttpServiceActor
-import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.BlockchainController
-import scorex.consensus.qora.QoraBlockGenerationFunctions
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.NetworkController
 import scorex.network.message._
-import scorex.transaction.{Transaction, TransactionCreator}
+import scorex.transaction.Transaction
 import scorex.wallet.Wallet
 import settings.{Constants, Settings}
 import spray.can.Http
@@ -60,16 +57,8 @@ object Controller {
     System.exit(10)
   }
 
-  //FORGE
   def onTransactionCreate(transaction: Transaction) {
     UnconfirmedTransactionsDatabaseImpl.put(transaction)
     networkController ! NetworkController.BroadcastMessage(TransactionMessage(transaction))
   }
-
-  //todo: proxy methods below are not needed probably
-
-  def sendPayment(sender: PrivateKeyAccount, recipient: Account, amount: BigDecimal, fee: BigDecimal) =
-    TransactionCreator.synchronized {
-      TransactionCreator.createPayment(sender, recipient, amount, fee)
-    }
 }
