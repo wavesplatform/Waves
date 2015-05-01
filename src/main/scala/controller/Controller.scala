@@ -72,6 +72,4 @@ object Controller {
     TransactionCreator.synchronized {
       TransactionCreator.createPayment(sender, recipient, amount, fee)
     }
-
-  def nextBlockGeneratingBalance() = QoraBlockGenerationFunctions.getNextBlockGeneratingBalance(PrunableBlockchainStorage.lastBlock)
 }
