@@ -37,16 +37,20 @@ Install SBT(Scala Build Tool):
 Run
 ---
 
-Run start.sh script to connect to the network, but network is down now :)
+Run start.sh script to connect to the network, but network is down now :) 
+
+You can edit folders / other settings in settings.json file before running ./start.sh .  
 
 Another option is to run one or two peers on the local machine:
  
- todo: finish
- 
-*  
- 
 
-* 
+* run ./recompile.sh to (re-)build .jar file
+* run ./start-local1.sh to run first local peer binded to 127.0.0.1:9084 . Edit settings in settings-local1.json
+   if needed.
+* run ./start-local2.sh to run second local peer binded to 127.0.0.2:9084 . Edit settings in settings-local2.json
+   if needed.   
+* You can run both peers simultaneously by running ./start-local.sh   
+   
 
 
 Current Limitations
