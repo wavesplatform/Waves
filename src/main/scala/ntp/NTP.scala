@@ -5,8 +5,6 @@ import java.util.logging.Logger
 
 import org.apache.commons.net.ntp.NTPUDPClient
 
-import scala.util.Try
-
 
 object NTP {
   private val TIME_TILL_UPDATE = 1000 * 60 * 10L
@@ -15,7 +13,7 @@ object NTP {
   private var lastUpdate: Long = 0
   private var offset: Long = 0
 
-  def getTime = {
+  def getTime() = {
     //CHECK IF OFFSET NEEDS TO BE UPDATED
     if (System.currentTimeMillis() > lastUpdate + TIME_TILL_UPDATE) {
       updateOffSet()
@@ -33,16 +31,16 @@ object NTP {
     val client = new NTPUDPClient()
     client.setDefaultTimeout(10000)
 
-    Try {
+    try {
       client.open()
 
-      //GET INFO FROM NTP SERVER
-      val hostAddr = InetAddress.getByName(NTP_SERVER)
-      val info = client.getTime(hostAddr)
+      val info = client.getTime(InetAddress.getByName(NTP_SERVER))
       info.computeDetails()
-
       if (info.getOffset != null) offset = info.getOffset
+    } catch {
+      case t: Throwable => Logger.getGlobal.warning("Problems with NTP: " + t.getMessage)
+    } finally {
+      client.close()
     }
-    client.close()
   }
 }
