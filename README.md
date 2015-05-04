@@ -1,13 +1,38 @@
 Scorex - Lagonaki Release
 =========================
 
-**It's the buggy as hell pre-release version! So better wait until release!**
+**At the moment it's the buggy as hell pre-release version! Anyway, I would be happy to invite early 
+birds to play with the Scorex and submit any bugs if found.**
 
 Motivation
 ----------
 
+There are two huge problems around cryptocurrencies development project Scorex aims to weaken:
+
+* Bitcoin source code contains more 100K lines of code(80K of C++ only), Nxt is about more than 45K
+ line of Java code. All parts of the design(network/transactions/consensus layers) are mixed in a hard way. 
+ So researchers & developers are not in good start positions to make experiments.
+  
+ In opposite, Scorex is less than 4K of Scala code. Transactions layer is as simple as that. Consensus algo 
+ could be switched easily(with two consensus algos out of the box, one could be replaced with an another with
+  just one line of code edited!)
+
+* Major coins forks are trying to make IPO immediately, often having just one or two pretty controversial
+ feature. Scorex is intentionally not production-ready, so please participate in experiments built on top of it,
+ but don't buy tokens unless you are 100% sure what are you doing.
+ 
 Features
 --------
+
+* Compact, functional, actors-powered code
+* Two 100% Proof-of-Stake consensus algos out of the box, Nxt-like and Qora-like. One algo could be replaced
+with an another with just one line of code edited (in Constants.scala)
+* Simplest transactions model
+* Asynchronous network layer on top of TCP 
+* JSON API
+* Command line client for the JSON API
+* Curve25519 for signatures
+
 
 Installation
 ------------
@@ -57,6 +82,7 @@ Current Limitations
 -------------------
 
 todo: current glitches / limitations list
+
 
 Contributions
 -------------
