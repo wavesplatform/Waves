@@ -92,4 +92,22 @@ Contributions are welcome!
 
 API
 ---
-todo: API description
+
+Access API in a browser (e.g. http://localhost:9085/addresses/ ) or CURL 
+or with the command line client (GET addresses/)
+
+**/addresses - info about wallet's accounts and different utilitary calls about addresses**
+
+* /addresses/ - get wallet addresses
+
+* /addresses/validate/{address} - check whether address {address} is valid or not
+
+* /addresses/seed/{address} - export seed value for the {address}
+
+* /addresses/new - create new address in the local wallet
+
+
+  
+  
+
+todo: finish API description
