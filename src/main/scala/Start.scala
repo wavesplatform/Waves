@@ -10,16 +10,21 @@ import scorex.crypto.Base58
 import scorex.transaction.TransactionCreator
 import scorex.wallet.Wallet
 import settings.Settings
+import ch.qos.logback.classic.LoggerContext
+import org.slf4j.LoggerFactory
 
 import scala.io.StdIn
 import scala.util.{Failure, Random, Try}
 
 object Start {
+  def logger = LoggerFactory.getLogger(this.getClass)
 
   def main(args: Array[String]) {
+    logger.debug("main " + args)
     if (!args.contains("-cli")) {
       Try {
         if (args.length > 0) Settings.filename = args(0)
+        logger.debug("Controller init")
         Controller.init() //STARTING NETWORK/BLOCKCHAIN/RPC
         Thread.sleep(1000)
         testingScript()
