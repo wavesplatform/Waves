@@ -29,8 +29,6 @@ class WalletSpecification extends FunSuite {
     Wallet.deleteAccount(Wallet.privateKeyAccounts().head)
     assert(Wallet.privateKeyAccounts().size == walletSize - 2)
 
-    println(Wallet.privateKeyAccounts().mkString(" : "))
-
     Wallet.privateKeyAccounts().foreach(Wallet.deleteAccount)
 
     assert(Wallet.privateKeyAccounts().size == 0)
