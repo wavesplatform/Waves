@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory
 import scala.util.Random
 
 object PeerManager {
-  def logger = LoggerFactory.getLogger(this.getClass)
+  lazy val logger = LoggerFactory.getLogger(this.getClass)
 
   private val DATABASE_PEERS_AMOUNT = 1000
 

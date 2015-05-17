@@ -17,7 +17,7 @@ import scala.io.StdIn
 import scala.util.{Failure, Random, Try}
 
 object Start {
-  def logger = LoggerFactory.getLogger(this.getClass)
+  lazy val logger = LoggerFactory.getLogger(this.getClass)
 
   def main(args: Array[String]) {
     logger.debug("main " + args)

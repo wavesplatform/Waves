@@ -13,7 +13,7 @@ There are two huge problems around cryptocurrencies development project Scorex a
  line of Java code. All parts of the design(network/transactions/consensus layers) are mixed in a hard way. 
  So researchers & developers are not in good start positions to make experiments.
   
- In opposite, Scorex is less than 4K of Scala code. Transactions layer is as simple as that. Consensus algo 
+ In opposite, Scorex is less than 4K lines of Scala code. Transactions layer is as simple as that. Consensus algo 
  could be switched easily(with two consensus algos out of the box, one could be replaced with an another with
   just one line of code edited!)
 
