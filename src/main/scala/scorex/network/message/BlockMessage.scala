@@ -31,7 +31,7 @@ object BlockMessage {
     val heightBytes = Arrays.copyOfRange(data, 0, HEIGHT_LENGTH)
     val height = Ints.fromByteArray(heightBytes)
 
-    val block = Block.parse(Arrays.copyOfRange(data, HEIGHT_LENGTH, data.length + 1)).get //todo: exceptions?
+    val block = Block.parse(Arrays.copyOfRange(data, HEIGHT_LENGTH, data.length + 1)).get
 
     new BlockMessage(height, block)
   }
