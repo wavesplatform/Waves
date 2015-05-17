@@ -21,7 +21,6 @@ class SecureWalletDatabase(password: String, file: File) {
     .encryptionEnable(password)
     .checksumEnable()
     .closeOnJvmShutdown()
-    .mmapFileEnableIfSupported()
     .make()
 
   private lazy val accountsPersistence = database.createHashSet("accounts").makeOrGet[Array[Byte]]()
@@ -45,9 +44,11 @@ class SecureWalletDatabase(password: String, file: File) {
 
   def account(address: String) = accountsCache.get(address)
 
-  def setSeed(seed: Array[Byte]): Unit = {
-    Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY)).getOrElse(database.getAtomicVar(SEED).set(seed))
-  }
+  def setSeed(seed: Array[Byte]): Unit =
+    Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY))
+      .getOrElse(database.getAtomicVar(SEED)
+      .set(seed))
+
 
   def seed(): Array[Byte] = database.getAtomicVar(SEED).get()
 
