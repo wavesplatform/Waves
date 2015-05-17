@@ -2,22 +2,24 @@ package scorex.network
 
 import java.net.InetSocketAddress
 import java.util.logging.Logger
-
 import scorex.database.PeerDatabaseImpl
 import settings.Settings
+import ch.qos.logback.classic.LoggerContext
+import org.slf4j.LoggerFactory
 
 import scala.util.Random
 
 object PeerManager {
+  def logger = LoggerFactory.getLogger(this.getClass)
 
   private val DATABASE_PEERS_AMOUNT = 1000
 
   def knownPeers(): Seq[InetSocketAddress] = {
     val knownPeers = PeerDatabaseImpl.knownPeers()
-    Logger.getGlobal.info("Peers retrieved from database : " + knownPeers)
+    logger.info("Peers retrieved from database : " + knownPeers)
     if (knownPeers.size < DATABASE_PEERS_AMOUNT) {
       val allPeers = Settings.knownPeers ++ knownPeers
-      Logger.getGlobal.info("Peers retrieved after settings : " + allPeers)
+      logger.info("Peers retrieved including settings : " + allPeers)
       allPeers
     } else knownPeers
   }
