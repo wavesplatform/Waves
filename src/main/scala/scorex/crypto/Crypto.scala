@@ -15,7 +15,6 @@ object Crypto {
   val ADDRESS_VERSION: Byte = 58
 
   def getAddress(publicKey: Array[Byte]) = {
-    //SHA256 PUBLICKEY FOR PROTECTION THEN RIPEMD160 TO CREATE A SHORTER ADDRESS
     val publicKeyHash = new RIPEMD160().digest(sha256(publicKey))
 
     //CONVERT TO LIST
@@ -24,19 +23,16 @@ object Crypto {
     //GENERATE CHECKSUM
     val checkSum = doubleSha256(withoutChecksum)
 
-    //ADD FIRST 4 BYTES OF CHECKSUM TO ADDRESS
-    //BASE58 ENCODE ADDRESS
     Base58.encode(withoutChecksum ++ checkSum.take(4))
   }
 
   def isValidAddress(address: String) =
     Try {
-      //BASE 58 DECODE
       val addressBytes = Base58.decode(address)
 
       //CHECK BYTES
-      if (addressBytes.length != Account.ADDRESS_LENGTH) false
-      //else if(addressBytes.head != ADDRESS_VERSION) false    todo:???
+      if (addressBytes.length != Account.ADDRESS_LENGTH)
+        false
       else {
         val checkSum = addressBytes.takeRight(4)
 
