@@ -28,7 +28,7 @@ class NetworkController extends Actor {
 
   private def maxPeerScore() = Try(connectedPeers.maxBy(_._2.blockchainScore)._2.blockchainScore).toOption.flatten
 
-  private def maxHeightHandler() = Try(connectedPeers.maxBy(_._2.blockchainScore)._2.handler).toOption
+  private def maxScoreHandler() = Try(connectedPeers.maxBy(_._2.blockchainScore)._2.handler).toOption
 
   //todo: a bit stupid workaround, consider more elegant solution for circular linking
   private var blockchainControllerOpt: Option[ActorRef] = None
@@ -112,7 +112,7 @@ class NetworkController extends Actor {
       Logger.getGlobal.info("Broadcasting end")
 
     case SendMessageToBestPeer(message) =>
-      maxHeightHandler().foreach { handler =>
+      maxScoreHandler().foreach { handler =>
         Logger.getGlobal.info(s"Sending $message to a best peer")
         handler ! message
       }

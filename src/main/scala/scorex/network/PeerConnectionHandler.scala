@@ -60,6 +60,8 @@ class PeerConnectionHandler(networkController: ActorRef,
         }
 
       case SignaturesMessage(signaturesGot) =>
+        Logger.getGlobal.info(s"Got SignaturesMessage with ${signaturesGot.length} sigs")
+
         flags.copy(sigsAwait = false)
         val common = signaturesGot.head
         require(PrunableBlockchainStorage.contains(common))
