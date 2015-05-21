@@ -1,43 +1,30 @@
 package api.http
 
+import controller.Controller
 import play.api.libs.json.Json
 import scorex.crypto.Base58
-import scorex.wallet.Wallet
 import spray.routing.HttpService
 
 import scala.util.{Success, Try}
 
 
 trait WalletHttpService extends HttpService with CommonApifunctions {
+  import Controller.wallet
 
   lazy val walletRouting = {
     pathPrefix("wallet") {
       path("") {
         get {
-          complete(Json.obj("unlocked" -> Wallet.isUnlocked).toString())
+          complete(Json.obj("exists" -> wallet.exists()).toString())
         }
       } ~ path("seed") {
         get {
           complete {
-            lazy val seedJs = Json.obj("seed" -> Base58.encode(Wallet.exportSeed().get))
-            walletNotExistsOrLocked().getOrElse(seedJs).toString()
+            lazy val seedJs = Json.obj("seed" -> Base58.encode(wallet.exportSeed().get))
+            walletNotExists().getOrElse(seedJs).toString()
           }
         }
-      } ~ path("lock") {
-        get {
-          complete {
-            walletNotExistsOrLocked().getOrElse(Json.obj("locked" -> Wallet.lock())).toString()
-          }
-        }
-      } ~ path("unlock") {
-        post {
-          entity(as[String]) { body => complete {
-            val password = body
-            walletNotExistsOrLocked().getOrElse(Json.obj("unlocked" -> Wallet.unlock(password))).toString()
-          }
-          }
-        }
-      } ~ path("create") {
+      }  /* todo: fix or remove ~ path("create") {
         post {
           entity(as[String]) { body => complete {
             Try {
@@ -52,8 +39,8 @@ trait WalletHttpService extends HttpService with CommonApifunctions {
                   case Success(seedBytes) if seedBytes.length == 32 =>
                     if (amount < 1) ApiError.toJson(ApiError.ERROR_INVALID_AMOUNT)
                     else {
-                      val res = if (recover) Wallet.create(seedBytes, password, amount)
-                      else Wallet.create(seedBytes, password, amount)
+                      val res = if (recover) wallet.create(seedBytes, password, amount)
+                      else wallet.create(seedBytes, password, amount)
                       Json.obj("success" -> res)
                     }
                   case _ => ApiError.toJson(ApiError.ERROR_INVALID_SEED)
@@ -63,7 +50,7 @@ trait WalletHttpService extends HttpService with CommonApifunctions {
           }
           }
         }
-      }
+      } */
     }
   }
 }

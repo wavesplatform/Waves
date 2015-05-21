@@ -4,9 +4,7 @@ import controller.Controller
 import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.transaction.TransactionCreator
-import scorex.wallet.Wallet
 import spray.routing.HttpService
-
 import scala.util.{Failure, Success, Try}
 
 
@@ -15,11 +13,11 @@ trait PaymentHttpService extends HttpService with CommonApifunctions {
     path("payment") {
       post {
         entity(as[String]) { body => complete {
-          walletNotExistsOrLocked().getOrElse {
+          walletNotExists().getOrElse {
             Try(Json.parse(body)).map { js =>
               (Try(BigDecimal((js \ "amount").as[String]).setScale(8)),
                 Try(BigDecimal((js \ "fee").as[String]).setScale(8)),
-                Try(Wallet.privateKeyAccount((js \ " sender").as[String])),
+                Try(Controller.wallet.privateKeyAccount((js \ " sender").as[String])),
                 Try((js \ " recipient").as[String])) match {
                 case (Failure(_), _, _, _) => ApiError.toJson(ApiError.ERROR_INVALID_AMOUNT)
                 case (_, Failure(_), _, _) => ApiError.toJson(ApiError.ERROR_INVALID_FEE)

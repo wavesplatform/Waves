@@ -4,71 +4,62 @@ import java.io.File
 import java.util.logging.Logger
 
 import com.google.common.primitives.{Bytes, Ints}
+import org.mapdb.{Serializer, DBMaker}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.Crypto
-import scorex.database.wallet.SecureWalletDatabase
-import settings.Settings
-
+import scala.collection.concurrent.TrieMap
 import scala.util.Try
+import scala.collection.JavaConversions._
 
 
-//todo: the Wallet object is not thread-safe at all, fix!
-object Wallet {
-  private var walletFile: File = new File(Settings.walletDir, "wallet.s.dat")
+class Wallet(walletFile: File, password:String, seed:Array[Byte]) {
+  import Wallet._
 
-  private var secureDatabaseOpt: Option[SecureWalletDatabase] = None
+  //create parent folders then check their existence
+  walletFile.getParentFile.mkdirs().ensuring(walletFile.getParentFile.exists())
 
-  def privateKeyAccounts(): Seq[PrivateKeyAccount] = synchronized {
-    secureDatabaseOpt.map(_.accounts()).getOrElse(Seq())
+  private val database = DBMaker.newFileDB(walletFile)
+    .encryptionEnable(password)
+    .checksumEnable()
+    .closeOnJvmShutdown()
+    .make()
+
+  Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY))
+    .getOrElse(database.getAtomicVar(SEED)
+    .set(seed))
+
+  private lazy val accountsPersistence = database.createHashSet("accounts").makeOrGet[Array[Byte]]()
+
+  private lazy val accountsCache: TrieMap[String, PrivateKeyAccount] = {
+    val accs = accountsPersistence.map(seed => new PrivateKeyAccount(seed))
+    TrieMap(accs.map(acc => acc.address -> acc).toSeq: _*)
   }
 
-  def create(seed: Array[Byte],
-             password: String,
-             depth: Int,
-             customWalletFile: File = walletFile): Boolean = {
+  def privateKeyAccounts(): Seq[PrivateKeyAccount] = accountsCache.values.toSeq
 
-    if (customWalletFile != walletFile) walletFile = customWalletFile
-
-    val secureDatabase = new SecureWalletDatabase(password, walletFile)
-
-    create(secureDatabase, seed, depth)
-  }
-
-  def create(secureDatabase: SecureWalletDatabase, seed: Array[Byte], depth: Int): Boolean = synchronized {
-    //CREATE SECURE WALLET
-    secureDatabaseOpt = Some(secureDatabase)
-
-    //ADD SEED
-    secureDatabase.setSeed(seed)
-
-    //ADD NONCE
-    secureDatabase.setNonce(0)
-
-    //CREATE ACCOUNTS
-    (1 to depth).foreach(_ => generateNewAccount())
-
-    commit()
-    true
-  }
+  def generateNewAccounts(howMany:Int): Seq[PrivateKeyAccount] =
+    (1 to howMany).flatMap(_ => generateNewAccount())
 
   def generateNewAccount(): Option[PrivateKeyAccount] = synchronized {
-    secureDatabaseOpt.map { db =>
-      //READ SEED
-      val seed = db.seed()
-
       //READ NONCE
-      val nonce = db.getAndIncrementNonce()
+      val nonce = getAndIncrementNonce()
 
       //GENERATE ACCOUNT SEED
       val accountSeed = generateAccountSeed(seed, nonce)
       val account = new PrivateKeyAccount(accountSeed)
 
-      if (db.addAccount(account)) {
-        Logger.getGlobal.info("Added account #" + nonce)
-      }
+      val address = account.address
+      val created = if (!accountsCache.containsKey(address)) {
+        accountsCache += account.address -> account
+        accountsPersistence.add(account.seed)
+        database.commit()
+        true
+      } else false
 
-      account
-    }
+      if (created) {
+        Logger.getGlobal.info("Added account #" + nonce)
+        Some(account)
+      } else None
   }
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] = {
@@ -77,62 +68,38 @@ object Wallet {
     Crypto.doubleSha256(accountSeed)
   }
 
-  def commit() {
-    secureDatabaseOpt.foreach(_.commit())
-  }
-
-  def deleteAccount(account: PrivateKeyAccount) = synchronized {
-    if (!isUnlocked) {
-      false
-    } else {
-      secureDatabaseOpt.get.delete(account)
-      true
-    }
-  }
-
-  def isUnlocked = synchronized {
-    secureDatabaseOpt.isDefined
-  }
-
-  def unlock(password: String): Boolean = synchronized {
-    if (isUnlocked) {
-      false
-    } else {
-      Try {
-        secureDatabaseOpt = Some(new SecureWalletDatabase(password, walletFile))
-        secureDatabaseOpt
-      }.toOption.isDefined
-    }
-  }
-
-  def lock() = synchronized {
-    secureDatabaseOpt.map { db =>
-      db.commit()
-      db.close()
-      secureDatabaseOpt = None
-      secureDatabaseOpt
-    }.isDefined
-  }
-
-  def importAccountSeed(accountSeed: Array[Byte]): Option[String] = secureDatabaseOpt.flatMap { db =>
-    if (accountSeed.length != 32) {
-      None
-    } else {
-      val account = new PrivateKeyAccount(accountSeed)
-      if (db.addAccount(account)) Some(account.address) else None
-    }
+  def deleteAccount(account: PrivateKeyAccount):Boolean = synchronized {
+    val res = accountsPersistence.remove(account.seed)
+    database.commit()
+    accountsCache -= account.address
+    res
   }
 
   def exportAccountSeed(address: String): Option[Array[Byte]] = privateKeyAccount(address).map(_.seed)
 
-  def privateKeyAccount(address: String) = secureDatabaseOpt.flatMap(_.account(address))
+  def privateKeyAccount(address: String) = accountsCache.get(address)
 
-  def exportSeed(): Option[Array[Byte]] = secureDatabaseOpt.map(_.seed())
+  def exportSeed(): Option[Array[Byte]] = database.getAtomicVar(SEED).get()
 
-  def close() = synchronized {
-    secureDatabaseOpt.foreach(_.close())
-    secureDatabaseOpt = None
+  def close() = if (!database.isClosed) {
+    database.commit()
+    database.close()
+    accountsCache.clear()
   }
 
   def exists() = walletFile.exists()
+
+  def accounts() = accountsCache.values.toSeq
+
+  def nonce(): Int = database.getAtomicInteger(NONCE).intValue()
+
+  def setNonce(nonce: Int) = database.getAtomicInteger(NONCE).set(nonce)
+
+  def getAndIncrementNonce(): Int = database.getAtomicInteger(NONCE).getAndIncrement()
+}
+
+
+object Wallet {
+  private val SEED = "seed"
+  private val NONCE = "nonce"
 }

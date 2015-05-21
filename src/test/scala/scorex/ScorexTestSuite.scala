@@ -7,6 +7,6 @@ class ScorexTestSuite extends Suites(
   new CryptoSpecification,
   new MessageSpecification,
   new TransactionSpecification,
-  new BlockchainStorageSpecification
-  // , new WalletSpecification todo: fix issues in Wallet & according tests
+  new BlockchainStorageSpecification,
+  new WalletSpecification
 )

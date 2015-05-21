@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Json
+import scorex.crypto.Base58
 
 import scala.util.Try
 
@@ -53,6 +54,10 @@ object Settings {
     .asOpt[String]
     .getOrElse(DEFAULT_WALLET_DIR)
     .ensuring(path => directoryEnsuring(path))
+
+  lazy val walletPassword = (settingsJSON \ "walletpassword").as[String]
+
+  lazy val walletSeed = Base58.decode((settingsJSON \ "walletseed").as[String])
 
   lazy val dataDir = (settingsJSON \ "datadir")
     .asOpt[String]

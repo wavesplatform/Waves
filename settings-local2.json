@@ -4,6 +4,8 @@
       "127.0.0.1"
 	],
   	"walletdir" : "/tmp/wallet2",
+    "walletpassword" : "cookies",
+    "walletseed" : "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
     "datadir" : "/tmp/data2",
 	"minconnections": 10,
     "rpcport" : 9086,

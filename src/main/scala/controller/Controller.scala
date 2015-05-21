@@ -21,6 +21,9 @@ object Controller {
   lazy val networkController = actorSystem.actorOf(Props[NetworkController])
   lazy val blockchainController = actorSystem.actorOf(Props(classOf[BlockchainController], networkController))
 
+  private lazy val walletFile = new java.io.File(Settings.walletDir, "wallet.s.dat")
+  lazy val wallet = new Wallet(walletFile, Settings.walletPassword, Settings.walletSeed)
+
   def init() {
     if (PrunableBlockchainStorage.isEmpty()) {
       val genesisBlock = Constants.ConsensusAlgo.genesisBlock
@@ -51,7 +54,7 @@ object Controller {
 
     //CLOSE WALLET
     Logger.getGlobal.info("Closing wallet")
-    Wallet.close()
+    wallet.close()
 
     //FORCE CLOSE
     System.exit(10)

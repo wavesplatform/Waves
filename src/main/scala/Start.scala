@@ -6,18 +6,17 @@ import api.http.ApiClient
 import controller.Controller
 import scorex.account.Account
 import scorex.block.GenesisBlockParams
-import scorex.crypto.Base58
 import scorex.transaction.TransactionCreator
-import scorex.wallet.Wallet
 import settings.Settings
-import ch.qos.logback.classic.LoggerContext
 import org.slf4j.LoggerFactory
-
 import scala.io.StdIn
 import scala.util.{Failure, Random, Try}
 
+
 object Start {
-  lazy val logger = LoggerFactory.getLogger(this.getClass)
+  import Controller.wallet
+
+  def logger = LoggerFactory.getLogger(this.getClass)
 
   def main(args: Array[String]) {
     logger.debug("main " + args)
@@ -50,24 +49,21 @@ object Start {
 
     Logger.getGlobal.info("Going to execute testing scenario")
 
-    Try {
-      Wallet.create(Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"), "cookies", NumOfAccounts)
-      Wallet.privateKeyAccounts().takeRight(5).foreach(Wallet.deleteAccount)
-    }.ensuring(_.isSuccess)
+    wallet.generateNewAccounts(10)
+    wallet.privateKeyAccounts().takeRight(5).foreach(wallet.deleteAccount)
 
     Logger.getGlobal.info("Executing testing scenario with accounts" +
-      s"(${Wallet.privateKeyAccounts().size}) : "
-      + Wallet.privateKeyAccounts().mkString(" "))
+      s"(${wallet.privateKeyAccounts().size}) : "
+      + wallet.privateKeyAccounts().mkString(" "))
 
-    require(Wallet.exists())
-    require(Wallet.privateKeyAccounts().nonEmpty)
+    require(wallet.privateKeyAccounts().nonEmpty)
 
     (1 to Int.MaxValue).foreach { _ =>
       Thread.sleep(20000)
       val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size)
       val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx)
 
-      val pkAccs = Wallet.privateKeyAccounts().ensuring(_.size > 0)
+      val pkAccs = wallet.privateKeyAccounts().ensuring(_.size > 0)
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val recipientAcc = new Account(recipientAddress)
 
