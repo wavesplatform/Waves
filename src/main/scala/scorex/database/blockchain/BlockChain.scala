@@ -41,7 +41,8 @@ trait BlockChain {
     }.getOrElse(Seq())
 
   def lastSignatures(howMany: Int): Seq[Array[Byte]] = {
-    height().to(height() - howMany, -1).flatMap { h =>
+    val h = height()
+    h.to(Math.max(h - howMany, 1), -1).flatMap { h =>
       blockAt(h).map(_.signature)
     }
   }
