@@ -35,12 +35,12 @@ class NetworkController extends Actor {
 
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(Settings.bindAddress), Settings.Port))
 
-  private def updateScore(remote: InetSocketAddress, score: BigInt) = {
+  private def updateScore(remote: InetSocketAddress, height:Int, score: BigInt) = {
     val prevBestScore = maxPeerScore().getOrElse(0: BigInt)
 
     connectedPeers.get(remote).foreach { peerData =>
       connectedPeers.put(remote, peerData.copy(blockchainScore = Some(score)))
-      Logger.getGlobal.info(s"Score updated for $remote: $score")
+      Logger.getGlobal.info(s"Score updated for $remote: h. $height -- $score")
     }
 
     if (score > prevBestScore) {
@@ -130,7 +130,7 @@ class NetworkController extends Actor {
         self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
       }
 
-    case UpdateBlockchainScore(remote, score) => updateScore(remote, score)
+    case UpdateBlockchainScore(remote, height, score) => updateScore(remote, height, score)
 
     case a: Any => Logger.getGlobal.warning(s"NetworkController: got something strange $a")
   }
@@ -152,7 +152,7 @@ object NetworkController {
 
   case class PeerDisconnected(address: InetSocketAddress)
 
-  case class UpdateBlockchainScore(remote: InetSocketAddress, score: BigInt)
+  case class UpdateBlockchainScore(remote: InetSocketAddress, height:Int, score: BigInt)
 
   case class SendMessageToBestPeer(message: Message)
 

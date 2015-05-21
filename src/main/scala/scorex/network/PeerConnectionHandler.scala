@@ -48,7 +48,7 @@ class PeerConnectionHandler(networkController: ActorRef,
         flags.copy(peersAwait = false)
         println("got peers: " + peers) //todo:handling
 
-      case ScoreMessage(score) => networkController ! UpdateBlockchainScore(remote, score)
+      case ScoreMessage(height, score) => networkController ! UpdateBlockchainScore(remote, height, score)
 
       case GetSignaturesMessage(signaturesGot) =>
         signaturesGot.exists { parent =>
@@ -82,7 +82,9 @@ class PeerConnectionHandler(networkController: ActorRef,
 
         if (Block.isNewBlockValid(block)) {
           networkController ! NewBlock(block, Some(remote))
-        } else networkController ! UpdateBlockchainScore(remote, height)
+        } else {
+          Logger.getGlobal.info(s"Got non-valid block (height of a block: $height")
+        }
 
       case TransactionMessage(transaction) =>
         //CHECK IF SIGNATURE IS VALID OR GENESIS TRANSACTION
@@ -100,7 +102,8 @@ class PeerConnectionHandler(networkController: ActorRef,
   override def receive = {
     case PingRemote => self ! PingMessage
 
-    case SendBlockchainScore => self ! ScoreMessage(PrunableBlockchainStorage.score)
+    case SendBlockchainScore =>
+      self ! ScoreMessage(PrunableBlockchainStorage.height(), PrunableBlockchainStorage.score)
 
     case msg: Message =>
       val (sendFlag, newFlags) = msg match {
