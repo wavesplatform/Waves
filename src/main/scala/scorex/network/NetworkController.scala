@@ -45,7 +45,7 @@ class NetworkController extends Actor {
 
     if (score > prevBestScore) {
       connectedPeers.foreach { case (_, PeerData(handler, _)) =>
-        handler ! PeerConnectionHandler.BestPeer(remote, score > PrunableBlockchainStorage.height())
+        handler ! PeerConnectionHandler.BestPeer(remote, score > PrunableBlockchainStorage.score)
       }
     }
   }

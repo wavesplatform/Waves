@@ -51,6 +51,8 @@ class PeerConnectionHandler(networkController: ActorRef,
       case ScoreMessage(height, score) => networkController ! UpdateBlockchainScore(remote, height, score)
 
       case GetSignaturesMessage(signaturesGot) =>
+        Logger.getGlobal.info(s"Got GetSignaturesMessage with ${signaturesGot.length} sigs within")
+
         signaturesGot.exists { parent =>
           val headers = PrunableBlockchainStorage.getSignatures(parent)
           if (headers.size > 0) {
