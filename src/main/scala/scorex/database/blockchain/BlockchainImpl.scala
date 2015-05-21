@@ -14,7 +14,7 @@ import scala.util.Try
 
 // todo: syncing issues
 class BlockchainImpl extends BlockChain {
-  private val database = DBMaker.newFileDB(new java.io.File(s"/tmp/signatures"))
+  private val database = DBMaker.newFileDB(new java.io.File(Settings.dataDir + s"/signatures"))
     .closeOnJvmShutdown()
     .checksumEnable()
     .mmapFileEnableIfSupported()
@@ -36,6 +36,7 @@ class BlockchainImpl extends BlockChain {
     try {
       os.write(Ints.toByteArray(blockBytes.length))
       os.write(blockBytes)
+      os.flush()
     } finally os.close()
 
     database.commit()
