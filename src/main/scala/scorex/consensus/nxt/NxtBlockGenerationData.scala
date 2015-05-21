@@ -24,10 +24,10 @@ class NxtBlockGenerationData(val baseTarget: Long, val generatorSignature: Array
 
   override def signature(): Array[Byte] = generatorSignature.ensuring(_.length == NxtBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)
 
-  //todo: implement sig checking!
+  //todo: implement signature check!
   override def isSignatureValid(block: Block): Boolean = true
 
-  //todo: implement valid checking!
+  //todo: implement validity check!
   override def isValid(block: Block): Boolean = true
 
   override def blockScore() = BigInt("18446744073709551616") / baseTarget
