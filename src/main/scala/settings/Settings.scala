@@ -22,8 +22,11 @@ object Settings {
   private lazy val settingsJSON = Try {
     val jsonString = scala.io.Source.fromFile(filename).mkString
     Json.parse(jsonString)
+  }.recover {case _ =>
+    val jsonString = scala.io.Source.fromURL(getClass.getResource(s"/$filename")).mkString
+    Json.parse(jsonString)
   }.getOrElse {
-    logger.info("ERROR reading settings.json, closing")
+    logger.info(s"ERROR while reading $filename, closing")
     //catch error?
     System.exit(10)
     Json.obj()
