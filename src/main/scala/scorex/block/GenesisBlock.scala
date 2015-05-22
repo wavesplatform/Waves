@@ -47,8 +47,7 @@ abstract class GenesisBlock(override val generationData: kernelData, override va
 
   override def parent() = None
 
-  override def isValid() =
-    PrunableBlockchainStorage.isEmpty && transactions.forall(_.isValid() == ValidationResult.VALIDATE_OKE)
+  override def isValid() = transactions.forall(_.isValid() == ValidationResult.VALIDATE_OKE)
 }
 
 
