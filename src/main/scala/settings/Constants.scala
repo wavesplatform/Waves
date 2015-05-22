@@ -14,5 +14,5 @@ object Constants {
 
   val AgentName = s"$Product - $Release v. ${Version._1}.${Version._2}.${Version._3}"
 
-  val ConsensusAlgo: ConsensusModule = ConsensusModuleNxt
+  val ConsensusAlgo: ConsensusModule = ConsensusModuleQora
 }

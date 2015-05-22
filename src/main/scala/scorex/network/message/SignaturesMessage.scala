@@ -49,6 +49,8 @@ object SignaturesSeqMessage {
 
 
 case class GetSignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage {
+  require(signatures.forall(_.length == SignaturesSeqMessage.SIGNATURE_LENGTH))
+
   override val messageType = Message.GET_SIGNATURES_TYPE
 
   def this(data: Array[Byte]) = this(SignaturesSeqMessage.parse(data))
@@ -60,6 +62,8 @@ object GetSignaturesMessage {
 
 
 case class SignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage {
+  require(signatures.forall(_.length == SignaturesSeqMessage.SIGNATURE_LENGTH))
+
   override val messageType = Message.SIGNATURES_TYPE
 
   def this(data: Array[Byte]) = this(SignaturesSeqMessage.parse(data))
