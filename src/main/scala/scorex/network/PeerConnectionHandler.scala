@@ -84,10 +84,12 @@ class PeerConnectionHandler(networkController: ActorRef,
         require(block != null)
         Logger.getGlobal.info(s"Got block, height $height , local height: " + PrunableBlockchainStorage.height())
 
-        if (Block.isNewBlockValid(block)) {
-          networkController ! NewBlock(block, Some(remote))
-        } else {
-          Logger.getGlobal.info(s"Got non-valid block (height of a block: $height")
+        if(height == PrunableBlockchainStorage.height()+1) {
+          if (Block.isNewBlockValid(block)) {
+            networkController ! NewBlock(block, Some(remote))
+          } else {
+            Logger.getGlobal.info(s"Got non-valid block (height of a block: $height")
+          }
         }
 
       case TransactionMessage(transaction) =>

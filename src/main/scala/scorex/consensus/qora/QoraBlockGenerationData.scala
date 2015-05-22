@@ -52,11 +52,7 @@ class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignatur
       //CONVERT HIT TO BIGINT
       val hit = BigInt(1, Crypto.sha256(generatorSignature))
 
-      if (hit >= target) {
-        false
-      } else if (hit < lowerTarget) {
-        false
-      } else true
+      hit > lowerTarget && hit <= target
     }
   }
 
