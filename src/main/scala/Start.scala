@@ -43,10 +43,7 @@ object Start {
     }
   }
 
-
   def testingScript(): Unit = {
-    val NumOfAccounts = 10
-
     Logger.getGlobal.info("Going to execute testing scenario")
 
     wallet.generateNewAccounts(10)
