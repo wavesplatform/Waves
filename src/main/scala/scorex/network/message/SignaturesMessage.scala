@@ -27,7 +27,7 @@ abstract class SignaturesSeqMessage extends Message {
 
 object SignaturesSeqMessage {
 
-  private val SIGNATURE_LENGTH = 128
+  val SIGNATURE_LENGTH = 128
   private val DATA_LENGTH = 4
 
   def parse(data: Array[Byte]) = {
@@ -42,7 +42,7 @@ object SignaturesSeqMessage {
     //CREATE HEADERS LIST
     (0 to length - 1).map { i =>
       val position = DATA_LENGTH + (i * SIGNATURE_LENGTH)
-      Arrays.copyOfRange(data, position, position + SIGNATURE_LENGTH)
+      data.slice(position, position + SIGNATURE_LENGTH)
     }.toSeq
   }
 }
