@@ -110,8 +110,8 @@ object Block {
   import ConsensusAlgo.kernelDataParser.GENERATION_DATA_LENGTH
 
   val Version = 1
-  val MAX_BLOCK_BYTES = 261120
-  //255 kb
+  val MAX_BLOCK_BYTES = 1024*1024 // 1 mb block
+
   val VERSION_LENGTH = 4
   val REFERENCE_LENGTH = 64 + Constants.ConsensusAlgo.KERNEL_SIGNATURE_LENGTH
   val TIMESTAMP_LENGTH = 8
