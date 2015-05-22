@@ -37,7 +37,7 @@ trait BlockChain {
 
   def getSignatures(parentSignature: Array[Byte]): Seq[Array[Byte]] =
     heightOf(parentSignature).map { h =>
-      (h + 1).to(Math.max(height(), h + Settings.MaxBlocksChunks)).flatMap(blockAt).map(_.signature)
+      (h + 1).to(Math.min(height(), h + Settings.MaxBlocksChunks)).flatMap(blockAt).map(_.signature)
     }.getOrElse(Seq())
 
   def lastSignatures(howMany: Int): Seq[Array[Byte]] = {
