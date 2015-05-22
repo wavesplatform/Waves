@@ -7,7 +7,7 @@ import settings.Settings
 trait BlockChain {
   def height(): Int
 
-  def isEmpty(): Boolean = height() == 0
+  def isEmpty: Boolean = height() == 0
 
   def heightOf(block: Block): Option[Int]
 

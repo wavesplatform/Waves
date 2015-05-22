@@ -25,7 +25,7 @@ object Controller {
   lazy val wallet = new Wallet(walletFile, Settings.walletPassword, Settings.walletSeed)
 
   def init() {
-    if (PrunableBlockchainStorage.isEmpty()) {
+    if (PrunableBlockchainStorage.isEmpty) {
       val genesisBlock = Constants.ConsensusAlgo.genesisBlock
       genesisBlock.process()
       PrunableBlockchainStorage.appendBlock(genesisBlock)
