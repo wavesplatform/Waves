@@ -12,13 +12,13 @@ abstract class Message {
 
   import scorex.network.message.Message._
 
-  val messageType: Int
+  val messageType: Byte
 
   def hash() = Crypto.sha256(toBytes())
 
   def toBytes() = {
     // MESSAGE TYPE
-    val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(messageType), TYPE_LENGTH, 0)
+    val typeBytes = Array(messageType)
     Bytes.concat(MAGIC, typeBytes, Ints.toByteArray(this.getDataLength()))
   }
 
@@ -46,15 +46,15 @@ object Message {
   val MESSAGE_LENGTH = 4
   val CHECKSUM_LENGTH = 4
 
-  val GET_PEERS_TYPE = 1
-  val PEERS_TYPE = 2
-  val VERSION_TYPE = 3
-  val GET_SIGNATURES_TYPE = 4
-  val SIGNATURES_TYPE = 5
-  val GET_BLOCK_TYPE = 6
-  val BLOCK_TYPE = 7
-  val TRANSACTION_TYPE = 8
-  val PING_TYPE = 9
+  val GET_PEERS_TYPE = 1:Byte
+  val PEERS_TYPE = 2:Byte
+  val VERSION_TYPE = 3:Byte
+  val GET_SIGNATURES_TYPE = 4:Byte
+  val SIGNATURES_TYPE = 5:Byte
+  val GET_BLOCK_TYPE = 6:Byte
+  val BLOCK_TYPE = 7:Byte
+  val TRANSACTION_TYPE = 8:Byte
+  val PING_TYPE = 9:Byte
 
   def parse(bytes: ByteBuffer): Try[Message] = Try {
     val magic = new Array[Byte](MESSAGE_LENGTH)
@@ -62,7 +62,7 @@ object Message {
 
     if (!magic.sameElements(Message.MAGIC)) throw new Exception("wrong magic")
 
-    val msgType = bytes.getInt
+    val msgType = bytes.get
 
     val length = bytes.getInt
 

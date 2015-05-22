@@ -3,7 +3,7 @@ package scorex.network
 import java.net.InetSocketAddress
 import java.util.logging.Logger
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{ActorLogging, Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
 import scorex.block.{Block, NewBlock}
@@ -20,7 +20,7 @@ import scala.util.{Failure, Success}
 
 class PeerConnectionHandler(networkController: ActorRef,
                             connection: ActorRef,
-                            remote: InetSocketAddress) extends Actor {
+                            remote: InetSocketAddress) extends Actor with ActorLogging {
 
   import PeerConnectionHandler._
 
@@ -136,15 +136,14 @@ class PeerConnectionHandler(networkController: ActorRef,
 
     case Received(data) =>
       Message.parse(data.toByteBuffer) match {
+        case Success(message) =>
+          Logger.getGlobal.info("received message " + message.getClass.getSimpleName + " from " + remote)
+          handleMessage(message)
+
         case Failure(e) =>
           Logger.getGlobal.info(s"Corrupted data from: " + remote + " : " + e.getMessage)
           connection ! Close
         //context stop self
-
-        case Success(message) =>
-          Logger.getGlobal.info("received message " + message.getClass.getSimpleName + " from " + remote)
-
-          handleMessage(message)
       }
 
     case cc: ConnectionClosed =>
@@ -161,6 +160,8 @@ class PeerConnectionHandler(networkController: ActorRef,
     //  connection ! Close
 
     case BestPeer(peer, betterThanLocal) => best = betterThanLocal && (peer == remote)
+
+    case nonsense: Any => log.warning(s"Strange input: $nonsense")
   }
 }
 

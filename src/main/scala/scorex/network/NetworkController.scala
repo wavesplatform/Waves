@@ -74,8 +74,7 @@ class NetworkController extends Actor {
       Logger.getGlobal.info(s"Connected to $remote")
       connectingPeers -= remote
       val connection = sender()
-      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], self, connection, remote),
-                                    remote.toString)
+      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], self, connection, remote))
       connection ! Register(handler)
       connectedPeers += remote -> PeerData(handler, None)
       PeerManager.peerConnected(remote)
@@ -114,7 +113,7 @@ class NetworkController extends Actor {
 
     case SendMessageToBestPeer(message) =>
       maxScoreHandler().foreach { handler =>
-        Logger.getGlobal.info(s"Sending $message to a best peer")
+        Logger.getGlobal.info(s"Sending $message to a best peer ${handler.path}")
         handler ! message
       }
 
