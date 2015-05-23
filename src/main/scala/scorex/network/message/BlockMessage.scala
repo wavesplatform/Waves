@@ -28,10 +28,10 @@ object BlockMessage {
   private val HEIGHT_LENGTH = 4
 
   def apply(data: Array[Byte]): BlockMessage = {
-    val heightBytes = Arrays.copyOfRange(data, 0, HEIGHT_LENGTH)
+    val heightBytes = data.take(HEIGHT_LENGTH)
     val height = Ints.fromByteArray(heightBytes)
 
-    val block = Block.parse(Arrays.copyOfRange(data, HEIGHT_LENGTH, data.length + 1)).get
+    val block = Block.parse(data.drop(HEIGHT_LENGTH)).get
 
     new BlockMessage(height, block)
   }
