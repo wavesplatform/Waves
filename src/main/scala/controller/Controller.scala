@@ -45,6 +45,7 @@ object Controller {
     })
   }
 
+  //todo: stopping the app works bad
   def stopAll() = this.synchronized {
     Logger.getGlobal.info("Stopping message processor")
     networkController ! NetworkController.ShutdownNetwork
