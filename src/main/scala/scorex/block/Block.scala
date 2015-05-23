@@ -14,12 +14,12 @@ import settings.Constants
 
 import scala.util.Try
 
-case class BlockStub(version: Int, reference: Array[Byte], timestamp: Long,
+case class BlockStub(version: Byte, reference: Array[Byte], timestamp: Long,
                      generator: PublicKeyAccount, generationData: Constants.ConsensusAlgo.kernelData) {
   require(reference.length == Block.REFERENCE_LENGTH)
 }
 
-case class Block(version: Int, reference: Array[Byte], timestamp: Long,
+case class Block(version: Byte, reference: Array[Byte], timestamp: Long,
                  generator: PublicKeyAccount, generationData: Constants.ConsensusAlgo.kernelData,
                  transactions: List[Transaction], transactionsSignature: Array[Byte]) {
 
@@ -38,7 +38,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long,
   lazy val signature = Bytes.concat(generationData.signature(), transactionsSignature)
 
   def toJson: JsObject =
-    Json.obj("version" -> version,
+    Json.obj("version" -> version.toInt,
       "signature" -> Base58.encode(signature),
       "reference" -> Base58.encode(reference),
       "timestamp" -> timestamp,
@@ -49,7 +49,7 @@ case class Block(version: Int, reference: Array[Byte], timestamp: Long,
     ) ++ generationData.toJson
 
   def toBytes = {
-    val versionBytes = Ints.toByteArray(version)
+    val versionBytes = Array(version)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0)
     val referenceBytes = Bytes.ensureCapacity(reference, REFERENCE_LENGTH, 0)
     val transactionCountBytes = Ints.toByteArray(transactions.size)
@@ -109,10 +109,10 @@ object Block {
   import Constants.ConsensusAlgo
   import ConsensusAlgo.kernelDataParser.GENERATION_DATA_LENGTH
 
-  val Version = 1
+  val Version:Byte = 1
   val MAX_BLOCK_BYTES = 1024*1024 // 1 mb block
 
-  val VERSION_LENGTH = 4
+  val VERSION_LENGTH = 1
   val REFERENCE_LENGTH = 64 + Constants.ConsensusAlgo.KERNEL_SIGNATURE_LENGTH
   val TIMESTAMP_LENGTH = 8
   val GENERATOR_LENGTH = 32
@@ -158,8 +158,7 @@ object Block {
     var position = 0
 
     //READ VERSION
-    val versionBytes = Arrays.copyOfRange(data, position, position + VERSION_LENGTH)
-    val version = Ints.fromByteArray(versionBytes)
+    val version = data.head
     position += VERSION_LENGTH
 
     //READ TIMESTAMP

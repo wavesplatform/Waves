@@ -12,7 +12,6 @@ import scala.collection.JavaConversions._
 import scala.reflect.io.File
 import scala.util.Try
 
-// todo: syncing issues
 class BlockchainImpl extends BlockChain {
   private val database = DBMaker.newFileDB(new java.io.File(Settings.dataDir + s"/signatures"))
     .closeOnJvmShutdown()
@@ -27,7 +26,7 @@ class BlockchainImpl extends BlockChain {
 
   private def blockFile(height: Int) = File(Settings.dataDir + s"/block-$height")
 
-  override def appendBlock(block: Block): BlockChain = {
+  override def appendBlock(block: Block): BlockChain = synchronized{
     val h = height() + 1
     signaturesIndex.put(h, block.signature)
 
@@ -43,7 +42,7 @@ class BlockchainImpl extends BlockChain {
     this
   }
 
-  override def discardBlock(): BlockChain = {
+  override def discardBlock(): BlockChain = synchronized {
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
     Try(blockFile(h).delete()) //todo: write msg to log if problems with deleting
@@ -55,7 +54,7 @@ class BlockchainImpl extends BlockChain {
   override def heightOf(block: Block): Option[Int] =
     signaturesIndex.descendingMap().find(_._2.sameElements(block.signature)).map(_._1)
 
-  override def blockAt(height: Int): Option[Block] = {
+  override def blockAt(height: Int): Option[Block] = synchronized {
     val is = new DataInputStream(blockFile(height).inputStream())
     try {
       val szBytes = new Array[Byte](4)

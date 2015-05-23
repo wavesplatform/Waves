@@ -8,7 +8,6 @@ import scorex.account.{Account, PublicKeyAccount}
 import scorex.consensus.nxt.NxtBlockGenerationData
 import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataParser}
 import scorex.crypto.Crypto
-import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.Transaction.ValidationResult
 import settings.Constants
@@ -16,7 +15,7 @@ import settings.Constants.ConsensusAlgo.kernelData
 
 
 object GenesisBlockParams {
-  val version = 1
+  val version:Byte = 1
   val reference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
   val generator = new PublicKeyAccount(Array[Byte](1, 1, 1, 1, 1, 1, 1, 1))
 

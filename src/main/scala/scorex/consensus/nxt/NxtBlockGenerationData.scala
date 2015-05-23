@@ -12,7 +12,7 @@ class NxtBlockGenerationData(val baseTarget: Long, val generatorSignature: Array
   override def toBytes: Array[Byte] = Bytes.concat(
     Longs.toByteArray(baseTarget),
     generatorSignature
-  )
+  ).ensuring(_.length == NxtBlockGenerationDataParser.GENERATION_DATA_LENGTH)
 
   override def toJson: JsObject = Json.obj(
     "baseTarget" -> baseTarget,
