@@ -44,8 +44,8 @@ class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignatur
 
       //target bounds
       val guesses = (block.timestamp - block.parent().get.timestamp) / 1000
-      val lowerTarget = target0 * BigInt(guesses - 1)
-      val target = target0 * BigInt(guesses)
+      val lowerTarget = target0 * (guesses - 1)
+      val target = target0 * guesses
 
       val hit = BigInt(1, Crypto.sha256(generatorSignature))
 
