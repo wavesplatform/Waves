@@ -22,6 +22,11 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         get {
           complete(PrunableBlockchainStorage.lastBlock.toJson.toString())
         }
+      } ~ path("at" / IntNumber) {case height =>
+        get {
+          //todo: json instead of n/a
+          complete(PrunableBlockchainStorage.blockAt(height).map(_.toJson.toString()).getOrElse("n/a"))
+        }
       } ~ path("height") {
         get {
           complete(Json.obj("height" -> PrunableBlockchainStorage.height()).toString())
