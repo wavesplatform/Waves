@@ -130,7 +130,6 @@ object Block {
       stub.generator, stub.generationData, transactions, transactionsSignature)
 
   def apply(stub: BlockStub, account: PrivateKeyAccount): Block = {
-    //ORDER TRANSACTIONS BY FEE PER BYTE
     val orderedTransactions = UnconfirmedTransactionsDatabaseImpl.getAll().sortBy(_.feePerByte)
 
     val (_, transactions) = orderedTransactions.foldLeft((0, List[Transaction]())) {

@@ -1,7 +1,5 @@
 package scorex.network.message
 
-import java.util.Arrays
-
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.block.Block
 
