@@ -4,15 +4,17 @@ import java.io.File
 import java.util.logging.Logger
 
 import com.google.common.primitives.{Bytes, Ints}
-import org.mapdb.{Serializer, DBMaker}
+import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.Crypto
+
+import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.util.Try
-import scala.collection.JavaConversions._
 
 
-class Wallet(walletFile: File, password:String, seed:Array[Byte]) {
+class Wallet(walletFile: File, password: String, seed: Array[Byte]) {
+
   import Wallet._
 
   //create parent folders then check their existence
@@ -37,29 +39,29 @@ class Wallet(walletFile: File, password:String, seed:Array[Byte]) {
 
   def privateKeyAccounts(): Seq[PrivateKeyAccount] = accountsCache.values.toSeq
 
-  def generateNewAccounts(howMany:Int): Seq[PrivateKeyAccount] =
+  def generateNewAccounts(howMany: Int): Seq[PrivateKeyAccount] =
     (1 to howMany).flatMap(_ => generateNewAccount())
 
   def generateNewAccount(): Option[PrivateKeyAccount] = synchronized {
-      //READ NONCE
-      val nonce = getAndIncrementNonce()
+    //READ NONCE
+    val nonce = getAndIncrementNonce()
 
-      //GENERATE ACCOUNT SEED
-      val accountSeed = generateAccountSeed(seed, nonce)
-      val account = new PrivateKeyAccount(accountSeed)
+    //GENERATE ACCOUNT SEED
+    val accountSeed = generateAccountSeed(seed, nonce)
+    val account = new PrivateKeyAccount(accountSeed)
 
-      val address = account.address
-      val created = if (!accountsCache.containsKey(address)) {
-        accountsCache += account.address -> account
-        accountsPersistence.add(account.seed)
-        database.commit()
-        true
-      } else false
+    val address = account.address
+    val created = if (!accountsCache.containsKey(address)) {
+      accountsCache += account.address -> account
+      accountsPersistence.add(account.seed)
+      database.commit()
+      true
+    } else false
 
-      if (created) {
-        Logger.getGlobal.info("Added account #" + nonce)
-        Some(account)
-      } else None
+    if (created) {
+      Logger.getGlobal.info("Added account #" + nonce)
+      Some(account)
+    } else None
   }
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] = {
@@ -68,7 +70,7 @@ class Wallet(walletFile: File, password:String, seed:Array[Byte]) {
     Crypto.doubleSha256(accountSeed)
   }
 
-  def deleteAccount(account: PrivateKeyAccount):Boolean = synchronized {
+  def deleteAccount(account: PrivateKeyAccount): Boolean = synchronized {
     val res = accountsPersistence.remove(account.seed)
     database.commit()
     accountsCache -= account.address

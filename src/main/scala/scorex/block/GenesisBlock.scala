@@ -15,7 +15,7 @@ import settings.Constants.ConsensusAlgo.kernelData
 
 
 object GenesisBlockParams {
-  val version:Byte = 1
+  val version: Byte = 1
   val reference = Array[Byte](1, 1, 1, 1, 1, 1, 1, 1)
   val generator = new PublicKeyAccount(Array[Byte](1, 1, 1, 1, 1, 1, 1, 1))
 

@@ -1,8 +1,8 @@
 package scorex.network.message
 
-import com.google.common.primitives.{Ints, Bytes}
+import com.google.common.primitives.{Bytes, Ints}
 
-case class ScoreMessage(height:Int, score: BigInt) extends Message {
+case class ScoreMessage(height: Int, score: BigInt) extends Message {
   lazy val scoreBytes = score.toByteArray
 
   override val messageType = Message.VERSION_TYPE

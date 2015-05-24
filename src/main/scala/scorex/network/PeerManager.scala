@@ -1,11 +1,10 @@
 package scorex.network
 
 import java.net.InetSocketAddress
-import java.util.logging.Logger
+
+import org.slf4j.LoggerFactory
 import scorex.database.PeerDatabaseImpl
 import settings.Settings
-import ch.qos.logback.classic.LoggerContext
-import org.slf4j.LoggerFactory
 
 import scala.util.Random
 

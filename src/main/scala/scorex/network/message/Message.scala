@@ -46,15 +46,15 @@ object Message {
   val MESSAGE_LENGTH = 4
   val CHECKSUM_LENGTH = 4
 
-  val GET_PEERS_TYPE = 1:Byte
-  val PEERS_TYPE = 2:Byte
-  val VERSION_TYPE = 3:Byte
-  val GET_SIGNATURES_TYPE = 4:Byte
-  val SIGNATURES_TYPE = 5:Byte
-  val GET_BLOCK_TYPE = 6:Byte
-  val BLOCK_TYPE = 7:Byte
-  val TRANSACTION_TYPE = 8:Byte
-  val PING_TYPE = 9:Byte
+  val GET_PEERS_TYPE = 1: Byte
+  val PEERS_TYPE = 2: Byte
+  val VERSION_TYPE = 3: Byte
+  val GET_SIGNATURES_TYPE = 4: Byte
+  val SIGNATURES_TYPE = 5: Byte
+  val GET_BLOCK_TYPE = 6: Byte
+  val BLOCK_TYPE = 7: Byte
+  val TRANSACTION_TYPE = 8: Byte
+  val PING_TYPE = 9: Byte
 
   def parse(bytes: ByteBuffer): Try[Message] = Try {
     val magic = new Array[Byte](MESSAGE_LENGTH)

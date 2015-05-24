@@ -4,11 +4,13 @@ import controller.Controller
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.database.blockchain.PrunableBlockchainStorage
+
 import scala.collection.concurrent.TrieMap
 import scala.util.Random
 
 
 trait BlockGenerationFunctions {
+
   import Controller.wallet
 
   def generateBlock(): Option[Block] = {

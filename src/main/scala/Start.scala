@@ -4,16 +4,18 @@ import java.util.logging.Logger
 
 import api.http.ApiClient
 import controller.Controller
+import org.slf4j.LoggerFactory
 import scorex.account.Account
 import scorex.block.GenesisBlockParams
 import scorex.transaction.TransactionCreator
 import settings.Settings
-import org.slf4j.LoggerFactory
+
 import scala.io.StdIn
 import scala.util.{Failure, Random, Try}
 
 
 object Start {
+
   import Controller.wallet
 
   def logger = LoggerFactory.getLogger(this.getClass)

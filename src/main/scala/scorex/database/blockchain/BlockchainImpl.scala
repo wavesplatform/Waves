@@ -26,7 +26,7 @@ class BlockchainImpl extends BlockChain {
 
   private def blockFile(height: Int) = File(Settings.dataDir + s"/block-$height")
 
-  override def appendBlock(block: Block): BlockChain = synchronized{
+  override def appendBlock(block: Block): BlockChain = synchronized {
     val h = height() + 1
     signaturesIndex.put(h, block.signature)
 

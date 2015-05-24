@@ -3,7 +3,7 @@ package scorex.network
 import java.net.InetSocketAddress
 import java.util.logging.Logger
 
-import akka.actor.{ActorLogging, Actor, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
 import scorex.block.{Block, NewBlock}
@@ -84,7 +84,7 @@ class PeerConnectionHandler(networkController: ActorRef,
         require(block != null)
         Logger.getGlobal.info(s"Got block, height $height , local height: " + PrunableBlockchainStorage.height())
 
-        if(height == PrunableBlockchainStorage.height()+1) {
+        if (height == PrunableBlockchainStorage.height() + 1) {
           if (Block.isNewBlockValid(block)) {
             networkController ! NewBlock(block, Some(remote))
           } else {

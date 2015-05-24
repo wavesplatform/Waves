@@ -22,7 +22,7 @@ object Settings {
   private lazy val settingsJSON = Try {
     val jsonString = scala.io.Source.fromFile(filename).mkString
     Json.parse(jsonString)
-  }.recover {case _ =>
+  }.recover { case _ =>
     val jsonString = scala.io.Source.fromURL(getClass.getResource(s"/$filename")).mkString
     Json.parse(jsonString)
   }.getOrElse {

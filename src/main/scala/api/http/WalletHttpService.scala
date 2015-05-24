@@ -5,10 +5,9 @@ import play.api.libs.json.Json
 import scorex.crypto.Base58
 import spray.routing.HttpService
 
-import scala.util.{Success, Try}
-
 
 trait WalletHttpService extends HttpService with CommonApifunctions {
+
   import Controller.wallet
 
   lazy val walletRouting = {
@@ -24,7 +23,7 @@ trait WalletHttpService extends HttpService with CommonApifunctions {
             walletNotExists().getOrElse(seedJs).toString()
           }
         }
-      }  /* todo: fix or remove ~ path("create") {
+      } /* todo: fix or remove ~ path("create") {
         post {
           entity(as[String]) { body => complete {
             Try {
