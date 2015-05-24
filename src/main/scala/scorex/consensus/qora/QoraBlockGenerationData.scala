@@ -36,23 +36,21 @@ class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignatur
       //CHECK IF GENERATING BALANCE IS CORRECT
       false
     } else {
-      //CREATE TARGET
+      //target base
       val targetBytes = Array.fill(32)(Byte.MaxValue)
-
-      //DIVIDE TARGET BY BASE TARGET
       val baseTarget = BigInt(QoraBlockGenerationFunctions.getBaseTarget(generatingBalance))
       val genBalance = PrunableBlockchainStorage.generationBalance(block.generator.address).toBigInt()
       val target0 = BigInt(1, targetBytes) / baseTarget * genBalance
 
-      //MULTIPLE TARGET BY GUESSES
+      //target bounds
       val guesses = (block.timestamp - block.parent().get.timestamp) / 1000
       val lowerTarget = target0 * BigInt(guesses - 1)
       val target = target0 * BigInt(guesses)
 
-      //CONVERT HIT TO BIGINT
       val hit = BigInt(1, Crypto.sha256(generatorSignature))
 
-      hit > lowerTarget && hit <= target
+      //generation check
+      hit >= lowerTarget && hit < target
     }
   }
 
