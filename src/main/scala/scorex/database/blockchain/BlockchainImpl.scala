@@ -6,14 +6,13 @@ import com.google.common.primitives.Ints
 import org.mapdb.DBMaker
 import scorex.account.Account
 import scorex.block.Block
-import settings.Settings
 
 import scala.collection.JavaConversions._
 import scala.reflect.io.File
 import scala.util.Try
 
-class BlockchainImpl extends BlockChain {
-  private val database = DBMaker.newFileDB(new java.io.File(Settings.dataDir + s"/signatures"))
+class BlockchainImpl(dataFolder:String) extends BlockChain {
+  private val database = DBMaker.newFileDB(new java.io.File(dataFolder + s"/signatures"))
     .closeOnJvmShutdown()
     .checksumEnable()
     .mmapFileEnableIfSupported()
@@ -24,7 +23,7 @@ class BlockchainImpl extends BlockChain {
   //if there are some uncommited changes from last run, discard'em
   if (signaturesIndex.size() > 0) database.rollback()
 
-  private def blockFile(height: Int) = File(Settings.dataDir + s"/block-$height")
+  private def blockFile(height: Int) = File(dataFolder + s"/block-$height")
 
   override def appendBlock(block: Block): BlockChain = synchronized {
     val h = height() + 1

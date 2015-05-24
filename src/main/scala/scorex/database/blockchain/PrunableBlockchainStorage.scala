@@ -3,6 +3,7 @@ package scorex.database.blockchain
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.Transaction
+import settings.Settings
 
 //todo: object isn't thread-safe!
 
@@ -10,7 +11,7 @@ import scorex.transaction.Transaction
  * Facade to both blockchain & internal state implementations
  */
 object PrunableBlockchainStorage extends BlockChain with StateQuery {
-  private val chain = new BlockchainImpl()
+  private val chain = new BlockchainImpl(Settings.dataDir)
   private val state = new InternalState()
 
   override def height(): Int = chain.height()
