@@ -1,12 +1,14 @@
 package scorex.integration
 
+import java.nio.ByteBuffer
+
 import controller.Controller
 import controller.Controller._
 import org.scalatest.FunSuite
 import scorex.block.Block
 import scorex.consensus.{ConsensusModuleNxt, ConsensusModuleQora}
 import scorex.database.blockchain.PrunableBlockchainStorage
-import scorex.network.message.BlockMessage
+import scorex.network.message.{Message, BlockMessage}
 import settings.{Constants, Settings}
 
 //todo: clear environment after test
@@ -52,11 +54,11 @@ class ValidChainGenerationSpecification extends FunSuite {
       assert(bytes.size == 262)
     }
 
-    val restored = BlockMessage(bytes).block
+    val restored = Message.parse(ByteBuffer.wrap(bytes)).get.asInstanceOf[BlockMessage].block
     println(s"b2: $b2")
     println(s"restored: $restored")
     assert(restored.timestamp == b2.timestamp)
-    //assert(restored.isValid())
+    assert(restored.isValid())
 
     Controller.stopAll()
   }
