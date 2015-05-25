@@ -14,10 +14,10 @@ import scorex.transaction.Transaction
 // Make design ready for pruning!
 // Make possibility of easy switching underlying storage implementation(e.g. from MapDb to Riak)
 
-class InternalState extends StateQuery {
+class InternalState(dataFolder: String) extends StateQuery {
   private val StateHeight = "height"
 
-  private val database = DBMaker.newFileDB(new File(s"/tmp/state"))
+  private val database = DBMaker.newFileDB(new File(dataFolder + s"/state"))
     .closeOnJvmShutdown()
     .cacheSize(2048)
     .checksumEnable()

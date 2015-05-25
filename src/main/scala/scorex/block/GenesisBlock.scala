@@ -77,11 +77,11 @@ object NxtGenesisBlockGenerationData {
 
 object NxtGenesisBlock extends GenesisBlock(
   NxtGenesisBlockGenerationData.generationData.asInstanceOf[Constants.ConsensusAlgo.kernelData],
-  new DateTime(2015, 4, 13, 10, 35).getMillis) {
+  new DateTime(2015, 5, 23, 10, 35).getMillis) {
 
   require(signature.length == 96)
 }
 
 object QoraGenesisBlock extends GenesisBlock(
   QoraGenesisBlockGenerationData.generationData.asInstanceOf[Constants.ConsensusAlgo.kernelData],
-  new DateTime(2015, 4, 13, 10, 35).getMillis)
+  new DateTime(2015, 5, 23, 10, 35).getMillis)
