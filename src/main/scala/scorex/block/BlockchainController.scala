@@ -60,7 +60,7 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
         block.process()
         PrunableBlockchainStorage.appendBlock(block)
         val height = PrunableBlockchainStorage.height()
-        val exceptOf = remoteOpt.map(r => List(r)).getOrElse(List())
+        val exceptOf = remoteOpt.toList
         networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block), exceptOf)
       } else {
         Logger.getGlobal.warning(s"Non-valid block: $block from $remoteOpt")

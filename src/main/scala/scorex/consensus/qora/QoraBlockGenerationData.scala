@@ -31,7 +31,7 @@ class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignatur
 
   override def isGenesis = QoraGenesisBlockGenerationData.generatorSignature.sameElements(generatorSignature)
 
-  override def isValid(block: Block): Boolean = {
+  override def isValid(block: Block): Boolean =
     if (generatingBalance != QoraBlockGenerationFunctions.getNextBlockGeneratingBalance(block.parent().get)) {
       //CHECK IF GENERATING BALANCE IS CORRECT
       false
@@ -52,7 +52,7 @@ class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignatur
       //generation check
       hit >= lowerTarget && hit < target
     }
-  }
+
 
   override def isSignatureValid(block: Block): Boolean = {
     val generatingBalanceBytes = Longs.toByteArray(generatingBalance).ensuring(_.size == GENERATING_BALANCE_LENGTH)

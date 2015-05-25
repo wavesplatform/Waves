@@ -11,7 +11,7 @@ import scala.collection.JavaConversions._
 import scala.reflect.io.File
 import scala.util.Try
 
-class BlockchainImpl(dataFolder:String) extends BlockChain {
+class BlockchainImpl(dataFolder: String) extends BlockChain {
   private val database = DBMaker.newFileDB(new java.io.File(dataFolder + s"/signatures"))
     .closeOnJvmShutdown()
     .checksumEnable()
