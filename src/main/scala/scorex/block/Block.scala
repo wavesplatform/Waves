@@ -151,36 +151,28 @@ object Block {
   }
 
   def parse(data: Array[Byte]): Try[Block] = Try {
-    //CHECK IF WE HAVE MINIMUM BLOCK LENGTH
     require(data.length >= BASE_LENGTH, "Data is less then minimum block length")
 
     var position = 0
 
-    //READ VERSION
     val version = data.head
     position += VERSION_LENGTH
 
-    //READ TIMESTAMP
     val timestampBytes = Arrays.copyOfRange(data, position, position + TIMESTAMP_LENGTH)
     val timestamp = Longs.fromByteArray(timestampBytes)
     position += TIMESTAMP_LENGTH
 
-    //READ REFERENCE
     val reference = Arrays.copyOfRange(data, position, position + REFERENCE_LENGTH)
     position += REFERENCE_LENGTH
 
-    //READ GENERATOR
     val generatorBytes = Arrays.copyOfRange(data, position, position + GENERATOR_LENGTH)
     val generator = new PublicKeyAccount(generatorBytes)
     position += GENERATOR_LENGTH
-
 
     val generationDatabytes = Arrays.copyOfRange(data, position, position + GENERATION_DATA_LENGTH)
     val generationData: ConsensusAlgo.kernelData = ConsensusAlgo.kernelDataParser.parse(generationDatabytes)
     position += GENERATION_DATA_LENGTH
 
-
-    //READ TRANSACTION SIGNATURE
     val transactionsSignature = Arrays.copyOfRange(data, position, position + TRANSACTIONS_SIGNATURE_LENGTH)
     position += TRANSACTIONS_SIGNATURE_LENGTH
 
@@ -188,7 +180,6 @@ object Block {
       ConsensusAlgo.genesisBlock
     } else {
 
-      //READ TRANSACTIONS COUNT
       val transactionCountBytes = Arrays.copyOfRange(data, position, position + TRANSACTIONS_COUNT_LENGTH)
       val transactionCount = Ints.fromByteArray(transactionCountBytes)
       position += TRANSACTIONS_COUNT_LENGTH
