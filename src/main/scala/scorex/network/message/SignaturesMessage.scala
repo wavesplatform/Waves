@@ -1,7 +1,5 @@
 package scorex.network.message
 
-import java.util.Arrays
-
 import com.google.common.primitives.{Bytes, Ints}
 
 
@@ -32,7 +30,7 @@ object SignaturesSeqMessage {
 
   def parse(data: Array[Byte]) = {
     //READ LENGTH
-    val lengthBytes = Arrays.copyOfRange(data, 0, DATA_LENGTH)
+    val lengthBytes = data.take(DATA_LENGTH)
     val length = Ints.fromByteArray(lengthBytes)
 
     //CHECK IF DATA MATCHES LENGTH
