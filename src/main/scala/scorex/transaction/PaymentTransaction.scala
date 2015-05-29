@@ -94,6 +94,12 @@ object PaymentTransaction {
   private val BASE_LENGTH = TIMESTAMP_LENGTH + SENDER_LENGTH + RECIPIENT_LENGTH + AMOUNT_LENGTH + FEE_LENGTH + SIGNATURE_LENGTH
 
 
+  def apply(sender: PrivateKeyAccount, recipient: Account,
+            amount: BigDecimal, fee: BigDecimal, timestamp: Long): PaymentTransaction = {
+    val sig = generateSignature(sender, recipient, amount, fee, timestamp)
+    PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
+  }
+
   def Parse(data: Array[Byte]) = {
     require(data.length >= BASE_LENGTH, "Data does not match base length")
 

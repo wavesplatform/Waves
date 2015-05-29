@@ -70,7 +70,7 @@ object Settings {
   //BLOCKCHAIN
   lazy val maxRollback = 100
 
-  val MaxBlocksChunks = 200
+  val MaxBlocksChunks = 5
 
   //NETWORK
   private val DEFAULT_MAX_CONNECTIONS = 20

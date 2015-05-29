@@ -21,7 +21,7 @@ case class BlockStub(version: Byte, reference: Array[Byte], timestamp: Long,
 
 case class Block(version: Byte, reference: Array[Byte], timestamp: Long,
                  generator: PublicKeyAccount, generationData: Constants.ConsensusAlgo.kernelData,
-                 transactions: List[Transaction], transactionsSignature: Array[Byte]) {
+                 transactions: Seq[Transaction], transactionsSignature: Array[Byte]) {
 
   import scorex.block.Block._
 
@@ -125,9 +125,18 @@ object Block {
     TRANSACTIONS_SIGNATURE_LENGTH + TRANSACTIONS_COUNT_LENGTH
   val MAX_TRANSACTION_BYTES = MAX_BLOCK_BYTES - BASE_LENGTH
 
-  def apply(stub: BlockStub, transactions: List[Transaction], transactionsSignature: Array[Byte]): Block =
+  def apply(stub: BlockStub, transactions: Seq[Transaction], transactionsSignature: Array[Byte]): Block =
     Block(stub.version, stub.reference, stub.timestamp,
       stub.generator, stub.generationData, transactions, transactionsSignature)
+
+  def apply(stub: BlockStub, transactions: Seq[Transaction], account: PrivateKeyAccount): Block = {
+    val txSigsBytes = transactions.foldLeft(stub.generationData.signature()) { case (bytes, tx) =>
+      Bytes.concat(bytes, tx.signature);
+    }
+
+    val transactionsSignature = Crypto.sign(account, txSigsBytes)
+    Block(stub, transactions, transactionsSignature)
+  }
 
   def apply(stub: BlockStub, account: PrivateKeyAccount): Block = {
     val orderedTransactions = UnconfirmedTransactionsDatabaseImpl.getAll().sortBy(_.feePerByte)
@@ -142,12 +151,7 @@ object Block {
         } else (totalBytes, filteredTxs)
     }
 
-    val txSigsBytes = transactions.foldLeft(stub.generationData.signature()) { case (bytes, tx) =>
-      Bytes.concat(bytes, tx.signature);
-    }
-
-    val transactionsSignature = Crypto.sign(account, txSigsBytes)
-    Block(stub, transactions, transactionsSignature)
+    Block(stub, transactions, account)
   }
 
   def parse(data: Array[Byte]): Try[Block] = Try {

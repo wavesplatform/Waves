@@ -10,7 +10,7 @@ import scorex.crypto.{Base58, Crypto}
 import scorex.database.blockchain.PrunableBlockchainStorage
 
 
-class QoraBlockGenerationData(val generatingBalance: Long, val generatorSignature: Array[Byte])
+case class QoraBlockGenerationData(generatingBalance: Long, generatorSignature: Array[Byte])
   extends BlockGenerationData {
 
   import QoraBlockGenerationDataParser._

@@ -6,7 +6,7 @@ import scorex.block.{Block, NxtGenesisBlockGenerationData}
 import scorex.consensus.BlockGenerationData
 import scorex.crypto.Base58
 
-class NxtBlockGenerationData(val baseTarget: Long, val generatorSignature: Array[Byte])
+case class NxtBlockGenerationData(baseTarget: Long, generatorSignature: Array[Byte])
   extends BlockGenerationData {
 
   override def toBytes: Array[Byte] = Bytes.concat(

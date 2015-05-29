@@ -6,7 +6,7 @@ import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataPa
 
 //data and functions related to a consensus algo
 //todo: stricter typing solution?
-trait ConsensusModule {
+sealed trait ConsensusModule {
   type kernelData <: BlockGenerationData
 
   val KERNEL_SIGNATURE_LENGTH: Int
