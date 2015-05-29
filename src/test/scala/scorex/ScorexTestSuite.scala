@@ -1,7 +1,6 @@
 package scorex
 
 import org.scalatest.Suites
-import scorex.integration.ValidChainGenerationSpecification
 import scorex.unit._
 
 class ScorexTestSuite extends Suites(
@@ -9,6 +8,7 @@ class ScorexTestSuite extends Suites(
   new CryptoSpecification
   ,new MessageSpecification
   ,new TransactionSpecification
+  ,new BlockSpecification
   ,new BlockchainStorageSpecification
   ,new WalletSpecification
 
