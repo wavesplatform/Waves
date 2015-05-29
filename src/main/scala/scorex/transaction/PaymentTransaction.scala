@@ -11,8 +11,8 @@ import scorex.transaction.Transaction.TransactionType
 
 case class PaymentTransaction(sender: PublicKeyAccount,
                               override val recipient: Account,
-                              override val amount: BigDecimal,
-                              override val fee: BigDecimal,
+                              override val amount: Long,
+                              override val fee: Long,
                               override val timestamp: Long,
                               override val signature: Array[Byte])
   extends Transaction(TransactionType.PAYMENT_TRANSACTION, recipient, amount, fee, timestamp, signature) {
@@ -36,17 +36,14 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
 
     //WRITE AMOUNT
-    val amountBytes = amount.toBigInt().toByteArray
-    val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
+    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AMOUNT_LENGTH, 0)
 
     //WRITE FEE
-    val feeBytes = fee.toBigInt().toByteArray
-    val feeFill = new Array[Byte](FEE_LENGTH - feeBytes.length)
+    val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FEE_LENGTH, 0)
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
-      Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes),
-      Bytes.concat(feeFill, feeBytes, signature)
-    )
+      Base58.decode(recipient.address), amountBytes,
+      feeBytes, signature)
   }
 
   override def isSignatureValid() = {
@@ -95,18 +92,18 @@ object PaymentTransaction {
 
 
   def apply(sender: PrivateKeyAccount, recipient: Account,
-            amount: BigDecimal, fee: BigDecimal, timestamp: Long): PaymentTransaction = {
+            amount: Long, fee: Long, timestamp: Long): PaymentTransaction = {
     val sig = generateSignature(sender, recipient, amount, fee, timestamp)
     PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
   }
 
-  def Parse(data: Array[Byte]) = {
+  def parse(data: Array[Byte]) = {
     require(data.length >= BASE_LENGTH, "Data does not match base length")
 
     var position = 0
 
     //READ TIMESTAMP
-    val timestampBytes = Arrays.copyOfRange(data, position, position + TIMESTAMP_LENGTH)
+    val timestampBytes = data.take(TIMESTAMP_LENGTH)
     val timestamp = Longs.fromByteArray(timestampBytes)
     position += TIMESTAMP_LENGTH
 
@@ -122,12 +119,12 @@ object PaymentTransaction {
 
     //READ AMOUNT
     val amountBytes = Arrays.copyOfRange(data, position, position + AMOUNT_LENGTH)
-    val amount = BigDecimal(BigInt(amountBytes), 8)
+    val amount = Longs.fromByteArray(amountBytes)
     position += AMOUNT_LENGTH
 
     //READ FEE
     val feeBytes = Arrays.copyOfRange(data, position, position + FEE_LENGTH)
-    val fee = BigDecimal(BigInt(feeBytes), 8)
+    val fee = Longs.fromByteArray(feeBytes)
     position += FEE_LENGTH
 
     //READ SIGNATURE
@@ -137,12 +134,12 @@ object PaymentTransaction {
   }
 
   def generateSignature(sender: PrivateKeyAccount, recipient: Account,
-                        amount: BigDecimal, fee: BigDecimal, timestamp: Long): Array[Byte] = {
+                        amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
     Crypto.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
   }
 
   private def signatureData(sender: PublicKeyAccount, recipient: Account,
-                            amount: BigDecimal, fee: BigDecimal, timestamp: Long): Array[Byte] = {
+                            amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
     //WRITE TYPE
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.PAYMENT_TRANSACTION.id), TYPE_LENGTH, 0)
 
@@ -150,14 +147,12 @@ object PaymentTransaction {
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
 
     //WRITE AMOUNT
-    val amountBytes = amount.toBigInt().toByteArray
-    val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
+    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AMOUNT_LENGTH, 0)
 
     //WRITE FEE
-    val feeBytes = fee.toBigInt().toByteArray
-    val feeFill = new Array[Byte](FEE_LENGTH - feeBytes.length)
+    val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FEE_LENGTH, 0)
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
-      Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes), Bytes.concat(feeFill, feeBytes))
+      Base58.decode(recipient.address), amountBytes, feeBytes)
   }
 }

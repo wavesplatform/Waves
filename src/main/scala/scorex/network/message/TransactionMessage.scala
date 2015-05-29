@@ -16,5 +16,5 @@ case class TransactionMessage(transaction: Transaction) extends Message {
 }
 
 object TransactionMessage {
-  def apply(data: Array[Byte]): TransactionMessage = new TransactionMessage(Transaction.fromBytes(data))
+  def apply(data: Array[Byte]): TransactionMessage = new TransactionMessage(Transaction.parse(data))
 }

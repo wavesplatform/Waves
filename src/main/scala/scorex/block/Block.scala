@@ -25,7 +25,7 @@ case class Block(version: Byte, reference: Array[Byte], timestamp: Long,
 
   import scorex.block.Block._
 
-  def totalFee() = transactions.foldLeft(BigDecimal(0).setScale(8)) { case (fee, tx) => fee + tx.fee }
+  def totalFee() = transactions.foldLeft(0L) { case (fee, tx) => fee + tx.fee }
 
   def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
 
@@ -82,13 +82,8 @@ case class Block(version: Byte, reference: Array[Byte], timestamp: Long,
     if (reference == null || parent().isEmpty) {
       false
     } else if (this.timestamp < parent().get.timestamp) {
-      //CHECK IF TIMESTAMP IS VALID -500 MS ERROR MARGIN TIME
       false
-    } /* else if (timestamp % 1000 != parent().get.timestamp % 1000) {
-      //CHECK IF TIMESTAMP REST SAME AS PARENT TIMESTAMP REST
-      false
-    }*/
-    else {
+    } else {
       generationData.isValid(this) &&
         transactions.forall { transaction =>
           !transaction.isInstanceOf[GenesisTransaction] &&
@@ -100,7 +95,7 @@ case class Block(version: Byte, reference: Array[Byte], timestamp: Long,
 
   def process() = transactions.foreach(UnconfirmedTransactionsDatabaseImpl.remove)
 
-  def rollback() = transactions.foreach(UnconfirmedTransactionsDatabaseImpl.put)
+  def rollback() = transactions.foreach(UnconfirmedTransactionsDatabaseImpl.putIfNew)
 }
 
 
@@ -139,7 +134,7 @@ object Block {
   }
 
   def apply(stub: BlockStub, account: PrivateKeyAccount): Block = {
-    val orderedTransactions = UnconfirmedTransactionsDatabaseImpl.getAll().sortBy(_.feePerByte)
+    val orderedTransactions = UnconfirmedTransactionsDatabaseImpl.getAll().sortBy(_.feePerByte).toList
 
     val (_, transactions) = orderedTransactions.foldLeft((0, List[Transaction]())) {
       case ((totalBytes, filteredTxs), tx) =>
@@ -188,13 +183,13 @@ object Block {
       val transactionCount = Ints.fromByteArray(transactionCountBytes)
       position += TRANSACTIONS_COUNT_LENGTH
 
-      val (_, transactions) = (0 to transactionCount - 1).foldLeft((position, List[Transaction]())) { case ((pos, list), _) =>
+      val (_, transactions) = (1 to transactionCount).foldLeft((position, Seq[Transaction]())) { case ((pos, txs), _) =>
         val transactionLengthBytes = Arrays.copyOfRange(data, pos, pos + TRANSACTION_SIZE_LENGTH)
         val transactionLength = Ints.fromByteArray(transactionLengthBytes)
         val transactionBytes = Arrays.copyOfRange(data, pos + TRANSACTION_SIZE_LENGTH, pos + TRANSACTION_SIZE_LENGTH + transactionLength)
-        val transaction = Transaction.fromBytes(transactionBytes)
+        val transaction = Transaction.parse(transactionBytes)
 
-        (position + TRANSACTION_SIZE_LENGTH + transactionLength, transaction :: list)
+        (pos + TRANSACTION_SIZE_LENGTH + transactionLength, txs :+ transaction)
       }
 
       new Block(version, reference, timestamp, generator, generationData, transactions, transactionsSignature)

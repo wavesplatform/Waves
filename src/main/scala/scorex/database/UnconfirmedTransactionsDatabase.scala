@@ -4,7 +4,7 @@ import scorex.transaction.Transaction
 
 
 trait UnconfirmedTransactionsDatabase {
-  def put(tx: Transaction): Boolean
+  def putIfNew(tx: Transaction): Boolean
 
   def getAll(): Seq[Transaction]
 

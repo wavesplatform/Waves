@@ -11,9 +11,9 @@ import scorex.transaction.Transaction.TransactionType
 
 
 case class GenesisTransaction(override val recipient: Account,
-                              override val amount: BigDecimal,
+                              override val amount: Long,
                               override val timestamp: Long)
-  extends Transaction(TransactionType.GENESIS_TRANSACTION, recipient, amount, BigDecimal.apply(0), timestamp,
+  extends Transaction(TransactionType.GENESIS_TRANSACTION, recipient, amount, 0, timestamp,
     GenesisTransaction.generateSignature(recipient, amount, timestamp)) {
 
   import scorex.transaction.GenesisTransaction._
@@ -27,13 +27,12 @@ case class GenesisTransaction(override val recipient: Account,
 
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
 
-    val amountBytes = amount.bigDecimal.unscaledValue().toByteArray
-    val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
+    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AMOUNT_LENGTH, 0)
 
     val rcpBytes = Base58.decode(recipient.address)
     require(rcpBytes.length == Account.ADDRESS_LENGTH)
 
-    val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, Bytes.concat(amountFill, amountBytes))
+    val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, amountBytes)
     require(res.length == dataLength)
     res
   }
@@ -46,10 +45,9 @@ case class GenesisTransaction(override val recipient: Account,
   def isSignatureValid() = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GENESIS_TRANSACTION.id), TYPE_LENGTH, 0)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
-    val amountBytes = amount.bigDecimal.unscaledValue().toByteArray
-    val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
+    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AMOUNT_LENGTH, 0)
     val data = Bytes.concat(typeBytes, timestampBytes,
-      Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes))
+      Base58.decode(recipient.address), amountBytes)
     val digest = Crypto.sha256(data)
 
     Bytes.concat(digest, digest).sameElements(signature)
@@ -91,7 +89,7 @@ object GenesisTransaction {
     Bytes.concat(digest, digest)
   }
 
-  def Parse(data: Array[Byte]): Transaction = {
+  def parse(data: Array[Byte]): Transaction = {
     require(data.length >= BASE_LENGTH, "Data does not match block length") //CHECK IF WE MATCH BLOCK LENGTH
 
     var position = 0
@@ -108,7 +106,7 @@ object GenesisTransaction {
 
     //READ AMOUNT
     val amountBytes = Arrays.copyOfRange(data, position, position + AMOUNT_LENGTH)
-    val amount = BigDecimal(new BigInteger(amountBytes), 8)
+    val amount = Longs.fromByteArray(amountBytes)
 
     GenesisTransaction(recipient, amount, timestamp)
   }

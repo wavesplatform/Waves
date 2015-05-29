@@ -6,8 +6,8 @@ import java.util.logging.Logger
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
+import controller.Controller
 import scorex.block.{Block, NewBlock}
-import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.NetworkController.UpdateBlockchainScore
 import scorex.network.message.{Message, _}
@@ -97,8 +97,7 @@ class PeerConnectionHandler(networkController: ActorRef,
         if (!transaction.isSignatureValid || transaction.transactionType == TransactionType.GENESIS_TRANSACTION) {
           self ! Blacklist
         } else if (transaction.hasMinimumFee && transaction.hasMinimumFeePerByte) {
-          UnconfirmedTransactionsDatabaseImpl.put(transaction)
-          networkController ! NetworkController.BroadcastMessage(message, List(remote))
+          Controller.onNewOffchainTransaction(transaction)
         }
 
       case a: Any => Logger.getGlobal.warning(s"PeerConnectionHandler: got something strange $a")

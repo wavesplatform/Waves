@@ -62,8 +62,8 @@ object Controller {
     System.exit(10)
   }
 
-  def onTransactionCreate(transaction: Transaction) {
-    UnconfirmedTransactionsDatabaseImpl.put(transaction)
-    networkController ! NetworkController.BroadcastMessage(TransactionMessage(transaction))
-  }
+  def onNewOffchainTransaction(transaction: Transaction) =
+    if (UnconfirmedTransactionsDatabaseImpl.putIfNew(transaction)) {
+      networkController ! NetworkController.BroadcastMessage(TransactionMessage(transaction))
+    }
 }

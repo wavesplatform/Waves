@@ -57,8 +57,10 @@ object Start {
 
     require(wallet.privateKeyAccounts().nonEmpty)
 
+    Thread.sleep(10000)
+
     (1 to Int.MaxValue).foreach { _ =>
-      Thread.sleep(20000)
+      Thread.sleep(2000)
       val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size)
       val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx)
 
@@ -66,8 +68,8 @@ object Start {
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val recipientAcc = new Account(recipientAddress)
 
-      val amt = new java.math.BigDecimal(Random.nextInt(100000))
-      val fee = new java.math.BigDecimal(1 + Random.nextInt(5))
+      val amt = Random.nextInt(100000).toLong
+      val fee = Random.nextInt(5).toLong
 
       val (tx, valRes) = TransactionCreator.createPayment(senderAcc, recipientAcc, amt, fee)
       println(s"Payment created: $tx, validationResult: $valRes")

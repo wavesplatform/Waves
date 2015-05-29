@@ -16,8 +16,8 @@ trait PaymentHttpService extends HttpService with CommonApifunctions {
         entity(as[String]) { body => complete {
           walletNotExists().getOrElse {
             Try(Json.parse(body)).map { js =>
-              (Try(BigDecimal((js \ "amount").as[String]).setScale(8)),
-                Try(BigDecimal((js \ "fee").as[String]).setScale(8)),
+              (Try((js \ "amount").as[String].toLong),
+                Try((js \ "fee").as[String].toLong),
                 Try(Controller.wallet.privateKeyAccount((js \ " sender").as[String])),
                 Try((js \ " recipient").as[String])) match {
                 case (Failure(_), _, _, _) => ApiError.toJson(ApiError.ERROR_INVALID_AMOUNT)

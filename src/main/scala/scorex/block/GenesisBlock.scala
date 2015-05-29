@@ -1,7 +1,5 @@
 package scorex.block
 
-import java.math.BigDecimal
-
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import org.joda.time.DateTime
 import scorex.account.{Account, PublicKeyAccount}
@@ -34,7 +32,7 @@ object GenesisBlockParams {
 
   def transactions(timestamp: Long) = ipoMembers.map { addr =>
     val recipient = new Account(addr)
-    GenesisTransaction(recipient, new BigDecimal("1000000000").setScale(8), timestamp)
+    GenesisTransaction(recipient, 1000000000L, timestamp)
   }
 }
 

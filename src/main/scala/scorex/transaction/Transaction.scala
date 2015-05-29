@@ -9,13 +9,14 @@ import settings.Settings
 
 abstract class Transaction(val transactionType: TransactionType.Value,
                            val recipient: Account,
-                           val amount: BigDecimal,
-                           val fee: BigDecimal,
+                           val amount: Long,
+                           val fee: Long,
                            val timestamp: Long,
                            val signature: Array[Byte]) {
 
-  lazy val deadline = timestamp + (1000 * 60 * 60 * 24)
   //24HOUR DEADLINE TO INCLUDE TRANSACTION IN BLOCK
+  lazy val deadline = timestamp + (1000 * 60 * 60 * 24)
+
   lazy val feePerByte = fee / BigDecimal(dataLength)
   lazy val hasMinimumFee = fee >= MINIMUM_FEE
   lazy val hasMinimumFeePerByte = {
@@ -62,8 +63,7 @@ abstract class Transaction(val transactionType: TransactionType.Value,
 object Transaction {
 
   //MINIMUM FEE
-  val MINIMUM_FEE = BigDecimal(1)
-  //PROPERTIES LENGTH
+  val MINIMUM_FEE = 1
   val RECIPIENT_LENGTH = Account.ADDRESS_LENGTH
   val TYPE_LENGTH = 1
   val TIMESTAMP_LENGTH = 8
@@ -81,18 +81,16 @@ object Transaction {
 
   //TYPES
   object TransactionType extends Enumeration {
-    type Transactiontype = Value
-
     val GENESIS_TRANSACTION = Value(1)
     val PAYMENT_TRANSACTION = Value(2)
   }
 
-  def fromBytes(data: Array[Byte]): Transaction = data.head match {
+  def parse(data: Array[Byte]): Transaction = data.head match {
     case txType: Byte if txType == TransactionType.GENESIS_TRANSACTION.id =>
-      GenesisTransaction.Parse(data.tail)
+      GenesisTransaction.parse(data.tail)
 
     case txType: Byte if txType == TransactionType.PAYMENT_TRANSACTION.id =>
-      PaymentTransaction.Parse(data.tail)
+      PaymentTransaction.parse(data.tail)
 
     case txType => throw new Exception(s"Invalid transaction type: $txType")
   }
