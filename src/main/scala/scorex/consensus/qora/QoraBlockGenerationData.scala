@@ -1,7 +1,5 @@
 package scorex.consensus.qora
 
-import java.util
-
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.Json
 import scorex.block.{Block, QoraGenesisBlockGenerationData}
@@ -57,11 +55,11 @@ case class QoraBlockGenerationData(generatingBalance: Long, generatorSignature: 
   override def isSignatureValid(block: Block): Boolean = {
     val generatingBalanceBytes = Longs.toByteArray(generatingBalance).ensuring(_.size == GENERATING_BALANCE_LENGTH)
 
-    val blockSignature = Bytes.concat(util.Arrays.copyOfRange(block.reference, 0, GENERATOR_SIGNATURE_LENGTH),
+    val blockSignatureImage = Bytes.concat(block.reference.take(GENERATOR_SIGNATURE_LENGTH),
       generatingBalanceBytes,
       block.generator.publicKey)
 
-    Crypto.verify(signature(), blockSignature, block.generator.publicKey)
+    Crypto.verify(signature(), blockSignatureImage, block.generator.publicKey)
   }
 
   override def blockScore() = BigInt(1)

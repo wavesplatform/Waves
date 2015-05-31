@@ -4,7 +4,7 @@ import org.scalatest.FunSuite
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.nxt.{NxtBlockGenerationData, NxtBlockGenerationDataParser}
-import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataParser}
+import scorex.consensus.qora.{QoraBlockGenerationFunctions, QoraBlockGenerationData}
 import scorex.consensus.{ConsensusModuleNxt, ConsensusModuleQora}
 import scorex.crypto.Base58
 import scorex.transaction.{PaymentTransaction, Transaction}
@@ -19,10 +19,11 @@ class BlockSpecification extends FunSuite {
     val gd = (Constants.ConsensusAlgo match {
       case ConsensusModuleNxt =>
         val gs = Array.fill(NxtBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)(Random.nextInt(100).toByte)
-        NxtBlockGenerationData(Random.nextLong(), gs)
+        NxtBlockGenerationData(Random.nextInt(Int.MaxValue)+1, gs)
       case ConsensusModuleQora =>
-        val gs = Array.fill(QoraBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)(Random.nextInt(100).toByte)
-        QoraBlockGenerationData(Random.nextLong(), gs)
+        val gb = Random.nextInt(Int.MaxValue)+1
+        val gs = QoraBlockGenerationFunctions.calculateSignature(reference, gb, gen)
+        QoraBlockGenerationData(gb, gs)
     }).asInstanceOf[Constants.ConsensusAlgo.kernelData]
     val bs = BlockStub(1, reference, System.currentTimeMillis(), gen, gd)
 
@@ -38,6 +39,7 @@ class BlockSpecification extends FunSuite {
 
     assert(at1 == at2)
     assert(at1.amount == at2.amount)
+    assert(b.generationData.isSignatureValid(b))
     assert(b.isSignatureValid())
     assert(b2.isSignatureValid())
   }

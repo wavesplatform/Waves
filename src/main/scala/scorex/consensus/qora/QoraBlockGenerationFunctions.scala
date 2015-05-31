@@ -47,8 +47,6 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
   private def blockGeneratingBalance(block: Block) =
     block.generationData.asInstanceOf[QoraBlockGenerationData].generatingBalance
 
-  private def blockGeneratorSignature(block: Block) =
-    block.generationData.asInstanceOf[QoraBlockGenerationData].generatorSignature
 
   def getNextBlockGeneratingBalance(block: Block): Long = {
     if (block.height().get % RETARGET == 0) {
@@ -77,14 +75,24 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
     (MIN_BLOCK_TIME + ((MAX_BLOCK_TIME - MIN_BLOCK_TIME) * (1 - percentageOfTotal))).toLong
   }
 
-  private def calculateSignature(solvingBlock: Block, account: PrivateKeyAccount) = {
-    //PARENT GENERATOR SIGNATURE
-    val generatorSignature = blockGeneratorSignature(solvingBlock)
+  def calculateSignature(prevBlock: Block, account: PrivateKeyAccount):Array[Byte] = {
+    val gb = getNextBlockGeneratingBalance(prevBlock)
+    val ref = prevBlock.generationData.asInstanceOf[QoraBlockGenerationData].generatorSignature
+    calculateSignature(ref, gb, account)
+  }
 
-    val genBalanceBytes = Longs.toByteArray(getNextBlockGeneratingBalance(solvingBlock))
+  def calculateSignature(reference:Array[Byte],
+                                 generatingBalance:Long,
+                                 account: PrivateKeyAccount):Array[Byte] = {
+    //PARENT GENERATOR SIGNATURE
+    val generatorSignature = reference.take(QoraBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)
+
+    val genBalanceBytes = Longs.toByteArray(generatingBalance)
+      .ensuring(_.size == QoraBlockGenerationDataParser.GENERATING_BALANCE_LENGTH)
 
     require(account.publicKey.length == Block.GENERATOR_LENGTH)
-    Crypto.sign(account, Bytes.concat(generatorSignature, genBalanceBytes, account.publicKey))
+    val si = Bytes.concat(generatorSignature, genBalanceBytes, account.publicKey)
+    Crypto.sign(account, si)
   }
 
   private def minMaxBalance(generatingBalance: Long) =
