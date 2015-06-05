@@ -38,7 +38,7 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
     //CHECK IF NOT HIGHER THAN MAX LONG VALUE
     val timestamp = if (timestampRaw > Long.MaxValue) Long.MaxValue else timestampRaw.longValue()
 
-    if (timestamp <= NTP.correctedTime) {
+    if (timestamp <= NTP.correctedTime()) {
       Some(BlockStub(Block.Version, lastBlock.signature, timestamp, account,
         new QoraBlockGenerationData(getNextBlockGeneratingBalance(lastBlock), signature).asInstanceOf[Constants.ConsensusAlgo.kernelData]))
     } else None

@@ -17,10 +17,10 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
     val h = hit(lastBlockKernelData, account)
     val t = target(lastBlockKernelData, lastBlockTime, account)
 
-    val eta = (NTP.correctedTime - lastBlock.timestamp) / 1000
+    val eta = (NTP.correctedTime() - lastBlock.timestamp) / 1000
     println(s"hit: $h, target: $t, generating ${h < t}, eta $eta, account balance: ${account.generatingBalance}")
     if (h < t) {
-      val ts = NTP.correctedTime
+      val ts = NTP.correctedTime()
       val btg = baseTarget(lastBlockKernelData, lastBlockTime, ts)
       val gs = generatorSignature(lastBlockKernelData, account)
       Some(BlockStub(Block.Version, lastBlock.signature, ts, account,
@@ -44,7 +44,7 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
   }
 
   private def target(lastBlockData: NxtBlockGenerationData, lastBlockTimestamp: Long, generator: PrivateKeyAccount): BigInt = {
-    val eta = (NTP.correctedTime - lastBlockTimestamp) / 1000 //in seconds
+    val eta = (NTP.correctedTime() - lastBlockTimestamp) / 1000 //in seconds
     val effBalance: BigDecimal = 10000000 // generator.generatingBalance
     (lastBlockData.baseTarget * eta * effBalance).toBigInt()
   }
