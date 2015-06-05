@@ -11,7 +11,7 @@ import settings.Settings
  * Facade to both blockchain & internal state implementations
  */
 object PrunableBlockchainStorage extends BlockChain with StateQuery {
-  private val chain = new BlockchainImpl(Settings.dataDir)
+  private val chain = new BlockchainImpl(Some(Settings.dataDir))
   private val state = new InternalState(Settings.dataDir)
 
   override def height(): Int = chain.height()
