@@ -67,8 +67,8 @@ object QoraGenesisBlockGenerationData {
 
 object NxtGenesisBlockGenerationData {
   val InitialGenerationSignature = Array.fill(32)(0: Byte)
-  val InitialBaseTarget: Long = 153722867 * 10
   //Nxt's initial base target * 10, as 10 bln tokens total instead of 1
+  val InitialBaseTarget: Long = 153722867 * 10
   lazy val generationData = new NxtBlockGenerationData(NxtGenesisBlockGenerationData.InitialBaseTarget,
     NxtGenesisBlockGenerationData.InitialGenerationSignature)
 }
