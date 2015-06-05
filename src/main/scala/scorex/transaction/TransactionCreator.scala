@@ -12,7 +12,7 @@ object TransactionCreator {
                     recipient: Account,
                     amount: Long,
                     fee: Long): (Transaction, ValidationResult) = {
-    val time = NTP.getTime()
+    val time = NTP.correctedTime()
     val signature = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
     val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, signature)
     val valid = payment.isValid() //CHECK IF PAYMENT VALID

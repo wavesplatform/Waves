@@ -10,10 +10,10 @@ object NTP {
   private val TIME_TILL_UPDATE = 1000 * 60 * 10L
   private val NTP_SERVER = "pool.ntp.org"
 
-  private var lastUpdate: Long = 0
-  private var offset: Long = 0
+  private var lastUpdate = 0L
+  private var offset = 0L
 
-  def getTime() = {
+  def correctedTime() = {
     //CHECK IF OFFSET NEEDS TO BE UPDATED
     if (System.currentTimeMillis() > lastUpdate + TIME_TILL_UPDATE) {
       updateOffSet()
@@ -27,7 +27,6 @@ object NTP {
   }
 
   private def updateOffSet() {
-    //CREATE CLIENT
     val client = new NTPUDPClient()
     client.setDefaultTimeout(10000)
 
