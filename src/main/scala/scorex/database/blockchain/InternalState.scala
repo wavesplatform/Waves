@@ -2,7 +2,7 @@ package scorex.database.blockchain
 
 import java.io.File
 
-import org.mapdb.DBMaker
+import org.mapdb.{DB, DBMaker}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.Transaction
@@ -11,20 +11,26 @@ import scorex.transaction.Transaction
 // Store current balances only, and balances changes within effective balance depth.
 // Store transactions for selected accounts only.
 
-// Make design ready for pruning!
-// Make possibility of easy switching underlying storage implementation(e.g. from MapDb to Riak)
+// todo: Make design ready for pruning!
+// todo: Make possibility of easy switching underlying storage implementation(e.g. from MapDb to Riak)
 
-class InternalState(dataFolder: String) extends StateQuery {
+class InternalState(dataFolderOpt: Option[String]) extends StateQuery {
   private val StateHeight = "height"
 
-  private val database = DBMaker.newFileDB(new File(dataFolder + s"/state"))
-    .closeOnJvmShutdown()
-    .cacheSize(2048)
-    .checksumEnable()
-    .mmapFileEnableIfSupported()
-    .make()
+  private val database: DB = dataFolderOpt match {
+    case Some(dataFolder) =>
+      val db = DBMaker.newFileDB(new File(dataFolder + s"/state"))
+        .closeOnJvmShutdown()
+        .cacheSize(2048)
+        .checksumEnable()
+        .mmapFileEnableIfSupported()
+        .make()
+      db.rollback() //clear uncommited data from possibly invalid last run
+      db
+    case None => DBMaker.newMemoryDB().make()
+  }
 
-  database.rollback()
+
   //initial rollback
 
   private val balances = database.createHashMap("balances").makeOrGet[Account, BigDecimal]()
