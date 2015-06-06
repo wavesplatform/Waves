@@ -1,9 +1,9 @@
 package api.http
 
+import controller.Controller
 import play.api.libs.json.Json
 import scorex.crypto.Base58
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.database.blockchain.PrunableBlockchainStorage
 import spray.routing.HttpService
 
 import scala.util.Try
@@ -30,14 +30,14 @@ trait TransactionsHttpService extends HttpService with CommonApifunctions {
       } ~ path("address" / Segment) { case address =>
         get {
           complete {
-            val txs = PrunableBlockchainStorage.accountTransactions(address)
+            val txs = Controller.blockchainStorage.accountTransactions(address)
             Json.arr(txs.map(_.toJson())).toString()
           }
         }
       } ~ path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
         get {
           complete {
-            val txs = PrunableBlockchainStorage.accountTransactions(address).takeRight(limit)
+            val txs = Controller.blockchainStorage.accountTransactions(address).takeRight(limit)
             Json.arr(txs.map(_.toJson())).toString()
           }
         }

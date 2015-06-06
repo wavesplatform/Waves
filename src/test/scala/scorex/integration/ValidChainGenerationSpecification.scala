@@ -20,16 +20,16 @@ class ValidChainGenerationSpecification extends FunSuite {
     require(wallet.privateKeyAccounts().nonEmpty)
 
     Thread.sleep(15000)
-    val bh = PrunableBlockchainStorage.height()
+    val bh = Controller.blockchainStorage.height()
 
     //chain validity check
     (2 to bh).foreach { h =>
-      assert(PrunableBlockchainStorage.blockAt(h).get.isValid())
-      assert(PrunableBlockchainStorage.blockAt(h).get.isSignatureValid())
+      assert(Controller.blockchainStorage.blockAt(h).get.isValid())
+      assert(Controller.blockchainStorage.blockAt(h).get.isSignatureValid())
     }
 
-    val b1 = PrunableBlockchainStorage.blockAt(1).get
-    val b2 = PrunableBlockchainStorage.blockAt(2).get
+    val b1 = Controller.blockchainStorage.blockAt(1).get
+    val b2 = Controller.blockchainStorage.blockAt(2).get
 
     //empty block size check
     if (Constants.ConsensusAlgo == ConsensusModuleQora) {

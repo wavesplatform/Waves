@@ -6,9 +6,9 @@ import java.util.logging.Logger
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
+import controller.Controller
 import scorex.block.BlockchainController.GetMaxChainScore
 import scorex.block.{BlockchainController, NewBlock}
-import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.message.{Message, _}
 import settings.Settings
 
@@ -45,7 +45,7 @@ class NetworkController extends Actor {
 
     if (score > prevBestScore) {
       connectedPeers.foreach { case (_, PeerData(handler, _)) =>
-        handler ! PeerConnectionHandler.BestPeer(remote, score > PrunableBlockchainStorage.score)
+        handler ! PeerConnectionHandler.BestPeer(remote, score > Controller.blockchainStorage.score)
       }
     }
   }
@@ -126,7 +126,7 @@ class NetworkController extends Actor {
     case NewBlock(block, Some(sndr)) =>
       blockchainControllerOpt.foreach { blockchainController =>
         blockchainController ! NewBlock(block, Some(sndr))
-        val height = PrunableBlockchainStorage.height()
+        val height = Controller.blockchainStorage.height()
         self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
       }
 

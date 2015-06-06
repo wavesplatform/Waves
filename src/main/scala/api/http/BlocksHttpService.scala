@@ -1,7 +1,7 @@
 package api.http
 
+import controller.Controller
 import play.api.libs.json.Json
-import scorex.database.blockchain.PrunableBlockchainStorage
 import settings.Constants
 import spray.routing.HttpService
 
@@ -20,17 +20,17 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
         }
       } ~ path("last") {
         get {
-          complete(PrunableBlockchainStorage.lastBlock.toJson.toString())
+          complete(Controller.blockchainStorage.lastBlock.toJson.toString())
         }
       } ~ path("at" / IntNumber) {case height =>
         get {
           //todo: json instead of n/a
-          val res = PrunableBlockchainStorage.blockAt(height).map(_.toJson.toString()).getOrElse("n/a")
+          val res = Controller.blockchainStorage.blockAt(height).map(_.toJson.toString()).getOrElse("n/a")
           complete(res)
         }
       } ~ path("height") {
         get {
-          complete(Json.obj("height" -> PrunableBlockchainStorage.height()).toString())
+          complete(Json.obj("height" -> Controller.blockchainStorage.height()).toString())
         }
       } ~ path("height" / Segment) { case encodedSignature =>
         get {
@@ -47,7 +47,7 @@ trait BlocksHttpService extends HttpService with CommonApifunctions {
       } ~ path("address" / Segment) { case address =>
         get {
           complete(withAccount(address) { account =>
-            Json.arr(PrunableBlockchainStorage.generatedBy(account).map(_.toJson))
+            Json.arr(Controller.blockchainStorage.generatedBy(account).map(_.toJson))
           }.toString())
         }
       }

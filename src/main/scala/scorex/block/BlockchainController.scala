@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.util.logging.Logger
 
 import akka.actor.{Actor, ActorRef}
-import scorex.database.blockchain.PrunableBlockchainStorage
+import controller.Controller
 import scorex.network.NetworkController
 import scorex.network.message.{BlockMessage, GetSignaturesMessage}
 import settings.Constants
@@ -36,7 +36,7 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
         case Status.Offline =>
 
         case Status.Syncing =>
-          val msg = GetSignaturesMessage(PrunableBlockchainStorage.lastSignatures())
+          val msg = GetSignaturesMessage(Controller.blockchainStorage.lastSignatures())
           networkController ! NetworkController.SendMessageToBestPeer(msg)
 
         case Status.Generating =>
@@ -48,7 +48,7 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
 
     case MaxChainScore(scoreOpt) => scoreOpt match {
       case Some(maxScore) =>
-        if (maxScore > PrunableBlockchainStorage.score) status = Status.Syncing
+        if (maxScore > Controller.blockchainStorage.score) status = Status.Syncing
         else status = Status.Generating
 
       case None => status = Status.Offline
@@ -58,8 +58,8 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
       if (Block.isNewBlockValid(block)) {
         Logger.getGlobal.info(s"New block: $block")
         block.process()
-        PrunableBlockchainStorage.appendBlock(block)
-        val height = PrunableBlockchainStorage.height()
+        Controller.blockchainStorage.appendBlock(block)
+        val height = Controller.blockchainStorage.height()
         val exceptOf = remoteOpt.toList
         networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block), exceptOf)
       } else {

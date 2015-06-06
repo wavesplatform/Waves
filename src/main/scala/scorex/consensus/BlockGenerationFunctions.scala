@@ -3,8 +3,6 @@ package scorex.consensus
 import controller.Controller
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
-import scorex.database.blockchain.PrunableBlockchainStorage
-
 import scala.collection.concurrent.TrieMap
 import scala.util.Random
 
@@ -16,7 +14,7 @@ trait BlockGenerationFunctions {
   def generateBlock(): Option[Block] = {
     val blockStubs = wallet.privateKeyAccounts().foldLeft(TrieMap[PrivateKeyAccount, BlockStub]()) { case (bm, account) =>
       if (account.generatingBalance >= BigDecimal(1)) {
-        generateNextBlock(account, PrunableBlockchainStorage.lastBlock).foreach { blockStub =>
+        generateNextBlock(account, Controller.blockchainStorage.lastBlock).foreach { blockStub =>
           bm += account -> blockStub
         }
       }

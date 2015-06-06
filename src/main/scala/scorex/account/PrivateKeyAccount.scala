@@ -1,7 +1,7 @@
 package scorex.account
 
+import controller.Controller
 import scorex.crypto.Crypto
-import scorex.database.blockchain.PrunableBlockchainStorage
 
 case class PrivateKeyAccount(seed: Array[Byte], privateKey: Array[Byte], override val publicKey: Array[Byte])
   extends PublicKeyAccount(publicKey) {
@@ -16,5 +16,5 @@ case class PrivateKeyAccount(seed: Array[Byte], privateKey: Array[Byte], overrid
 
   def this(seed: Array[Byte]) = this(seed, Crypto.createKeyPair(seed))
 
-  def generatingBalance: BigDecimal = PrunableBlockchainStorage.generationBalance(address)
+  def generatingBalance: BigDecimal = Controller.blockchainStorage.generationBalance(address)
 }

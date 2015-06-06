@@ -6,8 +6,6 @@ import play.api.libs.json.{JsObject, JsValue}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.{Base58, Crypto}
-import scorex.database.blockchain.PrunableBlockchainStorage
-
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -24,7 +22,7 @@ trait CommonApifunctions {
     Try {
       Base58.decode(encodedSignature)
     }.toOption.map { signature =>
-      PrunableBlockchainStorage.blockByHeader(signature) match {
+      Controller.blockchainStorage.blockByHeader(signature) match {
         case Some(block) => action(block)
         case None => ApiError.toJson(ApiError.ERROR_BLOCK_NO_EXISTS)
       }

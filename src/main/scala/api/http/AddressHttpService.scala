@@ -6,7 +6,6 @@ import controller.Controller
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.crypto.{Base58, Crypto}
-import scorex.database.blockchain.PrunableBlockchainStorage
 import spray.routing.HttpService
 
 import scala.util.{Failure, Success, Try}
@@ -79,7 +78,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
             } else {
               Json.obj(
                 "address" -> address,
-                "balance" -> PrunableBlockchainStorage.generationBalance(address)
+                "balance" -> Controller.blockchainStorage.generationBalance(address)
               )
             }
             Json.stringify(jsRes)
@@ -189,7 +188,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
       Json.obj(
         "address" -> address,
         "confirmations" -> confirmations,
-        "balance" -> PrunableBlockchainStorage.balance(address, confirmations)
+        "balance" -> Controller.blockchainStorage.balance(address, confirmations)
       )
     }
 }

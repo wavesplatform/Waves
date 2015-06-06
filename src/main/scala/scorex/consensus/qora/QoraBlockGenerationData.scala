@@ -1,12 +1,11 @@
 package scorex.consensus.qora
 
 import com.google.common.primitives.{Bytes, Longs}
+import controller.Controller
 import play.api.libs.json.Json
 import scorex.block.{Block, QoraGenesisBlockGenerationData}
 import scorex.consensus.BlockGenerationData
 import scorex.crypto.{Base58, Crypto}
-import scorex.database.blockchain.PrunableBlockchainStorage
-
 
 case class QoraBlockGenerationData(generatingBalance: Long, generatorSignature: Array[Byte])
   extends BlockGenerationData {
@@ -37,7 +36,7 @@ case class QoraBlockGenerationData(generatingBalance: Long, generatorSignature: 
       //target base
       val targetBytes = Array.fill(32)(Byte.MaxValue)
       val baseTarget = BigInt(QoraBlockGenerationFunctions.getBaseTarget(generatingBalance))
-      val genBalance = PrunableBlockchainStorage.generationBalance(block.generator.address).toBigInt()
+      val genBalance = Controller.blockchainStorage.generationBalance(block.generator.address).toBigInt()
       val target0 = BigInt(1, targetBytes) / baseTarget * genBalance
 
       //target bounds

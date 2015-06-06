@@ -25,12 +25,14 @@ object Controller {
   private lazy val walletFile = new java.io.File(Settings.walletDir, "wallet.s.dat")
   lazy val wallet = new Wallet(walletFile, Settings.walletPassword, Settings.walletSeed)
 
+  lazy val blockchainStorage = new PrunableBlockchainStorage(Some(Settings.dataDir))
+
   def init() {
-    if (PrunableBlockchainStorage.isEmpty) {
+    if (blockchainStorage.isEmpty) {
       val genesisBlock = Constants.ConsensusAlgo.genesisBlock
       genesisBlock.process()
-      PrunableBlockchainStorage.appendBlock(genesisBlock)
-    }.ensuring(PrunableBlockchainStorage.height() >= 1)
+      blockchainStorage.appendBlock(genesisBlock)
+    }.ensuring(blockchainStorage.height() >= 1)
 
     val httpServiceActor = actorSystem.actorOf(Props[HttpServiceActor], "http-service")
     val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = Settings.rpcPort)

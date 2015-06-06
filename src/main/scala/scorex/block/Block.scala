@@ -3,11 +3,11 @@ package scorex.block
 import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import controller.Controller
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.{Base58, Crypto}
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
 import settings.Constants
@@ -29,11 +29,11 @@ case class Block(version: Byte, reference: Array[Byte], timestamp: Long,
 
   def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
 
-  def parent(): Option[Block] = PrunableBlockchainStorage.parent(this)
+  def parent(): Option[Block] = Controller.blockchainStorage.parent(this)
 
-  def child(): Option[Block] = PrunableBlockchainStorage.child(this)
+  def child(): Option[Block] = Controller.blockchainStorage.child(this)
 
-  def height(): Option[Int] = PrunableBlockchainStorage.heightOf(this)
+  def height(): Option[Int] = Controller.blockchainStorage.heightOf(this)
 
   lazy val signature = Bytes.concat(generationData.signature(), transactionsSignature)
 
@@ -199,6 +199,6 @@ object Block {
   def isNewBlockValid(block: Block) =
     block != ConsensusAlgo.genesisBlock &&
       block.isSignatureValid() &&
-      PrunableBlockchainStorage.lastBlock.signature.sameElements(block.reference) &&
+      Controller.blockchainStorage.lastBlock.signature.sameElements(block.reference) &&
       block.isValid()
 }

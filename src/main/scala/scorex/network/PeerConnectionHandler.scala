@@ -8,7 +8,6 @@ import akka.io.Tcp._
 import akka.util.ByteString
 import controller.Controller
 import scorex.block.{Block, NewBlock}
-import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.NetworkController.UpdateBlockchainScore
 import scorex.network.message.{Message, _}
 import scorex.transaction.Transaction.TransactionType
@@ -54,7 +53,7 @@ class PeerConnectionHandler(networkController: ActorRef,
         Logger.getGlobal.info(s"Got GetSignaturesMessage with ${signaturesGot.length} sigs within")
 
         signaturesGot.exists { parent =>
-          val headers = PrunableBlockchainStorage.getSignatures(parent)
+          val headers = Controller.blockchainStorage.getSignatures(parent)
           if (headers.size > 0) {
             self ! SignaturesMessage(Seq(parent) ++ headers)
             true
@@ -66,25 +65,25 @@ class PeerConnectionHandler(networkController: ActorRef,
 
         flags.copy(sigsAwait = false)
         val common = signaturesGot.head
-        require(PrunableBlockchainStorage.contains(common))
+        require(Controller.blockchainStorage.contains(common))
 
-        PrunableBlockchainStorage.removeAfter(common)
+        Controller.blockchainStorage.removeAfter(common)
 
         signaturesGot.tail.foreach { case sig =>
           self ! GetBlockMessage(sig)
         }
 
       case GetBlockMessage(signature) =>
-        PrunableBlockchainStorage.blockByHeader(signature) match {
+        Controller.blockchainStorage.blockByHeader(signature) match {
           case Some(block) => self ! BlockMessage(block.height().get, block)
           case None => self ! Blacklist
         }
 
       case BlockMessage(height, block) =>
         require(block != null)
-        Logger.getGlobal.info(s"Got block, height $height , local height: " + PrunableBlockchainStorage.height())
+        Logger.getGlobal.info(s"Got block, height $height , local height: " + Controller.blockchainStorage.height())
 
-        if (height == PrunableBlockchainStorage.height() + 1) {
+        if (height == Controller.blockchainStorage.height() + 1) {
           if (Block.isNewBlockValid(block)) {
             networkController ! NewBlock(block, Some(remote))
           } else {
@@ -108,7 +107,7 @@ class PeerConnectionHandler(networkController: ActorRef,
     case PingRemote => self ! PingMessage
 
     case SendBlockchainScore =>
-      self ! ScoreMessage(PrunableBlockchainStorage.height(), PrunableBlockchainStorage.score)
+      self ! ScoreMessage(Controller.blockchainStorage.height(), Controller.blockchainStorage.score)
 
     case msg: Message =>
       val (sendFlag, newFlags) = msg match {

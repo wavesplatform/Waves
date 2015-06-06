@@ -3,6 +3,7 @@ package scorex.transaction
 import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import controller.Controller
 import play.api.libs.json.Json
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.{Base58, Crypto}
@@ -54,7 +55,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   override def isValid() =
     if (!Crypto.isValidAddress(recipient.address)) {
       ValidationResult.INVALID_ADDRESS //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (PrunableBlockchainStorage.balance(sender.address) < amount + fee) {
+    } else if (Controller.blockchainStorage.balance(sender.address) < amount + fee) {
       ValidationResult.NO_BALANCE //CHECK IF SENDER HAS ENOUGH MONEY
     } else if (amount <= BigDecimal(0)) {
       ValidationResult.NEGATIVE_AMOUNT //CHECK IF AMOUNT IS POSITIVE
