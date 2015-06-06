@@ -7,11 +7,9 @@ import controller.Controller._
 import org.scalatest.FunSuite
 import scorex.block.Block
 import scorex.consensus.{ConsensusModuleNxt, ConsensusModuleQora}
-import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.message.{Message, BlockMessage}
 import settings.{Constants, Settings}
 
-//todo: clear environment after test
 class ValidChainGenerationSpecification extends FunSuite {
   test("retroactive chain test") {
     Settings.filename = "settings-test.json"

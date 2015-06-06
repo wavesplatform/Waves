@@ -25,7 +25,7 @@ object Controller {
   private lazy val walletFile = new java.io.File(Settings.walletDir, "wallet.s.dat")
   lazy val wallet = new Wallet(walletFile, Settings.walletPassword, Settings.walletSeed)
 
-  lazy val blockchainStorage = new PrunableBlockchainStorage(Some(Settings.dataDir))
+  lazy val blockchainStorage = new PrunableBlockchainStorage(Settings.dataDirOpt)
 
   def init() {
     if (blockchainStorage.isEmpty) {

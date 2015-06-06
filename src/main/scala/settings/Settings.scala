@@ -62,10 +62,8 @@ object Settings {
 
   lazy val walletSeed = Base58.decode((settingsJSON \ "walletseed").as[String])
 
-  lazy val dataDir = (settingsJSON \ "datadir")
+  lazy val dataDirOpt = (settingsJSON \ "datadir")
     .asOpt[String]
-    .getOrElse(DEFAULT_DATA_DIR)
-    .ensuring(path => directoryEnsuring(path))
 
   //BLOCKCHAIN
   lazy val maxRollback = 100
