@@ -7,7 +7,6 @@ import controller.Controller
 import play.api.libs.json.Json
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.{Base58, Crypto}
-import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.transaction.Transaction.TransactionType
 
 case class PaymentTransaction(sender: PublicKeyAccount,

@@ -1,7 +1,6 @@
 package scorex.block
 
 import java.util.Arrays
-
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import controller.Controller
 import play.api.libs.json.{JsArray, JsObject, Json}
@@ -11,8 +10,8 @@ import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
 import settings.Constants
-
 import scala.util.Try
+
 
 case class BlockStub(version: Byte, reference: Array[Byte], timestamp: Long,
                      generator: PublicKeyAccount, generationData: Constants.ConsensusAlgo.kernelData) {
