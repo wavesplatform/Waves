@@ -53,8 +53,6 @@ class ValidChainGenerationSpecification extends FunSuite {
     }
 
     val restored = Message.parse(ByteBuffer.wrap(bytes)).get.asInstanceOf[BlockMessage].block
-    println(s"b2: $b2")
-    println(s"restored: $restored")
     assert(restored.timestamp == b2.timestamp)
     assert(restored.isValid())
 
