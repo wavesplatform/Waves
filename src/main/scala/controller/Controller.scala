@@ -61,7 +61,7 @@ object Controller {
     wallet.close()
 
     //FORCE CLOSE
-    System.exit(10)
+    System.exit(0)
   }
 
   def onNewOffchainTransaction(transaction: Transaction) =

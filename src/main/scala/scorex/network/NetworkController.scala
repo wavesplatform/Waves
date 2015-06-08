@@ -57,9 +57,9 @@ class NetworkController extends Actor {
       context.system.scheduler.schedule(500.millis, 5.seconds)(self ! AskForPeers)
 
     case CommandFailed(_: Bind) =>
-      Logger.getGlobal.warning("Network port " + Settings.Port + " already in use!")
-      System.exit(10) //todo: too rough way to shutdown?
+      Logger.getGlobal.severe("Network port " + Settings.Port + " already in use!")
       context stop self
+      Controller.stopAll()
 
     case CheckPeers =>
       if (connectedPeers.size < Settings.maxConnections) {
@@ -157,5 +157,4 @@ object NetworkController {
   case class SendMessageToBestPeer(message: Message)
 
   case class BroadcastMessage(message: Message, exceptOf: List[InetSocketAddress] = List())
-
 }
