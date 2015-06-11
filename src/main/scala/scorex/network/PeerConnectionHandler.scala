@@ -31,7 +31,7 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   context watch connection
 
-  context.system.scheduler.schedule(500.millis, 5.seconds)(self ! PingRemote)
+  context.system.scheduler.schedule(500.millis, 10.seconds)(self ! PingRemote)
   context.system.scheduler.schedule(1.second, 15.seconds)(self ! SendBlockchainScore)
 
   private def handleMessage(message: Message) = {

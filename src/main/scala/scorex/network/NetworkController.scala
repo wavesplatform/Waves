@@ -17,6 +17,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
+//must be singleton
 class NetworkController extends Actor {
 
   import NetworkController._
