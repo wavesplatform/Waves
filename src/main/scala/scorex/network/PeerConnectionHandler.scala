@@ -45,7 +45,9 @@ class PeerConnectionHandler(networkController: ActorRef,
 
       case PeersMessage(peers) =>
         flags.copy(peersAwait = false)
-        println("got peers: " + peers) //todo:handling
+        peers.foreach { peer =>
+          PeerManager.addPeer(peer)
+        }
 
       case ScoreMessage(height, score) => networkController ! UpdateBlockchainScore(remote, height, score)
 
