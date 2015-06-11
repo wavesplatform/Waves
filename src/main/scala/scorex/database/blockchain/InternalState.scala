@@ -10,6 +10,7 @@ import scorex.transaction.Transaction
 
 // Store current balances only, and balances changes within effective balance depth.
 // Store transactions for selected accounts only.
+// If no datafolder provided, blockchain lives in RAM (for tests only)
 
 // todo: Make design ready for pruning!
 // todo: Make possibility of easy switching underlying storage implementation(e.g. from MapDb to Riak)

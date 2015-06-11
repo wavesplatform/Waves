@@ -15,17 +15,20 @@ import scala.util.Try
 /*If no datafolder provided, blockchain lives in RAM (for tests only) */
 
 class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain {
-  trait BlockStorage{
-    def writeBlock(height:Int, block:Block):Unit
-    def readBlock(height:Int):Option[Block]
-    def deleteBlock(height:Int):Unit
+
+  trait BlockStorage {
+    def writeBlock(height: Int, block: Block): Unit
+
+    def readBlock(height: Int): Option[Block]
+
+    def deleteBlock(height: Int): Unit
   }
 
-  case class FileBlockStorage(dataFolder:String) extends BlockStorage{
+  case class FileBlockStorage(dataFolder: String) extends BlockStorage {
     private def blockFile(height: Int) = File(dataFolder + s"/block-$height")
 
     //todo: return Try[Unit] instead of Unit?
-    override def writeBlock(height:Int, block:Block):Unit = {
+    override def writeBlock(height: Int, block: Block): Unit = {
       val blockBytes = block.toBytes
       val os = blockFile(height).outputStream(append = false)
       try {
@@ -35,7 +38,7 @@ class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain {
       } finally os.close()
     }
 
-    override def readBlock(height:Int):Option[Block] = {
+    override def readBlock(height: Int): Option[Block] = {
       val is = new DataInputStream(blockFile(height).inputStream())
       try {
         val szBytes = new Array[Byte](4)
@@ -47,19 +50,22 @@ class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain {
       } finally is.close()
     }
 
-    override def deleteBlock(height:Int):Unit = {
+    override def deleteBlock(height: Int): Unit = {
       Try(blockFile(height).delete()) //todo: write msg to log if problems with deleting
     }
   }
 
-  object MemoryBlockStorage extends BlockStorage{
+  object MemoryBlockStorage extends BlockStorage {
     private val memStorage = TrieMap[Int, Block]()
-    override def writeBlock(height:Int, block:Block):Unit = memStorage.put(height, block)
-    override def readBlock(height:Int):Option[Block] = memStorage.get(height)
-    override def deleteBlock(height:Int):Unit = memStorage.remove(height)
+
+    override def writeBlock(height: Int, block: Block): Unit = memStorage.put(height, block)
+
+    override def readBlock(height: Int): Option[Block] = memStorage.get(height)
+
+    override def deleteBlock(height: Int): Unit = memStorage.remove(height)
   }
 
-  private val (blockStorage, database) = dataFolderOpt match{
+  private val (blockStorage, database) = dataFolderOpt match {
     case Some(dataFolder) =>
       (FileBlockStorage(dataFolder),
         DBMaker.newFileDB(new java.io.File(dataFolder + s"/signatures"))
@@ -115,6 +121,9 @@ class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain {
   //todo: implement
   override def child(block: Block): Option[Block] = ???
 
-  //todo: implement
-  override def generatedBy(account: Account): Seq[Block] = ???
+  override def generatedBy(account: Account): Seq[Block] = (1 to height()).toStream.flatMap { h =>
+    blockAt(h).flatMap { block =>
+      if (block.generator.address == account.address) Some(block) else None
+    }
+  }
 }
