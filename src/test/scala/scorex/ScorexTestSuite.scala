@@ -13,6 +13,6 @@ class ScorexTestSuite extends Suites(
   ,new WalletSpecification
 
   //integration tests - slow!
-  // todo:uncomment after fixing problems with test stopping & environment clearing
+  // todo:uncomment after fixing problems with test stopping
   //,new ValidChainGenerationSpecification
 )
