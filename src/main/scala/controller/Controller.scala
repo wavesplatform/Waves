@@ -15,6 +15,9 @@ import scorex.wallet.Wallet
 import settings.{Constants, Settings}
 import spray.can.Http
 
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
+
 
 object Controller {
   private implicit lazy val actorSystem = ActorSystem("lagonaki")
@@ -48,8 +51,9 @@ object Controller {
     })
   }
 
-  //todo: stopping the app works bad
-  def stopAll() = this.synchronized {
+  //todo: nicer stopping the app
+  private val lock = ""
+  def stopAll() = lock.synchronized {
     Logger.getGlobal.info("Stopping message processor")
     networkController ! NetworkController.ShutdownNetwork
 
@@ -60,7 +64,13 @@ object Controller {
     Logger.getGlobal.info("Closing wallet")
     wallet.close()
 
+    Future {
+      Thread.sleep(10000)
+      Runtime.getRuntime.halt(0)
+    }
+
     //FORCE CLOSE
+    Logger.getGlobal.info("Exiting from the app...")
     System.exit(0)
   }
 
