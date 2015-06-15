@@ -31,9 +31,6 @@ class InternalState(dataFolderOpt: Option[String]) extends StateQuery {
     case None => DBMaker.newMemoryDB().make()
   }
 
-
-  //initial rollback
-
   private val balances = database.createHashMap("balances").makeOrGet[Account, BigDecimal]()
 
   private val accountTransactions = database.createHashMap("watchedTxs").makeOrGet[Account, List[Transaction]]()
@@ -71,7 +68,6 @@ class InternalState(dataFolderOpt: Option[String]) extends StateQuery {
   def appendBlock(block: Block): Unit = transactionsProcessing(block, reversal = false)
 
   def discardBlock(block: Block): Unit = transactionsProcessing(block, reversal = true)
-
 
   //todo: confirmations
   override def balance(address: String, confirmations: Int): BigDecimal = {
