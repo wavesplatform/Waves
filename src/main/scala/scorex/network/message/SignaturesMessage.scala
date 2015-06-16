@@ -10,18 +10,13 @@ abstract class SignaturesSeqMessage extends Message {
 
   val signatures: Seq[Array[Byte]]
 
-  override def toBytes() = {
+  override lazy val dataBytes = {
     val length = signatures.size
     val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DATA_LENGTH, 0)
 
     //WRITE SIGNATURES
-    val data = signatures.foldLeft(lengthBytes) { case (bytes, header) => Bytes.concat(bytes, header) }
-
-    //ADD CHECKSUM
-    Bytes.concat(super.toBytes(), generateChecksum(data), data)
+    signatures.foldLeft(lengthBytes) { case (bytes, header) => Bytes.concat(bytes, header) }
   }
-
-  override def getDataLength() = DATA_LENGTH + (signatures.size * SIGNATURE_LENGTH)
 }
 
 object SignaturesSeqMessage {

@@ -1,7 +1,6 @@
 package scorex.network.message
 
 import java.nio.ByteBuffer
-import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.crypto.Crypto
@@ -14,28 +13,23 @@ abstract class Message {
 
   val messageType: Byte
 
-  def hash() = Crypto.sha256(toBytes())
+  def hash() = Crypto.sha256(serialize())
 
-  def toBytes() = {
-    // MESSAGE TYPE
+  val dataBytes: Array[Byte]
+  lazy val dataLength: Int = dataBytes.length
+
+  def serialize(): Array[Byte] = {
     val typeBytes = Array(messageType)
-    Bytes.concat(MAGIC, typeBytes, Ints.toByteArray(this.getDataLength()))
+
+    val dataWithChecksum = if (dataLength > 0) {
+      val checksum = Crypto.sha256(dataBytes).take(CHECKSUM_LENGTH)
+      Bytes.concat(checksum, dataBytes)
+    } else dataBytes //empty array
+
+    Bytes.concat(MAGIC, typeBytes, Ints.toByteArray(dataLength), dataWithChecksum)
   }
-
-  protected def getDataLength() = 0
-
-  protected def generateChecksum(data: Array[Byte]) =
-    Arrays.copyOfRange(Crypto.sha256(data), 0, CHECKSUM_LENGTH)
 }
 
-
-case object PingMessage extends Message {
-  override val messageType = Message.PING_TYPE
-}
-
-case object GetPeersMessage extends Message {
-  override val messageType = Message.GET_PEERS_TYPE
-}
 
 object Message {
   val MAGIC = Array(0x12: Byte, 0x34: Byte, 0x56: Byte, 0x78: Byte)
@@ -76,7 +70,7 @@ object Message {
       bytes.get(data)
 
       //VALIDATE CHECKSUM
-      val digest = Arrays.copyOfRange(Crypto.sha256(data), 0, Message.CHECKSUM_LENGTH)
+      val digest = Crypto.sha256(data).take(Message.CHECKSUM_LENGTH)
 
       //CHECK IF CHECKSUM MATCHES
       if (!checksum.sameElements(digest)) throw new Exception("Invalid data checksum length=" + length)
@@ -94,4 +88,14 @@ object Message {
       case Message.TRANSACTION_TYPE => TransactionMessage(data)
     }
   }
+}
+
+case object PingMessage extends Message {
+  override val messageType = Message.PING_TYPE
+  override val dataBytes = Array[Byte]()
+}
+
+case object GetPeersMessage extends Message {
+  override val messageType = Message.GET_PEERS_TYPE
+  override val dataBytes = Array[Byte]()
 }

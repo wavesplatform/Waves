@@ -45,7 +45,7 @@ class ValidChainGenerationSpecification extends FunSuite {
     assert(b1 != b2)
 
     //serialization/deserialization  thru BlockMessage roundtrip test
-    val bytes = BlockMessage(2, b2).toBytes()
+    val bytes = BlockMessage(2, b2).serialize()
     if (Constants.ConsensusAlgo == ConsensusModuleQora) {
       assert(bytes.size == 326)
     } else if (Constants.ConsensusAlgo == ConsensusModuleNxt) {

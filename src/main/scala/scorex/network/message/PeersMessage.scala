@@ -13,20 +13,14 @@ case class PeersMessage(peers: Seq[InetSocketAddress]) extends Message {
 
   override val messageType = Message.PEERS_TYPE
 
-  override def toBytes() = {
+  override lazy val dataBytes = {
     val length = peers.size
     val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DATA_LENGTH, 0)
 
-    //WRITE PEERS
-    val data = peers.foldLeft(lengthBytes) { case (bytes, peer) =>
+    peers.foldLeft(lengthBytes) { case (bytes, peer) =>
       Bytes.concat(bytes, peer.getAddress.getAddress)
     }
-
-    //ADD CHECKSUM
-    Bytes.concat(super.toBytes(), generateChecksum(data), data)
   }
-
-  override def getDataLength() = DATA_LENGTH + (peers.size * ADDRESS_LENGTH)
 }
 
 

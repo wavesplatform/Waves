@@ -62,8 +62,11 @@ object Settings {
 
   lazy val walletSeed = Base58.decode((settingsJSON \ "walletseed").as[String])
 
-  lazy val dataDirOpt = (settingsJSON \ "datadir")
-    .asOpt[String]
+  lazy val dataDirOpt = {
+    val res = (settingsJSON \ "datadir").asOpt[String]
+    res.foreach(folder => new java.io.File(folder).mkdirs())
+    res
+  }
 
   //BLOCKCHAIN
   lazy val maxRollback = 100

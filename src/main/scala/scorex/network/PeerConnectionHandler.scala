@@ -123,7 +123,7 @@ class PeerConnectionHandler(networkController: ActorRef,
           (true, flags)
       }
       if (sendFlag) {
-        self ! ByteString(msg.toBytes())
+        self ! ByteString(msg.serialize())
         flags = newFlags
       }
 

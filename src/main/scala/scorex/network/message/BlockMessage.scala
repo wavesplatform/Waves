@@ -5,19 +5,13 @@ import scorex.block.Block
 
 
 case class BlockMessage(height: Int, block: Block) extends Message {
-
-  import scorex.network.message.BlockMessage._
-
   override val messageType = Message.BLOCK_TYPE
 
-  override def toBytes() = {
+  override lazy val dataBytes = {
     val heightBytes = Ints.toByteArray(block.height().get)
     val blockBytes = block.toBytes
-    val data = Bytes.concat(heightBytes, blockBytes)
-    Bytes.concat(super.toBytes(), this.generateChecksum(data), data)
+    Bytes.concat(heightBytes, blockBytes)
   }
-
-  override protected def getDataLength() = HEIGHT_LENGTH + block.dataLength()
 }
 
 

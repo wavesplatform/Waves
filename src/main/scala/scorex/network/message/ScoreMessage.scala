@@ -1,23 +1,18 @@
 package scorex.network.message
 
-import com.google.common.primitives.{Bytes, Ints}
+import com.google.common.primitives.Ints
 
 case class ScoreMessage(height: Int, score: BigInt) extends Message {
   lazy val scoreBytes = score.toByteArray
 
   override val messageType = Message.VERSION_TYPE
 
-  override def toBytes() = {
-
+  override lazy val dataBytes = {
     val bb = java.nio.ByteBuffer.allocate(4 + scoreBytes.length)
     bb.putInt(height)
     bb.put(scoreBytes)
-    val bytes = bb.array()
-
-    Bytes.concat(super.toBytes(), generateChecksum(bytes), bytes)
+    bb.array()
   }
-
-  override def getDataLength() = 4 + scoreBytes.length
 }
 
 

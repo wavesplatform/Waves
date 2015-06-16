@@ -1,7 +1,5 @@
 package scorex.network.message
 
-import com.google.common.primitives.Bytes
-
 case class GetBlockMessage(signature: Array[Byte]) extends Message {
   import SignaturesSeqMessage.SIGNATURE_LENGTH
 
@@ -9,7 +7,5 @@ case class GetBlockMessage(signature: Array[Byte]) extends Message {
 
   override val messageType = Message.GET_BLOCK_TYPE
 
-  override def toBytes() = Bytes.concat(super.toBytes(), generateChecksum(signature), signature)
-
-  override def getDataLength() = SIGNATURE_LENGTH
+  override lazy val dataBytes = signature
 }
