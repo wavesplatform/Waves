@@ -39,7 +39,6 @@ class BlockSpecification extends FunSuite {
 
     assert(at1 == at2)
     assert(at1.amount == at2.amount)
-    assert(b.generationData.isSignatureValid(b))
     assert(b.isSignatureValid())
     assert(b2.isSignatureValid())
   }

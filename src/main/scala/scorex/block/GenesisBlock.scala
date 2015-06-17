@@ -40,7 +40,7 @@ object GenesisBlockParams {
 abstract class GenesisBlock(override val generationData: kernelData, override val timestamp: Long)
   extends Block(version = GenesisBlockParams.version, reference = GenesisBlockParams.reference, timestamp,
     generator = GenesisBlockParams.generator, generationData,
-    GenesisBlockParams.transactions(timestamp), Array.fill(64)(0)) {
+    GenesisBlockParams.transactions(timestamp), Some(Array.fill(64)(0))) {
 
   override def parent() = None
 
@@ -77,7 +77,7 @@ object NxtGenesisBlock extends GenesisBlock(
   NxtGenesisBlockGenerationData.generationData.asInstanceOf[Constants.ConsensusAlgo.kernelData],
   new DateTime(2015, 5, 23, 10, 35).getMillis) {
 
-  require(signature.length == 96)
+  require(signature.length == 64)
 }
 
 object QoraGenesisBlock extends GenesisBlock(

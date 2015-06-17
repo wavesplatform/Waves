@@ -24,14 +24,6 @@ case class NxtBlockGenerationData(baseTarget: Long, generatorSignature: Array[By
 
   override def signature(): Array[Byte] = generatorSignature.ensuring(_.length == NxtBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)
 
-  override def isSignatureValid(block: Block): Boolean = {
-    val prevGs = block.parent()
-      .map(_.generationData.asInstanceOf[NxtBlockGenerationData].generatorSignature)
-      .getOrElse(NxtGenesisBlockGenerationData.generationData.generatorSignature)
-    val preImage = prevGs ++ block.generator.publicKey
-    signature().sameElements(Crypto.sha256(preImage))
-  }
-
   //todo: implement validity check!
   override def isValid(block: Block): Boolean = true
 

@@ -21,7 +21,7 @@ abstract class SignaturesSeqMessage extends Message {
 
 object SignaturesSeqMessage {
 
-  val SIGNATURE_LENGTH = Constants.ConsensusAlgo.KERNEL_SIGNATURE_LENGTH + 64
+  val SIGNATURE_LENGTH = 64
   private val DATA_LENGTH = 4
 
   def parse(data: Array[Byte]) = {

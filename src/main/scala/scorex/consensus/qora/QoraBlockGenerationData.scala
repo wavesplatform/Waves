@@ -50,16 +50,5 @@ case class QoraBlockGenerationData(generatingBalance: Long, generatorSignature: 
       hit >= lowerTarget && hit < target
     }
 
-
-  override def isSignatureValid(block: Block): Boolean = {
-    val generatingBalanceBytes = Longs.toByteArray(generatingBalance).ensuring(_.size == GENERATING_BALANCE_LENGTH)
-
-    val blockSignatureImage = Bytes.concat(block.reference.take(GENERATOR_SIGNATURE_LENGTH),
-      generatingBalanceBytes,
-      block.generator.publicKey)
-
-    Crypto.verify(signature(), blockSignatureImage, block.generator.publicKey)
-  }
-
   override def blockScore() = BigInt(1)
 }
