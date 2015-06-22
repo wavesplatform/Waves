@@ -15,5 +15,5 @@ object Constants {
   val AgentName = s"$Product - $Release v. ${Version._1}.${Version._2}.${Version._3}"
 
   //Change to ConsensusModuleNxt to have Nxt-like forging
-  val ConsensusAlgo: ConsensusModule = ConsensusModuleQora
+  val ConsensusAlgo: ConsensusModule = ConsensusModuleNxt
 }

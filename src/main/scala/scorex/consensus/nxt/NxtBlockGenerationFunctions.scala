@@ -1,7 +1,7 @@
 package scorex.consensus.nxt
 
 import ntp.NTP
-import scorex.account.PrivateKeyAccount
+import scorex.account.{PublicKeyAccount, PrivateKeyAccount}
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.Crypto
@@ -28,10 +28,10 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
     } else None
   }
 
-  private[nxt] def calcGeneratorSignature(lastBlockData: NxtBlockGenerationData, generator: PrivateKeyAccount) =
+  private[nxt] def calcGeneratorSignature(lastBlockData: NxtBlockGenerationData, generator: PublicKeyAccount) =
     Crypto.sha256(lastBlockData.generatorSignature ++ generator.publicKey)
 
-  private[nxt] def calcHit(lastBlockData: NxtBlockGenerationData, generator: PrivateKeyAccount): BigInt =
+  private[nxt] def calcHit(lastBlockData: NxtBlockGenerationData, generator: PublicKeyAccount): BigInt =
     BigInt(1, calcGeneratorSignature(lastBlockData, generator).take(8))
 
   private[nxt] def calcBaseTarget(lastBlockData: NxtBlockGenerationData,
@@ -43,9 +43,11 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
     bound(t, 1, Long.MaxValue).toLong
   }
 
-  private[nxt] def calcTarget(lastBlockData: NxtBlockGenerationData, lastBlockTimestamp: Long, generator: PrivateKeyAccount): BigInt = {
+  private[nxt] def calcTarget(lastBlockData: NxtBlockGenerationData,
+                              lastBlockTimestamp: Long,
+                              generator:PublicKeyAccount): BigInt = {
     val eta = (NTP.correctedTime() - lastBlockTimestamp) / 1000 //in seconds
-    val effBalance: BigDecimal = 10000000 // generator.generatingBalance
+    val effBalance: BigDecimal = generator.generatingBalance
     (lastBlockData.baseTarget * eta * effBalance).toBigInt()
   }
 
