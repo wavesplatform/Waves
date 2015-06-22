@@ -14,27 +14,27 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
     val lastBlockKernelData = lastBlock.generationData.asInstanceOf[NxtBlockGenerationData]
     val lastBlockTime = lastBlock.timestamp
 
-    val h = hit(lastBlockKernelData, account)
-    val t = target(lastBlockKernelData, lastBlockTime, account)
+    val h = calcHit(lastBlockKernelData, account)
+    val t = calcTarget(lastBlockKernelData, lastBlockTime, account)
 
     val eta = (NTP.correctedTime() - lastBlock.timestamp) / 1000
     println(s"hit: $h, target: $t, generating ${h < t}, eta $eta, account balance: ${account.generatingBalance}")
     if (h < t) {
       val ts = NTP.correctedTime()
-      val btg = baseTarget(lastBlockKernelData, lastBlockTime, ts)
-      val gs = generatorSignature(lastBlockKernelData, account)
+      val btg = calcBaseTarget(lastBlockKernelData, lastBlockTime, ts)
+      val gs = calcGeneratorSignature(lastBlockKernelData, account)
       Some(BlockStub(Block.Version, lastBlock.signature, ts, account,
         new NxtBlockGenerationData(btg, gs).asInstanceOf[Constants.ConsensusAlgo.kernelData]))
     } else None
   }
 
-  private def generatorSignature(lastBlockData: NxtBlockGenerationData, generator: PrivateKeyAccount) =
+  private[nxt] def calcGeneratorSignature(lastBlockData: NxtBlockGenerationData, generator: PrivateKeyAccount) =
     Crypto.sha256(lastBlockData.generatorSignature ++ generator.publicKey)
 
-  private def hit(lastBlockData: NxtBlockGenerationData, generator: PrivateKeyAccount): BigInt =
-    BigInt(1, generatorSignature(lastBlockData, generator).take(8))
+  private[nxt] def calcHit(lastBlockData: NxtBlockGenerationData, generator: PrivateKeyAccount): BigInt =
+    BigInt(1, calcGeneratorSignature(lastBlockData, generator).take(8))
 
-  private def baseTarget(lastBlockData: NxtBlockGenerationData,
+  private[nxt] def calcBaseTarget(lastBlockData: NxtBlockGenerationData,
                          lastBlockTimestamp: Long,
                          currentTime: Long): Long = {
     val eta = (currentTime - lastBlockTimestamp) / 1000 //in seconds
@@ -43,7 +43,7 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
     bound(t, 1, Long.MaxValue).toLong
   }
 
-  private def target(lastBlockData: NxtBlockGenerationData, lastBlockTimestamp: Long, generator: PrivateKeyAccount): BigInt = {
+  private[nxt] def calcTarget(lastBlockData: NxtBlockGenerationData, lastBlockTimestamp: Long, generator: PrivateKeyAccount): BigInt = {
     val eta = (NTP.correctedTime() - lastBlockTimestamp) / 1000 //in seconds
     val effBalance: BigDecimal = 10000000 // generator.generatingBalance
     (lastBlockData.baseTarget * eta * effBalance).toBigInt()
