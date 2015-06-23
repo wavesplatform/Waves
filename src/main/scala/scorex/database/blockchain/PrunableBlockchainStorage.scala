@@ -3,7 +3,6 @@ package scorex.database.blockchain
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.Transaction
-import settings.Settings
 
 //todo: object isn't thread-safe!
 
