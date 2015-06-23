@@ -118,8 +118,7 @@ class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain {
   override def blockByHeader(signature: Array[Byte]): Option[Block] =
     heightOf(signature).flatMap(blockAt)
 
-  //todo: implement
-  override def child(block: Block): Option[Block] = ???
+  override def child(block: Block): Option[Block] = heightOf(block).flatMap(h => blockAt(h + 1))
 
   override def generatedBy(account: Account): Seq[Block] = (1 to height()).toStream.flatMap { h =>
     blockAt(h).flatMap { block =>
