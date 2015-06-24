@@ -90,31 +90,4 @@ public class Base58 {
         }
         return bi;
     }
-
-    /**
-     * Uses the checksum in the last 4 bytes of the decoded data to verify the
-     * rest are correct. The checksum is removed from the returned data.
-     *
-     * @param input The base58 encoded string to decode and verify.
-     * @return The decoded and verified input as an array of bytes.
-     */
-    public static byte[] decodeChecked(String input) {
-        byte[] tmp = decode(input);
-        if (tmp == null) {
-            return null;
-        }
-        if (tmp.length < 4) {
-            return null;
-        }
-        byte[] checksum = new byte[4];
-        System.arraycopy(tmp, tmp.length - 4, checksum, 0, 4);
-        byte[] bytes = new byte[tmp.length - 4];
-        System.arraycopy(tmp, 0, bytes, 0, tmp.length - 4);
-        tmp = Crypto.doubleSha256(bytes);
-        byte[] hash = new byte[4];
-        System.arraycopy(tmp, 0, hash, 0, 4);
-        if (!Arrays.equals(hash, checksum))
-            return null;
-        return bytes;
-    }
 }
