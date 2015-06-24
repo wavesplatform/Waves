@@ -4,11 +4,11 @@ import org.scalatest.FunSuite
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.nxt.{NxtBlockGenerationData, NxtBlockGenerationDataParser}
-import scorex.consensus.qora.{QoraBlockGenerationFunctions, QoraBlockGenerationData}
+import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationFunctions}
 import scorex.consensus.{ConsensusModuleNxt, ConsensusModuleQora}
 import scorex.crypto.Base58
-import scorex.transaction.{PaymentTransaction, Transaction}
 import scorex.settings.Constants
+import scorex.transaction.{PaymentTransaction, Transaction}
 
 import scala.util.Random
 
@@ -20,11 +20,13 @@ class BlockSpecification extends FunSuite {
       case ConsensusModuleNxt =>
         val gs = Array.fill(NxtBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)(Random.nextInt(100).toByte)
         NxtBlockGenerationData(Random.nextInt(Int.MaxValue)+1, gs)
+
       case ConsensusModuleQora =>
         val gb = Random.nextInt(Int.MaxValue)+1
         val gs = QoraBlockGenerationFunctions.calculateSignature(reference, gb, gen)
         QoraBlockGenerationData(gb, gs)
     }).asInstanceOf[Constants.ConsensusAlgo.kernelData]
+
     val bs = BlockStub(1, reference, System.currentTimeMillis(), gen, gd)
 
     val sender = new PrivateKeyAccount(reference.dropRight(2))
