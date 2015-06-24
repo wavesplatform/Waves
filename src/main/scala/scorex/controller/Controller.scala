@@ -1,10 +1,10 @@
-package controller
+package scorex.controller
 
 import java.util.logging.Logger
 
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
-import api.http.HttpServiceActor
+import scorex.api.http.HttpServiceActor
 import scorex.block.BlockchainController
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
@@ -12,7 +12,7 @@ import scorex.network.NetworkController
 import scorex.network.message._
 import scorex.transaction.Transaction
 import scorex.wallet.Wallet
-import settings.{Constants, Settings}
+import scorex.settings.{Constants, Settings}
 import spray.can.Http
 
 import scala.concurrent.Future

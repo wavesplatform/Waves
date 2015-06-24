@@ -1,4 +1,4 @@
-package settings
+package scorex.settings
 
 import scorex.consensus._
 

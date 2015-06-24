@@ -2,7 +2,7 @@ package scorex.database.blockchain
 
 import scorex.account.Account
 import scorex.block.Block
-import settings.Settings
+import scorex.settings.Settings
 
 trait BlockChain {
   def height(): Int

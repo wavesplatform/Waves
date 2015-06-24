@@ -1,6 +1,6 @@
-package api.http
+package scorex.api.http
 
-import controller.Controller
+import scorex.controller.Controller
 import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.transaction.TransactionCreator

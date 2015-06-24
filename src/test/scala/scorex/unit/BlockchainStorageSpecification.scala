@@ -1,6 +1,6 @@
 package scorex.unit
 
-import controller.Controller
+import scorex.controller.Controller
 import org.scalatest.FunSuite
 import scorex.block.NxtGenesisBlock
 

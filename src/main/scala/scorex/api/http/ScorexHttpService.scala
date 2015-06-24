@@ -1,10 +1,10 @@
-package api.http
+package scorex.api.http
 
 import akka.pattern.ask
-import controller.Controller
+import scorex.controller.Controller
 import play.api.libs.json.Json
 import scorex.block.BlockchainController
-import settings.Constants
+import scorex.settings.Constants
 import spray.routing.HttpService
 
 import scala.concurrent.ExecutionContext.Implicits.global

@@ -3,7 +3,7 @@ package scorex.transaction
 import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import controller.Controller
+import scorex.controller.Controller
 import play.api.libs.json.Json
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.{Base58, Crypto}

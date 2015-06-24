@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import settings.Settings
+import scorex.settings.Settings
 
 
 case class PeersMessage(peers: Seq[InetSocketAddress]) extends Message {

@@ -2,13 +2,13 @@ package scorex
 
 import java.util.logging.Logger
 
-import api.http.ApiClient
-import controller.Controller
 import org.slf4j.LoggerFactory
 import scorex.account.Account
+import scorex.api.http.ApiClient
 import scorex.block.GenesisBlockParams
+import scorex.controller.Controller
+import scorex.settings.Settings
 import scorex.transaction.TransactionCreator
-import settings.Settings
 
 import scala.io.StdIn
 import scala.util.{Failure, Random, Try}

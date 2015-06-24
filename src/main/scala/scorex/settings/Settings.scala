@@ -1,4 +1,4 @@
-package settings
+package scorex.settings
 
 import java.net.{InetAddress, InetSocketAddress}
 

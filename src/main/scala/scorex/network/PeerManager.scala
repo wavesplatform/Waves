@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import org.slf4j.LoggerFactory
 import scorex.database.PeerDatabaseImpl
-import settings.Settings
+import scorex.settings.Settings
 
 import scala.util.Random
 

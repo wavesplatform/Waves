@@ -1,4 +1,4 @@
-package api.http
+package scorex.api.http
 
 import java.security.SecureRandom
 

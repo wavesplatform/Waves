@@ -1,8 +1,8 @@
-package api.http
+package scorex.api.http
 
 import java.nio.charset.StandardCharsets
 
-import controller.Controller
+import scorex.controller.Controller
 import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.crypto.{Base58, Crypto}

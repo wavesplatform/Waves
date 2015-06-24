@@ -4,7 +4,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.Account
 import scorex.crypto.Base58
 import scorex.transaction.Transaction.{ValidationResult, _}
-import settings.Settings
+import scorex.settings.Settings
 
 
 abstract class Transaction(val transactionType: TransactionType.Value,

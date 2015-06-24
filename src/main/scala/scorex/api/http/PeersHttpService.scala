@@ -1,9 +1,9 @@
-package api.http
+package scorex.api.http
 
 import java.net.InetSocketAddress
 
 import akka.pattern.ask
-import controller.Controller
+import scorex.controller.Controller
 import play.api.libs.json.Json
 import scorex.block.BlockchainController
 import scorex.network.NetworkController

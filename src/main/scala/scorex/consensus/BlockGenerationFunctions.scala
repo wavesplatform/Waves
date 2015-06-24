@@ -1,6 +1,6 @@
 package scorex.consensus
 
-import controller.Controller
+import scorex.controller.Controller
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scala.collection.concurrent.TrieMap

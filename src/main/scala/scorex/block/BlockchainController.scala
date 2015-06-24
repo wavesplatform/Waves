@@ -4,10 +4,10 @@ import java.net.InetSocketAddress
 import java.util.logging.Logger
 
 import akka.actor.{Actor, ActorRef}
-import controller.Controller
+import scorex.controller.Controller
 import scorex.network.NetworkController
 import scorex.network.message.{BlockMessage, GetSignaturesMessage}
-import settings.Constants
+import scorex.settings.Constants
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._

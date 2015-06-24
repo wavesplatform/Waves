@@ -8,8 +8,8 @@ import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataPa
 import scorex.crypto.Crypto
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.Transaction.ValidationResult
-import settings.Constants
-import settings.Constants.ConsensusAlgo.kernelData
+import scorex.settings.Constants
+import scorex.settings.Constants.ConsensusAlgo.kernelData
 
 
 object GenesisBlockParams {

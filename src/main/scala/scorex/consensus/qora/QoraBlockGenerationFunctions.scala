@@ -1,12 +1,12 @@
 package scorex.consensus.qora
 
 import com.google.common.primitives.{Bytes, Longs}
-import ntp.NTP
+import scorex.ntp.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.Crypto
-import settings.Constants
+import scorex.settings.Constants
 
 //a lot of asInstanceOf[QoraBlockGenerationData] in the code, not type-safe
 object QoraBlockGenerationFunctions extends BlockGenerationFunctions {

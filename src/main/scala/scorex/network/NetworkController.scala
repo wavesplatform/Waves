@@ -6,11 +6,11 @@ import java.util.logging.Logger
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import controller.Controller
+import scorex.controller.Controller
 import scorex.block.BlockchainController.GetMaxChainScore
 import scorex.block.{BlockchainController, NewBlock}
 import scorex.network.message.{Message, _}
-import settings.Settings
+import scorex.settings.Settings
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global

@@ -1,7 +1,7 @@
 package scorex.consensus.qora
 
 import com.google.common.primitives.{Bytes, Longs}
-import controller.Controller
+import scorex.controller.Controller
 import play.api.libs.json.Json
 import scorex.block.{Block, QoraGenesisBlockGenerationData}
 import scorex.consensus.BlockGenerationData

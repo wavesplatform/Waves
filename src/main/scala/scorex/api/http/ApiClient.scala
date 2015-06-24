@@ -1,10 +1,10 @@
-package api.http
+package scorex.api.http
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.net.{HttpURLConnection, URL}
 
 import play.libs.Json
-import settings.Settings
+import scorex.settings.Settings
 
 import scala.util.Try
 

@@ -1,7 +1,7 @@
-package api.http
+package scorex.api.http
 
 import akka.util.Timeout
-import controller.Controller
+import scorex.controller.Controller
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.account.Account
 import scorex.block.Block

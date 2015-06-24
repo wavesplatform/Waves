@@ -1,4 +1,4 @@
-package ntp
+package scorex.ntp
 
 import java.net.InetAddress
 import java.util.logging.Logger
