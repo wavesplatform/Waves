@@ -57,6 +57,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
           }
         }
       } ~ path("balance" / Segment / IntNumber) { case (address, confirmations) =>
+        //todo: confirmations parameter doesn't work atm
         get {
           complete {
             val jsRes = balanceJson(address, confirmations)
@@ -98,13 +99,14 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
                   ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
                 } else {
                   //DECODE SIGNATURE
-                  (Try(Base58.decode(signature)), Try(Base58.decode(pubKey))) match {
-                    case (Failure(_), _) => ApiError.toJson(ApiError.ERROR_INVALID_SIGNATURE)
-                    case (_, Failure(_)) => ApiError.toJson(ApiError.ERROR_INVALID_PUBLIC_KEY)
-                    case (Success(signatureBytes), Success(pubKeyBytes)) =>
+                  (Try(Base58.decode(msg)), Try(Base58.decode(signature)), Try(Base58.decode(pubKey))) match {
+                    case (_, Failure(_), _) => ApiError.toJson(ApiError.ERROR_INVALID_MESSAGE)
+                    case (_, Failure(_), _) => ApiError.toJson(ApiError.ERROR_INVALID_SIGNATURE)
+                    case (_, _, Failure(_)) => ApiError.toJson(ApiError.ERROR_INVALID_PUBLIC_KEY)
+                    case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
                       val account = new PublicKeyAccount(pubKeyBytes)
                       val isValid = account.address == address &&
-                        Crypto.verify(signatureBytes, msg.getBytes(StandardCharsets.UTF_8), pubKeyBytes)
+                        Crypto.verify(signatureBytes, msgBytes, pubKeyBytes)
                       Json.obj("valid" -> isValid)
                   }
                 }
