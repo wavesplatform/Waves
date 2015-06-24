@@ -96,7 +96,9 @@ API
 Access API in a browser (e.g. http://localhost:9085/addresses/ ) or CURL 
 or with the command line client (GET addresses/)
 
-**/addresses - info about wallet's accounts and different utilitary calls about addresses**
+**/addresses - info about wallet's accounts and other calls about addresses**
+
+*GET requests:*
 
 * /addresses/ - get wallet addresses
 
@@ -105,6 +107,19 @@ or with the command line client (GET addresses/)
 * /addresses/seed/{address} - export seed value for the {address}
 
 * /addresses/new - create new address in the local wallet
+
+* /addresses/balance/{address} - account's balance
+
+* /addresses/generatingbalance/{address} - account's generating balance(the same as balance atm)
+
+*POST requests:*
+
+* /addresses/verify/{address} - check a signature of a message signed by an account. POST request 
+body is the JSON object containing following fields: 1. *"message"* - Base58-encoded message.   
+2. *"signature"* - Base58-encoded signature.  3. *"publickey"* - Base58-encoded public key(corresponding to the 
+*address*).
+
+
 
 
   
