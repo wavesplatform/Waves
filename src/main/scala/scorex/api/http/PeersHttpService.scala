@@ -29,7 +29,7 @@ trait PeersHttpService extends HttpService with CommonApifunctions {
             case Failure(ex) => failWith(ex)
           }
         }
-      } ~ path("height") {
+      } ~ path("height") {                       //todo:fix
         get {
           onComplete {
             (Controller.blockchainController ? BlockchainController.GetMaxChainScore).map { peerHeightsRaw =>
