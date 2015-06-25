@@ -10,14 +10,15 @@ import scala.util.{Failure, Success, Try}
 
 
 trait PaymentHttpService extends HttpService with CommonApifunctions {
+  //todo: check / fix / document
   lazy val paymentRouting =
     path("payment") {
       post {
         entity(as[String]) { body => complete {
           walletNotExists().getOrElse {
             Try(Json.parse(body)).map { js =>
-              (Try((js \ "amount").as[String].toLong),
-                Try((js \ "fee").as[String].toLong),
+              (Try((js \ "amount").as[Long]),
+                Try((js \ "fee").as[Long]),
                 Try(Controller.wallet.privateKeyAccount((js \ " sender").as[String])),
                 Try((js \ " recipient").as[String])) match {
                 case (Failure(_), _, _, _) => ApiError.toJson(ApiError.ERROR_INVALID_AMOUNT)
