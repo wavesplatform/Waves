@@ -66,7 +66,7 @@ case class BlockchainController(networkController: ActorRef) extends Actor {
         Logger.getGlobal.warning(s"Non-valid block: $block from $remoteOpt")
       }
 
-    case GetStatus => sender() ! Status.replicate(status)
+    case GetStatus => sender() ! status
 
     case a: Any => Logger.getGlobal.warning(s"BlockchainController: got something strange $a")
   }
@@ -78,8 +78,6 @@ object BlockchainController {
     val Offline = Value(0)
     val Syncing = Value(1)
     val Generating = Value(2)
-
-    def replicate(status: Status.Value) = Value(status.id)
   }
 
   case object CheckState
@@ -89,5 +87,4 @@ object BlockchainController {
   case class MaxChainScore(scoreOpt: Option[BigInt])
 
   case object GetStatus
-
 }

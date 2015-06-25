@@ -2,7 +2,7 @@ organization := "com.consensusresearch"
 
 name := "scorex"
 
-version := "0.9.0"
+version := "1.0.0"
 
 scalaVersion := "2.11.6"
 
