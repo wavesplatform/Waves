@@ -47,10 +47,8 @@ class InternalState(dataFolderOpt: Option[String]) extends StateQuery {
       changes.foreach { case (accOpt, delta) =>
         //check whether account is watched, add tx to its txs list if so
         accOpt.foreach { acc =>
-          val atxs = accountTransactions.get(acc)
-          if (atxs != null) {
-            accountTransactions.put(acc, tx :: atxs)
-          }
+          val atxs:List[Transaction] = Option(accountTransactions.get(acc)).getOrElse(List())
+          accountTransactions.put(acc, tx :: atxs)
         }
 
         //update balances sheet
