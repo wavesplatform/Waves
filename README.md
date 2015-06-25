@@ -174,9 +174,12 @@ body is the JSON object containing following fields: 1. *"message"* - Base58-enc
 * transactions/address/{address}/limit/{limit} - get list of transactions where specified address 
     has been involved, with specified number of records to be returned
  
-**wallet - wallet-related calls** 
-
+**wallet - wallet-related calls**
  
+*GET requests:* 
+
+* wallet/ - prints whether wallet exists or not
+* wallet/seed - export wallet seed
 
 
   

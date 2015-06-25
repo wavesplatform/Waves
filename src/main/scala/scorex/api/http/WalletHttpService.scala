@@ -19,7 +19,7 @@ trait WalletHttpService extends HttpService with CommonApifunctions {
       } ~ path("seed") {
         get {
           complete {
-            lazy val seedJs = Json.obj("seed" -> Base58.encode(wallet.exportSeed().get))
+            lazy val seedJs = Json.obj("seed" -> Base58.encode(wallet.exportSeed()))
             walletNotExists().getOrElse(seedJs).toString()
           }
         }

@@ -27,8 +27,7 @@ class Wallet(walletFile: File, password: String, seed: Array[Byte]) {
     .make()
 
   Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY))
-    .getOrElse(database.getAtomicVar(SEED)
-    .set(seed))
+    .getOrElse(database.getAtomicVar(SEED).set(seed))
 
   private lazy val accountsPersistence = database.createHashSet("accounts").makeOrGet[Array[Byte]]()
 
@@ -81,7 +80,7 @@ class Wallet(walletFile: File, password: String, seed: Array[Byte]) {
 
   def privateKeyAccount(address: String) = accountsCache.get(address)
 
-  def exportSeed(): Option[Array[Byte]] = database.getAtomicVar(SEED).get()
+  def exportSeed(): Array[Byte] = database.getAtomicVar(SEED).get()
 
   def close() = if (!database.isClosed) {
     database.commit()
