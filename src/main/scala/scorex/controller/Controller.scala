@@ -26,7 +26,7 @@ object Controller {
   lazy val blockchainController = actorSystem.actorOf(Props(classOf[BlockchainController], networkController))
 
   private lazy val walletFile = new java.io.File(Settings.walletDir, "wallet.s.dat")
-  lazy val wallet = new Wallet(walletFile, Settings.walletPassword, Settings.walletSeed)
+  lazy val wallet = new Wallet(walletFile, Settings.walletPassword, Settings.walletSeed.get)
 
   lazy val blockchainStorage = new PrunableBlockchainStorage(Settings.dataDirOpt)
 

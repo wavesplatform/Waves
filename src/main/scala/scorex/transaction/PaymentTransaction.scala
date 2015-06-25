@@ -42,7 +42,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FEE_LENGTH, 0)
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
-      Base58.decode(recipient.address), amountBytes,
+      Base58.decode(recipient.address).get, amountBytes,
       feeBytes, signature)
   }
 
@@ -153,6 +153,6 @@ object PaymentTransaction {
     val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FEE_LENGTH, 0)
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
-      Base58.decode(recipient.address), amountBytes, feeBytes)
+      Base58.decode(recipient.address).get, amountBytes, feeBytes)
   }
 }

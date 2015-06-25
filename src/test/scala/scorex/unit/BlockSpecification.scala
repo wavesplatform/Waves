@@ -48,7 +48,7 @@ class BlockSpecification extends FunSuite {
   test("restoring from Base58 form"){
     if(Constants.ConsensusAlgo == ConsensusModuleNxt) {
       val b58 =  "9FCfN5CGJPFtD8yt7Z26hbMfT3g2W52M2medVw8onEPbZHBa76TKnX7GaBNRbdcBVjv1cJ1ERQzhcNbf4BvU4jBNQ65x9bq4Btt5MQN7eXiEEGn6EXNsEXNURJz5UrNXefWw2bi2jwQV4fPF54eFw9EQYCnU2yzMZqWNjZJQNoouFszbzijEyjPreU1gSjJDeRvHHzP5rPnbqCr7QpoHCj4zNQ1LzbDfc5ahUer3Kn9xDgDbogMDZFgPw5E1KfNNB7N7vA3emqdyysab6EVDV3NKiy1MWL16d3"
-      val b = Block.parse(Base58.decode(b58)).get
+      val b = Block.parse(Base58.decode(b58).get).get
       assert(b.isSignatureValid())
     }
   }

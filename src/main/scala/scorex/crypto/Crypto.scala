@@ -27,8 +27,7 @@ object Crypto {
   }
 
   def isValidAddress(address: String) =
-    Try {
-      val addressBytes = Base58.decode(address)
+    Base58.decode(address).map{addressBytes =>
 
       //CHECK BYTES
       if (addressBytes.length != Account.ADDRESS_LENGTH)

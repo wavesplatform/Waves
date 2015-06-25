@@ -29,7 +29,7 @@ case class GenesisTransaction(override val recipient: Account,
 
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AMOUNT_LENGTH, 0)
 
-    val rcpBytes = Base58.decode(recipient.address)
+    val rcpBytes = Base58.decode(recipient.address).get
     require(rcpBytes.length == Account.ADDRESS_LENGTH)
 
     val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, amountBytes)
@@ -47,7 +47,7 @@ case class GenesisTransaction(override val recipient: Account,
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AMOUNT_LENGTH, 0)
     val data = Bytes.concat(typeBytes, timestampBytes,
-      Base58.decode(recipient.address), amountBytes)
+      Base58.decode(recipient.address).get, amountBytes)
     val digest = Crypto.sha256(data)
 
     Bytes.concat(digest, digest).sameElements(signature)
@@ -83,7 +83,7 @@ object GenesisTransaction {
     val amountFill = new Array[Byte](AMOUNT_LENGTH - amountBytes.length)
 
     val data = Bytes.concat(typeBytes, timestampBytes,
-      Base58.decode(recipient.address), Bytes.concat(amountFill, amountBytes))
+      Base58.decode(recipient.address).get, Bytes.concat(amountFill, amountBytes))
 
     val digest = Crypto.sha256(data)
     Bytes.concat(digest, digest)

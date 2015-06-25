@@ -19,9 +19,7 @@ trait CommonApifunctions {
     } else None
 
   protected[api] def withBlock(encodedSignature: String)(action: Block => JsValue): JsValue =
-    Try {
-      Base58.decode(encodedSignature)
-    }.toOption.map { signature =>
+    Base58.decode(encodedSignature).toOption.map { signature =>
       Controller.blockchainStorage.blockByHeader(signature) match {
         case Some(block) => action(block)
         case None => ApiError.toJson(ApiError.ERROR_BLOCK_NO_EXISTS)

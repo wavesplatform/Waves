@@ -99,7 +99,7 @@ trait AddressHttpService extends HttpService with CommonApifunctions {
                   ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
                 } else {
                   //DECODE SIGNATURE
-                  (Try(Base58.decode(msg)), Try(Base58.decode(signature)), Try(Base58.decode(pubKey))) match {
+                  (Base58.decode(msg), Base58.decode(signature), Base58.decode(pubKey)) match {
                     case (_, Failure(_), _) => ApiError.toJson(ApiError.ERROR_INVALID_MESSAGE)
                     case (_, Failure(_), _) => ApiError.toJson(ApiError.ERROR_INVALID_SIGNATURE)
                     case (_, _, Failure(_)) => ApiError.toJson(ApiError.ERROR_INVALID_PUBLIC_KEY)
