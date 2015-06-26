@@ -1,10 +1,10 @@
-organization := "com.consensusresearch"
+organization := "org.consensusresearch"
 
 name := "scorex"
 
 version := "1.0.0"
 
-scalaVersion := "2.11.6"
+scalaVersion := "2.11.7"
 
 resolvers ++= Seq("Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases/",
                   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/")
