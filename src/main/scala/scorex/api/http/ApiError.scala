@@ -21,6 +21,8 @@ object ApiError extends Enumeration {
   val ERROR_INVALID_PUBLIC_KEY = Value(108, "invalid public key")
   val ERROR_INVALID_NOT_NUMBER = Value(109, "argument is not a number")
   val ERROR_INVALID_MESSAGE = Value(110, "invalid message")
+  val ERROR_NEGATIVE_AMOUNT = Value(111, "negative amount")
+  val ERROR_NEGATIVE_FEE = Value(112, "negative fee")
 
   //WALLET
   val ERROR_WALLET_NO_EXISTS = Value(201, "wallet does not exist")
