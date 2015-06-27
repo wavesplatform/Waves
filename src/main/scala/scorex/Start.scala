@@ -71,8 +71,8 @@ object Start {
       val amt = Random.nextInt(100000).toLong
       val fee = Random.nextInt(5).toLong
 
-      val (tx, valRes) = TransactionCreator.createPayment(senderAcc, recipientAcc, amt, fee)
-      println(s"Payment created: $tx, validationResult: $valRes")
+      val tx = TransactionCreator.createPayment(senderAcc, recipientAcc, amt, fee)
+      println(s"Payment created: $tx")
     }
   }
 }

@@ -37,7 +37,7 @@ abstract class Transaction(val transactionType: TransactionType.Value,
 
   //VALIDATE
 
-  def isValid(): ValidationResult.Value
+  def validate(): ValidationResult.Value
 
   def getCreator(): Option[Account]
 
@@ -51,7 +51,7 @@ abstract class Transaction(val transactionType: TransactionType.Value,
     case _ => false
   }
 
-  protected def getJsonBase() = {
+  protected def jsonBase() = {
     Json.obj("type" -> transactionType.id,
       "fee" -> fee,
       "timestamp" -> timestamp,

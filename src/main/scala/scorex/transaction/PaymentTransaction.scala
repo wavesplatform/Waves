@@ -22,7 +22,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
   override lazy val dataLength = TYPE_LENGTH + BASE_LENGTH
 
-  override def toJson() = getJsonBase() ++ Json.obj(
+  override def toJson() = jsonBase() ++ Json.obj(
     "sender" -> sender.address,
     "recipient" -> recipient.address,
     "amount" -> amount
@@ -51,7 +51,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     Crypto.verify(signature, data, sender.publicKey)
   }
 
-  override def isValid() =
+  override def validate() =
     if (!Crypto.isValidAddress(recipient.address)) {
       ValidationResult.INVALID_ADDRESS //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (Controller.blockchainStorage.balance(sender.address) < amount + fee) {
@@ -89,7 +89,6 @@ object PaymentTransaction {
   private val FEE_LENGTH = 8
   private val SIGNATURE_LENGTH = 64
   private val BASE_LENGTH = TIMESTAMP_LENGTH + SENDER_LENGTH + RECIPIENT_LENGTH + AMOUNT_LENGTH + FEE_LENGTH + SIGNATURE_LENGTH
-
 
   def apply(sender: PrivateKeyAccount, recipient: Account,
             amount: Long, fee: Long, timestamp: Long): PaymentTransaction = {

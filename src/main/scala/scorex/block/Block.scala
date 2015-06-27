@@ -89,7 +89,7 @@ case class Block(version: Byte,
       generationData.isValid(this) &&
         transactions.forall { transaction =>
           !transaction.isInstanceOf[GenesisTransaction] &&
-            transaction.isValid() == ValidationResult.VALIDATE_OKE &&
+            transaction.validate() == ValidationResult.VALIDATE_OKE &&
             transaction.timestamp < timestamp && transaction.deadline >= timestamp
         }
     }
@@ -130,7 +130,7 @@ object Block {
     val (_, transactions) = orderedTransactions.foldLeft((0, List[Transaction]())) {
       case ((totalBytes, filteredTxs), tx) =>
         if (tx.timestamp <= stub.timestamp && tx.deadline > stub.timestamp
-          && tx.isValid() == ValidationResult.VALIDATE_OKE
+          && tx.validate() == ValidationResult.VALIDATE_OKE
           && totalBytes + tx.dataLength <= Block.MAX_TRANSACTION_BYTES) {
 
           (totalBytes + tx.dataLength, tx :: filteredTxs)

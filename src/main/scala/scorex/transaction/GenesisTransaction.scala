@@ -20,7 +20,7 @@ case class GenesisTransaction(override val recipient: Account,
   import scorex.transaction.Transaction._
 
   override def toJson() =
-    getJsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toString())
+    jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toString())
 
   override def toBytes() = {
     val typeBytes = Array(TransactionType.GENESIS_TRANSACTION.id.toByte)
@@ -53,7 +53,7 @@ case class GenesisTransaction(override val recipient: Account,
     Bytes.concat(digest, digest).sameElements(signature)
   }
 
-  override def isValid() =
+  override def validate() =
     if (amount < BigDecimal(0)) {
       ValidationResult.NEGATIVE_AMOUNT
     } else if (!Crypto.isValidAddress(recipient.address)) {

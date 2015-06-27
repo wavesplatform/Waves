@@ -11,14 +11,14 @@ object TransactionCreator {
   def createPayment(sender: PrivateKeyAccount,
                     recipient: Account,
                     amount: Long,
-                    fee: Long): (Transaction, ValidationResult) = {
+                    fee: Long): Transaction = {
     val time = NTP.correctedTime()
     val signature = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
     val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, signature)
-    val valid = payment.isValid() //CHECK IF PAYMENT VALID
+    val valid = payment.validate()
     if (valid == ValidationResult.VALIDATE_OKE) {
       Controller.onNewOffchainTransaction(payment)
     }
-    payment -> valid
+    payment
   }
 }

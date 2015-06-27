@@ -10,7 +10,6 @@ import scala.util.{Failure, Success, Try}
 
 
 trait PaymentHttpService extends HttpService with CommonApifunctions {
-  //todo: check / fix / document
   lazy val paymentRouting =
     path("payment") {
       post {
@@ -26,7 +25,7 @@ trait PaymentHttpService extends HttpService with CommonApifunctions {
                 case (_, _, Failure(_), _) => ApiError.toJson(ApiError.ERROR_INVALID_SENDER)
                 case (_, _, _, Failure(_)) => ApiError.toJson(ApiError.ERROR_INVALID_RECIPIENT)
                 case (Success(amount), Success(fee), Success(Some(sender)), Success(recipient)) =>
-                  TransactionCreator.createPayment(sender, new Account(recipient), amount, fee)
+                  val tx = TransactionCreator.createPayment(sender, new Account(recipient), amount, fee)
                 //todo: create json
               }
             }.getOrElse(ApiError.toJson(ApiError.ERROR_JSON))
