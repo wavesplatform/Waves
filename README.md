@@ -75,7 +75,17 @@ Another option is to run one or two peers on the local machine:
 * run ./start-local2.sh to run second local peer binded to 127.0.0.2:9084 . Edit settings in settings-local2.json
    if needed   
 * You can run both peers simultaneously by running ./start-local.sh   
-   
+
+
+Command-Line Client
+-------------------
+
+todo: finish
+
+API
+---
+
+There's separate [API.md](API.md) file with API description   
 
 
 Current Limitations
@@ -89,8 +99,9 @@ Contributions
 
 Contributions are welcome!
 
-
-API
----
-
-There's separate [API.md](API.md) file with API description 
+License
+-------
+ 
+To the extent possible under law, the authors have dedicated all copyright and related and neighboring 
+rights to this software to the public domain worldwide. This software is distributed without any warranty.
+You can find applied CC0 license legalcode in the [COPYING](COPYING) 
