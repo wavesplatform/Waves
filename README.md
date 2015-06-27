@@ -192,9 +192,3 @@ POST payment {"amount":400, "fee":1, "sender":"2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPN
 
 * wallet/ - prints whether wallet exists or not
 * wallet/seed - export wallet seed
-
-
-  
-  
-
-todo: finish API description
