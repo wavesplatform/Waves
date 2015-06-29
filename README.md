@@ -61,12 +61,8 @@ Install SBT(Scala Build Tool):
 
 Run
 ---
-
-Run start.sh script to connect to the network, but network is down now :) 
-
-You can edit folders / other settings in settings.json file before running ./start.sh.  
-
-Another option is to run one or two peers on the local machine:
+  
+Run one or two peers on the local machine:
  
 
 * run ./recompile.sh to (re-)build .jar file
@@ -74,13 +70,21 @@ Another option is to run one or two peers on the local machine:
    if needed
 * run ./start-local2.sh to run second local peer binded to 127.0.0.2:9084 . Edit settings in settings-local2.json
    if needed   
-* You can run both peers simultaneously by running ./start-local.sh   
+* You can run both peers simultaneously by running ./start-local.sh
+   
+   
+You can also run start.sh script to connect to the network, but network is down now :) 
+You can edit folders / other settings in settings.json file before running ./start.sh.   
 
 
 Command-Line Client
 -------------------
 
-todo: finish
+Run ./cli.sh after launching server to issue API requests to it via command-line client. See API section below.
+Some examples of CLI commands:
+
+ * GET blocks/first
+ * POST payment {"amount":400, "fee":1, "sender":"2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPNKr","recipient":"Y2BXLjiAhPUMSo8iBbDEhv81VwKnytTXsH"} 
 
 API
 ---
