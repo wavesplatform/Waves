@@ -12,7 +12,7 @@ resolvers ++= Seq("Sonatype Releases" at "http://oss.sonatype.org/content/reposi
 libraryDependencies ++= Seq(
   "org.mapdb" % "mapdb" % "1.0.8",
   "com.typesafe.play" %% "play-json" % "2.4.0",
-  "com.typesafe.akka" %% "akka-actor" % "2.3.10",
+  "com.typesafe.akka" %% "akka-actor" % "2.3.12",
   "io.spray" %% "spray-routing" % "1.3.3",
   "io.spray" %% "spray-can" % "1.3.3",
   "io.spray" %% "spray-http" % "1.3.3",
