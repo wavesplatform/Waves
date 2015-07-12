@@ -10,7 +10,7 @@ resolvers ++= Seq("Sonatype Releases" at "http://oss.sonatype.org/content/reposi
                   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/")
 
 libraryDependencies ++= Seq(
-  "org.mapdb" % "mapdb" % "1.0.7",
+  "org.mapdb" % "mapdb" % "1.0.8",
   "com.typesafe.play" %% "play-json" % "2.4.0",
   "com.typesafe.akka" %% "akka-actor" % "2.3.10",
   "io.spray" %% "spray-routing" % "1.3.3",
