@@ -13,18 +13,23 @@ import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
 
-class Wallet(walletFile: File, password: String, seed: Array[Byte]) {
+class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) {
 
   import Wallet._
 
-  //create parent folders then check their existence
-  walletFile.getParentFile.mkdirs().ensuring(walletFile.getParentFile.exists())
+  private val database = walletFileOpt match {
+    case Some(walletFile) =>
+      //create parent folders then check their existence
+      walletFile.getParentFile.mkdirs().ensuring(walletFile.getParentFile.exists())
 
-  private val database = DBMaker.newFileDB(walletFile)
-    .encryptionEnable(password)
-    .checksumEnable()
-    .closeOnJvmShutdown()
-    .make()
+      DBMaker.newFileDB(walletFile)
+        .checksumEnable()
+        .closeOnJvmShutdown()
+        .encryptionEnable(password).make
+    case None =>
+      DBMaker.newMemoryDB().encryptionEnable(password).make
+  }
+
 
   Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY))
     .getOrElse(database.getAtomicVar(SEED).set(seed))
@@ -88,7 +93,7 @@ class Wallet(walletFile: File, password: String, seed: Array[Byte]) {
     accountsCache.clear()
   }
 
-  def exists() = walletFile.exists()
+  def exists() = walletFileOpt.map(_.exists()).getOrElse(true)
 
   def accounts() = accountsCache.values.toSeq
 

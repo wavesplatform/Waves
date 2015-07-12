@@ -33,7 +33,7 @@ class ValidChainGenerationSpecification extends FunSuite {
     if (Constants.ConsensusAlgo == ConsensusModuleQora) {
       assert(b2.toBytes.size == 309)
     } else if (Constants.ConsensusAlgo == ConsensusModuleNxt) {
-      assert(b2.toBytes.size == 245)
+      assert(b2.toBytes.size == 213)
     }
 
     //toBytes/parse roundtrip test
@@ -49,7 +49,7 @@ class ValidChainGenerationSpecification extends FunSuite {
     if (Constants.ConsensusAlgo == ConsensusModuleQora) {
       assert(bytes.size == 326)
     } else if (Constants.ConsensusAlgo == ConsensusModuleNxt) {
-      assert(bytes.size == 262)
+      assert(bytes.size == 230)
     }
 
     val restored = Message.parse(ByteBuffer.wrap(bytes)).get.asInstanceOf[BlockMessage].block

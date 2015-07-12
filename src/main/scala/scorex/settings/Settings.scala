@@ -53,10 +53,8 @@ object Settings {
   lazy val offlineGeneration = (settingsJSON \ "offline-generation").asOpt[Boolean].getOrElse(false)
   lazy val bindAddress = (settingsJSON \ "bindAddress").asOpt[String].getOrElse(DEFAULT_BIND_ADDRESS)
 
-  lazy val walletDir = (settingsJSON \ "walletdir")
-    .asOpt[String]
-    .getOrElse(DEFAULT_WALLET_DIR)
-    .ensuring(path => directoryEnsuring(path))
+  lazy val walletDirOpt = (settingsJSON \ "walletdir").asOpt[String]
+    .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
 
   lazy val walletPassword = (settingsJSON \ "walletpassword").as[String]
 
