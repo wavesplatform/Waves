@@ -81,9 +81,6 @@ object Settings {
   private val DEFAULT_RPC_PORT = 9085
   private val DEFAULT_RPC_ALLOWED = "127.0.0.1"
 
-  //FOLDERS
-  private val DEFAULT_DATA_DIR = "data"
-  private val DEFAULT_WALLET_DIR = "wallet"
 
   private val DEFAULT_MAX_BYTE_PER_FEE = 512
 }
