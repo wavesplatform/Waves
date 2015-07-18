@@ -1,6 +1,5 @@
 package scorex.transaction
 
-import java.math.BigInteger
 import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints, Longs}

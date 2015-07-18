@@ -64,7 +64,7 @@ object Start {
       val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size)
       val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx)
 
-      val pkAccs = wallet.privateKeyAccounts().ensuring(_.size > 0)
+      val pkAccs = wallet.privateKeyAccounts().ensuring(_.nonEmpty)
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val recipientAcc = new Account(recipientAddress)
 
