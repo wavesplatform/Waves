@@ -14,8 +14,7 @@ object TransactionCreator {
     val time = NTP.correctedTime()
     val signature = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
     val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, signature)
-    val valid = payment.validate()
-    if (valid == ValidationResult.VALIDATE_OKE) {
+    if (payment.validate() == ValidationResult.VALIDATE_OKE) {
       Controller.onNewOffchainTransaction(payment)
     }
     payment
