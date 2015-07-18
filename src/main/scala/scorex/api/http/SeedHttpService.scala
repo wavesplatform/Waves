@@ -7,7 +7,6 @@ import scorex.crypto.Base58
 import spray.routing.HttpService
 
 trait SeedHttpService extends HttpService with CommonApiFunctions {
-  lazy val random = new SecureRandom()
   lazy val seedRouting =
     path("seed"./) {
       get(complete(seed(32)))
@@ -17,7 +16,7 @@ trait SeedHttpService extends HttpService with CommonApiFunctions {
 
   private def seed(length: Int): String = {
     val seed = new Array[Byte](length)
-    random.nextBytes(seed)
+    new SecureRandom().nextBytes(seed) //seed mutated here!
     Json.obj("seed" -> Base58.encode(seed)).toString()
   }
 }

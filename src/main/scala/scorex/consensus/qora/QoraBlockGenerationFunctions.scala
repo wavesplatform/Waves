@@ -8,7 +8,7 @@ import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.Crypto
 import scorex.settings.Constants
 
-//a lot of asInstanceOf[QoraBlockGenerationData] in the code, not type-safe
+//!! a lot of asInstanceOf[QoraBlockGenerationData] in the code, not type-safe
 object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
   private val RETARGET = 10
   private val MIN_BALANCE = 1L
