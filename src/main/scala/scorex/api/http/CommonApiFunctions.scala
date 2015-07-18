@@ -7,14 +7,13 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.{Base58, Crypto}
 import scala.concurrent.duration._
-import scala.util.Try
 
 
-trait CommonApifunctions {
+trait CommonApiFunctions {
   implicit val timeout = Timeout(5.seconds)
 
   protected[api] def walletExists(): Option[JsObject] =
-    if (Controller.wallet.exists) {
+    if (Controller.wallet.exists()) {
       Some(ApiError.toJson(ApiError.ERROR_WALLET_ALREADY_EXISTS))
     } else None
 

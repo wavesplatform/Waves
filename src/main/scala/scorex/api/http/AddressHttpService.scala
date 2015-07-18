@@ -11,7 +11,7 @@ import spray.routing.HttpService
 import scala.util.{Failure, Success, Try}
 
 
-trait AddressHttpService extends HttpService with CommonApifunctions {
+trait AddressHttpService extends HttpService with CommonApiFunctions {
 
   import Controller.wallet
 

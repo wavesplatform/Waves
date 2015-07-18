@@ -13,7 +13,7 @@ import spray.routing.HttpService
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-trait PeersHttpService extends HttpService with CommonApifunctions {
+trait PeersHttpService extends HttpService with CommonApiFunctions {
 
   lazy val peersRouting =
     pathPrefix("peers") {

@@ -9,7 +9,7 @@ import spray.routing.HttpService
 import scala.util.Try
 
 
-trait TransactionsHttpService extends HttpService with CommonApifunctions {
+trait TransactionsHttpService extends HttpService with CommonApiFunctions {
 
   lazy val transactionsRouting =
     pathPrefix("transactions") {

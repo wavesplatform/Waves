@@ -6,7 +6,7 @@ import scorex.crypto.Base58
 import spray.routing.HttpService
 
 
-trait WalletHttpService extends HttpService with CommonApifunctions {
+trait WalletHttpService extends HttpService with CommonApiFunctions {
 
   import Controller.wallet
 

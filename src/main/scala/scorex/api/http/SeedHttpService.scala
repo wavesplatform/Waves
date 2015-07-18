@@ -6,7 +6,7 @@ import play.api.libs.json.Json
 import scorex.crypto.Base58
 import spray.routing.HttpService
 
-trait SeedHttpService extends HttpService with CommonApifunctions {
+trait SeedHttpService extends HttpService with CommonApiFunctions {
   lazy val random = new SecureRandom()
   lazy val seedRouting =
     path("seed"./) {

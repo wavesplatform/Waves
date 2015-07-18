@@ -11,7 +11,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-trait ScorexHttpService extends HttpService with CommonApifunctions {
+trait ScorexHttpService extends HttpService with CommonApiFunctions {
   lazy val scorexRouting =
     pathPrefix("scorex") {
       path("stop") {

@@ -6,7 +6,7 @@ import scorex.settings.Constants
 import spray.routing.HttpService
 
 
-trait BlocksHttpService extends HttpService with CommonApifunctions {
+trait BlocksHttpService extends HttpService with CommonApiFunctions {
 
   lazy val blocksRouting =
     pathPrefix("blocks") {

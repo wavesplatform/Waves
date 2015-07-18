@@ -10,7 +10,7 @@ import spray.routing.HttpService
 import scala.util.{Failure, Success, Try}
 
 
-trait PaymentHttpService extends HttpService with CommonApifunctions {
+trait PaymentHttpService extends HttpService with CommonApiFunctions {
   lazy val paymentRouting =
     path("payment") {
       post {
