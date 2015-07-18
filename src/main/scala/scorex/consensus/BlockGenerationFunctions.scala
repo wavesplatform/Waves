@@ -24,7 +24,7 @@ trait BlockGenerationFunctions {
   }
 
   protected def randomBlockFromStubs(blockStubs: TrieMap[PrivateKeyAccount, BlockStub]): Option[Block] =
-    if (blockStubs.size > 0) {
+    if (blockStubs.nonEmpty) {
       val generators = blockStubs.keys.toIndexedSeq
       val randomGen = generators(Random.nextInt(generators.size))
       val rndStub = blockStubs(randomGen)

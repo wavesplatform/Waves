@@ -125,7 +125,7 @@ object Block {
     Block(stub.version, stub.reference, stub.timestamp, stub.generator, stub.generationData, transactions, None)
 
   def apply(stub: BlockStub, account: PrivateKeyAccount): Block = {
-    val orderedTransactions = UnconfirmedTransactionsDatabaseImpl.getAll().sortBy(_.feePerByte).toList
+    val orderedTransactions = UnconfirmedTransactionsDatabaseImpl.all().sortBy(_.feePerByte).toList
 
     val (_, transactions) = orderedTransactions.foldLeft((0, List[Transaction]())) {
       case ((totalBytes, filteredTxs), tx) =>

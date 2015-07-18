@@ -1,9 +1,7 @@
 package scorex.crypto
 
 import java.security.MessageDigest
-
 import scorex.account.{Account, PrivateKeyAccount}
-
 import scala.util.Try
 
 /*

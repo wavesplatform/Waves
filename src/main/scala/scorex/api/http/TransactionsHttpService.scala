@@ -24,7 +24,7 @@ trait TransactionsHttpService extends HttpService with CommonApiFunctions {
       } ~ path("unconfirmed") {
         get {
           complete {
-            Json.arr(UnconfirmedTransactionsDatabaseImpl.getAll().map(_.toJson())).toString()
+            Json.arr(UnconfirmedTransactionsDatabaseImpl.all().map(_.toJson())).toString()
           }
         }
       } ~ path("address" / Segment) { case address =>

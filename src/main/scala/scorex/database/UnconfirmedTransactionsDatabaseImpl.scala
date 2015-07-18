@@ -20,7 +20,7 @@ object UnconfirmedTransactionsDatabaseImpl extends UnconfirmedTransactionsDataba
 
   override def remove(tx: Transaction): Unit = transactions -= key(tx)
 
-  override def getAll(): Seq[Transaction] = transactions.values.toSeq
+  override def all(): Seq[Transaction] = transactions.values.toSeq
 
   override def getBySignature(signature: Array[Byte]): Option[Transaction] = transactions.get(key(signature))
 }
