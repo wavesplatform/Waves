@@ -1,15 +1,17 @@
 package scorex.block
 
 import java.util.Arrays
+
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import scorex.controller.Controller
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.controller.Controller
 import scorex.crypto.{Base58, Crypto}
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.settings.Constants
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}
-import scorex.settings.Constants
+
 import scala.util.Try
 
 case class BlockStub(version: Byte, reference: Array[Byte], timestamp: Long,
@@ -23,7 +25,7 @@ case class Block(version: Byte,
                  generator: PublicKeyAccount,
                  generationData: Constants.ConsensusAlgo.kernelData,
                  transactions: Seq[Transaction],
-                 signatureOpt:Option[Array[Byte]]) {
+                 signatureOpt: Option[Array[Byte]]) {
 
   import scorex.block.Block._
 
@@ -37,9 +39,9 @@ case class Block(version: Byte,
 
   def height(): Option[Int] = Controller.blockchainStorage.heightOf(this)
 
-  lazy val signature = signatureOpt.getOrElse{
+  lazy val signature = signatureOpt.getOrElse {
     generator match {
-      case privKeyAcc:PrivateKeyAccount =>
+      case privKeyAcc: PrivateKeyAccount =>
         Crypto.sign(privKeyAcc, bytesWithoutSignature)
 
       case _ =>
