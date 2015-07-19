@@ -2,8 +2,8 @@ package scorex.settings
 
 import scorex.consensus._
 
-/*
-  System constants here.
+/**
+ * System constants here.
  */
 
 object Constants {

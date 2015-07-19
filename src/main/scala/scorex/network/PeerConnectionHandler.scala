@@ -56,7 +56,7 @@ class PeerConnectionHandler(networkController: ActorRef,
 
         signaturesGot.exists { parent =>
           val headers = Controller.blockchainStorage.getSignatures(parent)
-          if (headers.size > 0) {
+          if (headers.nonEmpty) {
             self ! SignaturesMessage(Seq(parent) ++ headers)
             true
           } else false
@@ -94,7 +94,6 @@ class PeerConnectionHandler(networkController: ActorRef,
         }
 
       case TransactionMessage(transaction) =>
-        //CHECK IF SIGNATURE IS VALID OR GENESIS TRANSACTION
         if (!transaction.isSignatureValid || transaction.transactionType == TransactionType.GenesisTransaction) {
           self ! Blacklist
         } else if (transaction.hasMinimumFee && transaction.hasMinimumFeePerByte) {
@@ -131,7 +130,6 @@ class PeerConnectionHandler(networkController: ActorRef,
       connection ! Write(data)
 
     case CommandFailed(w: Write) =>
-      // O/S buffer was full
       Logger.getGlobal.info(s"Write failed : $w " + remote)
       PeerManager.blacklistPeer(remote)
       connection ! Close
@@ -158,6 +156,7 @@ class PeerConnectionHandler(networkController: ActorRef,
 
     case Blacklist =>
       Logger.getGlobal.info(s"Going to blacklist " + remote)
+    //todo: real blacklisting
     //  PeerManager.blacklistPeer(remote)
     //  connection ! Close
 
@@ -178,5 +177,4 @@ object PeerConnectionHandler {
   case object Blacklist
 
   case class BestPeer(remote: InetSocketAddress, betterThanLocal: Boolean)
-
 }
