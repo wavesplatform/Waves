@@ -37,7 +37,7 @@ object Message {
   val MagicLength = MAGIC.length
 
   val TypeLength = 4
-  val MesssageLength = 4
+  val MessageLength = 4
   val ChecksumLength = 4
 
   val GetPeersType = 1: Byte
@@ -51,7 +51,7 @@ object Message {
   val PingType = 9: Byte
 
   def parse(bytes: ByteBuffer): Try[Message] = Try {
-    val magic = new Array[Byte](MesssageLength)
+    val magic = new Array[Byte](MessageLength)
     bytes.get(magic)
 
     if (!magic.sameElements(Message.MAGIC)) throw new Exception("wrong magic")
