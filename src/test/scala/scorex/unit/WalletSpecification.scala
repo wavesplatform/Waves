@@ -31,21 +31,19 @@ class WalletSpecification extends FunSuite {
     assert(w.privateKeyAccounts().isEmpty)
   }
 
+
   /*
+  //todo: report MapDb bug with reopening a database
 
-  todo: report MapDb bug with reopening a database
-
-  test("double creation"){
+  test("reopening"){
     val wf = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")
 
-    val w = new Wallet(wf, "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"))
+    val w = new Wallet(Some(wf), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
     w.generateNewAccounts(10)
     w.close()
     assert(w.exists())
 
-    val w2 = new Wallet(wf, "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"))
+    val w2 = new Wallet(Some(wf), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
     assert(w2.privateKeyAccounts().head.address != null)
-  }
-
-  */
+  } */
 }
