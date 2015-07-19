@@ -90,7 +90,7 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
     val genBalanceBytes = Longs.toByteArray(generatingBalance)
       .ensuring(_.size == QoraBlockGenerationDataParser.GENERATING_BALANCE_LENGTH)
 
-    require(account.publicKey.length == Block.GENERATOR_LENGTH)
+    require(account.publicKey.length == Block.GeneratorLength)
     val si = Bytes.concat(generatorSignature, genBalanceBytes, account.publicKey)
     Crypto.sign(account, si)
   }

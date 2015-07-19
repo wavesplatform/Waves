@@ -14,7 +14,7 @@ import scala.util.Random
 
 class BlockSpecification extends FunSuite {
   test("block with txs toBytes/parse roundtrip") {
-    val reference = Array.fill(Block.REFERENCE_LENGTH)(Random.nextInt(100).toByte)
+    val reference = Array.fill(Block.ReferenceLength)(Random.nextInt(100).toByte)
     val gen = new PrivateKeyAccount(reference)
     val gd = (Constants.ConsensusAlgo match {
       case ConsensusModuleNxt =>

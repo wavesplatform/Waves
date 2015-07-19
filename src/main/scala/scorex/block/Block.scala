@@ -14,7 +14,7 @@ import scala.util.Try
 
 case class BlockStub(version: Byte, reference: Array[Byte], timestamp: Long,
                      generator: PrivateKeyAccount, generationData: Constants.ConsensusAlgo.kernelData) {
-  require(reference.length == Block.REFERENCE_LENGTH)
+  require(reference.length == Block.ReferenceLength)
 }
 
 case class Block(version: Byte,
@@ -60,20 +60,20 @@ case class Block(version: Byte,
   private lazy val bytesWithoutSignature = {
     val versionBytes = Array(version)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0)
-    val referenceBytes = Bytes.ensureCapacity(reference, REFERENCE_LENGTH, 0)
+    val referenceBytes = Bytes.ensureCapacity(reference, ReferenceLength, 0)
     val transactionCountBytes = Ints.toByteArray(transactions.size)
     val transactionBytes = transactions.foldLeft(Array[Byte]()) { case (txBytes, tx) =>
       Bytes.concat(txBytes, Ints.toByteArray(tx.dataLength), tx.bytes())
     }
 
     Bytes.concat(versionBytes, timestampBytes, referenceBytes,
-      Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0), generationData.bytes,
+      Bytes.ensureCapacity(generator.publicKey, GeneratorLength, 0), generationData.bytes,
       transactionCountBytes, transactionBytes)
   }
 
   def toBytes = Bytes.concat(bytesWithoutSignature, signature)
 
-  def dataLength() = transactions.foldLeft(BASE_LENGTH) { case (len, tx) => len + 4 + tx.dataLength }
+  def dataLength() = transactions.foldLeft(BaseLength) { case (len, tx) => len + 4 + tx.dataLength }
 
   //VALIDATION
 
@@ -107,19 +107,19 @@ object Block {
   import ConsensusAlgo.kernelDataParser.GenerationDataLength
 
   val Version: Byte = 1
-  val MAX_BLOCK_BYTES = 1024 * 1024 // 1 mb block
+  val MaxBlockBytes = 1024 * 1024 // 1 mb block
 
-  val VERSION_LENGTH = 1
-  val REFERENCE_LENGTH = 64
-  val TIMESTAMP_LENGTH = 8
-  val GENERATOR_LENGTH = 32
+  val VersionLength = 1
+  val ReferenceLength = 64
+  val TimestampLength = 8
+  val GeneratorLength = 32
 
-  private[block] val SIGNATURE_LENGTH = 64
-  private[block] val TRANSACTIONS_COUNT_LENGTH = 4
-  private[block] val TRANSACTION_SIZE_LENGTH = 4
-  private[block] val BASE_LENGTH = VERSION_LENGTH + REFERENCE_LENGTH + TIMESTAMP_LENGTH +
-    GENERATOR_LENGTH + GenerationDataLength + TRANSACTIONS_COUNT_LENGTH + SIGNATURE_LENGTH
-  val MAX_TRANSACTION_BYTES = MAX_BLOCK_BYTES - BASE_LENGTH
+  private[block] val SignatureLength = scorex.crypto.Crypto.SignatureLength
+  private[block] val TransactionsCountLength = 4
+  private[block] val TransactionSizeLength = 4
+  private[block] val BaseLength = VersionLength + ReferenceLength + TimestampLength +
+    GeneratorLength + GenerationDataLength + TransactionsCountLength + SignatureLength
+  val MaxTransactionBytes = MaxBlockBytes - BaseLength
 
   def apply(stub: BlockStub, transactions: Seq[Transaction], account: PrivateKeyAccount): Block =
     Block(stub.version, stub.reference, stub.timestamp, stub.generator, stub.generationData, transactions, None)
@@ -131,7 +131,7 @@ object Block {
       case ((totalBytes, filteredTxs), tx) =>
         if (tx.timestamp <= stub.timestamp && tx.deadline > stub.timestamp
           && tx.validate() == ValidationResult.ValidateOke
-          && totalBytes + tx.dataLength <= Block.MAX_TRANSACTION_BYTES) {
+          && totalBytes + tx.dataLength <= Block.MaxTransactionBytes) {
 
           (totalBytes + tx.dataLength, tx :: filteredTxs)
         } else (totalBytes, filteredTxs)
@@ -141,23 +141,23 @@ object Block {
   }
 
   def parse(data: Array[Byte]): Try[Block] = Try {
-    require(data.length >= BASE_LENGTH, "Data is less then minimum block length")
+    require(data.length >= BaseLength, "Data is less then minimum block length")
 
     var position = 0
 
     val version = data.head
-    position += VERSION_LENGTH
+    position += VersionLength
 
-    val timestampBytes = Arrays.copyOfRange(data, position, position + TIMESTAMP_LENGTH)
+    val timestampBytes = Arrays.copyOfRange(data, position, position + TimestampLength)
     val timestamp = Longs.fromByteArray(timestampBytes)
-    position += TIMESTAMP_LENGTH
+    position += TimestampLength
 
-    val reference = Arrays.copyOfRange(data, position, position + REFERENCE_LENGTH)
-    position += REFERENCE_LENGTH
+    val reference = Arrays.copyOfRange(data, position, position + ReferenceLength)
+    position += ReferenceLength
 
-    val generatorBytes = Arrays.copyOfRange(data, position, position + GENERATOR_LENGTH)
+    val generatorBytes = Arrays.copyOfRange(data, position, position + GeneratorLength)
     val generator = new PublicKeyAccount(generatorBytes)
-    position += GENERATOR_LENGTH
+    position += GeneratorLength
 
     val generationDatabytes = Arrays.copyOfRange(data, position, position + GenerationDataLength)
     val generationData: ConsensusAlgo.kernelData = ConsensusAlgo.kernelDataParser.parse(generationDatabytes)
@@ -167,20 +167,20 @@ object Block {
       ConsensusAlgo.genesisBlock
     } else {
 
-      val transactionCountBytes = Arrays.copyOfRange(data, position, position + TRANSACTIONS_COUNT_LENGTH)
+      val transactionCountBytes = Arrays.copyOfRange(data, position, position + TransactionsCountLength)
       val transactionCount = Ints.fromByteArray(transactionCountBytes)
-      position += TRANSACTIONS_COUNT_LENGTH
+      position += TransactionsCountLength
 
       val (sigPosition, transactions) = (1 to transactionCount).foldLeft((position, Seq[Transaction]())) { case ((pos, txs), _) =>
-        val transactionLengthBytes = Arrays.copyOfRange(data, pos, pos + TRANSACTION_SIZE_LENGTH)
+        val transactionLengthBytes = Arrays.copyOfRange(data, pos, pos + TransactionSizeLength)
         val transactionLength = Ints.fromByteArray(transactionLengthBytes)
-        val transactionBytes = Arrays.copyOfRange(data, pos + TRANSACTION_SIZE_LENGTH, pos + TRANSACTION_SIZE_LENGTH + transactionLength)
+        val transactionBytes = Arrays.copyOfRange(data, pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
         val transaction = Transaction.parse(transactionBytes)
 
-        (pos + TRANSACTION_SIZE_LENGTH + transactionLength, txs :+ transaction)
+        (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
       }
 
-      val signature = Arrays.copyOfRange(data, sigPosition, sigPosition + SIGNATURE_LENGTH)
+      val signature = Arrays.copyOfRange(data, sigPosition, sigPosition + SignatureLength)
 
       new Block(version, reference, timestamp, generator, generationData, transactions, Some(signature))
     }
