@@ -80,4 +80,7 @@ class InternalState(dataFolderOpt: Option[String]) extends StateQueries {
   override def stopWatchingAccountTransactions(account: Account): Unit = accountTransactions.remove(account)
 
   override def watchAccountTransactions(account: Account): Unit = accountTransactions.put(account, List())
+
+  //initialization
+  setStateHeight(0)
 }
