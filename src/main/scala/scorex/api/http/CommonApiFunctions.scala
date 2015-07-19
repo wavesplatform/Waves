@@ -10,7 +10,7 @@ import scala.concurrent.duration._
 
 
 trait CommonApiFunctions {
-  implicit val Timeout = Timeout(5.seconds)
+  implicit val timeout = Timeout(5.seconds)
 
   protected[api] def walletExists(): Option[JsObject] =
     if (Controller.wallet.exists()) {

@@ -44,7 +44,7 @@ class MessageSpecification extends FunSuite {
   test("GetSignaturesMessage roundtrip 1") {
     val e1 = 33:Byte
     val e2 = 34:Byte
-    val s1 = e2 +: Array.fill(SignaturesSeqMessage.SignatureLength - 1)(e1)
+    val s1 = e2 +: Array.fill(scorex.crypto.Crypto.SignatureLength - 1)(e1)
 
     val msg = GetSignaturesMessage(Seq(s1))
     val parsed = Message.parse(ByteBuffer.wrap(msg.serialize())).get
@@ -56,8 +56,8 @@ class MessageSpecification extends FunSuite {
   test("SignaturesMessage roundtrip 1") {
     val e1 = 33:Byte
     val e2 = 34:Byte
-    val s1 = e2 +: Array.fill(SignaturesSeqMessage.SignatureLength - 1)(e1)
-    val s2 = e1 +: Array.fill(SignaturesSeqMessage.SignatureLength - 1)(e2)
+    val s1 = e2 +: Array.fill(scorex.crypto.Crypto.SignatureLength - 1)(e1)
+    val s2 = e1 +: Array.fill(scorex.crypto.Crypto.SignatureLength - 1)(e2)
 
     val msg = SignaturesMessage(Seq(s1,s2))
     val parsed = Message.parse(ByteBuffer.wrap(msg.serialize())).get
