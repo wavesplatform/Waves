@@ -1,11 +1,11 @@
 package scorex.network.message
 
 case class GetBlockMessage(signature: Array[Byte]) extends Message {
-  import SignaturesSeqMessage.SIGNATURE_LENGTH
+  import SignaturesSeqMessage.SignatureLength
 
-  require(signature.length == SIGNATURE_LENGTH, "Data does not match length")
+  require(signature.length == SignatureLength, "Data does not match length")
 
-  override val messageType = Message.GET_BLOCK_TYPE
+  override val messageType = Message.GetBlockType
 
   override lazy val dataBytes = signature
 }

@@ -4,7 +4,7 @@ import scorex.transaction.Transaction
 
 case class TransactionMessage(transaction: Transaction) extends Message {
 
-  override val messageType = Message.TRANSACTION_TYPE
+  override val messageType = Message.TransactionType
 
   override lazy val dataBytes = transaction.toBytes()
 }

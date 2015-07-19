@@ -5,7 +5,7 @@ import com.google.common.primitives.Ints
 case class ScoreMessage(height: Int, score: BigInt) extends Message {
   lazy val scoreBytes = score.toByteArray
 
-  override val messageType = Message.VERSION_TYPE
+  override val messageType = Message.VersionType
 
   override lazy val dataBytes = {
     val bb = java.nio.ByteBuffer.allocate(4 + scoreBytes.length)

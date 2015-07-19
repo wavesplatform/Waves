@@ -1,7 +1,7 @@
 package scorex.network.message
 
 import com.google.common.primitives.{Bytes, Ints}
-
+import scorex.crypto.Crypto.SignatureLength
 
 abstract class SignaturesSeqMessage extends Message {
 
@@ -11,7 +11,7 @@ abstract class SignaturesSeqMessage extends Message {
 
   override lazy val dataBytes = {
     val length = signatures.size
-    val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DATA_LENGTH, 0)
+    val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DataLength, 0)
 
     //WRITE SIGNATURES
     signatures.foldLeft(lengthBytes) { case (bytes, header) => Bytes.concat(bytes, header) }
@@ -20,31 +20,30 @@ abstract class SignaturesSeqMessage extends Message {
 
 object SignaturesSeqMessage {
 
-  val SIGNATURE_LENGTH = 64
-  private val DATA_LENGTH = 4
+  private val DataLength = 4
 
   def parse(data: Array[Byte]) = {
     //READ LENGTH
-    val lengthBytes = data.take(DATA_LENGTH)
+    val lengthBytes = data.take(DataLength)
     val length = Ints.fromByteArray(lengthBytes)
 
     //CHECK IF DATA MATCHES LENGTH
-    if (data.length != DATA_LENGTH + (length * SIGNATURE_LENGTH))
+    if (data.length != DataLength + (length * SignatureLength))
       throw new Exception("Data does not match length")
 
     //CREATE HEADERS LIST
     (0 to length - 1).map { i =>
-      val position = DATA_LENGTH + (i * SIGNATURE_LENGTH)
-      data.slice(position, position + SIGNATURE_LENGTH)
+      val position = DataLength + (i * SignatureLength)
+      data.slice(position, position + SignatureLength)
     }.toSeq
   }
 }
 
 
 case class GetSignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage {
-  require(signatures.forall(_.length == SignaturesSeqMessage.SIGNATURE_LENGTH))
+  require(signatures.forall(_.length == SignatureLength))
 
-  override val messageType = Message.GET_SIGNATURES_TYPE
+  override val messageType = Message.GetSignaturesType
 
   def this(data: Array[Byte]) = this(SignaturesSeqMessage.parse(data))
 }
@@ -55,9 +54,9 @@ object GetSignaturesMessage {
 
 
 case class SignaturesMessage(override val signatures: Seq[Array[Byte]]) extends SignaturesSeqMessage {
-  require(signatures.forall(_.length == SignaturesSeqMessage.SIGNATURE_LENGTH))
+  require(signatures.forall(_.length == SignatureLength))
 
-  override val messageType = Message.SIGNATURES_TYPE
+  override val messageType = Message.SignaturesType
 
   def this(data: Array[Byte]) = this(SignaturesSeqMessage.parse(data))
 }
