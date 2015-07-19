@@ -9,7 +9,7 @@ import scorex.transaction.Transaction
 /**
  * Facade to both blockchain & internal state implementations
  */
-class PrunableBlockchainStorage(dataFolderOpt:Option[String]) extends BlockChain with StateQuery {
+class PrunableBlockchainStorage(dataFolderOpt:Option[String]) extends BlockChain with StateQueries {
   private val chain = new BlockchainImpl(dataFolderOpt)
   private val state = new InternalState(dataFolderOpt)
 

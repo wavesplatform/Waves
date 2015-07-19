@@ -15,7 +15,7 @@ import scorex.transaction.Transaction
 // todo: Make design ready for pruning!
 // todo: Make possibility of easy switching underlying storage implementation(e.g. from MapDb to Riak)
 
-class InternalState(dataFolderOpt: Option[String]) extends StateQuery {
+class InternalState(dataFolderOpt: Option[String]) extends StateQueries {
   private val StateHeight = "height"
 
   private val database: DB = dataFolderOpt match {

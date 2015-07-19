@@ -5,7 +5,7 @@ import scorex.crypto.Crypto
 import scorex.transaction.Transaction
 
 
-trait StateQuery {
+trait StateQueries {
   def balance(address: String, confirmations: Int): BigDecimal
 
   def balance(address: String): BigDecimal = balance(address, 0)
