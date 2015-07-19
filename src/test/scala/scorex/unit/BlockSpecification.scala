@@ -19,10 +19,10 @@ class BlockSpecification extends FunSuite {
     val gd = (Constants.ConsensusAlgo match {
       case ConsensusModuleNxt =>
         val gs = Array.fill(NxtBlockGenerationDataParser.GeneratorSignatureLength)(Random.nextInt(100).toByte)
-        NxtBlockGenerationData(Random.nextInt(Int.MaxValue)+1, gs)
+        NxtBlockGenerationData(Random.nextInt(Int.MaxValue) + 1, gs)
 
       case ConsensusModuleQora =>
-        val gb = Random.nextInt(Int.MaxValue)+1
+        val gb = Random.nextInt(Int.MaxValue) + 1
         val gs = QoraBlockGenerationFunctions.calculateSignature(reference, gb, gen)
         QoraBlockGenerationData(gb, gs)
     }).asInstanceOf[Constants.ConsensusAlgo.kernelData]
@@ -45,9 +45,9 @@ class BlockSpecification extends FunSuite {
     assert(b2.signatureValid)
   }
 
-  test("restoring from Base58 form"){
-    if(Constants.ConsensusAlgo == ConsensusModuleNxt) {
-      val b58 =  "9FCfN5CGJPFtD8yt7Z26hbMfT3g2W52M2medVw8onEPbZHBa76TKnX7GaBNRbdcBVjv1cJ1ERQzhcNbf4BvU4jBNQ65x9bq4Btt5MQN7eXiEEGn6EXNsEXNURJz5UrNXefWw2bi2jwQV4fPF54eFw9EQYCnU2yzMZqWNjZJQNoouFszbzijEyjPreU1gSjJDeRvHHzP5rPnbqCr7QpoHCj4zNQ1LzbDfc5ahUer3Kn9xDgDbogMDZFgPw5E1KfNNB7N7vA3emqdyysab6EVDV3NKiy1MWL16d3"
+  test("restoring from Base58 form") {
+    if (Constants.ConsensusAlgo == ConsensusModuleNxt) {
+      val b58 = "9FCfN5CGJPFtD8yt7Z26hbMfT3g2W52M2medVw8onEPbZHBa76TKnX7GaBNRbdcBVjv1cJ1ERQzhcNbf4BvU4jBNQ65x9bq4Btt5MQN7eXiEEGn6EXNsEXNURJz5UrNXefWw2bi2jwQV4fPF54eFw9EQYCnU2yzMZqWNjZJQNoouFszbzijEyjPreU1gSjJDeRvHHzP5rPnbqCr7QpoHCj4zNQ1LzbDfc5ahUer3Kn9xDgDbogMDZFgPw5E1KfNNB7N7vA3emqdyysab6EVDV3NKiy1MWL16d3"
       val b = Block.parse(Base58.decode(b58).get).get
       assert(b.signatureValid)
     }

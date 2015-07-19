@@ -26,8 +26,8 @@ class MessageSpecification extends FunSuite {
   }
 
   test("ScoreMessage roundtrip 2") {
-    val h1 = Int.MaxValue-1
-    val s1 = BigInt(Long.MaxValue)+100
+    val h1 = Int.MaxValue - 1
+    val s1 = BigInt(Long.MaxValue) + 100
 
     val msg = ScoreMessage(h1, s1)
     val parsed = Message.parse(ByteBuffer.wrap(msg.serialize())).get
@@ -38,8 +38,8 @@ class MessageSpecification extends FunSuite {
   }
 
   test("GetSignaturesMessage roundtrip 1") {
-    val e1 = 33:Byte
-    val e2 = 34:Byte
+    val e1 = 33: Byte
+    val e2 = 34: Byte
     val s1 = e2 +: Array.fill(scorex.crypto.Crypto.SignatureLength - 1)(e1)
 
     val msg = GetSignaturesMessage(Seq(s1))
@@ -50,12 +50,12 @@ class MessageSpecification extends FunSuite {
   }
 
   test("SignaturesMessage roundtrip 1") {
-    val e1 = 33:Byte
-    val e2 = 34:Byte
+    val e1 = 33: Byte
+    val e2 = 34: Byte
     val s1 = e2 +: Array.fill(scorex.crypto.Crypto.SignatureLength - 1)(e1)
     val s2 = e1 +: Array.fill(scorex.crypto.Crypto.SignatureLength - 1)(e2)
 
-    val msg = SignaturesMessage(Seq(s1,s2))
+    val msg = SignaturesMessage(Seq(s1, s2))
     val parsed = Message.parse(ByteBuffer.wrap(msg.serialize())).get
 
     assert(parsed.isInstanceOf[SignaturesMessage])
