@@ -7,13 +7,10 @@ import scorex.transaction.Transaction.ValidationResult
 
 
 object TransactionCreator {
-  def createPayment(sender: PrivateKeyAccount,
-                    recipient: Account,
-                    amount: Long,
-                    fee: Long): Transaction = {
+  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Transaction = {
     val time = NTP.correctedTime()
-    val signature = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
-    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, signature)
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
+    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
     if (payment.validate() == ValidationResult.VALIDATE_OKE) {
       Controller.onNewOffchainTransaction(payment)
     }
