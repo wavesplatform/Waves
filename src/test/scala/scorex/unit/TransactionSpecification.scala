@@ -57,5 +57,4 @@ class TransactionSpecification extends FunSuite {
     assert(tx.fee == txAfter.fee)
     assert(tx.amount == txAfter.amount)
   }
-
 }

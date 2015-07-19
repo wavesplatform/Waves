@@ -7,9 +7,8 @@ import scorex.wallet.Wallet
 import scala.util.Random
 
 class WalletSpecification extends FunSuite {
+
   private val walletSize = 10
-
-
 
   test("wallet deletion") {
     val wf = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")
@@ -29,9 +28,8 @@ class WalletSpecification extends FunSuite {
 
     w.privateKeyAccounts().foreach(w.deleteAccount)
 
-    assert(w.privateKeyAccounts().size == 0)
+    assert(w.privateKeyAccounts().isEmpty)
   }
-
 
   /*
 
