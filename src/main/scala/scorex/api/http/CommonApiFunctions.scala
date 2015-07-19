@@ -14,24 +14,24 @@ trait CommonApiFunctions {
 
   protected[api] def walletExists(): Option[JsObject] =
     if (Controller.wallet.exists()) {
-      Some(ApiError.toJson(ApiError.ERROR_WALLET_ALREADY_EXISTS))
+      Some(ApiError.json(ApiError.WalletAlreadyExists))
     } else None
 
   protected[api] def withBlock(encodedSignature: String)(action: Block => JsValue): JsValue =
     Base58.decode(encodedSignature).toOption.map { signature =>
       Controller.blockchainStorage.blockByHeader(signature) match {
         case Some(block) => action(block)
-        case None => ApiError.toJson(ApiError.ERROR_BLOCK_NO_EXISTS)
+        case None => ApiError.json(ApiError.BlockNotExists)
       }
-    }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_SIGNATURE))
+    }.getOrElse(ApiError.json(ApiError.InvalidSignature))
 
   protected[api] def withAccount(address: String)(action: Account => JsValue): JsValue =
     walletNotExists().getOrElse {
       if (!Crypto.isValidAddress(address)) {
-        ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
+        ApiError.json(ApiError.InvalidAddress)
       } else {
         Controller.wallet.privateKeyAccount(address) match {
-          case None => ApiError.toJson(ApiError.ERROR_WALLET_ADDRESS_NO_EXISTS)
+          case None => ApiError.json(ApiError.WalletAddressNotExists)
           case Some(account) => action(account)
         }
       }
@@ -39,6 +39,6 @@ trait CommonApiFunctions {
 
   protected[api] def walletNotExists(): Option[JsObject] =
     if (!Controller.wallet.exists()) {
-      Some(ApiError.toJson(ApiError.ERROR_WALLET_NO_EXISTS))
+      Some(ApiError.json(ApiError.WalletNotExist))
     } else None
 }

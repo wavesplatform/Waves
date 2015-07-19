@@ -18,7 +18,7 @@ trait TransactionsHttpService extends HttpService with CommonApiFunctions {
           complete {
             Try(Base58.decode(signature)).map { signatureBytes =>
               ??? //todo: implement?
-            }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_SIGNATURE)).toString()
+            }.getOrElse(ApiError.json(ApiError.InvalidSignature)).toString()
           }
         }
       } ~ path("unconfirmed") {
