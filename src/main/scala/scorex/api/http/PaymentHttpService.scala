@@ -29,19 +29,19 @@ trait PaymentHttpService extends HttpService with CommonApiFunctions {
                 case (Success(amount), Success(fee), Success(Some(sender)), Success(recipient)) =>
                   val tx = TransactionCreator.createPayment(sender, new Account(recipient), amount, fee)
                   tx.validate() match {
-                    case ValidationResult.VALIDATE_OKE =>
-                      tx.toJson()
+                    case ValidationResult.ValidateOke =>
+                      tx.json()
 
-                    case ValidationResult.INVALID_ADDRESS =>
+                    case ValidationResult.InvalidAddress =>
                       ApiError.toJson(ApiError.ERROR_INVALID_ADDRESS)
 
-                    case ValidationResult.NEGATIVE_AMOUNT =>
+                    case ValidationResult.NegativeAmount =>
                       ApiError.toJson(ApiError.ERROR_NEGATIVE_AMOUNT)
 
-                    case ValidationResult.NEGATIVE_FEE =>
+                    case ValidationResult.NegativeFee =>
                       ApiError.toJson(ApiError.ERROR_NEGATIVE_FEE)
 
-                    case ValidationResult.NO_BALANCE =>
+                    case ValidationResult.NoBalance =>
                       ApiError.toJson(ApiError.ERROR_NEGATIVE_FEE)
                   }
               }

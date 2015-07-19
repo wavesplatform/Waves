@@ -7,15 +7,15 @@ import org.apache.commons.net.ntp.NTPUDPClient
 
 
 object NTP {
-  private val TIME_TILL_UPDATE = 1000 * 60 * 10L
-  private val NTP_SERVER = "pool.ntp.org"
+  private val TimeTillUpdate = 1000 * 60 * 10L
+  private val NtpServer = "pool.ntp.org"
 
   private var lastUpdate = 0L
   private var offset = 0L
 
   def correctedTime() = {
     //CHECK IF OFFSET NEEDS TO BE UPDATED
-    if (System.currentTimeMillis() > lastUpdate + TIME_TILL_UPDATE) {
+    if (System.currentTimeMillis() > lastUpdate + TimeTillUpdate) {
       updateOffSet()
       lastUpdate = System.currentTimeMillis()
 
@@ -33,7 +33,7 @@ object NTP {
     try {
       client.open()
 
-      val info = client.getTime(InetAddress.getByName(NTP_SERVER))
+      val info = client.getTime(InetAddress.getByName(NtpServer))
       info.computeDetails()
       if (info.getOffset != null) offset = info.getOffset
     } catch {

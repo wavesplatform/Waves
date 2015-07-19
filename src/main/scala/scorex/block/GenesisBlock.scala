@@ -44,7 +44,7 @@ abstract class GenesisBlock(override val generationData: kernelData, override va
 
   override def parent() = None
 
-  override def isValid() = transactions.forall(_.validate() == ValidationResult.VALIDATE_OKE)
+  override def isValid() = transactions.forall(_.validate() == ValidationResult.ValidateOke)
 }
 
 
@@ -60,7 +60,7 @@ object QoraGenesisBlockGenerationData {
     val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
     val digest = Crypto.sha256(data)
     Bytes.concat(digest, digest)
-  }.ensuring(sig => sig.size == QoraBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)
+  }.ensuring(sig => sig.size == QoraBlockGenerationDataParser.GeneratorSignatureLength)
 
   lazy val generationData = new QoraBlockGenerationData(generatingBalance, generatorSignature)
 }

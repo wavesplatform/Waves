@@ -85,7 +85,7 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
                                  generatingBalance:Long,
                                  account: PrivateKeyAccount):Array[Byte] = {
     //PARENT GENERATOR SIGNATURE
-    val generatorSignature = reference.take(QoraBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)
+    val generatorSignature = reference.take(QoraBlockGenerationDataParser.GeneratorSignatureLength)
 
     val genBalanceBytes = Longs.toByteArray(generatingBalance)
       .ensuring(_.size == QoraBlockGenerationDataParser.GENERATING_BALANCE_LENGTH)

@@ -6,18 +6,18 @@ import scala.util.Try
  * A custom form of base58 is used to encode BitCoin addresses.
  */
 object Base58 {
-  private val ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-  private val BASE = BigInt(58)
+  private val Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+  private val Base = BigInt(58)
 
   def encode(input: Array[Byte]): String = {
     var bi = BigInt(1, input)
     val s = new StringBuilder()
-    while (bi >= BASE) {
-      val mod = bi.mod(BASE)
-      s.insert(0, ALPHABET.charAt(mod.intValue()))
-      bi = (bi - mod) / BASE
+    while (bi >= Base) {
+      val mod = bi.mod(Base)
+      s.insert(0, Alphabet.charAt(mod.intValue()))
+      bi = (bi - mod) / Base
     }
-    s.insert(0, ALPHABET.charAt(bi.intValue()))
+    s.insert(0, Alphabet.charAt(bi.intValue()))
     // Convert leading zeros too.
     input.takeWhile(_ == 0).foldLeft(s) { case (ss, z) =>
       ss.insert(0, z)
@@ -36,7 +36,7 @@ object Base58 {
     val stripSignByte = bytes.length > 1 && bytes.head == 0 && bytes(1) < 0
     val stripSignBytePos = if (stripSignByte) 1 else 0
     // Count the leading zeros, if any.
-    val leadingZeros = input.takeWhile(_ == ALPHABET.charAt(0)).length
+    val leadingZeros = input.takeWhile(_ == Alphabet.charAt(0)).length
 
     // Now cut/pad correctly. Java 6 has a convenience for this, but Android
     // can't use it.
@@ -48,8 +48,8 @@ object Base58 {
   private def decodeToBigInteger(input: String): BigInt =
   // Work backwards through the string.
     input.foldRight((BigInt(0), input.length - 1)) { case (ch, (bi, i)) =>
-      val alphaIndex = ALPHABET.indexOf(ch)
+      val alphaIndex = Alphabet.indexOf(ch)
         .ensuring(_ != -1, "Wrong char in Base58 string")
-      (bi + BigInt(alphaIndex) * BASE.pow(input.length - 1 - i), i - 1)
+      (bi + BigInt(alphaIndex) * Base.pow(input.length - 1 - i), i - 1)
     }._1
 }

@@ -15,28 +15,28 @@ case class PaymentTransaction(sender: PublicKeyAccount,
                               override val fee: Long,
                               override val timestamp: Long,
                               override val signature: Array[Byte])
-  extends Transaction(TransactionType.PAYMENT_TRANSACTION, recipient, amount, fee, timestamp, signature) {
+  extends Transaction(TransactionType.PaymentTransaction, recipient, amount, fee, timestamp, signature) {
 
   import scorex.transaction.PaymentTransaction._
   import scorex.transaction.Transaction._
 
-  override lazy val dataLength = TYPE_LENGTH + BASE_LENGTH
+  override lazy val dataLength = TypeLength + BASE_LENGTH
 
-  override def toJson() = jsonBase() ++ Json.obj(
+  override def json() = jsonBase() ++ Json.obj(
     "sender" -> sender.address,
     "recipient" -> recipient.address,
     "amount" -> amount
   )
 
-  override def toBytes() = {
+  override def bytes() = {
     //WRITE TYPE
     val typeBytes = Array(TypeId.toByte)
 
     //WRITE TIMESTAMP
-    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
+    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
 
     //WRITE AMOUNT
-    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AMOUNT_LENGTH, 0)
+    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
 
     //WRITE FEE
     val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FEE_LENGTH, 0)
@@ -53,14 +53,14 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
   override def validate() =
     if (!Crypto.isValidAddress(recipient.address)) {
-      ValidationResult.INVALID_ADDRESS //CHECK IF RECIPIENT IS VALID ADDRESS
+      ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (Controller.blockchainStorage.balance(sender.address) < amount + fee) {
-      ValidationResult.NO_BALANCE //CHECK IF SENDER HAS ENOUGH MONEY
+      ValidationResult.NoBalance //CHECK IF SENDER HAS ENOUGH MONEY
     } else if (amount <= BigDecimal(0)) {
-      ValidationResult.NEGATIVE_AMOUNT //CHECK IF AMOUNT IS POSITIVE
+      ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= BigDecimal(0)) {
-      ValidationResult.NEGATIVE_FEE //CHECK IF FEE IS POSITIVE
-    } else ValidationResult.VALIDATE_OKE
+      ValidationResult.NegativeFee //CHECK IF FEE IS POSITIVE
+    } else ValidationResult.ValidateOke
 
   override def getCreator() = Some(sender)
 
@@ -88,7 +88,7 @@ object PaymentTransaction {
   private val SENDER_LENGTH = 32
   private val FEE_LENGTH = 8
   private val SIGNATURE_LENGTH = 64
-  private val BASE_LENGTH = TIMESTAMP_LENGTH + SENDER_LENGTH + RECIPIENT_LENGTH + AMOUNT_LENGTH + FEE_LENGTH + SIGNATURE_LENGTH
+  private val BASE_LENGTH = TimestampLength + SENDER_LENGTH + RecipientLength + AmountLength + FEE_LENGTH + SIGNATURE_LENGTH
 
   def apply(sender: PrivateKeyAccount, recipient: Account,
             amount: Long, fee: Long, timestamp: Long): PaymentTransaction = {
@@ -102,9 +102,9 @@ object PaymentTransaction {
     var position = 0
 
     //READ TIMESTAMP
-    val timestampBytes = data.take(TIMESTAMP_LENGTH)
+    val timestampBytes = data.take(TimestampLength)
     val timestamp = Longs.fromByteArray(timestampBytes)
-    position += TIMESTAMP_LENGTH
+    position += TimestampLength
 
     //READ SENDER
     val senderBytes = Arrays.copyOfRange(data, position, position + SENDER_LENGTH)
@@ -112,14 +112,14 @@ object PaymentTransaction {
     position += SENDER_LENGTH
 
     //READ RECIPIENT
-    val recipientBytes = Arrays.copyOfRange(data, position, position + RECIPIENT_LENGTH)
+    val recipientBytes = Arrays.copyOfRange(data, position, position + RecipientLength)
     val recipient = new Account(Base58.encode(recipientBytes))
-    position += RECIPIENT_LENGTH
+    position += RecipientLength
 
     //READ AMOUNT
-    val amountBytes = Arrays.copyOfRange(data, position, position + AMOUNT_LENGTH)
+    val amountBytes = Arrays.copyOfRange(data, position, position + AmountLength)
     val amount = Longs.fromByteArray(amountBytes)
-    position += AMOUNT_LENGTH
+    position += AmountLength
 
     //READ FEE
     val feeBytes = Arrays.copyOfRange(data, position, position + FEE_LENGTH)
@@ -140,13 +140,13 @@ object PaymentTransaction {
   private def signatureData(sender: PublicKeyAccount, recipient: Account,
                             amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
     //WRITE TYPE
-    val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.PAYMENT_TRANSACTION.id), TYPE_LENGTH, 0)
+    val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.PaymentTransaction.id), TypeLength, 0)
 
     //WRITE TIMESTAMP
-    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TIMESTAMP_LENGTH, 0)
+    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
 
     //WRITE AMOUNT
-    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AMOUNT_LENGTH, 0)
+    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
 
     //WRITE FEE
     val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FEE_LENGTH, 0)

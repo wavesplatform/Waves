@@ -44,14 +44,14 @@ object Settings {
       if (inetAddress == InetAddress.getLocalHost) None else Some(new InetSocketAddress(inetAddress, Port))
     }
   }.getOrElse(Seq[InetSocketAddress]())
-  lazy val maxConnections = (settingsJSON \ "maxconnections").asOpt[Int].getOrElse(DEFAULT_MAX_CONNECTIONS)
-  lazy val connectionTimeout = (settingsJSON \ "connectiontimeout").asOpt[Int].getOrElse(DEFAULT_CONNECTION_TIMEOUT)
-  lazy val rpcPort = (settingsJSON \ "rpcport").asOpt[Int].getOrElse(DEFAULT_RPC_PORT)
-  lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcallowed").asOpt[List[String]].getOrElse(DEFAULT_RPC_ALLOWED.split(""))
-  lazy val pingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DEFAULT_PING_INTERVAL)
-  lazy val maxBytePerFee = (settingsJSON \ "maxbyteperfee").asOpt[Int].getOrElse(DEFAULT_MAX_BYTE_PER_FEE)
+  lazy val maxConnections = (settingsJSON \ "maxconnections").asOpt[Int].getOrElse(DefaultMaxConnections)
+  lazy val connectionTimeout = (settingsJSON \ "connectiontimeout").asOpt[Int].getOrElse(DefaultConnectionTimeout)
+  lazy val rpcPort = (settingsJSON \ "rpcport").asOpt[Int].getOrElse(DefaultRpcPort)
+  lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcallowed").asOpt[List[String]].getOrElse(DefaultRpcAllowed.split(""))
+  lazy val pingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DefaultPingInterval)
+  lazy val maxBytePerFee = (settingsJSON \ "maxbyteperfee").asOpt[Int].getOrElse(DefaultMaxBytePerFee)
   lazy val offlineGeneration = (settingsJSON \ "offline-generation").asOpt[Boolean].getOrElse(false)
-  lazy val bindAddress = (settingsJSON \ "bindAddress").asOpt[String].getOrElse(DEFAULT_BIND_ADDRESS)
+  lazy val bindAddress = (settingsJSON \ "bindAddress").asOpt[String].getOrElse(DefaultBindAddress)
 
   lazy val walletDirOpt = (settingsJSON \ "walletdir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
@@ -72,15 +72,15 @@ object Settings {
   val MaxBlocksChunks = 5
 
   //NETWORK
-  private val DEFAULT_MAX_CONNECTIONS = 20
-  private val DEFAULT_CONNECTION_TIMEOUT = 60000
-  private val DEFAULT_PING_INTERVAL = 30000
-  private val DEFAULT_BIND_ADDRESS = "127.0.0.1"
+  private val DefaultMaxConnections = 20
+  private val DefaultConnectionTimeout = 60000
+  private val DefaultPingInterval = 30000
+  private val DefaultBindAddress = "127.0.0.1"
 
   //RPC
-  private val DEFAULT_RPC_PORT = 9085
-  private val DEFAULT_RPC_ALLOWED = "127.0.0.1"
+  private val DefaultRpcPort = 9085
+  private val DefaultRpcAllowed = "127.0.0.1"
 
 
-  private val DEFAULT_MAX_BYTE_PER_FEE = 512
+  private val DefaultMaxBytePerFee = 512
 }

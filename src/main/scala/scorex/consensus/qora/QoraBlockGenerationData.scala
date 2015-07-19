@@ -14,12 +14,12 @@ case class QoraBlockGenerationData(generatingBalance: Long, generatorSignature: 
 
   require(generatingBalance > 0)
 
-  override def toBytes: Array[Byte] = Bytes.concat(
+  override def bytes: Array[Byte] = Bytes.concat(
     Longs.toByteArray(generatingBalance),
     generatorSignature
-  ).ensuring(_.length == GENERATION_DATA_LENGTH)
+  ).ensuring(_.length == GenerationDataLength)
 
-  override def toJson = Json.obj(
+  override def json = Json.obj(
     "generatingBalance" -> generatingBalance,
     "generatorSignature" -> Base58.encode(generatorSignature)
   )

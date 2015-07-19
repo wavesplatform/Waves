@@ -6,7 +6,7 @@ case class TransactionMessage(transaction: Transaction) extends Message {
 
   override val messageType = Message.TransactionType
 
-  override lazy val dataBytes = transaction.toBytes()
+  override lazy val dataBytes = transaction.bytes()
 }
 
 object TransactionMessage {

@@ -18,7 +18,7 @@ abstract class Transaction(val transactionType: TransactionType.Value,
   lazy val deadline = timestamp + (1000 * 60 * 60 * 24)
 
   lazy val feePerByte = fee / BigDecimal(dataLength)
-  lazy val hasMinimumFee = fee >= MINIMUM_FEE
+  lazy val hasMinimumFee = fee >= MinimumFee
   lazy val hasMinimumFeePerByte = {
     val minFeePerByte = BigDecimal(1) / BigDecimal.valueOf(Settings.maxBytePerFee)
     feePerByte >= minFeePerByte
@@ -29,9 +29,9 @@ abstract class Transaction(val transactionType: TransactionType.Value,
   //PARSE/CONVERT
   val dataLength: Int
 
-  def toJson(): JsObject
+  def json(): JsObject
 
-  def toBytes(): Array[Byte]
+  def bytes(): Array[Byte]
 
   def isSignatureValid(): Boolean
 
@@ -63,33 +63,33 @@ abstract class Transaction(val transactionType: TransactionType.Value,
 object Transaction {
 
   //MINIMUM FEE
-  val MINIMUM_FEE = 1
-  val RECIPIENT_LENGTH = Account.ADDRESS_LENGTH
-  val TYPE_LENGTH = 1
-  val TIMESTAMP_LENGTH = 8
-  val AMOUNT_LENGTH = 8
+  val MinimumFee = 1
+  val RecipientLength = Account.AddressLength
+  val TypeLength = 1
+  val TimestampLength = 8
+  val AmountLength = 8
 
   object ValidationResult extends Enumeration {
     type ValidationResult = Value
 
-    val VALIDATE_OKE = Value(1)
-    val INVALID_ADDRESS = Value(2)
-    val NEGATIVE_AMOUNT = Value(3)
-    val NEGATIVE_FEE = Value(4)
-    val NO_BALANCE = Value(5)
+    val ValidateOke = Value(1)
+    val InvalidAddress = Value(2)
+    val NegativeAmount = Value(3)
+    val NegativeFee = Value(4)
+    val NoBalance = Value(5)
   }
 
   //TYPES
   object TransactionType extends Enumeration {
-    val GENESIS_TRANSACTION = Value(1)
-    val PAYMENT_TRANSACTION = Value(2)
+    val GenesisTransaction = Value(1)
+    val PaymentTransaction = Value(2)
   }
 
   def parse(data: Array[Byte]): Transaction = data.head match {
-    case txType: Byte if txType == TransactionType.GENESIS_TRANSACTION.id =>
+    case txType: Byte if txType == TransactionType.GenesisTransaction.id =>
       GenesisTransaction.parse(data.tail)
 
-    case txType: Byte if txType == TransactionType.PAYMENT_TRANSACTION.id =>
+    case txType: Byte if txType == TransactionType.PaymentTransaction.id =>
       PaymentTransaction.parse(data.tail)
 
     case txType => throw new Exception(s"Invalid transaction type: $txType")

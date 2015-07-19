@@ -4,17 +4,17 @@ import com.google.common.primitives.Longs
 import scorex.consensus.BlockGenerationDataParser
 
 object NxtBlockGenerationDataParser extends BlockGenerationDataParser[NxtBlockGenerationData] {
-  val BASE_TARGET_LENGTH = 8
+  val BaseTargetLength = 8
 
-  override val GENERATOR_SIGNATURE_LENGTH = 32
+  override val GeneratorSignatureLength = 32
 
-  override val GENERATION_DATA_LENGTH: Int = GENERATOR_SIGNATURE_LENGTH + BASE_TARGET_LENGTH
+  override val GenerationDataLength: Int = GeneratorSignatureLength + BaseTargetLength
 
   override def parse(bytes: Array[Byte]): NxtBlockGenerationData = {
-    require(bytes.length == GENERATION_DATA_LENGTH)
+    require(bytes.length == GenerationDataLength)
 
-    val baseTarget = Longs.fromByteArray(bytes.take(BASE_TARGET_LENGTH))
-    val generatorSignature = bytes.drop(BASE_TARGET_LENGTH)
+    val baseTarget = Longs.fromByteArray(bytes.take(BaseTargetLength))
+    val generatorSignature = bytes.drop(BaseTargetLength)
     new NxtBlockGenerationData(baseTarget, generatorSignature)
   }
 }

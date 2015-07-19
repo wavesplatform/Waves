@@ -11,12 +11,12 @@ import scala.util.Try
 case class NxtBlockGenerationData(baseTarget: Long, generatorSignature: Array[Byte])
   extends BlockGenerationData {
 
-  override def toBytes: Array[Byte] = Bytes.concat(
+  override def bytes: Array[Byte] = Bytes.concat(
     Longs.toByteArray(baseTarget),
     generatorSignature
-  ).ensuring(_.length == NxtBlockGenerationDataParser.GENERATION_DATA_LENGTH)
+  ).ensuring(_.length == NxtBlockGenerationDataParser.GenerationDataLength)
 
-  override def toJson: JsObject = Json.obj(
+  override def json: JsObject = Json.obj(
     "baseTarget" -> baseTarget,
     "generatorSignature" -> Base58.encode(generatorSignature)
   )
@@ -24,7 +24,7 @@ case class NxtBlockGenerationData(baseTarget: Long, generatorSignature: Array[By
   override def isGenesis: Boolean = baseTarget == NxtGenesisBlockGenerationData.InitialBaseTarget &&
     generatorSignature.sameElements(NxtGenesisBlockGenerationData.InitialGenerationSignature)
 
-  override def signature(): Array[Byte] = generatorSignature.ensuring(_.length == NxtBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)
+  override def signature(): Array[Byte] = generatorSignature.ensuring(_.length == NxtBlockGenerationDataParser.GeneratorSignatureLength)
 
   override def isValid(block: Block): Boolean = Try {
     import NxtBlockGenerationFunctions._

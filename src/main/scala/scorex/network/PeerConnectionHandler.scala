@@ -95,7 +95,7 @@ class PeerConnectionHandler(networkController: ActorRef,
 
       case TransactionMessage(transaction) =>
         //CHECK IF SIGNATURE IS VALID OR GENESIS TRANSACTION
-        if (!transaction.isSignatureValid || transaction.transactionType == TransactionType.GENESIS_TRANSACTION) {
+        if (!transaction.isSignatureValid || transaction.transactionType == TransactionType.GenesisTransaction) {
           self ! Blacklist
         } else if (transaction.hasMinimumFee && transaction.hasMinimumFeePerByte) {
           Controller.onNewOffchainTransaction(transaction)

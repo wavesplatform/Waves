@@ -31,7 +31,7 @@ object Crypto {
     Base58.decode(address).map{addressBytes =>
 
       //CHECK BYTES
-      if (addressBytes.length != Account.ADDRESS_LENGTH)
+      if (addressBytes.length != Account.AddressLength)
         false
       else {
         val checkSum = addressBytes.takeRight(4)

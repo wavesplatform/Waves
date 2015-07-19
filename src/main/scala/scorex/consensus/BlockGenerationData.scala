@@ -4,9 +4,9 @@ import play.api.libs.json.JsObject
 import scorex.block.Block
 
 trait BlockGenerationData {
-  def toBytes: Array[Byte]
+  def bytes: Array[Byte]
 
-  def toJson: JsObject
+  def json: JsObject
 
   def isGenesis: Boolean
 

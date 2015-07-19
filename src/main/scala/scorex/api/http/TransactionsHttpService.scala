@@ -24,21 +24,21 @@ trait TransactionsHttpService extends HttpService with CommonApiFunctions {
       } ~ path("unconfirmed") {
         get {
           complete {
-            Json.arr(UnconfirmedTransactionsDatabaseImpl.all().map(_.toJson())).toString()
+            Json.arr(UnconfirmedTransactionsDatabaseImpl.all().map(_.json())).toString()
           }
         }
       } ~ path("address" / Segment) { case address =>
         get {
           complete {
             val txs = Controller.blockchainStorage.accountTransactions(address)
-            Json.arr(txs.map(_.toJson())).toString()
+            Json.arr(txs.map(_.json())).toString()
           }
         }
       } ~ path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
         get {
           complete {
             val txs = Controller.blockchainStorage.accountTransactions(address).takeRight(limit)
-            Json.arr(txs.map(_.toJson())).toString()
+            Json.arr(txs.map(_.json())).toString()
           }
         }
       }

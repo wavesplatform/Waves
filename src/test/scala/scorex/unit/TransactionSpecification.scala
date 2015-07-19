@@ -53,7 +53,7 @@ class TransactionSpecification extends FunSuite {
     val fee = 1
     val tx = PaymentTransaction(sender, recipient, amount, fee, time)
 
-    val txAfter = Transaction.parse(tx.toBytes())
+    val txAfter = Transaction.parse(tx.bytes())
     assert(tx.fee == txAfter.fee)
     assert(tx.amount == txAfter.amount)
   }

@@ -15,5 +15,5 @@ class Account(val address: String) extends Serializable {
 
 
 object Account {
-  val ADDRESS_LENGTH = 25
+  val AddressLength = 25
 }

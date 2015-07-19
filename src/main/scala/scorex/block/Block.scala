@@ -54,8 +54,8 @@ case class Block(version: Byte,
       "timestamp" -> timestamp,
       "generator" -> generator.address,
       "fee" -> totalFee(),
-      "transactions" -> JsArray(transactions.map(_.toJson()))
-    ) ++ generationData.toJson
+      "transactions" -> JsArray(transactions.map(_.json()))
+    ) ++ generationData.json
 
   private lazy val bytesWithoutSignature = {
     val versionBytes = Array(version)
@@ -63,11 +63,11 @@ case class Block(version: Byte,
     val referenceBytes = Bytes.ensureCapacity(reference, REFERENCE_LENGTH, 0)
     val transactionCountBytes = Ints.toByteArray(transactions.size)
     val transactionBytes = transactions.foldLeft(Array[Byte]()) { case (txBytes, tx) =>
-      Bytes.concat(txBytes, Ints.toByteArray(tx.dataLength), tx.toBytes())
+      Bytes.concat(txBytes, Ints.toByteArray(tx.dataLength), tx.bytes())
     }
 
     Bytes.concat(versionBytes, timestampBytes, referenceBytes,
-      Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0), generationData.toBytes,
+      Bytes.ensureCapacity(generator.publicKey, GENERATOR_LENGTH, 0), generationData.bytes,
       transactionCountBytes, transactionBytes)
   }
 
@@ -89,7 +89,7 @@ case class Block(version: Byte,
       generationData.isValid(this) &&
         transactions.forall { transaction =>
           !transaction.isInstanceOf[GenesisTransaction] &&
-            transaction.validate() == ValidationResult.VALIDATE_OKE &&
+            transaction.validate() == ValidationResult.ValidateOke &&
             transaction.timestamp < timestamp && transaction.deadline >= timestamp
         }
     }
@@ -104,7 +104,7 @@ case class Block(version: Byte,
 object Block {
 
   import Constants.ConsensusAlgo
-  import ConsensusAlgo.kernelDataParser.GENERATION_DATA_LENGTH
+  import ConsensusAlgo.kernelDataParser.GenerationDataLength
 
   val Version: Byte = 1
   val MAX_BLOCK_BYTES = 1024 * 1024 // 1 mb block
@@ -118,7 +118,7 @@ object Block {
   private[block] val TRANSACTIONS_COUNT_LENGTH = 4
   private[block] val TRANSACTION_SIZE_LENGTH = 4
   private[block] val BASE_LENGTH = VERSION_LENGTH + REFERENCE_LENGTH + TIMESTAMP_LENGTH +
-    GENERATOR_LENGTH + GENERATION_DATA_LENGTH + TRANSACTIONS_COUNT_LENGTH + SIGNATURE_LENGTH
+    GENERATOR_LENGTH + GenerationDataLength + TRANSACTIONS_COUNT_LENGTH + SIGNATURE_LENGTH
   val MAX_TRANSACTION_BYTES = MAX_BLOCK_BYTES - BASE_LENGTH
 
   def apply(stub: BlockStub, transactions: Seq[Transaction], account: PrivateKeyAccount): Block =
@@ -130,7 +130,7 @@ object Block {
     val (_, transactions) = orderedTransactions.foldLeft((0, List[Transaction]())) {
       case ((totalBytes, filteredTxs), tx) =>
         if (tx.timestamp <= stub.timestamp && tx.deadline > stub.timestamp
-          && tx.validate() == ValidationResult.VALIDATE_OKE
+          && tx.validate() == ValidationResult.ValidateOke
           && totalBytes + tx.dataLength <= Block.MAX_TRANSACTION_BYTES) {
 
           (totalBytes + tx.dataLength, tx :: filteredTxs)
@@ -159,9 +159,9 @@ object Block {
     val generator = new PublicKeyAccount(generatorBytes)
     position += GENERATOR_LENGTH
 
-    val generationDatabytes = Arrays.copyOfRange(data, position, position + GENERATION_DATA_LENGTH)
+    val generationDatabytes = Arrays.copyOfRange(data, position, position + GenerationDataLength)
     val generationData: ConsensusAlgo.kernelData = ConsensusAlgo.kernelDataParser.parse(generationDatabytes)
-    position += GENERATION_DATA_LENGTH
+    position += GenerationDataLength
 
     if (generationData.isGenesis) {
       ConsensusAlgo.genesisBlock

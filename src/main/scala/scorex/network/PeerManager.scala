@@ -11,12 +11,12 @@ import scala.util.Random
 object PeerManager {
   lazy val logger = LoggerFactory.getLogger(this.getClass)
 
-  private val DATABASE_PEERS_AMOUNT = 1000
+  private val DatabasePeersAmount = 1000
 
   def knownPeers(): Seq[InetSocketAddress] = {
     val knownPeers = PeerDatabaseImpl.knownPeers()
     logger.info("Peers retrieved from database : " + knownPeers)
-    if (knownPeers.size < DATABASE_PEERS_AMOUNT) {
+    if (knownPeers.size < DatabasePeersAmount) {
       val allPeers = Settings.knownPeers ++ knownPeers
       logger.info("Peers retrieved including settings : " + allPeers)
       allPeers

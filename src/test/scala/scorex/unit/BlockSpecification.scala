@@ -18,7 +18,7 @@ class BlockSpecification extends FunSuite {
     val gen = new PrivateKeyAccount(reference)
     val gd = (Constants.ConsensusAlgo match {
       case ConsensusModuleNxt =>
-        val gs = Array.fill(NxtBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH)(Random.nextInt(100).toByte)
+        val gs = Array.fill(NxtBlockGenerationDataParser.GeneratorSignatureLength)(Random.nextInt(100).toByte)
         NxtBlockGenerationData(Random.nextInt(Int.MaxValue)+1, gs)
 
       case ConsensusModuleQora =>

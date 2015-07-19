@@ -20,7 +20,7 @@ sealed trait ConsensusModule {
 object ConsensusModuleQora extends ConsensusModule {
   override type kernelData = QoraBlockGenerationData
 
-  override val KERNEL_SIGNATURE_LENGTH = QoraBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH
+  override val KERNEL_SIGNATURE_LENGTH = QoraBlockGenerationDataParser.GeneratorSignatureLength
 
   override val consensusFunctions = QoraBlockGenerationFunctions
   override val kernelDataParser = QoraBlockGenerationDataParser
@@ -31,7 +31,7 @@ object ConsensusModuleQora extends ConsensusModule {
 object ConsensusModuleNxt extends ConsensusModule {
   override type kernelData = NxtBlockGenerationData
 
-  override val KERNEL_SIGNATURE_LENGTH = NxtBlockGenerationDataParser.GENERATOR_SIGNATURE_LENGTH
+  override val KERNEL_SIGNATURE_LENGTH = NxtBlockGenerationDataParser.GeneratorSignatureLength
 
   override val consensusFunctions = NxtBlockGenerationFunctions
   override val kernelDataParser = NxtBlockGenerationDataParser
