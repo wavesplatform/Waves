@@ -34,7 +34,7 @@ class BlockSpecification extends FunSuite {
 
     val b = Block(bs, Seq(tx), gen)
 
-    val b2 = Block.parse(b.toBytes).get
+    val b2 = Block.parse(b.bytes).get
 
     val at1 = b.transactions.head
     val at2 = b2.transactions.head

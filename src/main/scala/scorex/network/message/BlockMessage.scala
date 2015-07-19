@@ -9,7 +9,7 @@ case class BlockMessage(height: Int, block: Block) extends Message {
 
   override lazy val dataBytes = {
     val heightBytes = Ints.toByteArray(block.height().get)
-    val blockBytes = block.toBytes
+    val blockBytes = block.bytes
     Bytes.concat(heightBytes, blockBytes)
   }
 }

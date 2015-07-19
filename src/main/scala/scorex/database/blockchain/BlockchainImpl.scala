@@ -29,7 +29,7 @@ class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain {
 
     //todo: return Try[Unit] instead of Unit?
     override def writeBlock(height: Int, block: Block): Unit = {
-      val blockBytes = block.toBytes
+      val blockBytes = block.bytes
       val os = blockFile(height).outputStream(append = false)
       try {
         os.write(Ints.toByteArray(blockBytes.length))

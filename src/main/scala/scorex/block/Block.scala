@@ -29,7 +29,7 @@ case class Block(version: Byte,
 
   import scorex.block.Block._
 
-  def totalFee() = transactions.foldLeft(0L) { case (fee, tx) => fee + tx.fee }
+  lazy val totalFee = transactions.foldLeft(0L) { case (fee, tx) => fee + tx.fee }
 
 // todo: not used, remove
 // def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
@@ -56,7 +56,7 @@ case class Block(version: Byte,
       "reference" -> Base58.encode(reference),
       "timestamp" -> timestamp,
       "generator" -> generator.address,
-      "fee" -> totalFee(),
+      "fee" -> totalFee,
       "transactions" -> JsArray(transactions.map(_.json()))
     ) ++ generationData.json
 
@@ -74,9 +74,9 @@ case class Block(version: Byte,
       transactionCountBytes, transactionBytes)
   }
 
-  def toBytes = Bytes.concat(bytesWithoutSignature, signature)
+  lazy val bytes = Bytes.concat(bytesWithoutSignature, signature)
 
-  def dataLength() = transactions.foldLeft(BaseLength) { case (len, tx) => len + 4 + tx.dataLength }
+  lazy val dataLength = transactions.foldLeft(BaseLength) { case (len, tx) => len + 4 + tx.dataLength }
 
   //VALIDATION
 

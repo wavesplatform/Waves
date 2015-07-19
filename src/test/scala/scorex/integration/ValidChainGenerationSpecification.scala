@@ -31,13 +31,13 @@ class ValidChainGenerationSpecification extends FunSuite {
 
     //empty block size check
     if (Constants.ConsensusAlgo == ConsensusModuleQora) {
-      assert(b2.toBytes.size == 309)
+      assert(b2.bytes.size == 309)
     } else if (Constants.ConsensusAlgo == ConsensusModuleNxt) {
-      assert(b2.toBytes.size == 213)
+      assert(b2.bytes.size == 213)
     }
 
     //toBytes/parse roundtrip test
-    val bb2 = Block.parse(b2.toBytes).get
+    val bb2 = Block.parse(b2.bytes).get
     assert(bb2.timestamp == b2.timestamp)
     assert(bb2.generator == b2.generator)
 
