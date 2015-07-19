@@ -23,7 +23,7 @@ class ValidChainGenerationSpecification extends FunSuite {
     //chain validity check
     (2 to bh).foreach { h =>
       assert(Controller.blockchainStorage.blockAt(h).get.isValid())
-      assert(Controller.blockchainStorage.blockAt(h).get.isSignatureValid())
+      assert(Controller.blockchainStorage.blockAt(h).get.signatureValid)
     }
 
     val b1 = Controller.blockchainStorage.blockAt(1).get

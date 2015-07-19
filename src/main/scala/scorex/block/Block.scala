@@ -31,8 +31,8 @@ case class Block(version: Byte,
 
   lazy val totalFee = transactions.foldLeft(0L) { case (fee, tx) => fee + tx.fee }
 
-// todo: not used, remove
-// def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
+  // todo: not used, remove
+  // def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
 
   def parent(): Option[Block] = Controller.blockchainStorage.parent(this)
 
@@ -80,7 +80,7 @@ case class Block(version: Byte,
 
   //VALIDATION
 
-  def isSignatureValid() = Crypto.verify(signature, bytesWithoutSignature, generator.publicKey)
+  lazy val signatureValid: Boolean = Crypto.verify(signature, bytesWithoutSignature, generator.publicKey)
 
   def isValid(): Boolean = {
     //CHECK IF PARENT EXISTS
@@ -191,7 +191,7 @@ object Block {
 
   def isNewBlockValid(block: Block) =
     block != ConsensusAlgo.genesisBlock &&
-      block.isSignatureValid() &&
+      block.signatureValid &&
       Controller.blockchainStorage.lastBlock.signature.sameElements(block.reference) &&
       block.isValid()
 }
