@@ -31,7 +31,8 @@ case class Block(version: Byte,
 
   def totalFee() = transactions.foldLeft(0L) { case (fee, tx) => fee + tx.fee }
 
-  def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
+// todo: not used, remove
+// def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
 
   def parent(): Option[Block] = Controller.blockchainStorage.parent(this)
 
@@ -49,7 +50,7 @@ case class Block(version: Byte,
     }
   }
 
-  def toJson: JsObject =
+  lazy val json: JsObject =
     Json.obj("version" -> version.toInt,
       "signature" -> Base58.encode(signature),
       "reference" -> Base58.encode(reference),

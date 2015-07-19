@@ -12,20 +12,20 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
     pathPrefix("blocks") {
       path("signature" / Segment) { case encodedSignature =>
         get {
-          complete(withBlock(encodedSignature)(_.toJson).toString())
+          complete(withBlock(encodedSignature)(_.json).toString())
         }
       } ~ path("first") {
         get {
-          complete(Constants.ConsensusAlgo.genesisBlock.toJson.toString())
+          complete(Constants.ConsensusAlgo.genesisBlock.json.toString())
         }
       } ~ path("last") {
         get {
-          complete(Controller.blockchainStorage.lastBlock.toJson.toString())
+          complete(Controller.blockchainStorage.lastBlock.json.toString())
         }
       } ~ path("at" / IntNumber) {case height =>
         get {
           //todo: json instead of n/a
-          val res = Controller.blockchainStorage.blockAt(height).map(_.toJson.toString()).getOrElse("n/a")
+          val res = Controller.blockchainStorage.blockAt(height).map(_.json.toString()).getOrElse("n/a")
           complete(res)
         }
       } ~ path("height") {
@@ -42,12 +42,12 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
         }
       } ~ path("child" / Segment) { case encodedSignature =>
         get {
-          complete(withBlock(encodedSignature)(_.child().get.toJson).toString())
+          complete(withBlock(encodedSignature)(_.child().get.json).toString())
         }
       } ~ path("address" / Segment) { case address =>
         get {
           complete(withAccount(address) { account =>
-            Json.arr(Controller.blockchainStorage.generatedBy(account).map(_.toJson))
+            Json.arr(Controller.blockchainStorage.generatedBy(account).map(_.json))
           }.toString())
         }
       }
