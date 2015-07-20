@@ -1,8 +1,8 @@
 package scorex.consensus.qora
 
 import com.google.common.primitives.{Bytes, Longs}
-import scorex.controller.Controller
 import play.api.libs.json.Json
+import scorex.Controller
 import scorex.block.{Block, QoraGenesisBlockGenerationData}
 import scorex.consensus.BlockGenerationData
 import scorex.crypto.{Base58, Crypto}

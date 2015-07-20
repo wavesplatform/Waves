@@ -1,8 +1,8 @@
 package scorex.api.http
 
 import akka.pattern.ask
-import scorex.controller.Controller
 import play.api.libs.json.Json
+import scorex.Controller
 import scorex.block.BlockchainController
 import scorex.settings.Constants
 import spray.routing.HttpService

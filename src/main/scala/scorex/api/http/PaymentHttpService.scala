@@ -1,7 +1,7 @@
 package scorex.api.http
 
-import scorex.controller.Controller
 import play.api.libs.json.Json
+import scorex.Controller
 import scorex.account.Account
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.TransactionCreator

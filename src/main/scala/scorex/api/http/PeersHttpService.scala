@@ -3,8 +3,8 @@ package scorex.api.http
 import java.net.InetSocketAddress
 
 import akka.pattern.ask
-import scorex.controller.Controller
 import play.api.libs.json.Json
+import scorex.Controller
 import scorex.block.BlockchainController
 import scorex.network.NetworkController
 import scorex.network.NetworkController.PeerData

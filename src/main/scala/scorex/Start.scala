@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory
 import scorex.account.Account
 import scorex.api.http.ApiClient
 import scorex.block.GenesisBlockParams
-import scorex.controller.Controller
+import Controller
 import scorex.settings.Settings
 import scorex.transaction.TransactionCreator
 

@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import scorex.controller.Controller
+import scorex.Controller
 import scorex.ntp.NTP
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.Transaction.ValidationResult

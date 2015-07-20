@@ -1,7 +1,7 @@
 package scorex.api.http
 
-import scorex.controller.Controller
 import play.api.libs.json.Json
+import scorex.Controller
 import scorex.crypto.Base58
 import spray.routing.HttpService
 

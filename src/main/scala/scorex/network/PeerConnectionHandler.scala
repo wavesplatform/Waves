@@ -6,7 +6,7 @@ import java.util.logging.Logger
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
-import scorex.controller.Controller
+import scorex.Controller
 import scorex.block.{Block, NewBlock}
 import scorex.network.NetworkController.UpdateBlockchainScore
 import scorex.network.message.{Message, _}

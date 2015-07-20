@@ -1,9 +1,8 @@
 package scorex.integration
 
 import java.nio.ByteBuffer
-
-import scorex.controller.Controller
-import scorex.controller.Controller._
+import scorex.Controller
+import Controller._
 import org.scalatest.FunSuite
 import scorex.block.Block
 import scorex.consensus.{ConsensusModuleNxt, ConsensusModuleQora}

@@ -1,8 +1,8 @@
 package scorex.api.http
 
 import akka.util.Timeout
-import scorex.controller.Controller
 import play.api.libs.json.{JsObject, JsValue}
+import scorex.Controller
 import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.{Base58, Crypto}

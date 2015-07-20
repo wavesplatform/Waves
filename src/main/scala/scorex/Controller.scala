@@ -1,4 +1,4 @@
-package scorex.controller
+package scorex
 
 import java.util.logging.Logger
 
@@ -10,13 +10,13 @@ import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.NetworkController
 import scorex.network.message._
+import scorex.settings.{Constants, Settings}
 import scorex.transaction.Transaction
 import scorex.wallet.Wallet
-import scorex.settings.{Constants, Settings}
 import spray.can.Http
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 
 object Controller {

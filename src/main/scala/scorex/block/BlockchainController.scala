@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.util.logging.Logger
 
 import akka.actor.{Actor, ActorRef}
-import scorex.controller.Controller
+import scorex.Controller
 import scorex.network.NetworkController
 import scorex.network.message.{BlockMessage, GetSignaturesMessage}
 import scorex.settings.Constants
