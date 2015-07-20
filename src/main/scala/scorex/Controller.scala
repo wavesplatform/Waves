@@ -1,7 +1,5 @@
 package scorex
 
-import java.util.logging.Logger
-
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import scorex.api.http.HttpServiceActor
@@ -12,6 +10,7 @@ import scorex.network.NetworkController
 import scorex.network.message._
 import scorex.settings.{Constants, Settings}
 import scorex.transaction.Transaction
+import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import spray.can.Http
 
@@ -19,7 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 
-object Controller {
+object Controller extends ScorexLogging {
   private implicit lazy val actorSystem = ActorSystem("lagonaki")
 
   lazy val networkController = actorSystem.actorOf(Props[NetworkController])
@@ -54,14 +53,14 @@ object Controller {
   //todo: nicer stopping the app
   private val lock = ""
   def stopAll() = lock.synchronized {
-    Logger.getGlobal.info("Stopping message processor")
+    log.info("Stopping message processor")
     networkController ! NetworkController.ShutdownNetwork
 
-    Logger.getGlobal.info("Stopping actors (incl. block generator)")
+    log.info("Stopping actors (incl. block generator)")
     actorSystem.shutdown()
 
     //CLOSE WALLET
-    Logger.getGlobal.info("Closing wallet")
+    log.info("Closing wallet")
     wallet.close()
 
     Future {
@@ -70,7 +69,7 @@ object Controller {
     }
 
     //FORCE CLOSE
-    Logger.getGlobal.info("Exiting from the app...")
+    log.info("Exiting from the app...")
     System.exit(0)
   }
 

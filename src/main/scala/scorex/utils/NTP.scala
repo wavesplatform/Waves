@@ -1,12 +1,10 @@
-package scorex.ntp
+package scorex.utils
 
 import java.net.InetAddress
-import java.util.logging.Logger
-
 import org.apache.commons.net.ntp.NTPUDPClient
 
 
-object NTP {
+object NTP extends ScorexLogging{
   private val TimeTillUpdate = 1000 * 60 * 10L
   private val NtpServer = "pool.ntp.org"
 
@@ -19,7 +17,7 @@ object NTP {
       updateOffSet()
       lastUpdate = System.currentTimeMillis()
 
-      Logger.getGlobal.info("Adjusting time with " + offset + " milliseconds.")
+      log.info("Adjusting time with " + offset + " milliseconds.")
     }
 
     //CALCULATE CORRECTED TIME
@@ -37,7 +35,7 @@ object NTP {
       info.computeDetails()
       if (info.getOffset != null) offset = info.getOffset
     } catch {
-      case t: Throwable => Logger.getGlobal.warning("Problems with NTP: " + t.getMessage)
+      case t: Throwable => log.warn("Problems with NTP: ",t)
     } finally {
       client.close()
     }

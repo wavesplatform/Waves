@@ -1,19 +1,19 @@
 package scorex.wallet
 
 import java.io.File
-import java.util.logging.Logger
 
 import com.google.common.primitives.{Bytes, Ints}
 import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.Crypto
+import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
 
-class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) {
+class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) extends ScorexLogging {
 
   import Wallet._
 
@@ -63,7 +63,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) {
     } else false
 
     if (created) {
-      Logger.getGlobal.info("Added account #" + nonce)
+      log.info("Added account #" + nonce)
       Some(account)
     } else None
   }

@@ -1,7 +1,7 @@
 package scorex.consensus.qora
 
 import com.google.common.primitives.{Bytes, Longs}
-import scorex.ntp.NTP
+import scorex.utils.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions

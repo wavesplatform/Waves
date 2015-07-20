@@ -1,38 +1,34 @@
 package scorex
 
-import java.util.logging.Logger
 
-import org.slf4j.LoggerFactory
 import scorex.account.Account
 import scorex.api.http.ApiClient
 import scorex.block.GenesisBlockParams
-import Controller
 import scorex.settings.Settings
 import scorex.transaction.TransactionCreator
+import scorex.utils.ScorexLogging
 
 import scala.io.StdIn
 import scala.util.{Failure, Random, Try}
 
 
-object Start {
+object Start extends ScorexLogging {
 
   import Controller.wallet
 
-  def logger = LoggerFactory.getLogger(this.getClass)
-
   def main(args: Array[String]) {
-    logger.debug("main " + args)
+    log.debug("main " + args)
     if (!args.contains("-cli")) {
       Try {
         if (args.length > 0) Settings.filename = args(0)
-        logger.debug("Controller init")
+        log.debug("Controller init")
         Controller.init() //STARTING NETWORK/BLOCKCHAIN/RPC
         Thread.sleep(1000)
         testingScript()
       } match {
         case Failure(e) =>
           e.printStackTrace()
-          println("STARTUP ERROR: " + e.getMessage)
+          log.error("STARTUP ERROR: " , e)
           System.exit(0) // force all threads shutdown
         case _ =>
           System.exit(0) // force all threads shutdown
@@ -46,12 +42,12 @@ object Start {
   }
 
   def testingScript(): Unit = {
-    Logger.getGlobal.info("Going to execute testing scenario")
+    log.info("Going to execute testing scenario")
 
     wallet.generateNewAccounts(10)
     wallet.privateKeyAccounts().takeRight(5).foreach(wallet.deleteAccount)
 
-    Logger.getGlobal.info("Executing testing scenario with accounts" +
+    log.info("Executing testing scenario with accounts" +
       s"(${wallet.privateKeyAccounts().size}) : "
       + wallet.privateKeyAccounts().mkString(" "))
 
@@ -72,7 +68,7 @@ object Start {
       val fee = Random.nextInt(5).toLong
 
       val tx = TransactionCreator.createPayment(senderAcc, recipientAcc, amt, fee)
-      println(s"Payment created: $tx")
+      log.info(s"Payment created: $tx")
     }
   }
 }

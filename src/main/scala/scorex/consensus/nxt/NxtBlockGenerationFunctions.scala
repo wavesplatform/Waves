@@ -1,6 +1,6 @@
 package scorex.consensus.nxt
 
-import scorex.ntp.NTP
+import scorex.utils.NTP
 import scorex.account.{PublicKeyAccount, PrivateKeyAccount}
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
