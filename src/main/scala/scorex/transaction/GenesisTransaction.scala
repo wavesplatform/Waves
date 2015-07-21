@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import java.util.Arrays
+import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
@@ -19,7 +19,7 @@ case class GenesisTransaction(override val recipient: Account,
   import scorex.transaction.Transaction._
 
   override def json() =
-    jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toString())
+    jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toString)
 
   override def bytes() = {
     val typeBytes = Array(TransactionType.GenesisTransaction.id.toByte)
@@ -37,9 +37,6 @@ case class GenesisTransaction(override val recipient: Account,
   }
 
   override lazy val dataLength = TypeLength + BASE_LENGTH
-
-
-  //VALIDATE
 
   def isSignatureValid() = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GenesisTransaction.id), TypeLength, 0)
@@ -94,17 +91,17 @@ object GenesisTransaction {
     var position = 0
 
     //READ TIMESTAMP
-    val timestampBytes = Arrays.copyOfRange(data, position, position + TimestampLength)
+    val timestampBytes = util.Arrays.copyOfRange(data, position, position + TimestampLength)
     val timestamp = Longs.fromByteArray(timestampBytes)
     position += TimestampLength
 
     //READ RECIPIENT
-    val recipientBytes = Arrays.copyOfRange(data, position, position + RECIPIENT_LENGTH)
+    val recipientBytes = util.Arrays.copyOfRange(data, position, position + RECIPIENT_LENGTH)
     val recipient = new Account(Base58.encode(recipientBytes))
     position += RECIPIENT_LENGTH
 
     //READ AMOUNT
-    val amountBytes = Arrays.copyOfRange(data, position, position + AmountLength)
+    val amountBytes = util.Arrays.copyOfRange(data, position, position + AmountLength)
     val amount = Longs.fromByteArray(amountBytes)
 
     GenesisTransaction(recipient, amount, timestamp)
