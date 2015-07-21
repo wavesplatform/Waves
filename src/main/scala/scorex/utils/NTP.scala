@@ -1,10 +1,11 @@
 package scorex.utils
 
 import java.net.InetAddress
+
 import org.apache.commons.net.ntp.NTPUDPClient
 
 
-object NTP extends ScorexLogging{
+object NTP extends ScorexLogging {
   private val TimeTillUpdate = 1000 * 60 * 10L
   private val NtpServer = "pool.ntp.org"
 
@@ -35,7 +36,7 @@ object NTP extends ScorexLogging{
       info.computeDetails()
       if (info.getOffset != null) offset = info.getOffset
     } catch {
-      case t: Throwable => log.warn("Problems with NTP: ",t)
+      case t: Throwable => log.warn("Problems with NTP: ", t)
     } finally {
       client.close()
     }
