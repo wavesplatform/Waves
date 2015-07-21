@@ -27,7 +27,7 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   private case class MessagesWithoutReply(pingAwait: Boolean, peersAwait: Boolean, sigsAwait: Boolean)
 
-  private var flags = MessagesWithoutReply(pingAwait = false, peersAwait = false, sigsAwait = false)
+  //private var flags = MessagesWithoutReply(pingAwait = false, peersAwait = false, sigsAwait = false)
 
   context watch connection
 
@@ -37,14 +37,12 @@ class PeerConnectionHandler(networkController: ActorRef,
   private def handleMessage(message: Message) = {
     message match {
       case PingMessage =>
-        flags.copy(pingAwait = false)
         self ! PingMessage
 
       case GetPeersMessage =>
         self ! PeersMessage(PeerManager.knownPeers())
 
       case PeersMessage(peers) =>
-        flags.copy(peersAwait = false)
         peers.foreach { peer =>
           PeerManager.addPeer(peer)
         }
@@ -65,7 +63,6 @@ class PeerConnectionHandler(networkController: ActorRef,
       case SignaturesMessage(signaturesGot) =>
         log.info(s"Got SignaturesMessage with ${signaturesGot.length} sigs")
 
-        flags.copy(sigsAwait = false)
         val common = signaturesGot.head
         require(Controller.blockchainStorage.contains(common))
 
@@ -100,7 +97,7 @@ class PeerConnectionHandler(networkController: ActorRef,
           Controller.onNewOffchainTransaction(transaction)
         }
 
-      case a: Any => log.warn(s"PeerConnectionHandler: got something strange $a")
+      case nonsense: Any => log.warn(s"PeerConnectionHandler: got something strange $nonsense")
     }
   }
 
@@ -111,20 +108,7 @@ class PeerConnectionHandler(networkController: ActorRef,
       self ! ScoreMessage(Controller.blockchainStorage.height(), Controller.blockchainStorage.score)
 
     case msg: Message =>
-      val (sendFlag, newFlags) = msg match {
-        case PingMessage =>
-          (!flags.pingAwait, flags.copy(pingAwait = true))
-        case GetPeersMessage =>
-          (!flags.peersAwait, flags.copy(peersAwait = true))
-        //case _:GetSignaturesMessage =>
-        //(!flags.sigsAwait, flags.copy(sigsAwait = true))
-        case _ =>
-          (true, flags)
-      }
-      if (sendFlag) {
-        self ! ByteString(msg.serialize())
-        flags = newFlags
-      }
+      self ! ByteString(msg.bytes)
 
     case data: ByteString =>
       connection ! Write(data)

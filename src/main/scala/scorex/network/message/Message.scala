@@ -13,12 +13,12 @@ abstract class Message {
 
   val messageType: Byte
 
-  def hash() = Crypto.sha256(serialize())
+  lazy val hash = Crypto.sha256(bytes)
 
   val dataBytes: Array[Byte]
   lazy val dataLength: Int = dataBytes.length
 
-  def serialize(): Array[Byte] = {
+  lazy val bytes: Array[Byte] = {
     val typeBytes = Array(messageType)
 
     val dataWithChecksum = if (dataLength > 0) {
