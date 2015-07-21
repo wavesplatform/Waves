@@ -1,9 +1,8 @@
 package scorex.network
 
 import java.net.InetSocketAddress
-import java.util.logging.Logger
 
-import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
 import scorex.Controller
@@ -11,6 +10,7 @@ import scorex.block.{Block, NewBlock}
 import scorex.network.NetworkController.UpdateBlockchainScore
 import scorex.network.message.{Message, _}
 import scorex.transaction.Transaction.TransactionType
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -19,7 +19,7 @@ import scala.util.{Failure, Success}
 
 class PeerConnectionHandler(networkController: ActorRef,
                             connection: ActorRef,
-                            remote: InetSocketAddress) extends Actor with ActorLogging {
+                            remote: InetSocketAddress) extends Actor with ScorexLogging {
 
   import PeerConnectionHandler._
 
@@ -52,7 +52,7 @@ class PeerConnectionHandler(networkController: ActorRef,
       case ScoreMessage(height, score) => networkController ! UpdateBlockchainScore(remote, height, score)
 
       case GetSignaturesMessage(signaturesGot) =>
-        Logger.getGlobal.info(s"Got GetSignaturesMessage with ${signaturesGot.length} sigs within")
+        log.info(s"Got GetSignaturesMessage with ${signaturesGot.length} sigs within")
 
         signaturesGot.exists { parent =>
           val headers = Controller.blockchainStorage.getSignatures(parent)
@@ -63,7 +63,7 @@ class PeerConnectionHandler(networkController: ActorRef,
         }
 
       case SignaturesMessage(signaturesGot) =>
-        Logger.getGlobal.info(s"Got SignaturesMessage with ${signaturesGot.length} sigs")
+        log.info(s"Got SignaturesMessage with ${signaturesGot.length} sigs")
 
         flags.copy(sigsAwait = false)
         val common = signaturesGot.head
@@ -83,13 +83,13 @@ class PeerConnectionHandler(networkController: ActorRef,
 
       case BlockMessage(height, block) =>
         require(block != null)
-        Logger.getGlobal.info(s"Got block, height $height , local height: " + Controller.blockchainStorage.height())
+        log.info(s"Got block, height $height , local height: " + Controller.blockchainStorage.height())
 
         if (height == Controller.blockchainStorage.height() + 1) {
           if (Block.isNewBlockValid(block)) {
             networkController ! NewBlock(block, Some(remote))
           } else {
-            Logger.getGlobal.info(s"Got non-valid block (height of a block: $height")
+            log.info(s"Got non-valid block (height of a block: $height")
           }
         }
 
@@ -100,7 +100,7 @@ class PeerConnectionHandler(networkController: ActorRef,
           Controller.onNewOffchainTransaction(transaction)
         }
 
-      case a: Any => Logger.getGlobal.warning(s"PeerConnectionHandler: got something strange $a")
+      case a: Any => log.warn(s"PeerConnectionHandler: got something strange $a")
     }
   }
 
@@ -130,39 +130,39 @@ class PeerConnectionHandler(networkController: ActorRef,
       connection ! Write(data)
 
     case CommandFailed(w: Write) =>
-      Logger.getGlobal.info(s"Write failed : $w " + remote)
+      log.info(s"Write failed : $w " + remote)
       PeerManager.blacklistPeer(remote)
       connection ! Close
 
     case Received(data) =>
       Message.parse(data.toByteBuffer) match {
         case Success(message) =>
-          Logger.getGlobal.info("received message " + message.getClass.getSimpleName + " from " + remote)
+          log.info("received message " + message.getClass.getSimpleName + " from " + remote)
           handleMessage(message)
 
         case Failure(e) =>
-          Logger.getGlobal.info(s"Corrupted data from: " + remote + " : " + e.getMessage)
+          log.info(s"Corrupted data from: " + remote + " : " + e.getMessage)
           connection ! Close
         //context stop self
       }
 
     case cc: ConnectionClosed =>
       networkController ! NetworkController.PeerDisconnected(remote)
-      Logger.getGlobal.info("Connection closed to : " + remote + ": " + cc.getErrorCause)
+      log.info("Connection closed to : " + remote + ": " + cc.getErrorCause)
 
     case CloseConnection =>
-      Logger.getGlobal.info(s"Enforced to abort communication with: " + remote)
+      log.info(s"Enforced to abort communication with: " + remote)
       connection ! Close
 
     case Blacklist =>
-      Logger.getGlobal.info(s"Going to blacklist " + remote)
+      log.info(s"Going to blacklist " + remote)
     //todo: real blacklisting
     //  PeerManager.blacklistPeer(remote)
     //  connection ! Close
 
     case BestPeer(peer, betterThanLocal) => best = betterThanLocal && (peer == remote)
 
-    case nonsense: Any => log.warning(s"Strange input: $nonsense")
+    case nonsense: Any => log.warn(s"Strange input: $nonsense")
   }
 }
 

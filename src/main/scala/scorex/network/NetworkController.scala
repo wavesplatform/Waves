@@ -1,7 +1,6 @@
 package scorex.network
 
 import java.net.{InetAddress, InetSocketAddress}
-import java.util.logging.Logger
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
@@ -11,6 +10,7 @@ import scorex.block.BlockchainController.GetMaxChainScore
 import scorex.block.{BlockchainController, NewBlock}
 import scorex.network.message.{Message, _}
 import scorex.settings.Settings
+import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -18,7 +18,7 @@ import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
 //must be singleton
-class NetworkController extends Actor {
+class NetworkController extends Actor with ScorexLogging {
 
   import NetworkController._
 
@@ -41,7 +41,7 @@ class NetworkController extends Actor {
 
     connectedPeers.get(remote).foreach { peerData =>
       connectedPeers.put(remote, peerData.copy(blockchainScore = Some(score)))
-      Logger.getGlobal.info(s"Score updated for $remote: h. $height -- $score")
+      log.info(s"Score updated for $remote: h. $height -- $score")
     }
 
     if (score > prevBestScore) {
@@ -53,12 +53,12 @@ class NetworkController extends Actor {
 
   override def receive = {
     case b@Bound(localAddress) =>
-      Logger.getGlobal.info("Successfully bound to the port " + Settings.Port)
+      log.info("Successfully bound to the port " + Settings.Port)
       context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)
       context.system.scheduler.schedule(500.millis, 5.seconds)(self ! AskForPeers)
 
     case CommandFailed(_: Bind) =>
-      Logger.getGlobal.severe("Network port " + Settings.Port + " already in use!")
+      log.error("Network port " + Settings.Port + " already in use!")
       context stop self
       Controller.stopAll()
 
@@ -72,7 +72,7 @@ class NetworkController extends Actor {
       }
 
     case c@Connected(remote, local) =>
-      Logger.getGlobal.info(s"Connected to $remote")
+      log.info(s"Connected to $remote")
       connectingPeers -= remote
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], self, connection, remote))
@@ -81,15 +81,15 @@ class NetworkController extends Actor {
       PeerManager.peerConnected(remote)
 
     case CommandFailed(c: Connect) =>
-      Logger.getGlobal.info("Failed to connect to : " + c.remoteAddress)
+      log.info("Failed to connect to : " + c.remoteAddress)
       connectedPeers -= c.remoteAddress
       PeerManager.peerDisconnected(c.remoteAddress)
 
     case CommandFailed(cmd: Tcp.Command) =>
-      Logger.getGlobal.info("Failed to execute command : " + cmd)
+      log.info("Failed to execute command : " + cmd)
 
     case ShutdownNetwork =>
-      Logger.getGlobal.info("Going to shutdown all connections & unbind port")
+      log.info("Going to shutdown all connections & unbind port")
       connectedPeers.values.foreach(_.handler ! PeerConnectionHandler.CloseConnection)
       self ! Unbind
       context stop self
@@ -106,15 +106,15 @@ class NetworkController extends Actor {
       }
 
     case BroadcastMessage(message, exceptOf) =>
-      Logger.getGlobal.info(s"Broadcasting message $message")
+      log.info(s"Broadcasting message $message")
       connectedPeers.foreach { case (remote, PeerData(handler, _)) =>
         if (!exceptOf.contains(remote)) handler ! message
       }
-      Logger.getGlobal.info("Broadcasting end")
+      log.info("Broadcasting end")
 
     case SendMessageToBestPeer(message) =>
       maxScoreHandler().foreach { handler =>
-        Logger.getGlobal.info(s"Sending $message to a best peer ${handler.path}")
+        log.info(s"Sending $message to a best peer ${handler.path}")
         handler ! message
       }
 
@@ -133,7 +133,7 @@ class NetworkController extends Actor {
 
     case UpdateBlockchainScore(remote, height, score) => updateScore(remote, height, score)
 
-    case a: Any => Logger.getGlobal.warning(s"NetworkController: got something strange $a")
+    case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
   }
 }
 
