@@ -25,10 +25,6 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   private var best = false
 
-  private case class MessagesWithoutReply(pingAwait: Boolean, peersAwait: Boolean, sigsAwait: Boolean)
-
-  //private var flags = MessagesWithoutReply(pingAwait = false, peersAwait = false, sigsAwait = false)
-
   context watch connection
 
   context.system.scheduler.schedule(500.millis, 10.seconds)(self ! PingRemote)
