@@ -2,9 +2,9 @@ package scorex.settings
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import org.slf4j.LoggerFactory
 import play.api.libs.json.Json
 import scorex.crypto.Base58
+import scorex.utils.ScorexLogging
 
 import scala.util.Try
 
@@ -12,8 +12,7 @@ import scala.util.Try
  Changeable settings here
  */
 
-object Settings {
-  def logger = LoggerFactory.getLogger(this.getClass)
+object Settings extends ScorexLogging {
 
   var filename = "settings.json"
 
@@ -26,7 +25,7 @@ object Settings {
     val jsonString = scala.io.Source.fromURL(getClass.getResource(s"/$filename")).mkString
     Json.parse(jsonString)
   }.getOrElse {
-    logger.info(s"ERROR while reading $filename, closing")
+    log.info(s"ERROR while reading $filename, closing")
     //catch error?
     System.exit(10)
     Json.obj()

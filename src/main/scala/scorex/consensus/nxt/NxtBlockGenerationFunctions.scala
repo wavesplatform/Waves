@@ -1,13 +1,13 @@
 package scorex.consensus.nxt
 
-import scorex.utils.NTP
+import scorex.utils.{ScorexLogging, NTP}
 import scorex.account.{PublicKeyAccount, PrivateKeyAccount}
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.Crypto
 import scorex.settings.Constants
 
-object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
+object NxtBlockGenerationFunctions extends BlockGenerationFunctions with ScorexLogging {
   val AvgFrequency = 2 //60 - the algo's goal is 1 block per minute in average
 
   override protected def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block): Option[BlockStub] = {
@@ -18,7 +18,7 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions {
     val t = calcTarget(lastBlockKernelData, lastBlockTime, account)
 
     val eta = (NTP.correctedTime() - lastBlock.timestamp) / 1000
-    println(s"hit: $h, target: $t, generating ${h < t}, eta $eta, account balance: ${account.generatingBalance}")
+    log.debug(s"hit: $h, target: $t, generating ${h < t}, eta $eta, account balance: ${account.generatingBalance}")
     if (h < t) {
       val ts = NTP.correctedTime()
       val btg = calcBaseTarget(lastBlockKernelData, lastBlockTime, ts)
