@@ -29,16 +29,12 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   )
 
   override def bytes() = {
-    //WRITE TYPE
     val typeBytes = Array(TypeId.toByte)
 
-    //WRITE TIMESTAMP
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
 
-    //WRITE AMOUNT
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
 
-    //WRITE FEE
     val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FEE_LENGTH, 0)
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
