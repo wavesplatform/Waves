@@ -10,10 +10,11 @@ class WalletSpecification extends FunSuite {
 
   private val walletSize = 10
 
-  test("wallet deletion") {
-    val wf = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")
+  private def walletFile() = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")
 
-    val w = new Wallet(Some(wf), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
+  test("wallet - acc deletion") {
+
+    val w = new Wallet(Some(walletFile()), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
 
     w.generateNewAccounts(walletSize)
 
@@ -36,9 +37,8 @@ class WalletSpecification extends FunSuite {
   //todo: report MapDb bug with reopening a database
 
   test("reopening"){
-    val wf = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")
 
-    val w = new Wallet(Some(wf), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
+    val w = new Wallet(Some(walletFile()), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
     w.generateNewAccounts(10)
     w.close()
     assert(w.exists())
