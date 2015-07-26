@@ -4,8 +4,10 @@ import scorex.block.{GenesisBlock, NxtGenesisBlock, QoraGenesisBlock}
 import scorex.consensus.nxt.{NxtBlockGenerationData, NxtBlockGenerationDataParser, NxtBlockGenerationFunctions}
 import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataParser, QoraBlockGenerationFunctions}
 
-//data and functions related to a consensus algo
-//todo: stricter typing solution?
+/**
+ * Data and functions related to a consensus algo
+ */
+
 sealed trait ConsensusModule {
   type kernelData <: BlockGenerationData
 
