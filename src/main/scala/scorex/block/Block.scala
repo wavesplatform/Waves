@@ -31,9 +31,6 @@ case class Block(version: Byte,
 
   lazy val totalFee = transactions.foldLeft(0L) { case (fee, tx) => fee + tx.fee }
 
-  // todo: not used, remove
-  // def getTransaction(signature: Array[Byte]) = transactions.find(tx => tx.signature.sameElements(signature))
-
   def parent(): Option[Block] = Controller.blockchainStorage.parent(this)
 
   def child(): Option[Block] = Controller.blockchainStorage.child(this)
