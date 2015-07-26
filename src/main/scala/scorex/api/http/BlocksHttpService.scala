@@ -24,8 +24,10 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
         }
       } ~ path("at" / IntNumber) {case height =>
         get {
-          //todo: json instead of n/a
-          val res = Controller.blockchainStorage.blockAt(height).map(_.json.toString()).getOrElse("n/a")
+          val res = Controller.blockchainStorage
+            .blockAt(height)
+            .map(_.json.toString())
+            .getOrElse(Json.obj("status" -> "error", "details" -> "No block for this height").toString())
           complete(res)
         }
       } ~ path("height") {
