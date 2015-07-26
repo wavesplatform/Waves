@@ -53,20 +53,4 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions with ScorexL
 
   private def bound(value: BigInt, min: BigInt, max: BigInt): BigInt =
     if (value < min) min else if (value > max) max else value
-
-  /*
-  todo: remove testing code
-  def main(args:Array[String]): Unit ={
-    val seed = Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz")
-    val acc = new PrivateKeyAccount(seed)
-    val ts = System.currentTimeMillis() - 10000
-
-    (1 to 1000).flatMap{_ =>
-        val data = new NxtBlockGenerationData(307445734, Crypto.sha256(Random.nextString(5).getBytes))
-        val h = hit(data, acc)
-        val t = target(data, ts, acc)
-        val bt = baseTarget(data, ts)
-        if(h<t) Some((h,t,bt)) else None
-    }.foreach{case (h,t,bt) => println(s"hit: $h target: $t, next base: $bt generation: ${h<t}`")}
-  } */
 }
