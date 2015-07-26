@@ -12,7 +12,7 @@ import scala.collection.concurrent.TrieMap
 import scala.reflect.io.File
 import scala.util.Try
 
-/*If no datafolder provided, blockchain lives in RAM (for tests only) */
+/*If no datafolder provided, blockchain lives in RAM (useful for tests) */
 
 class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain {
 
@@ -115,8 +115,7 @@ class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain {
   override def heightOf(blockSignature: Array[Byte]): Option[Int] =
     signaturesIndex.find(_._2.sameElements(blockSignature)).map(_._1)
 
-  override def blockByHeader(signature: Array[Byte]): Option[Block] =
-    heightOf(signature).flatMap(blockAt)
+  override def blockByHeader(signature: Array[Byte]): Option[Block] = heightOf(signature).flatMap(blockAt)
 
   override def child(block: Block): Option[Block] = heightOf(block).flatMap(h => blockAt(h + 1))
 
