@@ -21,11 +21,12 @@ object Settings extends ScorexLogging {
   private lazy val settingsJSON = Try {
     val jsonString = scala.io.Source.fromFile(filename).mkString
     Json.parse(jsonString)
-  }.recover { case _ =>
+  }.recover { case m =>
+    log.warn(s"Unable to read $filename: $m")
     val jsonString = scala.io.Source.fromURL(getClass.getResource(s"/$filename")).mkString
     Json.parse(jsonString)
   }.getOrElse {
-    log.info(s"ERROR while reading $filename, closing")
+    log.error(s"Unable to read $filename, closing")
     //catch error?
     System.exit(10)
     Json.obj()
