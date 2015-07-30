@@ -6,4 +6,5 @@
 .idea
 /target
 /project/target
+/project/project/target
 /out
