@@ -65,15 +65,15 @@ Run
 Run one or two peers on the local machine:
  
 
-* run ./recompile.sh to (re-)build .jar file
-* run ./start-local1.sh to run first local peer binded to 127.0.0.1:9084 . Edit settings in settings-local1.json
+* run "sbt recompile" to (re-)build .jar file
+* run "sbt startLocal1" to run first local peer binded to 127.0.0.1:9084 . Edit settings in settings-local1.json
    if needed
-* run ./start-local2.sh to run second local peer binded to 127.0.0.2:9084 . Edit settings in settings-local2.json
+* run "sbt startLocal2" to run second local peer binded to 127.0.0.2:9084 . Edit settings in settings-local2.json
    if needed   
-* You can run both peers simultaneously by running ./start-local.sh
+* You can run both peers simultaneously by running "sbt startLocal"
    
    
-You can also run start.sh script to connect to the network, but network is down now :) 
+You can also run "sbt start" script to connect to the network, but network is down now :) 
 You can edit folders / other settings in settings.json file before running ./start.sh.   
 
 
