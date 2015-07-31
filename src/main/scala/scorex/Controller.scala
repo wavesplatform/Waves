@@ -50,9 +50,7 @@ object Controller extends ScorexLogging {
     })
   }
 
-  //todo: nicer stopping the app
-  private val lock = ""
-  def stopAll() = lock.synchronized {
+  def stopAll() = synchronized {
     log.info("Stopping message processor")
     networkController ! NetworkController.ShutdownNetwork
 
