@@ -1,3 +1,3 @@
 #!/bin/sh
 
-java -jar target/scala-2.11/scorex.jar -cli
+java -cp target/scala-2.11/scorex.jar scorex.Cli
