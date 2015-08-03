@@ -27,12 +27,6 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.+" % "test"
 )
 
-lazy val importRun = inputKey[Unit]("custom run task for importing")
-
-importRun := {
-  val one = (runMain in Compile).fullInput("migration.ImportUtils").evaluated
-}
-
 
 assemblyJarName in assembly := "scorex.jar"
 
