@@ -10,7 +10,7 @@ object Constants {
 
   val Product = "Scorex"
   val Release = "Lagonaki"
-  val Version = (1, 0, 2)
+  val Version = (1, 0, 3)
   val VersionString = s"${Version._1}.${Version._2}.${Version._3}"
 
   val AgentName = s"$Product - $Release v. $VersionString"
