@@ -73,7 +73,7 @@ object Settings extends ScorexLogging {
 
   //NETWORK
   private val DefaultMaxConnections = 20
-  private val DefaultConnectionTimeout = 60000
+  private val DefaultConnectionTimeout = 60
   private val DefaultPingInterval = 30000
   private val DefaultBindAddress = "127.0.0.1"
 
