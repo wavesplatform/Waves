@@ -39,6 +39,7 @@ class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain with Scor
       } finally os.close()
     }
 
+    //todo: exceptions handling, err log output
     override def readBlock(height: Int): Option[Block] = {
       val is = new DataInputStream(blockFile(height).inputStream())
       try {
