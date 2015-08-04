@@ -1,15 +1,22 @@
 package scorex.unit
 
-import org.scalatest.FunSuite
+import org.scalatest.{Matchers, FunSuite}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.{Base58, Crypto}
 
 import scala.util.Random
 
-class CryptoSpecification extends FunSuite {
-  test("base58 roundtrip"){
+class CryptoSpecification extends FunSuite with Matchers {
+  test("base58 roundtrip") {
     val b58 = "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62i"
-    Base58.encode(Base58.decode(b58).get) == b58
+    Base58.encode(Base58.decode(b58).get) shouldBe b58
+  }
+
+  test("base58 encode and decode") {
+    val data = Random.nextString(50).getBytes
+    val encoded = Base58.encode(data)
+    val restored = Base58.decode(encoded).get
+    restored shouldBe data
   }
 
   test("sign then verify") {
