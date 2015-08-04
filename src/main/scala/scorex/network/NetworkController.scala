@@ -67,7 +67,8 @@ class NetworkController extends Actor with ScorexLogging {
         val peer = PeerManager.randomPeer()
         if (!connectedPeers.contains(peer) && !connectingPeers.contains(peer)) {
           connectingPeers += peer
-          IO(Tcp) ! Connect(peer, timeout = Some(new FiniteDuration(10, SECONDS))) //todo: make configurable
+          val connTimeout = Some(new FiniteDuration(Settings.connectionTimeout, SECONDS))
+          IO(Tcp) ! Connect(peer, timeout = connTimeout)
         }
       }
 
