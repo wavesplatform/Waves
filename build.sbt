@@ -28,6 +28,12 @@ libraryDependencies ++= Seq(
 )
 
 
+javaOptions ++= Seq(
+  "-server"
+)
+
+//assembly settings
+
 assemblyJarName in assembly := "scorex.jar"
 
 test in assembly := {}
