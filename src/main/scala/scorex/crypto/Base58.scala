@@ -19,13 +19,14 @@ object Base58 {
     }
     s.insert(0, Alphabet.charAt(bi.intValue()))
     // Convert leading zeros too.
-    input.takeWhile(_ == 0).foldLeft(s) { case (ss, z) =>
-      ss.insert(0, z)
+    input.takeWhile(_ == 0).foldLeft(s) { case (ss, _) =>
+      ss.insert(0, Alphabet.charAt(0))
     }.toString()
   }
 
   def decode(input: String): Try[Array[Byte]] = Try {
     require(input.length > 0, "Empty input for Base58.decode")
+
     val decoded = decodeToBigInteger(input)
 
     val bytes = decoded.toByteArray
