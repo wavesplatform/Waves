@@ -6,6 +6,7 @@ import com.google.common.primitives.Ints
 import org.mapdb.DBMaker
 import scorex.account.Account
 import scorex.block.Block
+import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
@@ -14,7 +15,7 @@ import scala.util.Try
 
 /*If no datafolder provided, blockchain lives in RAM (useful for tests) */
 
-class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain {
+class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain with ScorexLogging {
 
   trait BlockStorage {
     def writeBlock(height: Int, block: Block): Unit
@@ -50,9 +51,10 @@ class BlockchainImpl(dataFolderOpt: Option[String]) extends BlockChain {
       } finally is.close()
     }
 
-    override def deleteBlock(height: Int): Unit = {
-      Try(blockFile(height).delete()) //todo: write msg to log if problems with deleting
-    }
+    override def deleteBlock(height: Int): Unit =
+      Try(blockFile(height).delete()).recover { case t =>
+        log.error(s"Can't delete blockfile: ${blockFile(height).name}", t)
+      }
   }
 
   object MemoryBlockStorage extends BlockStorage {
