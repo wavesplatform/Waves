@@ -28,6 +28,8 @@ libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-core" % "1.+",
 
   //dependencies for testing:
+  "io.spray" %% "spray-testkit" % "1.+" % "test",
+//"com.typesafe.akka" %% "akka-testkit" % "2+" % "test",
   "org.scalatest" %% "scalatest" % "2.+" % "test"
 )
 

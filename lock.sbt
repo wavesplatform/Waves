@@ -13,6 +13,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.google.guava" % "guava" % "15.0",
   "com.typesafe" % "config" % "1.3.0",
   "com.typesafe.akka" % "akka-actor_2.11" % "2.4-M2",
+  "com.typesafe.akka" % "akka-testkit_2.11" % "2.3.9",
   "com.typesafe.play" % "play-datacommons_2.11" % "2.4.2",
   "com.typesafe.play" % "play-functional_2.11" % "2.4.2",
   "com.typesafe.play" % "play-iteratees_2.11" % "2.4.2",
@@ -23,6 +24,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "io.spray" % "spray-httpx_2.11" % "1.3.3",
   "io.spray" % "spray-io_2.11" % "1.3.3",
   "io.spray" % "spray-routing_2.11" % "1.3.3",
+  "io.spray" % "spray-testkit_2.11" % "1.3.3",
   "io.spray" % "spray-util_2.11" % "1.3.3",
   "joda-time" % "joda-time" % "2.8.1",
   "org.joda" % "joda-convert" % "1.7",
@@ -36,4 +38,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scalatest" % "scalatest_2.11" % "2.3.0-SNAP2",
   "org.slf4j" % "slf4j-api" % "1.7.7"
 )
-// LIBRARY_DEPENDENCIES_HASH d85cf41f0016c2e86fb51dcd66297a3391fb1395
+// LIBRARY_DEPENDENCIES_HASH f3cf6fe07d409592911e79c4ecc930d3840b0957
