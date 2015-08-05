@@ -1,20 +1,27 @@
 package scorex.settings
 
+import com.typesafe.config.ConfigFactory
 import scorex.consensus._
+import scorex.utils.ScorexLogging
 
 /**
  * System constants here.
  */
 
-object Constants {
+object Constants extends ScorexLogging {
 
-  val Product = "Scorex"
-  val Release = "Lagonaki"
-  val Version = (1, 0, 3)
-  val VersionString = s"${Version._1}.${Version._2}.${Version._3}"
+  private val appConf = ConfigFactory.load().getConfig("app")
 
+  val Product = appConf.getString("product")
+  val Release = appConf.getString("release")
+  val VersionString = appConf.getString("version")
   val AgentName = s"$Product - $Release v. $VersionString"
+  val ConsensusAlgo: ConsensusModule = appConf.getString("consensusAlgo") match {
+    case "ConsensusModuleNxt" => ConsensusModuleNxt
+    case "ConsensusModuleQora" => ConsensusModuleQora
+    case algo =>
+      log.error(s"Unknown consensus algo: $algo. Use ConsensusModuleNxt instead.")
+      ConsensusModuleNxt
+  }
 
-  //Change to ConsensusModuleNxt to have Nxt-like forging
-  val ConsensusAlgo: ConsensusModule = ConsensusModuleNxt
 }
