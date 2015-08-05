@@ -55,21 +55,26 @@ object Controller extends ScorexLogging {
     networkController ! NetworkController.ShutdownNetwork
 
     log.info("Stopping actors (incl. block generator)")
-    actorSystem.shutdown()
+    actorSystem.terminate() onComplete {
+      case t =>
+        //CLOSE WALLET
+        log.info("Closing wallet")
+        wallet.close()
 
-    //CLOSE WALLET
-    log.info("Closing wallet")
-    wallet.close()
+        //TODO catch situations when we need this and remove
+        Future {
+          Thread.sleep(10000)
+          log.error("Halt app!")
+          Runtime.getRuntime.halt(0)
+        }
 
-    Future {
-      Thread.sleep(10000)
-      Runtime.getRuntime.halt(0)
+        //FORCE CLOSE
+        log.info("Exiting from the app...")
+        System.exit(0)
     }
-
-    //FORCE CLOSE
-    log.info("Exiting from the app...")
-    System.exit(0)
   }
+
+
 
   def onNewOffchainTransaction(transaction: Transaction) =
     if (UnconfirmedTransactionsDatabaseImpl.putIfNew(transaction)) {
