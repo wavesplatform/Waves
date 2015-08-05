@@ -1,8 +1,12 @@
+import com.typesafe.config._
+
+val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
+
 organization := "org.consensusresearch"
 
-name := "scorex"
+name := appConf.getString("product")
 
-version := "1.0.3"
+version := appConf.getString("version")
 
 scalaVersion := "2.11.7"
 
@@ -27,13 +31,11 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.+" % "test"
 )
 
-
 javaOptions ++= Seq(
   "-server"
 )
 
 //assembly settings
-
 assemblyJarName in assembly := "scorex.jar"
 
 test in assembly := {}
