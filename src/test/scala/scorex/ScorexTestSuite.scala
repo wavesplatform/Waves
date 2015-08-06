@@ -11,6 +11,7 @@ class ScorexTestSuite extends Suites(
   ,new BlockSpecification
   ,new BlockchainStorageSpecification
   ,new WalletSpecification
+  ,new HttpServiceSpecification
 
   //integration tests - slow!
   // todo:uncomment after fixing problems with test stopping
