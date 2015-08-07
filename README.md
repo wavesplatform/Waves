@@ -101,6 +101,11 @@ Roadmap
 -------------------
 
 
+Documentation
+--------------
+
+[The Architecture Of A Cryptocurrency](docs/components.md)
+
 
 Contributions
 -------------
