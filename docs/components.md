@@ -1,9 +1,8 @@
 The Architecture Of A Cryptocurrency
 ====================================
 
-Though we have thousands cryptocurrencies buzzing around at the moment, 
-all of them share the same implementation design. Basically every cryptocurrency implementation 
-has following parts:
+Though we have thousands cryptocurrencies buzzing around at the moment, all of them share the same 
+implementation design. Basically every cryptocurrency implementation has following parts:
 
 * Network Protocol
 * Consensus Protocol
@@ -126,4 +125,14 @@ The Protocols Mess Problem
 
 The real problem of cryptocurrency development process is the mess of all the parts described above. 
 The most known example, even simple change in software validation(so in Transaction Protocol) could causes  
-hardforking.                            
+hardforking.     
+               
+                       
+Acknowledgments        
+---------------
+               
+The idea of Network/Transaction/Consensus protocols was initially explicitly stated by L.M Goodman in the 
+"Tezos: A Self-Amending Crypto-Ledger Position Paper" ([http://tezos.com/position_paper.pdf](http://tezos.com/position_paper.pdf)).
+I would like to thank lead Nxt developer Jean-Luc Picard for conversations via dev maillist, and Bill White 
+ for very thoughtful conversations.
+               
