@@ -1,5 +1,5 @@
-A Cryptocurrency Architecture
-==============================
+The Architecture Of A Cryptocurrency
+====================================
 
 Though we have thousands cryptocurrencies buzzing around at the moment, 
 all of them share the same implementation design. Basically every cryptocurrency implementation 
@@ -126,8 +126,4 @@ The Protocols Mess Problem
 
 The real problem of cryptocurrency development process is the mess of all the parts described above. 
 The most known example, even simple change in software validation(so in Transaction Protocol) could causes  
-hardforking.     
-
-
-
-                            
+hardforking.                            
