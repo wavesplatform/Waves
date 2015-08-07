@@ -1,8 +1,9 @@
 A Cryptocurrency Architecture
 ==============================
 
-Though we have thousands cryptocurrencies at the moment, all of them share the same implementation 
-design. Basically every cryptocurrency implementation has following parts:
+Though we have thousands cryptocurrencies buzzing around at the moment, 
+all of them share the same implementation design. Basically every cryptocurrency implementation 
+has following parts:
 
 * Network Protocol
 * Consensus Protocol
