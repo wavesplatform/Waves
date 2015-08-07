@@ -10,11 +10,9 @@ class WalletSpecification extends FunSuite {
 
   private val walletSize = 10
 
-  private def walletFile() = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")
-
   test("wallet - acc deletion") {
 
-    val w = new Wallet(Some(walletFile()), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
+    val w = new Wallet(None, "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
 
     w.generateNewAccounts(walletSize)
 
@@ -33,17 +31,20 @@ class WalletSpecification extends FunSuite {
   }
 
 
+
   /*
   //todo: report MapDb bug with reopening a database
 
   test("reopening"){
 
-    val w = new Wallet(Some(walletFile()), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
+    val walletFile = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")
+
+    val w = new Wallet(Some(walletFile), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
     w.generateNewAccounts(10)
     w.close()
     assert(w.exists())
 
-    val w2 = new Wallet(Some(wf), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
+    val w2 = new Wallet(Some(walletFile), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
     assert(w2.privateKeyAccounts().head.address != null)
   } */
 }
