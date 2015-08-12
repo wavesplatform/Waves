@@ -1,4 +1,4 @@
-package scorex.unit
+package scorex.integration
 
 import org.scalatest.{FlatSpec, Matchers}
 import play.api.libs.json.Json
@@ -6,11 +6,10 @@ import scorex.api.http._
 import spray.routing.HttpService
 import spray.testkit.ScalatestRouteTest
 
-class HttpServiceSpecification extends FlatSpec
+class BlocksRoutingSpecification extends FlatSpec
 with ScalatestRouteTest
 with HttpService
 with Matchers
-with AddressHttpService
 with BlocksHttpService {
   def actorRefFactory = system
 
@@ -60,9 +59,9 @@ with BlocksHttpService {
   //TODO test route /blocks/address/$address
 
   //TODO uncomment after fixing hang up problem
-  "adressesRouting" should "handle root request" in {
-    Get("/addresses/") ~> adressesRouting ~> check {
-      println(responseAs[String])
-    }
-  }
+//  "adressesRouting" should "handle root request" in {
+//    Get("/addresses/") ~> adressesRouting ~> check {
+//      println(responseAs[String])
+//    }
+//  }
 }
