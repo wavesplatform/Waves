@@ -1,13 +1,9 @@
 package scorex.integration
 
-import org.scalatest.{FlatSpec, Matchers}
 import play.api.libs.json.Json
 import scorex.api.http._
-import spray.routing.HttpService
-import spray.testkit.ScalatestRouteTest
 
 class BlocksRoutingSpecification extends RouteTest with BlocksHttpService {
-  def actorRefFactory = system
 
   "blocksRouting" should "return first block" in {
     Get("/blocks/first") ~> blocksRouting ~> check {
