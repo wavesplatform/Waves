@@ -1,6 +1,7 @@
 package scorex
 
 import org.scalatest.Suites
+import scorex.integration.BlocksRoutingSpecification
 import scorex.unit._
 
 class ScorexTestSuite extends Suites(
@@ -11,7 +12,7 @@ class ScorexTestSuite extends Suites(
   ,new BlockSpecification
   ,new BlockchainStorageSpecification
   ,new WalletSpecification
-  ,new HttpServiceSpecification
+  ,new BlocksRoutingSpecification
 
   //integration tests - slow!
   // todo:uncomment after fixing problems with test stopping
