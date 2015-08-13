@@ -17,11 +17,7 @@ object Crypto {
 
   def getAddress(publicKey: Array[Byte]) = {
     val publicKeyHash = new RIPEMD160().digest(sha256(publicKey))
-
-    //CONVERT TO LIST
     val withoutChecksum = publicKeyHash :+ AddressVersion //prepend ADDRESS_VERSION
-
-    //GENERATE CHECKSUM
     val checkSum = doubleSha256(withoutChecksum)
 
     Base58.encode(withoutChecksum ++ checkSum.take(4))
