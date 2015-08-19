@@ -11,4 +11,4 @@ accomplished with public key or public/private keypair.
 
 
 Other functions can be added to build offchain/onchain protocols e.g. one-way accumulators, commitments
-(e.g. Pedersen commitment) etc. 
+(e.g. Pedersen commitment), ring signatures etc. 
