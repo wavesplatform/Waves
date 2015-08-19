@@ -29,5 +29,8 @@ class CryptoSpecification extends FunSuite with Matchers {
 
     val wrongKey = new PrivateKeyAccount(Random.nextString(20).getBytes).publicKey
     assert(!SigningFunctionsImpl.verify(sig, data, wrongKey))
+
+    val wrongData = data ++ Seq(0:Byte)
+    assert(!SigningFunctionsImpl.verify(sig, wrongData, rightKey))
   }
 }
