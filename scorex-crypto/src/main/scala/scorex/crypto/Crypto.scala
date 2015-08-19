@@ -2,7 +2,7 @@ package scorex.crypto
 
 import java.security.MessageDigest
 
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.PrivateKeyAccount
 
 import scala.util.Try
 
@@ -11,10 +11,8 @@ import scala.util.Try
  */
 
 object Crypto {
-
-
   val SignatureLength = 64
-  val KeyLength = 32
+  val KeyLength = Curve25519.KEY_SIZE
 
   def doubleSha256(input: Array[Byte]) = sha256(sha256(input))
 
@@ -25,6 +23,13 @@ object Crypto {
   type PublicKey = Array[Byte]
   type Signature = Array[Byte]
   type MessageToSign = Array[Byte]
+
+  def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = {
+    val privateKey = new Array[Byte](KeyLength)
+    val publicKey = new Array[Byte](KeyLength)
+    Curve25519.keygen(publicKey, privateKey, seed)
+    privateKey -> publicKey
+  }
 
   def sign(account: PrivateKeyAccount, message: MessageToSign): Signature =
     Try(sign(account.privateKey, account.publicKey, message)).ensuring(_.isSuccess).get
@@ -43,13 +48,6 @@ object Crypto {
     val v = new Array[Byte](KeyLength)
     Curve25519.sign(v, h, x, privateKey)
     v ++ h
-  }
-
-  def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = {
-    val privateKey = new Array[Byte](KeyLength)
-    val publicKey = new Array[Byte](KeyLength)
-    Curve25519.keygen(publicKey, privateKey, seed)
-    privateKey -> publicKey
   }
 
   def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean = Try {
