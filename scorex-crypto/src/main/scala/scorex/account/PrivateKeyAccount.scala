@@ -1,6 +1,6 @@
 package scorex.account
 
-import scorex.crypto.Crypto
+import scorex.crypto.SigningFunctionsImpl
 
 case class PrivateKeyAccount(seed: Array[Byte], privateKey: Array[Byte], override val publicKey: Array[Byte])
   extends PublicKeyAccount(publicKey) {
@@ -13,5 +13,5 @@ case class PrivateKeyAccount(seed: Array[Byte], privateKey: Array[Byte], overrid
 
   def this(seed: Array[Byte], keyPair: (Array[Byte], Array[Byte])) = this(seed, keyPair._1, keyPair._2)
 
-  def this(seed: Array[Byte]) = this(seed, Crypto.createKeyPair(seed))
+  def this(seed: Array[Byte]) = this(seed, SigningFunctionsImpl.createKeyPair(seed))
 }

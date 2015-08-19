@@ -1,7 +1,7 @@
 package scorex.database.blockchain
 
 import scorex.account.Account
-import scorex.crypto.Crypto
+import scorex.crypto.SigningFunctionsImpl
 import scorex.transaction.Transaction
 
 

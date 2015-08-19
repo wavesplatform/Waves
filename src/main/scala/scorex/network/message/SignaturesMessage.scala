@@ -1,7 +1,7 @@
 package scorex.network.message
 
 import com.google.common.primitives.{Bytes, Ints}
-import scorex.crypto.Crypto.SignatureLength
+import scorex.crypto.SigningFunctionsImpl.SignatureLength
 
 abstract class SignaturesSeqMessage extends Message {
 

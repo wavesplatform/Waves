@@ -1,6 +1,6 @@
 package scorex.account
 
-import scorex.crypto.{Crypto, Base58, RIPEMD160}
+import scorex.crypto.{Base58, RIPEMD160}
 
 
 class Account(val address: String) extends Serializable {

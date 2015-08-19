@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 import play.api.libs.json.Json
 import scorex.Controller
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.crypto.{Base58, Crypto}
+import scorex.crypto.{Base58, SigningFunctionsImpl}
 import spray.routing.HttpService
 
 import scala.util.{Failure, Success, Try}
@@ -105,7 +105,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
                     case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
                       val account = new PublicKeyAccount(pubKeyBytes)
                       val isValid = account.address == address &&
-                        Crypto.verify(signatureBytes, msgBytes, pubKeyBytes)
+                        SigningFunctionsImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
                       Json.obj("valid" -> isValid)
                   }
                 }
@@ -125,7 +125,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
                   wallet.privateKeyAccount(address) match {
                     case None => ApiError.json(ApiError.WalletAddressNotExists)
                     case Some(account) =>
-                      Try(Crypto.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
+                      Try(SigningFunctionsImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
                         case Success(signature) =>
                           Json.obj("message" -> message,
                             "publickey" -> Base58.encode(account.publicKey),

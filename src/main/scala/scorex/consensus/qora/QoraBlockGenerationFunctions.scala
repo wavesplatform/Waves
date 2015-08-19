@@ -6,7 +6,7 @@ import scorex.utils.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
-import scorex.crypto.Crypto
+import scorex.crypto.SigningFunctionsImpl
 import scorex.settings.Constants
 import scorex.crypto.HashFunctionsImpl._
 
@@ -95,7 +95,7 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
 
     require(account.publicKey.length == Block.GeneratorLength)
     val si = Bytes.concat(generatorSignature, genBalanceBytes, account.publicKey)
-    Crypto.sign(account, si)
+    SigningFunctionsImpl.sign(account, si)
   }
 
   private def minMaxBalance(generatingBalance: Long) =

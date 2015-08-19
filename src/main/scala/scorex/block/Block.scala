@@ -6,7 +6,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.Controller
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.{Base58, Crypto}
+import scorex.crypto.{Base58, SigningFunctionsImpl}
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.settings.Constants
 import scorex.transaction.Transaction.ValidationResult
@@ -40,7 +40,7 @@ case class Block(version: Byte,
   lazy val signature = signatureOpt.getOrElse {
     generator match {
       case privKeyAcc: PrivateKeyAccount =>
-        Crypto.sign(privKeyAcc, bytesWithoutSignature)
+        SigningFunctionsImpl.sign(privKeyAcc, bytesWithoutSignature)
 
       case _ =>
         throw new IllegalStateException("Illegal piece of code reached, cant' sign block")
@@ -77,7 +77,7 @@ case class Block(version: Byte,
 
   //VALIDATION
 
-  lazy val signatureValid: Boolean = Crypto.verify(signature, bytesWithoutSignature, generator.publicKey)
+  lazy val signatureValid: Boolean = SigningFunctionsImpl.verify(signature, bytesWithoutSignature, generator.publicKey)
 
   def isValid(): Boolean = {
     //CHECK IF PARENT EXISTS
@@ -114,7 +114,7 @@ object Block {
   val TimestampLength = 8
   val GeneratorLength = 32
 
-  private[block] val SignatureLength = scorex.crypto.Crypto.SignatureLength
+  private[block] val SignatureLength = scorex.crypto.SigningFunctionsImpl.SignatureLength
   private[block] val TransactionsCountLength = 4
   private[block] val TransactionSizeLength = 4
   private[block] val BaseLength = VersionLength + ReferenceLength + TimestampLength +

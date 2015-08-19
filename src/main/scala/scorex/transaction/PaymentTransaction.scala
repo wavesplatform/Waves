@@ -6,7 +6,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
 import scorex.Controller
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.{Base58, Crypto}
+import scorex.crypto.{Base58, SigningFunctionsImpl}
 import scorex.transaction.Transaction.TransactionType
 
 case class PaymentTransaction(sender: PublicKeyAccount,
@@ -44,7 +44,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
   override def isSignatureValid() = {
     val data = signatureData(sender, recipient, amount, fee, timestamp)
-    Crypto.verify(signature, data, sender.publicKey)
+    SigningFunctionsImpl.verify(signature, data, sender.publicKey)
   }
 
   override def validate() =
@@ -130,7 +130,7 @@ object PaymentTransaction {
 
   def generateSignature(sender: PrivateKeyAccount, recipient: Account,
                         amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
-    Crypto.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
+    SigningFunctionsImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
   }
 
   private def signatureData(sender: PublicKeyAccount, recipient: Account,

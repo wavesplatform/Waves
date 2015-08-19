@@ -5,7 +5,7 @@ import play.api.libs.json.{JsObject, JsValue}
 import scorex.Controller
 import scorex.account.Account
 import scorex.block.Block
-import scorex.crypto.{Base58, Crypto}
+import scorex.crypto.{Base58, SigningFunctionsImpl}
 import scala.concurrent.duration._
 
 

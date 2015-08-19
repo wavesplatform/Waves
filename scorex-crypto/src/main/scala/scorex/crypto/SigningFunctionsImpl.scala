@@ -23,33 +23,41 @@ object HashFunctionsImpl extends HashFunctions {
 }
 
 
-/**
- * sign & verify functions defined in the same way as in Nxt
- */
-
-object Crypto {
-
-  import HashFunctionsImpl._
-
-  val SignatureLength = 64
-  val KeyLength = Curve25519.KEY_SIZE
-
+trait SigningFunctions {
   type PrivateKey = Array[Byte]
   type PublicKey = Array[Byte]
   type Signature = Array[Byte]
   type MessageToSign = Array[Byte]
 
-  def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = {
+  val SignatureLength: Int
+  val KeyLength: Int
+
+  //is it a real part of the interface? or not signing schemes have this kind of functionality?
+  def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey)
+
+  def sign(privateKey: PrivateKey, publicKey: PublicKey, message: MessageToSign): Signature
+
+  def sign(account: PrivateKeyAccount, message: MessageToSign): Signature =
+    Try(sign(account.privateKey, account.publicKey, message)).ensuring(_.isSuccess).get
+
+  def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean
+}
+
+object SigningFunctionsImpl extends SigningFunctions {
+
+  import HashFunctionsImpl._
+
+  override val SignatureLength = 64
+  override val KeyLength = Curve25519.KEY_SIZE
+
+  override def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = {
     val privateKey = new Array[Byte](KeyLength)
     val publicKey = new Array[Byte](KeyLength)
     Curve25519.keygen(publicKey, privateKey, seed)
     privateKey -> publicKey
   }
 
-  def sign(account: PrivateKeyAccount, message: MessageToSign): Signature =
-    Try(sign(account.privateKey, account.publicKey, message)).ensuring(_.isSuccess).get
-
-  def sign(privateKey: PrivateKey, publicKey: PublicKey, message: MessageToSign): Signature = {
+  override def sign(privateKey: PrivateKey, publicKey: PublicKey, message: MessageToSign): Signature = {
     require(privateKey.length == KeyLength)
     require(publicKey.length == KeyLength)
 
@@ -65,7 +73,7 @@ object Crypto {
     v ++ h
   }
 
-  def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean = Try {
+  override def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean = Try {
     require(signature.length == SignatureLength)
     require(publicKey.length == KeyLength)
 
