@@ -19,9 +19,9 @@ case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 
 case class BlocksDownload(signatures: List[Array[Byte]], peer: InetSocketAddress)
 
-case class BlockchainController(networkController: ActorRef) extends Actor with ScorexLogging {
+case class BlockchainSyncer(networkController: ActorRef) extends Actor with ScorexLogging {
 
-  import BlockchainController._
+  import BlockchainSyncer._
 
   private var status = Status.Offline
 
@@ -68,11 +68,11 @@ case class BlockchainController(networkController: ActorRef) extends Actor with 
 
     case GetStatus => sender() ! status
 
-    case nonsense: Any => log.warn(s"BlockchainController: got something strange $nonsense")
+    case nonsense: Any => log.warn(s"BlockchainSyncer: got something strange $nonsense")
   }
 }
 
-object BlockchainController {
+object BlockchainSyncer {
 
   object Status extends Enumeration {
     val Offline = Value(0)

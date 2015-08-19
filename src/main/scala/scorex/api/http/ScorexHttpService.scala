@@ -3,7 +3,7 @@ package scorex.api.http
 import akka.pattern.ask
 import play.api.libs.json.Json
 import scorex.Controller
-import scorex.block.BlockchainController
+import scorex.block.BlockchainSyncer$
 import scorex.settings.Constants
 import spray.routing.HttpService
 
@@ -24,8 +24,8 @@ trait ScorexHttpService extends HttpService with CommonApiFunctions {
       } ~ path("status") {
         get {
           onComplete {
-            (Controller.blockchainController ? BlockchainController.GetStatus).map { status =>
-              Json.obj("status" -> status.asInstanceOf[BlockchainController.Status.Value].toString).toString()
+            (Controller.blockchainController ? BlockchainSyncer.GetStatus).map { status =>
+              Json.obj("status" -> status.asInstanceOf[BlockchainSyncer.Status.Value].toString).toString()
             }
           } {
             case Success(value) => complete(value)

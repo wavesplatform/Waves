@@ -6,8 +6,8 @@ import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import scorex.Controller
-import scorex.block.BlockchainController.GetMaxChainScore
-import scorex.block.{BlockchainController, NewBlock}
+import scorex.block.BlockchainSyncer.GetMaxChainScore
+import scorex.block.{BlockchainSyncer$, NewBlock}
 import scorex.network.message.{Message, _}
 import scorex.settings.Settings
 import scorex.utils.ScorexLogging
@@ -123,7 +123,7 @@ class NetworkController extends Actor with ScorexLogging {
 
     case GetMaxChainScore =>
       if (blockchainControllerOpt.isEmpty) blockchainControllerOpt = Some(sender())
-      sender() ! BlockchainController.MaxChainScore(maxPeerScore())
+      sender() ! BlockchainSyncer.MaxChainScore(maxPeerScore())
 
     case NewBlock(block, Some(sndr)) =>
       blockchainControllerOpt.foreach { blockchainController =>

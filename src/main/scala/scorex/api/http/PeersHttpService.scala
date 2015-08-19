@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.pattern.ask
 import play.api.libs.json.Json
 import scorex.Controller
-import scorex.block.BlockchainController
+import scorex.block.BlockchainSyncer$
 import scorex.network.NetworkController
 import scorex.network.NetworkController.PeerData
 import spray.routing.HttpService
@@ -32,7 +32,7 @@ trait PeersHttpService extends HttpService with CommonApiFunctions {
       } ~ path("height") {                       //todo:fix
         get {
           onComplete {
-            (Controller.blockchainController ? BlockchainController.GetMaxChainScore).map { peerHeightsRaw =>
+            (Controller.blockchainController ? BlockchainSyncer.GetMaxChainScore).map { peerHeightsRaw =>
               val peerHeights = peerHeightsRaw.asInstanceOf[Map[InetSocketAddress, Int]]
               Json.arr(peerHeights.map { case (peer, h) =>
                 Json.obj("peer" -> peer.getAddress.getHostAddress, "height" -> h)

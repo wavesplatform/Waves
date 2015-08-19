@@ -3,7 +3,7 @@ package scorex
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import scorex.api.http.HttpServiceActor
-import scorex.block.BlockchainController
+import scorex.block.BlockchainSyncer$
 import scorex.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.database.blockchain.PrunableBlockchainStorage
 import scorex.network.NetworkController
@@ -22,7 +22,7 @@ object Controller extends ScorexLogging {
   private implicit lazy val actorSystem = ActorSystem("lagonaki")
 
   lazy val networkController = actorSystem.actorOf(Props[NetworkController])
-  lazy val blockchainController = actorSystem.actorOf(Props(classOf[BlockchainController], networkController))
+  lazy val blockchainController = actorSystem.actorOf(Props(classOf[BlockchainSyncer], networkController))
 
   private lazy val walletFileOpt = Settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
   lazy val wallet = new Wallet(walletFileOpt, Settings.walletPassword, Settings.walletSeed.get)
@@ -40,7 +40,7 @@ object Controller extends ScorexLogging {
     val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = Settings.rpcPort)
     IO(Http) ! bindCommand
 
-    blockchainController ! BlockchainController.CheckState //just to init lazy val
+    blockchainController ! BlockchainSyncer.CheckState //just to init lazy val
 
     //CLOSE ON UNEXPECTED SHUTDOWN
     Runtime.getRuntime.addShutdownHook(new Thread() {
