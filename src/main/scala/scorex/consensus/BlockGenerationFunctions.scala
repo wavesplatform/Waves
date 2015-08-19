@@ -13,7 +13,7 @@ trait BlockGenerationFunctions {
 
   def generateBlock(): Option[Block] = {
     val blockStubs = wallet.privateKeyAccounts().foldLeft(TrieMap[PrivateKeyAccount, BlockStub]()) { case (bm, account) =>
-      if (account.generatingBalance >= BigDecimal(1)) {
+      if (Controller.blockchainStorage.generationBalance(account) >= BigDecimal(1)) {
         generateNextBlock(account, Controller.blockchainStorage.lastBlock).foreach { blockStub =>
           bm += account -> blockStub
         }

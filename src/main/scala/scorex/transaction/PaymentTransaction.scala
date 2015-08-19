@@ -48,7 +48,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   }
 
   override def validate() =
-    if (!Crypto.isValidAddress(recipient.address)) {
+    if (!Account.isValidAddress(recipient.address)) {
       ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (Controller.blockchainStorage.balance(sender.address) < amount + fee) {
       ValidationResult.NoBalance //CHECK IF SENDER HAS ENOUGH MONEY

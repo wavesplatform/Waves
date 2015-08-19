@@ -27,7 +27,7 @@ trait CommonApiFunctions {
 
   protected[api] def withAccount(address: String)(action: Account => JsValue): JsValue =
     walletNotExists().getOrElse {
-      if (!Crypto.isValidAddress(address)) {
+      if (!Account.isValidAddress(address)) {
         ApiError.json(ApiError.InvalidAddress)
       } else {
         Controller.wallet.privateKeyAccount(address) match {

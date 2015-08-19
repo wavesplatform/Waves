@@ -9,7 +9,7 @@ case class PrivateKeyAccount(seed: Array[Byte], privateKey: Array[Byte], overrid
   require(privateKey != null)
   require(publicKey != null)
 
-  override val address = Crypto.addressFromPubkey(publicKey)
+  override val address = Account.addressFromPubkey(publicKey)
 
   def this(seed: Array[Byte], keyPair: (Array[Byte], Array[Byte])) = this(seed, keyPair._1, keyPair._2)
 

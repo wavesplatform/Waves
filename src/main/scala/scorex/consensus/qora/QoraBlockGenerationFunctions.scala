@@ -1,6 +1,7 @@
 package scorex.consensus.qora
 
 import com.google.common.primitives.{Bytes, Longs}
+import scorex.Controller
 import scorex.utils.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
@@ -17,7 +18,7 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
   private val MAX_BLOCK_TIME = 5 * 60
 
   override protected def generateNextBlock(account: PrivateKeyAccount, lastBlock: Block): Option[BlockStub] = {
-    require(account.generatingBalance > BigDecimal(0), "Zero generating balance in generateNextBlock")
+    require(Controller.blockchainStorage.generationBalance(account) > BigDecimal(0), "Zero generating balance in generateNextBlock")
 
     val signature = calculateSignature(lastBlock, account)
     val hash = Crypto.sha256(signature)
@@ -27,7 +28,7 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
     val targetBytes = Array.fill(32)(Byte.MaxValue)
     val baseTarget = BigInt(getBaseTarget(getNextBlockGeneratingBalance(lastBlock)))
     //MULTIPLY TARGET BY USER BALANCE
-    val target = BigInt(1, targetBytes) / baseTarget * account.generatingBalance.toBigInt()
+    val target = BigInt(1, targetBytes) / baseTarget * Controller.blockchainStorage.generationBalance(account).toBigInt()
 
     //CALCULATE GUESSES
     val guesses = hashValue / target + 1

@@ -52,7 +52,7 @@ case class GenesisTransaction(override val recipient: Account,
   override def validate() =
     if (amount < BigDecimal(0)) {
       ValidationResult.NegativeAmount
-    } else if (!Crypto.isValidAddress(recipient.address)) {
+    } else if (!Account.isValidAddress(recipient.address)) {
       ValidationResult.InvalidAddress
     } else ValidationResult.ValidateOke
 

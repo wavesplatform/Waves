@@ -11,7 +11,7 @@ trait StateQueries {
   def balance(address: String): BigDecimal = balance(address, 0)
 
   def accountTransactions(address: String): Seq[Transaction] = {
-    Crypto.isValidAddress(address) match {
+    Account.isValidAddress(address) match {
       case false => Seq()
       case true =>
         val acc = new Account(address)
@@ -26,4 +26,6 @@ trait StateQueries {
   def accountTransactions(account: Account): Seq[Transaction]
 
   def generationBalance(address: String): BigDecimal = balance(address, 50)
+
+  def generationBalance(account: Account): BigDecimal = balance(account.address, 50)
 }

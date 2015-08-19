@@ -12,45 +12,24 @@ import scala.util.Try
 
 object Crypto {
 
-  val AddressVersion: Byte = 58
+
   val SignatureLength = 64
   val KeyLength = 32
-  val ChecksumLength = 4
-
-  def addressFromPubkey(publicKey: Array[Byte]) = {
-    val publicKeyHash = new RIPEMD160().digest(sha256(publicKey))
-    val withoutChecksum = publicKeyHash :+ AddressVersion //prepend ADDRESS_VERSION
-    val checkSum = doubleSha256(withoutChecksum).take(ChecksumLength)
-
-    Base58.encode(withoutChecksum ++ checkSum)
-  }
-
-  def isValidAddress(address: String):Boolean =
-    Base58.decode(address).map{addressBytes =>
-
-      //CHECK BYTES
-      if (addressBytes.length != Account.AddressLength)
-        false
-      else {
-        val checkSum = addressBytes.takeRight(ChecksumLength)
-
-        //GENERATE ADDRESS CHECKSUM
-        val digest = doubleSha256(addressBytes.dropRight(ChecksumLength))
-        val checkSumGenerated = digest.take(ChecksumLength)
-
-        //CHECK IF CHECKSUMS ARE THE SAME
-        checkSum.sameElements(checkSumGenerated)
-      }
-    }.getOrElse(false)
 
   def doubleSha256(input: Array[Byte]) = sha256(sha256(input))
 
   def sha256(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
 
-  def sign(account: PrivateKeyAccount, message: Array[Byte]): Array[Byte] =
+
+  type PrivateKey = Array[Byte]
+  type PublicKey = Array[Byte]
+  type Signature = Array[Byte]
+  type MessageToSign = Array[Byte]
+
+  def sign(account: PrivateKeyAccount, message: MessageToSign): Signature =
     Try(sign(account.privateKey, account.publicKey, message)).ensuring(_.isSuccess).get
 
-  def sign(privateKey: Array[Byte], publicKey: Array[Byte], message: Array[Byte]): Array[Byte] = {
+  def sign(privateKey: PrivateKey, publicKey: PublicKey, message: MessageToSign): Signature = {
     require(privateKey.length == KeyLength)
     require(publicKey.length == KeyLength)
 
@@ -66,14 +45,14 @@ object Crypto {
     v ++ h
   }
 
-  def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = {
+  def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = {
     val privateKey = new Array[Byte](KeyLength)
     val publicKey = new Array[Byte](KeyLength)
     Curve25519.keygen(publicKey, privateKey, seed)
     privateKey -> publicKey
   }
 
-  def verify(signature: Array[Byte], message: Array[Byte], publicKey: Array[Byte]): Boolean = Try {
+  def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean = Try {
     require(signature.length == SignatureLength)
     require(publicKey.length == KeyLength)
 
