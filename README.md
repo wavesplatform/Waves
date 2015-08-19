@@ -106,6 +106,8 @@ Documentation
 
 [The Architecture Of A Cryptocurrency](docs/components.md)
 
+[Scorex-Crypto Sub-Module](scorex-crypto/README.md)
+
 
 Contributions
 -------------
