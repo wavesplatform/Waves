@@ -3,8 +3,9 @@ package scorex.crypto
 import scala.util.Try
 
 /**
- * A custom form of base58 is used to encode BitCoin addresses.
+ * A custom form of base58 is used to encode Scorex addresses.
  */
+
 object Base58 {
   private val Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
   private val Base = BigInt(58)

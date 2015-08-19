@@ -1,13 +1,16 @@
 package scorex.crypto;
 
-/* Ported from C to Java by Dmitry Skiba [sahn0], 23/02/08.
- * Original: http://cds.xs4all.nl:8081/ecdh/
- */
-/* Generic 64-bit integer implementation of Curve25519 ECDH
+/**
+ *
+ * Generic 64-bit integer implementation of Curve25519 ECDH
  * Written by Matthijs van Duin, 200608242056
  * Public domain.
  *
+ * Ported from C to Java by Dmitry Skiba [sahn0], 23/02/08.
+ * Original: http://cds.xs4all.nl:8081/ecdh/
+ *
  * Based on work by Daniel J Bernstein, http://cr.yp.to/ecdh.html
+ *
  */
 
 final public class Curve25519 {
