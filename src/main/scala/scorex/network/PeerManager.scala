@@ -28,7 +28,6 @@ object PeerManager extends ScorexLogging {
   def peerDisconnected(peer: InetSocketAddress): Unit =
     PeerDatabaseImpl.removeConnectedPeer(peer)
 
-
   def randomPeer(): InetSocketAddress = {
     val peers = knownPeers()
     peers(Random.nextInt(peers.size))

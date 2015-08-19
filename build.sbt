@@ -8,6 +8,10 @@ name := appConf.getString("product")
 
 version := appConf.getString("version")
 
+licenses := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
+
+homepage := Some(url("https://github.com/ConsensusResearch/Scorex-Lagonaki"))
+
 scalaVersion := "2.11.7"
 
 resolvers ++= Seq("Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases/",
@@ -43,3 +47,33 @@ assemblyJarName in assembly := "scorex.jar"
 test in assembly := {}
 
 mainClass in assembly := Some("scorex.Start")
+
+
+//publishing settings
+
+publishMavenStyle := true
+
+publishArtifact in Test := false
+
+publishTo := {
+  val nexus = "https://oss.sonatype.org/"
+  if (isSnapshot.value)
+    Some("snapshots" at nexus + "content/repositories/snapshots")
+  else
+    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+}
+
+pomIncludeRepository := { _ => false }
+
+pomExtra := (
+    <scm>
+      <url>git@github.com:ConsensusResearch/Scorex-Lagonaki.git</url>
+      <connection>scm:git:git@github.com:ConsensusResearch/Scorex-Lagonaki.git</connection>
+    </scm>
+    <developers>
+      <developer>
+        <id>kushti</id>
+        <name>Alexander Chepurnoy</name>
+        <url>http://chepurnoy.org/</url>
+      </developer>
+    </developers>)
