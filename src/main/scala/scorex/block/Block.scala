@@ -83,7 +83,6 @@ case class Block(version: Byte,
   lazy val signatureValid: Boolean = SigningFunctionsImpl.verify(signature, bytesWithoutSignature, generator.publicKey)
 
   def isValid(): Boolean = {
-    //CHECK IF PARENT EXISTS
     if (reference == null || parent().isEmpty) {
       false
     } else if (this.timestamp < parent().get.timestamp) {
