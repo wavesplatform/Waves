@@ -8,6 +8,8 @@ import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.Crypto
 import scorex.settings.Constants
+import scorex.crypto.HashFunctionsImpl._
+
 
 //!! a lot of asInstanceOf[QoraBlockGenerationData] in the code, not type-safe
 object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
@@ -21,8 +23,8 @@ object QoraBlockGenerationFunctions extends BlockGenerationFunctions {
     require(Controller.blockchainStorage.generationBalance(account) > BigDecimal(0), "Zero generating balance in generateNextBlock")
 
     val signature = calculateSignature(lastBlock, account)
-    val hash = Crypto.sha256(signature)
-    val hashValue = BigInt(1, hash)
+    val h = hash(signature)
+    val hashValue = BigInt(1, h)
 
     //CALCULATE ACCOUNT TARGET
     val targetBytes = Array.fill(32)(Byte.MaxValue)

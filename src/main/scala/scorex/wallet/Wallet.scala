@@ -5,12 +5,12 @@ import java.io.File
 import com.google.common.primitives.{Bytes, Ints}
 import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.Crypto
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.util.Try
+import scorex.crypto.HashFunctionsImpl._
 
 
 class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) extends ScorexLogging {
@@ -70,8 +70,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) e
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] = {
     val nonceBytes = Ints.toByteArray(nonce)
-    val accountSeed = Bytes.concat(nonceBytes, seed, nonceBytes)
-    Crypto.doubleSha256(accountSeed)
+    doubleHash(Bytes.concat(nonceBytes, seed, nonceBytes))
   }
 
   def deleteAccount(account: PrivateKeyAccount): Boolean = synchronized {

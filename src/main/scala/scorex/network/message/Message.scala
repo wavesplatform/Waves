@@ -3,7 +3,7 @@ package scorex.network.message
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
-import scorex.crypto.Crypto
+import scorex.crypto.HashFunctionsImpl._
 
 import scala.util.Try
 
@@ -13,7 +13,7 @@ abstract class Message {
 
   val messageType: Byte
 
-  lazy val hash = Crypto.sha256(bytes)
+  lazy val mhash = hash(bytes)
 
   val dataBytes: Array[Byte]
   lazy val dataLength: Int = dataBytes.length
@@ -22,7 +22,7 @@ abstract class Message {
     val typeBytes = Array(messageType)
 
     val dataWithChecksum = if (dataLength > 0) {
-      val checksum = Crypto.sha256(dataBytes).take(ChecksumLength)
+      val checksum = hash(dataBytes).take(ChecksumLength)
       Bytes.concat(checksum, dataBytes)
     } else dataBytes //empty array
 
@@ -70,7 +70,7 @@ object Message {
       bytes.get(data)
 
       //VALIDATE CHECKSUM
-      val digest = Crypto.sha256(data).take(Message.ChecksumLength)
+      val digest = hash(data).take(Message.ChecksumLength)
 
       //CHECK IF CHECKSUM MATCHES
       if (!checksum.sameElements(digest)) throw new Exception("Invalid data checksum length=" + length)

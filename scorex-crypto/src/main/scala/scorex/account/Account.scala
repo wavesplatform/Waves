@@ -17,29 +17,30 @@ class Account(val address: String) extends Serializable {
 
 
 object Account {
+  import scorex.crypto.HashFunctionsImpl._
+
   val AddressLength = 25
 
   val AddressVersion: Byte = 58
   val ChecksumLength = 4
 
   def addressFromPubkey(publicKey: Array[Byte]) = {
-    val publicKeyHash = new RIPEMD160().digest(Crypto.sha256(publicKey))
+    val publicKeyHash = new RIPEMD160().digest(hash(publicKey))
     val withoutChecksum = publicKeyHash :+ AddressVersion //prepend ADDRESS_VERSION
-    val checkSum = Crypto.doubleSha256(withoutChecksum).take(ChecksumLength)
+    val checkSum = doubleHash(withoutChecksum).take(ChecksumLength)
 
     Base58.encode(withoutChecksum ++ checkSum)
   }
 
   def isValidAddress(address: String): Boolean =
     Base58.decode(address).map { addressBytes =>
-
       if (addressBytes.length != Account.AddressLength)
         false
       else {
         val checkSum = addressBytes.takeRight(ChecksumLength)
 
-        val hash = Crypto.doubleSha256(addressBytes.dropRight(ChecksumLength))
-        val checkSumGenerated = hash.take(ChecksumLength)
+        val dh = doubleHash(addressBytes.dropRight(ChecksumLength))
+        val checkSumGenerated = dh.take(ChecksumLength)
 
         checkSum.sameElements(checkSumGenerated)
       }

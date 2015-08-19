@@ -5,7 +5,8 @@ import play.api.libs.json.Json
 import scorex.Controller
 import scorex.block.{Block, QoraGenesisBlockGenerationData}
 import scorex.consensus.BlockGenerationData
-import scorex.crypto.{Base58, Crypto}
+import scorex.crypto.Base58
+import scorex.crypto.HashFunctionsImpl._
 
 case class QoraBlockGenerationData(generatingBalance: Long, generatorSignature: Array[Byte])
   extends BlockGenerationData {
@@ -44,7 +45,7 @@ case class QoraBlockGenerationData(generatingBalance: Long, generatorSignature: 
       val lowerTarget = target0 * (guesses - 1)
       val target = target0 * guesses
 
-      val hit = BigInt(1, Crypto.sha256(generatorSignature))
+      val hit = BigInt(1, hash(generatorSignature))
 
       //generation check
       hit >= lowerTarget && hit < target

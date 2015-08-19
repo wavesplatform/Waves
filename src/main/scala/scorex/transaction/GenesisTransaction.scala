@@ -5,8 +5,9 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
 import scorex.account.Account
-import scorex.crypto.{Base58, Crypto}
+import scorex.crypto.Base58
 import scorex.transaction.Transaction.TransactionType
+import scorex.crypto.HashFunctionsImpl._
 
 
 case class GenesisTransaction(override val recipient: Account,
@@ -44,9 +45,9 @@ case class GenesisTransaction(override val recipient: Account,
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
     val data = Bytes.concat(typeBytes, timestampBytes,
       Base58.decode(recipient.address).get, amountBytes)
-    val digest = Crypto.sha256(data)
+    val h = hash(data)
 
-    Bytes.concat(digest, digest).sameElements(signature)
+    Bytes.concat(h, h).sameElements(signature)
   }
 
   override def validate() =
@@ -81,8 +82,8 @@ object GenesisTransaction {
     val data = Bytes.concat(typeBytes, timestampBytes,
       Base58.decode(recipient.address).get, Bytes.concat(amountFill, amountBytes))
 
-    val digest = Crypto.sha256(data)
-    Bytes.concat(digest, digest)
+    val h = hash(data)
+    Bytes.concat(h, h)
   }
 
   def parse(data: Array[Byte]): Transaction = {

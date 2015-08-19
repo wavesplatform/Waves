@@ -4,9 +4,9 @@ import scorex.Controller
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
-import scorex.crypto.Crypto
 import scorex.settings.Constants
 import scorex.utils.{NTP, ScorexLogging}
+import scorex.crypto.HashFunctionsImpl._
 
 object NxtBlockGenerationFunctions extends BlockGenerationFunctions with ScorexLogging {
   val AvgFrequency = 2 //60 - the algo's goal is 1 block per minute in average
@@ -30,7 +30,7 @@ object NxtBlockGenerationFunctions extends BlockGenerationFunctions with ScorexL
   }
 
   private[nxt] def calcGeneratorSignature(lastBlockData: NxtBlockGenerationData, generator: PublicKeyAccount) =
-    Crypto.sha256(lastBlockData.generatorSignature ++ generator.publicKey)
+    hash(lastBlockData.generatorSignature ++ generator.publicKey)
 
   private[nxt] def calcHit(lastBlockData: NxtBlockGenerationData, generator: PublicKeyAccount): BigInt =
     BigInt(1, calcGeneratorSignature(lastBlockData, generator).take(8))

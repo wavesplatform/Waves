@@ -5,7 +5,6 @@ import org.joda.time.DateTime
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.consensus.nxt.NxtBlockGenerationData
 import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataParser}
-import scorex.crypto.Crypto
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.Transaction.ValidationResult
 import scorex.settings.Constants
@@ -49,6 +48,8 @@ abstract class GenesisBlock(override val generationData: kernelData, override va
 
 
 object QoraGenesisBlockGenerationData {
+  import scorex.crypto.HashFunctionsImpl._
+
   val generatingBalance = 10000000
 
   lazy val generatorSignature = {
@@ -58,7 +59,7 @@ object QoraGenesisBlockGenerationData {
     val generatorBytes = Bytes.ensureCapacity(GenesisBlockParams.generator.publicKey, 32, 0)
 
     val data = Bytes.concat(versionBytes, referenceBytes, generatingBalanceBytes, generatorBytes)
-    val digest = Crypto.sha256(data)
+    val digest = hash(data)
     Bytes.concat(digest, digest)
   }.ensuring(sig => sig.size == QoraBlockGenerationDataParser.GeneratorSignatureLength)
 

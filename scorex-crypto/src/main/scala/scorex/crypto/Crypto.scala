@@ -6,18 +6,33 @@ import scorex.account.PrivateKeyAccount
 
 import scala.util.Try
 
+
+trait HashFunctions {
+  def doubleHash(input: Array[Byte]): Array[Byte]
+
+  def hash(input: Array[Byte]): Array[Byte]
+}
+
 /**
- * sign & verify functions defined in the same way as in Nxt 
+ * Hashing functions implementation with sha256 impl from Java SDK
+ */
+object HashFunctionsImpl extends HashFunctions {
+  override def doubleHash(input: Array[Byte]) = hash(hash(input))
+
+  override def hash(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
+}
+
+
+/**
+ * sign & verify functions defined in the same way as in Nxt
  */
 
 object Crypto {
+
+  import HashFunctionsImpl._
+
   val SignatureLength = 64
   val KeyLength = Curve25519.KEY_SIZE
-
-  def doubleSha256(input: Array[Byte]) = sha256(sha256(input))
-
-  def sha256(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
-
 
   type PrivateKey = Array[Byte]
   type PublicKey = Array[Byte]
@@ -38,12 +53,12 @@ object Crypto {
     require(privateKey.length == KeyLength)
     require(publicKey.length == KeyLength)
 
-    val m = sha256(message)
-    val x = sha256(m ++ privateKey)
+    val m = hash(message)
+    val x = hash(m ++ privateKey)
 
     val Y = new Array[Byte](KeyLength)
     Curve25519.keygen(Y, null, x)
-    val h = sha256(m ++ Y)
+    val h = hash(m ++ Y)
 
     val v = new Array[Byte](KeyLength)
     Curve25519.sign(v, h, x, privateKey)
@@ -63,8 +78,8 @@ object Crypto {
     val Y = new Array[Byte](KeyLength)
     Curve25519.verify(Y, v, h, publicKey)
 
-    val m = sha256(message)
-    val h2 = sha256(m ++ Y)
+    val m = hash(message)
+    val h2 = hash(m ++ Y)
 
     h.sameElements(h2)
   }.getOrElse(false)
