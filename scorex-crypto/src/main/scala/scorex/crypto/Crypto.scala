@@ -1,7 +1,9 @@
 package scorex.crypto
 
 import java.security.MessageDigest
+
 import scorex.account.{Account, PrivateKeyAccount}
+
 import scala.util.Try
 
 /**
@@ -15,7 +17,7 @@ object Crypto {
   val KeyLength = 32
   val ChecksumLength = 4
 
-  def getAddress(publicKey: Array[Byte]) = {
+  def addressFromPubkey(publicKey: Array[Byte]) = {
     val publicKeyHash = new RIPEMD160().digest(sha256(publicKey))
     val withoutChecksum = publicKeyHash :+ AddressVersion //prepend ADDRESS_VERSION
     val checkSum = doubleSha256(withoutChecksum).take(ChecksumLength)
@@ -23,7 +25,7 @@ object Crypto {
     Base58.encode(withoutChecksum ++ checkSum)
   }
 
-  def isValidAddress(address: String) =
+  def isValidAddress(address: String):Boolean =
     Base58.decode(address).map{addressBytes =>
 
       //CHECK BYTES
