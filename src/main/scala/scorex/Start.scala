@@ -2,11 +2,12 @@ package scorex
 
 
 import scorex.account.Account
-import scorex.api.http.ApiClient
+import scorex.app.Controller
+import scorex.app.api.http.ApiClient
 import scorex.block.GenesisBlockParams
-import scorex.settings.Settings
+import scorex.app.settings.Settings
 import scorex.transaction.TransactionCreator
-import scorex.utils.ScorexLogging
+import scorex.app.utils.ScorexLogging
 
 import scala.io.StdIn
 import scala.util.{Failure, Random, Try}

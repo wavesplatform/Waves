@@ -7,8 +7,8 @@ import scorex.consensus.nxt.NxtBlockGenerationData
 import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataParser}
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.Transaction.ValidationResult
-import scorex.settings.Constants
-import scorex.settings.Constants.ConsensusAlgo.kernelData
+import scorex.app.settings.Constants
+import scorex.app.settings.Constants.ConsensusAlgo.kernelData
 
 
 object GenesisBlockParams {

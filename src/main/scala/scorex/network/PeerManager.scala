@@ -1,9 +1,9 @@
 package scorex.network
 
 import java.net.InetSocketAddress
-import scorex.database.PeerDatabaseImpl
-import scorex.settings.Settings
-import scorex.utils.ScorexLogging
+import scorex.state.database.PeerDatabaseImpl
+import scorex.app.settings.Settings
+import scorex.app.utils.ScorexLogging
 
 import scala.util.Random
 

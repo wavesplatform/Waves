@@ -4,8 +4,8 @@ import java.util.Arrays
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
-import scorex.Controller
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.app.Controller
 import scorex.crypto.{Base58, SigningFunctionsImpl}
 import scorex.transaction.Transaction.TransactionType
 

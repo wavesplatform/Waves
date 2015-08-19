@@ -1,7 +1,7 @@
 package scorex.consensus
 
-import scorex.Controller
 import scorex.account.PrivateKeyAccount
+import scorex.app.Controller
 import scorex.block.{Block, BlockStub}
 import scala.collection.concurrent.TrieMap
 import scala.util.Random

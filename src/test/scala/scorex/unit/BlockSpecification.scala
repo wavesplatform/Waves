@@ -7,7 +7,7 @@ import scorex.consensus.nxt.{NxtBlockGenerationData, NxtBlockGenerationDataParse
 import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationFunctions}
 import scorex.consensus.{ConsensusModuleNxt, ConsensusModuleQora}
 import scorex.crypto.Base58
-import scorex.settings.Constants
+import scorex.app.settings.Constants
 import scorex.transaction.{PaymentTransaction, Transaction}
 
 import scala.util.Random

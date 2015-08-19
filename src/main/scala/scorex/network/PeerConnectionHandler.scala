@@ -5,12 +5,12 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
-import scorex.Controller
-import scorex.block.{Block, NewBlock}
+import scorex.app.Controller
+import scorex.block.Block
 import scorex.network.NetworkController.UpdateBlockchainScore
 import scorex.network.message.{Message, _}
 import scorex.transaction.Transaction.TransactionType
-import scorex.utils.ScorexLogging
+import scorex.app.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._

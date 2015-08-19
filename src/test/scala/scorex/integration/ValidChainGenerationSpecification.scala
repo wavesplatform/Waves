@@ -1,13 +1,14 @@
 package scorex.integration
 
 import java.nio.ByteBuffer
-import scorex.Controller
+import scorex.app.Controller
 import Controller._
 import org.scalatest.FunSuite
+import scorex.app.Controller
 import scorex.block.Block
 import scorex.consensus.{ConsensusModuleNxt, ConsensusModuleQora}
 import scorex.network.message.{Message, BlockMessage}
-import scorex.settings.{Constants, Settings}
+import scorex.app.settings.{Constants, Settings}
 
 class ValidChainGenerationSpecification extends FunSuite {
   test("retroactive chain test") {

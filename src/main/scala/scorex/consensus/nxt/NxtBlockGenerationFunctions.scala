@@ -1,11 +1,11 @@
 package scorex.consensus.nxt
 
-import scorex.Controller
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.app.Controller
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
-import scorex.settings.Constants
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.app.settings.Constants
+import scorex.app.utils.{NTP, ScorexLogging}
 import scorex.crypto.HashFunctionsImpl._
 
 object NxtBlockGenerationFunctions extends BlockGenerationFunctions with ScorexLogging {

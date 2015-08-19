@@ -1,13 +1,13 @@
 package scorex.consensus.qora
 
 import com.google.common.primitives.{Bytes, Longs}
-import scorex.Controller
-import scorex.utils.NTP
+import scorex.app.Controller
+import scorex.app.utils.NTP
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.SigningFunctionsImpl
-import scorex.settings.Constants
+import scorex.app.settings.Constants
 import scorex.crypto.HashFunctionsImpl._
 
 

@@ -1,6 +1,6 @@
 package scorex
 
-import scorex.api.http.ApiClient
+import scorex.app.api.http.ApiClient
 
 import scala.io.StdIn
 

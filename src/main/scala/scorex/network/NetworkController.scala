@@ -5,12 +5,11 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import scorex.Controller
-import scorex.block.BlockchainSyncer.GetMaxChainScore
-import scorex.block.{BlockchainSyncer$, NewBlock}
+import scorex.app.Controller
+import BlockchainSyncer.GetMaxChainScore
 import scorex.network.message.{Message, _}
-import scorex.settings.Settings
-import scorex.utils.ScorexLogging
+import scorex.app.settings.Settings
+import scorex.app.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global

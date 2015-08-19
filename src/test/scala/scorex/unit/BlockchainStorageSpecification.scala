@@ -1,7 +1,7 @@
 package scorex.unit
 
 import org.scalatest.FunSuite
-import scorex.Controller
+import scorex.app.Controller
 import scorex.block.NxtGenesisBlock
 
 class BlockchainStorageSpecification extends FunSuite {

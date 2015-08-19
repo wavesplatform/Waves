@@ -1,7 +1,7 @@
 package scorex.integration
 
 import play.api.libs.json.Json
-import scorex.api.http._
+import scorex.app.api.http._
 
 class BlocksRoutingSpecification extends RouteTest with BlocksHttpService {
 
