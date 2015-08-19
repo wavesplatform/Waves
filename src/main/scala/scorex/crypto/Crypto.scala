@@ -13,14 +13,14 @@ object Crypto {
   val AddressVersion: Byte = 58
   val SignatureLength = 64
   val KeyLength = 32
-  
+  val ChecksumLength = 4
 
   def getAddress(publicKey: Array[Byte]) = {
     val publicKeyHash = new RIPEMD160().digest(sha256(publicKey))
     val withoutChecksum = publicKeyHash :+ AddressVersion //prepend ADDRESS_VERSION
-    val checkSum = doubleSha256(withoutChecksum)
+    val checkSum = doubleSha256(withoutChecksum).take(ChecksumLength)
 
-    Base58.encode(withoutChecksum ++ checkSum.take(4))
+    Base58.encode(withoutChecksum ++ checkSum)
   }
 
   def isValidAddress(address: String) =
@@ -30,14 +30,14 @@ object Crypto {
       if (addressBytes.length != Account.AddressLength)
         false
       else {
-        val checkSum = addressBytes.takeRight(4)
+        val checkSum = addressBytes.takeRight(ChecksumLength)
 
         //GENERATE ADDRESS CHECKSUM
-        val digest = doubleSha256(addressBytes.dropRight(4))
-        val checkSumTwo = digest.take(4)
+        val digest = doubleSha256(addressBytes.dropRight(ChecksumLength))
+        val checkSumGenerated = digest.take(ChecksumLength)
 
         //CHECK IF CHECKSUMS ARE THE SAME
-        checkSum.sameElements(checkSumTwo)
+        checkSum.sameElements(checkSumGenerated)
       }
     }.getOrElse(false)
 
