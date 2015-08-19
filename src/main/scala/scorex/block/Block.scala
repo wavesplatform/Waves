@@ -14,8 +14,11 @@ import scorex.transaction.{GenesisTransaction, Transaction}
 
 import scala.util.Try
 
-case class BlockStub(version: Byte, reference: Array[Byte], timestamp: Long,
-                     generator: PrivateKeyAccount, generationData: Constants.ConsensusAlgo.kernelData) {
+case class BlockStub(version: Byte,
+                     reference: Array[Byte],
+                     timestamp: Long,
+                     generator: PrivateKeyAccount,
+                     generationData: Constants.ConsensusAlgo.kernelData) {
   require(reference.length == Block.ReferenceLength)
 }
 
