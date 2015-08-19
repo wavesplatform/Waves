@@ -13,7 +13,7 @@ package scorex.crypto;
  *
  */
 
-final public class Curve25519 {
+final class Curve25519 {
 
     /* key size */
     public static final int KEY_SIZE = 32;
