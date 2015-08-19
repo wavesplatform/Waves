@@ -6,7 +6,7 @@ import scorex.app.Controller
 import scorex.app.api.http.ApiClient
 import scorex.block.GenesisBlockParams
 import scorex.app.settings.Settings
-import scorex.transaction.TransactionCreator
+import scorex.transaction.TransactionProducer
 import scorex.app.utils.ScorexLogging
 
 import scala.io.StdIn
@@ -59,7 +59,7 @@ object Start extends App with ScorexLogging {
       val amt = Random.nextInt(100000).toLong
       val fee = Random.nextInt(5).toLong
 
-      val tx = TransactionCreator.createPayment(senderAcc, recipientAcc, amt, fee)
+      val tx = TransactionProducer.createPayment(senderAcc, recipientAcc, amt, fee)
       log.info(s"Payment created: $tx")
     }
   }

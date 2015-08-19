@@ -4,7 +4,7 @@ import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.app.Controller
 import scorex.transaction.Transaction.ValidationResult
-import scorex.transaction.TransactionCreator
+import scorex.transaction.TransactionProducer
 import spray.routing.HttpService
 
 import scala.util.{Failure, Success, Try}
@@ -27,7 +27,7 @@ trait PaymentHttpService extends HttpService with CommonApiFunctions {
                 case (_, _, _, Failure(_)) => ApiError.json(ApiError.InvalidRecipient)
                 case (Success(_), Success(_), Success(None), Success(_)) => ApiError.json(ApiError.InvalidSender)
                 case (Success(amount), Success(fee), Success(Some(sender)), Success(recipient)) =>
-                  val tx = TransactionCreator.createPayment(sender, new Account(recipient), amount, fee)
+                  val tx = TransactionProducer.createPayment(sender, new Account(recipient), amount, fee)
                   tx.validate() match {
                     case ValidationResult.ValidateOke =>
                       tx.json()

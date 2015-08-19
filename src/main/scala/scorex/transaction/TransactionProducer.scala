@@ -6,7 +6,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.Transaction.ValidationResult
 
 
-object TransactionCreator {
+object TransactionProducer {
   def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Transaction = {
     val time = NTP.correctedTime()
     val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
