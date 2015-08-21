@@ -29,13 +29,8 @@ libraryDependencies ++= Seq(
   "com.google.guava" % "guava" % "15.+",
   "commons-net" % "commons-net" % "3.+",
   "ch.qos.logback" % "logback-classic" % "1.+",
-  "ch.qos.logback" % "logback-core" % "1.+",
-
-  //dependencies for testing:
-  "io.spray" %% "spray-testkit" % "1.+" % "test",
-  "org.scalatest" %% "scalatest" % "2.+" % "test",
-  "org.scalactic" %% "scalactic" % "2.+" % "test"
-)
+  "ch.qos.logback" % "logback-core" % "1.+"
+) ++ Dependencies.testKit
 
 javaOptions ++= Seq(
   "-server"
