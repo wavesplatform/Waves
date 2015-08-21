@@ -1,5 +1,6 @@
 package scorex
 
+import _root_.unit.CryptoSpecification
 import org.scalatest.Suites
 import scorex.integration.BlocksRoutingSpecification
 import scorex.unit._
