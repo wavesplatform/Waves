@@ -2,17 +2,13 @@ import com.typesafe.config._
 
 val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
 
-organization := "org.consensusresearch"
+ScorexBuild.buildSettings
 
 name := appConf.getString("product")
-
-version := appConf.getString("version")
 
 licenses := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
 
 homepage := Some(url("https://github.com/ConsensusResearch/Scorex-Lagonaki"))
-
-scalaVersion := "2.11.7"
 
 resolvers ++= Seq("Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases/",
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/")
