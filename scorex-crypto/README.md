@@ -10,5 +10,6 @@ The module contains utility functions to be used by other parts of the project:
 accomplished with public key or public/private keypair. 
 
 
-Other functions can be added to build offchain/onchain protocols e.g. one-way accumulators, commitments
-(e.g. Pedersen commitment), ring signatures etc. 
+Other functions can be added to build offchain/onchain protocols e.g. 
+other hash functions(e.g. keccak256 / sha3), Merkle trees, one-way accumulators, 
+commitments (e.g. Pedersen commitment), ring signatures etc. 

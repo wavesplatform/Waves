@@ -8,6 +8,15 @@ import scorex.consensus.qora.{QoraBlockGenerationData, QoraBlockGenerationDataPa
  * Data and functions related to a consensus algo
  */
 
+/*
+ To modularize consensus part of the Scorex:
+  - blockscore could be state-dependent
+  - isValid is state-dependent
+  - Block structure knowledge is needed for generateBlock
+  -
+
+ */
+
 sealed trait ConsensusModule {
   type kernelData <: BlockGenerationData
 
