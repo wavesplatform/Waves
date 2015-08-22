@@ -2,17 +2,13 @@ import com.typesafe.config._
 
 val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
 
-organization := "org.consensusresearch"
+ScorexBuild.buildSettings
 
 name := appConf.getString("product")
-
-version := appConf.getString("version")
 
 licenses := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
 
 homepage := Some(url("https://github.com/ConsensusResearch/Scorex-Lagonaki"))
-
-scalaVersion := "2.11.7"
 
 resolvers ++= Seq("Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases/",
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/")
@@ -29,13 +25,8 @@ libraryDependencies ++= Seq(
   "com.google.guava" % "guava" % "15.+",
   "commons-net" % "commons-net" % "3.+",
   "ch.qos.logback" % "logback-classic" % "1.+",
-  "ch.qos.logback" % "logback-core" % "1.+",
-
-  //dependencies for testing:
-  "io.spray" %% "spray-testkit" % "1.+" % "test",
-  "org.scalatest" %% "scalatest" % "2.+" % "test",
-  "org.scalactic" %% "scalactic" % "2.+" % "test"
-)
+  "ch.qos.logback" % "logback-core" % "1.+"
+) ++ Dependencies.testKit
 
 javaOptions ++= Seq(
   "-server"
