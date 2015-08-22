@@ -1,14 +1,12 @@
 package scorex
 
-import _root_.unit.CryptoSpecification
 import org.scalatest.Suites
 import scorex.integration.BlocksRoutingSpecification
 import scorex.unit._
 
 class ScorexTestSuite extends Suites(
   //unit tests
-  new CryptoSpecification
-  ,new MessageSpecification
+  new MessageSpecification
   ,new TransactionSpecification
   ,new BlockSpecification
   ,new BlockchainStorageSpecification

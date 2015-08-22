@@ -14,5 +14,4 @@ object ScorexBuild extends Build {
   lazy val root = Project(id = "scorex", base = file(".")).aggregate(crypto).dependsOn(crypto)
 
   lazy val crypto = subModule("crypto")
-
 }
