@@ -1,5 +1,6 @@
 package unit
 
+import org.scalatest.{Matchers, FunSuite}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.{Base58, SigningFunctionsImpl}
 
