@@ -7,7 +7,7 @@ import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.Base58
 import scorex.transaction.Transaction.TransactionType
-import scorex.crypto.HashFunctionsImpl._
+import scorex.crypto.Sha256._
 
 
 case class GenesisTransaction(override val recipient: Account,

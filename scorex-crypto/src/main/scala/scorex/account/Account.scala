@@ -17,7 +17,7 @@ class Account(val address: String) extends Serializable {
 
 
 object Account {
-  import scorex.crypto.HashFunctionsImpl._
+  import scorex.crypto.Sha256._
 
   val AddressLength = 25
 

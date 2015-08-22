@@ -6,7 +6,7 @@ import scorex.app.Controller
 import scorex.block.{Block, QoraGenesisBlockGenerationData}
 import scorex.consensus.BlockGenerationData
 import scorex.crypto.Base58
-import scorex.crypto.HashFunctionsImpl._
+import scorex.crypto.Sha256._
 
 case class QoraBlockGenerationData(generatingBalance: Long, generatorSignature: Array[Byte])
   extends BlockGenerationData {

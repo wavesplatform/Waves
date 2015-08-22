@@ -10,7 +10,7 @@ import scorex.app.utils.ScorexLogging
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.util.Try
-import scorex.crypto.HashFunctionsImpl._
+import scorex.crypto.Sha256._
 
 
 class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) extends ScorexLogging {

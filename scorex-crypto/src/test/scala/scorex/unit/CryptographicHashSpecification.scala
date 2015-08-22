@@ -3,8 +3,8 @@ package scorex.unit
 import org.scalatest.{FunSuite, Matchers}
 
 
-class HashFunctionsSpecification  extends FunSuite with Matchers {
-  import scorex.crypto.HashFunctionsImpl._
+class CryptographicHashSpecification  extends FunSuite with Matchers {
+  import scorex.crypto.Sha256._
 
   val testBytes = "hello world".getBytes
 

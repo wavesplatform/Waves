@@ -8,7 +8,7 @@ import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
 import scorex.crypto.SigningFunctionsImpl
 import scorex.app.settings.Constants
-import scorex.crypto.HashFunctionsImpl._
+import scorex.crypto.Sha256._
 
 
 //!! a lot of asInstanceOf[QoraBlockGenerationData] in the code, not type-safe

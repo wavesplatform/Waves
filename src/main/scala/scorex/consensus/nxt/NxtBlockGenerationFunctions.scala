@@ -6,7 +6,7 @@ import scorex.block.{Block, BlockStub}
 import scorex.consensus.BlockGenerationFunctions
 import scorex.app.settings.Constants
 import scorex.app.utils.{NTP, ScorexLogging}
-import scorex.crypto.HashFunctionsImpl._
+import scorex.crypto.Sha256._
 
 object NxtBlockGenerationFunctions extends BlockGenerationFunctions with ScorexLogging {
   val AvgFrequency = 2 //60 - the algo's goal is 1 block per minute in average

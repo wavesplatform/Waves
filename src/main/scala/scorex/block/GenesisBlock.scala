@@ -48,7 +48,7 @@ abstract class GenesisBlock(override val generationData: kernelData, override va
 
 
 object QoraGenesisBlockGenerationData {
-  import scorex.crypto.HashFunctionsImpl._
+  import scorex.crypto.Sha256._
 
   val generatingBalance = 10000000
 

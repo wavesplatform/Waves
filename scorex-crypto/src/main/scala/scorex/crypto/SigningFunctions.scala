@@ -26,7 +26,7 @@ trait SigningFunctions {
 
 object SigningFunctionsImpl extends SigningFunctions {
 
-  import HashFunctionsImpl._
+  import Sha256._
 
   override val SignatureLength = 64
   override val KeyLength = Curve25519.KEY_SIZE
