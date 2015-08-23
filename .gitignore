@@ -1,10 +1,6 @@
-/data
-/Data Files
-/ACCOUNTS.txt
-/settings.ini
-/bin
 .idea
 /target
 /project/target
 /project/project/target
 /out
+scorex-errors.log
