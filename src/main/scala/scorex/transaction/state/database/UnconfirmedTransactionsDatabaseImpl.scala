@@ -1,4 +1,4 @@
-package scorex.state.database
+package scorex.transaction.state.database
 
 import com.google.common.primitives.Longs
 import scorex.transaction.Transaction

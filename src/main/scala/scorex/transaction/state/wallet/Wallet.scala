@@ -1,4 +1,4 @@
-package scorex.state.wallet
+package scorex.transaction.state.wallet
 
 import java.io.File
 

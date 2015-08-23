@@ -1,4 +1,4 @@
-package scorex.state.database
+package scorex.transaction.state.database
 
 import scorex.transaction.Transaction
 

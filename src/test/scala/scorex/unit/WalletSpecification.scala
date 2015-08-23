@@ -2,7 +2,7 @@ package scorex.unit
 
 import org.scalatest.FunSuite
 import scorex.crypto.Base58
-import scorex.state.wallet.Wallet
+import scorex.transaction.state.wallet.Wallet
 
 import scala.util.Random
 

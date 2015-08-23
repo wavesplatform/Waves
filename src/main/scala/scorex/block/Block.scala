@@ -7,7 +7,7 @@ import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Controller
 import scorex.crypto.{Base58, SigningFunctionsImpl}
-import scorex.state.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.app.settings.Constants
 import scorex.transaction.Transaction.ValidationResult
 import scorex.transaction.{GenesisTransaction, Transaction}

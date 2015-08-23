@@ -1,7 +1,7 @@
 package scorex.network
 
 import java.net.InetSocketAddress
-import scorex.state.database.PeerDatabaseImpl
+import scorex.transaction.state.database.PeerDatabaseImpl
 import scorex.app.settings.Settings
 import scorex.app.utils.ScorexLogging
 

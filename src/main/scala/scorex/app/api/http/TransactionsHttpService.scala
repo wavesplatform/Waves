@@ -3,7 +3,7 @@ package scorex.app.api.http
 import play.api.libs.json.Json
 import scorex.app.Controller
 import scorex.crypto.Base58
-import scorex.state.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import spray.routing.HttpService
 
 import scala.util.Try

@@ -1,4 +1,4 @@
-package scorex.state.database.blockchain
+package scorex.transaction.state.database.blockchain
 
 import java.io.File
 

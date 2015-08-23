@@ -7,9 +7,9 @@ import scorex.app.settings.{Constants, Settings}
 import scorex.app.utils.ScorexLogging
 import scorex.network.{BlockchainSyncer, NetworkController}
 import scorex.network.message._
-import scorex.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.state.database.blockchain.PrunableBlockchainStorage
-import scorex.state.wallet.Wallet
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.transaction.state.database.blockchain.PrunableBlockchainStorage
+import scorex.transaction.state.wallet.Wallet
 import scorex.transaction.Transaction
 import spray.can.Http
 
