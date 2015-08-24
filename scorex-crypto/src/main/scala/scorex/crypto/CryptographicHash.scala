@@ -19,7 +19,7 @@ import java.security.MessageDigest
  */
 
 trait CryptographicHash {
-  val ValueSize:Int   //in Bytes
+  val ValueSize: Int //in Bytes
 
   type Message = Array[Byte]
   type Digest = Array[Byte]
