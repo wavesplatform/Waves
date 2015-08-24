@@ -24,9 +24,9 @@ trait CryptographicHash {
   type Message = Array[Byte]
   type Digest = Array[Byte]
 
-  def doubleHash(input: Message): Digest = hash(hash(input))
-
   def hash(input: Message): Digest
+
+  def doubleHash(input: Message): Digest = hash(hash(input))
 }
 
 /**
