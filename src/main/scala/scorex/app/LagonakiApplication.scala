@@ -40,7 +40,6 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
       storedState.processBlock(genesisBlock)
       blockchainStorage.appendBlock(genesisBlock)
       log.info("Genesis block has been added to the state")
-      Thread.sleep(5000)
     }.ensuring(blockchainStorage.height() >= 1 &&
       blockchainStorage.lastBlock.isValid &&
       blockchainStorage.lastBlock.transactionModule.balancesSupport &&

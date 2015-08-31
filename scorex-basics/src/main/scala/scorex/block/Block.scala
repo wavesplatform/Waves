@@ -3,12 +3,13 @@ package scorex.block
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
-import scorex.block.Block._
-import scorex.consensus.{ConsensusModule}
+import scorex.block.Block.BlockId
+import scorex.consensus.ConsensusModule
 import scorex.crypto.{Base58, SigningFunctionsImpl}
 import scorex.transaction.{Transaction, TransactionModule}
+import scorex.utils.ScorexLogging
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 abstract class BlockField[T] {
   val name: String
@@ -125,14 +126,18 @@ trait Block {
 }
 
 
-object Block {
+object Block extends ScorexLogging {
   type BlockId = Array[Byte]
 
   val BlockIdLength = SigningFunctionsImpl.SignatureLength
 
   def parse[CDT, TDT](bytes: Array[Byte])
-           (implicit consensusModule: ConsensusModule[CDT],
-            transactionModule: TransactionModule[TDT]): Try[Block] = Try {
+           (implicit consModule: ConsensusModule[CDT],
+            transModule: TransactionModule[TDT]): Try[Block] = Try {
+
+    require(consModule != null)
+    require(transModule != null)
+
     var position = 1
 
     val version = bytes.head
@@ -146,14 +151,14 @@ object Block {
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position+4))
     position += 4
     val cBytes = bytes.slice(position, position + cBytesLength)
-    val consBlockField = consensusModule.parseBlockData(cBytes)
+    val consBlockField = consModule.parseBlockData(cBytes)
     position += cBytesLength
 
 
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position+4))
     position += 4
     val tBytes = bytes.slice(position, position + tBytesLength)
-    val txBlockField = transactionModule.parseBlockData(tBytes)
+    val txBlockField = transModule.parseBlockData(tBytes)
     position += tBytesLength
 
     val genPK = bytes.slice(position, position + SigningFunctionsImpl.KeyLength)
@@ -167,7 +172,8 @@ object Block {
 
       override val transactionDataField: BlockField[TT] = txBlockField
 
-      override implicit val transactionModule: TransactionModule[TT] = transactionModule.ensuring(_ != null)
+      override implicit val consensusModule: ConsensusModule[CT] = consModule
+      override implicit val transactionModule: TransactionModule[TT] = transModule
 
       override val versionField: ByteBlockField = ByteBlockField("version", version)
       override val referenceField: BlockIdField = BlockIdField("reference", reference)
@@ -179,9 +185,12 @@ object Block {
       //todo: wrong!
       override val uniqueId: BlockId = signature
 
-      override implicit val consensusModule: ConsensusModule[CT] = consensusModule.ensuring(_ != null)
       override val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
     }
+  }.recoverWith{case t:Throwable =>
+    log.error("Error when parsing block", t)
+    t.printStackTrace()
+    Failure(t)
   }
 }
 

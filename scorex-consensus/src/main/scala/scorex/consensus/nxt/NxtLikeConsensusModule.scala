@@ -54,7 +54,7 @@ class NxtLikeConsensusModule
                                     (implicit transactionModule: TransactionModule[TT]): Option[Block] = {
 
     val lastBlock = history.asInstanceOf[BlockChain].lastBlock
-    val lastBlockKernelData = lastBlock.consensusDataField.asInstanceOf[NxtLikeConsensusBlockData]
+    val lastBlockKernelData = lastBlock.consensusDataField.asInstanceOf[NxtConsensusBlockField].value
 
     val lastBlockTime = lastBlock.timestampField.value
 
@@ -64,7 +64,7 @@ class NxtLikeConsensusModule
     val eta = (NTP.correctedTime() - lastBlockTime) / 1000
 
     log.debug(s"hit: $h, target: $t, generating ${h < t}, eta $eta, " +
-      s"account balance: ${transactionModule.asInstanceOf[BalanceSheet].generationBalance(account)}")
+      s"account balance: ${transactionModule.state.asInstanceOf[BalanceSheet].generationBalance(account)}")
 
     if (h < t) {
       val timestamp = NTP.correctedTime()
@@ -100,7 +100,7 @@ class NxtLikeConsensusModule
                          lastBlockTimestamp: Long,
                          generator: PublicKeyAccount)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val eta = (NTP.correctedTime() - lastBlockTimestamp) / 1000 //in seconds
-    val effBalance: BigDecimal = transactionModule.asInstanceOf[BalanceSheet].generationBalance(generator)
+    val effBalance: BigDecimal = transactionModule.state.asInstanceOf[BalanceSheet].generationBalance(generator)
     (lastBlockData.baseTarget * eta * effBalance).toBigInt()
   }
 
@@ -115,7 +115,7 @@ class NxtLikeConsensusModule
 
   override def blockScore(block: Block, history: History)
                          (implicit transactionModule: TransactionModule[_]): BigInt = {
-    val baseTarget = block.consensusDataField.asInstanceOf[NxtLikeConsensusBlockData].baseTarget
+    val baseTarget = block.consensusDataField.asInstanceOf[NxtConsensusBlockField].value.baseTarget
     BigInt("18446744073709551616") / baseTarget
   }
 

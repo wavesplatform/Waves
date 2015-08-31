@@ -48,7 +48,9 @@ class StoredBlockchain(dataFolderOpt: Option[String])
 
     //todo: exceptions handling, err log output
     override def readBlock(height: Int): Option[Block] = {
-      val is = new DataInputStream(blockFile(height).inputStream())
+      val file = blockFile(height)
+
+      val is = new DataInputStream(file.inputStream())
       try {
         val szBytes = new Array[Byte](4)
         is.read(szBytes, 0, 4)

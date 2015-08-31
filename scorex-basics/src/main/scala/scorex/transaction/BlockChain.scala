@@ -1,8 +1,9 @@
 package scorex.transaction
 
 import scorex.block.Block
+import scorex.utils.ScorexLogging
 
-trait BlockChain extends History {
+trait BlockChain extends History with ScorexLogging {
 
   def blockAt(height: Int): Option[Block]
 
@@ -11,7 +12,7 @@ trait BlockChain extends History {
 
   def discardBlock(): BlockChain
 
-  def lastBlock: Block = blockAt(height()).get
+  def lastBlock: Block = blockAt(height())  .get
 
   def getSignatures(parentSignature: Block.BlockId, howMany: Int): Seq[Block.BlockId] =
     heightOf(parentSignature).map { h =>
