@@ -5,7 +5,7 @@ object ScorexBuild extends Build {
 
   lazy val buildSettings = Seq(
     organization := "org.consensusresearch",
-    version := "1.0.4-SNAPSHOT",
+    version := "1.0.4",
     scalaVersion := "2.11.7"
   )
 
