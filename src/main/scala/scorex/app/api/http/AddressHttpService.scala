@@ -3,7 +3,7 @@ package scorex.app.api.http
 import java.nio.charset.StandardCharsets
 import play.api.libs.json.Json
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.app.Controller
+import scorex.app.LagonakiApplication
 import scorex.crypto.{Base58, SigningFunctionsImpl}
 import spray.routing.HttpService
 
@@ -11,8 +11,10 @@ import scala.util.{Failure, Success, Try}
 
 
 trait AddressHttpService extends HttpService with CommonApiFunctions {
+  val application:LagonakiApplication
 
-  import Controller.wallet
+  lazy val wallet = application.wallet
+  lazy val state = application.storedState
 
   lazy val adressesRouting =
     pathPrefix("addresses") {
@@ -78,7 +80,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
             } else {
               Json.obj(
                 "address" -> address,
-                "balance" -> Controller.blockchainStorage.generationBalance(address)
+                "balance" -> state.generationBalance(address)
               )
             }
             Json.stringify(jsRes)
@@ -189,7 +191,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
       Json.obj(
         "address" -> address,
         "confirmations" -> confirmations,
-        "balance" -> Controller.blockchainStorage.balance(address, confirmations)
+        "balance" -> state.balance(address, confirmations)
       )
     }
 }

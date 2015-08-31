@@ -4,12 +4,11 @@ import java.io.{BufferedReader, InputStreamReader}
 import java.net.{HttpURLConnection, URL}
 
 import play.libs.Json
-import scorex.app.settings.Settings
-
+import scorex.app.LagonakiApplication
 import scala.util.Try
 
 
-object ApiClient {
+class ApiClient(application:LagonakiApplication) {
 
   def executeCommand(command: String): String = {
     if (command.equals("help")) {
@@ -23,7 +22,7 @@ object ApiClient {
         command.substring((method + " " + path + " ").length())
       } else ""
 
-      val url = new URL("http://127.0.0.1:" + Settings.rpcPort + "/" + path)
+      val url = new URL("http://127.0.0.1:" + application.settings.rpcPort + "/" + path)
       val connection = url.openConnection().asInstanceOf[HttpURLConnection]
       connection.setRequestMethod(method)
 

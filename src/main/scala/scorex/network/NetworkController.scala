@@ -5,11 +5,10 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import scorex.app.Controller
-import BlockchainSyncer.GetMaxChainScore
+import scorex.app.LagonakiApplication
+import scorex.network.BlockchainSyncer.GetMaxChainScore
 import scorex.network.message.{Message, _}
-import scorex.app.settings.Settings
-import scorex.app.utils.ScorexLogging
+import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -17,11 +16,15 @@ import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
 //must be singleton
-class NetworkController extends Actor with ScorexLogging {
+class NetworkController(application: LagonakiApplication) extends Actor with ScorexLogging {
 
   import NetworkController._
 
   private implicit val system = context.system
+
+  private val settings = application.settings
+  private lazy val blockchainSyncer = application.blockchainSyncer
+  private lazy val peerManager = new PeerManager(application.settings)
 
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerData]()
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
@@ -30,10 +33,7 @@ class NetworkController extends Actor with ScorexLogging {
 
   private def maxScoreHandler() = Try(connectedPeers.maxBy(_._2.blockchainScore)._2.handler).toOption
 
-  //todo: a bit stupid workaround, consider more elegant solution for circular linking
-  private var blockchainControllerOpt: Option[ActorRef] = None
-
-  IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(Settings.bindAddress), Settings.Port))
+  IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.Port))
 
   private def updateScore(remote: InetSocketAddress, height: Int, score: BigInt) = {
     val prevBestScore = maxPeerScore().getOrElse(0: BigInt)
@@ -45,28 +45,28 @@ class NetworkController extends Actor with ScorexLogging {
 
     if (score > prevBestScore) {
       connectedPeers.foreach { case (_, PeerData(handler, _)) =>
-        handler ! PeerConnectionHandler.BestPeer(remote, score > Controller.blockchainStorage.score)
+        handler ! PeerConnectionHandler.BestPeer(remote, score > application.blockchainStorage.score)
       }
     }
   }
 
   override def receive = {
     case b@Bound(localAddress) =>
-      log.info("Successfully bound to the port " + Settings.Port)
+      log.info("Successfully bound to the port " + settings.Port)
       context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)
       context.system.scheduler.schedule(500.millis, 5.seconds)(self ! AskForPeers)
 
     case CommandFailed(_: Bind) =>
-      log.error("Network port " + Settings.Port + " already in use!")
+      log.error("Network port " + settings.Port + " already in use!")
       context stop self
-      Controller.stopAll()
+      application.stopAll()
 
     case CheckPeers =>
-      if (connectedPeers.size < Settings.maxConnections) {
-        val peer = PeerManager.randomPeer()
+      if (connectedPeers.size < settings.maxConnections) {
+        val peer = peerManager.randomPeer()
         if (!connectedPeers.contains(peer) && !connectingPeers.contains(peer)) {
           connectingPeers += peer
-          val connTimeout = Some(new FiniteDuration(Settings.connectionTimeout, SECONDS))
+          val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
           IO(Tcp) ! Connect(peer, timeout = connTimeout)
         }
       }
@@ -75,15 +75,15 @@ class NetworkController extends Actor with ScorexLogging {
       log.info(s"Connected to $remote")
       connectingPeers -= remote
       val connection = sender()
-      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], self, connection, remote))
+      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
       connection ! Register(handler)
       connectedPeers += remote -> PeerData(handler, None)
-      PeerManager.peerConnected(remote)
+      peerManager.peerConnected(remote)
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
       connectedPeers -= c.remoteAddress
-      PeerManager.peerDisconnected(c.remoteAddress)
+      peerManager.peerDisconnected(c.remoteAddress)
 
     case CommandFailed(cmd: Tcp.Command) =>
       log.info("Failed to execute command : " + cmd)
@@ -96,7 +96,7 @@ class NetworkController extends Actor with ScorexLogging {
 
     case PeerDisconnected(remote) =>
       connectedPeers -= remote
-      PeerManager.peerDisconnected(remote)
+      peerManager.peerDisconnected(remote)
 
     case AskForPeers =>
       val handlers = connectedPeers.values.toList
@@ -121,15 +121,13 @@ class NetworkController extends Actor with ScorexLogging {
     case GetPeers => sender() ! connectedPeers.toMap
 
     case GetMaxChainScore =>
-      if (blockchainControllerOpt.isEmpty) blockchainControllerOpt = Some(sender())
       sender() ! BlockchainSyncer.MaxChainScore(maxPeerScore())
 
     case NewBlock(block, Some(sndr)) =>
-      blockchainControllerOpt.foreach { blockchainController =>
-        blockchainController ! NewBlock(block, Some(sndr))
-        val height = Controller.blockchainStorage.height()
-        self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
-      }
+      blockchainSyncer ! NewBlock(block, Some(sndr))
+      val height = application.blockchainStorage.height()
+      self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
+
 
     case UpdateBlockchainScore(remote, height, score) => updateScore(remote, height, score)
 

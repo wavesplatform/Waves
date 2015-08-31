@@ -3,11 +3,11 @@ package scorex.network
 import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorRef}
-import scorex.app.Controller
+import scorex.app.LagonakiApplication
 import scorex.app.settings.Constants
-import scorex.app.utils.ScorexLogging
 import scorex.block.Block
 import scorex.network.message.{BlockMessage, GetSignaturesMessage}
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -19,9 +19,11 @@ case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 
 case class BlocksDownload(signatures: List[Array[Byte]], peer: InetSocketAddress)
 
-case class BlockchainSyncer(networkController: ActorRef) extends Actor with ScorexLogging {
+case class BlockchainSyncer(application: LagonakiApplication) extends Actor with ScorexLogging {
 
   import BlockchainSyncer._
+
+  private lazy val networkController = application.networkController
 
   private var status = Status.Offline
 
@@ -36,30 +38,39 @@ case class BlockchainSyncer(networkController: ActorRef) extends Actor with Scor
         case Status.Offline =>
 
         case Status.Syncing =>
-          val msg = GetSignaturesMessage(Controller.blockchainStorage.lastSignatures())
+          val sigs = application.blockchainStorage.lastSignatures(application.settings.MaxBlocksChunks)
+          val msg = GetSignaturesMessage(sigs)
           networkController ! NetworkController.SendMessageToBestPeer(msg)
 
         case Status.Generating =>
           log.info("Trying to generate a new block")
-          Constants.ConsensusAlgo.consensusFunctions.generateBlock().foreach { block =>
-            self ! NewBlock(block, None)
+          application.wallet.privateKeyAccounts().find{privKeyAcc =>
+            val state = application.storedState
+            val history = application.blockchainStorage
+            implicit val transactionModule = application.transactionModule
+            application.consensusModule.generateNextBlock(privKeyAcc, state, history) match {
+              case Some(block) =>
+                self ! NewBlock(block, None)
+                true
+              case None => false
+            }
           }
       }
 
     case MaxChainScore(scoreOpt) => scoreOpt match {
       case Some(maxScore) =>
-        if (maxScore > Controller.blockchainStorage.score) status = Status.Syncing
+        if (maxScore > application.blockchainStorage.score) status = Status.Syncing
         else status = Status.Generating
 
       case None => status = Status.Offline
     }
 
     case NewBlock(block, remoteOpt) =>
-      if (Block.isNewBlockValid(block)) {
+      if (block.isValid) {
         log.info(s"New block: $block")
-        block.process()
-        Controller.blockchainStorage.appendBlock(block)
-        val height = Controller.blockchainStorage.height()
+        application.storedState.processBlock(block)
+        application.blockchainStorage.appendBlock(block)
+        val height = application.blockchainStorage.height()
         val exceptOf = remoteOpt.toList
         networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block), exceptOf)
       } else {

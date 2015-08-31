@@ -5,13 +5,19 @@ object ScorexBuild extends Build {
 
   lazy val buildSettings = Seq(
     organization := "org.consensusresearch",
-    version := "1.0.4-SNAPSHOT",
+    version := "1.0.5-SNAPSHOT",
     scalaVersion := "2.11.7"
   )
 
   def subModule(id: String): Project = Project(id = id, base = file(s"scorex-$id"))
 
-  lazy val root = Project(id = "scorex", base = file(".")).aggregate(crypto).dependsOn(crypto)
+  lazy val root = Project(id = "scorex", base = file("."))
+    .aggregate(basics, transaction, consensus)
+    .dependsOn(basics, transaction, consensus)
 
-  lazy val crypto = subModule("crypto")
+  lazy val basics = subModule("basics")
+
+  lazy val transaction = subModule("transaction").aggregate(basics).dependsOn(basics)
+
+  lazy val consensus = subModule("consensus").aggregate(basics).dependsOn(basics)
 }

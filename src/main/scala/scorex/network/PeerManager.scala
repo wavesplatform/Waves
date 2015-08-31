@@ -1,20 +1,20 @@
 package scorex.network
 
 import java.net.InetSocketAddress
+import scorex.app.LagonakiSettings
 import scorex.transaction.state.database.PeerDatabaseImpl
-import scorex.app.settings.Settings
-import scorex.app.utils.ScorexLogging
+import scorex.utils.ScorexLogging
 
 import scala.util.Random
 
-object PeerManager extends ScorexLogging {
+class PeerManager(settings: LagonakiSettings) extends ScorexLogging {
   private val DatabasePeersAmount = 1000
 
   def knownPeers(): Seq[InetSocketAddress] = {
     val knownPeers = PeerDatabaseImpl.knownPeers()
     log.info("Peers retrieved from database : " + knownPeers)
     if (knownPeers.size < DatabasePeersAmount) {
-      val allPeers = Settings.knownPeers ++ knownPeers
+      val allPeers = settings.knownPeers ++ knownPeers
       log.info("Peers retrieved including settings : " + allPeers)
       allPeers
     } else knownPeers
@@ -33,10 +33,10 @@ object PeerManager extends ScorexLogging {
     peers(Random.nextInt(peers.size))
   }
 
-  def addPeer(peer: InetSocketAddress): Unit = {
-    //require(peer.getPort == Settings.Port)
-    if (!Settings.knownPeers.contains(peer)) PeerDatabaseImpl.addKnownPeer(peer)
-  }
+  def addPeer(peer: InetSocketAddress): Unit =
+    if (!settings.knownPeers.contains(peer))
+      PeerDatabaseImpl.addKnownPeer(peer)
+
 
   def blacklistPeer(peer: InetSocketAddress) = {
     PeerDatabaseImpl.removeConnectedPeer(peer)

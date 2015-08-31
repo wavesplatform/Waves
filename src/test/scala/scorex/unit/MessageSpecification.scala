@@ -3,9 +3,17 @@ package scorex.unit
 import java.nio.ByteBuffer
 
 import org.scalatest.FunSuite
+import scorex.app.LagonakiSettings
+import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.network.message._
+import scorex.transaction.SimpleTransactionModule
 
 class MessageSpecification extends FunSuite {
+  implicit val consensusModule = new NxtLikeConsensusModule
+  implicit val settings = new LagonakiSettings("settings-test.json")
+  implicit val transactionModule = new SimpleTransactionModule
+
+
   test("PingMessage roundtrip") {
     val msg = PingMessage
     val parsedTry = Message.parse(ByteBuffer.wrap(msg.bytes))

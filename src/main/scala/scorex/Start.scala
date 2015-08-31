@@ -1,29 +1,25 @@
 package scorex
 
 
-import scorex.account.Account
-import scorex.app.Controller
-import scorex.app.api.http.ApiClient
-import scorex.block.GenesisBlockParams
-import scorex.app.settings.Settings
-import scorex.transaction.TransactionProducer
-import scorex.app.utils.ScorexLogging
+import scorex.app.LagonakiApplication
+import scorex.transaction.GenesisTransaction
+import scorex.utils.ScorexLogging
 
-import scala.io.StdIn
 import scala.util.{Failure, Random, Try}
 
 
 object Start extends App with ScorexLogging {
 
-  import Controller.wallet
-
   log.debug("main " + args)
   Try {
-    if (args.length > 0) Settings.filename = args(0)
-    log.debug("Controller init")
-    Controller.init() //STARTING NETWORK/BLOCKCHAIN/RPC
+    val filename = if (args.length > 0) args(0) else "settings.json"
+
+    val application = new LagonakiApplication(filename)
+
+    log.debug("LagonakiApplication init")
+    application.init() //STARTING NETWORK/BLOCKCHAIN/RPC
     Thread.sleep(1000)
-    testingScript()
+    testingScript(application)
   } match {
     case Failure(e) =>
       e.printStackTrace()
@@ -33,8 +29,9 @@ object Start extends App with ScorexLogging {
       System.exit(0) // force all threads shutdown
   }
 
-  def testingScript(): Unit = {
+  def testingScript(application: LagonakiApplication): Unit = {
     log.info("Going to execute testing scenario")
+    val wallet = application.wallet
 
     wallet.generateNewAccounts(10)
     wallet.privateKeyAccounts().takeRight(5).foreach(wallet.deleteAccount)
@@ -47,19 +44,26 @@ object Start extends App with ScorexLogging {
 
     Thread.sleep(10000)
 
+    val genesisBlock = application.blockchainStorage.blockAt(1)
+    val genesisAccs = genesisBlock.get.transactions.flatMap { tx => tx match {
+      case gtx: GenesisTransaction =>
+        Some(gtx.recipient)
+      case _ =>
+        log.error("Non-genesis tx in the genesis block!")
+        None
+    }
+    }
+
     (1 to Int.MaxValue).foreach { _ =>
       Thread.sleep(2000)
-      val rndIdx = Random.nextInt(GenesisBlockParams.ipoMembers.size)
-      val recipientAddress = GenesisBlockParams.ipoMembers(rndIdx)
-
       val pkAccs = wallet.privateKeyAccounts().ensuring(_.nonEmpty)
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
-      val recipientAcc = new Account(recipientAddress)
+      val recipientAcc = genesisAccs(Random.nextInt(genesisAccs.size))
 
       val amt = Random.nextInt(100000).toLong
       val fee = Random.nextInt(5).toLong
 
-      val tx = TransactionProducer.createPayment(senderAcc, recipientAcc, amt, fee)
+      val tx = application.createPayment(senderAcc, recipientAcc, amt, fee)
       log.info(s"Payment created: $tx")
     }
   }

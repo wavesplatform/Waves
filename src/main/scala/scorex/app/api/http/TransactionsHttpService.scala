@@ -1,7 +1,7 @@
 package scorex.app.api.http
 
 import play.api.libs.json.Json
-import scorex.app.Controller
+import scorex.app.LagonakiApplication
 import scorex.crypto.Base58
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import spray.routing.HttpService
@@ -10,6 +10,8 @@ import scala.util.Try
 
 
 trait TransactionsHttpService extends HttpService with CommonApiFunctions {
+
+  val application:LagonakiApplication
 
   lazy val transactionsRouting =
     pathPrefix("transactions") {
@@ -30,14 +32,14 @@ trait TransactionsHttpService extends HttpService with CommonApiFunctions {
       } ~ path("address" / Segment) { case address =>
         get {
           complete {
-            val txs = Controller.blockchainStorage.accountTransactions(address)
+            val txs = application.storedState.accountTransactions(address)
             Json.arr(txs.map(_.json())).toString()
           }
         }
       } ~ path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
         get {
           complete {
-            val txs = Controller.blockchainStorage.accountTransactions(address).takeRight(limit)
+            val txs = application.storedState.accountTransactions(address).takeRight(limit)
             Json.arr(txs.map(_.json())).toString()
           }
         }

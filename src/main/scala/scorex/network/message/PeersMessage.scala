@@ -4,7 +4,6 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import scorex.app.settings.Settings
 
 
 case class PeersMessage(peers: Seq[InetSocketAddress]) extends Message {
@@ -17,8 +16,9 @@ case class PeersMessage(peers: Seq[InetSocketAddress]) extends Message {
     val length = peers.size
     val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DataLength, 0)
 
-    peers.foldLeft(lengthBytes) { case (bytes, peer) =>
-      Bytes.concat(bytes, peer.getAddress.getAddress)
+    peers.foldLeft(lengthBytes) { case (bs, peer) =>
+      Bytes.concat(bs,
+        peer.getAddress.getAddress, Bytes.ensureCapacity(Ints.toByteArray(peer.getPort), 4, 0))
     }
   }
 }
@@ -26,6 +26,7 @@ case class PeersMessage(peers: Seq[InetSocketAddress]) extends Message {
 
 object PeersMessage {
   private val AddressLength = 4
+  private val PortLength = 4
   private val DataLength = 4
 
   def apply(data: Array[Byte]): PeersMessage = {
@@ -34,14 +35,15 @@ object PeersMessage {
     val length = Ints.fromByteArray(lengthBytes)
 
     //CHECK IF DATA MATCHES LENGTH
-    if (data.length != DataLength + (length * AddressLength))
+    if (data.length != DataLength + (length * (AddressLength + PortLength)))
       throw new Exception("Data does not match length")
 
     val peers = (0 to length - 1).map { i =>
-      val position = lengthBytes.length + (i * AddressLength)
+      val position = lengthBytes.length + (i * (AddressLength + PortLength))
       val addressBytes = util.Arrays.copyOfRange(data, position, position + AddressLength)
       val address = InetAddress.getByAddress(addressBytes)
-      new InetSocketAddress(address, Settings.Port)
+      val portBytes = util.Arrays.copyOfRange(data, position + AddressLength, position + AddressLength + PortLength)
+      new InetSocketAddress(address, Ints.fromByteArray(portBytes))
     }
 
     new PeersMessage(peers)

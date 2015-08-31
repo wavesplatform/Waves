@@ -3,7 +3,9 @@ package scorex.network.message
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
+import scorex.consensus.ConsensusModule
 import scorex.crypto.Sha256._
+import scorex.transaction.TransactionModule
 
 import scala.util.Try
 
@@ -13,7 +15,7 @@ abstract class Message {
 
   val messageType: Byte
 
-  lazy val mhash = hash(bytes)
+  //lazy val mhash = hash(bytes)
 
   val dataBytes: Array[Byte]
   lazy val dataLength: Int = dataBytes.length
@@ -37,7 +39,7 @@ object Message {
   val MagicLength = MAGIC.length
 
   val TypeLength = 4
-  val MessageLength = 4
+  //val MessageLength = 4
   val ChecksumLength = 4
 
   val GetPeersType = 1: Byte
@@ -50,8 +52,9 @@ object Message {
   val TransactionType = 8: Byte
   val PingType = 9: Byte
 
-  def parse(bytes: ByteBuffer): Try[Message] = Try {
-    val magic = new Array[Byte](MessageLength)
+  def parse(bytes: ByteBuffer)(implicit consensusModule: ConsensusModule[_],
+                               transactionModule: TransactionModule[_]): Try[Message] = Try {
+    val magic = new Array[Byte](MagicLength)
     bytes.get(magic)
 
     if (!magic.sameElements(Message.MAGIC)) throw new Exception("wrong magic")

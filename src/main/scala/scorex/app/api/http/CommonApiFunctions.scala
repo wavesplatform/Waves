@@ -3,23 +3,25 @@ package scorex.app.api.http
 import akka.util.Timeout
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.account.Account
-import scorex.app.Controller
+import scorex.app.LagonakiApplication
 import scorex.block.Block
-import scorex.crypto.{Base58, SigningFunctionsImpl}
+import scorex.crypto.Base58
 import scala.concurrent.duration._
 
 
 trait CommonApiFunctions {
   implicit val timeout = Timeout(5.seconds)
 
+  val application:LagonakiApplication
+
   protected[api] def walletExists(): Option[JsObject] =
-    if (Controller.wallet.exists()) {
+    if (application.wallet.exists()) {
       Some(ApiError.json(ApiError.WalletAlreadyExists))
     } else None
 
   protected[api] def withBlock(encodedSignature: String)(action: Block => JsValue): JsValue =
     Base58.decode(encodedSignature).toOption.map { signature =>
-      Controller.blockchainStorage.blockByHeader(signature) match {
+      application.blockchainStorage.blockById(signature) match {
         case Some(block) => action(block)
         case None => ApiError.json(ApiError.BlockNotExists)
       }
@@ -30,7 +32,7 @@ trait CommonApiFunctions {
       if (!Account.isValidAddress(address)) {
         ApiError.json(ApiError.InvalidAddress)
       } else {
-        Controller.wallet.privateKeyAccount(address) match {
+        application.wallet.privateKeyAccount(address) match {
           case None => ApiError.json(ApiError.WalletAddressNotExists)
           case Some(account) => action(account)
         }
@@ -38,7 +40,7 @@ trait CommonApiFunctions {
     }
 
   protected[api] def walletNotExists(): Option[JsObject] =
-    if (!Controller.wallet.exists()) {
+    if (!application.wallet.exists()) {
       Some(ApiError.json(ApiError.WalletNotExist))
     } else None
 }
