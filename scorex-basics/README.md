@@ -1,4 +1,4 @@
-Scorex-Crypto Sub-Module
+Scorex-Basics Sub-Module
 ========================
 
 The module contains utility functions to be used by other parts of the project:
