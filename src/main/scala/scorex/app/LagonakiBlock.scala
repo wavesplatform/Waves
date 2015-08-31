@@ -18,18 +18,18 @@ trait LagonakiBlock extends Block {
 
   val signature: Block.BlockId
 
-  override val versionField = ByteBlockField("version", 1:Byte)
+  override val versionField = ByteBlockField("version", 1: Byte)
 
   override implicit val transactionModule = new SimpleTransactionModule()(settings, consensusModule)
 
   override val uniqueId = signature
-  
+
   // todo: make changeable
   override type TT = Seq[Transaction]
 }
 
 object NxtLagonakiBlockBuilder extends BlockBuilder[NxtLikeConsensusBlockData, Seq[Transaction]] {
-  override val version = 1:Byte
+  override val version = 1: Byte
 
   override def build(timestamp: Long,
                      reference: BlockId,
@@ -66,11 +66,11 @@ class NxtLagonakiBlock(val timestamp: Long,
 }
 
 class QoraLagonakiBlock(val timestamp: Long,
-                       val reference: Block.BlockId,
-                       val qoraConsensusData: QoraLikeConsensusBlockData,
-                       val blockTransactions: Seq[Transaction],
+                        val reference: Block.BlockId,
+                        val qoraConsensusData: QoraLikeConsensusBlockData,
+                        val blockTransactions: Seq[Transaction],
                         val generator: PublicKeyAccount,
-                       val signature: Array[Byte])
+                        val signature: Array[Byte])
                        (implicit override val settings: Settings with TransactionSettings)
   extends LagonakiBlock {
 
@@ -88,14 +88,14 @@ class QoraLagonakiBlock(val timestamp: Long,
 
 
 class LagonakiGenesisNxt()(override implicit val consensusModule: NxtLikeConsensusModule,
-                         override implicit val transactionModule: SimpleTransactionModule,
+                           override implicit val transactionModule: SimpleTransactionModule,
                            implicit override val settings: Settings with TransactionSettings)
   extends NxtLagonakiBlock(
     timestamp = new DateTime(System.currentTimeMillis()).toDateMidnight.getMillis,
     reference = Array.fill(SigningFunctionsImpl.SignatureLength)(0),
     nxtConsensusData = consensusModule.genesisData.value,
     blockTransactions = transactionModule.genesisData.value,
-    generator = new PublicKeyAccount(Array()), //todo:
+    generator = new PublicKeyAccount(Array.fill(32)(0)),
     signature = Array.fill(SigningFunctionsImpl.SignatureLength)(0)
   )
 
@@ -107,6 +107,6 @@ class LagonakiGenesisQora(override implicit val consensusModule: QoraLikeConsens
     reference = Array(),
     qoraConsensusData = consensusModule.genesisData.value,
     blockTransactions = transactionModule.genesisData.value,
-    generator = new PublicKeyAccount(Array()), //todo:
+    generator = new PublicKeyAccount(Array.fill(32)(0)),
     signature = Array()
   )
