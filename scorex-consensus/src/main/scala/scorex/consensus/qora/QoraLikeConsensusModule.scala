@@ -68,7 +68,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
         override val generatorSignature: Array[Byte] = signature
         override val generatingBalance: Long = getNextBlockGeneratingBalance(lastBlock, history)
       }
-      None
+      ???
       /*todo: Some(LagonakiBlock.apply(version,
         timestamp,
         lastBlock.uniqueId,

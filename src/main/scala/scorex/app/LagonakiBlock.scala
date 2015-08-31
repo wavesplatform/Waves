@@ -83,7 +83,6 @@ class QoraLagonakiBlock(val timestamp: Long,
   override val consensusDataField = QoraConsensusBlockField(qoraConsensusData)
   override val transactionDataField = TransactionsBlockField(blockTransactions)
   override val signerDataField = new SignerDataBlockField("signature", SignerData(generator, signature))
-
 }
 
 

@@ -75,8 +75,8 @@ class NxtLikeConsensusModule
         override val baseTarget: Long = btg
       }
 
-      None
-      //todo: Some(Block(version, timestamp, lastBlock.uniqueId, consensusData, transactionModule.packUnconfirmed()))
+      ???
+      ///Some(Block(version, timestamp, lastBlock.uniqueId, consensusData, transactionModule.packUnconfirmed()))
 
     } else None
   }
