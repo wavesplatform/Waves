@@ -35,4 +35,6 @@ trait ConsensusModule[ConsensusBlockData] {
     blockFields.value
 
   def genesisData:BlockField[ConsensusBlockData]
+
+  def formBlockData(data:ConsensusBlockData):BlockField[ConsensusBlockData]
 }

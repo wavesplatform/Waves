@@ -172,4 +172,6 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
       override val generatingBalance: Long = 10000000
       override val generatorSignature: Array[Byte] = Array.fill(64)(0: Byte)
     })
+
+  def formBlockData(data: QoraLikeConsensusBlockData): BlockField[QoraLikeConsensusBlockData] = QoraConsensusBlockField(data)
 }

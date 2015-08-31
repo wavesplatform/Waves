@@ -2,8 +2,7 @@ package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.PublicKeyAccount
-import scorex.block.Block.BlockId
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.consensus.ConsensusModule
 import scorex.crypto.{Base58, SigningFunctionsImpl}
 import scorex.transaction.{Transaction, TransactionModule}
@@ -132,8 +131,8 @@ object Block extends ScorexLogging {
   val BlockIdLength = SigningFunctionsImpl.SignatureLength
 
   def parse[CDT, TDT](bytes: Array[Byte])
-           (implicit consModule: ConsensusModule[CDT],
-            transModule: TransactionModule[TDT]): Try[Block] = Try {
+                     (implicit consModule: ConsensusModule[CDT],
+                      transModule: TransactionModule[TDT]): Try[Block] = Try {
 
     require(consModule != null)
     require(transModule != null)
@@ -145,17 +144,17 @@ object Block extends ScorexLogging {
     val timestamp = Longs.fromByteArray(bytes.slice(position, position + 8))
     position += 8
 
-    val reference = bytes.slice(position, position+Block.BlockIdLength)
+    val reference = bytes.slice(position, position + Block.BlockIdLength)
     position += BlockIdLength
 
-    val cBytesLength = Ints.fromByteArray(bytes.slice(position, position+4))
+    val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val cBytes = bytes.slice(position, position + cBytesLength)
     val consBlockField = consModule.parseBlockData(cBytes)
     position += cBytesLength
 
 
-    val tBytesLength = Ints.fromByteArray(bytes.slice(position, position+4))
+    val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val tBytes = bytes.slice(position, position + tBytesLength)
     val txBlockField = transModule.parseBlockData(tBytes)
@@ -166,7 +165,7 @@ object Block extends ScorexLogging {
 
     val signature = bytes.slice(position, position + SigningFunctionsImpl.SignatureLength)
 
-    new Block{
+    new Block {
       override type CT = CDT
       override type TT = TDT
 
@@ -187,22 +186,53 @@ object Block extends ScorexLogging {
 
       override val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
     }
-  }.recoverWith{case t:Throwable =>
+  }.recoverWith { case t: Throwable =>
     log.error("Error when parsing block", t)
     t.printStackTrace()
     Failure(t)
   }
-}
 
-trait BlockBuilder[CDT, TDT] {
-  val version: Byte
+  def build[CDT, TDT](version: Byte,
+                      timestamp: Long,
+                      reference: BlockId,
+                      consensusData: CDT,
+                      transactionData: TDT,
+                      generator: PublicKeyAccount,
+                      signature: Array[Byte])
+                     (implicit consModule: ConsensusModule[CDT],
+                      transModule: TransactionModule[TDT]): Block = {
+    new Block {
+      override type CT = CDT
+      override type TT = TDT
 
-  def build(timestamp: Long,
-                 reference: BlockId,
-                 consensusData: CDT,
-                 transactionData: TDT,
-                 generator:PublicKeyAccount,
-                 signature:Array[Byte])
-                (implicit consensusModule: ConsensusModule[CDT],
-                 transactionModule: TransactionModule[TDT]): Block{type CT = CDT; type TT = TDT}
+      override implicit val transactionModule: TransactionModule[TDT] = transModule
+      override implicit val consensusModule: ConsensusModule[CDT] = consModule
+
+      override val versionField: ByteBlockField = ByteBlockField("version", version)
+
+      override val transactionDataField: BlockField[TDT] = transModule.formBlockData(transactionData)
+
+      override val referenceField: BlockIdField = BlockIdField("reference", reference)
+      override val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", SignerData(generator, signature))
+      override val consensusDataField: BlockField[CDT] = consensusModule.formBlockData(consensusData)
+
+      override val uniqueId: BlockId = signature //todo:wrong
+
+      override val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
+    }
+  }
+
+  def buildAndSign[CDT, TDT](version: Byte,
+                      timestamp: Long,
+                      reference: BlockId,
+                      consensusData: CDT,
+                      transactionData: TDT,
+                      signer: PrivateKeyAccount)
+                     (implicit consModule: ConsensusModule[CDT],
+                      transModule: TransactionModule[TDT]): Block = {
+    val nonSignedBlock = build(version, timestamp, reference, consensusData, transactionData, signer, Array())
+    val toSign = nonSignedBlock.bytes
+    val signature = SigningFunctionsImpl.sign(signer, toSign)
+    build(version, timestamp, reference, consensusData, transactionData, signer, signature)
+  }
 }

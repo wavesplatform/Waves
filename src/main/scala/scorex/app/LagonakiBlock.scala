@@ -2,9 +2,7 @@ package scorex.app
 
 import org.joda.time.DateTime
 import scorex.account.PublicKeyAccount
-import scorex.block.Block.BlockId
 import scorex.block._
-import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, NxtLikeConsensusModule}
 import scorex.consensus.qora.{QoraConsensusBlockField, QoraLikeConsensusBlockData, QoraLikeConsensusModule}
 import scorex.crypto.SigningFunctionsImpl
@@ -26,23 +24,6 @@ trait LagonakiBlock extends Block {
 
   // todo: make changeable
   override type TT = Seq[Transaction]
-}
-
-object NxtLagonakiBlockBuilder extends BlockBuilder[NxtLikeConsensusBlockData, Seq[Transaction]] {
-  override val version = 1: Byte
-
-  override def build(timestamp: Long,
-                     reference: BlockId,
-                     consensusData: NxtLikeConsensusBlockData,
-                     transactionData: Seq[Transaction],
-                     generator: PublicKeyAccount,
-                     signature: Array[Byte])
-                    (implicit consensusModule: ConsensusModule[NxtLikeConsensusBlockData],
-                     transactionModule: TransactionModule[Seq[Transaction]]):
-  Block {type TT = Seq[Transaction]; type CT = NxtLikeConsensusBlockData} = {
-    implicit val settings = transactionModule.asInstanceOf[SimpleTransactionModule].settings //todo: asInstanceOf
-    new NxtLagonakiBlock(timestamp, reference, consensusData, transactionData, generator, signature)
-  }
 }
 
 class NxtLagonakiBlock(val timestamp: Long,

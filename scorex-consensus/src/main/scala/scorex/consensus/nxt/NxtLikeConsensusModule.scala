@@ -75,8 +75,12 @@ class NxtLikeConsensusModule
         override val baseTarget: Long = btg
       }
 
-      ???
-      ///Some(Block(version, timestamp, lastBlock.uniqueId, consensusData, transactionModule.packUnconfirmed()))
+      Some(Block.buildAndSign(version,
+        timestamp,
+        lastBlock.uniqueId,
+        consensusData,
+        transactionModule.packUnconfirmed(),
+        account))
 
     } else None
   }
@@ -126,4 +130,6 @@ class NxtLikeConsensusModule
       override val baseTarget: Long = 153722867
       override val generationSignature: Array[Byte] = Array.fill(32)(0: Byte)
     })
+
+  def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] = NxtConsensusBlockField(data)
 }
