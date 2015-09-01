@@ -44,7 +44,7 @@ class PeerConnectionHandler(application: LagonakiApplication,
         context.system.scheduler.scheduleOnce(10 seconds)(self ! PingMessage)
 
       case GetPeersMessage =>
-        self ! PeersMessage(peerManager.knownPeers())
+        self ! PeersMessage(peerManager.knownPeers().filter(_ != remote)) //excluding sender
 
       case PeersMessage(peers) =>
         peers.foreach { peer =>
