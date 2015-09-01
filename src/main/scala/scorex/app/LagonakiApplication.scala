@@ -4,6 +4,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import scorex.account.{PublicKeyAccount, Account, PrivateKeyAccount}
 import scorex.app.api.http.HttpServiceActor
+import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.network.{BlockchainSyncer, NetworkController}
 import scorex.network.message._
@@ -36,7 +37,7 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
 
   def init() {
     if (blockchainStorage.isEmpty) {
-      val genesisBlock = new LagonakiGenesisNxt
+      val genesisBlock = Block.genesis()
       storedState.processBlock(genesisBlock)
       blockchainStorage.appendBlock(genesisBlock)
       log.info("Genesis block has been added to the state")

@@ -1,6 +1,7 @@
 package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import org.joda.time.DateTime
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.consensus.ConsensusModule
@@ -234,5 +235,24 @@ object Block extends ScorexLogging {
     val toSign = nonSignedBlock.bytes
     val signature = SigningFunctionsImpl.sign(signer, toSign)
     build(version, timestamp, reference, consensusData, transactionData, signer, signature)
+  }
+
+  def genesis[CDT, TDT]()(implicit consModule: ConsensusModule[CDT],
+                          transModule: TransactionModule[TDT]): Block = new Block {
+    override type CT = CDT
+    override type TT = TDT
+
+    override implicit val transactionModule: TransactionModule[TDT] = transModule
+    override implicit val consensusModule: ConsensusModule[CDT] = consModule
+
+    override val versionField: ByteBlockField = ByteBlockField("version", 1)
+    override val transactionDataField: BlockField[TDT] = transactionModule.genesisData
+    override val referenceField: BlockIdField = BlockIdField("reference", Array.fill(BlockIdLength)(0:Byte))
+    override val consensusDataField: BlockField[CDT] = consensusModule.genesisData
+    override val uniqueId: BlockId = Array.fill(BlockIdLength)(0:Byte)
+    override val timestampField: LongBlockField = LongBlockField("timestamp", new DateTime(System.currentTimeMillis()).toDateMidnight.getMillis)
+
+    override val signerDataField: SignerDataBlockField =
+      new SignerDataBlockField("signature", SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array.fill(SigningFunctionsImpl.SignatureLength)(0)))
   }
 }

@@ -28,7 +28,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 
 class SimpleTransactionModule(implicit val settings: TransactionSettings,
                               consensusModule: ConsensusModule[_])
-  extends TransactionModule[Seq[Transaction]] with ScorexLogging {
+  extends TransactionModule[SimpleTransactionModule.StoredInBlock] with ScorexLogging {
 
   val TransactionSizeLength = 4
 
@@ -57,23 +57,23 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     }
   }
 
-  override def formBlockData(transactions: Seq[Transaction]): TransactionsBlockField =
+  override def formBlockData(transactions: SimpleTransactionModule.StoredInBlock): TransactionsBlockField =
     TransactionsBlockField(transactions)
 
-  override def transactions(block: Block): Seq[Transaction] =
+  override def transactions(block: Block): SimpleTransactionModule.StoredInBlock =
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value //todo: asInstanceOf
 
-  override def packUnconfirmed(): Seq[Transaction] = UnconfirmedTransactionsDatabaseImpl.all()
+  override def packUnconfirmed(): SimpleTransactionModule.StoredInBlock = UnconfirmedTransactionsDatabaseImpl.all()
 
   //todo: not used
-  override def clearFromUnconfirmed(data: Seq[Transaction]): Unit = {
+  override def clearFromUnconfirmed(data: SimpleTransactionModule.StoredInBlock): Unit = {
     data.foreach(tx => UnconfirmedTransactionsDatabaseImpl.getBySignature(tx.signature) match {
       case Some(unconfirmedTx) => UnconfirmedTransactionsDatabaseImpl.remove(unconfirmedTx)
       case None =>
     })
   }
 
-  override def genesisData: BlockField[Seq[Transaction]] = {
+  override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
     val ipoMembers = List(
       "2UyntBprhFgZPJ1tCtKBAwryiSnDSk9Xmh8",
       "Y2BXLjiAhPUMSo8iBbDEhv81VwKnytTXsH",
