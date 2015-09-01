@@ -7,7 +7,8 @@ import spray.routing.HttpService
 
 trait BlocksHttpService extends HttpService with CommonApiFunctions {
   val application: LagonakiApplication
-  val blockchainStorage = application.blockchainStorage
+
+  lazy val blockchainStorage = application.blockchainStorage
 
   lazy val blocksRouting =
     pathPrefix("blocks") {

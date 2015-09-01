@@ -1,21 +1,16 @@
 package scorex.unit
 
 import org.scalatest.FunSuite
-import scorex.account.PrivateKeyAccount
-import scorex.crypto.Base58
-import scorex.app.settings.Constants
-import scorex.transaction.PaymentTransaction
-
-import scala.util.Random
 
 class BlockSpecification extends FunSuite {
 
-  test("block generation then validation"){
+  test("block generation then validation") {
 
   }
 
+  /*
   test("block with txs toBytes/parse roundtrip") {
-    val reference = Array.fill(Block.)(Random.nextInt(100).toByte)
+    val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
     val gen = new PrivateKeyAccount(reference)
     val gd = (Constants.ConsensusAlgo match {
       case NxtLikeConsensusModule =>

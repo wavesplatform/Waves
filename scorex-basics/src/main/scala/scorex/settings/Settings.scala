@@ -6,6 +6,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.Base58
 import scorex.utils.ScorexLogging
 
+import scala.io.Source
 import scala.util.Try
 
 /**
@@ -19,7 +20,7 @@ trait Settings extends ScorexLogging {
   val filename:String
 
   lazy val settingsJSON: JsObject = Try {
-    val jsonString = scala.io.Source.fromFile(filename).mkString
+    val jsonString = Source.fromURL(getClass.getResource(s"/$filename")).mkString
     Json.parse(jsonString).as[JsObject]
   }.recoverWith { case t =>
     log.warn(s"Unable to read $filename", t)
