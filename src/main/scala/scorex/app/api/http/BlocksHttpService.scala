@@ -6,7 +6,7 @@ import spray.routing.HttpService
 
 
 trait BlocksHttpService extends HttpService with CommonApiFunctions {
-  val application:LagonakiApplication
+  val application: LagonakiApplication
   val blockchainStorage = application.blockchainStorage
 
   lazy val blocksRouting =
@@ -23,7 +23,7 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
         get {
           complete(blockchainStorage.lastBlock.json.toString())
         }
-      } ~ path("at" / IntNumber) {case height =>
+      } ~ path("at" / IntNumber) { case height =>
         get {
           val res = blockchainStorage
             .blockAt(height)
@@ -45,7 +45,7 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
         }
       } ~ path("child" / Segment) { case encodedSignature =>
         get {
-          complete(withBlock(encodedSignature){ block =>
+          complete(withBlock(encodedSignature) { block =>
             blockchainStorage.children(block).head.json
           }.toString())
         }

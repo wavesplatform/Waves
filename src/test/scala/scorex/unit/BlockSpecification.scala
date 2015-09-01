@@ -9,7 +9,11 @@ import scorex.transaction.PaymentTransaction
 import scala.util.Random
 
 class BlockSpecification extends FunSuite {
-  /* todo: fix tests
+
+  test("block generation then validation"){
+
+  }
+
   test("block with txs toBytes/parse roundtrip") {
     val reference = Array.fill(Block.)(Random.nextInt(100).toByte)
     val gen = new PrivateKeyAccount(reference)
