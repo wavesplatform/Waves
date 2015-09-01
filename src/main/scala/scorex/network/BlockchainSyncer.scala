@@ -1,10 +1,8 @@
 package scorex.network
 
 import java.net.InetSocketAddress
-
-import akka.actor.{Actor, ActorRef}
+import akka.actor.Actor
 import scorex.app.LagonakiApplication
-import scorex.app.settings.Constants
 import scorex.block.Block
 import scorex.network.message.{BlockMessage, GetSignaturesMessage}
 import scorex.utils.ScorexLogging
