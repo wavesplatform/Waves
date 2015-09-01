@@ -119,7 +119,7 @@ trait Block {
       transactionModule.isValid(this) &&
       history.contains(referenceField.value) &&
       SigningFunctionsImpl.verify(signerDataField.value.signature,
-        bytes.dropRight(SigningFunctionsImpl.KeyLength),
+        bytes.dropRight(SigningFunctionsImpl.SignatureLength),
         signerDataField.value.generator.publicKey)
   }
 }

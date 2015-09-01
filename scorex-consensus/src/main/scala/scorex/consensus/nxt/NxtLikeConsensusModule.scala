@@ -32,19 +32,20 @@ class NxtLikeConsensusModule
     val prev = history.parent(block).get
     val prevTime = prev.timestampField.value
 
-    val consensusBlockData = block.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData]
+    val prevBlockData = prev.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData]
+    val blockData = block.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData]
     val generator = block.signerDataField.value.generator
 
     //check baseTarget
-    val cbt = calcBaseTarget(consensusBlockData, prevTime, blockTime)
-    require(cbt == consensusBlockData.baseTarget, "Block's basetarget is wrong")
+    val cbt = calcBaseTarget(prevBlockData, prevTime, blockTime)
+    require(cbt == blockData.baseTarget, "Block's basetarget is wrong")
 
     //check generation signature
-    val calcGs = calcGeneratorSignature(consensusBlockData, generator)
-    require(calcGs.sameElements(consensusBlockData.generationSignature), "Block's generation signature is wrong")
+    val calcGs = calcGeneratorSignature(prevBlockData, generator)
+    require(calcGs.sameElements(blockData.generationSignature), "Block's generation signature is wrong")
 
     //check hit < target
-    calcHit(consensusBlockData, generator) < calcTarget(consensusBlockData, prevTime, generator)
+    calcHit(prevBlockData, generator) < calcTarget(prevBlockData, prevTime, generator)
   }.recoverWith{ case t =>
       log.error("Error while generating a block", t)
       Failure(t)
