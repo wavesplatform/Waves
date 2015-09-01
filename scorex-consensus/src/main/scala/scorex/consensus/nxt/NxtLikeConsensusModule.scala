@@ -8,7 +8,7 @@ import scorex.crypto.Sha256._
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 class NxtLikeConsensusModule
   extends LagonakiConsensusModule[NxtLikeConsensusBlockData] with ScorexLogging {
@@ -32,7 +32,7 @@ class NxtLikeConsensusModule
     val prev = history.parent(block).get
     val prevTime = prev.timestampField.value
 
-    val consensusBlockData = prev.consensusDataField.asInstanceOf[NxtLikeConsensusBlockData]
+    val consensusBlockData = block.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData]
     val generator = block.signerDataField.value.generator
 
     //check baseTarget
@@ -45,6 +45,9 @@ class NxtLikeConsensusModule
 
     //check hit < target
     calcHit(consensusBlockData, generator) < calcTarget(consensusBlockData, prevTime, generator)
+  }.recoverWith{ case t =>
+      log.error("Error while generating a block", t)
+      Failure(t)
   }.getOrElse(false)
 
 
@@ -96,8 +99,8 @@ class NxtLikeConsensusModule
                              currentTime: Long): Long = {
     val eta = (currentTime - lastBlockTimestamp) / 1000 //in seconds
     val prevBt = BigInt(lastBlockData.baseTarget)
-    val t = bounded(prevBt * eta / AvgFrequency, prevBt / 2, prevBt * 2)
-    bounded(t, 1, Long.MaxValue).toLong
+    val t0 = bounded(prevBt * eta / AvgFrequency, prevBt / 2, prevBt * 2)
+    bounded(t0, 1, Long.MaxValue).toLong
   }
 
   private def calcTarget(lastBlockData: NxtLikeConsensusBlockData,

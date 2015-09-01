@@ -74,7 +74,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
         val exceptOf = remoteOpt.toList
         networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block), exceptOf)
       } else {
-        log.warn(s"Non-valid block: $block from $remoteOpt")
+        log.warn(s"Non-valid block: $block from ${remoteOpt.map(_.toString).getOrElse("local")}")
       }
 
     case GetStatus => sender() ! status
