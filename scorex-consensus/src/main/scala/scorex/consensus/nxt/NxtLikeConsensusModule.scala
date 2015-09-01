@@ -104,8 +104,8 @@ class NxtLikeConsensusModule
                          lastBlockTimestamp: Long,
                          generator: PublicKeyAccount)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val eta = (NTP.correctedTime() - lastBlockTimestamp) / 1000 //in seconds
-    val effBalance: BigDecimal = transactionModule.state.asInstanceOf[BalanceSheet].generationBalance(generator)
-    (lastBlockData.baseTarget * eta * effBalance).toBigInt()
+    val effBalance = transactionModule.state.asInstanceOf[BalanceSheet].generationBalance(generator)
+    BigInt(lastBlockData.baseTarget) * eta * effBalance
   }
 
   private def bounded(value: BigInt, min: BigInt, max: BigInt): BigInt =
