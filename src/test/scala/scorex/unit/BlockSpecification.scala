@@ -4,7 +4,7 @@ import org.scalatest.FunSuite
 
 class BlockSpecification extends FunSuite {
 
-  test("block generation then validation") {
+  ignore("block generation then validation") {
 
   }
 
