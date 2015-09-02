@@ -16,8 +16,8 @@ object Server extends App with ScorexLogging {
 
     val application = new LagonakiApplication(filename)
 
-    log.debug("LagonakiApplication init")
-    application.init() //STARTING NETWORK/BLOCKCHAIN/RPC
+    log.debug("LagonakiApplication run")
+    application.run() //STARTING NETWORK/BLOCKCHAIN/RPC
     Thread.sleep(10000)
     testingScript(application)
   } match {

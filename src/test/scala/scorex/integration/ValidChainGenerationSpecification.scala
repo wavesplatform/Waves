@@ -11,7 +11,7 @@ class ValidChainGenerationSpecification extends FunSuite {
     implicit val consensusModule = application.consensusModule
     implicit val transactionModule = application.transactionModule
 
-    application.init()
+    application.run()
     application.wallet.generateNewAccounts(10)
     require(application.wallet.privateKeyAccounts().nonEmpty)
 

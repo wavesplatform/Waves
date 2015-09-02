@@ -35,7 +35,7 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
   lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
-  def init() {
+  def run() {
     if (blockchainStorage.isEmpty) {
       val genesisBlock = Block.genesis()
       storedState.processBlock(genesisBlock)
