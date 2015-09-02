@@ -1,6 +1,7 @@
 package scorex.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.Actor
 import scorex.app.LagonakiApplication
 import scorex.block.Block
@@ -26,7 +27,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
   private var status = Status.Offline
 
   override def preStart() = {
-    context.system.scheduler.schedule(1.second, 2.seconds)(self ! CheckState)
+    context.system.scheduler.schedule(100.millis, 2.seconds)(self ! CheckState)
     context.system.scheduler.schedule(500.millis, 1.second)(networkController ! GetMaxChainScore)
   }
 
@@ -42,7 +43,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
 
         case Status.Generating =>
           log.info("Trying to generate a new block")
-          application.wallet.privateKeyAccounts().find{privKeyAcc =>
+          application.wallet.privateKeyAccounts().find { privKeyAcc =>
             val state = application.storedState
             val history = application.blockchainStorage
             implicit val transactionModule = application.transactionModule
@@ -96,4 +97,5 @@ object BlockchainSyncer {
   case class MaxChainScore(scoreOpt: Option[BigInt])
 
   case object GetStatus
+
 }

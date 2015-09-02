@@ -20,7 +20,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
-  private implicit lazy val actorSystem = ActorSystem("lagonaki")
 
   implicit val settings = new LagonakiSettings(settingsFilename)
   implicit val consensusModule = new NxtLikeConsensusModule
@@ -29,6 +28,7 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
   lazy val storedState = new StoredState(settings.dataDirOpt)
   lazy val blockchainStorage = new StoredBlockchain(settings.dataDirOpt)
 
+  private implicit lazy val actorSystem = ActorSystem("lagonaki")
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
   lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this))
 
