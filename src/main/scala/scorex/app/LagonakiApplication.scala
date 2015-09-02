@@ -36,16 +36,16 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
   lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
   def run() {
+    require(blockchainStorage.lastBlock.transactionModule.balancesSupport)
+    require(blockchainStorage.blockAt(1).get.transactionModule.accountWatchingSupport)
+
     if (blockchainStorage.isEmpty) {
       val genesisBlock = Block.genesis()
       storedState.processBlock(genesisBlock)
       blockchainStorage.appendBlock(genesisBlock)
       log.info("Genesis block has been added to the state")
     }.ensuring(blockchainStorage.height() >= 1 &&
-      blockchainStorage.lastBlock.isValid &&
-      blockchainStorage.lastBlock.transactionModule.balancesSupport &&
-      blockchainStorage.blockAt(1).get.transactionModule.accountWatchingSupport
-      )
+      blockchainStorage.lastBlock.isValid)
 
     val httpServiceActor = actorSystem.actorOf(Props(classOf[HttpServiceActor], this), "http-service")
     val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = settings.rpcPort)

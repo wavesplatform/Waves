@@ -21,12 +21,12 @@ trait TransactionModule[TransactionBlockData] {
 
   def transactions(block: Block): Seq[Transaction]
 
-  def balancesSupport(): Boolean = state match {
+  lazy val balancesSupport: Boolean = state match {
     case _: State with BalanceSheet => true
     case _ => false
   }
 
-  def accountWatchingSupport(): Boolean = state match {
+  lazy val accountWatchingSupport: Boolean = state match {
     case _: State with AccountTransactionsHistory => true
     case _ => false
   }
