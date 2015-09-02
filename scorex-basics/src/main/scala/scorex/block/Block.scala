@@ -2,86 +2,29 @@ package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import org.joda.time.DateTime
-import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.consensus.ConsensusModule
-import scorex.crypto.{Base58, SigningFunctionsImpl}
-import scorex.transaction.{Transaction, TransactionModule}
+import scorex.crypto.SigningFunctionsImpl
+import scorex.transaction.TransactionModule
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}
 
-abstract class BlockField[T] {
-  val name: String
-  val value: T
-
-  def json: JsObject
-
-  def bytes: Array[Byte]
-}
-
-case class ByteBlockField(override val name: String, override val value: Byte)
-  extends BlockField[Byte] {
-
-  override lazy val json: JsObject = Json.obj(name -> value.toInt)
-  override lazy val bytes: Array[Byte] = Array(value)
-}
-
-case class IntBlockField(override val name: String, override val value: Int)
-  extends BlockField[Int] {
-
-  override lazy val json: JsObject = Json.obj(name -> value)
-  override lazy val bytes: Array[Byte] = Bytes.ensureCapacity(Ints.toByteArray(value), 4, 0)
-}
-
-case class LongBlockField(override val name: String, override val value: Long)
-  extends BlockField[Long] {
-
-  override lazy val json: JsObject = Json.obj(name -> value)
-  override lazy val bytes: Array[Byte] = Bytes.ensureCapacity(Longs.toByteArray(value), 8, 0)
-}
-
-case class BlockIdField(override val name: String, override val value: Block.BlockId)
-  extends BlockField[Block.BlockId] {
-
-  override lazy val json: JsObject = Json.obj(name -> Base58.encode(value))
-  override lazy val bytes: Array[Byte] = value
-}
-
-case class TransactionBlockField(override val name: String, override val value: Transaction)
-  extends BlockField[Transaction] {
-
-  override lazy val json: JsObject = value.json()
-  override lazy val bytes: Array[Byte] = value.bytes()
-}
-
-
-case class SignerData(generator: PublicKeyAccount, signature: Array[Byte])
-
-//todo: Seq[SignerData] to support multiple signers?
-case class SignerDataBlockField(override val name: String, override val value: SignerData)
-  extends BlockField[SignerData] {
-
-  override lazy val json: JsObject = Json.obj("generator" -> value.generator.toString,
-    "signature" -> value.signature)
-
-  override lazy val bytes: Array[Byte] = value.generator.publicKey ++ value.signature
-}
 
 trait Block {
-  type CT
-  type TT
+  type ConsensusDataType
+  type TransactionDataType
 
   val versionField: ByteBlockField
   val timestampField: LongBlockField
   val referenceField: BlockIdField
-  val consensusDataField: BlockField[CT]
-  val transactionDataField: BlockField[TT]
+  val consensusDataField: BlockField[ConsensusDataType]
+  val transactionDataField: BlockField[TransactionDataType]
   val signerDataField: SignerDataBlockField
 
 
-  implicit val consensusModule: ConsensusModule[CT]
-  implicit val transactionModule: TransactionModule[TT]
+  implicit val consensusModule: ConsensusModule[ConsensusDataType]
+  implicit val transactionModule: TransactionModule[TransactionDataType]
 
   // Some block characteristic which is uniq e.g. hash or signature(if timestamp is included there).
   // Used in referencing
@@ -167,20 +110,20 @@ object Block extends ScorexLogging {
     val signature = bytes.slice(position, position + SigningFunctionsImpl.SignatureLength)
 
     new Block {
-      override type CT = CDT
-      override type TT = TDT
+      override type ConsensusDataType = CDT
+      override type TransactionDataType = TDT
 
-      override val transactionDataField: BlockField[TT] = txBlockField
+      override val transactionDataField: BlockField[TransactionDataType] = txBlockField
 
-      override implicit val consensusModule: ConsensusModule[CT] = consModule
-      override implicit val transactionModule: TransactionModule[TT] = transModule
+      override implicit val consensusModule: ConsensusModule[ConsensusDataType] = consModule
+      override implicit val transactionModule: TransactionModule[TransactionDataType] = transModule
 
       override val versionField: ByteBlockField = ByteBlockField("version", version)
       override val referenceField: BlockIdField = BlockIdField("reference", reference)
       override val signerDataField: SignerDataBlockField =
         SignerDataBlockField("signature", SignerData(new PublicKeyAccount(genPK), signature))
 
-      override val consensusDataField: BlockField[CT] = consBlockField
+      override val consensusDataField: BlockField[ConsensusDataType] = consBlockField
 
       //todo: wrong!
       override val uniqueId: BlockId = signature
@@ -203,8 +146,8 @@ object Block extends ScorexLogging {
                      (implicit consModule: ConsensusModule[CDT],
                       transModule: TransactionModule[TDT]): Block = {
     new Block {
-      override type CT = CDT
-      override type TT = TDT
+      override type ConsensusDataType = CDT
+      override type TransactionDataType = TDT
 
       override implicit val transactionModule: TransactionModule[TDT] = transModule
       override implicit val consensusModule: ConsensusModule[CDT] = consModule
@@ -239,8 +182,8 @@ object Block extends ScorexLogging {
 
   def genesis[CDT, TDT]()(implicit consModule: ConsensusModule[CDT],
                           transModule: TransactionModule[TDT]): Block = new Block {
-    override type CT = CDT
-    override type TT = TDT
+    override type ConsensusDataType = CDT
+    override type TransactionDataType = TDT
 
     override implicit val transactionModule: TransactionModule[TDT] = transModule
     override implicit val consensusModule: ConsensusModule[CDT] = consModule

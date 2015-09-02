@@ -1,7 +1,7 @@
 package scorex.block
 
-import com.google.common.primitives.{Longs, Ints, Bytes}
-import play.api.libs.json.{Json, JsObject}
+import com.google.common.primitives.{Bytes, Ints, Longs}
+import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.Base58
 import scorex.transaction.Transaction
