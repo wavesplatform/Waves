@@ -46,9 +46,9 @@ class NxtLikeConsensusModule
 
     //check hit < target
     calcHit(prevBlockData, generator) < calcTarget(prevBlockData, prevTime, generator)
-  }.recoverWith{ case t =>
-      log.error("Error while generating a block", t)
-      Failure(t)
+  }.recoverWith { case t =>
+    log.error("Error while generating a block", t)
+    Failure(t)
   }.getOrElse(false)
 
 
@@ -135,5 +135,6 @@ class NxtLikeConsensusModule
       override val generationSignature: Array[Byte] = Array.fill(32)(0: Byte)
     })
 
-  def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] = NxtConsensusBlockField(data)
+  def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] =
+    NxtConsensusBlockField(data)
 }

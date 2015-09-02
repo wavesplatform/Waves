@@ -224,13 +224,13 @@ object Block extends ScorexLogging {
   }
 
   def buildAndSign[CDT, TDT](version: Byte,
-                      timestamp: Long,
-                      reference: BlockId,
-                      consensusData: CDT,
-                      transactionData: TDT,
-                      signer: PrivateKeyAccount)
-                     (implicit consModule: ConsensusModule[CDT],
-                      transModule: TransactionModule[TDT]): Block = {
+                             timestamp: Long,
+                             reference: BlockId,
+                             consensusData: CDT,
+                             transactionData: TDT,
+                             signer: PrivateKeyAccount)
+                            (implicit consModule: ConsensusModule[CDT],
+                             transModule: TransactionModule[TDT]): Block = {
     val nonSignedBlock = build(version, timestamp, reference, consensusData, transactionData, signer, Array())
     val toSign = nonSignedBlock.bytes
     val signature = SigningFunctionsImpl.sign(signer, toSign)
@@ -247,9 +247,9 @@ object Block extends ScorexLogging {
 
     override val versionField: ByteBlockField = ByteBlockField("version", 1)
     override val transactionDataField: BlockField[TDT] = transactionModule.genesisData
-    override val referenceField: BlockIdField = BlockIdField("reference", Array.fill(BlockIdLength)(0:Byte))
+    override val referenceField: BlockIdField = BlockIdField("reference", Array.fill(BlockIdLength)(0: Byte))
     override val consensusDataField: BlockField[CDT] = consensusModule.genesisData
-    override val uniqueId: BlockId = Array.fill(BlockIdLength)(0:Byte)
+    override val uniqueId: BlockId = Array.fill(BlockIdLength)(0: Byte)
     override val timestampField: LongBlockField = LongBlockField("timestamp", new DateTime(System.currentTimeMillis()).toDateMidnight.getMillis)
 
     override val signerDataField: SignerDataBlockField =
