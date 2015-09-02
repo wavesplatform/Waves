@@ -42,10 +42,11 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
     if (blockchainStorage.isEmpty) {
       val genesisBlock = Block.genesis()
       storedState.processBlock(genesisBlock)
-      blockchainStorage.appendBlock(genesisBlock)
+      blockchainStorage.appendBlock(genesisBlock).ensuring(_.height() == 1)
       log.info("Genesis block has been added to the state")
-    }.ensuring(blockchainStorage.height() >= 1 &&
-      blockchainStorage.lastBlock.isValid)
+    }
+
+    assert(blockchainStorage.height() >= 1)
 
     val httpServiceActor = actorSystem.actorOf(Props(classOf[HttpServiceActor], this), "http-service")
     val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = settings.rpcPort)
