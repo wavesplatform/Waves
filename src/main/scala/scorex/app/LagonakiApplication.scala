@@ -36,8 +36,8 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
   lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
   def run() {
-    require(blockchainStorage.lastBlock.transactionModule.balancesSupport)
-    require(blockchainStorage.blockAt(1).get.transactionModule.accountWatchingSupport)
+    require(transactionModule.balancesSupport)
+    require(transactionModule.accountWatchingSupport)
 
     if (blockchainStorage.isEmpty) {
       val genesisBlock = Block.genesis()
