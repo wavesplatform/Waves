@@ -8,7 +8,7 @@ import scorex.utils.ScorexLogging
 import scala.util.{Failure, Random, Try}
 
 
-object Start extends App with ScorexLogging {
+object Server extends App with ScorexLogging {
 
   log.debug("main " + args)
   Try {
@@ -18,15 +18,15 @@ object Start extends App with ScorexLogging {
 
     log.debug("LagonakiApplication init")
     application.init() //STARTING NETWORK/BLOCKCHAIN/RPC
-    Thread.sleep(1000)
+    Thread.sleep(10000)
     testingScript(application)
   } match {
     case Failure(e) =>
       e.printStackTrace()
       log.error("STARTUP ERROR: ", e)
-      System.exit(0) // force all threads shutdown
+      System.exit(0)
     case _ =>
-      System.exit(0) // force all threads shutdown
+      System.exit(0)
   }
 
   def testingScript(application: LagonakiApplication): Unit = {
