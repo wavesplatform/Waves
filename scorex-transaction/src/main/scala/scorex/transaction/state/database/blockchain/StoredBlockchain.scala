@@ -123,7 +123,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   override def contains(signature: Array[Byte]): Boolean =
     signaturesIndex.exists(_._2.sameElements(signature))
 
-  override def height(): Int = Option(signaturesIndex.size).getOrElse(0)
+  override def height(): Int = signaturesIndex.size
 
   override def heightOf(blockSignature: Array[Byte]): Option[Int] =
     signaturesIndex.find(_._2.sameElements(blockSignature)).map(_._1)
@@ -140,4 +140,9 @@ class StoredBlockchain(dataFolderOpt: Option[String])
         if (block.consensusModule.generators(block).contains(account)) Some(block) else None
       }
     }
+
+  override def toString() = ((1 to height()) map {case h =>
+      val bl = blockAt(h).get
+      s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
+  }).mkString("\n")
 }
