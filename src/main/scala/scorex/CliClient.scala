@@ -4,7 +4,7 @@ import scorex.app.LagonakiApplication
 import scorex.app.api.http.ApiClient
 import scala.io.StdIn
 
-object Cli extends App {
+object CliClient extends App {
   val filename = if (args.length > 0) args(0) else "settings.json"
   val application = new LagonakiApplication(filename)
   val apiClient = new ApiClient(application)
