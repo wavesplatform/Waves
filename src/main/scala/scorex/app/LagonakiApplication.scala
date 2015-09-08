@@ -48,7 +48,7 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
     assert(blockchainStorage.height() >= 1)
     println("Initial balances: \n" + storedState)
 
-    blockchainSyncer ! BlockchainSyncer.CheckState //just to init lazy val
+    blockchainSyncer ! BlockchainSyncer.CheckState
 
     val httpServiceActor = actorSystem.actorOf(Props(classOf[HttpServiceActor], this), "http-service")
     val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = settings.rpcPort)

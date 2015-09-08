@@ -38,6 +38,7 @@ class PeerConnectionHandler(application: LagonakiApplication,
   context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
 
   private def handleMessage(message: Message) = {
+    log.debug("Handling message: " + message)
     message match {
 
       case GetPeersMessage =>

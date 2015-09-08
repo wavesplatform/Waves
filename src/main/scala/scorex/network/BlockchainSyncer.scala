@@ -33,7 +33,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
 
   override def receive = {
     case CheckState =>
-      log.debug("Blockchain syncer status: "+status)
+      log.debug("Blockchain syncer status: " + status)
       status match {
         case Status.Offline =>
 
@@ -44,6 +44,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
 
         case Status.Generating =>
           log.info("Trying to generate a new block")
+
           application.wallet.privateKeyAccounts().find { privKeyAcc =>
             val state = application.storedState
             val history = application.blockchainStorage
@@ -59,7 +60,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
 
     case MaxChainScore(scoreOpt) => scoreOpt match {
       case Some(maxScore) =>
-        if (maxScore > application.blockchainStorage.score) status = Status.Syncing
+        if (maxScore > application.blockchainStorage.score()) status = Status.Syncing
         else status = Status.Generating
 
       case None => status = Status.Offline
