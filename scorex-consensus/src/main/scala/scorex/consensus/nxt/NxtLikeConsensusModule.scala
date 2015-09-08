@@ -30,7 +30,6 @@ class NxtLikeConsensusModule
     val blockTime = block.timestampField.value
 
     println("chain: \n"+history)
-    println("reference: " + block.referenceField.value.mkString)
 
     val prev = history.parent(block).get
     val prevTime = prev.timestampField.value
@@ -41,11 +40,15 @@ class NxtLikeConsensusModule
 
     //check baseTarget
     val cbt = calcBaseTarget(prevBlockData, prevTime, blockTime)
-    require(cbt == blockData.baseTarget, "Block's basetarget is wrong")
+    val bbt = blockData.baseTarget
+    require(cbt == bbt,
+      s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
 
     //check generation signature
     val calcGs = calcGeneratorSignature(prevBlockData, generator)
-    require(calcGs.sameElements(blockData.generationSignature), "Block's generation signature is wrong")
+    val blockGs = blockData.generationSignature
+    require(calcGs.sameElements(blockGs),
+      s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
 
     //check hit < target
     calcHit(prevBlockData, generator) < calcTarget(prevBlockData, prevTime, generator)
