@@ -46,6 +46,8 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
       log.info("Genesis block has been added to the state")
     }
 
+    println("Initial balances: \n" + storedState)
+
     assert(blockchainStorage.height() >= 1)
 
     val httpServiceActor = actorSystem.actorOf(Props(classOf[HttpServiceActor], this), "http-service")
