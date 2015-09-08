@@ -29,6 +29,9 @@ class NxtLikeConsensusModule
 
     val blockTime = block.timestampField.value
 
+    println("chain: \n"+history)
+    println("reference: " + block.referenceField.value.mkString)
+
     val prev = history.parent(block).get
     val prevTime = prev.timestampField.value
 
@@ -68,7 +71,9 @@ class NxtLikeConsensusModule
     val eta = (NTP.correctedTime() - lastBlockTime) / 1000
 
     log.debug(s"hit: $h, target: $t, generating ${h < t}, eta $eta, " +
-      s"account balance: ${transactionModule.state.asInstanceOf[BalanceSheet].generationBalance(account)}")
+      s"account:  $account " +
+      s"account balance: ${transactionModule.state.asInstanceOf[BalanceSheet].generationBalance(account)}"
+    )
 
     if (h < t) {
       val timestamp = NTP.correctedTime()

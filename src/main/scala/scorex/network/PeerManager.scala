@@ -21,7 +21,6 @@ class PeerManager(settings: LagonakiSettings) extends ScorexLogging {
   }
 
   def peerConnected(peer: InetSocketAddress): Unit = {
-    addPeer(peer)
     PeerDatabaseImpl.addConnectedPeer(peer)
   }
 
