@@ -1,8 +1,8 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.File
+import java.io.{DataOutput, DataInput, File}
 
-import org.mapdb.{DB, DBMaker}
+import org.mapdb.{DataIO, Serializer, DB, DBMaker}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.LagonakiTransaction
@@ -17,12 +17,44 @@ import scorex.utils.ScorexLogging
 // todo: Make design ready for pruning!
 // todo: Make possibility of easy switching underlying storage implementation(e.g. from MapDb to Riak)
 
+
 class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with ScorexLogging {
-  private val StateHeight = "height"
+
+  private object AccSerializer extends Serializer[Account] {
+    override def serialize(dataOutput: DataOutput, a: Account): Unit =
+      Serializer.STRING.serialize(dataOutput, a.address)
+
+    override def deserialize(dataInput: DataInput, i: Int): Account = {
+      val address = Serializer.STRING.deserialize(dataInput, i)
+      new Account(address)
+    }
+  }
+
+  private object TxArraySerializer extends Serializer[Array[LagonakiTransaction]] {
+    override def serialize(dataOutput: DataOutput, txs: Array[LagonakiTransaction]): Unit = {
+      DataIO.packInt(dataOutput, txs.length)
+      txs.foreach{tx =>
+        val bytes = tx.bytes()
+        DataIO.packInt(dataOutput, bytes.length)
+        dataOutput.write(bytes)
+      }
+    }
+
+    override def deserialize(dataInput: DataInput, i: Int): Array[LagonakiTransaction] = {
+      val txsCount = DataIO.unpackInt(dataInput)
+      (1 to txsCount).toArray.map{_ =>
+        val txSize = DataIO.unpackInt(dataInput)
+        val b = new Array[Byte](txSize)
+        dataInput.readFully(b)
+        LagonakiTransaction.parse(b)
+      }
+    }
+  }
+
 
   private val database: DB = dataFolderOpt match {
     case Some(dataFolder) =>
-      val db = DBMaker.newFileDB(new File(dataFolder + s"/state"))
+      val db = DBMaker.fileDB(new File(dataFolder + s"/state"))
         .closeOnJvmShutdown()
         .cacheSize(2048)
         .checksumEnable()
@@ -30,16 +62,23 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
         .make()
       db.rollback() //clear uncommited data from possibly invalid last run
       db
+
     case None => DBMaker.memoryDB().make()
   }
 
-  private val balances = database.createHashMap("balances").makeOrGet[Account, Long]()
+  private val StateHeight = "height"
 
-  private val accountTransactions = database.createHashMap("watchedTxs").makeOrGet[Account, List[LagonakiTransaction]]()
+  private val balances = database.hashMap[Account, Long]("balances")
 
-  def setStateHeight(height: Int): Unit = database.getAtomicVar(StateHeight).set(height)
+  private val accountTransactions = database.hashMap(
+    "watchedTxs",
+    AccSerializer,
+    TxArraySerializer,
+    null)
 
-  def stateHeight(): Int = database.getAtomicVar(StateHeight).get()
+  def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
+
+  def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
   def processBlock(block:Block): Unit = processBlock(block, reversal = false)
 
@@ -50,8 +89,8 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
         tx.balanceChanges().foldLeft(changes) { case (iChanges, (acc, delta)) =>
 
           //check whether account is watched, add tx to its txs list if so
-          val prevTxs: List[LagonakiTransaction] = Option(accountTransactions.get(acc)).getOrElse(List())
-          accountTransactions.put(acc, tx :: prevTxs)
+          val prevTxs = accountTransactions.getOrDefault(acc, Array())
+          accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
 
           //update balances sheet
           val currentChange = iChanges.getOrElse(acc, 0L)
@@ -87,12 +126,12 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
     balance
   }
 
-  override def accountTransactions(account: Account): Seq[LagonakiTransaction] =
-    Option(accountTransactions.get(account)).getOrElse(List())
+  override def accountTransactions(account: Account): Array[LagonakiTransaction] =
+    Option(accountTransactions.get(account)).getOrElse(Array())
 
   override def stopWatchingAccountTransactions(account: Account): Unit = accountTransactions.remove(account)
 
-  override def watchAccountTransactions(account: Account): Unit = accountTransactions.put(account, List())
+  override def watchAccountTransactions(account: Account): Unit = accountTransactions.put(account, Array())
 
   //initialization
   setStateHeight(0)

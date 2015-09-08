@@ -32,15 +32,17 @@ trait TransactionsHttpService extends HttpService with CommonApiFunctions {
       } ~ path("address" / Segment) { case address =>
         get {
           complete {
-            val txs = application.storedState.accountTransactions(address)
-            Json.arr(txs.map(_.json())).toString()
+            val txJsons = application.storedState.accountTransactions(address).map(_.json())
+            Json.arr(txJsons).toString()
           }
         }
       } ~ path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
         get {
           complete {
-            val txs = application.storedState.accountTransactions(address).takeRight(limit)
-            Json.arr(txs.map(_.json())).toString()
+            val txJsons = application.storedState.accountTransactions(address)
+              .takeRight(limit)
+              .map(_.json())
+            Json.arr(txJsons).toString()
           }
         }
       }
