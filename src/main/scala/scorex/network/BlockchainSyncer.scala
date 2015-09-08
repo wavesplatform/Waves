@@ -27,7 +27,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
   private var status = Status.Offline
 
   override def preStart() = {
-    context.system.scheduler.schedule(100.millis, 2.seconds)(self ! CheckState)
+    context.system.scheduler.schedule(2.seconds, 2.seconds)(self ! CheckState)
     context.system.scheduler.schedule(500.millis, 1.second)(networkController ! GetMaxChainScore)
   }
 

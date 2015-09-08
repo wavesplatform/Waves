@@ -30,7 +30,6 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
 
   private implicit lazy val actorSystem = ActorSystem("lagonaki")
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
-  lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this))
 
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
   lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
@@ -45,16 +44,16 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
       blockchainStorage.appendBlock(genesisBlock).ensuring(_.height() == 1)
       log.info("Genesis block has been added to the state")
     }
-
+    assert(blockchainStorage.height() >= 1)
     println("Initial balances: \n" + storedState)
 
-    assert(blockchainStorage.height() >= 1)
+    val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this))
+    blockchainSyncer ! BlockchainSyncer.CheckState //just to init lazy val
 
     val httpServiceActor = actorSystem.actorOf(Props(classOf[HttpServiceActor], this), "http-service")
     val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = settings.rpcPort)
     IO(Http) ! bindCommand
 
-    blockchainSyncer ! BlockchainSyncer.CheckState //just to init lazy val
 
     //CLOSE ON UNEXPECTED SHUTDOWN
     Runtime.getRuntime.addShutdownHook(new Thread() {
