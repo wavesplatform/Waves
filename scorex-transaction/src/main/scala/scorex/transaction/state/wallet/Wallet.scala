@@ -3,21 +3,21 @@ package scorex.transaction.state.wallet
 import java.io.File
 
 import com.google.common.primitives.{Bytes, Ints}
-import org.mapdb.{DBMaker, Serializer}
+import org.mapdb.DBMaker
 import scorex.account.PrivateKeyAccount
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
-import scala.util.Try
 import scorex.crypto.Sha256._
 
 
+//todo: XOR priv keys with seed in db?
 class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) extends ScorexLogging {
 
   import Wallet._
 
-  private val database = walletFileOpt match {
+  private lazy val database = walletFileOpt match {
     case Some(walletFile) =>
       //create parent folders then check their existence
       walletFile.getParentFile.mkdirs().ensuring(walletFile.getParentFile.exists())
@@ -31,13 +31,10 @@ class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) e
       DBMaker.newMemoryDB().encryptionEnable(password).make
   }
 
-  Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY))
-    .getOrElse(database.getAtomicVar(SEED).set(seed))
-
-  private lazy val accountsPersistence = database.createHashSet("accounts").makeOrGet[Array[Byte]]()
+  private lazy val accountsPersistence = database.createHashSet("privkeys").makeOrGet[Array[Byte]]()
 
   private lazy val accountsCache: TrieMap[String, PrivateKeyAccount] = {
-    val accs = accountsPersistence.map(seed => new PrivateKeyAccount(seed))
+    val accs = accountsPersistence.map(privKey => new PrivateKeyAccount(privKey))
     TrieMap(accs.map(acc => acc.address -> acc).toSeq: _*)
   }
 
@@ -84,7 +81,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) e
 
   def privateKeyAccount(address: String) = accountsCache.get(address)
 
-  def exportSeed(): Array[Byte] = database.getAtomicVar(SEED).get()
+  def exportSeed(): Array[Byte] = seed
 
   def close() = if (!database.isClosed) {
     database.commit()
@@ -104,6 +101,5 @@ class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) e
 }
 
 object Wallet {
-  private val SEED = "seed"
   private val NONCE = "nonce"
 }
