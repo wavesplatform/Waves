@@ -26,11 +26,11 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
         .closeOnJvmShutdown()
         .cacheSize(2048)
         .checksumEnable()
-        .mmapFileEnableIfSupported()
+        .fileMmapEnable()
         .make()
       db.rollback() //clear uncommited data from possibly invalid last run
       db
-    case None => DBMaker.newMemoryDB().make()
+    case None => DBMaker.memoryDB().make()
   }
 
   private val balances = database.createHashMap("balances").makeOrGet[Account, Long]()

@@ -80,13 +80,13 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   private val (blockStorage, database) = dataFolderOpt match {
     case Some(dataFolder) =>
       (FileBlockStorage(dataFolder),
-        DBMaker.newFileDB(new java.io.File(dataFolder + s"/signatures"))
-          .mmapFileEnableIfSupported()
+        DBMaker.appendFileDB(new java.io.File(dataFolder + s"/signatures"))
+          .fileMmapEnableIfSupported()
           .closeOnJvmShutdown()
           .checksumEnable()
           .make())
     case None =>
-      (MemoryBlockStorage, DBMaker.newMemoryDB().make())
+      (MemoryBlockStorage, DBMaker.memoryDB().make())
   }
 
   private val signaturesIndex = database.createTreeMap("signatures").makeOrGet[Int, Array[Byte]]()

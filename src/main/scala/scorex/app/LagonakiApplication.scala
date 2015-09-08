@@ -25,8 +25,8 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   implicit val consensusModule = new NxtLikeConsensusModule
   implicit val transactionModule = new SimpleTransactionModule
 
-  lazy val storedState = new StoredState(settings.dataDirOpt)
-  lazy val blockchainStorage = new StoredBlockchain(settings.dataDirOpt)
+  lazy val storedState = transactionModule.state
+  lazy val blockchainStorage = transactionModule.history
 
   private implicit lazy val actorSystem = ActorSystem("lagonaki")
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
