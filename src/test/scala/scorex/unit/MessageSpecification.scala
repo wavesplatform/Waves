@@ -13,14 +13,6 @@ class MessageSpecification extends FunSuite {
   implicit val settings = new LagonakiSettings("settings-test.json")
   implicit val transactionModule = new SimpleTransactionModule
 
-
-  test("PingMessage roundtrip") {
-    val msg = PingMessage
-    val parsedTry = Message.parse(ByteBuffer.wrap(msg.bytes))
-
-    assert(parsedTry.isSuccess)
-  }
-
   test("ScoreMessage roundtrip 1") {
     val h1 = 1
     val s1 = BigInt(2)

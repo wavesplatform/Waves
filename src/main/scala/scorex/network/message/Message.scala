@@ -80,7 +80,6 @@ object Message {
     }
 
     msgType match {
-      case Message.PingType => PingMessage
       case Message.GetPeersType => GetPeersMessage
       case Message.PeersType => PeersMessage(data)
       case Message.VersionType => ScoreMessage(data)
@@ -91,11 +90,6 @@ object Message {
       case Message.TransactionType => TransactionMessage(data)
     }
   }
-}
-
-case object PingMessage extends Message {
-  override val messageType = Message.PingType
-  override val dataBytes = Array[Byte]()
 }
 
 case object GetPeersMessage extends Message {

@@ -35,13 +35,10 @@ class PeerConnectionHandler(application: LagonakiApplication,
 
   context watch connection
 
-  context.system.scheduler.schedule(500.millis, 10.seconds)(self ! PingRemote)
-  context.system.scheduler.schedule(1.second, 15.seconds)(self ! SendBlockchainScore)
+  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
 
   private def handleMessage(message: Message) = {
     message match {
-      case PingMessage =>
-        context.system.scheduler.scheduleOnce(10 seconds)(self ! PingMessage)
 
       case GetPeersMessage =>
         self ! PeersMessage(peerManager.knownPeers().filter(_ != remote)) //excluding sender
@@ -107,10 +104,9 @@ class PeerConnectionHandler(application: LagonakiApplication,
   }
 
   override def receive = {
-    case PingRemote => self ! PingMessage
 
     case SendBlockchainScore =>
-      self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score)
+      self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score())
 
     case msg: Message =>
       self ! ByteString(msg.bytes)
@@ -156,8 +152,6 @@ class PeerConnectionHandler(application: LagonakiApplication,
 }
 
 object PeerConnectionHandler {
-
-  case object PingRemote
 
   case object SendBlockchainScore
 
