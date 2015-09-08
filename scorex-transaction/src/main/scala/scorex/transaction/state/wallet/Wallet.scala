@@ -26,10 +26,10 @@ class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) e
         .checksumEnable()
         .closeOnJvmShutdown()
         .encryptionEnable(password).make
+
     case None =>
       DBMaker.newMemoryDB().encryptionEnable(password).make
   }
-
 
   Try(database.createAtomicVar(SEED, seed, Serializer.BYTE_ARRAY))
     .getOrElse(database.getAtomicVar(SEED).set(seed))
@@ -102,7 +102,6 @@ class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) e
 
   def getAndIncrementNonce(): Int = database.getAtomicInteger(NONCE).getAndIncrement()
 }
-
 
 object Wallet {
   private val SEED = "seed"
