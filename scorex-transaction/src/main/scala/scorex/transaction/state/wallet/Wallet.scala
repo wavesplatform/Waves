@@ -3,7 +3,7 @@ package scorex.transaction.state.wallet
 import java.io.File
 
 import com.google.common.primitives.{Bytes, Ints}
-import org.mapdb.DBMaker
+import org.mapdb.{Serializer, DBMaker}
 import scorex.account.PrivateKeyAccount
 import scorex.utils.ScorexLogging
 
@@ -33,11 +33,11 @@ class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) e
       DBMaker.newMemoryDB().encryptionEnable(password).make
   }
 
-  private val accountsPersistence = database.createHashSet("privkeys").makeOrGet[Array[Byte]]()
+  private val accountsPersistence = database.hashSet("privkeys", Serializer.BYTE_ARRAY)
 
   //todo: MapDB stucks here if file storage
   private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
-    val accs = accountsPersistence.map(privKey => new PrivateKeyAccount(privKey))
+    val accs = accountsPersistence.map(seed => new PrivateKeyAccount(seed))
     TrieMap(accs.map(acc => acc.address -> acc).toSeq: _*)
   }
 
