@@ -2,24 +2,24 @@ package scorex.app
 
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
-import scorex.account.{PublicKeyAccount, Account, PrivateKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.api.http.HttpServiceActor
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
-import scorex.network.{BlockchainSyncer, NetworkController}
 import scorex.network.message._
+import scorex.network.{BlockchainSyncer, NetworkController}
 import scorex.transaction.LagonakiTransaction.ValidationResult
+import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 import scorex.transaction.state.wallet.Wallet
-import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 import spray.can.Http
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
+class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
 
   implicit val settings = new LagonakiSettings(settingsFilename)
   implicit val consensusModule = new NxtLikeConsensusModule
@@ -68,23 +68,23 @@ class LagonakiApplication(val settingsFilename:String) extends ScorexLogging {
     networkController ! NetworkController.ShutdownNetwork
 
     log.info("Stopping actors (incl. block generator)")
-    actorSystem.terminate() onComplete {
-      case t =>
-        //CLOSE WALLET
-        log.info("Closing wallet")
-        wallet.close()
+    actorSystem.shutdown()
 
-        //TODO catch situations when we need this and remove
-        Future {
-          Thread.sleep(10000)
-          log.error("Halt app!")
-          Runtime.getRuntime.halt(0)
-        }
+    //CLOSE WALLET
+    log.info("Closing wallet")
+    wallet.close()
 
-        //FORCE CLOSE
-        log.info("Exiting from the app...")
-        System.exit(0)
+    //TODO catch situations when we need this and remove
+    Future {
+      Thread.sleep(10000)
+      log.error("Halt app!")
+      Runtime.getRuntime.halt(0)
     }
+
+    //FORCE CLOSE
+    log.info("Exiting from the app...")
+    System.exit(0)
+
   }
 
   def onNewOffchainTransaction(transaction: LagonakiTransaction) =

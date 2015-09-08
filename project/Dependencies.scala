@@ -14,7 +14,7 @@ object Dependencies {
   )
 
   lazy val db = Seq(
-    "org.mapdb" % "mapdb" % "1.+"
+    "org.mapdb" % "mapdb" % "2.+"
   )
 
   lazy val logging = Seq(

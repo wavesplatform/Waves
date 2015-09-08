@@ -12,12 +12,13 @@ import scala.collection.concurrent.TrieMap
 import scorex.crypto.Sha256._
 
 
+
 //todo: XOR priv keys with seed in db?
 class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) extends ScorexLogging {
 
   import Wallet._
 
-  private lazy val database = walletFileOpt match {
+  private val database = walletFileOpt match {
     case Some(walletFile) =>
       //create parent folders then check their existence
       walletFile.getParentFile.mkdirs().ensuring(walletFile.getParentFile.exists())
@@ -25,15 +26,17 @@ class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) e
       DBMaker.newFileDB(walletFile)
         .checksumEnable()
         .closeOnJvmShutdown()
-        .encryptionEnable(password).make
+        .encryptionEnable(password)
+        .make
 
     case None =>
       DBMaker.newMemoryDB().encryptionEnable(password).make
   }
 
-  private lazy val accountsPersistence = database.createHashSet("privkeys").makeOrGet[Array[Byte]]()
+  private val accountsPersistence = database.createHashSet("privkeys").makeOrGet[Array[Byte]]()
 
-  private lazy val accountsCache: TrieMap[String, PrivateKeyAccount] = {
+  //todo: MapDB stucks here if file storage
+  private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
     val accs = accountsPersistence.map(privKey => new PrivateKeyAccount(privKey))
     TrieMap(accs.map(acc => acc.address -> acc).toSeq: _*)
   }

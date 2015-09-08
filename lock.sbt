@@ -12,12 +12,12 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.5.4",
   "com.google.guava" % "guava" % "15.0",
   "com.typesafe" % "config" % "1.3.0",
-  "com.typesafe.akka" % "akka-actor_2.11" % "2.4-M2",
+  "com.typesafe.akka" % "akka-actor_2.11" % "2.3.9",
   "com.typesafe.akka" % "akka-testkit_2.11" % "2.3.9",
-  "com.typesafe.play" % "play-datacommons_2.11" % "2.4.2",
-  "com.typesafe.play" % "play-functional_2.11" % "2.4.2",
-  "com.typesafe.play" % "play-iteratees_2.11" % "2.4.2",
-  "com.typesafe.play" % "play-json_2.11" % "2.4.2",
+  "com.typesafe.play" % "play-datacommons_2.11" % "2.4.3",
+  "com.typesafe.play" % "play-functional_2.11" % "2.4.3",
+  "com.typesafe.play" % "play-iteratees_2.11" % "2.4.3",
+  "com.typesafe.play" % "play-json_2.11" % "2.4.3",
   "commons-net" % "commons-net" % "3.3",
   "io.spray" % "spray-can_2.11" % "1.3.3",
   "io.spray" % "spray-http_2.11" % "1.3.3",
@@ -29,7 +29,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "joda-time" % "joda-time" % "2.8.1",
   "org.joda" % "joda-convert" % "1.7",
   "org.jvnet.mimepull" % "mimepull" % "1.9.5",
-  "org.mapdb" % "mapdb" % "1.0.8",
+  "org.mapdb" % "mapdb" % "2.0-beta6",
   "org.parboiled" % "parboiled-core" % "1.1.7",
   "org.parboiled" % "parboiled-scala_2.11" % "1.1.7",
   "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.3",
@@ -38,4 +38,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scalatest" % "scalatest_2.11" % "2.3.0-SNAP2",
   "org.slf4j" % "slf4j-api" % "1.7.7"
 )
-// LIBRARY_DEPENDENCIES_HASH f3cf6fe07d409592911e79c4ecc930d3840b0957
+// LIBRARY_DEPENDENCIES_HASH a07b083e5da443733c03689c93517bf572b34b62
