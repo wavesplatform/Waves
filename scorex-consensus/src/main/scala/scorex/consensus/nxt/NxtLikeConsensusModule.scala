@@ -126,7 +126,7 @@ class NxtLikeConsensusModule
   override def parseBlockData(bytes: Array[Byte]): BlockField[NxtLikeConsensusBlockData] =
     NxtConsensusBlockField(new NxtLikeConsensusBlockData {
       override val baseTarget: Long = Longs.fromByteArray(bytes.take(BaseTargetLength))
-      override val generationSignature: Array[Byte] = bytes.slice(BaseTargetLength, GeneratorSignatureLength)
+      override val generationSignature: Array[Byte] = bytes.takeRight(GeneratorSignatureLength)
     })
 
   override def blockScore(block: Block, history: History)
