@@ -13,11 +13,9 @@ import scala.util.{Failure, Try}
 class NxtLikeConsensusModule
   extends LagonakiConsensusModule[NxtLikeConsensusBlockData] with ScorexLogging {
 
+  import NxtLikeConsensusModule._
+
   implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = this
-
-  val BaseTargetLength = 8
-
-  val GeneratorSignatureLength = 32
 
   val AvgFrequency = 2
 
@@ -145,4 +143,10 @@ class NxtLikeConsensusModule
 
   def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] =
     NxtConsensusBlockField(data)
+}
+
+
+object NxtLikeConsensusModule {
+  val BaseTargetLength = 8
+  val GeneratorSignatureLength = 32
 }

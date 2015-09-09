@@ -96,9 +96,9 @@ object Block extends ScorexLogging {
     require(consModule != null)
     require(transModule != null)
 
-    var position = 1
-
     val version = bytes.head
+
+    var position = 1
 
     val timestamp = Longs.fromByteArray(bytes.slice(position, position + 8))
     position += 8
