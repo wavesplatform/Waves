@@ -11,7 +11,6 @@ import scorex.network.{BlockchainSyncer, NetworkController}
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 import scorex.transaction.state.wallet.Wallet
 import scorex.utils.{NTP, ScorexLogging}
 import spray.can.Http
@@ -46,7 +45,6 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
       log.info("Genesis block has been added to the state")
     }
     assert(blockchainStorage.height() >= 1)
-    println("Initial balances: \n" + storedState)
 
     blockchainSyncer ! BlockchainSyncer.CheckState
 

@@ -27,8 +27,6 @@ class NxtLikeConsensusModule
 
     val blockTime = block.timestampField.value
 
-    println("chain: \n"+history)
-
     val prev = history.parent(block).get
     val prevTime = prev.timestampField.value
 
