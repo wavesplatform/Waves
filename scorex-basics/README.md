@@ -36,13 +36,17 @@ A block is a an atomic piece of data network participates are agreed on.
  
   - additional data: block structure version no, timestamp etc
 
-Consensus Module
-----------------
-
+State & History
+---------------
 
 
 Transaction Module
 ------------------
+
+
+Consensus Module
+----------------
+
 
 TODO:
 -----
