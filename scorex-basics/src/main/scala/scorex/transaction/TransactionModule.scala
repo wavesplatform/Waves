@@ -1,9 +1,8 @@
 package scorex.transaction
 
-import scorex.block.{Block, BlockField}
+import scorex.block.{BlockProcessingModule, Block}
 
-
-trait TransactionModule[TransactionBlockData] {
+trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[TransactionBlockData]{
 
   val state: State
 
@@ -11,13 +10,6 @@ trait TransactionModule[TransactionBlockData] {
   val history: History
 
   def isValid(block: Block):Boolean
-
-  def parseBlockData(bytes: Array[Byte]): BlockField[TransactionBlockData]
-
-  def parseBlockFields(blockFields: BlockField[TransactionBlockData]): TransactionBlockData =
-    blockFields.value
-
-  def genesisData:BlockField[TransactionBlockData]
 
   def transactions(block: Block): Seq[Transaction]
 
@@ -34,8 +26,6 @@ trait TransactionModule[TransactionBlockData] {
   def process(block: Block): Unit = state.processBlock(block, reversal = false)
 
   def popOff(block: Block): Unit = state.processBlock(block, reversal = true)
-
-  def formBlockData(data: TransactionBlockData): BlockField[TransactionBlockData]
 
   def packUnconfirmed(): TransactionBlockData
 

@@ -1,10 +1,11 @@
 package scorex.consensus
 
 import scorex.account.{PrivateKeyAccount, Account}
-import scorex.block.{BlockField, Block}
+import scorex.block.{BlockProcessingModule, Block}
 import scorex.transaction.{TransactionModule, History, State}
 
-trait ConsensusModule[ConsensusBlockData] {
+
+trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[ConsensusBlockData]{
 
   def isValid[TT](block: Block, history: History, state: State)
              (implicit transactionModule: TransactionModule[TT]): Boolean
@@ -28,13 +29,4 @@ trait ConsensusModule[ConsensusBlockData] {
 
   def generateNextBlock[TT](account: PrivateKeyAccount, state: State, history: History)
                        (implicit transactionModule: TransactionModule[TT]): Option[Block]
-
-  def parseBlockData(bytes: Array[Byte]): BlockField[ConsensusBlockData]
-
-  def parseBlockFields(blockFields: BlockField[ConsensusBlockData]): ConsensusBlockData =
-    blockFields.value
-
-  def genesisData:BlockField[ConsensusBlockData]
-
-  def formBlockData(data:ConsensusBlockData):BlockField[ConsensusBlockData]
 }
