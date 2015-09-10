@@ -6,6 +6,12 @@ import scorex.account.PublicKeyAccount
 import scorex.crypto.Base58
 import scorex.transaction.Transaction
 
+/**
+ * An abstraction of a part of a block, wrapping some data. The wrapper interface
+ * provides binary & json serializations.
+ *
+ * @tparam T - type of a value wrapped into a blockfield
+ */
 abstract class BlockField[T] {
   val name: String
   val value: T
