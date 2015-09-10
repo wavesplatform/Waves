@@ -1,15 +1,33 @@
 Scorex-Basics Sub-Module
 ========================
 
-The module contains utility functions to be used by other parts of the project:
+The module contains utility functions & basic common structure to be used by other parts of the project:
  
-- Hashing functions. Current implementation is sha256
-- Signing/verification functions. Curve 25519 is the current implementation 
+- Block structure and corresponding structures. Please note, there's no need to inherit from the Block trait, all 
+ functions to generate / parse / check a block are already in the trait & Block companion object
+- ConsensusModule interface to a consensus module(see "Consensus Module" section below) 
+- TransactionModule interface to a transaction module(see "Transaction Module" section below) 
+- Cryptographic hash functions. The only implementation in use at the moment is SHA-256
+- Signing/verification functions. Curve 25519 is the only current implementation 
 - RipeMD160 / Base58
-- Account. Basically an account is just a wrapper around valid address provided as string, could be 
+- Accounts. Basically an account is just a wrapper around valid address provided as string, could be 
 accomplished with public key or public/private keypair. 
+- NTP client for time synchronization(but please note, there's no global time in a cryptocurrency p2p
+network!)
+- ScorexLogging trait to be mixed into classes for logging  
 
 
-Other functions can be added to build offchain/onchain protocols e.g. 
-other hash functions(e.g. keccak256 / sha3), Merkle trees, one-way accumulators, 
-commitments (e.g. Pedersen commitment), ring signatures etc. 
+Consensus Module
+----------------
+
+
+
+Transaction Module
+------------------
+
+TODO:
+-----
+
+Other functions can be added to build offchain/onchain protocols e.g. other hash 
+functions(e.g. keccak256 / sha3), Merkle trees, one-way accumulators, commitments (e.g. Pedersen commitment), 
+ring signatures etc. 
