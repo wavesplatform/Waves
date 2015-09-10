@@ -20,7 +20,7 @@ trait Transaction {
   def json(): JsObject
 
   /**
-   * A transaction could be serialized into bytes
+   * A transaction could be serialized into binary form
    */
   def bytes(): Array[Byte]
 }
