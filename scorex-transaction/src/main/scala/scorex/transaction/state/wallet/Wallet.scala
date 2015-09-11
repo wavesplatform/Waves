@@ -16,26 +16,25 @@ import scorex.crypto.Sha256._
 //todo: XOR priv keys with seed in db?
 class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) extends ScorexLogging {
 
-  import Wallet._
+  private val NONCE = "nonce"
 
   private val database = walletFileOpt match {
     case Some(walletFile) =>
       //create parent folders then check their existence
       walletFile.getParentFile.mkdirs().ensuring(walletFile.getParentFile.exists())
 
-      DBMaker.newFileDB(walletFile)
+      DBMaker.fileDB(walletFile)
         .checksumEnable()
         .closeOnJvmShutdown()
         .encryptionEnable(password)
         .make
 
     case None =>
-      DBMaker.newMemoryDB().encryptionEnable(password).make
+      DBMaker.memoryDB().encryptionEnable(password).make
   }
 
   private val accountsPersistence = database.hashSet("privkeys", Serializer.BYTE_ARRAY)
 
-  //todo: MapDB stucks here if file storage
   private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
     val accs = accountsPersistence.map(seed => new PrivateKeyAccount(seed))
     TrieMap(accs.map(acc => acc.address -> acc).toSeq: _*)
@@ -96,13 +95,9 @@ class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) e
 
   def accounts() = accountsCache.values.toSeq
 
-  def nonce(): Int = database.getAtomicInteger(NONCE).intValue()
+  def nonce(): Int = database.atomicInteger(NONCE).intValue()
 
-  def setNonce(nonce: Int) = database.getAtomicInteger(NONCE).set(nonce)
+  def setNonce(nonce: Int) = database.atomicInteger(NONCE).set(nonce)
 
-  def getAndIncrementNonce(): Int = database.getAtomicInteger(NONCE).getAndIncrement()
-}
-
-object Wallet {
-  private val NONCE = "nonce"
+  def getAndIncrementNonce(): Int = database.atomicInteger(NONCE).getAndIncrement()
 }
