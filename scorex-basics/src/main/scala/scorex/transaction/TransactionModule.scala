@@ -6,7 +6,6 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   val state: State
 
-  // todo: change to more abstract History (with possible trees support)
   val history: History
 
   def isValid(block: Block):Boolean
