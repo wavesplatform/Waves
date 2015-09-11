@@ -14,10 +14,6 @@ import scorex.utils.ScorexLogging
 // Store transactions for selected accounts only.
 // If no datafolder provided, blockchain lives in RAM (intended for tests only)
 
-// todo: Make design ready for pruning!
-// todo: Make possibility of easy switching underlying storage implementation(e.g. from MapDb to Riak)
-
-
 class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with ScorexLogging {
 
   private object AccSerializer extends Serializer[Account] {
