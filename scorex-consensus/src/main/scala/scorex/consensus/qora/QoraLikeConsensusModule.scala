@@ -142,7 +142,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
 
   override def isValid[TT](block: Block, history: History, state: State)
                           (implicit transactionModule: TransactionModule[TT]): Boolean = {
-    val data = block.consensusDataField.asInstanceOf[QoraLikeConsensusBlockData]
+    val data = block.consensusDataField.asInstanceOf[QoraConsensusBlockField].value
 
     if (data.generatingBalance != getNextBlockGeneratingBalance(history.parent(block).get, history)) {
       //CHECK IF GENERATING BALANCE IS CORRECT
