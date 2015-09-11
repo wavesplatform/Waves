@@ -89,7 +89,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
       (MemoryBlockStorage, DBMaker.memoryDB().make())
   }
 
-  private val signaturesIndex = database.createTreeMap("signatures").makeOrGet[Int, Array[Byte]]()
+  private val signaturesIndex = database.treeMap[Int, Array[Byte]]("signatures")
 
   //if there are some uncommited changes from last run, discard'em
   if (signaturesIndex.size() > 0) database.rollback()
@@ -141,7 +141,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
       }
     }
 
-  override def toString() = ((1 to height()) map {case h =>
+  override def toString = ((1 to height()) map {case h =>
       val bl = blockAt(h).get
       s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
   }).mkString("\n")
