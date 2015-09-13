@@ -11,9 +11,9 @@ import scorex.utils.NTP
 
 
 class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusBlockData] {
-  val GeneratingBalanceLength = 8
+  import QoraLikeConsensusModule.GeneratorSignatureLength
 
-  val GeneratorSignatureLength = 64
+  val GeneratingBalanceLength = 8
 
   private val RETARGET = 10
   private val MIN_BALANCE = 1L
@@ -137,7 +137,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
   override def parseBlockData(bytes: Array[Byte]): BlockField[QoraLikeConsensusBlockData] =
     QoraConsensusBlockField(new QoraLikeConsensusBlockData {
       override val generatingBalance: Long = Longs.fromByteArray(bytes.take(GeneratingBalanceLength))
-      override val generatorSignature: Array[Byte] = bytes.slice(GeneratingBalanceLength, GeneratorSignatureLength)
+      override val generatorSignature: Array[Byte] = bytes.takeRight(GeneratorSignatureLength)
     })
 
   override def isValid[TT](block: Block, history: History, state: State)
@@ -173,5 +173,11 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
       override val generatorSignature: Array[Byte] = Array.fill(64)(0: Byte)
     })
 
-  def formBlockData(data: QoraLikeConsensusBlockData): BlockField[QoraLikeConsensusBlockData] = QoraConsensusBlockField(data)
+  def formBlockData(data: QoraLikeConsensusBlockData): BlockField[QoraLikeConsensusBlockData] =
+    QoraConsensusBlockField(data)
+}
+
+
+object QoraLikeConsensusModule {
+  val GeneratorSignatureLength = 64
 }
