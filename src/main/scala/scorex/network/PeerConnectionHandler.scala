@@ -86,11 +86,10 @@ class PeerConnectionHandler(application: LagonakiApplication,
         log.info(s"Got block, height $height , local height: " + blockchainStorage.height())
 
         if (height == blockchainStorage.height() + 1) {
-          if (block.isValid) {
+          if (block.isValid)
             networkController ! NewBlock(block, Some(remote))
-          } else {
+          else
             log.info(s"Got non-valid block (height of a block: $height")
-          }
         }
 
       case TransactionMessage(transaction) =>
@@ -161,4 +160,5 @@ object PeerConnectionHandler {
   case object Blacklist
 
   case class BestPeer(remote: InetSocketAddress, betterThanLocal: Boolean)
+
 }
