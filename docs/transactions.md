@@ -1,2 +1,2 @@
-A Cryptocurrency Transaction Protocol: Bitcoin vs. Nxt vs. Ethereum vs. Scorex
-==============================================================================
+A Cryptocurrency Transaction Protocol: Bitcoin vs. Nxt vs. Ethereum vs. Scorex Lagonaki
+=======================================================================================
