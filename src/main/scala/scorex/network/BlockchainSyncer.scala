@@ -77,8 +77,11 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
 
         block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
         val height = application.blockchainStorage.height()
-        val exceptOf = remoteOpt.toList
-        networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block), exceptOf)
+
+        //broadcast block only if it is generated locally
+        if(remoteOpt.isEmpty) {
+          networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block), List())
+        }
       } else {
         log.warn(s"Non-valid block: $block from $fromStr")
       }

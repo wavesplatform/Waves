@@ -42,7 +42,7 @@ object Server extends App with ScorexLogging {
 
     require(wallet.privateKeyAccounts().nonEmpty)
 
-    Thread.sleep(10000)
+    Thread.sleep(5000)
 
     val genesisBlock = application.blockchainStorage.blockAt(1)
     val genesisAccs = genesisBlock.get.transactions.flatMap { tx => tx match {

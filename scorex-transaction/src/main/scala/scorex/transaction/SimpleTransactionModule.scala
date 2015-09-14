@@ -63,7 +63,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
   override def transactions(block: Block): SimpleTransactionModule.StoredInBlock =
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value //todo: asInstanceOf
 
-  override def packUnconfirmed(): SimpleTransactionModule.StoredInBlock = UnconfirmedTransactionsDatabaseImpl.all()
+  override def packUnconfirmed(): SimpleTransactionModule.StoredInBlock =
+    UnconfirmedTransactionsDatabaseImpl.all()
 
   //todo: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: SimpleTransactionModule.StoredInBlock): Unit = {
