@@ -23,10 +23,6 @@ import scala.concurrent.Future
 
 class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   private val appConf = ConfigFactory.load().getConfig("app")
-
-  implicit val settings = new LagonakiSettings(settingsFilename)
-  implicit val transactionModule = new SimpleTransactionModule
-
   implicit val consensusModule: ConsensusModule[_] = appConf.getString("consensusAlgo") match {
     case "NxtLikeConsensusModule" => new NxtLikeConsensusModule
     case "QoraLikeConsensusModule" => new QoraLikeConsensusModule
@@ -34,6 +30,9 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
       log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
       new NxtLikeConsensusModule
   }
+
+  implicit val settings = new LagonakiSettings(settingsFilename)
+  implicit val transactionModule = new SimpleTransactionModule
 
   lazy val storedState = transactionModule.state
   lazy val blockchainStorage = transactionModule.history
