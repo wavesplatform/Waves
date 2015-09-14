@@ -9,11 +9,12 @@ import scala.collection.concurrent.TrieMap
 object UnconfirmedTransactionsDatabaseImpl extends UnconfirmedTransactionsDatabase {
   val transactions = TrieMap[Long, LagonakiTransaction]()
 
-  private def key(tx: LagonakiTransaction): Long = key(tx.signature)
-
+  //using Long instead of Array[Byte] just for performance improvement
   private def key(signature: Array[Byte]): Long = {
     Longs.fromByteArray(signature.take(8))
   }
+
+  private def key(tx: LagonakiTransaction): Long = key(tx.signature)
 
   override def putIfNew(tx: LagonakiTransaction): Boolean =
     transactions.putIfAbsent(key(tx), tx).isEmpty

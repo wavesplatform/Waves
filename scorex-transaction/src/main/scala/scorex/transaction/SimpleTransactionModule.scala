@@ -113,5 +113,5 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
 object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
-  val MaxTransactions = 255
+  val MaxTransactions = 4096
 }
