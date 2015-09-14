@@ -81,7 +81,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     assert(parsedBlock.signerDataField.value.generator.publicKey.sameElements(gen.publicKey))
   }
 
-  ignore("restoring from Base58 form") {
+  ignore("Base58 serialization/restoring") {
 
   }
 }

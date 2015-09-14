@@ -4,8 +4,11 @@ import play.api.libs.json.Json
 import scorex.app.LagonakiApplication
 import scorex.app.api.http._
 
+
 class BlocksRoutingSpecification extends RouteTest with BlocksHttpService {
   override implicit val application = new LagonakiApplication("settings-test.json")
+
+  application.checkGenesis()
 
   "blocksRouting" should "return first block" in {
     Get("/blocks/first") ~> blocksRouting ~> check {

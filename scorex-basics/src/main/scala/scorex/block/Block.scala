@@ -2,6 +2,7 @@ package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import org.joda.time.DateTime
+import play.api.libs.json.Json
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.consensus.ConsensusModule
 import scorex.crypto.SigningFunctionsImpl
@@ -47,13 +48,18 @@ trait Block {
 
   lazy val transactions = transactionModule.transactions(this)
 
+  lazy val fee = consensusModule.feesDistribution(this).values.sum
+
   lazy val json =
     versionField.json ++
       timestampField.json ++
       referenceField.json ++
       consensusDataField.json ++
       transactionDataField.json ++
-      signerDataField.json
+      signerDataField.json ++
+      Json.obj(
+        "fee" -> fee
+      )
 
   lazy val bytes = {
     val txBytesSize = transactionDataField.bytes.length

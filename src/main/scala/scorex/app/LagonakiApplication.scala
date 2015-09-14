@@ -6,6 +6,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.api.http.HttpServiceActor
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
+import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.network.message._
 import scorex.network.{BlockchainSyncer, NetworkController}
 import scorex.transaction.LagonakiTransaction.ValidationResult
@@ -21,7 +22,7 @@ import scala.concurrent.Future
 class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
 
   implicit val settings = new LagonakiSettings(settingsFilename)
-  implicit val consensusModule = new NxtLikeConsensusModule
+  implicit val consensusModule = new QoraLikeConsensusModule
   implicit val transactionModule = new SimpleTransactionModule
 
   lazy val storedState = transactionModule.state
@@ -34,24 +35,26 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
   lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
-  def run() {
-    require(transactionModule.balancesSupport)
-    require(transactionModule.accountWatchingSupport)
-
+  def checkGenesis(): Unit = {
     if (blockchainStorage.isEmpty) {
       val genesisBlock = Block.genesis()
       storedState.processBlock(genesisBlock)
       blockchainStorage.appendBlock(genesisBlock).ensuring(_.height() == 1)
       log.info("Genesis block has been added to the state")
     }
-    assert(blockchainStorage.height() >= 1)
+  }.ensuring(blockchainStorage.height() >= 1)
+
+  def run() {
+    require(transactionModule.balancesSupport)
+    require(transactionModule.accountWatchingSupport)
+
+    checkGenesis()
 
     blockchainSyncer ! BlockchainSyncer.CheckState
 
     val httpServiceActor = actorSystem.actorOf(Props(classOf[HttpServiceActor], this), "http-service")
     val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = settings.rpcPort)
     IO(Http) ! bindCommand
-
 
     //CLOSE ON UNEXPECTED SHUTDOWN
     Runtime.getRuntime.addShutdownHook(new Thread() {

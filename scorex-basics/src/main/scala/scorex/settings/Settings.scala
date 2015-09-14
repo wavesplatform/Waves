@@ -22,7 +22,6 @@ trait Settings extends ScorexLogging {
     val jsonString = scala.io.Source.fromFile(filename).mkString
     Json.parse(jsonString).as[JsObject]
   }.recoverWith { case t =>
-    log.error(s"Unable to read $filename", t)
     Try {
       val jsonString = scala.io.Source.fromURL(getClass.getResource(s"/$filename")).mkString
       Json.parse(jsonString).as[JsObject]
