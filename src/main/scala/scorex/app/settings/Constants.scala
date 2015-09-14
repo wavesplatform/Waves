@@ -11,16 +11,7 @@ import scorex.utils.ScorexLogging
  */
 
 object Constants extends ScorexLogging {
-
   private val appConf = ConfigFactory.load().getConfig("app")
-
-  val ConsensusAlgo: ConsensusModule[_] = appConf.getString("consensusAlgo") match {
-    case "NxtLikeConsensusModule" => new NxtLikeConsensusModule
-    case "QoraLikeConsensusModule" => new QoraLikeConsensusModule
-    case algo =>
-      log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
-      new NxtLikeConsensusModule
-  }
 
   val Product = appConf.getString("product")
   val Release = appConf.getString("release")

@@ -2,9 +2,11 @@ package scorex.app
 
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
+import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.api.http.HttpServiceActor
 import scorex.block.Block
+import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.network.message._
@@ -20,10 +22,18 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
+  private val appConf = ConfigFactory.load().getConfig("app")
 
   implicit val settings = new LagonakiSettings(settingsFilename)
-  implicit val consensusModule = new QoraLikeConsensusModule
   implicit val transactionModule = new SimpleTransactionModule
+
+  implicit val consensusModule: ConsensusModule[_] = appConf.getString("consensusAlgo") match {
+    case "NxtLikeConsensusModule" => new NxtLikeConsensusModule
+    case "QoraLikeConsensusModule" => new QoraLikeConsensusModule
+    case algo =>
+      log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
+      new NxtLikeConsensusModule
+  }
 
   lazy val storedState = transactionModule.state
   lazy val blockchainStorage = transactionModule.history
