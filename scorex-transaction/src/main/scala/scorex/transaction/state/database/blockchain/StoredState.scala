@@ -1,8 +1,8 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.{DataOutput, DataInput, File}
+import java.io.{DataInput, DataOutput, File}
 
-import org.mapdb.{DataIO, Serializer, DB, DBMaker}
+import org.mapdb.{DB, DBMaker, DataIO, Serializer}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.LagonakiTransaction
@@ -10,9 +10,10 @@ import scorex.transaction.state.LagonakiState
 import scorex.utils.ScorexLogging
 
 
-// Store current balances only, and balances changes within effective balance depth.
-// Store transactions for selected accounts only.
-// If no datafolder provided, blockchain lives in RAM (intended for tests only)
+/** Store current balances only, and balances changes within effective balance depth.
+  * Store transactions for selected accounts only.
+  * If no datafolder provided, blockchain lives in RAM (intended for tests only)
+  */
 
 class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with ScorexLogging {
 
@@ -29,7 +30,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
   private object TxArraySerializer extends Serializer[Array[LagonakiTransaction]] {
     override def serialize(dataOutput: DataOutput, txs: Array[LagonakiTransaction]): Unit = {
       DataIO.packInt(dataOutput, txs.length)
-      txs.foreach{tx =>
+      txs.foreach { tx =>
         val bytes = tx.bytes()
         DataIO.packInt(dataOutput, bytes.length)
         dataOutput.write(bytes)
@@ -38,7 +39,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
     override def deserialize(dataInput: DataInput, i: Int): Array[LagonakiTransaction] = {
       val txsCount = DataIO.unpackInt(dataInput)
-      (1 to txsCount).toArray.map{_ =>
+      (1 to txsCount).toArray.map { _ =>
         val txSize = DataIO.unpackInt(dataInput)
         val b = new Array[Byte](txSize)
         dataInput.readFully(b)
@@ -76,29 +77,29 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
-  def processBlock(block:Block): Unit = processBlock(block, reversal = false)
+  def processBlock(block: Block): Unit = processBlock(block, reversal = false)
 
   override def processBlock(block: Block, reversal: Boolean): Unit = {
     val balanceChanges = block.transactionModule.transactions(block)
       .foldLeft(block.consensusModule.feesDistribution(block)) { case (changes, atx) => atx match {
-      case tx: LagonakiTransaction =>
-        tx.balanceChanges().foldLeft(changes) { case (iChanges, (acc, delta)) =>
+        case tx: LagonakiTransaction =>
+          tx.balanceChanges().foldLeft(changes) { case (iChanges, (acc, delta)) =>
 
-          //check whether account is watched, add tx to its txs list if so
-          val prevTxs = accountTransactions.getOrDefault(acc, Array())
-          accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
+            //check whether account is watched, add tx to its txs list if so
+            val prevTxs = accountTransactions.getOrDefault(acc, Array())
+            accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
 
-          //update balances sheet
-          val currentChange = iChanges.getOrElse(acc, 0L)
-          val newChange = currentChange + delta
-          iChanges.updated(acc, newChange)
-        }
+            //update balances sheet
+            val currentChange = iChanges.getOrElse(acc, 0L)
+            val newChange = currentChange + delta
+            iChanges.updated(acc, newChange)
+          }
 
-      case _ =>
-        log.error("Wrong transaction type in pattern-matching")
-        changes
-    }
-    }
+        case _ =>
+          log.error("Wrong transaction type in pattern-matching")
+          changes
+      }
+      }
 
     balanceChanges.foreach { case (acc, delta) =>
       val balance = Option(balances.get(acc)).getOrElse(0L)
@@ -133,7 +134,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
   setStateHeight(0)
 
   //for debugging purposes only
-  override def toString() = {
+  override def toString = {
     import scala.collection.JavaConversions._
     balances.mkString("\n")
   }
