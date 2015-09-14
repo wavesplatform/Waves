@@ -7,6 +7,8 @@ trait BlockChain extends History with ScorexLogging {
 
   def blockAt(height: Int): Option[Block]
 
+  def genesisBlock = blockAt(1)
+
   override def parent(block: Block): Option[Block] =
     heightOf(block.referenceField.value).flatMap(blockAt)
 
