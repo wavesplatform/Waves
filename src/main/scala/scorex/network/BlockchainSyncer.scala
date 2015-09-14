@@ -44,9 +44,11 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
 
         case Status.Generating =>
           log.info("Trying to generate a new block")
+          val state = application.storedState
 
-          application.wallet.privateKeyAccounts().find { privKeyAcc =>
-            val state = application.storedState
+          application.wallet.privateKeyAccounts()
+            .filter(acc => state.balance(acc.address) > 0)
+            .find { privKeyAcc =>
             val history = application.blockchainStorage
             implicit val transactionModule = application.transactionModule
             application.consensusModule.generateNextBlock(privKeyAcc, state, history) match {
@@ -67,15 +69,18 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
     }
 
     case NewBlock(block, remoteOpt) =>
+      val fromStr = remoteOpt.map(_.toString).getOrElse("local")
       if (block.isValid) {
-        log.info(s"New block: $block")
+        log.info(s"New block: $block from $fromStr")
         application.storedState.processBlock(block)
         application.blockchainStorage.appendBlock(block)
+
+        block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
         val height = application.blockchainStorage.height()
         val exceptOf = remoteOpt.toList
         networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block), exceptOf)
       } else {
-        log.warn(s"Non-valid block: $block from ${remoteOpt.map(_.toString).getOrElse("local")}")
+        log.warn(s"Non-valid block: $block from $fromStr")
       }
 
     case GetStatus => sender() ! status
