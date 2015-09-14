@@ -16,8 +16,8 @@ object Server extends App with ScorexLogging {
 
     val application = new LagonakiApplication(filename)
 
-    log.debug("LagonakiApplication run")
-    application.run() //STARTING NETWORK/BLOCKCHAIN/RPC
+    log.debug("LagonakiApplication has been started")
+    application.run()
     Thread.sleep(10000)
     testingScript(application)
   } match {
@@ -55,7 +55,7 @@ object Server extends App with ScorexLogging {
     }
 
     (1 to Int.MaxValue).foreach { _ =>
-      Thread.sleep(2000)
+      Thread.sleep(5000)
       val pkAccs = wallet.privateKeyAccounts().ensuring(_.nonEmpty)
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val recipientAcc = genesisAccs(Random.nextInt(genesisAccs.size))
