@@ -18,7 +18,7 @@ object Server extends App with ScorexLogging {
 
     log.debug("LagonakiApplication has been started")
     application.run()
-    Thread.sleep(10000)
+    Thread.sleep(3000)
     testingScript(application)
   } match {
     case Failure(e) =>
@@ -42,7 +42,7 @@ object Server extends App with ScorexLogging {
 
     require(wallet.privateKeyAccounts().nonEmpty)
 
-    Thread.sleep(5000)
+    Thread.sleep(3000)
 
     val genesisBlock = application.blockchainStorage.blockAt(1)
     val genesisAccs = genesisBlock.get.transactions.flatMap { tx => tx match {
@@ -55,7 +55,7 @@ object Server extends App with ScorexLogging {
     }
 
     (1 to Int.MaxValue).foreach { _ =>
-      Thread.sleep(5000)
+      Thread.sleep(1000)
       val pkAccs = wallet.privateKeyAccounts().ensuring(_.nonEmpty)
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val recipientAcc = genesisAccs(Random.nextInt(genesisAccs.size))
