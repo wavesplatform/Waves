@@ -13,12 +13,14 @@ import scorex.utils.ScorexLogging
 case class TransactionsBlockField(override val value: Seq[Transaction])
   extends BlockField[Seq[Transaction]] {
 
+  import SimpleTransactionModule.MaxTransactionsPerBlock
+
   override val name = "transactions"
 
   override lazy val json: JsObject = Json.obj(name -> Json.arr(value.map(_.json())))
 
   override lazy val bytes: Array[Byte] = {
-    val txCount = value.size.ensuring(_ <= SimpleTransactionModule.MaxTransactions).toByte
+    val txCount = value.size.ensuring(_ <= MaxTransactionsPerBlock).toByte
     value.foldLeft(Array(txCount)) { case (bs, tx) =>
       val txBytes = tx.bytes()
       bs ++ Bytes.ensureCapacity(Ints.toByteArray(txBytes.length), 4, 0) ++ txBytes
@@ -29,6 +31,8 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 class SimpleTransactionModule(implicit val settings: TransactionSettings,
                               consensusModule: ConsensusModule[_])
   extends TransactionModule[SimpleTransactionModule.StoredInBlock] with ScorexLogging {
+
+  import SimpleTransactionModule._
 
   val TransactionSizeLength = 4
 
@@ -72,6 +76,15 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
       case Some(unconfirmedTx) => UnconfirmedTransactionsDatabaseImpl.remove(unconfirmedTx)
       case None =>
     })
+
+    val height = history.height()
+    if(height > MaxBlocksForUnconfirmed + 1){
+      val time10 = history.blockAt(height - MaxBlocksForUnconfirmed).get.timestampField.value
+      UnconfirmedTransactionsDatabaseImpl.all().foreach{tx=>
+        if (tx.timestamp < time10) UnconfirmedTransactionsDatabaseImpl.remove(tx)
+      }
+
+    }
   }
 
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
@@ -113,5 +126,6 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
 object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
-  val MaxTransactions = 4096
+  val MaxBlocksForUnconfirmed = 10
+  val MaxTransactionsPerBlock = 4096
 }
