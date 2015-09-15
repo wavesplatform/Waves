@@ -18,7 +18,7 @@ asynchronous exchange of the following messages:
 
 * M1: Serialized unconfirmed transaction
 * M2: Serialized block
-* M3: Blockchain quality score request(e.g. height for the Bitcoin, cumulative difficulty for the NXT). 
+* M3: Blockchain quality score request(e.g. height for the Bitcoin, cumulative difficulty for the Nxt). 
 * M4: Blockchain quality score response
 * M5: Get known peers request
 * M6: Get known peers response
@@ -29,8 +29,8 @@ for sure([https://en.bitcoin.it/wiki/Protocol_documentation#Message_types](https
  as well as NXT.
  
 Let's consider an example of a blockchain downloading with messages types given above if peer A knows only peer B and 
-has genesis block only. So possible interaction of A and outer world where A -> (B, M2) means 
-(peer A sends an instance of message kind M2 to peer B):
+has genesis block only. So possible trace of interaction of A and outer world could be as follows (where 
+A -> (B, M2) means (peer A sends an instance of message kind M2 to peer B)):
  
  1. A asks B for peers: A -> (B, M5)
  2. A asks B for a B's blockchain height: A -> (B, M3)
@@ -47,7 +47,6 @@ has genesis block only. So possible interaction of A and outer world where A -> 
  
  9. A asks D for a block with height (2,3,...,H(D)): A -> (D, M7)
  10. D replies with a block requested serialized into a binary form: D -> (A, M2)
-    
     
 Any real trace is much more complicated than this example :) 
     
@@ -112,8 +111,8 @@ A block contains transactions. A transaction is the global state modifier. In si
 Internal State
 --------------
 
-In Bitcoin node a can store no any state at all or use different formats for it, e.g. UTXO list or some indexes in addition.
- In contrast, Ethereum has state hash stored into each block, so each node must comply with state representation
+In Bitcoin node store no any state at all or use different formats for it, e.g. UTXO list or some indexes in addition to that.
+ In contrast, Ethereum has state hash stored into each block, so each node must comply with some standard state representation
  interface given in the Yellow Paper to check block validity. There's also interesting proposal from Bill White(coming 
  along with Coq theory) about using special kind of Merkle tree and storing its root into block for scalability's sake: 
  [http://qeditas.org/gitweb/?p=ledgertheory.git;a=blob_plain;f=lightcrypto.pdf;hb=HEAD] 

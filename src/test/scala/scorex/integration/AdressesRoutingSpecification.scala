@@ -1,9 +1,11 @@
 package scorex.integration
 
 import play.api.libs.json.Json
+import scorex.app.LagonakiApplication
 import scorex.app.api.http._
 
 class AdressesRoutingSpecification extends RouteTest with AddressHttpService {
+  override implicit val application = new LagonakiApplication("settings-test.json")
 
   "adressesRouting" should "handle root request" in {
     Get("/addresses/") ~> adressesRouting ~> check {

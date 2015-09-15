@@ -1,8 +1,8 @@
 package scorex.network.message
 
-import scorex.transaction.Transaction
+import scorex.transaction.LagonakiTransaction
 
-case class TransactionMessage(transaction: Transaction) extends Message {
+case class TransactionMessage(transaction: LagonakiTransaction) extends Message {
 
   override val messageType = Message.TransactionType
 
@@ -10,5 +10,5 @@ case class TransactionMessage(transaction: Transaction) extends Message {
 }
 
 object TransactionMessage {
-  def apply(data: Array[Byte]): TransactionMessage = new TransactionMessage(Transaction.parse(data))
+  def apply(data: Array[Byte]): TransactionMessage = new TransactionMessage(LagonakiTransaction.parse(data))
 }

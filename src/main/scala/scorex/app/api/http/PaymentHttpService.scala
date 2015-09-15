@@ -2,15 +2,19 @@ package scorex.app.api.http
 
 import play.api.libs.json.Json
 import scorex.account.Account
-import scorex.app.Controller
-import scorex.transaction.Transaction.ValidationResult
-import scorex.transaction.TransactionProducer
+import scorex.app.LagonakiApplication
+import scorex.transaction.LagonakiTransaction.ValidationResult
 import spray.routing.HttpService
 
 import scala.util.{Failure, Success, Try}
 
 
 trait PaymentHttpService extends HttpService with CommonApiFunctions {
+
+  val application:LagonakiApplication
+
+  implicit lazy val transactionModule = application.transactionModule
+
   lazy val paymentRouting =
     path("payment") {
       post {
@@ -19,7 +23,7 @@ trait PaymentHttpService extends HttpService with CommonApiFunctions {
             Try(Json.parse(body)).map { js =>
               (Try((js \ "amount").as[Long]),
                 Try((js \ "fee").as[Long]),
-                Try(Controller.wallet.privateKeyAccount((js \ "sender").as[String])),
+                Try(application.wallet.privateKeyAccount((js \ "sender").as[String])),
                 Try((js \ "recipient").as[String])) match {
                 case (Failure(_), _, _, _) => ApiError.json(ApiError.InvalidAmount)
                 case (_, Failure(_), _, _) => ApiError.json(ApiError.InvalidFee)
@@ -27,7 +31,7 @@ trait PaymentHttpService extends HttpService with CommonApiFunctions {
                 case (_, _, _, Failure(_)) => ApiError.json(ApiError.InvalidRecipient)
                 case (Success(_), Success(_), Success(None), Success(_)) => ApiError.json(ApiError.InvalidSender)
                 case (Success(amount), Success(fee), Success(Some(sender)), Success(recipient)) =>
-                  val tx = TransactionProducer.createPayment(sender, new Account(recipient), amount, fee)
+                  val tx = application.createPayment(sender, new Account(recipient), amount, fee)
                   tx.validate() match {
                     case ValidationResult.ValidateOke =>
                       tx.json()

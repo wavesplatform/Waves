@@ -1,12 +1,14 @@
 package scorex.app.api.http
 
 import play.api.libs.json.Json
-import scorex.app.Controller
-import scorex.app.settings.Constants
+import scorex.app.LagonakiApplication
 import spray.routing.HttpService
 
 
 trait BlocksHttpService extends HttpService with CommonApiFunctions {
+  val application: LagonakiApplication
+
+  lazy val blockchainStorage = application.blockchainStorage
 
   lazy val blocksRouting =
     pathPrefix("blocks") {
@@ -16,15 +18,15 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
         }
       } ~ path("first") {
         get {
-          complete(Constants.ConsensusAlgo.genesisBlock.json.toString())
+          complete(blockchainStorage.blockAt(1).get.json.toString())
         }
       } ~ path("last") {
         get {
-          complete(Controller.blockchainStorage.lastBlock.json.toString())
+          complete(blockchainStorage.lastBlock.json.toString())
         }
-      } ~ path("at" / IntNumber) {case height =>
+      } ~ path("at" / IntNumber) { case height =>
         get {
-          val res = Controller.blockchainStorage
+          val res = blockchainStorage
             .blockAt(height)
             .map(_.json.toString())
             .getOrElse(Json.obj("status" -> "error", "details" -> "No block for this height").toString())
@@ -32,24 +34,26 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
         }
       } ~ path("height") {
         get {
-          complete(Json.obj("height" -> Controller.blockchainStorage.height()).toString())
+          complete(Json.obj("height" -> blockchainStorage.height()).toString())
         }
       } ~ path("height" / Segment) { case encodedSignature =>
         get {
           complete {
             withBlock(encodedSignature) { block =>
-              Json.obj("height" -> block.height())
+              Json.obj("height" -> blockchainStorage.heightOf(block))
             }.toString()
           }
         }
       } ~ path("child" / Segment) { case encodedSignature =>
         get {
-          complete(withBlock(encodedSignature)(_.child().get.json).toString())
+          complete(withBlock(encodedSignature) { block =>
+            blockchainStorage.children(block).head.json
+          }.toString())
         }
       } ~ path("address" / Segment) { case address =>
         get {
           complete(withAccount(address) { account =>
-            Json.arr(Controller.blockchainStorage.generatedBy(account).map(_.json))
+            Json.arr(blockchainStorage.generatedBy(account).map(_.json))
           }.toString())
         }
       }
@@ -58,7 +62,7 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
       ~ path("time") {
         get {
           complete {
-            val block = PrunableBlockchainStorage.lastBlock
+            val block = StoredBlockchain.lastBlock
             val timePerBlock = QoraBlockGenerationFunctions.getBlockTime(block.generationData.generatingBalance)
             Json.obj("time" -> timePerBlock).toString()
           }
@@ -76,7 +80,7 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
       } ~ path("generatingbalance") {
         get {
           complete {
-            val generatingBalance = Controller.nextBlockGeneratingBalance()
+            val generatingBalance = LagonakiApplication.nextBlockGeneratingBalance()
             Json.obj("generatingbalance" -> generatingBalance).toString()
           }
         }

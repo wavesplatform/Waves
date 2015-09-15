@@ -8,4 +8,17 @@ object Dependencies {
     "org.scalactic" %% "scalactic" % "2.+" % "test"
   )
 
+  lazy val serizalization = Seq(
+    "com.google.guava" % "guava" % "15.+",
+    "com.typesafe.play" %% "play-json" % "2.+"
+  )
+
+  lazy val db = Seq(
+    "org.mapdb" % "mapdb" % "2.+"
+  )
+
+  lazy val logging = Seq(
+    "ch.qos.logback" % "logback-classic" % "1.+",
+    "ch.qos.logback" % "logback-core" % "1.+"
+  )
 }

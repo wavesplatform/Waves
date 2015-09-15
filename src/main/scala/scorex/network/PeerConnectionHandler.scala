@@ -5,19 +5,18 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
-import scorex.app.Controller
-import scorex.block.Block
+import scorex.app.LagonakiApplication
 import scorex.network.NetworkController.UpdateBlockchainScore
 import scorex.network.message.{Message, _}
-import scorex.transaction.Transaction.TransactionType
-import scorex.app.utils.ScorexLogging
+import scorex.transaction.LagonakiTransaction.TransactionType
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 
-class PeerConnectionHandler(networkController: ActorRef,
+class PeerConnectionHandler(application: LagonakiApplication,
                             connection: ActorRef,
                             remote: InetSocketAddress) extends Actor with ScorexLogging {
 
@@ -25,31 +24,39 @@ class PeerConnectionHandler(networkController: ActorRef,
 
   private var best = false
 
+  private lazy val blockchainStorage = application.blockchainStorage
+  private lazy val networkController = application.networkController
+
+  private lazy val settings = application.settings
+  private lazy val peerManager = new PeerManager(settings)
+
+  private implicit lazy val consensusModule = application.consensusModule
+  private implicit lazy val transactionModule = application.transactionModule
+
   context watch connection
 
-  context.system.scheduler.schedule(500.millis, 10.seconds)(self ! PingRemote)
-  context.system.scheduler.schedule(1.second, 15.seconds)(self ! SendBlockchainScore)
+  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
 
   private def handleMessage(message: Message) = {
+    log.debug("Handling message: " + message)
     message match {
-      case PingMessage =>
-        self ! PingMessage
 
       case GetPeersMessage =>
-        self ! PeersMessage(PeerManager.knownPeers())
+        self ! PeersMessage(peerManager.knownPeers().filter(_ != remote)) //excluding sender
 
       case PeersMessage(peers) =>
         peers.foreach { peer =>
-          PeerManager.addPeer(peer)
+          peerManager.addPeer(peer)
         }
 
-      case ScoreMessage(height, score) => networkController ! UpdateBlockchainScore(remote, height, score)
+      case ScoreMessage(height, score) =>
+        networkController ! UpdateBlockchainScore(remote, height, score)
 
       case GetSignaturesMessage(signaturesGot) =>
         log.info(s"Got GetSignaturesMessage with ${signaturesGot.length} sigs within")
 
         signaturesGot.exists { parent =>
-          val headers = Controller.blockchainStorage.getSignatures(parent)
+          val headers = application.blockchainStorage.getSignatures(parent, settings.MaxBlocksChunks)
           if (headers.nonEmpty) {
             self ! SignaturesMessage(Seq(parent) ++ headers)
             true
@@ -60,37 +67,36 @@ class PeerConnectionHandler(networkController: ActorRef,
         log.info(s"Got SignaturesMessage with ${signaturesGot.length} sigs")
 
         val common = signaturesGot.head
-        require(Controller.blockchainStorage.contains(common))
+        require(blockchainStorage.contains(common))
 
-        Controller.blockchainStorage.removeAfter(common)
+        blockchainStorage.removeAfter(common)
 
         signaturesGot.tail.foreach { case sig =>
           self ! GetBlockMessage(sig)
         }
 
       case GetBlockMessage(signature) =>
-        Controller.blockchainStorage.blockByHeader(signature) match {
-          case Some(block) => self ! BlockMessage(block.height().get, block)
+        blockchainStorage.blockById(signature) match {
+          case Some(block) => self ! BlockMessage(blockchainStorage.heightOf(block).get, block)
           case None => self ! Blacklist
         }
 
       case BlockMessage(height, block) =>
         require(block != null)
-        log.info(s"Got block, height $height , local height: " + Controller.blockchainStorage.height())
+        log.info(s"Got block, height $height , local height: " + blockchainStorage.height())
 
-        if (height == Controller.blockchainStorage.height() + 1) {
-          if (Block.isNewBlockValid(block)) {
+        if (height == blockchainStorage.height() + 1) {
+          if (block.isValid)
             networkController ! NewBlock(block, Some(remote))
-          } else {
+          else
             log.info(s"Got non-valid block (height of a block: $height")
-          }
         }
 
       case TransactionMessage(transaction) =>
         if (!transaction.isSignatureValid || transaction.transactionType == TransactionType.GenesisTransaction) {
           self ! Blacklist
         } else if (transaction.hasMinimumFee && transaction.hasMinimumFeePerByte) {
-          Controller.onNewOffchainTransaction(transaction)
+          application.onNewOffchainTransaction(transaction)
         }
 
       case nonsense: Any => log.warn(s"PeerConnectionHandler: got something strange $nonsense")
@@ -98,10 +104,9 @@ class PeerConnectionHandler(networkController: ActorRef,
   }
 
   override def receive = {
-    case PingRemote => self ! PingMessage
 
     case SendBlockchainScore =>
-      self ! ScoreMessage(Controller.blockchainStorage.height(), Controller.blockchainStorage.score)
+      self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score())
 
     case msg: Message =>
       self ! ByteString(msg.bytes)
@@ -111,7 +116,7 @@ class PeerConnectionHandler(networkController: ActorRef,
 
     case CommandFailed(w: Write) =>
       log.info(s"Write failed : $w " + remote)
-      PeerManager.blacklistPeer(remote)
+      peerManager.blacklistPeer(remote)
       connection ! Close
 
     case Received(data) =>
@@ -148,8 +153,6 @@ class PeerConnectionHandler(networkController: ActorRef,
 
 object PeerConnectionHandler {
 
-  case object PingRemote
-
   case object SendBlockchainScore
 
   case object CloseConnection
@@ -157,4 +160,5 @@ object PeerConnectionHandler {
   case object Blacklist
 
   case class BestPeer(remote: InetSocketAddress, betterThanLocal: Boolean)
+
 }

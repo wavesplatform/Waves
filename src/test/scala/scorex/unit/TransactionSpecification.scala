@@ -2,7 +2,7 @@ package scorex.unit
 
 import org.scalatest.FunSuite
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.transaction.{Transaction, PaymentTransaction}
+import scorex.transaction.{LagonakiTransaction, PaymentTransaction}
 
 import scala.util.Random
 
@@ -53,7 +53,7 @@ class TransactionSpecification extends FunSuite {
     val fee = 1
     val tx = PaymentTransaction(sender, recipient, amount, fee, time)
 
-    val txAfter = Transaction.parse(tx.bytes())
+    val txAfter = LagonakiTransaction.parse(tx.bytes())
     assert(tx.fee == txAfter.fee)
     assert(tx.amount == txAfter.amount)
   }

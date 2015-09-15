@@ -1,5 +1,3 @@
 .idea
-/target
-/project/target
-/project/project/target
+target
 scorex-errors.log
