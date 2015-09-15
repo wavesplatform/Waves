@@ -1,6 +1,9 @@
 **1.1.0**
+----------
 
+* Modular design: basics, consensus, transaction modules are extracted
 * Ping messages removed
+
 
 **1.0.4**
 ---------
