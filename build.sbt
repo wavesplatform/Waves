@@ -2,7 +2,31 @@ import com.typesafe.config._
 
 val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
 
-ScorexBuild.buildSettings
+lazy val commonSettings = Seq(
+  organization := "org.consensusresearch",
+  version := appConf.getString("version"),
+  scalaVersion := "2.11.7"
+)
+
+def subModule(id: String): Project = Project(id = id, base = file(s"scorex-$id"))
+
+lazy val basics = subModule("basics")
+  .settings(commonSettings: _*)
+
+lazy val transaction = subModule("transaction")
+  .aggregate(basics)
+  .dependsOn(basics)
+  .settings(commonSettings: _*)
+
+lazy val consensus = subModule("consensus")
+  .aggregate(basics)
+  .dependsOn(basics)
+  .settings(commonSettings: _*)
+
+lazy val root = Project(id = "scorex", base = file("."))
+  .aggregate(basics, transaction, consensus)
+  .dependsOn(basics, transaction, consensus)
+  .settings(commonSettings: _*)
 
 name := appConf.getString("product")
 

@@ -6,5 +6,3 @@ libraryDependencies ++=
     Dependencies.logging ++ Seq(
     "commons-net" % "commons-net" % "3.+"
   )
-
-ScorexBuild.buildSettings
