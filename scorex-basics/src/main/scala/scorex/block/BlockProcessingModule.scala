@@ -7,8 +7,7 @@ package scorex.block
 trait BlockProcessingModule[BlockPartDataType] {
   def parseBlockData(bytes: Array[Byte]): BlockField[BlockPartDataType]
 
-  def parseBlockFields(blockFields: BlockField[BlockPartDataType]): BlockPartDataType =
-    blockFields.value
+  def parseBlockFields(blockFields: BlockField[BlockPartDataType]): BlockPartDataType = blockFields.value
 
   def genesisData: BlockField[BlockPartDataType]
 
