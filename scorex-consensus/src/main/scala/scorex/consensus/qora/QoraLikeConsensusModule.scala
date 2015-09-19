@@ -3,7 +3,7 @@ package scorex.consensus.qora
 import com.google.common.primitives.{Bytes, Longs}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockField}
-import scorex.consensus.{LagonakiConsensusModule, ConsensusModule}
+import scorex.consensus.{ConsensusModule, LagonakiConsensusModule}
 import scorex.crypto.Sha256._
 import scorex.crypto.SigningFunctionsImpl
 import scorex.transaction._
@@ -11,6 +11,7 @@ import scorex.utils.NTP
 
 
 class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusBlockData] {
+
   import QoraLikeConsensusModule.GeneratorSignatureLength
 
   val GeneratingBalanceLength = 8
@@ -140,8 +141,10 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
       override val generatorSignature: Array[Byte] = bytes.takeRight(GeneratorSignatureLength)
     })
 
-  override def isValid[TT](block: Block, history: History, state: State)
-                          (implicit transactionModule: TransactionModule[TT]): Boolean = {
+  override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = {
+    val history = transactionModule.history
+    val state = transactionModule.state
+
     val data = block.consensusDataField.asInstanceOf[QoraConsensusBlockField].value
 
     if (data.generatingBalance != getNextBlockGeneratingBalance(history.parent(block).get, history)) {
@@ -150,7 +153,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     } else {
       //target base
       val targetBytes = Array.fill(32)(Byte.MaxValue)
-      val baseTarget:BigInt = getBaseTarget(data.generatingBalance)
+      val baseTarget: BigInt = getBaseTarget(data.generatingBalance)
       val gen = block.signerDataField.value.generator.address
       val genBalance = BigInt(state.asInstanceOf[BalanceSheet].generationBalance(gen))
       val target0 = BigInt(1, targetBytes) / baseTarget * genBalance

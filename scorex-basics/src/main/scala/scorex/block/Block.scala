@@ -79,17 +79,13 @@ trait Block {
 
   lazy val bytesWithoutSignature = bytes.dropRight(SigningFunctionsImpl.SignatureLength)
 
-  def isValid = {
-    val history = transactionModule.history
-    val state = transactionModule.state
-
-    consensusModule.isValid(this, history, state) &&
+  def isValid =
+    consensusModule.isValid(this) &&
       transactionModule.isValid(this) &&
-      history.contains(referenceField.value) &&
+      transactionModule.history.contains(referenceField.value) &&
       SigningFunctionsImpl.verify(signerDataField.value.signature,
         bytesWithoutSignature,
         signerDataField.value.generator.publicKey)
-  }
 }
 
 

@@ -7,8 +7,7 @@ import scorex.transaction.{TransactionModule, History, State}
 
 trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[ConsensusBlockData]{
 
-  def isValid[TT](block: Block, history: History, state: State)
-             (implicit transactionModule: TransactionModule[TT]): Boolean
+  def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean
 
   /**
   * Fees could go to a single miner(forger) usually, but can go to many parties, e.g. see

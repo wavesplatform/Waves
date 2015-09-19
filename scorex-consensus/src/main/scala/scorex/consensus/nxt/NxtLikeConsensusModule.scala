@@ -22,8 +22,9 @@ class NxtLikeConsensusModule
   //60 - the algo's goal is 1 block per minute in average
   val version = 1: Byte
 
-  def isValid[TT](block: Block, history: History, state: State)
-                 (implicit transactionModule: TransactionModule[TT]): Boolean = Try {
+  def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
+
+    val history = transactionModule.history
 
     val blockTime = block.timestampField.value
 
