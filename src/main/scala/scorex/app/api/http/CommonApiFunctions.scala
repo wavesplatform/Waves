@@ -6,13 +6,14 @@ import scorex.account.Account
 import scorex.app.LagonakiApplication
 import scorex.block.Block
 import scorex.crypto.Base58
+
 import scala.concurrent.duration._
 
 
 trait CommonApiFunctions {
   implicit val timeout = Timeout(5.seconds)
 
-  val application:LagonakiApplication
+  val application: LagonakiApplication
 
   protected[api] def walletExists(): Option[JsObject] =
     if (application.wallet.exists()) {
@@ -27,7 +28,7 @@ trait CommonApiFunctions {
       }
     }.getOrElse(ApiError.json(ApiError.InvalidSignature))
 
-  protected[api] def withAccount(address: String)(action: Account => JsValue): JsValue =
+  protected[api] def withPrivateKeyAccount(address: String)(action: Account => JsValue): JsValue =
     walletNotExists().getOrElse {
       if (!Account.isValidAddress(address)) {
         ApiError.json(ApiError.InvalidAddress)

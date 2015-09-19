@@ -52,7 +52,7 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
         }
       } ~ path("address" / Segment) { case address =>
         get {
-          complete(withAccount(address) { account =>
+          complete(withPrivateKeyAccount(address) { account =>
             Json.arr(blockchainStorage.generatedBy(account).map(_.json))
           }.toString())
         }

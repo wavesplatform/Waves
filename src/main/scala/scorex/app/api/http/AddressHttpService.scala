@@ -36,7 +36,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
         get {
           complete {
             //CHECK IF WALLET EXISTS
-            val jsRes = withAccount(address) { account =>
+            val jsRes = withPrivateKeyAccount(address) { account =>
               wallet.exportAccountSeed(account.address) match {
                 case None => ApiError.json(ApiError.WalletSeedExportFailed)
                 case Some(seed) => Json.obj("address" -> address, "seed" -> Base58.encode(seed))
