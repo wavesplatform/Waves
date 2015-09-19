@@ -31,16 +31,17 @@ trait Block {
   type ConsensusDataType
   type TransactionDataType
 
+  implicit val consensusModule: ConsensusModule[ConsensusDataType]
+  implicit val transactionModule: TransactionModule[TransactionDataType]
+
+  val consensusDataField: BlockField[ConsensusDataType]
+  val transactionDataField: BlockField[TransactionDataType]
+
   val versionField: ByteBlockField
   val timestampField: LongBlockField
   val referenceField: BlockIdField
-  val consensusDataField: BlockField[ConsensusDataType]
-  val transactionDataField: BlockField[TransactionDataType]
   val signerDataField: SignerDataBlockField
 
-
-  implicit val consensusModule: ConsensusModule[ConsensusDataType]
-  implicit val transactionModule: TransactionModule[TransactionDataType]
 
   // Some block characteristic which is uniq e.g. hash or signature(if timestamp is included there).
   // Used in referencing

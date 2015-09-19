@@ -1,16 +1,16 @@
 package scorex.block
 
 /**
-  * A generic interface having functions to convert data into a part of a block and vice versa.
-  */
+ * A generic interface having functions to convert data into a part of a block and vice versa.
+ */
 
-trait BlockProcessingModule[MT] {
-  def parseBlockData(bytes: Array[Byte]): BlockField[MT]
+trait BlockProcessingModule[BlockPartDataType] {
+  def parseBlockData(bytes: Array[Byte]): BlockField[BlockPartDataType]
 
-  def parseBlockFields(blockFields: BlockField[MT]): MT =
+  def parseBlockFields(blockFields: BlockField[BlockPartDataType]): BlockPartDataType =
     blockFields.value
 
-  def genesisData: BlockField[MT]
+  def genesisData: BlockField[BlockPartDataType]
 
-  def formBlockData(data: MT): BlockField[MT]
+  def formBlockData(data: BlockPartDataType): BlockField[BlockPartDataType]
 }
