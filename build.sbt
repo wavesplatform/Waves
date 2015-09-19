@@ -37,14 +37,13 @@ homepage := Some(url("https://github.com/ConsensusResearch/Scorex-Lagonaki"))
 resolvers ++= Seq("Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases/",
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/")
 
-libraryDependencies ++= Seq(
-  "com.typesafe.akka" %% "akka-actor" % "2.+",
-  "io.spray" %% "spray-routing" % "1.+",
-  "io.spray" %% "spray-can" % "1.+",
-  "io.spray" %% "spray-http" % "1.+",
-  "io.spray" %% "spray-httpx" % "1.+",
-  "io.spray" %% "spray-util" % "1.+"
-) ++ Dependencies.testKit ++ Dependencies.serizalization ++ Dependencies.db ++ Dependencies.logging
+libraryDependencies ++=
+  Dependencies.db ++
+  Dependencies.spray ++
+  Dependencies.akka ++
+  Dependencies.serizalization ++
+  Dependencies.testKit ++
+  Dependencies.logging
 
 javaOptions ++= Seq(
   "-server"
