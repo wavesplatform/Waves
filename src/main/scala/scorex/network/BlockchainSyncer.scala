@@ -49,9 +49,8 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
           application.wallet.privateKeyAccounts()
             .filter(acc => state.balance(acc.address) > 0)
             .find { privKeyAcc =>
-            val history = application.blockchainStorage
             implicit val transactionModule = application.transactionModule
-            application.consensusModule.generateNextBlock(privKeyAcc, state, history) match {
+            application.consensusModule.generateNextBlock(privKeyAcc) match {
               case Some(block) =>
                 self ! NewBlock(block, None)
                 true

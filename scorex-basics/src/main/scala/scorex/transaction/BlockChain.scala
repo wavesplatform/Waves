@@ -35,7 +35,7 @@ trait BlockChain extends History with ScorexLogging {
   def score() =
     (1 to height()).foldLeft(0: BigInt) { case (sc, h) =>
       sc + blockAt(h).map { bl: Block =>
-        bl.consensusModule.blockScore(bl, this)(bl.transactionModule)
+        bl.consensusModule.blockScore(bl)(bl.transactionModule)
       }.getOrElse(0: BigInt)
     }
 }
