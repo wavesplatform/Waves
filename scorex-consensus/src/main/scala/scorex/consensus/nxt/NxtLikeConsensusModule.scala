@@ -55,12 +55,10 @@ class NxtLikeConsensusModule
   }.getOrElse(false)
 
 
-  override def generateNextBlock[TT](account: PrivateKeyAccount,
-                                     state: State,
-                                     history: History)
+  override def generateNextBlock[TT](account: PrivateKeyAccount)
                                     (implicit transactionModule: TransactionModule[TT]): Option[Block] = {
 
-    val lastBlock = history.asInstanceOf[BlockChain].lastBlock
+    val lastBlock = transactionModule.history.asInstanceOf[BlockChain].lastBlock
     val lastBlockKernelData = lastBlock.consensusDataField.asInstanceOf[NxtConsensusBlockField].value
 
     val lastBlockTime = lastBlock.timestampField.value

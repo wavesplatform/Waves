@@ -31,11 +31,12 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
 
   override def generators(block: Block): Seq[Account] = Seq(block.signerDataField.value.generator)
 
-  override def generateNextBlock[TT](account: PrivateKeyAccount,
-                                     state: State,
-                                     history: History)
+  override def generateNextBlock[TT](account: PrivateKeyAccount)
                                     (implicit transactionModule: TransactionModule[TT]): Option[Block] = {
     val version = 1: Byte
+
+    val history = transactionModule.history
+    val state = transactionModule.state
 
     require(state.isInstanceOf[State with BalanceSheet])
     val generationBalance = state.asInstanceOf[State with BalanceSheet].generationBalance(account)

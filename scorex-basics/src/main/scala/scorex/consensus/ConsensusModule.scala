@@ -25,6 +25,6 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
 
   def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt
 
-  def generateNextBlock[TT](account: PrivateKeyAccount, state: State, history: History)
-                       (implicit transactionModule: TransactionModule[TT]): Option[Block]
+  def generateNextBlock[TT](account: PrivateKeyAccount)
+                           (implicit transactionModule: TransactionModule[TT]): Option[Block]
 }
