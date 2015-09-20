@@ -126,8 +126,7 @@ class NxtLikeConsensusModule
       override val generationSignature: Array[Byte] = bytes.takeRight(GeneratorSignatureLength)
     })
 
-  override def blockScore(block: Block, history: History)
-                         (implicit transactionModule: TransactionModule[_]): BigInt = {
+  override def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val baseTarget = block.consensusDataField.asInstanceOf[NxtConsensusBlockField].value.baseTarget
     BigInt("18446744073709551616") / baseTarget
   }

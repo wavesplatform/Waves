@@ -78,8 +78,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     } else None
   }
 
-  override def blockScore(block: Block, history: History)
-                         (implicit transactionModule: TransactionModule[_]): BigInt = BigInt(1)
+  override def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = BigInt(1)
 
   def calculateSignature(prevBlock: Block, history: History, account: PrivateKeyAccount): Array[Byte] = {
     val gb = getNextBlockGeneratingBalance(prevBlock, history)

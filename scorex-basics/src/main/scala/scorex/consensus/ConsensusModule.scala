@@ -23,8 +23,7 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
    */
   def generators(block: Block): Seq[Account]
 
-  def blockScore(block: Block, history: History)
-                (implicit transactionModule: TransactionModule[_]): BigInt
+  def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt
 
   def generateNextBlock[TT](account: PrivateKeyAccount, state: State, history: History)
                        (implicit transactionModule: TransactionModule[TT]): Option[Block]
