@@ -8,6 +8,7 @@ import scorex.block.Block
 import scorex.network.message.{BlockMessage, GetSignaturesMessage}
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
@@ -50,7 +51,10 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
             .filter(acc => state.balance(acc.address) > 0)
             .find { privKeyAcc =>
             implicit val transactionModule = application.transactionModule
-            application.consensusModule.generateNextBlock(privKeyAcc) match {
+
+            //As Proof-of-Stake is being used for Scorex Lagonaki, generateNextBlock() finishes quickly
+            //  (it should be, at least) so we're just going to wait for a result
+            Await.result(application.consensusModule.generateNextBlock(privKeyAcc), 500.millis) match {
               case Some(block) =>
                 self ! NewBlock(block, None)
                 true

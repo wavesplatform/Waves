@@ -8,7 +8,9 @@ import scorex.crypto.Sha256._
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 
+import scala.concurrent.Future
 import scala.util.{Failure, Try}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class NxtLikeConsensusModule
   extends LagonakiConsensusModule[NxtLikeConsensusBlockData] with ScorexLogging {
@@ -56,7 +58,7 @@ class NxtLikeConsensusModule
 
 
   override def generateNextBlock[TT](account: PrivateKeyAccount)
-                                    (implicit transactionModule: TransactionModule[TT]): Option[Block] = {
+                                    (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
 
     val lastBlock = transactionModule.history.asInstanceOf[BlockChain].lastBlock
     val lastBlockKernelData = lastBlock.consensusDataField.asInstanceOf[NxtConsensusBlockField].value
@@ -82,14 +84,14 @@ class NxtLikeConsensusModule
         override val baseTarget: Long = btg
       }
 
-      Some(Block.buildAndSign(version,
+      Future(Some(Block.buildAndSign(version,
         timestamp,
         lastBlock.uniqueId,
         consensusData,
         transactionModule.packUnconfirmed(),
-        account))
+        account)))
 
-    } else None
+    } else Future(None)
   }
 
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =

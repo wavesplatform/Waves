@@ -4,6 +4,8 @@ import scorex.account.{PrivateKeyAccount, Account}
 import scorex.block.{BlockProcessingModule, Block}
 import scorex.transaction.{TransactionModule, History, State}
 
+import scala.concurrent.Future
+
 
 trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[ConsensusBlockData]{
 
@@ -26,5 +28,5 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
   def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt
 
   def generateNextBlock[TT](account: PrivateKeyAccount)
-                           (implicit transactionModule: TransactionModule[TT]): Option[Block]
+                           (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]]
 }

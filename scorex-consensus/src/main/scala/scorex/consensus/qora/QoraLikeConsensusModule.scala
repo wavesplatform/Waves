@@ -9,6 +9,9 @@ import scorex.crypto.SigningFunctionsImpl
 import scorex.transaction._
 import scorex.utils.NTP
 
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
+
 
 class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusBlockData] {
 
@@ -32,7 +35,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
   override def generators(block: Block): Seq[Account] = Seq(block.signerDataField.value.generator)
 
   override def generateNextBlock[TT](account: PrivateKeyAccount)
-                                    (implicit transactionModule: TransactionModule[TT]): Option[Block] = {
+                                    (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
     val version = 1: Byte
 
     val history = transactionModule.history
@@ -70,13 +73,13 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
         override val generatorSignature: Array[Byte] = signature
         override val generatingBalance: Long = getNextBlockGeneratingBalance(lastBlock, history)
       }
-      Some(Block.buildAndSign(version,
+      Future(Some(Block.buildAndSign(version,
         timestamp,
         lastBlock.uniqueId,
         consensusData,
         transactionModule.packUnconfirmed(),
-        account))
-    } else None
+        account)))
+    } else Future(None)
   }
 
   override def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = BigInt(1)
