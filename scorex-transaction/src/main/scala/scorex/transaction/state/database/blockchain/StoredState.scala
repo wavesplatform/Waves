@@ -98,8 +98,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
         case _ =>
           log.error("Wrong transaction type in pattern-matching")
           changes
-      }
-      }
+      }}
 
     balanceChanges.foreach { case (acc, delta) =>
       val balance = Option(balances.get(acc)).getOrElse(0L)
