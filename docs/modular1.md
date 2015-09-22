@@ -6,10 +6,12 @@ The Protocols Mess Problem
 
 In a code of a today's cryptocurrency logical parts are very couply tied making codebase hard to understand
   and change. This series of articles shows how the problem could be solved by introducing separate inter-changeable 
-  injectable modules.
+  injectable modules. Preliminary article ["The Architecture Of A Cryptocurrency"](components.md) describes 
+  possible modules in a cryptocurrency design. 
   
 This article, the first in the series describes how a block structure and a block-related functionality 
 could be defined agnostic to implementation details of two separate modules, consensus-related and transaction-related.
+Code snippets using Scala language are provided.
 
 
 Generic Block Structure
@@ -59,8 +61,8 @@ interface to be replaced with a concrete implementation then:
       val timestampField: LongBlockField
       val referenceField: BlockIdField
       val signerDataField: SignerDataBlockField    
-
       ...
+      
       
 What both modules could have in common? Well, they are parsing data of a type they are parametrized with, producing
  a blockfield based on data and providing genesis block data details. Let's extract this functionality into the common

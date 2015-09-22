@@ -134,4 +134,7 @@ The idea of Network/Transaction/Consensus protocols was initially explicitly sta
 "Tezos: A Self-Amending Crypto-Ledger Position Paper" ([http://tezos.com/position_paper.pdf](http://tezos.com/position_paper.pdf)).
 I would like to thank lead Nxt developer Jean-Luc Picard for conversations via dev maillist, and Bill White 
  for very thoughtful conversations.
-               
+                                                                                         
+Further Work
+------------
+* [On the Way to a Modular Cryptocurrency, Part 1: Generic Block Structure](modular1.md)                                                                                        
