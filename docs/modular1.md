@@ -95,7 +95,7 @@ Consensus Module
    Also, we can add a function to generate a block here, taking private key owner(to sign a block) and transaction module
     (to form transactional part of a block) as parameters
     
-   Considering all those functions, we can encode the interface now:  
+   Considering all the functions, we can encode the interface now:  
 
     trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[ConsensusBlockData]{
       def isValid[TT](block: Block, history: History, state: State)(implicit transactionModule: TransactionModule[TT]): Boolean
@@ -111,7 +111,7 @@ Transaction Module
 We are going to consider a transactional part of a cryptocurrency, the most useful for an end user. An user isn't 
 using blockchain directly, querying some state instead:
          
-* There's some initial state of the world stated in the first block of a chain, called *genesis block*
+* There's some initial state of the world stated in the first block of a chain( *genesis block* )
 * Then each block carries transactions which are atomic world state modifiers
     
 Probably [State monad](https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State) could be helpful here, but for 
@@ -121,8 +121,8 @@ start(as we are rewriting existing project not using a true functional approach)
       def processBlock(block: Block, reversal: Boolean): Unit
     }
     
-   And no querying functions are stated at all in the basic trait, as we are going to make state design stackable. For
-      example, if it's possible for a cryptocurrency to support balance querying for an arbitrary account following trait 
+   Please note no any querying functions are listed in the basic trait, as we are going to make state design stackable. 
+   For example, if it's possible for a cryptocurrency to support balance querying for an arbitrary account following trait 
        could be mixed with the basic one: 
             
     trait BalanceSheet {
@@ -135,7 +135,7 @@ start(as we are rewriting existing project not using a true functional approach)
     
    In addition to state a history is to be stored as well(to send it to another peer for a reconstruction of a state, at
       least). Please note, history could be in a different form than the blockchain, for example, a blocktree could be
-       explicitly stored, or just uncles of blocks as Ethereum does. I'm not going to provide History interface code here,
+       explicitly stored, or blockchain with addition of block uncles as Ethereum does. I'm not going to provide History interface code here,
         but you can [find it online](https://github.com/ConsensusResearch/Scorex-Lagonaki/blob/master/scorex-basics/src/main/scala/scorex/transaction/History.scala).
       
 So a transactional module contains references to concrete implementations of state and history, and few functions able to:
@@ -155,7 +155,7 @@ The code reflecting requirements above is:
       val state: State
       val history: History
    
-      def isValid(block: Block):Boolean   
+      def isValid(block: Block): Boolean   
       def transactions(block: Block): Seq[Transaction]            
       def packUnconfirmed(): TransactionBlockData   
       def clearFromUnconfirmed(data: TransactionBlockData): Unit  
