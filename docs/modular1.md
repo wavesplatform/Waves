@@ -166,9 +166,9 @@ The Concrete Implementation
 ---------------------------
 
 To develop a concrete blockchain-powered product a developer needs to provide concrete implementations of state, history,
-consensus & transactions functions to glue them together in an application. 
+consensus & transactions modules to glue them together then in an application. 
 
-To see how that's done is Scorex, take a look into [LagonakiApplication.scala](https://github.com/ConsensusResearch/Scorex-Lagonaki/blob/master/src/main/scala/scorex/app/LagonakiApplication.scala).
+To see how that's done in Scorex Lagonaki, take a look into [LagonakiApplication.scala](https://github.com/ConsensusResearch/Scorex-Lagonaki/blob/master/src/main/scala/scorex/app/LagonakiApplication.scala).
  While Scorex is the name of an abstract framework, Lagonaki is the name of concrete implementation wiring together:
   
   * SimplestTransactionModule, working with just a sequence of simplest token transfer transactions without any metadata
