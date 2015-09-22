@@ -25,6 +25,7 @@ Features
 --------
 
 * Compact, functional, actors-powered code
+* Modular design
 * Two 100% Proof-of-Stake consensus algos out of the box, Nxt-like and Qora-like. One algo could be replaced
 with an another with just one line of code edited (in Constants.scala)
 * Simplest transactions model
