@@ -107,7 +107,6 @@ Roadmap
 
 * Fix Hanging When Stopping the Application ( [https://github.com/ConsensusResearch/Scorex-Lagonaki/issues/15](https://github.com/ConsensusResearch/Scorex-Lagonaki/issues/15) )
 
-* Investigation of Consensus Part extraction as Sub-module ( [https://github.com/ConsensusResearch/Scorex-Lagonaki/issues/16](https://github.com/ConsensusResearch/Scorex-Lagonaki/issues/16) )
 
 Documentation
 --------------
