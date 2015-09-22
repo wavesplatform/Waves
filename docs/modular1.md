@@ -171,9 +171,9 @@ consensus & transactions modules to glue them together then in an application.
 To see how that's done in Scorex Lagonaki, take a look into [LagonakiApplication.scala](https://github.com/ConsensusResearch/Scorex-Lagonaki/blob/master/src/main/scala/scorex/app/LagonakiApplication.scala).
  While Scorex is the name of an abstract framework, Lagonaki is the name of concrete implementation wiring together:
   
-  * SimplestTransactionModule, working with just a sequence of simplest token transfer transactions without any metadata
+  * SimpleTransactionModule operating with just a sequence of simplest token transfer transactions without any metadata
   * Two 100% Proof-of-Stake consensus module implementations, one is Nxt-like, other is Qora-like. It's possible to replace 
-  one consensus algorithm with another with just a single setting in application.conf
+  one consensus algorithm with another with just a single setting in application.conf.
 
 
 Further Work
