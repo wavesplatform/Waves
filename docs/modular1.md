@@ -4,14 +4,12 @@ On the Way to a Modular Cryptocurrency, Part 1: Generic Block Structure
 The Protocols Mess Problem
 --------------------------
 
-In a code of a cryptocurrency of today logical parts are couply tied together making code unreadable &
-  changes hard. This series of articles enlights how the problem could be solved by introducing 
-  separate inter-changeable injectable modules.
+In a code of a today's cryptocurrency logical parts are very couply tied making codebase hard to understand
+  and change. This series of articles shows how the problem could be solved by introducing separate inter-changeable 
+  injectable modules.
   
 This article, the first in the series describes how block structure & block-related functionality 
 could be defined agnostic to implementation details of two separate modules, consensus & transaction.
-   
-Strictly-typed and modular Scala language is used to illustrate the approach.    
 
 
 Generic Block Structure
@@ -113,18 +111,83 @@ Consensus Module
 Transaction Module
 ------------------
     
-   Now let's define functional building blocks for a transactional part of a cryptocurrency.
+   We are going to consider a transactional part of a cryptocurrency, the most useful for an end user. An user isn't 
+   using blockchain directly, querying some state instead:
+         
+    * There's some initial state of the world stated in the first block of a chain, called *genesis block*
+    * Then each block carries transactions which are atomic world state modifiers
     
+   Probably [State monad](https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State) could be helpful here, but 
+   for start(as we are rewriting existing project not using a true functional approach) state interface is: 
+       
+    trait State {
+      def processBlock(block: Block, reversal: Boolean): Unit
+    }
+    
+   And no querying functions are stated at all in the basic trait, as we are going to make state design stackable. For
+      example, if it's possible for a cryptocurrency to support balance querying for an arbitrary account following trait 
+       could be mixed with the basic one: 
+     
+       
+    trait BalanceSheet {
+      def balance(address: String, confirmations: Int): Long
+    }       
+                  
+   to have a concrete interface to be implemented by a cryptocurrency like
       
+    trait LagonakiState extends State with BalanceSheet with AccountTransactionsHistory
+    
+   In addition to state a history is to be stored as well(to send it to another peer for a reconstruction of a state, at
+      least). Please note, history could be in a different form than the blockchain, for example, a blocktree could be
+       explicitly stored, or just uncles of blocks as Ethereum does. I'm not going to provide History interface code here,
+        but you can [find it online](https://github.com/ConsensusResearch/Scorex-Lagonaki/blob/master/scorex-basics/src/main/scala/scorex/transaction/History.scala).
+   
+   
+So a transactional module contains references to concrete implementations of state and history, and few functions able to:
+       
+* check whether a block is valid from module's point of view(so whether all transactions within a block 
+    & transactions metadata e.g. Merkle tree root hash are valid)
+* extract transactions from a block
+* get transactions from unconfirmed pool and add corresponding metadata(on forming a new block) 
+* clear duplicates from unconfirmed pool(on getting a block from the network) 
+     
+     
+     
+The code reflecting requirements above is:
+                                
+    trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[TransactionBlockData]{
+                  
+      val state: State
+      val history: History
+   
+      def isValid(block: Block):Boolean   
+      def transactions(block: Block): Seq[Transaction]            
+      def packUnconfirmed(): TransactionBlockData   
+      def clearFromUnconfirmed(data: TransactionBlockData): Unit
+         
+      def process(block: Block): Unit = state.processBlock(block, reversal = false)         
+      def popOff(block: Block): Unit = state.processBlock(block, reversal = true)  
+      ... 
+       
+       
+The Concrete Implementation
+---------------------------
+
+To develop a concrete blockchain-powered product a developer needs to provide concrete implementations of state, history,
+consensus & transactions functions to glue them together in an application. 
+
+To see how that's done is Scorex, take a look into [LagonakiApplication.scala](https://github.com/ConsensusResearch/Scorex-Lagonaki/blob/master/src/main/scala/scorex/app/LagonakiApplication.scala).
+ While Scorex is the name of an abstract framework, Lagonaki is the name of concrete implementation wiring together:
+  
+  * SimplestTransactionModule, working with just a sequence of simplest token transfer transactions, without any metadata
+  * Two 100% Proof-of-Stake consensus module implementations, one is Nxt-like, other is Qora-like
 
 
-The Concrete Implementation - Scores Lagonaki
----------------------------------------------
-
-
-Further Work 
+Further Work
 ------------
 
+The resulting application wiring together modules is much leaner than before. Some work could be done further though:
 
-Conclusion
-----------
+* stackable user APIs when a module provides it's own part of API implementation 
+* stackable P2P protocol
+
