@@ -1,7 +1,7 @@
 package scorex
 
 import org.scalatest.{BeforeAndAfterAll, Suites}
-import scorex.integration.BlocksRoutingSpecification
+import scorex.integration.{ValidChainGenerationSpecification, BlocksRoutingSpecification}
 import scorex.unit._
 
 class ScorexTestSuite extends Suites(
@@ -12,11 +12,9 @@ class ScorexTestSuite extends Suites(
   ,new BlockchainStorageSpecification
   ,new WalletSpecification
   ,new BlocksRoutingSpecification
-  ,new CryptoTestSuite
 
   //integration tests - slow!
-  // todo:uncomment after fixing problems with test stopping
-  //,new ValidChainGenerationSpecification
+  ,new ValidChainGenerationSpecification
 
 )  with BeforeAndAfterAll {
 
