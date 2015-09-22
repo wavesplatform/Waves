@@ -111,9 +111,15 @@ Roadmap
 Documentation
 --------------
 
+Articles:
+
 [The Architecture Of A Cryptocurrency](docs/components.md)
 
-[Scorex-Crypto Sub-Module](scorex-crypto/README.md)
+[On the Way to a Modular Cryptocurrency, Part 1: Generic Block Structure](docs/modular1.md)
+
+Readmes:
+
+[Scorex-Basics Sub-Module](scorex-basics/README.md)
 
 
 Contributions
