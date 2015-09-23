@@ -1,14 +1,16 @@
-package scorex.app.api.http
+package scorex.client
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.net.{HttpURLConnection, URL}
 
 import play.libs.Json
 import scorex.app.LagonakiApplication
+
+import scala.io.StdIn
 import scala.util.Try
 
 
-class ApiClient(application:LagonakiApplication) {
+class ApiClient(application: LagonakiApplication) {
 
   def executeCommand(command: String): String = {
     if (command.equals("help")) {
@@ -44,5 +46,18 @@ class ApiClient(application:LagonakiApplication) {
 
       Try(Json.parse(result)).map(_.toString).getOrElse(result)
     }.getOrElse("Invalid command! \n Type help to get a list of commands.")
+  }
+}
+
+object ApiClient {
+  def main(args: Array[String]): Unit = {
+    val filename = if (args.length > 0) args(0) else "settings.json"
+    val application = new LagonakiApplication(filename)
+    val apiClient = new ApiClient(application)
+
+    println("Welcome to the Scorex command-line client...")
+    Iterator.continually(StdIn.readLine()).takeWhile(!_.equals("quit")).foreach { command =>
+      println(s"[$command RESULT] " + apiClient.executeCommand(command))
+    }
   }
 }

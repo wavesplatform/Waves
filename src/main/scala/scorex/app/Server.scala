@@ -1,7 +1,5 @@
-package scorex
+package scorex.app
 
-
-import scorex.app.LagonakiApplication
 import scorex.transaction.GenesisTransaction
 import scorex.utils.ScorexLogging
 
