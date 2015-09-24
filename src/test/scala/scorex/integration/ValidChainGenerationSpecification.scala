@@ -16,7 +16,7 @@ class ValidChainGenerationSpecification extends FunSuite {
     require(application.wallet.privateKeyAccounts().nonEmpty)
 
     Thread.sleep(15000)
-    val bh = application.blockchainStorage.height()
+    val bh = application.blockchainImpl.height()
 
     //chain validity check
     (2 to bh).foreach { h =>
@@ -24,8 +24,8 @@ class ValidChainGenerationSpecification extends FunSuite {
       //assert(application.blockchainStorage.blockAt(h).get.signatureValid)
     }
 
-    val b1 = application.blockchainStorage.blockAt(1).get
-    val b2 = application.blockchainStorage.blockAt(2).get
+    val b1 = application.blockchainImpl.blockAt(1).get
+    val b2 = application.blockchainImpl.blockAt(2).get
 
     //empty block size check
     /*

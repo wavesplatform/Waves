@@ -4,19 +4,18 @@ import java.net.InetSocketAddress
 
 import akka.pattern.ask
 import play.api.libs.json.Json
+import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.LagonakiApplication
 import scorex.network.{BlockchainSyncer, NetworkController}
 import scorex.network.NetworkController.PeerData
-import spray.routing.HttpService
+import spray.routing.HttpService._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-trait PeersHttpService extends HttpService with CommonApiFunctions {
+case class PeersHttpService(application:LagonakiApplication) extends ApiRoute with CommonApiFunctions {
 
-  val application:LagonakiApplication
-
-  lazy val peersRouting =
+  override lazy val route =
     pathPrefix("peers") {
       path("") {
         get {

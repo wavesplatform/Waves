@@ -1,22 +1,21 @@
-package scorex.app.api.http
+package scorex.api.http
 
 import java.nio.charset.StandardCharsets
+
 import play.api.libs.json.Json
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.app.LagonakiApplication
 import scorex.crypto.{Base58, SigningFunctionsImpl}
-import spray.routing.HttpService
+import scorex.transaction.state.LagonakiState
+import scorex.transaction.state.wallet.Wallet
+import spray.routing.HttpService._
 
 import scala.util.{Failure, Success, Try}
 
 
-trait AddressHttpService extends HttpService with CommonApiFunctions {
-  val application:LagonakiApplication
+case class AddressHttpService(implicit wallet: Wallet, state: LagonakiState)
+  extends ApiRoute with CommonTransactionApiFunctions {
 
-  lazy val wallet = application.wallet
-  lazy val state = application.storedState
-
-  lazy val adressesRouting =
+  override lazy val route =
     pathPrefix("addresses") {
       path("") {
         get {
@@ -38,7 +37,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
             //CHECK IF WALLET EXISTS
             val jsRes = withPrivateKeyAccount(address) { account =>
               wallet.exportAccountSeed(account.address) match {
-                case None => ApiError.json(ApiError.WalletSeedExportFailed)
+                case None => WalletSeedExportFailed.json
                 case Some(seed) => Json.obj("address" -> address, "seed" -> Base58.encode(seed))
               }
             }
@@ -51,7 +50,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
             walletNotExists().getOrElse {
               wallet.generateNewAccount() match {
                 case Some(pka) => Json.obj("address" -> pka.address)
-                case None => ApiError.json(ApiError.Unknown)
+                case None => Unknown.json
               }
 
             }.toString()
@@ -76,7 +75,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
         get {
           complete {
             val jsRes = if (!Account.isValidAddress(address)) {
-              ApiError.json(ApiError.InvalidAddress)
+              InvalidAddress.json
             } else {
               Json.obj(
                 "address" -> address,
@@ -97,13 +96,13 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
                 val pubKey = (js \ "publickey").as[String]
 
                 if (!Account.isValidAddress(address)) {
-                  ApiError.json(ApiError.InvalidAddress)
+                  InvalidAddress.json
                 } else {
                   //DECODE SIGNATURE
                   (Base58.decode(msg), Base58.decode(signature), Base58.decode(pubKey)) match {
-                    case (Failure(_), _, _) => ApiError.json(ApiError.InvalidMessage)
-                    case (_, Failure(_), _) => ApiError.json(ApiError.InvalidSignature)
-                    case (_, _, Failure(_)) => ApiError.json(ApiError.InvalidPublicKey)
+                    case (Failure(_), _, _) => InvalidMessage.json
+                    case (_, Failure(_), _) => InvalidSignature.json
+                    case (_, _, Failure(_)) => InvalidPublicKey.json
                     case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
                       val account = new PublicKeyAccount(pubKeyBytes)
                       val isValid = account.address == address &&
@@ -111,7 +110,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
                       Json.obj("valid" -> isValid)
                   }
                 }
-              }.getOrElse(ApiError.json(ApiError.WrongJson))
+              }.getOrElse(WrongJson.json)
               Json.stringify(jsRes)
             }
           }
@@ -122,17 +121,17 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
             complete {
               val jsRes = walletNotExists().getOrElse {
                 if (!Account.isValidAddress(address)) {
-                  ApiError.json(ApiError.InvalidAddress)
+                  InvalidAddress.json
                 } else {
                   wallet.privateKeyAccount(address) match {
-                    case None => ApiError.json(ApiError.WalletAddressNotExists)
+                    case None => WalletAddressNotExists.json
                     case Some(account) =>
                       Try(SigningFunctionsImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
                         case Success(signature) =>
                           Json.obj("message" -> message,
                             "publickey" -> Base58.encode(account.publicKey),
                             "signature" -> Base58.encode(signature))
-                        case Failure(t) => ApiError.json(t)
+                        case Failure(t) => json(t)
                       }
                   }
                 }
@@ -146,7 +145,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
           complete {
             val jsRes = walletNotExists().getOrElse {
               if (!Account.isValidAddress(address)) {
-                ApiError.json(ApiError.InvalidAddress)
+                InvalidAddress.json
               } else {
                 val deleted = wallet.privateKeyAccount(address).exists(account =>
                   wallet.deleteAccount(account))
@@ -186,7 +185,7 @@ trait AddressHttpService extends HttpService with CommonApiFunctions {
 
   private def balanceJson(address: String, confirmations: Int) =
     if (!Account.isValidAddress(address)) {
-      ApiError.json(ApiError.InvalidAddress)
+      InvalidAddress.json
     } else {
       Json.obj(
         "address" -> address,

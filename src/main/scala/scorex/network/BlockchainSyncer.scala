@@ -39,7 +39,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
         case Status.Offline =>
 
         case Status.Syncing =>
-          val sigs = application.blockchainStorage.lastSignatures(application.settings.MaxBlocksChunks)
+          val sigs = application.blockchainImpl.lastSignatures(application.settings.MaxBlocksChunks)
           val msg = GetSignaturesMessage(sigs)
           networkController ! NetworkController.SendMessageToBestPeer(msg)
 
@@ -65,7 +65,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
 
     case MaxChainScore(scoreOpt) => scoreOpt match {
       case Some(maxScore) =>
-        if (maxScore > application.blockchainStorage.score()) status = Status.Syncing
+        if (maxScore > application.blockchainImpl.score()) status = Status.Syncing
         else status = Status.Generating
 
       case None => status = Status.Offline
@@ -76,10 +76,10 @@ case class BlockchainSyncer(application: LagonakiApplication) extends Actor with
       if (block.isValid) {
         log.info(s"New block: $block from $fromStr")
         application.storedState.processBlock(block)
-        application.blockchainStorage.appendBlock(block)
+        application.blockchainImpl.appendBlock(block)
 
         block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-        val height = application.blockchainStorage.height()
+        val height = application.blockchainImpl.height()
 
         //broadcast block only if it is generated locally
         if(remoteOpt.isEmpty) {

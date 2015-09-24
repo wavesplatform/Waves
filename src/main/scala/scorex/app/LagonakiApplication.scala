@@ -4,7 +4,8 @@ import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.app.api.http.HttpServiceActor
+import scorex.api.http._
+import scorex.app.api.http.{SeedHttpService, ScorexHttpService, PaymentHttpService}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.NxtLikeConsensusModule
@@ -35,23 +36,23 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   implicit val transactionModule = new SimpleTransactionModule
 
   lazy val storedState = transactionModule.state
-  lazy val blockchainStorage = transactionModule.history
+  lazy val blockchainImpl = transactionModule.history
 
   private implicit lazy val actorSystem = ActorSystem("lagonaki")
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
   lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this))
 
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
-  lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
+  implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
   def checkGenesis(): Unit = {
-    if (blockchainStorage.isEmpty) {
+    if (blockchainImpl.isEmpty) {
       val genesisBlock = Block.genesis()
       storedState.processBlock(genesisBlock)
-      blockchainStorage.appendBlock(genesisBlock).ensuring(_.height() == 1)
+      blockchainImpl.appendBlock(genesisBlock).ensuring(_.height() == 1)
       log.info("Genesis block has been added to the state")
     }
-  }.ensuring(blockchainStorage.height() >= 1)
+  }.ensuring(blockchainImpl.height() >= 1)
 
   def run() {
     require(transactionModule.balancesSupport)
@@ -61,8 +62,19 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
 
     blockchainSyncer ! BlockchainSyncer.CheckState
 
-    val httpServiceActor = actorSystem.actorOf(Props(classOf[HttpServiceActor], this), "http-service")
-    val bindCommand = Http.Bind(httpServiceActor, interface = "0.0.0.0", port = settings.rpcPort)
+    val routes = Seq(
+      AddressHttpService()(wallet, storedState),
+      BlocksHttpService()(blockchainImpl, wallet),
+      TransactionsHttpService(storedState),
+      WalletHttpService()(wallet),
+      PaymentHttpService(this),
+      PaymentHttpService(this),
+      ScorexHttpService(this),
+      SeedHttpService
+    )
+
+    val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], routes), "api")
+    val bindCommand = Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
     IO(Http) ! bindCommand
 
     //CLOSE ON UNEXPECTED SHUTDOWN

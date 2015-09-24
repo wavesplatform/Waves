@@ -1,17 +1,14 @@
-package scorex.app.api.http
+package scorex.api.http
 
 import play.api.libs.json.Json
-import scorex.app.LagonakiApplication
 import scorex.crypto.Base58
-import spray.routing.HttpService
+import scorex.transaction.state.wallet.Wallet
+import spray.routing.HttpService._
 
 
-trait WalletHttpService extends HttpService with CommonApiFunctions {
+case class WalletHttpService(implicit wallet: Wallet) extends ApiRoute with CommonTransactionApiFunctions {
 
-  val application:LagonakiApplication
-  lazy val wallet = application.wallet
-
-  lazy val walletRouting = {
+  override lazy val route = {
     pathPrefix("wallet") {
       path("") {
         get {

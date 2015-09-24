@@ -1,16 +1,15 @@
-package scorex.app.api.http
+package scorex.api.http
 
 import play.api.libs.json.Json
-import scorex.app.LagonakiApplication
-import spray.routing.HttpService
+import scorex.transaction.BlockChain
+import scorex.transaction.state.wallet.Wallet
+import spray.routing.HttpService._
 
 
-trait BlocksHttpService extends HttpService with CommonApiFunctions {
-  val application: LagonakiApplication
+case class BlocksHttpService(implicit blockchain: BlockChain, wallet: Wallet)
+  extends ApiRoute with CommonTransactionApiFunctions {
 
-  lazy val blockchainStorage = application.blockchainStorage
-
-  lazy val blocksRouting =
+  override lazy val route =
     pathPrefix("blocks") {
       path("signature" / Segment) { case encodedSignature =>
         get {
@@ -18,15 +17,15 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
         }
       } ~ path("first") {
         get {
-          complete(blockchainStorage.blockAt(1).get.json.toString())
+          complete(blockchain.blockAt(1).get.json.toString())
         }
       } ~ path("last") {
         get {
-          complete(blockchainStorage.lastBlock.json.toString())
+          complete(blockchain.lastBlock.json.toString())
         }
       } ~ path("at" / IntNumber) { case height =>
         get {
-          val res = blockchainStorage
+          val res = blockchain
             .blockAt(height)
             .map(_.json.toString())
             .getOrElse(Json.obj("status" -> "error", "details" -> "No block for this height").toString())
@@ -34,26 +33,26 @@ trait BlocksHttpService extends HttpService with CommonApiFunctions {
         }
       } ~ path("height") {
         get {
-          complete(Json.obj("height" -> blockchainStorage.height()).toString())
+          complete(Json.obj("height" -> blockchain.height()).toString())
         }
       } ~ path("height" / Segment) { case encodedSignature =>
         get {
           complete {
             withBlock(encodedSignature) { block =>
-              Json.obj("height" -> blockchainStorage.heightOf(block))
+              Json.obj("height" -> blockchain.heightOf(block))
             }.toString()
           }
         }
       } ~ path("child" / Segment) { case encodedSignature =>
         get {
           complete(withBlock(encodedSignature) { block =>
-            blockchainStorage.children(block).head.json
+            blockchain.children(block).head.json
           }.toString())
         }
       } ~ path("address" / Segment) { case address =>
         get {
           complete(withPrivateKeyAccount(address) { account =>
-            Json.arr(blockchainStorage.generatedBy(account).map(_.json))
+            Json.arr(blockchain.generatedBy(account).map(_.json))
           }.toString())
         }
       }

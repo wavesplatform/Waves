@@ -2,20 +2,19 @@ package scorex.app.api.http
 
 import akka.pattern.ask
 import play.api.libs.json.Json
+import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.LagonakiApplication
 import scorex.app.settings.Constants
 import scorex.network.BlockchainSyncer
-import spray.routing.HttpService
+import spray.routing.HttpService._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-trait ScorexHttpService extends HttpService with CommonApiFunctions {
+case class ScorexHttpService(application:LagonakiApplication) extends ApiRoute with CommonApiFunctions {
 
-  val application:LagonakiApplication
-
-  lazy val scorexRouting =
+  override lazy val route =
     pathPrefix("scorex") {
       path("stop") {
         get {
