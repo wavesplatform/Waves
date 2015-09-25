@@ -45,6 +45,19 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
+  lazy val routes = Seq(
+    AddressHttpService()(wallet, storedState),
+    BlocksHttpService()(blockchainImpl, wallet),
+    TransactionsHttpService(storedState),
+    WalletHttpService()(wallet),
+    PaymentHttpService(this),
+    PaymentHttpService(this),
+    ScorexHttpService(this),
+    SeedHttpService
+  )
+
+  lazy val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], routes), "api")
+
   def checkGenesis(): Unit = {
     if (blockchainImpl.isEmpty) {
       val genesisBlock = Block.genesis()
@@ -62,20 +75,7 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
 
     blockchainSyncer ! BlockchainSyncer.CheckState
 
-    val routes = Seq(
-      AddressHttpService()(wallet, storedState),
-      BlocksHttpService()(blockchainImpl, wallet),
-      TransactionsHttpService(storedState),
-      WalletHttpService()(wallet),
-      PaymentHttpService(this),
-      PaymentHttpService(this),
-      ScorexHttpService(this),
-      SeedHttpService
-    )
-
-    val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], routes), "api")
-    val bindCommand = Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
-    IO(Http) ! bindCommand
+    IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
 
     //CLOSE ON UNEXPECTED SHUTDOWN
     Runtime.getRuntime.addShutdownHook(new Thread() {
@@ -90,22 +90,15 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
     networkController ! NetworkController.ShutdownNetwork
 
     log.info("Stopping actors (incl. block generator)")
-    actorSystem.shutdown()
+    actorSystem.terminate().onComplete {_ =>
+      //CLOSE WALLET
+      log.info("Closing wallet")
+      wallet.close()
 
-    //CLOSE WALLET
-    log.info("Closing wallet")
-    wallet.close()
-
-    //TODO catch situations when we need this and remove
-    Future {
-      Thread.sleep(10000)
-      log.error("Halt app!")
-      Runtime.getRuntime.halt(0)
+      //FORCE CLOSE
+      log.info("Exiting from the app...")
+      System.exit(0)
     }
-
-    //FORCE CLOSE
-    log.info("Exiting from the app...")
-    System.exit(0)
 
   }
 
