@@ -12,7 +12,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-case class ScorexHttpService(application:LagonakiApplication) extends ApiRoute with CommonApiFunctions {
+case class ScorexApiRoute(application:LagonakiApplication) extends ApiRoute with CommonApiFunctions {
 
   override lazy val route =
     pathPrefix("scorex") {

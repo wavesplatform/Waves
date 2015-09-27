@@ -6,7 +6,7 @@ import scorex.transaction.state.wallet.Wallet
 import spray.routing.HttpService._
 
 
-case class WalletHttpService(implicit wallet: Wallet) extends ApiRoute with CommonTransactionApiFunctions {
+case class WalletApiRoute(implicit wallet: Wallet) extends ApiRoute with CommonTransactionApiFunctions {
 
   override lazy val route = {
     pathPrefix("wallet") {

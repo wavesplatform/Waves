@@ -9,7 +9,7 @@ import spray.routing.HttpService._
 import scala.util.Try
 
 
-case class TransactionsHttpService(state:LagonakiState) extends ApiRoute with CommonApiFunctions {
+case class TransactionsApiRoute(state:LagonakiState) extends ApiRoute with CommonApiFunctions {
   override lazy val route =
     pathPrefix("transactions") {
       path("signature" / Segment) { case signature =>

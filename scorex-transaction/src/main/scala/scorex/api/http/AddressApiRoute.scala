@@ -12,7 +12,7 @@ import spray.routing.HttpService._
 import scala.util.{Failure, Success, Try}
 
 
-case class AddressHttpService(implicit wallet: Wallet, state: LagonakiState)
+case class AddressApiRoute(implicit wallet: Wallet, state: LagonakiState)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   override lazy val route =

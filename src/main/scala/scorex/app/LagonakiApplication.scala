@@ -5,7 +5,7 @@ import akka.io.IO
 import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
-import scorex.app.api.http.{SeedHttpService, ScorexHttpService, PaymentHttpService}
+import scorex.app.api.http.{SeedApiRoute, ScorexApiRoute, PaymentApiRoute}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.NxtLikeConsensusModule
@@ -18,9 +18,8 @@ import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.wallet.Wallet
 import scorex.utils.{NTP, ScorexLogging}
 import spray.can.Http
-
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+
 
 class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   private val appConf = ConfigFactory.load().getConfig("app")
@@ -46,14 +45,14 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
   lazy val routes = Seq(
-    AddressHttpService()(wallet, storedState),
-    BlocksHttpService()(blockchainImpl, wallet),
-    TransactionsHttpService(storedState),
-    WalletHttpService()(wallet),
-    PaymentHttpService(this),
-    PaymentHttpService(this),
-    ScorexHttpService(this),
-    SeedHttpService
+    AddressApiRoute()(wallet, storedState),
+    BlocksApiRoute()(blockchainImpl, wallet),
+    TransactionsApiRoute(storedState),
+    WalletApiRoute()(wallet),
+    PaymentApiRoute(this),
+    PaymentApiRoute(this),
+    ScorexApiRoute(this),
+    SeedApiRoute
   )
 
   lazy val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], routes), "api")

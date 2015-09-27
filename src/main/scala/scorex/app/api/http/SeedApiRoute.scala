@@ -8,7 +8,7 @@ import scorex.crypto.Base58
 import spray.routing.HttpService._
 
 //todo: move to basics?
-case object SeedHttpService extends ApiRoute with CommonApiFunctions {
+case object SeedApiRoute extends ApiRoute with CommonApiFunctions {
 
   private def seed(length: Int): String = {
     val seed = new Array[Byte](length)

@@ -10,7 +10,7 @@ import spray.routing.HttpService._
 import scala.util.{Failure, Success, Try}
 
 
-case class PaymentHttpService(application:LagonakiApplication) extends ApiRoute with CommonTransactionApiFunctions {
+case class PaymentApiRoute(application:LagonakiApplication) extends ApiRoute with CommonTransactionApiFunctions {
 
   implicit lazy val transactionModule = application.transactionModule
   implicit lazy val wallet = application.wallet
