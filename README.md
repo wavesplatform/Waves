@@ -117,6 +117,7 @@ Articles:
 
 [On the Way to a Modular Cryptocurrency, Part 1: Generic Block Structure](docs/modular1.md)
 
+[On the Way to a Modular Cryptocurrency, Part 2: Stackable API](docs/modular2.md)
 
 Readmes:
 

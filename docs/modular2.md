@@ -9,8 +9,8 @@ The previous chapter, [Generic Block Structure](modular1.md) described how to sp
  core design of a cryptocurrency into two separate modules to wire concrete implementations in an application
  then.
  
- A cryptocurrency core application provides some API for its user. In this simple chapter I'll show how to 
- split API implementation to wire it in an application then. 
+ A cryptocurrency core application provides some API for its user. In this chapter I will show how to 
+ split API implementation into pieces to wire it in an application then. 
 
 Gluing Things Together
 ----------------------
