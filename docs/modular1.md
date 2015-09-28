@@ -181,5 +181,5 @@ Further Work
 
 The resulting application wiring together modules is much leaner than before. Some work could be done further though:
 
-* stackable user APIs when a module provides it's own part of API implementation 
+* [stackable user APIs when a module provides it's own part of API implementation](modular2.md)  
 * stackable P2P protocol
