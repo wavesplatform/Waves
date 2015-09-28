@@ -5,7 +5,7 @@ import akka.io.IO
 import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
-import scorex.app.api.http.{SeedApiRoute, ScorexApiRoute, PaymentApiRoute}
+import scorex.app.api.http.{PaymentApiRoute, ScorexApiRoute, SeedApiRoute}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.NxtLikeConsensusModule
@@ -18,6 +18,7 @@ import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.wallet.Wallet
 import scorex.utils.{NTP, ScorexLogging}
 import spray.can.Http
+
 import scala.concurrent.ExecutionContext.Implicits.global
 
 
@@ -89,7 +90,7 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
     networkController ! NetworkController.ShutdownNetwork
 
     log.info("Stopping actors (incl. block generator)")
-    actorSystem.terminate().onComplete {_ =>
+    actorSystem.terminate().onComplete { _ =>
       //CLOSE WALLET
       log.info("Closing wallet")
       wallet.close()
