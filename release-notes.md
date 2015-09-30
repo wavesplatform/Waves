@@ -3,6 +3,7 @@
 
 * Modular design: basics, consensus, transaction modules are extracted
 * Ping messages removed
+* Docker container
 
 
 **1.0.4**

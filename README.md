@@ -86,6 +86,9 @@ You can edit folders / other settings in settings.json file before running ./sta
 It'll build docker image based on tiny https://www.alpinelinux.org/about/ with OracleJRE 8
 and run scorex.jar inside the container. Image size is about 201.8 MB.
 
+On getting "docker.sock: permission denied" error, add an user to docker group with `sudo usermod -a -G docker <username>`
+ then reboot ([https://github.com/docker/docker/issues/5314](https://github.com/docker/docker/issues/5314))
+
 
 Command-Line Client
 -------------------
