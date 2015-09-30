@@ -12,7 +12,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.5.4",
   "com.google.guava" % "guava" % "15.0",
   "com.typesafe" % "config" % "1.3.0",
-  "com.typesafe.akka" % "akka-actor_2.11" % "2.4.0-RC3",
+  "com.typesafe.akka" % "akka-actor_2.11" % "2.4.0",
   "com.typesafe.akka" % "akka-testkit_2.11" % "2.3.9",
   "com.typesafe.play" % "play-datacommons_2.11" % "2.4.3",
   "com.typesafe.play" % "play-functional_2.11" % "2.4.3",
@@ -38,4 +38,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scalatest" % "scalatest_2.11" % "2.3.0-SNAP2",
   "org.slf4j" % "slf4j-api" % "1.7.7"
 )
-// LIBRARY_DEPENDENCIES_HASH a07b083e5da443733c03689c93517bf572b34b62
+// LIBRARY_DEPENDENCIES_HASH c61c3dee7496aa03f952d03d0431a6f946dbbed8

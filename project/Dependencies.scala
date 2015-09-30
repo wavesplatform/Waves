@@ -14,7 +14,7 @@ object Dependencies {
   )
 
   lazy val akka = Seq(
-    "com.typesafe.akka" %% "akka-actor" % "2.+"
+    "com.typesafe.akka" %% "akka-actor" % "2.4.+"
   )
 
   lazy val db = Seq(
