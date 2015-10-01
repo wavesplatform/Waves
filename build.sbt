@@ -79,7 +79,7 @@ enablePlugins(DockerPlugin)
 docker <<= docker.dependsOn(sbt.Keys.`package`.in(Compile, packageBin))
 
 dockerfile in docker := {
-  val jarFile = (outputPath in assembly).value
+  val jarFile = (assemblyOutputPath in assembly).value
   val jarTargetPath = s"/app/${jarFile.name}"
   val settingsPath = (baseDirectory in ThisBuild).value / "settings.json"
 
