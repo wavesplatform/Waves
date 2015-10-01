@@ -30,13 +30,9 @@ class WalletSpecification extends FunSuite {
     assert(w.privateKeyAccounts().isEmpty)
   }
 
-
-
-  /*
-  //todo: report MapDb bug with reopening a database
-
   test("reopening"){
 
+    //todo read folder from settings
     val walletFile = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")
 
     val w = new Wallet(Some(walletFile), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
@@ -46,5 +42,5 @@ class WalletSpecification extends FunSuite {
 
     val w2 = new Wallet(Some(walletFile), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
     assert(w2.privateKeyAccounts().head.address != null)
-  } */
+  }
 }
