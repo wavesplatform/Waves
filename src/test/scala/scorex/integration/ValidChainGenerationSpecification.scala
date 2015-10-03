@@ -1,13 +1,14 @@
 package scorex.integration
 
 import org.scalatest.FunSuite
+import scorex.TestingCommons
 import scorex.app.LagonakiApplication
 import scorex.block.Block
 
 //todo: fix test, problems with app stopping
-class ValidChainGenerationSpecification extends FunSuite {
+class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
   ignore("retroactive chain test") {
-    val application = new LagonakiApplication("settings-test.json")
+    val application = new LagonakiApplication(SettingsFilename)
     implicit val consensusModule = application.consensusModule
     implicit val transactionModule = application.transactionModule
 
