@@ -4,7 +4,6 @@ import java.net.InetAddress
 
 import org.apache.commons.net.ntp.NTPUDPClient
 
-//todo: make code more functional
 object NTP extends ScorexLogging {
   private val TimeTillUpdate = 1000 * 60 * 10L
   private val NtpServer = "pool.ntp.org"

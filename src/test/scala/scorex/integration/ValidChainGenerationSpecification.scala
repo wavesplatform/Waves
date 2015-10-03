@@ -15,13 +15,12 @@ class ValidChainGenerationSpecification extends FunSuite {
     application.wallet.generateNewAccounts(10)
     require(application.wallet.privateKeyAccounts().nonEmpty)
 
-    Thread.sleep(15000)
+    Thread.sleep(5000)
     val bh = application.blockchainImpl.height()
 
     //chain validity check
     (2 to bh).foreach { h =>
-      //assert(application.blockchainStorage.blockAt(h).get.isValid())
-      //assert(application.blockchainStorage.blockAt(h).get.signatureValid)
+      assert(application.blockchainImpl.blockAt(h).get.isValid)
     }
 
     val b1 = application.blockchainImpl.blockAt(1).get
