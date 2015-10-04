@@ -39,6 +39,16 @@ A block is a an atomic piece of data network participates are agreed on.
 State & History
 ---------------
 
+A state is a result of sequential blocks applying, starting from a genesis block.  Probably 
+[State monad](https://en.wikibooks.org/wiki/Haskell/Understanding_monads/State) could be helpful here, but for 
+start(as we are rewriting existing project not using a true functional approach) the state interface is
+
+    trait State {
+      def processBlock(block: Block, reversal: Boolean): Unit
+    }
+
+
+    
 
 Transaction Module
 ------------------
