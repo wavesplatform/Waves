@@ -6,5 +6,6 @@ libraryDependencies ++=
     Dependencies.spray ++
     Dependencies.testKit ++
     Dependencies.logging ++ Seq(
-    "commons-net" % "commons-net" % "3.+"
+      "org.whispersystems" % "curve25519-java" % "+",
+      "commons-net" % "commons-net" % "3.+"
   )

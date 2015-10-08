@@ -38,10 +38,9 @@ class TransactionSpecification extends FunSuite {
     val tx2 = PaymentTransaction(sender, recipient, 5, 1, time, sig2)
     val tx3 = PaymentTransaction(sender, recipient, 5, 1, time)
 
-    assert(tx3.signature.sameElements(sig))
-
     assert(tx.isSignatureValid())
     assert(!tx2.isSignatureValid())
+    assert(tx3.isSignatureValid())
   }
 
   test("toBytes/parse roundtrip") {

@@ -36,6 +36,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scala-stm" % "scala-stm_2.11" % "0.7",
   "org.scalactic" % "scalactic_2.11" % "2.3.0-SNAP2",
   "org.scalatest" % "scalatest_2.11" % "2.3.0-SNAP2",
-  "org.slf4j" % "slf4j-api" % "1.7.7"
+  "org.slf4j" % "slf4j-api" % "1.7.7",
+  "org.whispersystems" % "curve25519-java" % "0.2.4"
 )
-// LIBRARY_DEPENDENCIES_HASH c61c3dee7496aa03f952d03d0431a6f946dbbed8
+// LIBRARY_DEPENDENCIES_HASH 4f87165a5fd52f152bc56a4fcf063ce7ed13aa89
