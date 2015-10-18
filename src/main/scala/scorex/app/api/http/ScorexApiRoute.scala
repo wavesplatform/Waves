@@ -27,7 +27,7 @@ case class ScorexApiRoute(application:LagonakiApplication) extends ApiRoute with
         get {
           onComplete {
             (application.blockchainSyncer ? BlockchainSyncer.GetStatus).map { status =>
-              Json.obj("status" -> status.asInstanceOf[BlockchainSyncer.Status.Value].toString).toString()
+              Json.obj("status" -> status.asInstanceOf[String]).toString()
             }
           } {
             case Success(value) => complete(value)

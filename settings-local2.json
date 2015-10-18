@@ -14,5 +14,5 @@
 		"123.123.123.123"
 	],
   	"max-rollback" : 100,
-  	"offline-generation" : true
+  	"offline-generation" : false
 }

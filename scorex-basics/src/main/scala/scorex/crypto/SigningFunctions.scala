@@ -1,6 +1,6 @@
 package scorex.crypto
 
-import org.whispersystems.curve25519.Curve25519
+import net.vrallev.java.ecc.{Ecc25519Helper, KeyHolder}
 import scorex.account.PrivateKeyAccount
 
 import scala.util.Try
@@ -30,22 +30,23 @@ object SigningFunctionsImpl extends SigningFunctions {
   override val SignatureLength = 64
   override val KeyLength = 32
 
-  private val cipher = Curve25519.getInstance(Curve25519.BEST)
-
   override def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = {
-    val keyPair = cipher.generateKeyPair()
-    keyPair.getPrivateKey -> keyPair.getPublicKey
+    require(seed.length == 32)
+
+    val privateKey = KeyHolder.createPrivateKey(seed)
+    val kh = new KeyHolder(privateKey)
+
+    kh.getPrivateKey -> kh.getPublicKeySignature
   }
 
   override def sign(privateKey: PrivateKey, message: MessageToSign): Signature = {
     require(privateKey.length == KeyLength)
-    cipher.calculateSignature(privateKey, message)
+    new Ecc25519Helper(privateKey).sign(message)
   }
 
   override def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean = Try {
     require(signature.length == SignatureLength)
     require(publicKey.length == KeyLength)
-
-    cipher.verifySignature(publicKey, message, signature)
+    new Ecc25519Helper().isValidSignature(message, signature, publicKey)
   }.getOrElse(false)      //todo: recover with log output
 }

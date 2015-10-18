@@ -73,7 +73,7 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
 
     checkGenesis()
 
-    blockchainSyncer ! BlockchainSyncer.CheckState
+    blockchainSyncer ! Unit //initializing
 
     IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
 

@@ -78,9 +78,9 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     })
 
     val height = history.height()
-    if(height > MaxBlocksForUnconfirmed + 1){
+    if (height > MaxBlocksForUnconfirmed + 1) {
       val time10 = history.blockAt(height - MaxBlocksForUnconfirmed).get.timestampField.value
-      UnconfirmedTransactionsDatabaseImpl.all().foreach{tx=>
+      UnconfirmedTransactionsDatabaseImpl.all().foreach { tx =>
         if (tx.timestamp < time10) UnconfirmedTransactionsDatabaseImpl.remove(tx)
       }
 
@@ -89,16 +89,16 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
 
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
     val ipoMembers = List(
-      "2UyntBprhFgZPJ1tCtKBAwryiSnDSk9Xmh8",
-      "Y2BXLjiAhPUMSo8iBbDEhv81VwKnytTXsH",
-      "a8zcZPAj4HJjNLCmfRPVxurcB4REj8YNse",
-      "hWUV4cjcGPgKjaNuRWAYyFMDZKadSPuwfP",
-      "2etPX8BRivVTqr3vBvaCBeebhhGipbuzBNW",
-      "dNKdbrqeykhxsnUpLjFTDHtTWHquiCcBGe",
-      "5MkGmznxmA1Jm2F5KtxYVaf2Bfa6sy2XS1",
-      "2Cqn5vN5iv7jDMehTiXTv3SGpxrCDAkAnBT",
-      "2ihjht1NWTv2T8nKDMzx2RMmp7ZDEchXJus",
-      "2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPNKr"
+      "27ZjrCKQP66AZsUGwud8c3ahcj13cVaX4cF",
+      "2KhD4L7tknTHe7yZoVbhujPUVkQDdhA3QGS",
+      "2G7PDfxdJG8jTDX8mM5uSbW8JFqpCMgQ5Xk",
+      "2GqbZk5UHagTFn7jhwohSCj3RaZrkj8Trcs",
+      "22AVpTZnZEav2SWGBZAHR3Vdrxojd59ETkX",
+      "61fcGqP9ULkoEhzdsRCbYmZmxzqK95b3Un",
+      "NNtdNKMeASKPNxM22abQWv8LEw9NzXpthq",
+      "2UNCFoaXLeZwpr1n6BfSi1qKhrVLMXPzedM",
+      "UDiEjY7hHhobG5188YB7DfQ2eZgaDaU8jS",
+      "XUU8gXPDyWGRPkRnLrR24cCryyRZhghdHo"
     )
 
     val timestamp = 0L
