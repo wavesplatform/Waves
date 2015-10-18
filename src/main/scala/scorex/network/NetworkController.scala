@@ -63,11 +63,15 @@ class NetworkController(application: LagonakiApplication) extends Actor with Sco
 
     case CheckPeers =>
       if (connectedPeers.size < settings.maxConnections) {
-        val peer = peerManager.randomPeer()
-        if (!connectedPeers.contains(peer) && !connectingPeers.contains(peer)) {
-          connectingPeers += peer
-          val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
-          IO(Tcp) ! Connect(peer, timeout = connTimeout)
+        peerManager.randomPeer() match {
+          case Some(peer) =>
+            if (!connectedPeers.contains(peer) && !connectingPeers.contains(peer)) {
+              connectingPeers += peer
+              val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
+              IO(Tcp) ! Connect(peer, timeout = connTimeout)
+            }
+
+          case None =>
         }
       }
 
@@ -127,7 +131,6 @@ class NetworkController(application: LagonakiApplication) extends Actor with Sco
       blockchainSyncer ! NewBlock(block, Some(sndr))
       val height = application.blockchainImpl.height()
       self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
-
 
     case UpdateBlockchainScore(remote, height, score) => updateScore(remote, height, score)
 

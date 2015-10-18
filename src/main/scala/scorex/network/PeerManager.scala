@@ -27,9 +27,10 @@ class PeerManager(settings: LagonakiSettings) extends ScorexLogging {
   def peerDisconnected(peer: InetSocketAddress): Unit =
     PeerDatabaseImpl.removeConnectedPeer(peer)
 
-  def randomPeer(): InetSocketAddress = {
+  def randomPeer(): Option[InetSocketAddress] = {
     val peers = knownPeers()
-    peers(Random.nextInt(peers.size))
+    if(peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
+    else None
   }
 
   def addPeer(peer: InetSocketAddress): Unit =
