@@ -44,44 +44,6 @@ public class RIPEMD160 {
         msglen = 0;
     }
 
-    public static String byteToHex(byte b) {
-        byte top = (byte) (((256 + b) / 16) & 15);
-        byte bottom = (byte) ((256 + b) & 15);
-
-        String res;
-
-        if (top > 9) {
-            res = "" + (char) ('a' + (top - 10));
-        } else {
-            res = "" + (char) ('0' + top);
-        }
-        if (bottom > 9) {
-            res += (char) ('a' + (bottom - 10));
-        } else {
-            res += (char) ('0' + bottom);
-        }
-        return res;
-    }
-
-    public static String RIPEMD160String(String txt) {
-        RIPEMD160 r = new RIPEMD160();
-        r.update(txt);
-        return r.digest();
-
-    }
-
-    public void reset() {
-        MDbuf = new int[5];
-        MDbuf[0] = 0x67452301;
-        MDbuf[1] = 0xefcdab89;
-        MDbuf[2] = 0x98badcfe;
-        MDbuf[3] = 0x10325476;
-        MDbuf[4] = 0xc3d2e1f0;
-        working = new int[16];
-        working_ptr = 0;
-        msglen = 0;
-    }
-
     private void compress(int[] X) {
         int index = 0;
 
@@ -224,19 +186,6 @@ public class RIPEMD160 {
         compress(X);
     }
 
-    public void update(byte input) {
-        working[working_ptr >> 2] ^= ((int) input) << ((working_ptr & 3) << 3);
-        working_ptr++;
-        if (working_ptr == 64) {
-            compress(working);
-            for (int j = 0; j < 16; j++) {
-                working[j] = 0;
-            }
-            working_ptr = 0;
-        }
-        msglen++;
-    }
-
     public void update(byte[] input) {
         for (int i = 0; i < input.length; i++) {
             working[working_ptr >> 2] ^= ((int) input[i]) << ((working_ptr & 3) << 3);
@@ -252,44 +201,6 @@ public class RIPEMD160 {
         msglen += input.length;
     }
 
-    public void update(byte[] input, int offset, int len) {
-        if (offset + len >= input.length) {
-            for (int i = offset; i < input.length; i++) {
-                working[working_ptr >> 2] ^= ((int) input[i]) << ((working_ptr & 3) << 3);
-                working_ptr++;
-                if (working_ptr == 64) {
-                    compress(working);
-                    for (int j = 0; j < 16; j++) {
-                        working[j] = 0;
-                    }
-                    working_ptr = 0;
-                }
-            }
-            msglen += input.length - offset;
-        } else {
-            for (int i = offset; i < offset + len; i++) {
-                working[working_ptr >> 2] ^= ((int) input[i]) << ((working_ptr & 3) << 3);
-                working_ptr++;
-                if (working_ptr == 64) {
-                    compress(working);
-                    for (int j = 0; j < 16; j++) {
-                        working[j] = 0;
-                    }
-                    working_ptr = 0;
-                }
-            }
-            msglen += len;
-        }
-    }
-
-    public void update(String s) {
-        byte[] bytearray = new byte[s.length()];
-        for (int i = 0; i < bytearray.length; i++) {
-            bytearray[i] = (byte) s.charAt(i);
-        }
-        update(bytearray);
-    }
-
     public byte[] digestBin() {
         MDfinish(working, msglen, 0);
         byte[] res = new byte[20];
@@ -302,30 +213,5 @@ public class RIPEMD160 {
     public byte[] digest(byte[] input) {
         update(input);
         return digestBin();
-    }
-
-    public String digest() {
-        MDfinish(working, msglen, 0);
-        byte[] res = new byte[20];
-        for (int i = 0; i < 20; i++) {
-            res[i] = (byte) ((MDbuf[i >> 2] >>> ((i & 3) << 3)) & 0x000000FF);
-        }
-
-        String hex = "";
-        for (int i = 0; i < res.length; i++) {
-            hex += byteToHex(res[i]);
-        }
-        return hex;
-    }
-
-    public byte[] digest(byte[] input, int offset, int len) {
-        update(input, offset, len);
-        return digestBin();
-    }
-
-    public int[] intdigest() {
-        int[] res = new int[5];
-        System.arraycopy(MDbuf, 0, res, 0, 5);
-        return res;
     }
 }
