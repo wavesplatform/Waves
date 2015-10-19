@@ -67,7 +67,7 @@ trait Settings extends ScorexLogging {
   private val DefaultPingInterval = 30000
   private val DefaultBindAddress = "127.0.0.1"
 
-  val MaxBlocksChunks = 5
+  val MaxBlocksChunks = 30
 
   //API
   private val DefaultRpcPort = 9085
