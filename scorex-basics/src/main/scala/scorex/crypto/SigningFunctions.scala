@@ -32,8 +32,6 @@ object SigningFunctionsImpl extends SigningFunctions with ScorexLogging {
   override val KeyLength = 32
 
   override def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = {
-    require(seed.length == KeyLength)
-
     val privateKey = KeyHolder.createPrivateKey(seed)
     val kh = new KeyHolder(privateKey)
 
