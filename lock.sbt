@@ -27,6 +27,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "io.spray" % "spray-testkit_2.11" % "1.3.3",
   "io.spray" % "spray-util_2.11" % "1.3.3",
   "joda-time" % "joda-time" % "2.8.1",
+  "net.vrallev.ecc" % "ecc-25519-java" % "1.0.1",
   "org.joda" % "joda-convert" % "1.7",
   "org.jvnet.mimepull" % "mimepull" % "1.9.5",
   "org.mapdb" % "mapdb" % "2.0-beta8",
@@ -36,7 +37,6 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scala-stm" % "scala-stm_2.11" % "0.7",
   "org.scalactic" % "scalactic_2.11" % "2.3.0-SNAP2",
   "org.scalatest" % "scalatest_2.11" % "2.3.0-SNAP2",
-  "org.slf4j" % "slf4j-api" % "1.7.7",
-  "org.whispersystems" % "curve25519-java" % "0.2.4"
+  "org.slf4j" % "slf4j-api" % "1.7.7"
 )
-// LIBRARY_DEPENDENCIES_HASH 4f87165a5fd52f152bc56a4fcf063ce7ed13aa89
+// LIBRARY_DEPENDENCIES_HASH f83f7a3c795307cf9e9d5a359bd4c14c1b573b8a

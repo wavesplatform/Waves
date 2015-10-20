@@ -10,7 +10,7 @@ object Dependencies {
 
   lazy val serizalization = Seq(
     "com.google.guava" % "guava" % "15.+",
-    "com.typesafe.play" %% "play-json" % "2.+"
+    "com.typesafe.play" %% "play-json" % "2.4.+"
   )
 
   lazy val akka = Seq(

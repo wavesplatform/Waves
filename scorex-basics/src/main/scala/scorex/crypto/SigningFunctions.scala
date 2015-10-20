@@ -2,8 +2,9 @@ package scorex.crypto
 
 import net.vrallev.java.ecc.{Ecc25519Helper, KeyHolder}
 import scorex.account.PrivateKeyAccount
+import scorex.utils.ScorexLogging
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 trait SigningFunctions {
   type PrivateKey = Array[Byte]
@@ -25,14 +26,12 @@ trait SigningFunctions {
   def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean
 }
 
-object SigningFunctionsImpl extends SigningFunctions {
+object SigningFunctionsImpl extends SigningFunctions with ScorexLogging {
 
   override val SignatureLength = 64
   override val KeyLength = 32
 
   override def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = {
-    require(seed.length == 32)
-
     val privateKey = KeyHolder.createPrivateKey(seed)
     val kh = new KeyHolder(privateKey)
 
@@ -48,5 +47,8 @@ object SigningFunctionsImpl extends SigningFunctions {
     require(signature.length == SignatureLength)
     require(publicKey.length == KeyLength)
     new Ecc25519Helper().isValidSignature(message, signature, publicKey)
-  }.getOrElse(false)      //todo: recover with log output
+  }.recoverWith { case e =>
+    log.debug("Error while message signature verification", e)
+    Failure(e)
+  }.getOrElse(false)
 }
