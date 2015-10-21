@@ -16,6 +16,7 @@ import scala.concurrent.duration._
 case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 
 
+//todo: reduce boilerplate code
 case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status, Unit] {
 
   private lazy val networkController = application.networkController
