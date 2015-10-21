@@ -111,7 +111,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     TransactionsBlockField(txs)
   }
 
-  override def isValid(block: Block): Boolean = transactions(block).forall { tx => tx match {
+  override def isValid(block: Block): Boolean = transactions(block).forall {
     case ptx: PaymentTransaction =>
       ptx.isSignatureValid() && ptx.validate()(this) == ValidationResult.ValidateOke
     case gtx: GenesisTransaction =>
@@ -119,7 +119,6 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     case otx: Any =>
       log.error(s"Wrong kind of tx: $otx")
       false
-  }
   }
 }
 
