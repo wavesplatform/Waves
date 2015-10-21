@@ -27,8 +27,8 @@ public class RIPEMD160 {
                     15, 5, 1, 3, 7, 14, 6, 9, 11, 8, 12, 2, 10, 0, 4, 13,
                     8, 6, 4, 1, 3, 11, 15, 0, 5, 12, 2, 13, 9, 7, 10, 14,
                     12, 15, 10, 4, 1, 5, 8, 7, 6, 2, 13, 14, 0, 3, 9, 11}};
-    private int[] MDbuf;
-    private int[] working;
+    private final int[] MDbuf;
+    private final int[] working;
     private int working_ptr;
     private int msglen;
 
