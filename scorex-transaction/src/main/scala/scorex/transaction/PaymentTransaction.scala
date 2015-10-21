@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import java.util.Arrays
+import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
@@ -103,27 +103,27 @@ object PaymentTransaction {
     position += TimestampLength
 
     //READ SENDER
-    val senderBytes = Arrays.copyOfRange(data, position, position + SENDER_LENGTH)
+    val senderBytes = util.Arrays.copyOfRange(data, position, position + SENDER_LENGTH)
     val sender = new PublicKeyAccount(senderBytes)
     position += SENDER_LENGTH
 
     //READ RECIPIENT
-    val recipientBytes = Arrays.copyOfRange(data, position, position + RecipientLength)
+    val recipientBytes = util.Arrays.copyOfRange(data, position, position + RecipientLength)
     val recipient = new Account(Base58.encode(recipientBytes))
     position += RecipientLength
 
     //READ AMOUNT
-    val amountBytes = Arrays.copyOfRange(data, position, position + AmountLength)
+    val amountBytes = util.Arrays.copyOfRange(data, position, position + AmountLength)
     val amount = Longs.fromByteArray(amountBytes)
     position += AmountLength
 
     //READ FEE
-    val feeBytes = Arrays.copyOfRange(data, position, position + FEE_LENGTH)
+    val feeBytes = util.Arrays.copyOfRange(data, position, position + FEE_LENGTH)
     val fee = Longs.fromByteArray(feeBytes)
     position += FEE_LENGTH
 
     //READ SIGNATURE
-    val signatureBytes = Arrays.copyOfRange(data, position, position + SIGNATURE_LENGTH)
+    val signatureBytes = util.Arrays.copyOfRange(data, position, position + SIGNATURE_LENGTH)
 
     new PaymentTransaction(sender, recipient, amount, fee, timestamp, signatureBytes)
   }
