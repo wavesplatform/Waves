@@ -113,7 +113,7 @@ imageNames in docker := Seq(
 
 pomIncludeRepository := { _ => false }
 
-pomExtra := (
+pomExtra :=
     <scm>
       <url>git@github.com:ConsensusResearch/Scorex-Lagonaki.git</url>
       <connection>scm:git:git@github.com:ConsensusResearch/Scorex-Lagonaki.git</connection>
@@ -124,4 +124,4 @@ pomExtra := (
         <name>Alexander Chepurnoy</name>
         <url>http://chepurnoy.org/</url>
       </developer>
-    </developers>)
+    </developers>
