@@ -15,7 +15,6 @@ trait SigningFunctions {
   val SignatureLength: Int
   val KeyLength: Int
 
-  //is it a real part of the interface? or not signing schemes have this kind of functionality?
   def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey)
 
   def sign(privateKey: PrivateKey, message: MessageToSign): Signature
