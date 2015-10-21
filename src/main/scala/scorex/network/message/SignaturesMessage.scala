@@ -14,7 +14,7 @@ abstract class SignaturesSeqMessage extends Message {
     val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DataLength, 0)
 
     //WRITE SIGNATURES
-    signatures.foldLeft(lengthBytes) { case (bytes, header) => Bytes.concat(bytes, header) }
+    signatures.foldLeft(lengthBytes) { case (bs, header) => Bytes.concat(bs, header) }
   }
 }
 
