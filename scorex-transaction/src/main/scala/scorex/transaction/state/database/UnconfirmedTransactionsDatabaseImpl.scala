@@ -10,9 +10,8 @@ object UnconfirmedTransactionsDatabaseImpl extends UnconfirmedTransactionsDataba
   val transactions = TrieMap[Long, LagonakiTransaction]()
 
   //using Long instead of Array[Byte] just for performance improvement
-  private def key(signature: Array[Byte]): Long = {
+  private def key(signature: Array[Byte]): Long =
     Longs.fromByteArray(signature.take(8))
-  }
 
   private def key(tx: LagonakiTransaction): Long = key(tx.signature)
 
