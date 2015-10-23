@@ -1,7 +1,7 @@
 package scorex
 
 import org.scalatest.Suites
-import scorex.unit.SigningFunctionsSpecification
+import scorex.props.SigningFunctionsSpecification
 
 class CryptoTestSuite extends Suites (
   //unit tests
