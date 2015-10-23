@@ -57,7 +57,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
         .checksumEnable()
         .fileMmapEnable()
         .make()
-      db.rollback() //clear uncommited data from possibly invalid last run
+      db.rollback() //clear uncommitted data from possibly invalid last run
       db
 
     case None => DBMaker.memoryDB().make()
