@@ -11,7 +11,7 @@ with Matchers {
 
   property("doublehash(x) is hash(hash(x))") {
     forAll { data: Array[Byte] =>
-      doubleHash(data).shouldBe(hash(hash(data)))
+      doubleHash(data) should equal (hash(hash(data)))
     }
   }
 
