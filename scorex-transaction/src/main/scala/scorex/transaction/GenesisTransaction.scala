@@ -84,7 +84,7 @@ object GenesisTransaction {
     Bytes.concat(h, h)
   }
 
-  def parse(data: Array[Byte]): LagonakiTransaction = {
+  private[transaction] def parse(data: Array[Byte]): LagonakiTransaction = {
     require(data.length >= BASE_LENGTH, "Data does not match base length")
 
     var position = 0

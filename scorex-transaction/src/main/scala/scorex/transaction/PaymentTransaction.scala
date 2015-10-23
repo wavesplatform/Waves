@@ -19,7 +19,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   import scorex.transaction.PaymentTransaction._
   import scorex.transaction.LagonakiTransaction._
 
-  override lazy val dataLength = TypeLength + BASE_LENGTH
+  override lazy val dataLength = TypeLength + BaseLength
 
   override lazy val creator = Some(sender)
 
@@ -36,7 +36,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
 
-    val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FEE_LENGTH, 0)
+    val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FeeLength, 0)
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
       Base58.decode(recipient.address).get, amountBytes,
@@ -81,10 +81,10 @@ object PaymentTransaction {
 
   import scorex.transaction.LagonakiTransaction._
 
-  private val SENDER_LENGTH = 32
-  private val FEE_LENGTH = 8
-  private val SIGNATURE_LENGTH = 64
-  private val BASE_LENGTH = TimestampLength + SENDER_LENGTH + RecipientLength + AmountLength + FEE_LENGTH + SIGNATURE_LENGTH
+  private val SenderLength = 32
+  private val FeeLength = 8
+  private val SignatureLength = 64
+  private val BaseLength = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
   def apply(sender: PrivateKeyAccount, recipient: Account,
             amount: Long, fee: Long, timestamp: Long): PaymentTransaction = {
@@ -92,8 +92,8 @@ object PaymentTransaction {
     PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
   }
 
-  def parse(data: Array[Byte]) = {
-    require(data.length >= BASE_LENGTH, "Data does not match base length")
+  private[transaction] def parse(data: Array[Byte]) = {
+    require(data.length >= BaseLength, "Data does not match base length")
 
     var position = 0
 
@@ -103,9 +103,9 @@ object PaymentTransaction {
     position += TimestampLength
 
     //READ SENDER
-    val senderBytes = util.Arrays.copyOfRange(data, position, position + SENDER_LENGTH)
+    val senderBytes = util.Arrays.copyOfRange(data, position, position + SenderLength)
     val sender = new PublicKeyAccount(senderBytes)
-    position += SENDER_LENGTH
+    position += SenderLength
 
     //READ RECIPIENT
     val recipientBytes = util.Arrays.copyOfRange(data, position, position + RecipientLength)
@@ -118,12 +118,12 @@ object PaymentTransaction {
     position += AmountLength
 
     //READ FEE
-    val feeBytes = util.Arrays.copyOfRange(data, position, position + FEE_LENGTH)
+    val feeBytes = util.Arrays.copyOfRange(data, position, position + FeeLength)
     val fee = Longs.fromByteArray(feeBytes)
-    position += FEE_LENGTH
+    position += FeeLength
 
     //READ SIGNATURE
-    val signatureBytes = util.Arrays.copyOfRange(data, position, position + SIGNATURE_LENGTH)
+    val signatureBytes = util.Arrays.copyOfRange(data, position, position + SignatureLength)
 
     new PaymentTransaction(sender, recipient, amount, fee, timestamp, signatureBytes)
   }
@@ -145,7 +145,7 @@ object PaymentTransaction {
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
 
     //WRITE FEE
-    val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FEE_LENGTH, 0)
+    val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FeeLength, 0)
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
       Base58.decode(recipient.address).get, amountBytes, feeBytes)

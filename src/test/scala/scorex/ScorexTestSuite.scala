@@ -7,7 +7,7 @@ import scorex.unit._
 class ScorexTestSuite extends Suites(
   //unit tests
   new MessageSpecification
-  ,new TransactionSpecification
+  ,new props.TransactionSpecification
   ,new BlockSpecification
   ,new BlockchainStorageSpecification
   ,new WalletSpecification
