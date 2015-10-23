@@ -34,9 +34,11 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.parboiled" % "parboiled-core" % "1.1.7",
   "org.parboiled" % "parboiled-scala_2.11" % "1.1.7",
   "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.3",
+  "org.scala-sbt" % "test-interface" % "1.0",
   "org.scala-stm" % "scala-stm_2.11" % "0.7",
+  "org.scalacheck" % "scalacheck_2.11" % "1.12.5",
   "org.scalactic" % "scalactic_2.11" % "2.3.0-SNAP2",
   "org.scalatest" % "scalatest_2.11" % "2.3.0-SNAP2",
   "org.slf4j" % "slf4j-api" % "1.7.7"
 )
-// LIBRARY_DEPENDENCIES_HASH f83f7a3c795307cf9e9d5a359bd4c14c1b573b8a
+// LIBRARY_DEPENDENCIES_HASH 09ef2e57470a96823714ce5281fd80ed8d1850b6
