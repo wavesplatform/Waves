@@ -12,7 +12,7 @@ class Base58Specification extends PropSpec
   property("Base58 encoding then decoding preserves data") {
 
     forAll { data: Array[Byte] =>
-      whenever (data.size>0 && data.head!=0) {
+      whenever (data.length>0 && data.head!=0) {
         val encoded = Base58.encode(data)
         val restored = Base58.decode(encoded).get
         restored shouldBe data
