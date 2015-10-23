@@ -102,7 +102,7 @@ Some examples of CLI commands:
 API
 ---
 
-There's separate [API.md](API.md) file with API description
+There's separate [API.md](docs/API.md) file with API description
 
 
 Current Limitations
@@ -137,7 +137,7 @@ Readmes:
 
 Others:
 
-[API Description](API.md)
+[API Description](docs/API.md)
 
 
 
