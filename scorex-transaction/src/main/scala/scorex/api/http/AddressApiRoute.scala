@@ -140,7 +140,7 @@ case class AddressApiRoute(implicit wallet: Wallet, state: LagonakiState)
             }
           }
         }
-      } ~ path("address" / Segment) { case address => //todo: fix routing to that?
+      } ~ path("address" / Segment) { case address =>
         delete {
           complete {
             val jsRes = walletNotExists().getOrElse {
