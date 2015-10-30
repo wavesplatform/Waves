@@ -7,7 +7,7 @@ import play.libs.Json
 import scorex.app.LagonakiSettings
 
 import scala.io.StdIn
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 
 class ApiClient(settings: LagonakiSettings) {
@@ -44,8 +44,12 @@ class ApiClient(settings: LagonakiSettings) {
       val br = new BufferedReader(isReader)
       val result = br.readLine()
 
-      Try(Json.parse(result)).map(_.toString).getOrElse(result)
-    }.getOrElse("Invalid command! \n Type help to get a list of commands.")
+      Try(Json.parse(result)).map(_.toString)
+    }.flatten match {
+      case Success(result) => result
+      case Failure(e) =>
+        s"Problem occurred $e! \n Type help to get a list of commands."
+    }
   }
 }
 
