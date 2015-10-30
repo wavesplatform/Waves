@@ -1,26 +1,15 @@
 package scorex.api.http
 
 import play.api.libs.json.Json
-import scorex.crypto.Base58
 import scorex.transaction.state.LagonakiState
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import spray.routing.HttpService._
-
-import scala.util.Try
 
 
 case class TransactionsApiRoute(state:LagonakiState) extends ApiRoute with CommonApiFunctions {
   override lazy val route =
     pathPrefix("transactions") {
-      path("signature" / Segment) { case signature =>
-        get {
-          complete {
-            Try(Base58.decode(signature)).map { signatureBytes =>
-              ??? //todo: implement?
-            }.getOrElse(InvalidSignature.json).toString()
-          }
-        }
-      } ~ path("unconfirmed") {
+      path("unconfirmed") {
         get {
           complete {
             Json.arr(UnconfirmedTransactionsDatabaseImpl.all().map(_.json())).toString()
