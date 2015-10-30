@@ -155,32 +155,20 @@ case class AddressApiRoute(implicit wallet: Wallet, state: LagonakiState)
             jsRes.toString()
           }
         }
-      } /* todo: fix or remove ~ path("") {
-        post {
-          entity(as[String]) { seed =>
-            complete {
-              val jsRes = if (seed.isEmpty) {
-                walletNotExists().getOrElse {
-                  wallet.generateNewAccount() match {
-                    case Some(pka) => Json.obj("address" -> pka.address)
-                    case None => ApiError.toJson(ApiError.ERROR_UNKNOWN)
-                  }
-                }
-              } else {
-                walletNotExists().getOrElse {
-                  //DECODE SEED
-                  Try(Base58.decode(seed)).toOption.flatMap { seedBytes =>
-                    if (seedBytes != null && seedBytes.size == 32) {
-                      Some(Json.obj("address" -> wallet.importAccountSeed(seedBytes)))
-                    } else None
-                  }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_SEED))
+      } ~ path("create") {
+        get {
+          complete {
+            val jsRes =
+              walletNotExists().getOrElse {
+                wallet.generateNewAccount() match {
+                  case Some(pka) => Json.obj("address" -> pka.address)
+                  case None => Unknown.json
                 }
               }
-              Json.stringify(jsRes)
-            }
+            Json.stringify(jsRes)
           }
         }
-      } */
+      }
     }
 
   private def balanceJson(address: String, confirmations: Int) =
