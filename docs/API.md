@@ -5,7 +5,7 @@ or with the command line client (GET addresses/)
 
 *GET requests:*
 
-* addresses/ - get wallet addresses
+* addresses/ - get wallet accounts addresses
 
 * addresses/validate/{address} - check whether address {address} is valid or not
 
@@ -17,12 +17,19 @@ or with the command line client (GET addresses/)
 
 * addresses/generatingbalance/{address} - account's generating balance(the same as balance atm)
 
+* addresses/create - create a new account in the wallet(if it exists)
+  
+
 *POST requests:*
 
 * addresses/verify/{address} - check a signature of a message signed by an account. POST request 
 body is the JSON object containing following fields: 1. *"message"* - Base58-encoded message. 2. 
 *"signature"* - Base58-encoded signature.  3. *"publickey"* - Base58-encoded public key(corresponding to the 
 *address*).
+
+*DELETE requests:*
+
+* addresses/address/{address} - remove the account with address {address} from the wallet
 
 
 **blocks - info about blockchain & individual blocks within it**

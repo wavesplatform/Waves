@@ -115,7 +115,7 @@ case class AddressApiRoute(implicit wallet: Wallet, state: LagonakiState)
             }
           }
         }
-      } ~ path("sign" / Segment) { case address =>
+      } ~ path("sign" / Segment) { case address => //todo: check / document
         post {
           entity(as[String]) { message =>
             complete {
