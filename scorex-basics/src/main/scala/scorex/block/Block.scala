@@ -43,8 +43,8 @@ trait Block {
   val signerDataField: SignerDataBlockField
 
 
-  // Some block characteristic which is uniq e.g. hash or signature(if timestamp is included there).
-  // Used in referencing
+  // Some block characteristic which is uniq for a block
+  // e.g. hash or signature. Used in referencing
   val uniqueId: Block.BlockId
 
   lazy val transactions = transactionModule.transactions(this)
