@@ -1,3 +1,9 @@
+**1.1.1**
+---------
+* API call added: addresses/create
+* Less buggy blockchain synchronization logic
+
+
 **1.1.0**
 ----------
 
