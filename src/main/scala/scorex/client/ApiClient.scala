@@ -4,13 +4,13 @@ import java.io.{BufferedReader, InputStreamReader}
 import java.net.{HttpURLConnection, URL}
 
 import play.libs.Json
-import scorex.app.LagonakiApplication
+import scorex.app.LagonakiSettings
 
 import scala.io.StdIn
 import scala.util.Try
 
 
-class ApiClient(application: LagonakiApplication) {
+class ApiClient(settings: LagonakiSettings) {
 
   def executeCommand(command: String): String = {
     if (command.equals("help")) {
@@ -24,7 +24,7 @@ class ApiClient(application: LagonakiApplication) {
         command.substring((method + " " + path + " ").length())
       } else ""
 
-      val url = new URL("http://127.0.0.1:" + application.settings.rpcPort + "/" + path)
+      val url = new URL("http://127.0.0.1:" + settings.rpcPort + "/" + path)
       val connection = url.openConnection().asInstanceOf[HttpURLConnection]
       connection.setRequestMethod(method)
 
@@ -51,9 +51,9 @@ class ApiClient(application: LagonakiApplication) {
 
 object ApiClient {
   def main(args: Array[String]): Unit = {
-    val filename = if (args.length > 0) args(0) else "settings.json"
-    val application = new LagonakiApplication(filename)
-    val apiClient = new ApiClient(application)
+    val settingsFilename = args.headOption.getOrElse("settings.json")
+    val settings = new LagonakiSettings(settingsFilename)
+    val apiClient = new ApiClient(settings)
 
     println("Welcome to the Scorex command-line client...")
     Iterator.continually(StdIn.readLine()).takeWhile(!_.equals("quit")).foreach { command =>
