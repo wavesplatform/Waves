@@ -70,7 +70,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
   override def packUnconfirmed(): SimpleTransactionModule.StoredInBlock =
     UnconfirmedTransactionsDatabaseImpl.all()
 
-  //todo: clear unconfirmed txs on receiving a block
+  //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: SimpleTransactionModule.StoredInBlock): Unit = {
     data.foreach(tx => UnconfirmedTransactionsDatabaseImpl.getBySignature(tx.signature) match {
       case Some(unconfirmedTx) => UnconfirmedTransactionsDatabaseImpl.remove(unconfirmedTx)
