@@ -135,6 +135,6 @@ The idea of Network/Transaction/Consensus protocols was initially explicitly sta
 I would like to thank lead Nxt developer Jean-Luc Picard for conversations via dev maillist, and Bill White 
  for very thoughtful conversations.
                                                                                          
-Further Work
-------------
+Following Articles
+------------------
 * [On the Way to a Modular Cryptocurrency, Part 1: Generic Block Structure](modular1.md)                                                                                        
