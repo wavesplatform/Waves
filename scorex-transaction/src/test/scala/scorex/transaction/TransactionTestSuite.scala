@@ -1,6 +1,8 @@
 package scorex.transaction
 
 import org.scalatest.Suites
-import scorex.basics.props.TransactionSpecification
+import scorex.transaction.props.TransactionSpecification
 
-class TransactionTestSuite extends Suites(new TransactionSpecification)
+class TransactionTestSuite extends Suites(
+  new TransactionSpecification
+)
