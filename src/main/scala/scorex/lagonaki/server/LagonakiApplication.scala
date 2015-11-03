@@ -5,7 +5,7 @@ import akka.io.IO
 import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
-import scorex.lagonaki.api.http.{PaymentApiRoute, ScorexApiRoute, SeedApiRoute}
+import scorex.lagonaki.api.http.{PaymentApiRoute, ScorexApiRoute}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.NxtLikeConsensusModule

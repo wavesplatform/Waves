@@ -1,13 +1,11 @@
-package scorex.lagonaki.api.http
+package scorex.api.http
 
 import java.security.SecureRandom
 
 import play.api.libs.json.Json
-import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.crypto.Base58
 import spray.routing.HttpService._
 
-//todo: move to basics?
 case object SeedApiRoute extends ApiRoute with CommonApiFunctions {
 
   private def seed(length: Int): String = {
