@@ -1,4 +1,4 @@
-package scorex.basics.props
+package scorex.props
 
 import org.scalatest.{PropSpec, Matchers}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}

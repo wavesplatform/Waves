@@ -1,4 +1,4 @@
-package scorex.lagonaki.unit
+package scorex.unit
 
 import org.scalatest.{FunSuite, Matchers}
 
