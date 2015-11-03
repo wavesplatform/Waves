@@ -1,4 +1,4 @@
-package scorex.unit
+package scorex.lagonaki.unit
 
 import org.scalatest.{FunSuite, Matchers}
 import scorex.crypto.Base58

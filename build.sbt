@@ -71,6 +71,9 @@ publishTo := {
     Some("releases"  at nexus + "service/local/staging/deploy/maven2")
 }
 
+// testing settings
+testOptions in Test := Seq(Tests.Filter(_.matches(".*Suite$")))
+
 // dockerize
 enablePlugins(DockerPlugin)
 
