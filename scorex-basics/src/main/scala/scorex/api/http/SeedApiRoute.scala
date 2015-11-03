@@ -7,6 +7,7 @@ import scorex.crypto.Base58
 import spray.routing.HttpService._
 
 case object SeedApiRoute extends ApiRoute with CommonApiFunctions {
+  val SeedSize = 32
 
   private def seed(length: Int): String = {
     val seed = new Array[Byte](length)
@@ -16,7 +17,7 @@ case object SeedApiRoute extends ApiRoute with CommonApiFunctions {
 
   override lazy val route =
     path("seed"./) {
-      get(complete(seed(32)))
+      get(complete(seed(SeedSize)))
     } ~ path("seed" / IntNumber) { case length =>
       get(complete(seed(length)))
     }
