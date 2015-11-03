@@ -1,10 +1,10 @@
-package scorex.lagonaki.app.api.http
+package scorex.lagonaki.api.http
 
 import akka.pattern.ask
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.lagonaki.app.LagonakiApplication
-import scorex.lagonaki.app.settings.Constants
+import scorex.lagonaki.server.LagonakiApplication
+import scorex.lagonaki.server.settings.Constants
 import scorex.lagonaki.network.BlockchainSyncer
 import spray.routing.HttpService._
 

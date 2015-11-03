@@ -3,7 +3,7 @@ package scorex.lagonaki.unit
 import java.nio.ByteBuffer
 
 import org.scalatest.FunSuite
-import scorex.lagonaki.app.LagonakiSettings
+import scorex.lagonaki.server.LagonakiSettings
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.lagonaki.network.message._
 import scorex.transaction.SimpleTransactionModule

@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
-import scorex.lagonaki.app.LagonakiApplication
+import scorex.lagonaki.server.LagonakiApplication
 import scorex.lagonaki.network.NetworkController.UpdateBlockchainScore
 import scorex.lagonaki.network.message.{Message, _}
 import scorex.transaction.LagonakiTransaction.TransactionType

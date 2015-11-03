@@ -1,4 +1,4 @@
-package scorex.lagonaki.app
+package scorex.lagonaki.server
 
 import scorex.transaction.GenesisTransaction
 import scorex.utils.ScorexLogging

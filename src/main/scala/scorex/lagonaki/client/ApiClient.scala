@@ -4,7 +4,7 @@ import java.io.{BufferedReader, InputStreamReader}
 import java.net.{HttpURLConnection, URL}
 
 import play.libs.Json
-import scorex.lagonaki.app.LagonakiSettings
+import scorex.lagonaki.server.LagonakiSettings
 
 import scala.io.StdIn
 import scala.util.{Failure, Success, Try}

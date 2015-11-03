@@ -1,9 +1,9 @@
-package scorex.lagonaki.app.api.http
+package scorex.lagonaki.api.http
 
 import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.api.http._
-import scorex.lagonaki.app.LagonakiApplication
+import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import spray.routing.HttpService._
 

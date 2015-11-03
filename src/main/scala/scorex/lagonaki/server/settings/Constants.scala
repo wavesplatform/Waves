@@ -1,4 +1,4 @@
-package scorex.lagonaki.app.settings
+package scorex.lagonaki.server.settings
 
 import com.typesafe.config.ConfigFactory
 import scorex.consensus._

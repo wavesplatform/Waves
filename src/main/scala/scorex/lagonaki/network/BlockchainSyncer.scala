@@ -3,7 +3,7 @@ package scorex.lagonaki.network
 import java.net.InetSocketAddress
 
 import akka.actor.FSM
-import scorex.lagonaki.app.LagonakiApplication
+import scorex.lagonaki.server.LagonakiApplication
 import scorex.block.Block
 import scorex.lagonaki.network.BlockchainSyncer._
 import scorex.lagonaki.network.message.{BlockMessage, GetSignaturesMessage}

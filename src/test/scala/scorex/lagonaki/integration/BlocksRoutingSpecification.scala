@@ -2,7 +2,7 @@ package scorex.lagonaki.integration
 
 import play.api.libs.json.Json
 import scorex.api.http.BlocksApiRoute
-import scorex.lagonaki.app.LagonakiApplication
+import scorex.lagonaki.server.LagonakiApplication
 
 
 class BlocksRoutingSpecification extends RouteTest {

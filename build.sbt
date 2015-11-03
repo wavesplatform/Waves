@@ -66,7 +66,7 @@ assemblyJarName in assembly := "scorex.jar"
 
 test in assembly := {}
 
-mainClass in assembly := Some("scorex.app.Server")
+mainClass in assembly := Some("scorex.lagonaki.server.Server")
 
 
 //publishing settings

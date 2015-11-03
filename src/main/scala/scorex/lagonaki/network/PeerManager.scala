@@ -1,7 +1,7 @@
 package scorex.lagonaki.network
 
 import java.net.InetSocketAddress
-import scorex.lagonaki.app.LagonakiSettings
+import scorex.lagonaki.server.LagonakiSettings
 import scorex.transaction.state.database.PeerDatabaseImpl
 import scorex.utils.ScorexLogging
 

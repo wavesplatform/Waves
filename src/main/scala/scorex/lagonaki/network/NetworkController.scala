@@ -5,7 +5,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import scorex.lagonaki.app.LagonakiApplication
+import scorex.lagonaki.server.LagonakiApplication
 import scorex.lagonaki.network.BlockchainSyncer.GetMaxChainScore
 import scorex.lagonaki.network.message.{Message, _}
 import scorex.utils.ScorexLogging

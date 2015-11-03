@@ -1,11 +1,11 @@
-package scorex.lagonaki.app
+package scorex.lagonaki.server
 
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
-import scorex.lagonaki.app.api.http.{PaymentApiRoute, ScorexApiRoute, SeedApiRoute}
+import scorex.lagonaki.api.http.{PaymentApiRoute, ScorexApiRoute, SeedApiRoute}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.NxtLikeConsensusModule

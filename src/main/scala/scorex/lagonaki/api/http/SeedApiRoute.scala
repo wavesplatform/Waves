@@ -1,4 +1,4 @@
-package scorex.lagonaki.app.api.http
+package scorex.lagonaki.api.http
 
 import java.security.SecureRandom
 

@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import org.scalatest.FunSuite
 import scorex.lagonaki.TestingCommons
-import scorex.lagonaki.app.LagonakiApplication
+import scorex.lagonaki.server.LagonakiApplication
 import scorex.block.Block
 import scorex.lagonaki.network.message.{BlockMessage, Message}
 
