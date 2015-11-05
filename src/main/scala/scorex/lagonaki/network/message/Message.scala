@@ -15,8 +15,6 @@ abstract class Message {
 
   val messageType: Byte
 
-  //lazy val mhash = hash(bytes)
-
   val dataBytes: Array[Byte]
   lazy val dataLength: Int = dataBytes.length
 
@@ -38,8 +36,6 @@ object Message {
 
   val MagicLength = MAGIC.length
 
-  val TypeLength = 4
-  //val MessageLength = 4
   val ChecksumLength = 4
 
   val GetPeersType = 1: Byte
@@ -57,7 +53,7 @@ object Message {
     val magic = new Array[Byte](MagicLength)
     bytes.get(magic)
 
-    if (!magic.sameElements(Message.MAGIC)) throw new Exception("wrong magic")
+    assert (magic.sameElements(Message.MAGIC), "wrong magic")
 
     val msgType = bytes.get
 
