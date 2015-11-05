@@ -1,5 +1,7 @@
 **1.1.1**
 ---------
+
+* API call added: addresses/sign
 * API call added: addresses/create
 * API call added: DELETE to addresses/address/{address}
 * Less buggy blockchain synchronization logic

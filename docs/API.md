@@ -27,6 +27,9 @@ body is the JSON object containing following fields: 1. *"message"* - Base58-enc
 *"signature"* - Base58-encoded signature.  3. *"publickey"* - Base58-encoded public key(corresponding to the 
 *address*).
 
+* addresses/sign/{address} - sign a message with a private key associated with {address}. POST request 
+body is just message to sign as a plain string 
+
 *DELETE requests:*
 
 * addresses/address/{address} - remove the account with address {address} from the wallet
