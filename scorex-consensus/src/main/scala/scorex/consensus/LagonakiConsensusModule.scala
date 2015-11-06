@@ -2,6 +2,7 @@ package scorex.consensus
 
 import scorex.account.Account
 import scorex.block.Block
+
 /**
  * Data and functions related to a consensus algo
  */
