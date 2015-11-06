@@ -10,6 +10,7 @@ import scorex.transaction._
 import scorex.utils.NTP
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 
@@ -22,8 +23,9 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
   private val RETARGET = 10
   private val MIN_BALANCE = 1L
   private val MAX_BALANCE = 10000000000L
-  private val MIN_BLOCK_TIME = 1 * 60
-  private val MAX_BLOCK_TIME = 5 * 60
+
+  private val MIN_BLOCK_TIME = 1.minute.toSeconds
+  private val MAX_BLOCK_TIME = 5.minute.toSeconds
 
   implicit val consensusModule: ConsensusModule[QoraLikeConsensusBlockData] = this
 
