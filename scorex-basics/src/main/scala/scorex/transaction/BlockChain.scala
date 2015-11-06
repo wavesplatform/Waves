@@ -14,7 +14,7 @@ trait BlockChain extends History with ScorexLogging {
 
   def discardBlock(): BlockChain
 
-  def lastBlock: Block = blockAt(height())  .get
+  def lastBlock: Block = blockAt(height()).get
 
   def getSignatures(parentSignature: Block.BlockId, howMany: Int): Seq[Block.BlockId] =
     heightOf(parentSignature).map { h =>
