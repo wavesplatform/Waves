@@ -17,7 +17,9 @@ case class QoraConsensusApiRoute(consensusModule:QoraLikeConsensusModule,
 
   override val route: Route =
     pathPrefix("consensus") {
-      path("time") {
+      path("algo"){
+        get(complete(Json.obj("consensus-algo" -> "qora").toString()))
+      } ~ path("time") {
         get {
           complete {
             val block = blockchain.lastBlock

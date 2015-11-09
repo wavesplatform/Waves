@@ -3,7 +3,7 @@ package scorex.consensus.nxt.api.http
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.consensus.nxt.NxtLikeConsensusModule
-import scorex.transaction.{History, BlockChain}
+import scorex.transaction.{BlockChain, History}
 import spray.routing.HttpService._
 import spray.routing.Route
 
@@ -11,11 +11,13 @@ import spray.routing.Route
 class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule,
                            blockchain: BlockChain) extends ApiRoute with CommonApiFunctions {
 
-  private implicit val history:History = blockchain
+  private implicit val history: History = blockchain
 
   override val route: Route =
     pathPrefix("consensus") {
-      path("basetarget") {
+      path("algo") {
+        get(complete(Json.obj("consensus-algo" -> "qora").toString()))
+      } ~ path("basetarget") {
         get {
           complete {
             val lastBlock = blockchain.lastBlock
