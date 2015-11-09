@@ -91,7 +91,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
                        onMax: () => State = () => goto(Generating),
                        onNone: () => State = () =>
                          if (application.settings.offlineGeneration) goto(Generating).using(Unit) else goto(Offline)
-                       ): State = scoreOpt match {
+                     ): State = scoreOpt match {
     case Some(maxScore) =>
       val localScore = application.blockchainImpl.score()
       log.info(s"maxScore: $maxScore, localScore: $localScore")
@@ -120,10 +120,17 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
   }
 
   def tryToGenerateABlock() = {
+    val consModule = application.consensusModule
+    implicit val transModule = application.transactionModule
+
     log.info("Trying to generate a new block")
     val accounts = application.wallet.privateKeyAccounts()
-    application.consensusModule.generateNextBlocks(accounts)(application.transactionModule) onComplete {
-      case Success(blocks: Seq[Block]) => blocks.foreach { self ! NewBlock(_, None)}
+    consModule.generateNextBlocks(accounts)(transModule) onComplete {
+      case Success(blocks: Seq[Block]) =>
+        if (blocks.nonEmpty) {
+          val bestBlock = blocks.maxBy(consModule.blockScore)
+          self ! NewBlock(bestBlock, None)
+        }
       case Failure(ex) => log.error("Failed to generate new block: {}", ex)
       case m => log.error("Unexpected message: {}", m)
     }
