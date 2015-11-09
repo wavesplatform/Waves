@@ -11,6 +11,7 @@ import scorex.network.message.{BlockMessage, GetSignaturesMessage}
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 
 case class NewBlock(block: Block, sender: Option[InetSocketAddress])
@@ -121,24 +122,14 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
 
   def tryToGenerateABlock() = {
     log.info("Trying to generate a new block")
-    val appState = application.storedState
-    val nonEmptyAccs = application.wallet.privateKeyAccounts().filter(acc => appState.balance(acc.address) > 0)
-    nonEmptyAccs.find {
-      privKeyAcc =>
-        implicit val transactionModule = application.transactionModule
-
-        //As Proof-of-Stake is being used for Scorex Lagonaki, generateNextBlock() finishes quickly
-        //  (it should be, at least) so we're just going to wait for a result
-        Await.result(application.consensusModule.generateNextBlock(privKeyAcc), 500.millis) match {
-          case Some(block) =>
-            self ! NewBlock(block, None)
-            true
-          case None => false
-        }
+    val accounts = application.wallet.privateKeyAccounts()
+    application.consensusModule.generateNextBlocks(accounts)(application.transactionModule) onComplete {
+      case Success(blocks: Seq[Block]) => blocks.foreach { self ! NewBlock(_, None)}
+      case Failure(ex) => log.error("Failed to generate new block: {}", ex)
+      case m => log.error("Unexpected message: {}", m)
     }
   }
 }
-
 
 object BlockchainSyncer {
 
