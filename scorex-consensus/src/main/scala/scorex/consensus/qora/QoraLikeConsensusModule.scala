@@ -30,7 +30,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
   implicit val consensusModule: ConsensusModule[QoraLikeConsensusBlockData] = this
 
   //todo: asInstanceOf ?
-  private def consensusBlockData(block: Block): QoraLikeConsensusBlockData =
+  def consensusBlockData(block: Block): QoraLikeConsensusBlockData =
     block.consensusDataField.value.asInstanceOf[QoraLikeConsensusBlockData]
 
   def calculateSignature(prevBlock: Block, history: History, account: PrivateKeyAccount): Array[Byte] = {
@@ -85,6 +85,11 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
       val generatingBalance = (blockGeneratingBalance(block) * multiplier).toLong
       minMaxBalance(generatingBalance)
     } else blockGeneratingBalance(block)
+  }
+
+  def getNextBlockGeneratingBalance(history: History): Long = {
+    val lastBlock = history.asInstanceOf[BlockChain].lastBlock
+    getNextBlockGeneratingBalance(lastBlock,history)
   }
 
   override def generators(block: Block): Seq[Account] = Seq(block.signerDataField.value.generator)
