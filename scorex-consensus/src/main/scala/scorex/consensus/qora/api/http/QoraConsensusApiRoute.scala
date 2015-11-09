@@ -10,8 +10,8 @@ import spray.routing.Route
 import scala.util.Try
 
 
-case class ConsensusApiRoute(consensusModule:QoraLikeConsensusModule,
-                             blockchain:BlockChain) extends ApiRoute with CommonApiFunctions {
+case class QoraConsensusApiRoute(consensusModule:QoraLikeConsensusModule,
+                                 blockchain:BlockChain) extends ApiRoute with CommonApiFunctions {
 
   implicit val history:History = blockchain
 
