@@ -3,14 +3,17 @@ package scorex.consensus.nxt
 import com.google.common.primitives.Longs
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
+import scorex.consensus.qora.QoraLikeConsensusBlockData
 import scorex.consensus.{ConsensusModule, LagonakiConsensusModule}
 import scorex.crypto.Sha256._
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 
-import scala.concurrent.Future
-import scala.util.{Failure, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util.{Failure, Try}
+
 
 class NxtLikeConsensusModule
   extends LagonakiConsensusModule[NxtLikeConsensusBlockData] with ScorexLogging {
@@ -19,12 +22,11 @@ class NxtLikeConsensusModule
 
   implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = this
 
-  val AvgFrequency = 2
+  val AvgDelay = 2.seconds.toSeconds
 
-  //60 - the algo's goal is 1 block per minute in average
   val version = 1: Byte
 
-  def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
+  override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
 
     val history = transactionModule.history
 
@@ -105,7 +107,7 @@ class NxtLikeConsensusModule
                              currentTime: Long): Long = {
     val eta = (currentTime - lastBlockTimestamp) / 1000 //in seconds
     val prevBt = BigInt(lastBlockData.baseTarget)
-    val t0 = bounded(prevBt * eta / AvgFrequency, prevBt / 2, prevBt * 2)
+    val t0 = bounded(prevBt * eta / AvgDelay, prevBt / 2, prevBt * 2)
     bounded(t0, 1, Long.MaxValue).toLong
   }
 
@@ -139,8 +141,12 @@ class NxtLikeConsensusModule
       override val generationSignature: Array[Byte] = Array.fill(32)(0: Byte)
     })
 
-  def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] =
+  override def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] =
     NxtConsensusBlockField(data)
+
+  //todo: asInstanceOf ?
+  override def consensusBlockData(block: Block): NxtLikeConsensusBlockData =
+    block.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData]
 }
 
 

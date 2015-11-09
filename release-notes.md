@@ -1,3 +1,14 @@
+**1.1.2**
+---------
+
+* API call added: consensus/algo
+
+* API calls added for Qora-like consensus algo: consensus/time, consensus/time/{generatingBalance}, 
+ consensus/generatingbalance, consensus/generatingbalance/{blockId}
+
+* API calls added for Nxt-like consensus algo: consensus/basetarget, consensus/basetarget/{blockId},
+  consensus/generationsignature, consensus/generationsignature/{blockId}
+
 **1.1.1**
 ---------
 

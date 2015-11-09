@@ -9,7 +9,7 @@ import scorex.utils.ScorexLogging
 import scala.util.Try
 
 /**
- * Changeable settings here
+ * Settings
  */
 
 trait Settings extends ScorexLogging {

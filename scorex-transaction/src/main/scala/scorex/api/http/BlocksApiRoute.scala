@@ -56,39 +56,5 @@ case class BlocksApiRoute(implicit blockchain: BlockChain, wallet: Wallet)
           }.toString())
         }
       }
-
-      /* todo: consider how to obtain consensus-specific data via API, commented out for now
-      ~ path("time") {
-        get {
-          complete {
-            val block = StoredBlockchain.lastBlock
-            val timePerBlock = QoraBlockGenerationFunctions.getBlockTime(block.generationData.generatingBalance)
-            Json.obj("time" -> timePerBlock).toString()
-          }
-        }
-      } ~ path("time" / Segment) { case generatingBalance =>
-        get {
-          complete {
-            val jsRes = Try {
-              val timePerBlock = QoraBlockGenerationFunctions.getBlockTime(generatingBalance.toLong)
-              Json.obj("time" -> timePerBlock)
-            }.getOrElse(ApiError.toJson(ApiError.ERROR_INVALID_NOT_NUMBER))
-            jsRes.toString()
-          }
-        }
-      } ~ path("generatingbalance") {
-        get {
-          complete {
-            val generatingBalance = LagonakiApplication.nextBlockGeneratingBalance()
-            Json.obj("generatingbalance" -> generatingBalance).toString()
-          }
-        }
-      } ~ path("generatingbalance" / Segment) { case encodedSignature =>
-        get {
-          complete(withBlock(encodedSignature) { block =>
-            Json.obj("generatingbalance" -> block.generationData.generatingBalance)
-          }.toString())
-        }
-      } */
     }
 }
