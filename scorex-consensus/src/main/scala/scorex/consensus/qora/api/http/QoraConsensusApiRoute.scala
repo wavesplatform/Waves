@@ -13,7 +13,7 @@ import scala.util.Try
 case class QoraConsensusApiRoute(consensusModule:QoraLikeConsensusModule,
                                  blockchain:BlockChain) extends ApiRoute with CommonApiFunctions {
 
-  implicit val history:History = blockchain
+  private implicit val history:History = blockchain
 
   override val route: Route =
     pathPrefix("consensus") {

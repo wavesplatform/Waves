@@ -52,8 +52,8 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
   val consensusApiRoute = consensusModule match {
-    case _: NxtLikeConsensusModule =>
-      new NxtConsensusApiRoute
+    case ncm: NxtLikeConsensusModule =>
+      new NxtConsensusApiRoute(ncm, blockchainImpl)
     case qcm: QoraLikeConsensusModule =>
       new QoraConsensusApiRoute(qcm, blockchainImpl)
   }
