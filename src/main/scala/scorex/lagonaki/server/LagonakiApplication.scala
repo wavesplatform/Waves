@@ -24,9 +24,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   private val appConf = ConfigFactory.load().getConfig("app")
+
   implicit val consensusModule: ConsensusModule[_] = appConf.getString("consensusAlgo") match {
-    case "NxtLikeConsensusModule" => new NxtLikeConsensusModule
-    case "QoraLikeConsensusModule" => new QoraLikeConsensusModule
+    case s:String if s.equalsIgnoreCase("nxt") => new NxtLikeConsensusModule
+    case s:String if s.equalsIgnoreCase("qora") => new QoraLikeConsensusModule
     case algo =>
       log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
       new NxtLikeConsensusModule
