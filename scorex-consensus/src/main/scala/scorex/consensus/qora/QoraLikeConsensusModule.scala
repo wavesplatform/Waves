@@ -20,12 +20,12 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
 
   val GeneratingBalanceLength = 8
 
-  private val RETARGET = 10
-  private val MIN_BALANCE = 1L
-  private val MAX_BALANCE = 10000000000L
+  private val ReTarget = 10
+  private val MinBalance = 1L
+  private val MaxBalance = 10000000000L
 
-  private val MIN_BLOCK_TIME = 1.minute.toSeconds
-  private val MAX_BLOCK_TIME = 5.minute.toSeconds
+  private val MinBlockTime = 1.minute.toSeconds
+  private val MaxBlockTime = 5.minute.toSeconds
 
   implicit val consensusModule: ConsensusModule[QoraLikeConsensusBlockData] = this
 
@@ -107,21 +107,21 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
   def getBaseTarget(generatingBalance: Long): BigInt = BigInt(minMaxBalance(generatingBalance)) * getBlockTime(generatingBalance)
 
   def getBlockTime(generatingBalance: Long): Long = {
-    val percentageOfTotal = minMaxBalance(generatingBalance) / MAX_BALANCE.toDouble
-    (MIN_BLOCK_TIME + ((MAX_BLOCK_TIME - MIN_BLOCK_TIME) * (1 - percentageOfTotal))).toLong
+    val percentageOfTotal = minMaxBalance(generatingBalance) / MaxBalance.toDouble
+    (MinBlockTime + ((MaxBlockTime - MinBlockTime) * (1 - percentageOfTotal))).toLong
   }
 
   private def minMaxBalance(generatingBalance: Long) =
-    if (generatingBalance < MIN_BALANCE) MIN_BALANCE
-    else if (generatingBalance > MAX_BALANCE) MAX_BALANCE
+    if (generatingBalance < MinBalance) MinBalance
+    else if (generatingBalance > MaxBalance) MaxBalance
     else generatingBalance
 
   private def blockGeneratingBalance(block: Block) = consensusBlockData(block).generatingBalance
 
   def getNextBlockGeneratingBalance(block: Block, history: History): Long = {
-    if (history.heightOf(block).get % RETARGET == 0) {
+    if (history.heightOf(block).get % ReTarget == 0) {
       //GET FIRST BLOCK OF TARGET
-      val firstBlock = (1 to RETARGET - 1).foldLeft(block) { case (bl, _) =>
+      val firstBlock = (1 to ReTarget - 1).foldLeft(block) { case (bl, _) =>
         history.parent(bl).get
       }
 
@@ -129,7 +129,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
       val generatingTime = block.timestampField.value - firstBlock.timestampField.value
 
       //CALCULATE EXPECTED FORGING TIME
-      val expectedGeneratingTime = getBlockTime(blockGeneratingBalance(block)) * RETARGET * 1000
+      val expectedGeneratingTime = getBlockTime(blockGeneratingBalance(block)) * ReTarget * 1000
 
       //CALCULATE MULTIPLIER
       val multiplier = expectedGeneratingTime / generatingTime.toDouble
