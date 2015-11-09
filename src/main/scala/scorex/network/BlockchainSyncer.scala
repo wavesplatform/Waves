@@ -115,7 +115,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status
 
       //broadcast block only if it is generated locally
       if (remoteOpt.isEmpty) {
-        networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block), List())
+        networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block))
       }
     } else {
       log.warning(s"Non-valid block: $block from $fromStr")
