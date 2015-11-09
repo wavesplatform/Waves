@@ -71,3 +71,9 @@ case object InvalidMessage extends ApiError {
   override val id = 110
   override val message = "invalid message"
 }
+
+//BLOCKS
+case object BlockNotExists extends ApiError {
+  override val id: Int = 301
+  override val message: String = "block does not exist"
+}
