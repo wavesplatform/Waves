@@ -21,33 +21,7 @@ case class WalletApiRoute(implicit wallet: Wallet) extends ApiRoute with CommonT
             walletNotExists().getOrElse(seedJs).toString()
           }
         }
-      } /* todo: fix or remove ~ path("create") {
-        post {
-          entity(as[String]) { body => complete {
-            Try {
-              walletExists().getOrElse {
-                val js = Json.parse(body)
-                val recover = (js \ "recover").as[Boolean]
-                val seed = (js \ "seed").as[String]
-                val password = (js \ "password").as[String]
-                val amount = (js \ "amount").as[Int]
-
-                Try(Base58.decode(seed)) match {
-                  case Success(seedBytes) if seedBytes.length == 32 =>
-                    if (amount < 1) ApiError.toJson(ApiError.ERROR_INVALID_AMOUNT)
-                    else {
-                      val res = if (recover) wallet.create(seedBytes, password, amount)
-                      else wallet.create(seedBytes, password, amount)
-                      Json.obj("success" -> res)
-                    }
-                  case _ => ApiError.toJson(ApiError.ERROR_INVALID_SEED)
-                }
-              }
-            }.getOrElse(ApiError.toJson(ApiError.ERROR_JSON)).toString()
-          }
-          }
-        }
-      } */
+      }
     }
   }
 }

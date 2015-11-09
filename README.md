@@ -131,6 +131,8 @@ Articles:
 
 [On the Way to a Modular Cryptocurrency, Part 2: Stackable API](docs/modular2.md)
 
+[On Private Blockchains, Technically](docs/private-chains.md)
+
 Readmes:
 
 [Scorex-Basics Sub-Module](scorex-basics/README.md)

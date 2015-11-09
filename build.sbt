@@ -12,21 +12,33 @@ def subModule(id: String): Project = Project(id = id, base = file(s"scorex-$id")
 
 lazy val basics = subModule("basics")
   .settings(commonSettings: _*)
+  .settings(
+    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
+  )
 
 lazy val transaction = subModule("transaction")
   .aggregate(basics)
   .dependsOn(basics)
   .settings(commonSettings: _*)
+  .settings(
+    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
+  )
 
 lazy val consensus = subModule("consensus")
   .aggregate(basics)
   .dependsOn(basics)
   .settings(commonSettings: _*)
+  .settings(
+    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
+  )
 
 lazy val root = Project(id = "scorex", base = file("."))
   .aggregate(basics, transaction, consensus)
   .dependsOn(basics, transaction, consensus)
   .settings(commonSettings: _*)
+  .settings(
+    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
+  )
 
 name := appConf.getString("product")
 
@@ -54,7 +66,7 @@ assemblyJarName in assembly := "scorex.jar"
 
 test in assembly := {}
 
-mainClass in assembly := Some("scorex.app.Server")
+mainClass in assembly := Some("scorex.lagonaki.server.Server")
 
 
 //publishing settings
@@ -70,6 +82,7 @@ publishTo := {
   else
     Some("releases"  at nexus + "service/local/staging/deploy/maven2")
 }
+
 
 // dockerize
 enablePlugins(DockerPlugin)

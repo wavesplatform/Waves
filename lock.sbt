@@ -31,7 +31,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "net.vrallev.ecc" % "ecc-25519-java" % "1.0.1",
   "org.joda" % "joda-convert" % "1.7",
   "org.jvnet.mimepull" % "mimepull" % "1.9.5",
-  "org.mapdb" % "mapdb" % "2.0-beta8",
+  "org.mapdb" % "mapdb" % "2.0-beta10",
   "org.parboiled" % "parboiled-core" % "1.1.7",
   "org.parboiled" % "parboiled-scala_2.11" % "1.1.7",
   "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.3",
