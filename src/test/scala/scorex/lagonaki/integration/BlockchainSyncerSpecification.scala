@@ -5,7 +5,7 @@ import akka.testkit._
 import org.scalatest.{Matchers, WordSpecLike}
 import scorex.lagonaki.network.BlockchainSyncer.{Generating, GetStatus, Offline}
 import scorex.lagonaki.server.LagonakiApplication
-
+import scorex.utils.retry
 
 class BlockchainSyncerSpecification(_system: ActorSystem)
   extends TestKit(_system)
@@ -26,9 +26,11 @@ class BlockchainSyncerSpecification(_system: ActorSystem)
     }
     "generate after downloading state" in {
       bcs ! Unit
-      Thread.sleep(1000)
-      bcs ! GetStatus
-      expectMsg(Generating.name)
+      //Wait up to 5 seconds to download blockchain and become generating
+      retry(5000) {
+        bcs ! GetStatus
+        expectMsg(Generating.name)
+      }
     }
   }
 
