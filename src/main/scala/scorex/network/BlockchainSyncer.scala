@@ -33,7 +33,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status
 
     case Event(Unit, _) =>
       log.info("Initializing")
-      stay
+      stay()
   }
 
   when(Syncing) {
@@ -45,7 +45,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status
           val sigs = application.blockchainImpl.lastSignatures(application.settings.MaxBlocksChunks)
           val msg = GetSignaturesMessage(sigs)
           networkController ! NetworkController.SendMessageToBestPeer(msg)
-          stay
+          stay()
         } else goto(Generating)
 
       case None =>
@@ -55,13 +55,13 @@ case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status
     case Event(NewBlock(block, remoteOpt), _) =>
       assert(remoteOpt.isDefined, "Local generation attempt while syncing")
       processNewBlock(block, remoteOpt)
-      stay
+      stay()
   }
 
   when(Generating) {
     case Event(NewBlock(block, remoteOpt), _) =>
       processNewBlock(block, remoteOpt)
-      stay
+      stay()
 
     case Event(MaxChainScore(scoreOpt), _) => scoreOpt match {
       case Some(maxScore) =>
@@ -70,12 +70,12 @@ case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status
         if (maxScore > localScore) goto(Syncing)
         else {
           tryToGenerateABlock()
-          stay
+          stay()
         }
 
       case None =>
         tryToGenerateABlock()
-        stay
+        stay()
     }
   }
 
@@ -93,11 +93,11 @@ case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status
 
     case Event(GetStatus, _) =>
       sender() ! super.stateName.name
-      stay
+      stay()
 
     case Event(e, s) =>
       log.warning(s"received unhandled request {$e} in state {$stateName}/{$s}")
-      stay
+      stay()
   }
 
   initialize()
