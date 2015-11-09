@@ -3,6 +3,7 @@ package scorex.consensus.nxt.api.http
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.consensus.nxt.NxtLikeConsensusModule
+import scorex.crypto.Base58
 import scorex.transaction.{BlockChain, History}
 import spray.routing.HttpService._
 import spray.routing.Route
@@ -37,15 +38,16 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule,
         get {
           complete {
             val lastBlock = blockchain.lastBlock
-            val bt = consensusModule.consensusBlockData(lastBlock).generationSignature
-            Json.obj("generation-signature" -> bt).toString()
+            val gs = consensusModule.consensusBlockData(lastBlock).generationSignature
+            Json.obj("generation-signature" -> Base58.encode(gs)).toString()
           }
         }
       } ~ path("generationsignature" / Segment) { case encodedSignature =>
         get {
           complete(withBlock(encodedSignature) { block =>
+            val gs = consensusModule.consensusBlockData(block).generationSignature
             Json.obj(
-              "generation-signature" -> consensusModule.consensusBlockData(block).generationSignature
+              "generation-signature" -> Base58.encode(gs)
             )
           }.toString())
         }
