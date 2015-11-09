@@ -64,7 +64,7 @@ case class SignerDataBlockField(override val name: String, override val value: S
   extends BlockField[SignerData] {
 
   override lazy val json: JsObject = Json.obj("generator" -> value.generator.toString,
-    "signature" -> value.signature)
+    "signature" -> Base58.encode(value.signature))
 
   override lazy val bytes: Array[Byte] = value.generator.publicKey ++ value.signature
 }

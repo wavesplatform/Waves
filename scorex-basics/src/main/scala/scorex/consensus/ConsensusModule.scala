@@ -35,4 +35,6 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
                            (implicit transactionModule: TransactionModule[T]): Future[Seq[Block]] = {
     Future.sequence(accounts.map(acc => generateNextBlock(acc))).map(_.flatten)
   }
+
+  def consensusBlockData(block: Block): ConsensusBlockData
 }
