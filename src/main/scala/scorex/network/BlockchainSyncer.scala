@@ -33,20 +33,16 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
   }
 
   when(Syncing) {
-    case Event(MaxChainScore(scoreOpt), _) => scoreOpt match {
-      case Some(maxScore) =>
-        val localScore = application.blockchainImpl.score()
-        log.info(s"maxScore: $maxScore, localScore: $localScore")
-        if (maxScore > localScore) {
+    case Event(MaxChainScore(scoreOpt), _) =>
+      processMaxScore(
+        scoreOpt,
+        onLocal = () => {
           val sigs = application.blockchainImpl.lastSignatures(application.settings.MaxBlocksChunks)
           val msg = GetSignaturesMessage(sigs)
           networkController ! NetworkController.SendMessageToBestPeer(msg)
           stay()
-        } else goto(Generating)
-
-      case None =>
-        if (application.settings.offlineGeneration) goto(Generating).using(Unit) else goto(Offline)
-    }
+        }
+      )
 
     case Event(NewBlock(block, remoteOpt), _) =>
       assert(remoteOpt.isDefined, "Local generation attempt while syncing")
@@ -59,33 +55,24 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
       processNewBlock(block, remoteOpt)
       stay()
 
-    case Event(MaxChainScore(scoreOpt), _) => scoreOpt match {
-      case Some(maxScore) =>
-        val localScore = application.blockchainImpl.score()
-        log.info(s"maxScore: $maxScore, localScore: $localScore")
-        if (maxScore > localScore) goto(Syncing)
-        else {
+    case Event(MaxChainScore(scoreOpt), _) =>
+      processMaxScore(
+        scoreOpt,
+        onNone = () => {
+          tryToGenerateABlock()
+          stay()
+        },
+        onMax = () => {
           tryToGenerateABlock()
           stay()
         }
-
-      case None =>
-        tryToGenerateABlock()
-        stay()
-    }
+      )
   }
 
   //common logic for all the states
   whenUnhandled {
-    case Event(MaxChainScore(scoreOpt), _) => scoreOpt match {
-      case Some(maxScore) =>
-        val localScore = application.blockchainImpl.score()
-        log.info(s"maxScore: $maxScore, localScore: $localScore")
-        if (maxScore > localScore) goto(Syncing) else goto(Generating)
-
-      case None =>
-        if (application.settings.offlineGeneration) goto(Generating).using(Unit) else goto(Offline)
-    }
+    case Event(MaxChainScore(scoreOpt), _) =>
+      processMaxScore(scoreOpt)
 
     case Event(GetStatus, _) =>
       sender() ! super.stateName.name
@@ -98,6 +85,20 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
 
   initialize()
 
+  def processMaxScore(
+                       scoreOpt: Option[BigInt],
+                       onLocal: () => State = () => goto(Syncing),
+                       onMax: () => State = () => goto(Generating),
+                       onNone: () => State = () =>
+                         if (application.settings.offlineGeneration) goto(Generating).using(Unit) else goto(Offline)
+                       ): State = scoreOpt match {
+    case Some(maxScore) =>
+      val localScore = application.blockchainImpl.score()
+      log.info(s"maxScore: $maxScore, localScore: $localScore")
+      if (localScore > maxScore) onLocal() else onMax()
+    case None =>
+      onNone()
+  }
 
   def processNewBlock(block: Block, remoteOpt: Option[InetSocketAddress]) = {
     val fromStr = remoteOpt.map(_.toString).getOrElse("local")
