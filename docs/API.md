@@ -105,5 +105,36 @@ POST payment {"amount":400, "fee":1, "sender":"2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPN
  
 *GET requests:* 
 
-* wallet/ - prints whether wallet exists or not
+* wallet/ - display whether wallet exists or not
 * wallet/seed - export wallet seed
+
+
+
+**consensus - consensus-related calls**
+
+*GET requests:*
+
+* consensus/algo - shows which consensus algo being using, Nxt-like or Qora-like 
+
+
+
+**If Qora-like algo being using**
+
+* consensus/time - estimated time before next block
+
+* consensus/time/{generatingBalance} - estimated time before next block with given generating balance
+
+* consensus/generatingbalance - generating balance of a next block
+
+* consensus/generatingbalance/{blockId} - generating balance of a block with given id
+
+
+**If Nxt-like algo being using**
+
+* consensus/basetarget - base target of a last block  
+
+* consensus/basetarget/{blockId} - base target of a block with specified id
+
+* consensus/generationsignature - generation signature of a last block
+
+* consensus/generationsignature/{blockId} - generation signature of a block with specified id

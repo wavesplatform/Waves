@@ -1,14 +1,14 @@
 package scorex.transaction
 
-import scorex.block.{BlockProcessingModule, Block}
+import scorex.block.{Block, BlockProcessingModule}
 
-trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[TransactionBlockData]{
+trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[TransactionBlockData] {
 
   val state: State
 
   val history: History
 
-  def isValid(block: Block):Boolean
+  def isValid(block: Block): Boolean
 
   def transactions(block: Block): Seq[Transaction]
 

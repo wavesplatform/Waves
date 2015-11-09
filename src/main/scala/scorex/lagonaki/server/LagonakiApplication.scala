@@ -5,6 +5,8 @@ import akka.io.IO
 import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
+import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
+import scorex.consensus.qora.api.http.QoraConsensusApiRoute
 import scorex.lagonaki.api.http.{PaymentApiRoute, ScorexApiRoute}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
@@ -24,9 +26,13 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   private val appConf = ConfigFactory.load().getConfig("app")
-  implicit val consensusModule: ConsensusModule[_] = appConf.getString("consensusAlgo") match {
-    case "NxtLikeConsensusModule" => new NxtLikeConsensusModule
-    case "QoraLikeConsensusModule" => new QoraLikeConsensusModule
+
+  implicit val consensusModule: ConsensusModule[_] =
+    appConf.getString("consensusAlgo") match {
+    case s:String if s.equalsIgnoreCase("nxt") =>
+      new NxtLikeConsensusModule
+    case s:String if s.equalsIgnoreCase("qora") =>
+      new QoraLikeConsensusModule
     case algo =>
       log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
       new NxtLikeConsensusModule
@@ -45,10 +51,18 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
+  val consensusApiRoute = consensusModule match {
+    case ncm: NxtLikeConsensusModule =>
+      new NxtConsensusApiRoute(ncm, blockchainImpl)
+    case qcm: QoraLikeConsensusModule =>
+      new QoraConsensusApiRoute(qcm, blockchainImpl)
+  }
+
   lazy val routes = Seq(
     AddressApiRoute()(wallet, storedState),
     BlocksApiRoute()(blockchainImpl, wallet),
     TransactionsApiRoute(storedState),
+    consensusApiRoute,
     WalletApiRoute()(wallet),
     PaymentApiRoute(this),
     PaymentApiRoute(this),
