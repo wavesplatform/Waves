@@ -1,23 +1,23 @@
 package scorex.consensus.qora.api.http
 
 import play.api.libs.json.Json
-import scorex.api.http.{CommonApiFunctions, InvalidNotNumber, ApiRoute}
+import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidNotNumber}
 import scorex.consensus.qora.QoraLikeConsensusModule
-import scorex.transaction.{History, BlockChain}
+import scorex.transaction.{BlockChain, History}
 import spray.routing.HttpService._
 import spray.routing.Route
 
 import scala.util.Try
 
 
-case class QoraConsensusApiRoute(consensusModule:QoraLikeConsensusModule,
-                                 blockchain:BlockChain) extends ApiRoute with CommonApiFunctions {
+case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule,
+                                 blockchain: BlockChain) extends ApiRoute with CommonApiFunctions {
 
-  private implicit val history:History = blockchain
+  private implicit val history: History = blockchain
 
   override val route: Route =
     pathPrefix("consensus") {
-      path("algo"){
+      path("algo") {
         get(complete(Json.obj("consensus-algo" -> "qora").toString()))
       } ~ path("time") {
         get {
