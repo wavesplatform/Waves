@@ -29,4 +29,6 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
 
   def generateNextBlock[TT](account: PrivateKeyAccount)
                            (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]]
+
+  def consensusBlockData(block: Block): ConsensusBlockData
 }

@@ -3,6 +3,7 @@ package scorex.consensus.nxt
 import com.google.common.primitives.Longs
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
+import scorex.consensus.qora.QoraLikeConsensusBlockData
 import scorex.consensus.{ConsensusModule, LagonakiConsensusModule}
 import scorex.crypto.Sha256._
 import scorex.transaction._
@@ -25,7 +26,7 @@ class NxtLikeConsensusModule
 
   val version = 1: Byte
 
-  def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
+  override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
 
     val history = transactionModule.history
 
@@ -140,8 +141,12 @@ class NxtLikeConsensusModule
       override val generationSignature: Array[Byte] = Array.fill(32)(0: Byte)
     })
 
-  def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] =
+  override def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] =
     NxtConsensusBlockField(data)
+
+  //todo: asInstanceOf ?
+  override def consensusBlockData(block: Block): NxtLikeConsensusBlockData =
+    block.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData]
 }
 
 

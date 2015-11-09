@@ -29,10 +29,6 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
 
   implicit val consensusModule: ConsensusModule[QoraLikeConsensusBlockData] = this
 
-  //todo: asInstanceOf ?
-  def consensusBlockData(block: Block): QoraLikeConsensusBlockData =
-    block.consensusDataField.value.asInstanceOf[QoraLikeConsensusBlockData]
-
   def calculateSignature(prevBlock: Block, history: History, account: PrivateKeyAccount): Array[Byte] = {
     val gb = getNextBlockGeneratingBalance(prevBlock, history)
     val ref = consensusBlockData(prevBlock).generatorSignature
@@ -187,6 +183,10 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     QoraConsensusBlockField(data)
 
   override def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = BigInt(1)
+
+  //todo: asInstanceOf ?
+  override def consensusBlockData(block: Block): QoraLikeConsensusBlockData =
+    block.consensusDataField.value.asInstanceOf[QoraLikeConsensusBlockData]
 }
 
 
