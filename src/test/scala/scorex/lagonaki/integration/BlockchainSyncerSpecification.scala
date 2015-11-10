@@ -17,7 +17,6 @@ class BlockchainSyncerSpecification(_system: ActorSystem)
   def this() = this(ActorSystem("MySpec"))
 
   val application = new LagonakiApplication("settings-test.json")
-  application.checkGenesis()
   val bcs = application.blockchainSyncer
 
   "BlockchainSyncer actor" must {
