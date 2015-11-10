@@ -18,7 +18,7 @@ trait SwaggerService {
     override def baseUrl = "/" // let swagger-ui determine the host and port
     override def docsPath = "api-docs"
     override def actorRefFactory = context
-    override def apiInfo = Some(new ApiInfo("Spray-Swagger Sample", "A sample petstore service using spray and spray-swagger.", "TOC Url", "Michael Hamrah @mhamrah", "Apache V2", "http://www.apache.org/licenses/LICENSE-2.0"))
+    override def apiInfo = Some(new ApiInfo("Scorex API", "Swagger service to describe scorex API/", "TOC Url", "Alexander Chepurnoy @kushti", "Apache V2", "http://www.apache.org/licenses/LICENSE-2.0"))
 
     //authorizations, not used
   }
