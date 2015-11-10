@@ -1,17 +1,11 @@
 package scorex.api.http
 
-import java.net.InetSocketAddress
-
-import akka.actor.{ActorRefFactory, ActorRef}
-import akka.pattern.ask
-import com.wordnik.swagger.model.ApiInfo
+import akka.actor.ActorRefFactory
 import com.gettyimages.spray.swagger.SwaggerHttpService
-import play.api.libs.json.Json
+import com.wordnik.swagger.model.ApiInfo
 import spray.routing.HttpService._
-import scala.reflect.runtime.universe.Type
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success}
+import scala.reflect.runtime.universe.Type
 
 trait SwaggerService {
 
