@@ -1,21 +1,22 @@
 package scorex.lagonaki
 
 import org.scalatest.{BeforeAndAfterAll, Suites}
-import scorex.lagonaki.integration.{BlocksRoutingSpecification, ValidChainGenerationSpecification}
+import scorex.lagonaki.integration.{BlockchainSyncerSpecification, BlocksRoutingSpecification, ValidChainGenerationSpecification}
 import scorex.lagonaki.unit._
 
 class LagonakiTestSuite extends Suites(
   //unit tests
   new MessageSpecification
-  ,new BlockSpecification
-  ,new BlockchainStorageSpecification
-  ,new WalletSpecification
-  ,new BlocksRoutingSpecification
+  , new BlockSpecification
+  , new BlockchainStorageSpecification
+  , new WalletSpecification
+  , new BlockchainSyncerSpecification
+  , new BlocksRoutingSpecification
 
   //integration tests - slow!
-  ,new ValidChainGenerationSpecification
+  , new ValidChainGenerationSpecification
 
-)  with BeforeAndAfterAll {
+) with BeforeAndAfterAll {
 
   override def beforeAll() = {}
 
