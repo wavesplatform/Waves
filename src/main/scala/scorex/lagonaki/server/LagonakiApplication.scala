@@ -8,7 +8,7 @@ import scorex.api.http._
 import scorex.app.Application
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
-import scorex.lagonaki.api.http.{PaymentApiRoute, ScorexApiRoute}
+import scorex.lagonaki.api.http.{PeersHttpService, PaymentApiRoute, ScorexApiRoute}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.qora.QoraLikeConsensusModule
@@ -63,16 +63,17 @@ class LagonakiApplication(val settingsFilename: String)
   }
 
   override lazy val apiRoutes = Seq(
-    AddressApiRoute()(wallet, storedState),
-    BlocksApiRoute()(blockchainImpl, wallet),
+    BlocksApiRoute(blockchainImpl, wallet),
     TransactionsApiRoute(storedState),
     consensusApiRoute,
-    WalletApiRoute()(wallet),
+    WalletApiRoute(wallet),
     PaymentApiRoute(this),
     ScorexApiRoute(this),
-    SeedApiRoute
+    SeedApiRoute(),
+    PeersHttpService(this),
+    AddressApiRoute(wallet, storedState)
   )
-  override lazy val apiTypes =  Seq(typeOf[PaymentApiRoute])
+  override lazy val apiTypes =  Seq(typeOf[PaymentApiRoute], typeOf[PeersHttpService], typeOf[ScorexApiRoute])
 
   def checkGenesis(): Unit = {
     if (blockchainImpl.isEmpty) {

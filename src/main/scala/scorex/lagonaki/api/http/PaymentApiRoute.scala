@@ -13,18 +13,18 @@ import spray.routing.HttpService._
 import scala.util.{Failure, Success, Try}
 
 @Api(value = "/payment", description = "Payment operations.", position = 0)
-case class PaymentApiRoute(application:LagonakiApplication)(implicit context: ActorRefFactory) extends HttpService with  ApiRoute with CommonTransactionApiFunctions {
+case class PaymentApiRoute(application: LagonakiApplication)(implicit val context: ActorRefFactory)
+  extends ApiRoute with CommonTransactionApiFunctions {
 
   implicit lazy val transactionModule = application.transactionModule
   implicit lazy val wallet = application.wallet
-  def actorRefFactory = context
 
   @ApiOperation(value = "Send payment", notes = "Send payment to another wallet", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "petId", value = "ID of pet that needs to be fetched", required = true, dataType = "integer", paramType = "path")
+    new ApiImplicitParam(name = "body", value = "Json with data", dataType = "json", required = true, paramType = "body")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Person got created")
+    new ApiResponse(code = 200, message = "Json with response or error")
   ))
   override lazy val route =
     path("payment") {

@@ -1,12 +1,15 @@
 package scorex.api.http
 
+import akka.actor.ActorRefFactory
 import play.api.libs.json.Json
 import scorex.transaction.state.LagonakiState
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import spray.routing.HttpService._
 
 
-case class TransactionsApiRoute(state:LagonakiState) extends ApiRoute with CommonApiFunctions {
+case class TransactionsApiRoute(state: LagonakiState)(implicit val context: ActorRefFactory)
+  extends ApiRoute with CommonApiFunctions {
+
   override lazy val route =
     pathPrefix("transactions") {
       path("unconfirmed") {

@@ -1,12 +1,15 @@
 package scorex.api.http
 
+import akka.actor.ActorRefFactory
 import play.api.libs.json.Json
 import scorex.crypto.Base58
 import scorex.transaction.state.wallet.Wallet
-import spray.routing.HttpService._
 
 
-case class WalletApiRoute(implicit wallet: Wallet) extends ApiRoute with CommonTransactionApiFunctions {
+case class WalletApiRoute(wallet: Wallet)(implicit val context: ActorRefFactory)
+  extends ApiRoute with CommonTransactionApiFunctions {
+
+  implicit val w = wallet
 
   override lazy val route = {
     pathPrefix("wallet") {
