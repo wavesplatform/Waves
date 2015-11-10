@@ -8,7 +8,7 @@ import scala.util.{Failure, Random, Try}
 
 object Server extends App with ScorexLogging {
 
-  log.debug("main " + args)
+  log.debug("Start server with args: {} ", args)
   Try {
     val filename = if (args.length > 0) args(0) else "settings.json"
 

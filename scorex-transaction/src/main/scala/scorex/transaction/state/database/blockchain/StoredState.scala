@@ -51,6 +51,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
   private val database: DB = dataFolderOpt match {
     case Some(dataFolder) =>
+      log.debug("DB loaded from {}", dataFolder)
       val db = DBMaker.fileDB(new File(dataFolder + s"/state"))
         .closeOnJvmShutdown()
         .cacheSize(2048)
