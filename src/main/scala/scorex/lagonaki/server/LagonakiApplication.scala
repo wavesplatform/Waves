@@ -62,7 +62,7 @@ class LagonakiApplication(val settingsFilename: String)
       new QoraConsensusApiRoute(qcm, blockchainImpl)
   }
 
-  override lazy val apiRoutes: Seq[ApiRoute] = Seq(
+  override lazy val apiRoutes = Seq(
     BlocksApiRoute(blockchainImpl, wallet),
     TransactionsApiRoute(storedState),
     consensusApiRoute,
