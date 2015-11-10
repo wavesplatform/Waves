@@ -1,15 +1,15 @@
 package scorex.lagonaki.server
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.Props
 import akka.io.IO
 import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
+import scorex.app.Application
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
 import scorex.lagonaki.api.http.{PaymentApiRoute, ScorexApiRoute}
 import scorex.block.Block
-import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.lagonaki.network.message._
@@ -24,10 +24,16 @@ import spray.can.Http
 import scala.concurrent.ExecutionContext.Implicits.global
 
 
-class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
+class LagonakiApplication(val settingsFilename: String)
+  extends Application with ScorexLogging {
+
+  override val applicationName = "lagonaki"
+
   private val appConf = ConfigFactory.load().getConfig("app")
 
-  implicit val consensusModule: ConsensusModule[_] =
+  override implicit val settings = new LagonakiSettings(settingsFilename)
+
+  override implicit val consensusModule =
     appConf.getString("consensusAlgo") match {
     case s:String if s.equalsIgnoreCase("nxt") =>
       new NxtLikeConsensusModule
@@ -38,18 +44,16 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
       new NxtLikeConsensusModule
   }
 
-  implicit val settings = new LagonakiSettings(settingsFilename)
-  implicit val transactionModule = new SimpleTransactionModule
+  override implicit val transactionModule:SimpleTransactionModule = new SimpleTransactionModule
 
-  lazy val storedState = transactionModule.state
-  lazy val blockchainImpl = transactionModule.history
-
-  private implicit lazy val actorSystem = ActorSystem("lagonaki")
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
   lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this, networkController))
 
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
+
+  lazy val storedState = transactionModule.state
+  lazy val blockchainImpl = transactionModule.history
 
   val consensusApiRoute = consensusModule match {
     case ncm: NxtLikeConsensusModule =>
@@ -58,7 +62,7 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
       new QoraConsensusApiRoute(qcm, blockchainImpl)
   }
 
-  lazy val routes = Seq(
+  override lazy val apiRoutes = Seq(
     AddressApiRoute()(wallet, storedState),
     BlocksApiRoute()(blockchainImpl, wallet),
     TransactionsApiRoute(storedState),
@@ -69,8 +73,6 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
     ScorexApiRoute(this),
     SeedApiRoute
   )
-
-  lazy val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], routes), "api")
 
   def checkGenesis(): Unit = {
     if (blockchainImpl.isEmpty) {
