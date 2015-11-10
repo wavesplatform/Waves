@@ -2,24 +2,20 @@ package scorex.lagonaki.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.FSM
-import scorex.lagonaki.server.LagonakiApplication
+import akka.actor.{ActorRef, FSM}
 import scorex.block.Block
 import scorex.lagonaki.network.BlockchainSyncer._
 import scorex.lagonaki.network.message.{BlockMessage, GetSignaturesMessage}
+import scorex.lagonaki.server.LagonakiApplication
 
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 
 case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 
-
-//todo: reduce boilerplate code
-case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status, Unit] {
-
-  private lazy val networkController = application.networkController
+class BlockchainSyncer(application: LagonakiApplication, networkController: ActorRef) extends FSM[Status, Unit] {
 
   private val stateTimeout = 1.second
 
@@ -33,75 +29,76 @@ case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status
 
     case Event(Unit, _) =>
       log.info("Initializing")
-      stay
+      stay()
   }
 
   when(Syncing) {
-    case Event(MaxChainScore(scoreOpt), _) => scoreOpt match {
-      case Some(maxScore) =>
-        val localScore = application.blockchainImpl.score()
-        log.info(s"maxScore: $maxScore, localScore: $localScore")
-        if (maxScore > localScore) {
+    case Event(MaxChainScore(scoreOpt), _) =>
+      processMaxScore(
+        scoreOpt,
+        onMax = () => {
           val sigs = application.blockchainImpl.lastSignatures(application.settings.MaxBlocksChunks)
           val msg = GetSignaturesMessage(sigs)
           networkController ! NetworkController.SendMessageToBestPeer(msg)
-          stay
-        } else goto(Generating)
-
-      case None =>
-        if (application.settings.offlineGeneration) goto(Generating).using(Unit) else goto(Offline)
-    }
+          stay()
+        }
+      )
 
     case Event(NewBlock(block, remoteOpt), _) =>
       assert(remoteOpt.isDefined, "Local generation attempt while syncing")
       processNewBlock(block, remoteOpt)
-      stay
+      stay()
   }
 
   when(Generating) {
     case Event(NewBlock(block, remoteOpt), _) =>
       processNewBlock(block, remoteOpt)
-      stay
+      stay()
 
-    case Event(MaxChainScore(scoreOpt), _) => scoreOpt match {
-      case Some(maxScore) =>
-        val localScore = application.blockchainImpl.score()
-        log.info(s"maxScore: $maxScore, localScore: $localScore")
-        if (maxScore > localScore) goto(Syncing)
-        else {
+    case Event(MaxChainScore(scoreOpt), _) =>
+      processMaxScore(
+        scoreOpt,
+        onNone = () => {
           tryToGenerateABlock()
-          stay
+          stay()
+        },
+        onLocal = () => {
+          tryToGenerateABlock()
+          stay()
         }
-
-      case None =>
-        tryToGenerateABlock()
-        stay
-    }
+      )
   }
 
   //common logic for all the states
   whenUnhandled {
-    case Event(MaxChainScore(scoreOpt), _) => scoreOpt match {
-      case Some(maxScore) =>
-        val localScore = application.blockchainImpl.score()
-        log.info(s"maxScore: $maxScore, localScore: $localScore")
-        if (maxScore > localScore) goto(Syncing) else goto(Generating)
-
-      case None =>
-        if (application.settings.offlineGeneration) goto(Generating).using(Unit) else goto(Offline)
-    }
+    case Event(MaxChainScore(scoreOpt), _) =>
+      processMaxScore(scoreOpt)
 
     case Event(GetStatus, _) =>
       sender() ! super.stateName.name
-      stay
+      stay()
 
     case Event(e, s) =>
       log.warning(s"received unhandled request {$e} in state {$stateName}/{$s}")
-      stay
+      stay()
   }
 
   initialize()
 
+  def processMaxScore(
+                       scoreOpt: Option[BigInt],
+                       onLocal: () => State = () => goto(Generating),
+                       onMax: () => State = () => goto(Syncing),
+                       onNone: () => State = () =>
+                         if (application.settings.offlineGeneration) goto(Generating).using(Unit) else goto(Offline)
+                     ): State = scoreOpt match {
+    case Some(maxScore) =>
+      val localScore = application.blockchainImpl.score()
+      log.info(s"maxScore: $maxScore, localScore: $localScore")
+      if (maxScore > localScore) onMax() else onLocal()
+    case None =>
+      onNone()
+  }
 
   def processNewBlock(block: Block, remoteOpt: Option[InetSocketAddress]) = {
     val fromStr = remoteOpt.map(_.toString).getOrElse("local")
@@ -115,7 +112,7 @@ case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status
 
       //broadcast block only if it is generated locally
       if (remoteOpt.isEmpty) {
-        networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block), List())
+        networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block))
       }
     } else {
       log.warning(s"Non-valid block: $block from $fromStr")
@@ -123,25 +120,22 @@ case class BlockchainSyncer(application: LagonakiApplication) extends FSM[Status
   }
 
   def tryToGenerateABlock() = {
-    log.info("Trying to generate a new block")
-    val appState = application.storedState
-    val nonEmptyAccs = application.wallet.privateKeyAccounts().filter(acc => appState.balance(acc.address) > 0)
-    nonEmptyAccs.find {
-      privKeyAcc =>
-        implicit val transactionModule = application.transactionModule
+    val consModule = application.consensusModule
+    implicit val transModule = application.transactionModule
 
-        //As Proof-of-Stake is being used for Scorex Lagonaki, generateNextBlock() finishes quickly
-        //  (it should be, at least) so we're just going to wait for a result
-        Await.result(application.consensusModule.generateNextBlock(privKeyAcc), 500.millis) match {
-          case Some(block) =>
-            self ! NewBlock(block, None)
-            true
-          case None => false
+    log.info("Trying to generate a new block")
+    val accounts = application.wallet.privateKeyAccounts()
+    consModule.generateNextBlocks(accounts)(transModule) onComplete {
+      case Success(blocks: Seq[Block]) =>
+        if (blocks.nonEmpty) {
+          val bestBlock = blocks.maxBy(consModule.blockScore)
+          self ! NewBlock(bestBlock, None)
         }
+      case Failure(ex) => log.error("Failed to generate new block: {}", ex)
+      case m => log.error("Unexpected message: {}", m)
     }
   }
 }
-
 
 object BlockchainSyncer {
 
