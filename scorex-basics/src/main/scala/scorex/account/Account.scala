@@ -5,6 +5,8 @@ import scorex.crypto.{Base58, RIPEMD160}
 
 class Account(val address: String) extends Serializable {
 
+  lazy val bytes = Base58.decode(address).get
+
   override def toString = address
 
   override def equals(b: Any) = b match {
@@ -13,8 +15,6 @@ class Account(val address: String) extends Serializable {
   }
 
   override def hashCode(): Int = address.hashCode()
-
-  lazy val bytes = Base58.decode(address).get
 }
 
 
