@@ -3,7 +3,7 @@
   "knownpeers":[
     "5.9.86.168"
   ],
-  "walletdir" : "/tmp/wallet",
+  "walletdir" : "/tmp/scorex/wallet",
   "walletpassword" : "cookies",
   "walletseed" : "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
   "datadir" : "/tmp/data",
