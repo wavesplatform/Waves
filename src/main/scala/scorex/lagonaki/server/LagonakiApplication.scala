@@ -20,10 +20,9 @@ import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.wallet.Wallet
 import scorex.utils.{NTP, ScorexLogging}
 import spray.can.Http
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.runtime.universe._
 
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class LagonakiApplication(val settingsFilename: String)
   extends Application with ScorexLogging {
@@ -70,10 +69,10 @@ class LagonakiApplication(val settingsFilename: String)
     consensusApiRoute,
     WalletApiRoute()(wallet),
     PaymentApiRoute(this),
-    PaymentApiRoute(this),
     ScorexApiRoute(this),
     SeedApiRoute
   )
+  override lazy val apiTypes =  Seq(typeOf[PaymentApiRoute])
 
   def checkGenesis(): Unit = {
     if (blockchainImpl.isEmpty) {
