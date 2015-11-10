@@ -10,7 +10,7 @@ class BlocksRoutingSpecification extends RouteTest {
 
    application.checkGenesis()
 
-   val blocksRoute = BlocksApiRoute()(application.blockchainImpl, application.wallet).route
+   val blocksRoute = BlocksApiRoute(application.blockchainImpl, application.wallet).route
 
    "blocksRouting" should "return first block" in {
      Get("/blocks/first") ~> blocksRoute ~> check {
