@@ -22,6 +22,7 @@ import scorex.utils.{NTP, ScorexLogging}
 import spray.can.Http
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.reflect.runtime.universe._
 
 
 class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
@@ -70,7 +71,7 @@ class LagonakiApplication(val settingsFilename: String) extends ScorexLogging {
     SeedApiRoute
   )
 
-  lazy val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], routes), "api")
+  lazy val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], Seq(typeOf[PaymentApiRoute]),routes), "api")
 
   def checkGenesis(): Unit = {
     if (blockchainImpl.isEmpty) {
