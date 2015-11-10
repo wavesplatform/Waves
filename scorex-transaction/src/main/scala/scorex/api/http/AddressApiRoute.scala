@@ -13,8 +13,10 @@ import spray.routing.HttpService._
 import scala.util.{Failure, Success, Try}
 
 
-case class AddressApiRoute(implicit wallet: Wallet, state: LagonakiState, implicit val context: ActorRefFactory)
+case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+
+  implicit val w = wallet
 
   override lazy val route =
     pathPrefix("addresses") {

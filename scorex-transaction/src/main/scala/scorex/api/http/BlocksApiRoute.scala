@@ -7,8 +7,10 @@ import scorex.transaction.state.wallet.Wallet
 import spray.routing.HttpService._
 
 
-case class BlocksApiRoute(implicit blockchain: BlockChain, wallet: Wallet, implicit val context: ActorRefFactory)
+case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+
+  implicit val b = blockchain
 
   override lazy val route =
     pathPrefix("blocks") {

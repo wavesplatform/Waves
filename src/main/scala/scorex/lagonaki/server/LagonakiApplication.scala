@@ -63,11 +63,11 @@ class LagonakiApplication(val settingsFilename: String)
   }
 
   override lazy val apiRoutes = Seq(
-    AddressApiRoute()(wallet, storedState),
-    BlocksApiRoute()(blockchainImpl, wallet),
+    AddressApiRoute(wallet, storedState),
+    BlocksApiRoute(blockchainImpl, wallet),
     TransactionsApiRoute(storedState),
     consensusApiRoute,
-    WalletApiRoute()(wallet),
+    WalletApiRoute(wallet),
     PaymentApiRoute(this),
     ScorexApiRoute(this),
     SeedApiRoute,

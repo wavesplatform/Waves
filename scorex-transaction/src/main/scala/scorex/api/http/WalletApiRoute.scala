@@ -6,8 +6,10 @@ import scorex.crypto.Base58
 import scorex.transaction.state.wallet.Wallet
 
 
-case class WalletApiRoute(implicit wallet: Wallet, implicit val context: ActorRefFactory)
+case class WalletApiRoute(wallet: Wallet)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+
+  implicit val w = wallet
 
   override lazy val route = {
     pathPrefix("wallet") {
