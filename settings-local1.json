@@ -3,7 +3,7 @@
   	"walletdir" : "/tmp/scorex/wallet1",
     "walletpassword" : "cookies",
     "walletseed" : "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
-    "datadir" : "/tmp/data1",
+    "datadir" : "/tmp/scorex/data1",
 	"minconnections": 10,
     "rpcport" : 9085,
 	"rpcallowed":[
