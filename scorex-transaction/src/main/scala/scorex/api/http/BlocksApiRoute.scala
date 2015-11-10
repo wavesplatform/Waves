@@ -11,6 +11,7 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   extends ApiRoute with CommonTransactionApiFunctions {
 
   implicit val b = blockchain
+  implicit val w = wallet
 
   override lazy val route =
     pathPrefix("blocks") {
