@@ -110,15 +110,6 @@ Current Limitations
 
 todo: current glitches / limitations list
 
-Roadmap
--------------------
-
-* Implement peers whitelist/blacklist persistence ( [https://github.com/ConsensusResearch/Scorex-Lagonaki/issues/13](https://github.com/ConsensusResearch/Scorex-Lagonaki/issues/13) )
-
-* Implement peers blacklist ( [https://github.com/ConsensusResearch/Scorex-Lagonaki/issues/14](https://github.com/ConsensusResearch/Scorex-Lagonaki/issues/14) )
-
-* Fix Hanging When Stopping the Application ( [https://github.com/ConsensusResearch/Scorex-Lagonaki/issues/15](https://github.com/ConsensusResearch/Scorex-Lagonaki/issues/15) )
-
 
 Documentation
 --------------
