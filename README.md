@@ -1,8 +1,10 @@
 Scorex - Lagonaki Release
 =========================
 
-**This is the pretty buggy initial release version! Please report bugs found, and contribute with
-fixes, if possible.**
+**The universal blockchain database framework**
+
+*This is the pretty buggy initial release version! Please report bugs found, and contribute with
+fixes, if possible.*
 
 Motivation
 ----------
