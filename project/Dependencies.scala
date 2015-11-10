@@ -32,6 +32,7 @@ object Dependencies {
     "io.spray" %% "spray-can" % "1.+",
     "io.spray" %% "spray-http" % "1.+",
     "io.spray" %% "spray-httpx" % "1.+",
-    "io.spray" %% "spray-util" % "1.+"
+    "io.spray" %% "spray-util" % "1.+",
+    "com.gettyimages" %% "spray-swagger" % "0.+"
   )
 }
