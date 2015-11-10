@@ -2,6 +2,7 @@ package scorex.api.http
 
 import java.nio.charset.StandardCharsets
 
+import akka.actor.ActorRefFactory
 import play.api.libs.json.Json
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.{Base58, SigningFunctionsImpl}
@@ -12,7 +13,7 @@ import spray.routing.HttpService._
 import scala.util.{Failure, Success, Try}
 
 
-case class AddressApiRoute(implicit wallet: Wallet, state: LagonakiState)
+case class AddressApiRoute(implicit wallet: Wallet, state: LagonakiState, implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   override lazy val route =

@@ -17,8 +17,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
 @Api(value = "/peers", description = "Get info about peers", position = 1)
-case class PeersHttpService(application: LagonakiApplication)(implicit val context: ActorRefFactory) extends ApiRoute
-with CommonApiFunctions {
+case class PeersHttpService(application: LagonakiApplication)(implicit val context: ActorRefFactory)
+  extends ApiRoute with CommonApiFunctions {
 
   override lazy val route =
     pathPrefix("peers") {

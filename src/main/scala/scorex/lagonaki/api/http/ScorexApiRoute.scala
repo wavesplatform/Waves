@@ -1,5 +1,6 @@
 package scorex.lagonaki.api.http
 
+import akka.actor.ActorRefFactory
 import akka.pattern.ask
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
@@ -12,7 +13,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-case class ScorexApiRoute(application:LagonakiApplication) extends ApiRoute with CommonApiFunctions {
+case class ScorexApiRoute(application: LagonakiApplication)(implicit val context: ActorRefFactory)
+  extends ApiRoute with CommonApiFunctions {
 
   override lazy val route =
     pathPrefix("scorex") {

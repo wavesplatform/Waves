@@ -1,5 +1,6 @@
 package scorex.consensus.nxt.api.http
 
+import akka.actor.ActorRefFactory
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.consensus.nxt.NxtLikeConsensusModule
@@ -9,8 +10,9 @@ import spray.routing.HttpService._
 import spray.routing.Route
 
 
-class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule,
-                           blockchain: BlockChain) extends ApiRoute with CommonApiFunctions {
+class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: BlockChain)
+                          (implicit val context: ActorRefFactory)
+  extends ApiRoute with CommonApiFunctions {
 
   private implicit val history: History = blockchain
 

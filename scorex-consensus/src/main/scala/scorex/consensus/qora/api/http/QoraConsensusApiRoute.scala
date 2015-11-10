@@ -1,5 +1,6 @@
 package scorex.consensus.qora.api.http
 
+import akka.actor.ActorRefFactory
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidNotNumber}
 import scorex.consensus.qora.QoraLikeConsensusModule
@@ -10,8 +11,9 @@ import spray.routing.Route
 import scala.util.Try
 
 
-case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule,
-                                 blockchain: BlockChain) extends ApiRoute with CommonApiFunctions {
+case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, blockchain: BlockChain)
+                                (implicit val context: ActorRefFactory)
+  extends ApiRoute with CommonApiFunctions {
 
   private implicit val history: History = blockchain
 

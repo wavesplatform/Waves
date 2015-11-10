@@ -2,11 +2,12 @@ package scorex.api.http
 
 import java.security.SecureRandom
 
+import akka.actor.ActorRefFactory
 import play.api.libs.json.Json
 import scorex.crypto.Base58
 import spray.routing.HttpService._
 
-case object SeedApiRoute extends ApiRoute with CommonApiFunctions {
+case class SeedApiRoute()(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions {
   val SeedSize = 32
 
   private def seed(length: Int): String = {

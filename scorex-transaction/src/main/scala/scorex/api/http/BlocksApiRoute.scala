@@ -1,12 +1,13 @@
 package scorex.api.http
 
+import akka.actor.ActorRefFactory
 import play.api.libs.json.Json
 import scorex.transaction.BlockChain
 import scorex.transaction.state.wallet.Wallet
 import spray.routing.HttpService._
 
 
-case class BlocksApiRoute(implicit blockchain: BlockChain, wallet: Wallet)
+case class BlocksApiRoute(implicit blockchain: BlockChain, wallet: Wallet, implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   override lazy val route =
