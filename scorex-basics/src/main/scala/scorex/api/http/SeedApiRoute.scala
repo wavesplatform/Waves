@@ -7,7 +7,6 @@ import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.crypto.Base58
-import spray.http.MediaTypes._
 
 @Api(value = "/seed", description = "Seed generation functions", position = 3)
 case class SeedApiRoute()(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions {
@@ -31,12 +30,8 @@ case class SeedApiRoute()(implicit val context: ActorRefFactory) extends ApiRout
     new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
   def seedRoute = path("") {
-    get {
-      respondWithMediaType(`application/json`) {
-        complete(
-          seed(SeedSize)
-        )
-      }
+    jsonRoute {
+      seed(SeedSize)
     }
   }
 
@@ -49,13 +44,10 @@ case class SeedApiRoute()(implicit val context: ActorRefFactory) extends ApiRout
     new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
   def length = path(IntNumber) { case length =>
-    get(
-      respondWithMediaType(`application/json`) {
-        complete(seed(length))
-      }
-    )
+    jsonRoute {
+      seed(length)
+    }
   }
-
 
 
 }

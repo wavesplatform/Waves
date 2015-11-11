@@ -31,10 +31,8 @@ case class ScorexApiRoute(application: LagonakiApplication)(implicit val context
   ))
   def version = {
     path("version") {
-      get {
-        respondWithMediaType(`application/json`) {
-          complete(Json.obj("version" -> Constants.AgentName).toString())
-        }
+      jsonRoute {
+        Json.obj("version" -> Constants.AgentName).toString()
       }
     }
   }
@@ -42,14 +40,10 @@ case class ScorexApiRoute(application: LagonakiApplication)(implicit val context
   @Path("/stop")
   @ApiOperation(value = "Stop", notes = "Stop the app", httpMethod = "POST")
   def scorex = path("stop") {
-    post {
-      respondWithMediaType(`application/json`) {
-        complete {
-          Future(application.stopAll())
-          Json.obj("stopped" -> true).toString()
-        }
-      }
-    }
+    jsonRoute({
+      Future(application.stopAll())
+      Json.obj("stopped" -> true).toString()
+    }, post)
   }
 
   @Path("/status")
