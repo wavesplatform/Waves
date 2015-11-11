@@ -1,17 +1,17 @@
 package scorex.lagonaki.api.http
 
 import java.net.InetSocketAddress
+import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
 import akka.pattern.ask
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.lagonaki.server.LagonakiApplication
-import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
 import scorex.lagonaki.network.NetworkController.PeerData
-import spray.routing.HttpService
-import spray.routing.HttpService._
+import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
+import scorex.lagonaki.server.LagonakiApplication
+import spray.http.MediaTypes._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
@@ -25,43 +25,50 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
       peers ~ height
     }
 
-  @ApiOperation(value = "Peers list", notes = "Peers list", httpMethod = "GET")
+  @Path("/")
+  @ApiOperation(value = "Peer list", notes = "Peer list", httpMethod = "GET")
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with response peer list")
+    new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
-  lazy val peers = path("") {
+  def peers = path("") {
     get {
-      onComplete {
-        (application.networkController ? NetworkController.GetPeers).map { peers =>
-          Json.obj("peers" -> Json.arr(peers.asInstanceOf[Map[InetSocketAddress, PeerData]]
-            .map(_._1.getAddress.toString))).toString()
+      respondWithMediaType(`application/json`) {
+        onComplete {
+          (application.networkController ? NetworkController.GetPeers).map { peers =>
+            Json.obj("peers" -> Json.arr(peers.asInstanceOf[Map[InetSocketAddress, PeerData]]
+              .map(_._1.getAddress.toString))).toString()
+          }
+        } {
+          case Success(value) => complete(value)
+          case Failure(ex) => failWith(ex)
         }
-      } {
-        case Success(value) => complete(value)
-        case Failure(ex) => failWith(ex)
       }
     }
   }
 
 
   //TODO ????
-  @ApiOperation(value = "Height", notes = "", httpMethod = "GET")
+  @Path("/height")
+  @ApiOperation(value = "Height", notes = "Node with maximum height", httpMethod = "GET")
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with response or error")
+    new ApiResponse(code = 200, message = "Json with response or error"),
+    new ApiResponse(code = 500, message = "Internal error")
   ))
-  lazy val height = path("height") {
+  def height = path("height") {
     //todo:fix
     get {
-      onComplete {
-        (application.blockchainSyncer ? BlockchainSyncer.GetMaxChainScore).map { peerHeightsRaw =>
-          val peerHeights = peerHeightsRaw.asInstanceOf[Map[InetSocketAddress, Int]]
-          Json.arr(peerHeights.map { case (peer, h) =>
-            Json.obj("peer" -> peer.getAddress.getHostAddress, "height" -> h)
-          }).toString()
+      respondWithMediaType(`application/json`) {
+        onComplete {
+          (application.blockchainSyncer ? BlockchainSyncer.GetMaxChainScore).map { peerHeightsRaw =>
+            val peerHeights = peerHeightsRaw.asInstanceOf[Map[InetSocketAddress, Int]]
+            Json.arr(peerHeights.map { case (peer, h) =>
+              Json.obj("peer" -> peer.getAddress.getHostAddress, "height" -> h)
+            }).toString()
+          }
+        } {
+          case Success(value) => complete(value)
+          case Failure(ex) => failWith(ex)
         }
-      } {
-        case Success(value) => complete(value)
-        case Failure(ex) => failWith(ex)
       }
     }
   }
