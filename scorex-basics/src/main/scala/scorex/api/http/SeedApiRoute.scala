@@ -5,7 +5,6 @@ import java.security.SecureRandom
 import akka.actor.ActorRefFactory
 import play.api.libs.json.Json
 import scorex.crypto.Base58
-import spray.routing.HttpService._
 
 case class SeedApiRoute()(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions {
   val SeedSize = 32
