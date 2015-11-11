@@ -40,9 +40,7 @@ case class SeedApiRoute()(implicit val context: ActorRefFactory) extends ApiRout
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "length", value = "Seed length ", required = true, dataType = "long", paramType = "path")
   ))
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with peer list or error")
-  ))
+  @ApiResponse(code = 200, message = "Json with peer list or error")
   def length = path(IntNumber) { case length =>
     jsonRoute {
       seed(length)
