@@ -1,4 +1,4 @@
-Access API in a browser (e.g. http://localhost:9085/addresses/ ) or CURL 
+Access API with swagger UI (http://localhost:9085) or CURL 
 or with the command line client (GET addresses/)
 
 **addresses - info about wallet's accounts and other calls about addresses**
@@ -11,16 +11,14 @@ or with the command line client (GET addresses/)
 
 * addresses/seed/{address} - export seed value for the {address}
 
-* addresses/new - create new address in the local wallet
-
 * addresses/balance/{address} - account's balance
 
 * addresses/generatingbalance/{address} - account's generating balance(the same as balance atm)
 
-* addresses/create - create a new account in the wallet(if it exists)
-  
 
 *POST requests:*
+
+* addresses/ - create a new account in the wallet(if it exists)
 
 * addresses/verify/{address} - check a signature of a message signed by an account. POST request 
 body is the JSON object containing following fields: 1. *"message"* - Base58-encoded message. 2. 
@@ -32,7 +30,7 @@ body is just message to sign as a plain string
 
 *DELETE requests:*
 
-* addresses/address/{address} - remove the account with address {address} from the wallet
+* addresses/{address} - remove the account with address {address} from the wallet
 
 
 **blocks - info about blockchain & individual blocks within it**
@@ -78,13 +76,16 @@ POST payment {"amount":400, "fee":1, "sender":"2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPN
  
 **scorex - general commands & information**
 
-*GET requests:*
+*POST requests:*
 
 * stop - stop the app
+
+*GET requests:*
 
 * status - get status of the running core(Offline/Syncing/Generating) 
 
 * version - get Scorex version
+ 
  
 **seed - seed generation functions**
 
