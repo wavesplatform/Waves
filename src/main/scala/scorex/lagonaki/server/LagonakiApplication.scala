@@ -17,7 +17,7 @@ import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.wallet.Wallet
+import scorex.transaction.state.wallet.{Payment, Wallet}
 import scorex.utils.{NTP, ScorexLogging}
 import spray.can.Http
 import scala.reflect.runtime.universe._
@@ -123,6 +123,12 @@ class LagonakiApplication(val settingsFilename: String)
     if (UnconfirmedTransactionsDatabaseImpl.putIfNew(transaction)) {
       networkController ! NetworkController.BroadcastMessage(TransactionMessage(transaction))
     }
+
+  def createPayment(payment: Payment): Option[PaymentTransaction] = {
+    wallet.privateKeyAccount(payment.sender).map { sender =>
+      createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
+    }
+  }
 
   def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
     val time = NTP.correctedTime()

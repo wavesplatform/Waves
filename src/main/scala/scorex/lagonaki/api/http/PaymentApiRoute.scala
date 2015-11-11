@@ -2,7 +2,7 @@ package scorex.lagonaki.api.http
 
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
-import play.api.libs.json.Json
+import play.api.libs.json.{JsError, JsSuccess, JsResult, Json}
 import scorex.account.Account
 import scorex.api.http._
 import scorex.lagonaki.server.LagonakiApplication
@@ -41,32 +41,31 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
         entity(as[String]) { body => complete {
           walletNotExists().getOrElse {
             Try(Json.parse(body)).map { js =>
-              (Try((js \ "amount").as[Long]),
-                Try((js \ "fee").as[Long]),
-                Try(application.wallet.privateKeyAccount((js \ "sender").as[String])),
-                Try((js \ "recipient").as[String])) match {
-                case (Failure(_), _, _, _) => InvalidAmount.json
-                case (_, Failure(_), _, _) => InvalidFee.json
-                case (_, _, Failure(_), _) => InvalidSender.json
-                case (_, _, _, Failure(_)) => InvalidRecipient.json
-                case (Success(_), Success(_), Success(None), Success(_)) => InvalidSender.json
-                case (Success(amount), Success(fee), Success(Some(sender)), Success(recipient)) =>
-                  val tx = application.createPayment(sender, new Account(recipient), amount, fee)
-                  tx.validate() match {
-                    case ValidationResult.ValidateOke =>
-                      tx.json()
+              js.validate[Payment] match {
+                case err: JsError =>
+                  err
+                case JsSuccess(payment: Payment, _) =>
+                  val txOpt = application.createPayment(payment)
+                  txOpt match {
+                    case Some(tx) =>
+                      tx.validate() match {
+                        case ValidationResult.ValidateOke =>
+                          tx.json()
 
-                    case ValidationResult.InvalidAddress =>
-                      InvalidAddress.json
+                        case ValidationResult.InvalidAddress =>
+                          InvalidAddress.json
 
-                    case ValidationResult.NegativeAmount =>
-                      NegativeAmount.json
+                        case ValidationResult.NegativeAmount =>
+                          NegativeAmount.json
 
-                    case ValidationResult.NegativeFee =>
-                      NegativeFee.json
+                        case ValidationResult.NegativeFee =>
+                          NegativeFee.json
 
-                    case ValidationResult.NoBalance =>
-                      NegativeFee.json
+                        case ValidationResult.NoBalance =>
+                          NoBalance.json
+                      }
+                    case None =>
+                      InvalidSender.json
                   }
               }
             }.getOrElse(WrongJson.json)
