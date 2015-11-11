@@ -7,6 +7,7 @@ import scorex.account.Account
 import scorex.api.http._
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.LagonakiTransaction.ValidationResult
+import spray.http.MediaTypes._
 import spray.routing.HttpService
 import spray.routing.HttpService._
 
@@ -19,16 +20,18 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
   implicit lazy val transactionModule = application.transactionModule
   implicit lazy val wallet = application.wallet
 
-  @ApiOperation(value = "Send payment", notes = "Send payment to another wallet", httpMethod = "POST")
+  override lazy val route = payment
+
+  @ApiOperation(value = "Send payment", notes = "Send payment to another wallet", httpMethod = "POST", produces = "application/json", consumes = "application/json")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "body", value = "Json with data", dataType = "json", required = true, paramType = "body")
+    new ApiImplicitParam(name = "body", value = "Json with data", dataType = "json", defaultValue = "{\"amount\":400, \"fee\":1, \"sender\":\"senderId\",\"recipient\":\"recipientId\"}", required = true, paramType = "body")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
-  override lazy val route =
-    path("payment") {
-      post {
+  def payment = path("payment") {
+    post {
+      respondWithMediaType(`application/json`) {
         entity(as[String]) { body => complete {
           walletNotExists().getOrElse {
             Try(Json.parse(body)).map { js =>
@@ -66,4 +69,6 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
         }
       }
     }
+  }
+
 }
