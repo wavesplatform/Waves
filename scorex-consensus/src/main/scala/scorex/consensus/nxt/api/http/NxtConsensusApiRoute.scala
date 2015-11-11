@@ -85,7 +85,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: 
   }
 
   @Path("/algo")
-  @ApiOperation(value = "Consensus algo", notes = "shows which consensus algo being using", httpMethod = "GET")
+  @ApiOperation(value = "Consensus algo", notes = "Shows which consensus algo being using", httpMethod = "GET")
   def algo = {
     path("algo") {
       jsonRoute {
