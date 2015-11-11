@@ -7,9 +7,8 @@ import scorex.account.Account
 import scorex.api.http._
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.LagonakiTransaction.ValidationResult
+import scorex.transaction.state.wallet.Payment
 import spray.http.MediaTypes._
-import spray.routing.HttpService
-import spray.routing.HttpService._
 
 import scala.util.{Failure, Success, Try}
 
@@ -24,7 +23,14 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
 
   @ApiOperation(value = "Send payment", notes = "Send payment to another wallet", httpMethod = "POST", produces = "application/json", consumes = "application/json")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "body", value = "Json with data", dataType = "json", defaultValue = "{\"amount\":400, \"fee\":1, \"sender\":\"senderId\",\"recipient\":\"recipientId\"}", required = true, paramType = "body")
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "Payment",
+      defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
+    )
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
@@ -70,5 +76,11 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
       }
     }
   }
+
+  // Workaround to show datatype of post request without using it in another route
+  // Related: https://github.com/swagger-api/swagger-core/issues/606
+  // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
+  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[Payment])
+  protected def showPayment = Unit
 
 }
