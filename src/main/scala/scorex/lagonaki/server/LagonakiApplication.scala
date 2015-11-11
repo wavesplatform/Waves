@@ -35,16 +35,16 @@ class LagonakiApplication(val settingsFilename: String)
 
   override implicit val consensusModule =
     appConf.getString("consensusAlgo") match {
-    case s:String if s.equalsIgnoreCase("nxt") =>
-      new NxtLikeConsensusModule
-    case s:String if s.equalsIgnoreCase("qora") =>
-      new QoraLikeConsensusModule
-    case algo =>
-      log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
-      new NxtLikeConsensusModule
-  }
+      case s: String if s.equalsIgnoreCase("nxt") =>
+        new NxtLikeConsensusModule
+      case s: String if s.equalsIgnoreCase("qora") =>
+        new QoraLikeConsensusModule
+      case algo =>
+        log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
+        new NxtLikeConsensusModule
+    }
 
-  override implicit val transactionModule:SimpleTransactionModule = new SimpleTransactionModule
+  override implicit val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
 
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
   lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this, networkController))
@@ -73,7 +73,21 @@ class LagonakiApplication(val settingsFilename: String)
     PeersHttpService(this),
     AddressApiRoute(wallet, storedState)
   )
-  override lazy val apiTypes =  Seq(typeOf[PaymentApiRoute], typeOf[PeersHttpService], typeOf[ScorexApiRoute])
+
+  override lazy val apiTypes = Seq(
+    typeOf[BlocksApiRoute],
+    typeOf[TransactionsApiRoute],
+    consensusApiRoute match {
+      case nxt: NxtConsensusApiRoute => typeOf[NxtConsensusApiRoute]
+      case qora: QoraConsensusApiRoute => typeOf[QoraConsensusApiRoute]
+    },
+    typeOf[WalletApiRoute],
+    typeOf[PaymentApiRoute],
+    typeOf[ScorexApiRoute],
+    typeOf[SeedApiRoute],
+    typeOf[PeersHttpService],
+    typeOf[AddressApiRoute]
+  )
 
   def checkGenesis(): Unit = {
     if (blockchainImpl.isEmpty) {
