@@ -3,16 +3,18 @@ package scorex.transaction.state.wallet
 import java.io.File
 
 import com.google.common.primitives.{Bytes, Ints}
-import org.mapdb.{Serializer, DBMaker}
+import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
+import scorex.crypto.Sha256._
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
-import scorex.crypto.Sha256._
 
 //todo: XOR priv keys with seed in db?
-class Wallet(walletFileOpt: Option[File], password: String, seed: Array[Byte]) extends ScorexLogging {
+class Wallet(walletFileOpt: Option[File],
+             password: String,
+             seed: Array[Byte]) extends ScorexLogging {
 
   private val NONCE = "nonce"
 
