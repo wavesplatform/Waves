@@ -12,7 +12,7 @@ import spray.http.MediaTypes._
 
 import scala.util.{Failure, Success, Try}
 
-@Api(value = "/payment", description = "Payment operations.", position = 0)
+@Api(value = "/payment", description = "Payment operations.", position = 1)
 case class PaymentApiRoute(application: LagonakiApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
