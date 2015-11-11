@@ -48,13 +48,13 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
 
 
   //TODO ????
-  @Path("/height")
-  @ApiOperation(value = "Height", notes = "Node with maximum height", httpMethod = "GET")
+  @Path("/score")
+  @ApiOperation(value = "Score", notes = "Node with a maximum blockchain score", httpMethod = "GET")
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error"),
     new ApiResponse(code = 500, message = "Internal error")
   ))
-  def height = path("height") {
+  def height = path("score") {
     //todo:fix
     get {
       respondWithMediaType(`application/json`) {
@@ -62,7 +62,7 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
           (application.blockchainSyncer ? BlockchainSyncer.GetMaxChainScore).map { peerHeightsRaw =>
             val peerHeights = peerHeightsRaw.asInstanceOf[Map[InetSocketAddress, Int]]
             Json.arr(peerHeights.map { case (peer, h) =>
-              Json.obj("peer" -> peer.getAddress.getHostAddress, "height" -> h)
+              Json.obj("peer" -> peer.getAddress.getHostAddress, "score" -> h)
             }).toString()
           }
         } {
