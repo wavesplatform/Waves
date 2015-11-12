@@ -26,10 +26,10 @@ trait SwaggerService {
     override def apiInfo = Some(
       new ApiInfo(
         "Scorex API",
-        "Swagger service to describe Scorex API/",
-        "TOC Url",
+        "The Web Interface to the Scorex API/",
+        null,
         "kushti@protonmail.ch",
-        "Creative Commons CC0",
+        "License: Creative Commons CC0",
         "https://github.com/ScorexProject/Scorex-Lagonaki/blob/master/COPYING")
     )
 
