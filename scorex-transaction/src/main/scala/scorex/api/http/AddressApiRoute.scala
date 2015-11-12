@@ -5,11 +5,12 @@ import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
-import play.api.libs.json.Json
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.{Base58, SigningFunctionsImpl}
 import scorex.transaction.state.LagonakiState
-import scorex.transaction.state.wallet.Wallet
+import scorex.transaction.state.wallet.{Payment, Wallet}
 import spray.http.MediaTypes._
 
 import scala.util.{Failure, Success, Try}
@@ -83,7 +84,6 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
     }
   }
 
-  //TODO add Message case class
   @Path("/verify/{address}")
   @ApiOperation(value = "Verify", notes = "Check a signature of a message signed by an account", httpMethod = "POST")
   @ApiImplicitParams(Array(
@@ -100,31 +100,33 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   def verify = {
     path("verify" / Segment) { case address =>
       post {
-        entity(as[String]) { jsText =>
-          complete {
-            val jsRes = Try {
-              val js = Json.parse(jsText)
-              val msg = (js \ "message").as[String]
-              val signature = (js \ "signature").as[String]
-              val pubKey = (js \ "publickey").as[String]
+        respondWithMediaType(`application/json`) {
+          entity(as[String]) { jsText =>
+            complete {
 
-              if (!Account.isValidAddress(address)) {
-                InvalidAddress.json
-              } else {
-                //DECODE SIGNATURE
-                (Base58.decode(msg), Base58.decode(signature), Base58.decode(pubKey)) match {
-                  case (Failure(_), _, _) => InvalidMessage.json
-                  case (_, Failure(_), _) => InvalidSignature.json
-                  case (_, _, Failure(_)) => InvalidPublicKey.json
-                  case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-                    val account = new PublicKeyAccount(pubKeyBytes)
-                    val isValid = account.address == address &&
-                      SigningFunctionsImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
-                    Json.obj("valid" -> isValid)
-                }
+              val parsed = Try(Json.parse(jsText)).getOrElse(WrongJson.json)
+              val jsRes = parsed.validate[Message] match {
+                case err: JsError =>
+                  WrongJson.json
+                case JsSuccess(m: Message, _) =>
+                  if (!Account.isValidAddress(address)) {
+                    InvalidAddress.json
+                  } else {
+                    //DECODE SIGNATURE
+                    (Base58.decode(m.message), Base58.decode(m.signature), Base58.decode(m.publickey)) match {
+                      case (Failure(_), _, _) => InvalidMessage.json
+                      case (_, Failure(_), _) => InvalidSignature.json
+                      case (_, _, Failure(_)) => InvalidPublicKey.json
+                      case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
+                        val account = new PublicKeyAccount(pubKeyBytes)
+                        val isValid = account.address == address &&
+                          SigningFunctionsImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
+                        Json.obj("valid" -> isValid)
+                    }
+                  }
               }
-            }.getOrElse(WrongJson.json)
-            Json.stringify(jsRes)
+              Json.stringify(jsRes)
+            }
           }
         }
       }
@@ -249,4 +251,24 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
         "balance" -> state.balance(address, confirmations)
       )
     }
+
+
+  // Workaround to show datatype of post request without using it in another route
+  // Related: https://github.com/swagger-api/swagger-core/issues/606
+  // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
+  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[Message])
+  protected def showPayment = Unit
+
+}
+
+case class Message(message: String, signature: String, publickey: String)
+
+object Message {
+
+  implicit val messageReads: Reads[Message] = (
+    (JsPath \ "message").read[String] and
+      (JsPath \ "signature").read[String] and
+      (JsPath \ "publickey").read[String]
+    ) (Message.apply _)
+
 }

@@ -13,7 +13,7 @@ object Payment {
       (JsPath \ "recipient").write[String]
     ) (unlift(Payment.unapply))
 
-  implicit val locationReads: Reads[Payment] = (
+  implicit val paymentReads: Reads[Payment] = (
     (JsPath \ "amount").read[Long] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "sender").read[String] and
