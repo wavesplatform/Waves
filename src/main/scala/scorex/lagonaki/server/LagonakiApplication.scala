@@ -17,7 +17,7 @@ import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.wallet.Wallet
+import scorex.transaction.state.wallet.{Payment, Wallet}
 import scorex.utils.{NTP, ScorexLogging}
 import spray.can.Http
 import scala.reflect.runtime.universe._
@@ -35,16 +35,16 @@ class LagonakiApplication(val settingsFilename: String)
 
   override implicit val consensusModule =
     appConf.getString("consensusAlgo") match {
-    case s:String if s.equalsIgnoreCase("nxt") =>
-      new NxtLikeConsensusModule
-    case s:String if s.equalsIgnoreCase("qora") =>
-      new QoraLikeConsensusModule
-    case algo =>
-      log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
-      new NxtLikeConsensusModule
-  }
+      case s: String if s.equalsIgnoreCase("nxt") =>
+        new NxtLikeConsensusModule
+      case s: String if s.equalsIgnoreCase("qora") =>
+        new QoraLikeConsensusModule
+      case algo =>
+        log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
+        new NxtLikeConsensusModule
+    }
 
-  override implicit val transactionModule:SimpleTransactionModule = new SimpleTransactionModule
+  override implicit val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
 
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
   lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this, networkController))
@@ -73,7 +73,21 @@ class LagonakiApplication(val settingsFilename: String)
     PeersHttpService(this),
     AddressApiRoute(wallet, storedState)
   )
-  override lazy val apiTypes =  Seq(typeOf[PaymentApiRoute], typeOf[PeersHttpService], typeOf[ScorexApiRoute])
+
+  override lazy val apiTypes = Seq(
+    typeOf[BlocksApiRoute],
+    typeOf[TransactionsApiRoute],
+    consensusApiRoute match {
+      case nxt: NxtConsensusApiRoute => typeOf[NxtConsensusApiRoute]
+      case qora: QoraConsensusApiRoute => typeOf[QoraConsensusApiRoute]
+    },
+    typeOf[WalletApiRoute],
+    typeOf[PaymentApiRoute],
+    typeOf[ScorexApiRoute],
+    typeOf[SeedApiRoute],
+    typeOf[PeersHttpService],
+    typeOf[AddressApiRoute]
+  )
 
   def checkGenesis(): Unit = {
     if (blockchainImpl.isEmpty) {
@@ -123,6 +137,12 @@ class LagonakiApplication(val settingsFilename: String)
     if (UnconfirmedTransactionsDatabaseImpl.putIfNew(transaction)) {
       networkController ! NetworkController.BroadcastMessage(TransactionMessage(transaction))
     }
+
+  def createPayment(payment: Payment): Option[PaymentTransaction] = {
+    wallet.privateKeyAccount(payment.sender).map { sender =>
+      createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
+    }
+  }
 
   def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
     val time = NTP.correctedTime()

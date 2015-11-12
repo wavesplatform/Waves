@@ -16,7 +16,7 @@ import spray.http.MediaTypes._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-@Api(value = "/peers", description = "Get info about peers", position = 1)
+@Api(value = "/peers", description = "Get info about peers", position = 2)
 case class PeersHttpService(application: LagonakiApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
@@ -46,8 +46,6 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
     }
   }
 
-
-  //TODO ????
   @Path("/score")
   @ApiOperation(value = "Score", notes = "Node with a maximum blockchain score", httpMethod = "GET")
   @ApiResponses(Array(

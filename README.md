@@ -3,9 +3,6 @@ Scorex - Lagonaki Release
 
 **The universal blockchain database framework**
 
-*This is the pretty buggy initial release version! Please report bugs found, and contribute with
-fixes, if possible.*
-
 Motivation
 ----------
 
@@ -36,6 +33,9 @@ with an another with just one line of code edited (in Constants.scala)
 * Command line client for the JSON API
 * Curve25519 for signatures
 
+
+**This is the pretty buggy initial release version! Please report bugs found, and contribute with
+fixes, if possible.**
 
 Installation
 ------------
