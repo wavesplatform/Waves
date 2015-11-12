@@ -13,8 +13,6 @@ import scorex.transaction.state.wallet.Wallet
 case class WalletApiRoute(wallet: Wallet)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
-  implicit val w = wallet
-
   override lazy val route = {
     pathPrefix("wallet") {
       root ~ seed
@@ -27,7 +25,7 @@ case class WalletApiRoute(wallet: Wallet)(implicit val context: ActorRefFactory)
     path("seed") {
       jsonRoute {
         lazy val seedJs = Json.obj("seed" -> Base58.encode(wallet.exportSeed()))
-        walletNotExists().getOrElse(seedJs).toString
+        walletNotExists(wallet).getOrElse(seedJs).toString
       }
 
     }

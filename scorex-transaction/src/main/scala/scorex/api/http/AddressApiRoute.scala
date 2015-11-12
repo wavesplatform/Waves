@@ -19,8 +19,6 @@ import scala.util.{Failure, Success, Try}
 case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
-  implicit val w = wallet
-
   override lazy val route =
     pathPrefix("addresses") {
       root ~ validate ~ seed ~ confirmationBalance ~ balance ~ geenratingBalance ~ verify ~ sign ~ deleteAddress ~ create
@@ -34,7 +32,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   def deleteAddress = {
     path(Segment) { case address =>
       jsonRoute({
-        val jsRes = walletNotExists().getOrElse {
+        val jsRes = walletNotExists(wallet).getOrElse {
           if (!Account.isValidAddress(address)) {
             InvalidAddress.json
           } else {
@@ -60,7 +58,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
         respondWithMediaType(`application/json`) {
           entity(as[String]) { message =>
             complete {
-              val jsRes = walletNotExists().getOrElse {
+              val jsRes = walletNotExists(wallet).getOrElse {
                 if (!Account.isValidAddress(address)) {
                   InvalidAddress.json
                 } else {
@@ -188,7 +186,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
     path("seed" / Segment) { case address =>
       jsonRoute {
         //CHECK IF WALLET EXISTS
-        val jsRes = withPrivateKeyAccount(address) { account =>
+        val jsRes = withPrivateKeyAccount(wallet, address) { account =>
           wallet.exportAccountSeed(account.address) match {
             case None => WalletSeedExportFailed.json
             case Some(seed) => Json.obj("address" -> address, "seed" -> Base58.encode(seed))
@@ -230,7 +228,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
     path("") {
       jsonRoute({
         val jsRes =
-          walletNotExists().getOrElse {
+          walletNotExists(wallet).getOrElse {
             wallet.generateNewAccount() match {
               case Some(pka) => Json.obj("address" -> pka.address)
               case None => Unknown.json

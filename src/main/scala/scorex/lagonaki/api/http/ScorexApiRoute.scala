@@ -62,5 +62,4 @@ case class ScorexApiRoute(application: LagonakiApplication)(implicit val context
       }
     }
   }
-
 }

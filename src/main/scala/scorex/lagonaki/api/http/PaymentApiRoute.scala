@@ -2,22 +2,21 @@ package scorex.lagonaki.api.http
 
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
-import play.api.libs.json.{JsError, JsSuccess, JsResult, Json}
-import scorex.account.Account
+import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.api.http._
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.state.wallet.Payment
 import spray.http.MediaTypes._
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 @Api(value = "/payment", description = "Payment operations.", position = 1)
 case class PaymentApiRoute(application: LagonakiApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   implicit lazy val transactionModule = application.transactionModule
-  implicit lazy val wallet = application.wallet
+  lazy val wallet = application.wallet
 
   override lazy val route = payment
 
@@ -39,7 +38,7 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
     post {
       respondWithMediaType(`application/json`) {
         entity(as[String]) { body => complete {
-          walletNotExists().getOrElse {
+          walletNotExists(wallet).getOrElse {
             Try(Json.parse(body)).map { js =>
               js.validate[Payment] match {
                 case err: JsError =>
@@ -69,7 +68,7 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
                   }
               }
             }.getOrElse(WrongJson.json)
-          }.toString()
+          }.toString
         }
         }
       }

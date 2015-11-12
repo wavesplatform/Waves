@@ -17,8 +17,6 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: 
                           (implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
-  private implicit val history: History = blockchain
-
   override val route: Route =
     pathPrefix("consensus") {
       algo ~ basetarget ~ baseTargetId ~ generationSignature ~ generationSignatureId
@@ -32,7 +30,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: 
   def generationSignatureId = {
     path("generationsignature" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(encodedSignature) { block =>
+        withBlock(blockchain, encodedSignature) { block =>
           val gs = consensusModule.consensusBlockData(block).generationSignature
           Json.obj(
             "generation-signature" -> Base58.encode(gs)
@@ -62,7 +60,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: 
   def baseTargetId = {
     path("basetarget" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(encodedSignature) { block =>
+        withBlock(blockchain, encodedSignature) { block =>
           Json.obj(
             "base-target" -> consensusModule.consensusBlockData(block).baseTarget
           )

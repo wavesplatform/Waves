@@ -7,7 +7,7 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidNotNumber}
 import scorex.consensus.qora.QoraLikeConsensusModule
-import scorex.transaction.{BlockChain, History}
+import scorex.transaction.BlockChain
 import spray.routing.Route
 
 import scala.util.Try
@@ -16,8 +16,6 @@ import scala.util.Try
 case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, blockchain: BlockChain)
                                 (implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
-
-  private implicit val history: History = blockchain
 
   override val route: Route =
     pathPrefix("consensus") {
@@ -32,7 +30,7 @@ case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, block
   def generating = {
     path("generatingbalance" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(encodedSignature) { block =>
+        withBlock(blockchain, encodedSignature) { block =>
           Json.obj(
             "generatingbalance" -> consensusModule.consensusBlockData(block).generatingBalance
           )

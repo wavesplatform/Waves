@@ -14,9 +14,6 @@ import spray.routing.Route
 case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
-  implicit val b = blockchain
-  implicit val w = wallet
-
   override lazy val route =
     pathPrefix("blocks") {
       signature ~ first ~ last ~ at ~ height ~ heightEncoded ~ child ~ address
@@ -30,7 +27,7 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def address: Route = {
     path("address" / Segment) { case address =>
       jsonRoute {
-        withPrivateKeyAccount(address) { account =>
+        withPrivateKeyAccount(wallet, address) { account =>
           Json.arr(blockchain.generatedBy(account).map(_.json))
         }.toString()
       }
@@ -45,7 +42,7 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def child: Route = {
     path("child" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(encodedSignature) { block =>
+        withBlock(blockchain, encodedSignature) { block =>
           blockchain.children(block).head.json
         }.toString()
       }
@@ -60,7 +57,7 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def heightEncoded: Route = {
     path("height" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(encodedSignature) { block =>
+        withBlock(blockchain, encodedSignature) { block =>
           Json.obj("height" -> blockchain.heightOf(block))
         }.toString()
       }
@@ -122,7 +119,7 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def signature: Route = {
     path("signature" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(encodedSignature)(_.json).toString()
+        withBlock(blockchain, encodedSignature)(_.json).toString()
       }
     }
   }

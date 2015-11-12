@@ -13,9 +13,8 @@ trait CommonApiFunctions {
 
   def json(t: Throwable) = Json.obj("error" -> Unknown.id, "message" -> t.getMessage)
 
-  protected[api] def withBlock(encodedSignature: String)
-                              (action: Block => JsValue)
-                              (implicit history: History): JsValue =
+  protected[api] def withBlock(history: History, encodedSignature: String)
+                              (action: Block => JsValue): JsValue =
     Base58.decode(encodedSignature).toOption.map { signature =>
       history.blockById(signature) match {
         case Some(block) => action(block)
