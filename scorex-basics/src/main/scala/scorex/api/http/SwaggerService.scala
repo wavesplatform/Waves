@@ -23,7 +23,15 @@ trait SwaggerService {
 
     override def actorRefFactory = context
 
-    override def apiInfo = Some(new ApiInfo("Scorex API", "Swagger service to describe scorex API/", "TOC Url", "kushti@protonmail.ch", "Apache V2", "http://www.apache.org/licenses/LICENSE-2.0"))
+    override def apiInfo = Some(
+      new ApiInfo(
+        "Scorex API",
+        "Swagger service to describe Scorex API/",
+        "TOC Url",
+        "kushti@protonmail.ch",
+        "Creative Commons CC0",
+        "https://github.com/ScorexProject/Scorex-Lagonaki/blob/master/COPYING")
+    )
 
     //authorizations, not used
   }
