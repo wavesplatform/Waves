@@ -22,7 +22,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
 
   override lazy val route =
     pathPrefix("addresses") {
-      root ~ validate ~ seed ~ confirmationBalance ~ balance ~ geenratingBalance ~ verify ~ sign ~ deleteAddress ~ create
+      root ~ validate ~ seed ~ confirmationBalance ~ balance ~ geenratingBalance ~ verify ~ sign ~ deleteAddress ~ create ~ verifyText ~ signText
     }
 
   @Path("/{address}")
@@ -53,34 +53,27 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
     new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "String"),
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
   ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"Base58-encoded\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
+  ))
   def sign = {
     path("sign" / Segment) { case address =>
-      post {
-        respondWithMediaType(`application/json`) {
-          entity(as[String]) { message =>
-            complete {
-              val jsRes = walletNotExists(wallet).getOrElse {
-                if (!Account.isValidAddress(address)) {
-                  InvalidAddress.json
-                } else {
-                  wallet.privateKeyAccount(address) match {
-                    case None => WalletAddressNotExists.json
-                    case Some(account) =>
-                      Try(SigningFunctionsImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
-                        case Success(signature) =>
-                          Json.obj("message" -> Base58.encode(message.getBytes),
-                            "publickey" -> Base58.encode(account.publicKey),
-                            "signature" -> Base58.encode(signature))
-                        case Failure(t) => json(t)
-                      }
-                  }
-                }
-              }
-              jsRes.toString()
-            }
-          }
-        }
-      }
+      signPath(address, encode = true)
+    }
+  }
+
+  @Path("/signText/{address}")
+  @ApiOperation(value = "Sign", notes = "Sign a message with a private key associated with {address}", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "String"),
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
+  ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"plain text\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
+  ))
+  def signText = {
+    path("signText" / Segment) { case address =>
+      signPath(address, encode = false)
     }
   }
 
@@ -99,39 +92,29 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   ))
   def verify = {
     path("verify" / Segment) { case address =>
-      post {
-        respondWithMediaType(`application/json`) {
-          entity(as[String]) { jsText =>
-            complete {
-
-              val parsed = Try(Json.parse(jsText)).getOrElse(WrongJson.json)
-              val jsRes = parsed.validate[Message] match {
-                case err: JsError =>
-                  WrongJson.json
-                case JsSuccess(m: Message, _) =>
-                  if (!Account.isValidAddress(address)) {
-                    InvalidAddress.json
-                  } else {
-                    //DECODE SIGNATURE
-                    (Base58.decode(m.message), Base58.decode(m.signature), Base58.decode(m.publickey)) match {
-                      case (Failure(_), _, _) => InvalidMessage.json
-                      case (_, Failure(_), _) => InvalidSignature.json
-                      case (_, _, Failure(_)) => InvalidPublicKey.json
-                      case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-                        val account = new PublicKeyAccount(pubKeyBytes)
-                        val isValid = account.address == address &&
-                          SigningFunctionsImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
-                        Json.obj("valid" -> isValid)
-                    }
-                  }
-              }
-              Json.stringify(jsRes)
-            }
-          }
-        }
-      }
+      verifyPath(address, decode = true)
     }
   }
+
+  @Path("/verifyText/{address}")
+  @ApiOperation(value = "Verify text", notes = "Check a signature of a message signed by an account", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path"),
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "Message",
+      defaultValue = "{\n\t\"message\":\"Plain message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
+    )
+  ))
+  def verifyText = {
+    path("verifyText" / Segment) { case address =>
+      verifyPath(address, decode = false)
+    }
+  }
+
 
   @Path("/generatingbalance/{address}")
   @ApiOperation(value = "Generating balance", notes = "Account's generating balance(the same as balance atm)", httpMethod = "GET")
@@ -173,8 +156,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
     path("balance" / Segment / IntNumber) { case (address, confirmations) =>
       //todo: confirmations parameter doesn't work atm
       jsonRoute {
-        val jsRes = balanceJson(address, confirmations)
-        Json.stringify(jsRes)
+        Json.stringify(balanceJson(address, confirmations))
       }
     }
   }
@@ -252,6 +234,69 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
       )
     }
 
+  private def signPath(address: String, encode: Boolean) = {
+    post {
+      respondWithMediaType(`application/json`) {
+        entity(as[String]) { message =>
+          complete {
+            val jsRes = walletNotExists(wallet).getOrElse {
+              if (!Account.isValidAddress(address)) {
+                InvalidAddress.json
+              } else {
+                wallet.privateKeyAccount(address) match {
+                  case None => WalletAddressNotExists.json
+                  case Some(account) =>
+                    Try(SigningFunctionsImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
+                      case Success(signature) =>
+                        val msg = if (encode) Base58.encode(message.getBytes) else message
+                        Json.obj("message" -> msg,
+                          "publickey" -> Base58.encode(account.publicKey),
+                          "signature" -> Base58.encode(signature))
+                      case Failure(t) => json(t)
+                    }
+                }
+              }
+            }
+            jsRes.toString()
+          }
+        }
+      }
+    }
+  }
+
+  private def verifyPath(address: String, decode: Boolean) = {
+    post {
+      respondWithMediaType(`application/json`) {
+        entity(as[String]) { jsText =>
+          complete {
+            val parsed = Try(Json.parse(jsText)).getOrElse(WrongJson.json)
+            val jsRes = parsed.validate[Message] match {
+              case err: JsError =>
+                WrongJson.json
+              case JsSuccess(m: Message, _) =>
+                if (!Account.isValidAddress(address)) {
+                  InvalidAddress.json
+                } else {
+                  //DECODE SIGNATURE
+                  val msg: Try[Array[Byte]] = if (decode) Base58.decode(m.message) else Success(m.message.getBytes)
+                  (msg, Base58.decode(m.signature), Base58.decode(m.publickey)) match {
+                    case (Failure(_), _, _) => InvalidMessage.json
+                    case (_, Failure(_), _) => InvalidSignature.json
+                    case (_, _, Failure(_)) => InvalidPublicKey.json
+                    case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
+                      val account = new PublicKeyAccount(pubKeyBytes)
+                      val isValid = account.address == address &&
+                        SigningFunctionsImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
+                      Json.obj("valid" -> isValid)
+                  }
+                }
+            }
+            Json.stringify(jsRes)
+          }
+        }
+      }
+    }
+  }
 
   // Workaround to show datatype of post request without using it in another route
   // Related: https://github.com/swagger-api/swagger-core/issues/606
