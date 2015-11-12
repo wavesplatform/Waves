@@ -68,7 +68,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
                     case Some(account) =>
                       Try(SigningFunctionsImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
                         case Success(signature) =>
-                          Json.obj("message" -> message,
+                          Json.obj("message" -> Base58.encode(message.getBytes),
                             "publickey" -> Base58.encode(account.publicKey),
                             "signature" -> Base58.encode(signature))
                         case Failure(t) => json(t)
