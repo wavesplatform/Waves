@@ -79,6 +79,6 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
   // Related: https://github.com/swagger-api/swagger-core/issues/606
   // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
   @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[Payment])
-  protected def showPayment = Unit
+  protected def paymentModel = Unit
 
 }

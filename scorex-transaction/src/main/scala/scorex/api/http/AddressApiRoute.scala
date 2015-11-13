@@ -22,7 +22,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
 
   override lazy val route =
     pathPrefix("addresses") {
-      root ~ validate ~ seed ~ confirmationBalance ~ balance ~ geenratingBalance ~ verify ~ sign ~ deleteAddress ~ create ~ verifyText ~ signText
+      root ~ validate ~ seed ~ confirmationBalance ~ balance ~ generatingBalance ~ verify ~ sign ~ deleteAddress ~ create ~ verifyText ~ signText
     }
 
   @Path("/{address}")
@@ -121,7 +121,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
   ))
-  def geenratingBalance = {
+  def generatingBalance = {
     path("generatingbalance" / Segment) { case address =>
       jsonRoute {
         val jsRes = if (!Account.isValidAddress(address)) {
@@ -302,7 +302,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   // Related: https://github.com/swagger-api/swagger-core/issues/606
   // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
   @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[Message])
-  protected def showPayment = Unit
+  protected def messagesModel = Unit
 
 }
 
