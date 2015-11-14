@@ -6,6 +6,7 @@ import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
 import scorex.app.Application
+import scorex.consensus.LagonakiConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
 import scorex.lagonaki.api.http.{PeersHttpService, PaymentApiRoute, ScorexApiRoute}
