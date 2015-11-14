@@ -32,9 +32,17 @@ lazy val consensus = subModule("consensus")
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
   )
 
+lazy val perma = subModule("perma")
+  .aggregate(basics)
+  .dependsOn(basics)
+  .settings(commonSettings: _*)
+  .settings(
+    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
+  )
+
 lazy val root = Project(id = "scorex", base = file("."))
-  .aggregate(basics, transaction, consensus)
-  .dependsOn(basics, transaction, consensus)
+  .aggregate(basics, transaction, consensus, perma)
+  .dependsOn(basics, transaction, consensus, perma)
   .settings(commonSettings: _*)
   .settings(
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
