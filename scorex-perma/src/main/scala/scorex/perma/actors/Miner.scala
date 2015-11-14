@@ -2,7 +2,7 @@ package scorex.perma.actors
 
 import java.security.SecureRandom
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{ActorLogging, Actor, ActorRef}
 import scorex.crypto.SigningFunctions.{PublicKey, Signature}
 import scorex.crypto.{SigningFunctions, SigningFunctionsImpl}
 import scorex.perma.Parameters
@@ -19,7 +19,7 @@ case class Ticket(publicKey: PublicKey,
                   s: Array[Byte],
                   proofs: IndexedSeq[PartialProof])
 
-class Miner(trustedDealerRef: ActorRef, rootHash: CryptographicHash.Digest) extends Actor {
+class Miner(trustedDealerRef: ActorRef, rootHash: CryptographicHash.Digest) extends Actor with ActorLogging {
 
   val NoSig = Array[Byte]()
 
@@ -42,6 +42,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: CryptographicHash.Digest) exte
   override def receive = {
 
     case Initialize =>
+      log.info("Initialize")
 
       val segmentIdsToDownload = 1.to(Parameters.l).map { i =>
         u(publicKey, i)
@@ -50,10 +51,12 @@ class Miner(trustedDealerRef: ActorRef, rootHash: CryptographicHash.Digest) exte
       trustedDealerRef ! SegmentsRequest(segmentIdsToDownload)
 
     case SegmentsToStore(sgs) =>
+      log.info("SegmentsToStore({})", sgs)
       require(segments.isEmpty)
       segments = sgs
 
     case TicketGeneration(puz) =>
+      log.info("TicketGeneration({})", puz)
       //scratch-off for the Local-POR lottery
       val s = randomBytes(32)
 
@@ -73,7 +76,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: CryptographicHash.Digest) exte
     Ticket(publicKey, s, proofs)
 
     case TicketValidation(puz, Ticket(pk, s, proofs)) =>
-
+      log.info("TicketValidation({}, {})", puz, Ticket(pk, s, proofs))
       require(proofs.size == Parameters.k)
       Try {
 

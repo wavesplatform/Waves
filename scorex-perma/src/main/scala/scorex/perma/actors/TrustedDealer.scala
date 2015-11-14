@@ -12,6 +12,8 @@ class TrustedDealer(val dataSet: Array[DataSegment]) extends Actor with ActorLog
 
   override def receive = {
     case SegmentsRequest(segmentIds) =>
+      log.info("SegmentsRequest({})", segmentIds)
+
       val segments: Subset = segmentIds.map { x =>
         x -> tree.byIndex(x)
       }.toMap.collect {
