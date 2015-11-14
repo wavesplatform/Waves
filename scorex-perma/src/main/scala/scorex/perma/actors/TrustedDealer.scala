@@ -1,15 +1,25 @@
 package scorex.perma.actors
 
-import akka.actor.Actor
+import akka.actor.{ActorLogging, Actor}
+import scorex.perma.Parameters.DataSegment
 import scorex.perma.actors.MinerSpec.Subset
-import scorex.perma.merkle.CryptographicHash
+import scorex.perma.actors.TrustedDealerSpec.{SegmentsToStore, SegmentsRequest}
+import scorex.perma.merkle.{MerkleTree, CryptographicHash}
 
-case class Segment(id:Int, data:Array[Byte], merklePath: Seq[CryptographicHash.Digest])
+class TrustedDealer(val dataSet: Array[DataSegment]) extends Actor with ActorLogging {
 
-class TrustedDealer extends Actor {
+  val tree = MerkleTree.create(dataSet)
 
   override def receive = {
-    case _ =>
+    case SegmentsRequest(segmentIds) =>
+      val segments: Subset = segmentIds.map { x =>
+        x -> tree.byIndex(x)
+      }.toMap.collect {
+        case (key, Some(value)) => key -> value
+      }
+      sender ! SegmentsToStore(segments)
+    case m =>
+      log.warning("Unknown message: {}", m)
   }
 
 }
@@ -18,7 +28,8 @@ object TrustedDealerSpec {
 
   case object PublishDataset
 
-  case class SegmentsRequest(segments:Array[Int])
+  case class SegmentsRequest(segments: Array[Int])
 
   case class SegmentsToStore(segments: Subset)
+
 }
