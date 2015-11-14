@@ -29,7 +29,6 @@ object TestApp extends App {
   val miners: Seq[ActorRef] = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], dealer, tree.hash)))
 
   log.info("start sending requests")
-//  miners.head ! Initialize
   miners.foreach { m =>
     m ! Initialize
     Thread.sleep(1000)
