@@ -4,11 +4,13 @@ import akka.actor.{ActorRef, Props, ActorSystem}
 import org.slf4j.LoggerFactory
 import scorex.perma.actors.MinerSpec.{TicketGeneration, Initialize}
 import scorex.perma.actors.{Miner, TrustedDealer}
-import scorex.perma.merkle.{HashImpl, MerkleTree}
+import scorex.perma.merkle.MerkleTree
 
 import scala.util.Random
 
 object TestApp extends App {
+
+  val MinersCount = 1
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -24,7 +26,7 @@ object TestApp extends App {
   log.info("start actor system")
   protected lazy val actorSystem = ActorSystem("lagonaki")
   val dealer = actorSystem.actorOf(Props(classOf[TrustedDealer], dataSet))
-  val miners: Seq[ActorRef] = (1 to 10).map(x => actorSystem.actorOf(Props(classOf[Miner], dealer, tree.hash)))
+  val miners: Seq[ActorRef] = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], dealer, tree.hash)))
 
   log.info("start sending requests")
 //  miners.head ! Initialize
