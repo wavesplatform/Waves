@@ -17,46 +17,84 @@ trait MerkleTreeI[A] {
 
 object MerkleTree {
 
-  type Block = Array[Byte]
+  def check[A, Hash <: CryptographicHash](index: Int, rootHash: Digest, data: A, treePath: Seq[Digest])
+                                         (hashFunction: Hash = HashImpl): Boolean = {
 
+    def calculateHash(i: Int, nodeHash: Digest, path: Seq[Digest]): Digest = {
+      if (i % 2 == 0) {
+        val hash = hashFunction.hash(nodeHash ++ path.head)
+        if (path.size == 1) {
+          hash
+        } else {
+          calculateHash(i / 2, hash, path.tail)
+        }
+      } else {
+        val hash = hashFunction.hash(path.head ++ nodeHash)
+        if (path.size == 1) {
+          hash
+        } else {
+          calculateHash(i / 2, hash, path.tail)
+        }
+      }
+    }
+    val calculated = calculateHash(index, hashFunction.hash(data.toString.getBytes), treePath)
+    calculated.mkString == rootHash.mkString
+  }
 
-  class MerkleTree[A, Hash <: CryptographicHash](val tree: Tree[A, Hash], val leaves: Seq[Tree[A, Hash]]) extends MerkleTreeI[A] {
+  class MerkleTree[A, Hash <: CryptographicHash](val tree: Tree[A, Hash], val leaves: Seq[Tree[A, Hash]])
+    extends MerkleTreeI[A] {
 
     val Size = leaves.size
-    lazy val rootNode:Node[A, Hash] = tree.asInstanceOf[Node[A, Hash]]
+    lazy val rootNode: Node[A, Hash] = tree.asInstanceOf[Node[A, Hash]]
+    lazy val hash = tree.hash
 
-    def byIndex(n: Int): Option[AuthDataBlock[A]] = {
+    def byIndex(index: Int): Option[AuthDataBlock[A]] = {
       @tailrec
-      def calculateTreePath(n: Int, node:Node[A, Hash], levelSize: Int, acc: Seq[Digest] = Seq()): Seq[Digest] = {
-        if(n< levelSize/2) {
+      def calculateTreePath(n: Int, node: Node[A, Hash], levelSize: Int, acc: Seq[Digest] = Seq()): Seq[Digest] = {
+        if (n < levelSize / 2) {
           node.leftChild match {
-            case leftNode:Node[A, Hash] =>
-              calculateTreePath(n, leftNode, levelSize/2, node.hash +: acc)
+            case nd: Node[A, Hash] =>
+              calculateTreePath(n, nd, levelSize / 2, node.rightChild.hash +: acc)
             case _ =>
-              acc
+              node.rightChild.hash +: acc
           }
         } else {
           node.rightChild match {
-            case rightNode:Node[A, Hash] =>
-              calculateTreePath(n - levelSize/2, rightNode, levelSize/2, node.hash +: acc)
+            case nd: Node[A, Hash] =>
+              calculateTreePath(n - levelSize / 2, nd, levelSize / 2, node.leftChild.hash +: acc)
             case _ =>
-              acc
+              node.leftChild.hash +: acc
           }
         }
       }
 
-      val leaf = leaves.lift(n)
+      val leaf = leaves.lift(index)
       if (leaf.isEmpty) {
         None
       } else {
         leaf.get match {
           case Leaf(data) =>
-            val treePath = calculateTreePath(n, rootNode, Size)
+            val treePath = calculateTreePath(index, rootNode, Size)
             Some(AuthDataBlock(data, treePath))
           case _ =>
             None
         }
       }
+    }
+
+    override def toString(): String = {
+      def printHashes(node: Tree[Any, Hash], prefix: String = ""): List[String] = {
+        node match {
+          case Node(leftChild: Tree[A, Hash], rightChild: Tree[A, Hash]) =>
+            (prefix + node.hash.mkString) :: printHashes(leftChild, " " + prefix) ++
+              printHashes(rightChild, " " + prefix)
+          case l: Leaf[A, Hash] =>
+            List(prefix + l.hash.mkString)
+          case _ =>
+            List()
+        }
+      }
+      printHashes(tree).mkString("\n")
     }
   }
 
@@ -70,8 +108,8 @@ object MerkleTree {
                                                   rightChild: Tree[A, Hash])(hashFunction: Hash)
     extends Tree[A, Hash] {
 
-    override val hash: Digest =
-      hashFunction.hash(leftChild.hash ++ rightChild.hash)
+    override val hash: Digest = hashFunction.hash(leftChild.hash ++ rightChild.hash)
+
   }
 
   case class Leaf[+A, Hash <: CryptographicHash](data: A)(hashFunction: Hash)
@@ -122,7 +160,7 @@ object MerkleTree {
       merge(leftChild, rightChild, hashFunction)
     }
 
-    if (trees.size == 0) {
+    if (trees.isEmpty) {
       EmptyLeaf()(hashFunction)
     } else if (trees.size == 1) {
       trees.head
