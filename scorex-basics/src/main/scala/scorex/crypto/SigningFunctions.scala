@@ -1,5 +1,7 @@
 package scorex.crypto
 
+import java.security.SecureRandom
+
 import net.vrallev.java.ecc.{Ecc25519Helper, KeyHolder}
 import scorex.account.PrivateKeyAccount
 import scorex.utils.ScorexLogging
@@ -16,6 +18,12 @@ trait SigningFunctions {
   val KeyLength: Int
 
   def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey)
+
+  def createKeyPair: (PrivateKey, PublicKey) = {
+    val seed = new Array[Byte](KeyLength)
+    new SecureRandom().nextBytes(seed) // modifies seed
+    createKeyPair(seed)
+  }
 
   def sign(privateKey: PrivateKey, message: MessageToSign): Signature
 
