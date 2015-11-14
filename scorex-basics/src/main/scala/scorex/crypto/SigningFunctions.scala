@@ -9,10 +9,7 @@ import scorex.utils.ScorexLogging
 import scala.util.{Failure, Try}
 
 trait SigningFunctions {
-  type PrivateKey = Array[Byte]
-  type PublicKey = Array[Byte]
-  type Signature = Array[Byte]
-  type MessageToSign = Array[Byte]
+  import SigningFunctions._
 
   val SignatureLength: Int
   val KeyLength: Int
@@ -33,7 +30,15 @@ trait SigningFunctions {
   def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean
 }
 
+object SigningFunctions {
+  type PrivateKey = Array[Byte]
+  type PublicKey = Array[Byte]
+  type Signature = Array[Byte]
+  type MessageToSign = Array[Byte]
+}
+
 object SigningFunctionsImpl extends SigningFunctions with ScorexLogging {
+  import SigningFunctions._
 
   override val SignatureLength = 64
   override val KeyLength = 32
