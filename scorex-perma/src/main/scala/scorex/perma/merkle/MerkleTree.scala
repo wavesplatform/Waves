@@ -3,19 +3,42 @@ package scorex.perma.merkle
 import scala.annotation.tailrec
 import scala.math
 
-trait MerkleTree[Data] {
+case class AuthDataBlock[A](data: A, merklePath: Seq[MerkleTree.Digest])
 
-  case class AuthDataBlock(data: Data, merklePath: Seq[Digest]) //bottom up
+//bottom up
 
-  type Digest = Array[Byte]
+trait MerkleTreeI[A] {
 
-  val Size: Int
-
-  def byIndex(n: Int): AuthDataBlock // require(n < Size)
+  def byIndex(n: Int): Option[AuthDataBlock[A]]
 }
 
 
 object MerkleTree {
+
+  type Block = Array[Byte]
+  type Digest = Array[Byte]
+
+  class MerkleTree[A, Hash <: CryptographicHash](val tree: Tree[A, Hash], val leaves: Seq[Tree[A, Hash]]) extends MerkleTreeI[A] {
+
+    val Size = leaves.size
+
+    def byIndex(n: Int): Option[AuthDataBlock[A]] = {
+      val leaf = leaves.lift(n)
+      if (leaf.isEmpty) {
+        None
+      } else {
+        leaf.get match {
+          case Leaf(data) =>
+            val treePath = Seq()
+            Some(AuthDataBlock(data, treePath))
+          case _ => None
+        }
+      }
+    }
+
+
+  }
+
 
   sealed trait Tree[+A, Hash <: CryptographicHash] {
     val hash: Vector[Byte]
@@ -42,7 +65,7 @@ object MerkleTree {
 
   def create[A, Hash <: CryptographicHash](
                                             dataBlocks: Seq[A],
-                                            hashFunction: Hash = HashImpl): Tree[A, Hash] = {
+                                            hashFunction: Hash = HashImpl): MerkleTree[A, Hash] = {
     val level = calculateRequiredLevel(dataBlocks.size)
 
     val dataLeaves = dataBlocks.map(data => Leaf(data)(hashFunction))
@@ -50,9 +73,9 @@ object MerkleTree {
     val paddingNeeded = math.pow(2, level).toInt - dataBlocks.size
     val padding = Seq.fill(paddingNeeded)(EmptyLeaf()(hashFunction))
 
-    val leaves = dataLeaves ++ padding
+    val leaves: Seq[Tree[A, Hash]] = dataLeaves ++ padding
 
-    makeTree(leaves, hashFunction)
+    new MerkleTree(makeTree(leaves, hashFunction), leaves)
   }
 
   def merge[A, Hash <: CryptographicHash](

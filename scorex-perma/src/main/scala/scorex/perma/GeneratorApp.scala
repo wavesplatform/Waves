@@ -14,10 +14,11 @@ object GeneratorApp extends App {
   val fullFile  = dataSet.mkString("")
 
   val tree = MerkleTree.create(dataSet)
-  val hash = tree.hash
+  val hash = tree.tree.hash
 
   println(dataSet)
   println(fullFile)
   println(hash)
-  println(tree)
+  println(tree.tree)
+  println(tree.byIndex(0))
 }
