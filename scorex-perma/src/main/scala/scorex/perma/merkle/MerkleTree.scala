@@ -5,7 +5,7 @@ import scala.math
 
 trait MerkleTree[Data] {
 
-  case class AuthDataBlock(data: Data, merklePath: Seq[Digest])
+  case class AuthDataBlock(data: Data, merklePath: Seq[Digest]) //bottom up
 
   type Digest = Array[Byte]
 
