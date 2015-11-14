@@ -1,6 +1,7 @@
 package scorex.perma.actors
 
 import akka.actor.Actor
+import scorex.perma.actors.MinerSpec.Subset
 import scorex.perma.merkle.CryptographicHash
 
 case class Segment(id:Int, data:Array[Byte], merklePath: Seq[CryptographicHash.Digest])
@@ -17,5 +18,7 @@ object TrustedDealerSpec {
 
   case object PublishDataset
 
-  case class SendOutSegments(segments:Array[Int])
+  case class SegmentsRequest(segments:Array[Int])
+
+  case class SegmentsToStore(segments: Subset)
 }
