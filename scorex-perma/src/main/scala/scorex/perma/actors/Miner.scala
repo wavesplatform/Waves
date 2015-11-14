@@ -2,12 +2,13 @@ package scorex.perma.actors
 
 import java.security.SecureRandom
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{ActorLogging, Actor, ActorRef}
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
 import scorex.crypto.{SigningFunctions, SigningFunctionsImpl}
 import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
+import scorex.perma.merkle.CryptographicHash.Digest
 import scorex.perma.merkle.HashImpl.hash
 import scorex.perma.merkle.{AuthDataBlock, CryptographicHash, MerkleTree}
 
@@ -19,7 +20,7 @@ case class Ticket(publicKey: PublicKey,
                   s: Array[Byte],
                   proofs: IndexedSeq[PartialProof])
 
-class Miner(trustedDealerRef: ActorRef, rootHash: CryptographicHash.Digest) extends Actor {
+class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with ActorLogging {
 
   import Miner._
 
@@ -30,6 +31,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: CryptographicHash.Digest) exte
   override def receive = {
 
     case Initialize =>
+      log.info("Initialize")
 
       val segmentIdsToDownload = 1.to(Parameters.l).map { i =>
         u(keyPair._2, i)
@@ -38,15 +40,18 @@ class Miner(trustedDealerRef: ActorRef, rootHash: CryptographicHash.Digest) exte
       trustedDealerRef ! SegmentsRequest(segmentIdsToDownload)
 
     case SegmentsToStore(sgs) =>
+      log.info("SegmentsToStore({})", sgs)
       require(segments.isEmpty)
       segments = sgs
 
     case TicketGeneration(puz) =>
+      log.info("TicketGeneration({})", puz)
       val ticket = generate(keyPair, puz, segments)
     //todo: check ticket
 
 
     case TicketValidation(puz, t: Ticket) =>
+      log.info("TicketValidation({}, {})", puz, t)
       val res = validate(keyPair._2, puz, t, rootHash)
 
   }
