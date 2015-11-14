@@ -27,10 +27,10 @@ object TestApp extends App {
   val miners: Seq[ActorRef] = (1 to 10).map(x => actorSystem.actorOf(Props(classOf[Miner], dealer, tree.hash)))
 
   log.info("start sending requests")
-  miners.head ! Initialize
-//  miners.map { m =>
-//    m ! Initialize
-//  }
+//  miners.head ! Initialize
+  miners.map { m =>
+    m ! Initialize
+  }
 
 
 }
