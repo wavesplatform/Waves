@@ -9,7 +9,7 @@ import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
 import scorex.perma.merkle.HashImpl.hash
-import scorex.perma.merkle.{AuthDataBlock, CryptographicHash}
+import scorex.perma.merkle.{MerkleTree, AuthDataBlock, CryptographicHash}
 
 import scala.util.Try
 
@@ -82,19 +82,14 @@ class Miner(trustedDealerRef: ActorRef, rootHash: CryptographicHash.Digest) exte
         val sigs = NoSig +: proofs.map(_.signature)
         val ris = proofs.map(_.segmentIndex)
 
-
-        /*
         1.to(Parameters.k).foldLeft(true){case (partialResult, i) =>
-            //val
+            val segment = proofs(i-1).segment
+
+            MerkleTree.check(ris(i-1), rootHash, segment.data, segment.merklePath)() || {
+              val hi = hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
+              SigningFunctionsImpl.verify(sigs(i), hi, publicKey)
+            }
         }
-
-        val r1 = u(publicKey, BigInt(hash(puz ++ publicKey ++ s)).mod(Parameters.l).toInt)
-
-        val result = proofs.foldLeft(((sig0, r1), true)) { case (((sig, ri), res), pi) =>
-          val hi = hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
-        } */
-
-
       }
   }
 }
