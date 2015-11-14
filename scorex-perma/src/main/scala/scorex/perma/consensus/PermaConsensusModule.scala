@@ -50,15 +50,19 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
   override def consensusBlockData(block: Block): PermaLikeConsensusBlockData =
     block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData]
 
-  override def parseBlockData(bytes: Array[Byte]): BlockField[PermaLikeConsensusBlockData] =
-    PermaConsensusBlockField(new PermaLikeConsensusBlockData{
-      override val generatorSignature: Array[Byte] = bytes
-    })
+  override def parseBlockData(bytes: Array[Byte]): BlockField[PermaLikeConsensusBlockData] = ???
 
-  override def genesisData: BlockField[PermaLikeConsensusBlockData] =
+  /*
+    PermaConsensusBlockField(new PermaLikeConsensusBlockData{
+      ???
+    })*/
+
+  override def genesisData: BlockField[PermaLikeConsensusBlockData] = ???
+
+  /*
     PermaConsensusBlockField(new PermaLikeConsensusBlockData {
       override val generatorSignature: Array[Byte] = Array.fill(32)(0: Byte)
-    })
+    })*/
 
   override def formBlockData(data: PermaLikeConsensusBlockData): BlockField[PermaLikeConsensusBlockData] =
     PermaConsensusBlockField(data)

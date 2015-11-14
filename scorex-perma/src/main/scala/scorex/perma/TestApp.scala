@@ -2,7 +2,7 @@ package scorex.perma
 
 import akka.actor.{ActorRef, Props, ActorSystem}
 import org.slf4j.LoggerFactory
-import scorex.perma.actors.MinerSpec.Initialize
+import scorex.perma.actors.MinerSpec.{TicketGeneration, Initialize}
 import scorex.perma.actors.{Miner, TrustedDealer}
 import scorex.perma.merkle.{HashImpl, MerkleTree}
 
@@ -28,9 +28,10 @@ object TestApp extends App {
 
   log.info("start sending requests")
 //  miners.head ! Initialize
-  miners.map { m =>
+  miners.foreach { m =>
     m ! Initialize
+    Thread.sleep(1000)
   }
 
-
+  miners.head ! TicketGeneration(Array(1:Byte))
 }
