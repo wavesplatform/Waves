@@ -62,7 +62,7 @@ object MerkleTree {
 
 
   sealed trait Tree[+A, Hash <: CryptographicHash] {
-    val hash: Vector[Byte]
+    val hash: Digest
   }
 
   case class Node[+A, Hash <: CryptographicHash](
@@ -81,7 +81,7 @@ object MerkleTree {
   }
 
   case class EmptyLeaf[Hash <: CryptographicHash]()(hashFunction: Hash) extends Tree[Nothing, Hash] {
-    override val hash: Digest = Vector.empty[Byte]
+    override val hash: Digest = Array.empty[Byte]
   }
 
   def create[A, Hash <: CryptographicHash](

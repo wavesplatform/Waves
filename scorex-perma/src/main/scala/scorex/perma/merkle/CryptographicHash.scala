@@ -8,5 +8,5 @@ trait CryptographicHash {
 
 object CryptographicHash {
   type Message = Seq[Byte]
-  type Digest = Vector[Byte]
+  type Digest = Array[Byte]
 }
