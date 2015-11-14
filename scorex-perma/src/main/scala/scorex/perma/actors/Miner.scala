@@ -2,7 +2,7 @@ package scorex.perma.actors
 
 import java.security.SecureRandom
 
-import akka.actor.{ActorLogging, Actor, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef}
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
 import scorex.crypto.{SigningFunctions, SigningFunctionsImpl}
 import scorex.perma.Parameters
@@ -34,7 +34,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
       log.info("Initialize")
 
       val segmentIdsToDownload = 1.to(Parameters.l).map { i =>
-        u(keyPair._2, i)
+        u(keyPair._2, i - 1)
       }.toArray
 
       trustedDealerRef ! SegmentsRequest(segmentIdsToDownload)
@@ -42,6 +42,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
     case SegmentsToStore(sgs) =>
       log.info("SegmentsToStore({})", sgs)
       require(segments.isEmpty)
+      require(sgs.size == Parameters.l)
       segments = sgs
 
     case TicketGeneration(puz) =>
@@ -65,7 +66,7 @@ object Miner {
   //calculate index of i-th segment
   private def u(pubKey: SigningFunctions.PublicKey, i: Int): Int = {
     val h = hash(pubKey ++ BigInt(i).toByteArray)
-    BigInt(h).mod(Parameters.n).toInt
+    BigInt(1, h).mod(Parameters.n).toInt
   }
 
 
@@ -84,7 +85,8 @@ object Miner {
     val s = randomBytes(32)
 
     val sig0 = NoSig
-    val r1 = u(publicKey, BigInt(hash(puz ++ publicKey ++ s)).mod(Parameters.l).toInt)
+    val r1 = u(publicKey, (BigInt(1, hash(puz ++ publicKey ++ s)) % Parameters.l).toInt)
+      .ensuring(r => segments.keySet.contains(r))
 
     val proofs = 1.to(Parameters.k).foldLeft(
       (r1, sig0, Seq[PartialProof]())
@@ -92,7 +94,9 @@ object Miner {
       case ((ri, sig_prev, seq), _) =>
         val hi = hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
         val sig = SigningFunctionsImpl.sign(privateKey, hi)
-        val r_next = u(publicKey, BigInt(hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
+        val r_next = u(publicKey, BigInt(1, hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
+          .ensuring{r => println(r); segments.keySet.contains(r)}
+
         (r_next, sig, seq :+ PartialProof(sig, ri, segments(ri)))
     }._3.toIndexedSeq.ensuring(_.size == Parameters.k)
 

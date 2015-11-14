@@ -1,6 +1,7 @@
 package scorex.perma.actors
 
 import akka.actor.{ActorLogging, Actor}
+import scorex.perma.Parameters
 import scorex.perma.Parameters.DataSegment
 import scorex.perma.actors.MinerSpec.Subset
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsToStore, SegmentsRequest}
@@ -12,7 +13,9 @@ class TrustedDealer(val dataSet: Array[DataSegment]) extends Actor with ActorLog
 
   override def receive = {
     case SegmentsRequest(segmentIds) =>
-      log.info("SegmentsRequest({})", segmentIds)
+      log.info(s"SegmentsRequest(${segmentIds.mkString(", ")})")
+
+      assert(segmentIds.length == Parameters.l)
 
       val segments: Subset = segmentIds.map { x =>
         x -> tree.byIndex(x)

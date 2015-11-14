@@ -18,7 +18,7 @@ object TestApp extends App {
 
   log.info("Generating random data set")
   val rnd = new Random()
-  val dataSet = (1 to segmentSize).map(x => Random.alphanumeric.take(n).mkString).toArray.map(_.getBytes)
+  val dataSet = (1 to n).map(x => Random.alphanumeric.take(segmentSize).mkString).toArray.map(_.getBytes)
 
   log.info("Calculate tree")
   val tree = MerkleTree.create(dataSet)
