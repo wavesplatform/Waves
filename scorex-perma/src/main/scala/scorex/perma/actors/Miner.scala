@@ -49,13 +49,15 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
       log.info("TicketGeneration({})", puz)
       val ticket = generate(keyPair, puz, segments)
       log.info("TicketGeneration result:{}", ticket)
+
     //todo: check ticket
+      self ! TicketValidation(puz, ticket)
 
 
     case TicketValidation(puz, t: Ticket) =>
       log.info("TicketValidation({}, {})", puz, t)
       val res = validate(keyPair._2, puz, t, rootHash)
-
+      log.info("TicketValidation result:{}", res)
   }
 }
 
