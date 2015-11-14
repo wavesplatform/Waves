@@ -7,7 +7,7 @@ import scorex.crypto.SigningFunctions.{Signature, PublicKey}
 import scorex.crypto.{SigningFunctions, SigningFunctionsImpl}
 import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
-import scorex.perma.actors.TrustedDealerSpec.SegmentsRequest
+import scorex.perma.actors.TrustedDealerSpec.{SegmentsToStore, SegmentsRequest}
 import scorex.perma.merkle.AuthDataBlock
 import scorex.perma.merkle.HashImpl.hash
 
