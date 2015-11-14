@@ -7,11 +7,17 @@ import scorex.crypto.SigningFunctions.{Signature, PublicKey}
 import scorex.crypto.{SigningFunctions, SigningFunctionsImpl}
 import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
-import scorex.perma.actors.TrustedDealerSpec.SendOutSegments
+import scorex.perma.actors.TrustedDealerSpec.SegmentsRequest
 import scorex.perma.merkle.AuthDataBlock
 import scorex.perma.merkle.HashImpl.hash
 
-case class Ticket(publicKey:PublicKey, s:Array[Byte], proof: Seq[(Signature, AuthDataBlock[Parameters.DataSegment])])
+import scala.util.Try
+
+case class PartialProof(signature: Signature, segmentIndex: Int, segment: AuthDataBlock[Parameters.DataSegment])
+
+case class Ticket(publicKey:PublicKey,
+                  s:Array[Byte],
+                  proofs: IndexedSeq[PartialProof])
 
 class Miner(trustedDealerRef: ActorRef) extends Actor {
 
@@ -39,7 +45,7 @@ class Miner(trustedDealerRef: ActorRef) extends Actor {
         u(publicKey, i)
       }.toArray
 
-      trustedDealerRef ! SendOutSegments(segmentIdsToDownload)
+      trustedDealerRef ! SegmentsRequest(segmentIdsToDownload)
 
     case SegmentsToStore(sgs) =>
       require(segments.isEmpty)
@@ -47,31 +53,43 @@ class Miner(trustedDealerRef: ActorRef) extends Actor {
 
     case TicketGeneration(puz) =>
       //scratch-off for the Local-POR lottery
-
       val s = randomBytes(32)
 
       val sig0 = Array[Byte]()
       val r1 = u(publicKey, BigInt(hash(puz ++ publicKey ++ s)).mod(Parameters.l).toInt)
 
-      val proof = 1.to(Parameters.k).foldLeft(
+      val proofs = 1.to(Parameters.k).foldLeft(
         (r1, sig0, Seq[(SigningFunctions.Signature, AuthDataBlock[Parameters.DataSegment])]())
       ) {
         case ((ri, sig_prev, seq), _) =>
-
           val hi = hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
           val sig = SigningFunctionsImpl.sign(privateKey, hi)
-
           val r_next = u(publicKey, BigInt(hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
-
           (r_next, sig, seq :+ (sig, segments(ri)))
-      }._3
+      }._3.toIndexedSeq.ensuring(_.size == Parameters.k)
 
-      Ticket(publicKey, s, proof)
+      //Ticket(publicKey, s, proofs)
+
+    case TicketValidation(puz, Ticket(pk, s, proofs)) =>
+
+      require(proofs.size == Parameters.k)
+      Try {
+
+        //scratch-off for the Local-POR lottery
+        val s = randomBytes(32)
+
+        val sigs = Array[Byte]() +: proofs.map(_.signature)
+        val ris = proofs.map(_.segmentIndex)
 
 
+        val r1 = u(publicKey, BigInt(hash(puz ++ publicKey ++ s)).mod(Parameters.l).toInt)
+
+        /*val result = proof.foldLeft(((sig0, r1), true)) { case (((sig, ri), res), pi) =>
+          val hi = hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
+        } */
 
 
-    case TicketValidation() =>
+      }
   }
 }
 
@@ -84,9 +102,9 @@ object MinerSpec {
 
   case class Initialize()
 
-  case class SegmentsToStore(segments: Subset)
+
 
   case class TicketGeneration(puz: Array[Byte])
 
-  case class TicketValidation()
+  case class TicketValidation(puz: Array[Byte], ticket: Ticket)
 }
