@@ -9,9 +9,13 @@ case class PermaConsensusBlockField(override val value: PermaLikeConsensusBlockD
 
   override val name: String = "perma-consensus"
 
-  override def bytes: Array[Byte] = value.generatorSignature
+  override def bytes: Array[Byte] = {
+    //todo: implement
+    (value.s.length.toByte +: value.s)
+  }
 
+  //todo: implement
   override def json: JsObject = Json.obj(name -> Json.obj(
-    "generation-signature" -> Base58.encode(value.generatorSignature)
+    "generation-signature" -> ???
   ))
 }
