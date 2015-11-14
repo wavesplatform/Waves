@@ -7,7 +7,7 @@ import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec.Initialize
 import scorex.perma.actors.TrustedDealerSpec.SendOutSegments
 import scorex.perma.merkle.HashImpl
-import scorex.perma.utils.SigningFunctionsImpl
+import scorex.crypto.SigningFunctionsImpl
 
 class Miner(trustedDealerRef: ActorRef) extends Actor {
 

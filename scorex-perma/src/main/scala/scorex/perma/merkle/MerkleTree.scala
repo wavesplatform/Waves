@@ -1,9 +1,11 @@
 package scorex.perma.merkle
 
+import scorex.perma.merkle.CryptographicHash.Digest
+
 import scala.annotation.tailrec
 import scala.math
 
-case class AuthDataBlock[A](data: A, merklePath: Seq[MerkleTree.Digest])
+case class AuthDataBlock[A](data: A, merklePath: Seq[Digest])
 
 //bottom up
 
@@ -16,7 +18,7 @@ trait MerkleTreeI[A] {
 object MerkleTree {
 
   type Block = Array[Byte]
-  type Digest = Vector[Byte]
+
 
   class MerkleTree[A, Hash <: CryptographicHash](val tree: Tree[A, Hash], val leaves: Seq[Tree[A, Hash]]) extends MerkleTreeI[A] {
 
