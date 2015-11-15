@@ -4,13 +4,12 @@ import java.security.SecureRandom
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
-import scorex.crypto.{SigningFunctions, SigningFunctionsImpl}
+import scorex.crypto.{Sha256, CryptographicHash, SigningFunctions, SigningFunctionsImpl}
 import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
-import scorex.perma.merkle.CryptographicHash.Digest
-import scorex.perma.merkle.HashImpl.hash
-import scorex.perma.merkle.{AuthDataBlock, CryptographicHash, MerkleTree}
+import scorex.perma.merkle.{AuthDataBlock, MerkleTree}
+import CryptographicHash._
 
 import scala.util.Try
 
@@ -42,7 +41,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
     case SegmentsToStore(sgs) =>
       log.info("SegmentsToStore({})", sgs)
       require(segments.isEmpty)
-      require(sgs.size == Parameters.l)
+//      require(sgs.size == Parameters.l)
       segments = sgs
 
     case TicketGeneration(puz) =>
@@ -67,7 +66,7 @@ object Miner {
 
   //calculate index of i-th segment
   private def u(pubKey: SigningFunctions.PublicKey, i: Int): Int = {
-    val h = hash(pubKey ++ BigInt(i).toByteArray)
+    val h = Sha256.hash(pubKey ++ BigInt(i).toByteArray)
     BigInt(1, h).mod(Parameters.n).toInt
   }
 
@@ -87,16 +86,16 @@ object Miner {
     val s = randomBytes(32)
 
     val sig0 = NoSig
-    val r1 = u(publicKey, (BigInt(1, hash(puz ++ publicKey ++ s)) % Parameters.l).toInt)
+    val r1 = u(publicKey, (BigInt(1, Sha256.hash(puz ++ publicKey ++ s)) % Parameters.l).toInt)
       .ensuring(r => segments.keySet.contains(r))
 
     val proofs = 1.to(Parameters.k).foldLeft(
       (r1, sig0, Seq[PartialProof]())
     ) {
       case ((ri, sig_prev, seq), _) =>
-        val hi = hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
+        val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
         val sig = SigningFunctionsImpl.sign(privateKey, hi)
-        val r_next = u(publicKey, BigInt(1, hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
+        val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
           .ensuring{r => println(r); segments.keySet.contains(r)}
 
         (r_next, sig, seq :+ PartialProof(sig, ri, segments(ri)))
@@ -119,7 +118,7 @@ object Miner {
       val segment = proofs(i - 1).segment
 
       MerkleTree.check(ris(i - 1), rootHash, segment.data, segment.merklePath)() || {
-        val hi = hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
+        val hi = Sha256.hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
         SigningFunctionsImpl.verify(sigs(i), hi, publicKey)
       }
     }
@@ -138,5 +137,4 @@ object MinerSpec {
   case class TicketGeneration(puz: Array[Byte])
 
   case class TicketValidation(puz: Array[Byte], ticket: Ticket)
-
 }

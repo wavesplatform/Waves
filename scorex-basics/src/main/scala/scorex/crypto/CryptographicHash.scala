@@ -19,14 +19,18 @@ import java.security.MessageDigest
  */
 
 trait CryptographicHash {
-  val ValueSize: Int //in bytes
+  import CryptographicHash._
 
-  type Message = Array[Byte]
-  type Digest = Array[Byte]
+  val ValueSize: Int //in bytes
 
   def hash(input: Message): Digest
 
   def doubleHash(input: Message): Digest = hash(hash(input))
+}
+
+object CryptographicHash {
+  type Message = Array[Byte]
+  type Digest = Array[Byte]
 }
 
 /**

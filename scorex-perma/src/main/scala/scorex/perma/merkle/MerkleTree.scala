@@ -1,6 +1,7 @@
 package scorex.perma.merkle
 
-import scorex.perma.merkle.CryptographicHash.Digest
+import scorex.crypto.{Sha256, CryptographicHash}
+import scorex.crypto.CryptographicHash.Digest
 
 import scala.annotation.tailrec
 import scala.math
@@ -18,7 +19,7 @@ trait MerkleTreeI[A] {
 object MerkleTree {
 
   def check[A, Hash <: CryptographicHash](index: Int, rootHash: Digest, data: A, treePath: Seq[Digest])
-                                         (hashFunction: Hash = HashImpl): Boolean = {
+                                         (hashFunction: Hash = Sha256): Boolean = {
 
     def calculateHash(i: Int, nodeHash: Digest, path: Seq[Digest]): Digest = {
       if (i % 2 == 0) {
@@ -124,7 +125,7 @@ object MerkleTree {
 
   def create[A, Hash <: CryptographicHash](
                                             dataBlocks: Seq[A],
-                                            hashFunction: Hash = HashImpl): MerkleTree[A, Hash] = {
+                                            hashFunction: Hash = Sha256): MerkleTree[A, Hash] = {
     val level = calculateRequiredLevel(dataBlocks.size)
 
     val dataLeaves = dataBlocks.map(data => Leaf(data)(hashFunction))

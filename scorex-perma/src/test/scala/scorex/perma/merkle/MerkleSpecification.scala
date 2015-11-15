@@ -1,6 +1,7 @@
 package scorex.perma.merkle
 
 import org.scalatest.{Matchers, FunSuite}
+import scorex.crypto.Sha256
 
 import scala.util.Random
 
@@ -21,6 +22,6 @@ class MerkleSpecification extends FunSuite with Matchers {
     val leaf = tree.byIndex(Index).get
     val data = leaf.data
     val path = leaf.merklePath
-    assert(MerkleTree.check(Index, tree.hash, data, path)(HashImpl))
+    assert(MerkleTree.check(Index, tree.hash, data, path)(Sha256))
   }
 }
