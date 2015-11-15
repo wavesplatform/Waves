@@ -41,7 +41,6 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
     case SegmentsToStore(sgs) =>
       log.info("SegmentsToStore({})", sgs)
       require(segments.isEmpty)
-//      require(sgs.size == Parameters.l)
       segments = sgs
 
     case TicketGeneration(puz) =>
