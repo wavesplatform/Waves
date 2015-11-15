@@ -55,7 +55,8 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
     case TicketValidation(puz, t: Ticket) =>
       log.info("TicketValidation({}, {})", puz, t)
       val res = validate(keyPair._2, puz, t, rootHash)
-      log.info("TicketValidation result:{}", res)
+      val score = ticketScore(t)
+      log.info("TicketValidation result:{}, score:{}", res, score)
   }
 }
 
@@ -95,7 +96,7 @@ object Miner {
         val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
         val sig = SigningFunctionsImpl.sign(privateKey, hi)
         val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
-          .ensuring (segments.keySet.contains(r))
+          .ensuring (r => segments.keySet.contains(r))
 
         (r_next, sig, seq :+ PartialProof(sig, ri, segments(ri)))
     }._3.toIndexedSeq.ensuring(_.size == Parameters.k)
@@ -122,6 +123,9 @@ object Miner {
       }
     }
   }.getOrElse(false)
+
+  def ticketScore(t:Ticket):BigInt = BigInt(1, Sha256.hash(t.proofs.map(_.signature).reduce(_++_)))
+
 }
 
 //todo: split miner & fullnode roles: a fullnode makes validation, miner validation & generation
