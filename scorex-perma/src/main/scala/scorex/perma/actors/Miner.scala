@@ -6,6 +6,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import scorex.crypto.CryptographicHash._
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
 import scorex.crypto.{CryptographicHash, Sha256, SigningFunctions, SigningFunctionsImpl}
+import scorex.perma.BlockchainBuilderSpec.WinningTicket
 import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
@@ -43,18 +44,24 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
       require(segments.isEmpty)
       segments = sgs
 
-    case TicketGeneration(puz) =>
+    case TicketGeneration(difficulty, puz) =>
       log.info("TicketGeneration({})", puz)
       val ticket = generate(keyPair, puz, segments)
       log.info("TicketGeneration result:{}", ticket)
 
-      //todo: check ticket
-      self ! TicketValidation(puz, ticket)
+      val check = validate(keyPair._2, puz, difficulty, ticket, rootHash)
+      val score = ticketScore(ticket)
+      log.info("TicketValidation result:{}, score:{}", check, score)
 
+      if (check) {
+        sender() ! WinningTicket(puz, score, ticket)
+      } else {
+        self ! TicketGeneration(difficulty, puz)
+      }
 
-    case TicketValidation(puz, t: Ticket) =>
+    case TicketValidation(difficulty, puz, t: Ticket) =>
       log.info("TicketValidation({}, {})", puz, t)
-      val res = validate(keyPair._2, puz, t, rootHash)
+      val res = validate(keyPair._2, puz, difficulty, t, rootHash)
       val score = ticketScore(t)
       log.info("TicketValidation result:{}, score:{}", res, score)
   }
@@ -96,7 +103,7 @@ object Miner {
         val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
         val sig = SigningFunctionsImpl.sign(privateKey, hi)
         val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
-          .ensuring (r => segments.keySet.contains(r))
+          .ensuring(r => segments.keySet.contains(r))
 
         (r_next, sig, seq :+ PartialProof(sig, ri, segments(ri)))
     }._3.toIndexedSeq.ensuring(_.size == Parameters.k)
@@ -104,8 +111,12 @@ object Miner {
     Ticket(publicKey, s, proofs)
   }
 
-  //todo: validate ri
-  def validate(publicKey: PublicKey, puz: Array[Byte], t: Ticket, rootHash: CryptographicHash.Digest): Boolean = Try {
+  //todo: validate r\i
+  def validate(publicKey: PublicKey,
+               puz: Array[Byte],
+               difficulty: BigInt,
+               t: Ticket,
+               rootHash: CryptographicHash.Digest): Boolean = Try {
     val proofs = t.proofs
     require(proofs.size == Parameters.k)
 
@@ -114,7 +125,7 @@ object Miner {
     val sigs = NoSig +: proofs.map(_.signature)
     val ris = proofs.map(_.segmentIndex)
 
-    1.to(Parameters.k).foldLeft(true) { case (partialResult, i) =>
+    val partialProofsCheck = 1.to(Parameters.k).foldLeft(true) { case (partialResult, i) =>
       val segment = proofs(i - 1).segment
 
       MerkleTree.check(ris(i - 1), rootHash, segment.data, segment.merklePath)() || {
@@ -122,9 +133,10 @@ object Miner {
         SigningFunctionsImpl.verify(sigs(i), hi, publicKey)
       }
     }
+    partialProofsCheck && (ticketScore(t) < difficulty)
   }.getOrElse(false)
 
-  def ticketScore(t:Ticket):BigInt = BigInt(1, Sha256.hash(t.proofs.map(_.signature).reduce(_++_)))
+  def ticketScore(t: Ticket): BigInt = BigInt(1, Sha256.hash(t.proofs.map(_.signature).reduce(_ ++ _)))
 
 }
 
@@ -137,8 +149,8 @@ object MinerSpec {
 
   case class Initialize()
 
-  case class TicketGeneration(puz: Array[Byte])
+  case class TicketGeneration(difficulty: BigInt, puz: Array[Byte])
 
-  case class TicketValidation(puz: Array[Byte], ticket: Ticket)
+  case class TicketValidation(difficulty: BigInt, puz: Array[Byte], ticket: Ticket)
 
 }
