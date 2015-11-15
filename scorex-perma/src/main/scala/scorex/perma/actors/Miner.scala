@@ -5,12 +5,13 @@ import java.security.SecureRandom
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import scorex.crypto.CryptographicHash._
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
+import scorex.crypto.ads.merkle.{MerkleTree, AuthDataBlock}
 import scorex.crypto.{CryptographicHash, Sha256, SigningFunctions, SigningFunctionsImpl}
 import scorex.perma.BlockchainBuilderSpec.WinningTicket
 import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
-import scorex.perma.merkle.{AuthDataBlock, MerkleTree}
+
 
 import scala.util.Try
 
@@ -40,17 +41,17 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
       trustedDealerRef ! SegmentsRequest(segmentIdsToDownload)
 
     case SegmentsToStore(sgs) =>
-      log.info("SegmentsToStore({})", sgs)
+      log.debug("SegmentsToStore({})", sgs)
       require(segments.isEmpty)
       segments = sgs
 
     case TicketGeneration(difficulty, puz) =>
-      log.info("TicketGeneration({})", puz)
+      log.debug("TicketGeneration({})", puz)
       val ticket = generate(keyPair, puz, segments)
 
       val check = validate(keyPair._2, puz, difficulty, ticket, rootHash)
       val score = ticketScore(ticket)
-      log.info("TicketGeneration result:{}, score:{}", check, score)
+      log.debug("TicketGeneration result:{}, score:{}", check, score)
 
       if (check) {
         sender() ! WinningTicket(puz, score, ticket)
@@ -60,10 +61,10 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
       }
 
     case TicketValidation(difficulty, puz, t: Ticket) =>
-      log.info("TicketValidation({}, {})", puz, t)
+      log.debug("TicketValidation({}, {})", puz, t)
       val res = validate(keyPair._2, puz, difficulty, t, rootHash)
       val score = ticketScore(t)
-      log.info("TicketValidation result:{}, score:{}", res, score)
+      log.debug("TicketValidation result:{}, score:{}", res, score)
   }
 }
 

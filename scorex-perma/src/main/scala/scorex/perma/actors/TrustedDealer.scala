@@ -1,11 +1,12 @@
 package scorex.perma.actors
 
 import akka.actor.{ActorLogging, Actor}
+import scorex.crypto.ads.merkle.MerkleTree
 import scorex.perma.Parameters
 import scorex.perma.Parameters.DataSegment
 import scorex.perma.actors.MinerSpec.Subset
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsToStore, SegmentsRequest}
-import scorex.perma.merkle.MerkleTree
+
 
 class TrustedDealer(val dataSet: Array[DataSegment]) extends Actor with ActorLogging {
 
@@ -36,5 +37,4 @@ object TrustedDealerSpec {
   case class SegmentsRequest(segments: Array[Int])
 
   case class SegmentsToStore(segments: Subset)
-
 }

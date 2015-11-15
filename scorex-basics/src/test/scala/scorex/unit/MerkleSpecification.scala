@@ -1,7 +1,8 @@
-package scorex.perma.merkle
+package scorex.unit
 
 import org.scalatest.{Matchers, FunSuite}
 import scorex.crypto.Sha256
+import scorex.crypto.ads.merkle.MerkleTree
 
 import scala.util.Random
 

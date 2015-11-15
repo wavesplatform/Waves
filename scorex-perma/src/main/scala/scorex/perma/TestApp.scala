@@ -2,10 +2,11 @@ package scorex.perma
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import org.slf4j.LoggerFactory
+import scorex.crypto.ads.merkle.MerkleTree
 import scorex.perma.BlockchainBuilderSpec.{SendWorkToMiners, WinningTicket}
 import scorex.perma.actors.MinerSpec.{Initialize, TicketGeneration}
 import scorex.perma.actors.{Miner, Ticket, TrustedDealer}
-import scorex.perma.merkle.MerkleTree
+
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -22,9 +23,9 @@ class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging 
   val blockchainLike = mutable.Buffer[BlockHeaderLike]()
 
 
-  private def calcPuz = 1.to(10).toArray.map(_ => Random.nextInt(256).toByte)
+  private def calcPuz = 1.to(100).toArray.map(_ => Random.nextInt(256).toByte)
 
-  def difficulty = blockchainLike.headOption.map(_.difficulty).getOrElse(InitialDifficulty)
+  def difficulty = blockchainLike.lastOption.map(_.difficulty).getOrElse(InitialDifficulty)
 
   override def receive = {
     case SendWorkToMiners =>
@@ -42,7 +43,7 @@ class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging 
         self ! SendWorkToMiners
       } else {
         sender() ! TicketGeneration(difficulty, puz)
-        log.info("Wrong puz from miner: " + minerPuz.mkString)
+        log.debug("Wrong puz from miner: " + minerPuz.mkString)
       }
   }
 }

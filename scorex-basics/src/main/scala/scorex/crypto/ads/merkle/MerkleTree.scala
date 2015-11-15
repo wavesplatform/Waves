@@ -1,20 +1,21 @@
-package scorex.perma.merkle
+package scorex.crypto.ads.merkle
 
-import scorex.crypto.{Sha256, CryptographicHash}
 import scorex.crypto.CryptographicHash.Digest
+import scorex.crypto.{CryptographicHash, Sha256}
 
 import scala.annotation.tailrec
 import scala.math
+
 
 case class AuthDataBlock[A](data: A, merklePath: Seq[Digest])
 
 //bottom up
 
 trait MerkleTreeI[A] {
-
   def byIndex(n: Int): Option[AuthDataBlock[A]]
 }
 
+//todo: check/optimize the code
 
 object MerkleTree {
 
@@ -83,7 +84,7 @@ object MerkleTree {
       }
     }
 
-    override def toString(): String = {
+    override def toString: String = {
       def printHashes(node: Tree[Any, Hash], prefix: String = ""): List[String] = {
         node match {
           case Node(leftChild: Tree[A, Hash], rightChild: Tree[A, Hash]) =>
