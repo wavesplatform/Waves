@@ -47,11 +47,10 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
     case TicketGeneration(difficulty, puz) =>
       log.info("TicketGeneration({})", puz)
       val ticket = generate(keyPair, puz, segments)
-      log.info("TicketGeneration result:{}", ticket)
 
       val check = validate(keyPair._2, puz, difficulty, ticket, rootHash)
       val score = ticketScore(ticket)
-      log.info("TicketValidation result:{}, score:{}", check, score)
+      log.info("TicketGeneration result:{}, score:{}", check, score)
 
       if (check) {
         sender() ! WinningTicket(puz, score, ticket)

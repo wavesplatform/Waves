@@ -37,7 +37,7 @@ class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging 
     case WinningTicket(minerPuz, score, ticket) =>
       if (minerPuz sameElements puz) {
         val newBlock = BlockHeaderLike(score, puz, ticket)
-        log.info("Block generrated: " + newBlock)
+        log.info(s"Block generated: $newBlock, blockchain size: ${blockchainLike.size}")
         blockchainLike += newBlock
         puz = calcPuz
         self ! SendWorkToMiners
@@ -74,6 +74,10 @@ object TestApp extends App {
   protected lazy val actorSystem = ActorSystem("lagonaki")
   val dealer = actorSystem.actorOf(Props(classOf[TrustedDealer], dataSet))
   val miners: Seq[ActorRef] = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], dealer, tree.hash)))
+
+  miners.foreach(minerRef => minerRef ! Initialize)
+
+  Thread.sleep(2000)
 
   log.info("start BlockchainBuilder")
 
