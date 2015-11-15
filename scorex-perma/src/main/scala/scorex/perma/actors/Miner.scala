@@ -55,6 +55,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
       if (check) {
         sender() ! WinningTicket(puz, score, ticket)
       } else {
+        Thread.sleep(100)
         self ! TicketGeneration(difficulty, puz)
       }
 

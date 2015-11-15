@@ -24,11 +24,10 @@ class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging 
 
   private def calcPuz = 1.to(10).toArray.map(_ => Random.nextInt(256).toByte)
 
+  def difficulty = blockchainLike.headOption.map(_.difficulty).getOrElse(InitialDifficulty)
 
   override def receive = {
     case SendWorkToMiners =>
-
-      val difficulty = blockchainLike.headOption.map(_.difficulty).getOrElse(InitialDifficulty)
       miners.foreach { minerRef =>
         minerRef ! TicketGeneration(difficulty, puz)
       }
@@ -42,6 +41,7 @@ class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging 
         puz = calcPuz
         self ! SendWorkToMiners
       } else {
+        sender() ! TicketGeneration(difficulty, puz)
         log.info("Wrong puz from miner: " + minerPuz.mkString)
       }
   }
@@ -57,7 +57,7 @@ object BlockchainBuilderSpec {
 
 object TestApp extends App {
 
-  val MinersCount = 3
+  val MinersCount = 10
 
   val log = LoggerFactory.getLogger(this.getClass)
 
