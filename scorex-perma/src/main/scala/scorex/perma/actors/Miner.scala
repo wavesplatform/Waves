@@ -3,13 +3,13 @@ package scorex.perma.actors
 import java.security.SecureRandom
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
+import scorex.crypto.CryptographicHash._
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
-import scorex.crypto.{Sha256, CryptographicHash, SigningFunctions, SigningFunctionsImpl}
+import scorex.crypto.{CryptographicHash, Sha256, SigningFunctions, SigningFunctionsImpl}
 import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
 import scorex.perma.merkle.{AuthDataBlock, MerkleTree}
-import CryptographicHash._
 
 import scala.util.Try
 
@@ -48,7 +48,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
       val ticket = generate(keyPair, puz, segments)
       log.info("TicketGeneration result:{}", ticket)
 
-    //todo: check ticket
+      //todo: check ticket
       self ! TicketValidation(puz, ticket)
 
 
@@ -95,7 +95,7 @@ object Miner {
         val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
         val sig = SigningFunctionsImpl.sign(privateKey, hi)
         val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
-          .ensuring{r => println(r); segments.keySet.contains(r)}
+          .ensuring (segments.keySet.contains(r))
 
         (r_next, sig, seq :+ PartialProof(sig, ri, segments(ri)))
     }._3.toIndexedSeq.ensuring(_.size == Parameters.k)
@@ -136,4 +136,5 @@ object MinerSpec {
   case class TicketGeneration(puz: Array[Byte])
 
   case class TicketValidation(puz: Array[Byte], ticket: Ticket)
+
 }
