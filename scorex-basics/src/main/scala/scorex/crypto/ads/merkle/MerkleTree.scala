@@ -6,7 +6,10 @@ import scorex.crypto.{CryptographicHash, Sha256}
 import scala.annotation.tailrec
 import scala.math
 
-
+/**
+  * @param data - data block
+  * @param merklePath - merkle path, complementary to data block
+  */
 case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest])
 
 //bottom up
@@ -54,17 +57,18 @@ object MerkleTree {
     def byIndex(index: Int): Option[AuthDataBlock[Block]] = {
       @tailrec
       def calculateTreePath(n: Int, node: Node[Block, Hash], levelSize: Int, acc: Seq[Digest] = Seq()): Seq[Digest] = {
-        if (n < levelSize / 2) {
+        val halfLevelSize: Int = levelSize / 2
+        if (n < halfLevelSize) {
           node.leftChild match {
             case nd: Node[Block, Hash] =>
-              calculateTreePath(n, nd, levelSize / 2, node.rightChild.hash +: acc)
+              calculateTreePath(n, nd, halfLevelSize, node.rightChild.hash +: acc)
             case _ =>
               node.rightChild.hash +: acc
           }
         } else {
           node.rightChild match {
             case nd: Node[Block, Hash] =>
-              calculateTreePath(n - levelSize / 2, nd, levelSize / 2, node.leftChild.hash +: acc)
+              calculateTreePath(n - halfLevelSize, nd, halfLevelSize, node.leftChild.hash +: acc)
             case _ =>
               node.leftChild.hash +: acc
           }
