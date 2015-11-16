@@ -141,7 +141,7 @@ object MerkleTree {
     new MerkleTree(makeTree(leaves, hashFunction), leaves)
   }
 
-  def merge[Block, Hash <: CryptographicHash](
+  private def merge[Block, Hash <: CryptographicHash](
                                                leftChild: Tree[Block, Hash],
                                                rightChild: Tree[Block, Hash],
                                                hashFunction: Hash): Node[Block, Hash] = {
