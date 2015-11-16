@@ -71,18 +71,15 @@ object MerkleTree {
         }
       }
 
-      val leaf = leaves.lift(index)
-      if (leaf.isEmpty) {
-        None
-      } else {
-        leaf.get match {
-          case Leaf(data) =>
+      leaves.lift(index).flatMap(l =>
+        l match {
+          case Leaf(data: Block) =>
             val treePath = calculateTreePath(index, rootNode, Size)
             Some(AuthDataBlock(data, treePath))
           case _ =>
             None
         }
-      }
+      )
     }
 
     override def toString: String = {
