@@ -1,175 +1,126 @@
 package scorex.crypto.ads.merkle
 
+import java.io.{File, FileInputStream, FileOutputStream}
+import java.nio.file.{Files, Paths}
+
 import scorex.crypto.CryptographicHash.Digest
 import scorex.crypto.{CryptographicHash, Sha256}
 
 import scala.annotation.tailrec
-import scala.math
 
-/**
-  * @param data - data block
-  * @param merklePath - merkle path, complementary to data block
-  */
-case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest])
+class MerkleTree[H <: CryptographicHash](treeFolder: String,
+                                         val nonEmptyBlocks: Int,
+                                         blockSize: Int = 1024,
+                                         hash: H = Sha256
+                                        ) {
 
-//bottom up
+  import MerkleTree._
 
-trait MerkleTreeI[Block] {
-  def byIndex(n: Int): Option[AuthDataBlock[Block]]
+  lazy val storage: Storage = new MapDBStorage(new File(treeFolder + "/tree.mapDB"))
+
+  val level = calculateRequiredLevel(nonEmptyBlocks)
+
+  lazy val rootHash: Digest = getHash((level, 0)).get
+
+  def byIndex(index: Int): Option[AuthDataBlock[Block]] = {
+    if (index < nonEmptyBlocks && index >= 0) {
+      @tailrec
+      def calculateTreePath(n: Int, currentLevel: Int, acc: Seq[Digest] = Seq()): Seq[Digest] = {
+        if (currentLevel < level) {
+          //TODO remove get? it should exists when (index < nonEmptyBlocks && index > 0)
+          if (n % 2 == 0) {
+            getHash((currentLevel, n + 1)) match {
+              case Some(v) =>
+                calculateTreePath(n / 2, currentLevel + 1, v +: acc)
+              case None =>
+                acc.reverse
+            }
+          } else {
+            calculateTreePath(n / 2, currentLevel + 1, getHash((currentLevel, n - 1)).get +: acc)
+          }
+        } else {
+          acc.reverse
+        }
+      }
+
+      val path = Paths.get(treeFolder + "/" + index)
+      val data: Block = Files.readAllBytes(path)
+      val treePath = calculateTreePath(index, 0)
+      Some(AuthDataBlock(data, treePath))
+    } else {
+      None
+    }
+  }
+
+  def getHash(key: Storage.Key): Option[Digest] = {
+    storage.get(key) match {
+      case None =>
+        if (key._1 > 0) {
+          val h1 = getHash((key._1 - 1, key._2 * 2))
+          val h2 = getHash((key._1 - 1, key._2 * 2 + 1))
+          (h1, h2) match {
+            case (Some(hash1), Some(hash2)) => Some(hash.hash(hash1 ++ hash2))
+            case (Some(h), _) => h1
+            case (_, Some(h)) => h2
+            case _ => None
+          }
+        } else {
+          None
+        }
+      case digest =>
+        digest
+    }
+
+  }
+
+
 }
 
-//todo: check/optimize the code
-
 object MerkleTree {
+  type Block = Array[Byte]
 
-  def check[Block, Hash <: CryptographicHash](index: Int, rootHash: Digest, block: AuthDataBlock[Block])
-                                             (hashFunction: Hash = Sha256): Boolean = {
+
+  def fromFile[H <: CryptographicHash](file: FileInputStream,
+                                       treeFolder: String,
+                                       blockSize: Int = 1024,
+                                       hash: H = Sha256
+                                      ): MerkleTree[H] = {
 
     @tailrec
-    def calculateHash(i: Int, nodeHash: Digest, path: Seq[Digest]): Digest = {
-      if (i % 2 == 0) {
-        val hash = hashFunction.hash(nodeHash ++ path.head)
-        if (path.size == 1) {
-          hash
-        } else {
-          calculateHash(i / 2, hash, path.tail)
-        }
+    def processFile(file: FileInputStream, blockIndex: Int = 0): Int = {
+      val buf = new Array[Byte](blockSize)
+      val length = file.read(buf)
+      if (length != -1) {
+        file.read(buf, 0, length)
+        processBlock(buf, blockIndex)
+        processFile(file, blockIndex + 1)
       } else {
-        val hash = hashFunction.hash(path.head ++ nodeHash)
-        if (path.size == 1) {
-          hash
-        } else {
-          calculateHash(i / 2, hash, path.tail)
-        }
+        blockIndex
       }
     }
-    val calculated = calculateHash(index, hashFunction.hash(block.data.toString.getBytes), block.merklePath)
-    calculated.mkString == rootHash.mkString
-  }
 
-  class MerkleTree[Block, Hash <: CryptographicHash](val tree: Tree[Block, Hash], val leaves: Seq[Tree[Block, Hash]])
-    extends MerkleTreeI[Block] {
-
-    val Size = leaves.size
-    lazy val rootNode: Node[Block, Hash] = tree.asInstanceOf[Node[Block, Hash]]
-    lazy val hash = tree.hash
-
-    def byIndex(index: Int): Option[AuthDataBlock[Block]] = {
-      @tailrec
-      def calculateTreePath(n: Int, node: Node[Block, Hash], levelSize: Int, acc: Seq[Digest] = Seq()): Seq[Digest] = {
-        val halfLevelSize: Int = levelSize / 2
-        if (n < halfLevelSize) {
-          node.leftChild match {
-            case nd: Node[Block, Hash] =>
-              calculateTreePath(n, nd, halfLevelSize, node.rightChild.hash +: acc)
-            case _ =>
-              node.rightChild.hash +: acc
-          }
-        } else {
-          node.rightChild match {
-            case nd: Node[Block, Hash] =>
-              calculateTreePath(n - halfLevelSize, nd, halfLevelSize, node.leftChild.hash +: acc)
-            case _ =>
-              node.leftChild.hash +: acc
-          }
-        }
-      }
-
-      leaves.lift(index).flatMap(l =>
-        l match {
-          case Leaf(data: Block) =>
-            val treePath = calculateTreePath(index, rootNode, Size)
-            Some(AuthDataBlock(data, treePath))
-          case _ =>
-            None
-        }
-      )
+    def processBlock(block: Block, i: Int): Unit = {
+      val fos = new FileOutputStream(treeFolder + "/" + i)
+      fos.write(block)
+      fos.close()
+      storage.set((0, i), hash.hash(block))
     }
 
-    override def toString: String = {
-      def printHashes(node: Tree[Any, Hash], prefix: String = ""): List[String] = {
-        node match {
-          case Node(leftChild: Tree[Block, Hash], rightChild: Tree[Block, Hash]) =>
-            (prefix + node.hash.mkString) :: printHashes(leftChild, " " + prefix) ++
-              printHashes(rightChild, " " + prefix)
-          case l: Leaf[Block, Hash] =>
-            List(prefix + l.hash.mkString)
-          case _ =>
-            List()
-        }
-      }
-      printHashes(tree).mkString("\n")
-    }
-  }
+    lazy val storage: Storage = new MapDBStorage(new File(treeFolder + "/tree.mapDB"))
 
+    val nonEmptyBlocks = processFile(file)
+    storage.commit()
 
-  sealed trait Tree[+Block, Hash <: CryptographicHash] {
-    val hash: Digest
-  }
+    new MerkleTree(treeFolder, nonEmptyBlocks, blockSize, hash)
 
-  case class Node[+Block, Hash <: CryptographicHash](
-                                                      leftChild: Tree[Block, Hash],
-                                                      rightChild: Tree[Block, Hash])(hashFunction: Hash)
-    extends Tree[Block, Hash] {
-
-    override val hash: Digest = hashFunction.hash(leftChild.hash ++ rightChild.hash)
-
-  }
-
-  case class Leaf[+Block, Hash <: CryptographicHash](data: Block)(hashFunction: Hash)
-    extends Tree[Block, Hash] {
-
-    override val hash: Digest = hashFunction.hash(data.toString.getBytes)
-  }
-
-  case class EmptyLeaf[Block <: CryptographicHash]()(hashFunction: Block) extends Tree[Nothing, Block] {
-    override val hash: Digest = Array.empty[Byte]
-  }
-
-  def create[Block, Hash <: CryptographicHash](
-                                                dataBlocks: Seq[Block],
-                                                hashFunction: Hash = Sha256): MerkleTree[Block, Hash] = {
-    val level = calculateRequiredLevel(dataBlocks.size)
-
-    val dataLeaves = dataBlocks.map(data => Leaf(data)(hashFunction))
-
-    val paddingNeeded = math.pow(2, level).toInt - dataBlocks.size
-    val padding = Seq.fill(paddingNeeded)(EmptyLeaf()(hashFunction))
-
-    val leaves: Seq[Tree[Block, Hash]] = dataLeaves ++ padding
-
-    new MerkleTree(makeTree(leaves, hashFunction), leaves)
-  }
-
-  private def merge[Block, Hash <: CryptographicHash](
-                                               leftChild: Tree[Block, Hash],
-                                               rightChild: Tree[Block, Hash],
-                                               hashFunction: Hash): Node[Block, Hash] = {
-    Node(leftChild, rightChild)(hashFunction)
   }
 
   private def log2(x: Double): Double = math.log(x) / math.log(2)
 
-  private def calculateRequiredLevel(numberOfDataBlocks: Int): Int = {
+  def calculateRequiredLevel(numberOfDataBlocks: Int): Int = {
 
     math.ceil(log2(numberOfDataBlocks)).toInt
   }
 
-  @tailrec
-  private def makeTree[Block, Hash <: CryptographicHash](
-                                                          trees: Seq[Tree[Block, Hash]],
-                                                          hashFunction: Hash): Tree[Block, Hash] = {
-    def createParent(treePair: Seq[Tree[Block, Hash]]): Node[Block, Hash] = {
-      val leftChild +: rightChild +: _ = treePair
-      merge(leftChild, rightChild, hashFunction)
-    }
 
-    if (trees.isEmpty) {
-      EmptyLeaf()(hashFunction)
-    } else if (trees.size == 1) {
-      trees.head
-    } else {
-      makeTree(trees.grouped(2).map(createParent).toSeq, hashFunction)
-    }
-  }
 }

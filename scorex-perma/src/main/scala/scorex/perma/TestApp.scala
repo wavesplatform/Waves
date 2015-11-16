@@ -1,5 +1,7 @@
 package scorex.perma
 
+import java.io.FileInputStream
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import org.slf4j.LoggerFactory
 import scorex.crypto.ads.merkle.MerkleTree
@@ -69,12 +71,14 @@ object TestApp extends App {
   val dataSet = (1 to n).map(x => Random.alphanumeric.take(segmentSize).mkString).toArray.map(_.getBytes)
 
   log.info("Calculate tree")
-  val tree = MerkleTree.create(dataSet)
+  val file = new FileInputStream("/home/pozharko/Documents/protokolnew-160915.doc")
+  val treeFolder = "/tmp/scorex"
+  val tree = MerkleTree.fromFile(file, treeFolder)
 
   log.info("start actor system")
   protected lazy val actorSystem = ActorSystem("lagonaki")
   val dealer = actorSystem.actorOf(Props(classOf[TrustedDealer], dataSet))
-  val miners: Seq[ActorRef] = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], dealer, tree.hash)))
+  val miners: Seq[ActorRef] = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], dealer, tree.rootHash)))
 
   miners.foreach(minerRef => minerRef ! Initialize)
 

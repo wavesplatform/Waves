@@ -9,21 +9,21 @@ import scorex.perma.actors.TrustedDealerSpec.{SegmentsToStore, SegmentsRequest}
 
 
 class TrustedDealer(val dataSet: Array[DataSegment]) extends Actor with ActorLogging {
-
-  val tree = MerkleTree.create(dataSet)
-
+//
+//  val tree = MerkleTree.create(dataSet)
+//
   override def receive = {
-    case SegmentsRequest(segmentIds) =>
-      log.info(s"SegmentsRequest(${segmentIds.mkString(", ")})")
-
-      assert(segmentIds.length == Parameters.l)
-
-      val segments: Subset = segmentIds.map { x =>
-        x -> tree.byIndex(x)
-      }.toMap.collect {
-        case (key, Some(value)) => key -> value
-      }
-      sender ! SegmentsToStore(segments)
+//    case SegmentsRequest(segmentIds) =>
+//      log.info(s"SegmentsRequest(${segmentIds.mkString(", ")})")
+//
+//      assert(segmentIds.length == Parameters.l)
+//
+//      val segments: Subset = segmentIds.map { x =>
+//        x -> tree.byIndex(x)
+//      }.toMap.collect {
+//        case (key, Some(value)) => key -> value
+//      }
+//      sender ! SegmentsToStore(segments)
     case m =>
       log.warning("Unknown message: {}", m)
   }
