@@ -129,7 +129,7 @@ object Miner {
     val partialProofsCheck = 1.to(Parameters.k).foldLeft(true) { case (partialResult, i) =>
       val segment = proofs(i - 1).segment
 
-      MerkleTree.check(ris(i - 1), rootHash, segment.data, segment.merklePath)() || {
+      MerkleTree.check(ris(i - 1), rootHash, segment)() || {
         val hi = Sha256.hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
         SigningFunctionsImpl.verify(sigs(i), hi, publicKey)
       }

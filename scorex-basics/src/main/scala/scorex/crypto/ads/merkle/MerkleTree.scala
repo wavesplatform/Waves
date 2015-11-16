@@ -22,7 +22,7 @@ trait MerkleTreeI[Block] {
 
 object MerkleTree {
 
-  def check[Block, Hash <: CryptographicHash](index: Int, rootHash: Digest, data: Block, treePath: Seq[Digest])
+  def check[Block, Hash <: CryptographicHash](index: Int, rootHash: Digest, block: AuthDataBlock[Block])
                                              (hashFunction: Hash = Sha256): Boolean = {
 
     @tailrec
@@ -43,7 +43,7 @@ object MerkleTree {
         }
       }
     }
-    val calculated = calculateHash(index, hashFunction.hash(data.toString.getBytes), treePath)
+    val calculated = calculateHash(index, hashFunction.hash(block.data.toString.getBytes), block.merklePath)
     calculated.mkString == rootHash.mkString
   }
 
