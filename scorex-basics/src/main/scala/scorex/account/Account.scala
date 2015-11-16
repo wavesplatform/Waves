@@ -26,12 +26,13 @@ object Account {
 
   val AddressVersion: Byte = 58
   val ChecksumLength = 4
-  
-  def fromBytes(bytes: Array[Byte]) = new Account(Base58.encode(bytes))
 
-  def fromPubkey(publicKey: Array[Byte]) = {
+  def fromBytes(bytes: Array[Byte]): Account = new Account(Base58.encode(bytes))
+
+  //todo: props test for: isValidAddress(fromPubkey(any)) == true
+  def fromPubkey(publicKey: Array[Byte]): String = {
     val publicKeyHash = new RIPEMD160().digest(hash(publicKey))
-    val withoutChecksum = publicKeyHash :+ AddressVersion //prepend ADDRESS_VERSION
+    val withoutChecksum = AddressVersion +: publicKeyHash //prepend ADDRESS_VERSION
     val checkSum = doubleHash(withoutChecksum).take(ChecksumLength)
 
     Base58.encode(withoutChecksum ++ checkSum)

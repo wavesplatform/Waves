@@ -1,18 +1,25 @@
 package scorex.perma.consensus
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scorex.account.{PrivateKeyAccount, Account}
-import scorex.block.{BlockField, Block}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
+import scorex.perma.actors.Ticket
 import scorex.transaction.TransactionModule
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 /**
- * Data and functions related to a consensus algo
- */
+  * Data and functions related to a consensus algo
+  */
 
 class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] {
+
+  val MiningReward = 1000000
+  val InitialDifficulty = BigInt(Array.fill(32)(1: Byte))
+  val GenesisCreator = new PublicKeyAccount(Array())
+
+  private def blockGenerator(block: Block) = block.signerDataField.value.generator
 
   def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = {
     //TODO
@@ -23,10 +30,8 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
     * Fees could go to a single miner(forger) usually, but can go to many parties, e.g. see
     * Meni Rosenfeld's Proof-of-Activity proposal http://eprint.iacr.org/2014/452.pdf
     */
-  def feesDistribution(block: Block): Map[Account, Long] = {
-    //TODO
-    Map()
-  }
+  def feesDistribution(block: Block): Map[Account, Long] =
+    Map(blockGenerator(block) -> MiningReward)
 
   /**
     * Get block producers(miners/forgers). Usually one miner produces a block, but in some proposals not
@@ -34,12 +39,9 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
     * @param block
     * @return
     */
-  def generators(block: Block): Seq[Account] = {
-    //TODO
-    Seq()
-  }
+  def generators(block: Block): Seq[Account] = Seq(blockGenerator(block))
 
-  def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt =  BigInt(1)
+  def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = BigInt(1)
 
   def generateNextBlock[TT](account: PrivateKeyAccount)
                            (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
@@ -57,7 +59,12 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
       ???
     })*/
 
-  override def genesisData: BlockField[PermaLikeConsensusBlockData] = ???
+  override def genesisData: BlockField[PermaLikeConsensusBlockData] =
+    PermaConsensusBlockField(new PermaLikeConsensusBlockData {
+      override val difficulty = InitialDifficulty
+      override val puz = Array[Byte]()
+      override val ticket = Ticket(GenesisCreator.publicKey, Array(), IndexedSeq())
+    })
 
   /*
     PermaConsensusBlockField(new PermaLikeConsensusBlockData {
@@ -66,5 +73,4 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
 
   override def formBlockData(data: PermaLikeConsensusBlockData): BlockField[PermaLikeConsensusBlockData] =
     PermaConsensusBlockField(data)
-
 }
