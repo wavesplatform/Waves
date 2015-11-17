@@ -40,7 +40,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "io.spray" % "spray-util_2.11" % "1.3.3",
   "javax.ws.rs" % "jsr311-api" % "1.1.1",
   "joda-time" % "joda-time" % "2.8.1",
-  "net.vrallev.ecc" % "ecc-25519-java" % "1.0.1",
+  "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.joda" % "joda-convert" % "1.7",
   "org.json4s" % "json4s-ast_2.11" % "3.2.11",
   "org.json4s" % "json4s-core_2.11" % "3.2.11",

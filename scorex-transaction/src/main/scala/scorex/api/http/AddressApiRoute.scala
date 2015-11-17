@@ -8,7 +8,7 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.crypto.{Base58, SigningFunctionsImpl}
+import scorex.crypto.{Base58, Curve25519}
 import scorex.transaction.state.LagonakiState
 import scorex.transaction.state.wallet.{Payment, Wallet}
 import spray.http.MediaTypes._
@@ -246,7 +246,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
                 wallet.privateKeyAccount(address) match {
                   case None => WalletAddressNotExists.json
                   case Some(account) =>
-                    Try(SigningFunctionsImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
+                    Try(Curve25519.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
                       case Success(signature) =>
                         val msg = if (encode) Base58.encode(message.getBytes) else message
                         Json.obj("message" -> msg,
@@ -286,7 +286,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
                     case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
                       val account = new PublicKeyAccount(pubKeyBytes)
                       val isValid = account.address == address &&
-                        SigningFunctionsImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
+                        Curve25519.verify(signatureBytes, msgBytes, pubKeyBytes)
                       Json.obj("valid" -> isValid)
                   }
                 }

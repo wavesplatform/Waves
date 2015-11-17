@@ -6,6 +6,6 @@ libraryDependencies ++=
     Dependencies.spray ++
     Dependencies.testKit ++
     Dependencies.logging ++ Seq(
-      "net.vrallev.ecc" % "ecc-25519-java" % "+",
+      "org.whispersystems" % "curve25519-java" % "+",
       "commons-net" % "commons-net" % "3.+"
   )

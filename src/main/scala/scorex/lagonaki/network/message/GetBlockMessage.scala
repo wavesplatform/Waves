@@ -2,7 +2,7 @@ package scorex.lagonaki.network.message
 
 case class GetBlockMessage(signature: Array[Byte]) extends Message {
 
-  require(signature.length == scorex.crypto.SigningFunctionsImpl.SignatureLength, "Data does not match length")
+  require(signature.length == scorex.crypto.Curve25519.SignatureLength, "Data does not match length")
 
   override val messageType = Message.GetBlockType
 

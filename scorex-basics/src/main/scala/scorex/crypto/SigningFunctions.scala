@@ -1,14 +1,16 @@
 package scorex.crypto
 
+import java.lang.reflect.Constructor
 import java.security.SecureRandom
 
-import net.vrallev.java.ecc.{Ecc25519Helper, KeyHolder}
+import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 import scorex.account.PrivateKeyAccount
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}
 
 trait SigningFunctions {
+
   import SigningFunctions._
 
   val SignatureLength: Int
@@ -37,28 +39,38 @@ object SigningFunctions {
   type MessageToSign = Array[Byte]
 }
 
-object SigningFunctionsImpl extends SigningFunctions with ScorexLogging {
+
+object Curve25519 extends SigningFunctions with ScorexLogging {
+
   import SigningFunctions._
 
   override val SignatureLength = 64
   override val KeyLength = 32
 
-  override def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = {
-    val privateKey = KeyHolder.createPrivateKey(seed)
-    val kh = new KeyHolder(privateKey)
+  private val provider: OpportunisticCurve25519Provider = {
+    val constructor = classOf[OpportunisticCurve25519Provider]
+      .getDeclaredConstructors
+      .head
+      .asInstanceOf[Constructor[OpportunisticCurve25519Provider]]
+    constructor.setAccessible(true)
+    constructor.newInstance()
+  }
 
-    kh.getPrivateKey -> kh.getPublicKeySignature
+  override def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = {
+    val hashedSeed = Sha256.hash(seed)
+    val privateKey = provider.generatePrivateKey(hashedSeed)
+    privateKey -> provider.generatePublicKey(privateKey)
   }
 
   override def sign(privateKey: PrivateKey, message: MessageToSign): Signature = {
     require(privateKey.length == KeyLength)
-    new Ecc25519Helper(privateKey).sign(message)
+    provider.calculateSignature(provider.getRandom(64), privateKey, message)
   }
 
   override def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean = Try {
     require(signature.length == SignatureLength)
     require(publicKey.length == KeyLength)
-    new Ecc25519Helper().isValidSignature(message, signature, publicKey)
+    provider.verifySignature(publicKey, message, signature)
   }.recoverWith { case e =>
     log.debug("Error while message signature verification", e)
     Failure(e)
