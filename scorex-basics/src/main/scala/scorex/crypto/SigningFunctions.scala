@@ -39,8 +39,10 @@ object SigningFunctions {
   type MessageToSign = Array[Byte]
 }
 
+trait EllipticCurve extends SigningFunctions
 
-object Curve25519 extends SigningFunctions with ScorexLogging {
+
+trait Curve25519 extends EllipticCurve with ScorexLogging {
 
   import SigningFunctions._
 
@@ -76,3 +78,6 @@ object Curve25519 extends SigningFunctions with ScorexLogging {
     Failure(e)
   }.getOrElse(false)
 }
+
+
+object EllipticCurveImpl extends Curve25519

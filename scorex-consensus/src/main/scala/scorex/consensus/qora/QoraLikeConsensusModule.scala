@@ -5,7 +5,7 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockField}
 import scorex.consensus.{ConsensusModule, LagonakiConsensusModule}
 import scorex.crypto.Sha256._
-import scorex.crypto.Curve25519
+import scorex.crypto.EllipticCurveImpl
 import scorex.transaction._
 import scorex.utils.NTP
 
@@ -44,7 +44,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
       .ensuring(_.size == GeneratingBalanceLength)
 
     val si = Bytes.concat(generatorSignature, genBalanceBytes, account.publicKey)
-    Curve25519.sign(account, si)
+    EllipticCurveImpl.sign(account, si)
   }
 
   def getBaseTarget(generatingBalance: Long): BigInt = BigInt(minMaxBalance(generatingBalance)) * getBlockTime(generatingBalance)

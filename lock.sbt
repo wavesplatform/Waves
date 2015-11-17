@@ -40,7 +40,6 @@ dependencyOverrides in ThisBuild ++= Set(
   "io.spray" % "spray-util_2.11" % "1.3.3",
   "javax.ws.rs" % "jsr311-api" % "1.1.1",
   "joda-time" % "joda-time" % "2.8.1",
-  "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.joda" % "joda-convert" % "1.7",
   "org.json4s" % "json4s-ast_2.11" % "3.2.11",
   "org.json4s" % "json4s-core_2.11" % "3.2.11",
@@ -58,6 +57,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scalacheck" % "scalacheck_2.11" % "1.12.5",
   "org.scalactic" % "scalactic_2.11" % "2.3.0-SNAP2",
   "org.scalatest" % "scalatest_2.11" % "2.3.0-SNAP2",
-  "org.slf4j" % "slf4j-api" % "1.7.7"
+  "org.slf4j" % "slf4j-api" % "1.7.7",
+  "org.whispersystems" % "curve25519-java" % "0.2.4"
 )
-// LIBRARY_DEPENDENCIES_HASH ebeb56ddcdda0c5167514687831e8a979a21a39d
+// LIBRARY_DEPENDENCIES_HASH 2c4136cc7cf36dbf51d6526b95d4108981b4f155

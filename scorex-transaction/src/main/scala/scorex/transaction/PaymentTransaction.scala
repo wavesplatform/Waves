@@ -5,7 +5,7 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.{Base58, Curve25519}
+import scorex.crypto.{EllipticCurveImpl, Base58}
 import scorex.transaction.LagonakiTransaction.TransactionType
 
 case class PaymentTransaction(sender: PublicKeyAccount,
@@ -45,7 +45,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
   override def isSignatureValid() = {
     val data = signatureData(sender, recipient, amount, fee, timestamp)
-    Curve25519.verify(signature, data, sender.publicKey)
+    EllipticCurveImpl.verify(signature, data, sender.publicKey)
   }
 
   override def validate()(implicit transactionModule: SimpleTransactionModule) =
@@ -130,7 +130,7 @@ object PaymentTransaction {
 
   def generateSignature(sender: PrivateKeyAccount, recipient: Account,
                         amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
-    Curve25519.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
+    EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
   }
 
   private def signatureData(sender: PublicKeyAccount, recipient: Account,

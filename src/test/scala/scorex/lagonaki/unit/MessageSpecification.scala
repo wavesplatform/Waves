@@ -8,6 +8,8 @@ import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.lagonaki.network.message._
 import scorex.transaction.SimpleTransactionModule
 
+import scorex.crypto.EllipticCurveImpl.SignatureLength
+
 class MessageSpecification extends FunSuite {
   implicit val consensusModule = new NxtLikeConsensusModule
   implicit val settings = new LagonakiSettings("settings-test.json")
@@ -40,7 +42,7 @@ class MessageSpecification extends FunSuite {
   test("GetSignaturesMessage roundtrip 1") {
     val e1 = 33: Byte
     val e2 = 34: Byte
-    val s1 = e2 +: Array.fill(scorex.crypto.Curve25519.SignatureLength - 1)(e1)
+    val s1 = e2 +: Array.fill(SignatureLength - 1)(e1)
 
     val msg = GetSignaturesMessage(Seq(s1))
     val parsed = Message.parse(ByteBuffer.wrap(msg.bytes)).get
@@ -52,8 +54,8 @@ class MessageSpecification extends FunSuite {
   test("SignaturesMessage roundtrip 1") {
     val e1 = 33: Byte
     val e2 = 34: Byte
-    val s1 = e2 +: Array.fill(scorex.crypto.Curve25519.SignatureLength - 1)(e1)
-    val s2 = e1 +: Array.fill(scorex.crypto.Curve25519.SignatureLength - 1)(e2)
+    val s1 = e2 +: Array.fill(SignatureLength - 1)(e1)
+    val s2 = e1 +: Array.fill(SignatureLength - 1)(e2)
 
     val msg = SignaturesMessage(Seq(s1, s2))
     val parsed = Message.parse(ByteBuffer.wrap(msg.bytes)).get
