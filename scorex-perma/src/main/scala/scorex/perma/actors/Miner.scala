@@ -6,7 +6,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import scorex.crypto.CryptographicHash._
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
 import scorex.crypto.ads.merkle.{MerkleTree, AuthDataBlock}
-import scorex.crypto.{CryptographicHash, Sha256, SigningFunctions, SigningFunctionsImpl}
+import scorex.crypto._
 import scorex.perma.BlockchainBuilderSpec.WinningTicket
 import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
@@ -25,7 +25,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
 
   import Miner._
 
-  private val keyPair = SigningFunctionsImpl.createKeyPair(randomBytes(32))
+  private val keyPair = EllipticCurveImpl.createKeyPair(randomBytes(32))
 
   private var segments: Subset = Map()
 
@@ -102,7 +102,7 @@ object Miner {
     ) {
       case ((ri, sig_prev, seq), _) =>
         val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
-        val sig = SigningFunctionsImpl.sign(privateKey, hi)
+        val sig = EllipticCurveImpl.sign(privateKey, hi)
         val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
           .ensuring(r => segments.keySet.contains(r))
 
@@ -131,7 +131,7 @@ object Miner {
 
       segment.check(ris(i - 1), rootHash)() || {
         val hi = Sha256.hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
-        SigningFunctionsImpl.verify(sigs(i), hi, publicKey)
+        EllipticCurveImpl.verify(sigs(i), hi, publicKey)
       }
     }
     partialProofsCheck && (ticketScore(t) < difficulty)

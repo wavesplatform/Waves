@@ -1,7 +1,7 @@
 package scorex.lagonaki.network.message
 
 import com.google.common.primitives.{Bytes, Ints}
-import scorex.crypto.SigningFunctionsImpl.SignatureLength
+import scorex.crypto.EllipticCurveImpl.SignatureLength
 
 abstract class SignaturesSeqMessage extends Message {
 
