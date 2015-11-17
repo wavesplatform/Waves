@@ -49,6 +49,10 @@ trait Curve25519 extends EllipticCurve with ScorexLogging {
   override val SignatureLength = 64
   override val KeyLength = 32
 
+  //todo: dirty hack, switch to logic as described in WhisperSystem's Curve25519 tutorial as
+  //todo: it will be possible to pass a random seed from outside
+  //todo: https://github.com/WhisperSystems/curve25519-java/pull/7
+
   private val provider: OpportunisticCurve25519Provider = {
     val constructor = classOf[OpportunisticCurve25519Provider]
       .getDeclaredConstructors
@@ -80,4 +84,10 @@ trait Curve25519 extends EllipticCurve with ScorexLogging {
 }
 
 
+/**
+  * This implementation is being used from many places in the code. We consider easy switching from one
+  * EC implementation from another as possible option, while switching to some other signature schemes
+  * (e.g. hash-based signatures) will require a lot of code changes around the project(at least because of
+  * big signature size).
+  */
 object EllipticCurveImpl extends Curve25519
