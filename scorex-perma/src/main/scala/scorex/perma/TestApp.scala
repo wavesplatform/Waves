@@ -23,9 +23,9 @@ class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging 
   val blockchainLike = mutable.Buffer[BlockHeaderLike]()
 
 
-  private def calcPuz = 1.to(100).toArray.map(_ => Random.nextInt(256).toByte)
+  private def calcPuz = 1.to(32).toArray.map(_ => Random.nextInt(256).toByte)
 
-  def difficulty = blockchainLike.lastOption.map(_.difficulty).getOrElse(InitialDifficulty)
+  def difficulty = blockchainLike.headOption.map(_.difficulty).getOrElse(InitialDifficulty)
 
   override def receive = {
     case SendWorkToMiners =>
