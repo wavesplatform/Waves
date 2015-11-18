@@ -17,9 +17,8 @@ class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDri
   property("value returned from byIndex() is valid for random dataset") {
     forAll(smallInteger) { (blocks: Int) =>
       val (treeDirName: String, treeDir: File, tempFile: String) = generateFile(blocks)
-      val file = new FileInputStream(tempFile)
 
-      val tree = MerkleTree.fromFile(file, treeDirName)
+      val tree = MerkleTree.fromFile(tempFile, treeDirName)
       val index = Random.nextInt(tree.nonEmptyBlocks)
 
       val leaf = tree.byIndex(index).get
@@ -32,9 +31,8 @@ class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDri
   property("hash root is the same") {
     forAll(smallInteger) { (blocks: Int) =>
       val (treeDirName: String, treeDir: File, tempFile: String) = generateFile(blocks, "2")
-      val file = new FileInputStream(tempFile)
 
-      val fileTree = MerkleTree.fromFile(file, treeDirName)
+      val fileTree = MerkleTree.fromFile(tempFile, treeDirName)
       val rootHash = fileTree.rootHash
 
       fileTree.storage.close()

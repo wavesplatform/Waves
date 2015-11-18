@@ -1,19 +1,12 @@
 package scorex.perma
 
-import java.io.FileInputStream
+import java.io.{File, RandomAccessFile}
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import org.slf4j.LoggerFactory
 import scorex.crypto.ads.merkle.MerkleTree
-import scorex.perma.BlockchainBuilderSpec.{SendWorkToMiners, WinningTicket}
-import scorex.perma.actors.MinerSpec.{Initialize, TicketGeneration}
-import scorex.perma.actors.{Miner, Ticket, TrustedDealer}
-
-import scorex.utils.ScorexLogging
-
-import scala.collection.mutable
-import scala.util.Random
-
+import scorex.perma.actors.MinerSpec.Initialize
+import scorex.perma.actors.{Miner, TrustedDealer}
 
 
 object TestApp extends App {
@@ -22,20 +15,22 @@ object TestApp extends App {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
-  import Parameters._
-
   log.info("Generating random data set")
-  val rnd = new Random()
-  val dataSet = (1 to n).map(x => Random.alphanumeric.take(segmentSize).mkString).toArray.map(_.getBytes)
+  val treeDirName = "/tmp/scorex/testApp/"
+  val treeDir = new File(treeDirName)
+  val datasetFile = treeDirName + "/data.file"
+
+  treeDir.mkdirs()
+  val f = new RandomAccessFile(datasetFile, "rw")
+  f.setLength(Parameters.n * Parameters.segmentSize)
 
   log.info("Calculate tree")
-  val file = new FileInputStream("/home/pozharko/Documents/protokolnew-160915.doc")
-  val treeFolder = "/tmp/scorex"
-  val tree = MerkleTree.fromFile(file, treeFolder)
+  val tree = MerkleTree.fromFile(datasetFile, treeDirName, Parameters.segmentSize)
+  assert(tree.nonEmptyBlocks == Parameters.n, s"${tree.nonEmptyBlocks} == ${Parameters.n}")
 
   log.info("start actor system")
   protected lazy val actorSystem = ActorSystem("lagonaki")
-  val dealer = actorSystem.actorOf(Props(classOf[TrustedDealer], dataSet))
+  val dealer = actorSystem.actorOf(Props(new TrustedDealer(tree)))
   val miners: Seq[ActorRef] = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], dealer, tree.rootHash)))
 
   miners.foreach(minerRef => minerRef ! Initialize)

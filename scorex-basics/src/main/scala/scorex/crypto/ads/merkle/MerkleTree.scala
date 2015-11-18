@@ -1,6 +1,6 @@
 package scorex.crypto.ads.merkle
 
-import java.io.{File, FileInputStream, FileOutputStream}
+import java.io.{File, FileOutputStream, RandomAccessFile}
 import java.nio.file.{Files, Paths}
 
 import scorex.crypto.CryptographicHash.Digest
@@ -76,24 +76,12 @@ object MerkleTree {
   type Block = Array[Byte]
 
 
-  def fromFile[H <: CryptographicHash](file: FileInputStream,
+  def fromFile[H <: CryptographicHash](fileName: String,
                                        treeFolder: String,
                                        blockSize: Int = 1024,
                                        hash: H = Sha256
                                       ): MerkleTree[H] = {
-
-    @tailrec
-    def processFile(file: FileInputStream, blockIndex: Int = 0): Int = {
-      val buf = new Array[Byte](blockSize)
-      val length = file.read(buf)
-      if (length != -1) {
-        file.read(buf, 0, length)
-        processBlock(buf, blockIndex)
-        processFile(file, blockIndex + 1)
-      } else {
-        blockIndex
-      }
-    }
+    lazy val storage: Storage = new MapDBStorage(new File(treeFolder + "/tree.mapDB"))
 
     def processBlock(block: Block, i: Int): Unit = {
       val fos = new FileOutputStream(treeFolder + "/" + i)
@@ -102,9 +90,35 @@ object MerkleTree {
       storage.set((0, i), hash.hash(block))
     }
 
-    lazy val storage: Storage = new MapDBStorage(new File(treeFolder + "/tree.mapDB"))
+    val byteBuffer = new Array[Byte](blockSize)
 
-    val nonEmptyBlocks = processFile(file)
+    def readLines(bigDataFilePath: String, chunkIndex: Int): Array[Byte] = {
+      val randomAccessFile = new RandomAccessFile(fileName, "r")
+      try {
+        val seek = chunkIndex * blockSize
+        randomAccessFile.seek(seek)
+        randomAccessFile.read(byteBuffer)
+        byteBuffer
+      } finally {
+        randomAccessFile.close()
+      }
+    }
+
+    val nonEmptyBlocks = {
+      val randomAccessFile = new RandomAccessFile(fileName, "r")
+      try {
+        (randomAccessFile.length / blockSize).toInt
+      } finally {
+        randomAccessFile.close()
+      }
+    }
+
+    for (i <- 0 to (nonEmptyBlocks - 1)) {
+      val block = readLines(fileName, i)
+      processBlock(block, i)
+    }
+
+
     storage.commit()
 
     new MerkleTree(treeFolder, nonEmptyBlocks, blockSize, hash)
