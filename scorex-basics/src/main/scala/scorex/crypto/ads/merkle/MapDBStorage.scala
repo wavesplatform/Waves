@@ -29,10 +29,10 @@ class MapDBStorage(file: File) extends Storage {
 
   override def commit(): Unit = {
     db.commit()
-    db.close()
   }
 
   override def close(): Unit = {
+    commit()
     db.close()
   }
 

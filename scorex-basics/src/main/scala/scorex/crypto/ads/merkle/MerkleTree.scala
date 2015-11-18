@@ -20,7 +20,9 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
 
   val level = calculateRequiredLevel(nonEmptyBlocks)
 
-  lazy val rootHash: Digest = getHash((level, 0)).get
+  val rootHash: Digest = getHash((level, 0)).get
+
+  storage.commit()
 
   def byIndex(index: Int): Option[AuthDataBlock[Block]] = {
     if (index < nonEmptyBlocks && index >= 0) {
@@ -55,12 +57,14 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
         if (key._1 > 0) {
           val h1 = getHash((key._1 - 1, key._2 * 2))
           val h2 = getHash((key._1 - 1, key._2 * 2 + 1))
-          (h1, h2) match {
-            case (Some(hash1), Some(hash2)) => Some(hash.hash(hash1 ++ hash2))
-            case (Some(h), _) => Some(hash.hash(h ++ emptyHash))
-            case (_, Some(h)) => Some(hash.hash(emptyHash ++ h))
-            case _ => Some(emptyHash)
+          val calculatedHash = (h1, h2) match {
+            case (Some(hash1), Some(hash2)) => hash.hash(hash1 ++ hash2)
+            case (Some(h), _) => hash.hash(h ++ emptyHash)
+            case (_, Some(h)) => hash.hash(emptyHash ++ h)
+            case _ => emptyHash
           }
+          storage.set(key, calculatedHash)
+          Some(calculatedHash)
         } else {
           None
         }
@@ -120,6 +124,7 @@ object MerkleTree {
 
 
     storage.commit()
+    storage.close()
 
     new MerkleTree(treeFolder, nonEmptyBlocks, blockSize, hash)
 
