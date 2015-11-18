@@ -38,6 +38,7 @@ class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDri
 
       val leaf = tree.byIndex(index).get
       leaf.check(index, tree.rootHash)(Sha256)
+      tree.storage.close()
       for (file <- treeDir.listFiles) file.delete
     }
 

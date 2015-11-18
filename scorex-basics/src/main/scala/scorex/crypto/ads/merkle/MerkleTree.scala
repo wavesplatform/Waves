@@ -27,7 +27,6 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
       @tailrec
       def calculateTreePath(n: Int, currentLevel: Int, acc: Seq[Digest] = Seq()): Seq[Digest] = {
         if (currentLevel < level) {
-          //TODO remove get? it should exists when (index < nonEmptyBlocks && index > 0)
           if (n % 2 == 0) {
             getHash((currentLevel, n + 1)) match {
               case Some(v) =>
@@ -36,6 +35,7 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
                 acc.reverse
             }
           } else {
+            //TODO remove get? it should exists when (index < nonEmptyBlocks && index > 0)
             calculateTreePath(n / 2, currentLevel + 1, getHash((currentLevel, n - 1)).get +: acc)
           }
         } else {

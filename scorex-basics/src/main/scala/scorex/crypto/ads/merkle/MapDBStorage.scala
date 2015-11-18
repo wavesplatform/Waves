@@ -12,7 +12,7 @@ class MapDBStorage(file: File) extends Storage {
 
   import Storage._
 
-  val db = DBMaker.appendFileDB(file)
+  val db = DBMaker.fileDB(file)
     .fileMmapEnableIfSupported()
     .closeOnJvmShutdown()
     .checksumEnable()
@@ -29,6 +29,10 @@ class MapDBStorage(file: File) extends Storage {
 
   override def commit(): Unit = {
     db.commit()
+    db.close()
+  }
+
+  override def close(): Unit = {
     db.close()
   }
 

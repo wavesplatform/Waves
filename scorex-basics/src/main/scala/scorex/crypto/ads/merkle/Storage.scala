@@ -13,6 +13,8 @@ trait Storage {
   def get(key: Key): Option[Digest]
 
   def commit(): Unit
+
+  def close(): Unit
 }
 
 object Storage {
