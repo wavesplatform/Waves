@@ -2,11 +2,14 @@ package scorex.perma
 
 import java.io.{File, RandomAccessFile}
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ActorSystem, Props}
+import akka.util.Timeout
 import org.slf4j.LoggerFactory
 import scorex.crypto.ads.merkle.MerkleTree
-import scorex.perma.actors.MinerSpec.Initialize
+import scorex.perma.BlockchainBuilderSpec.SendWorkToMiners
 import scorex.perma.actors.{Miner, TrustedDealer}
+
+import scala.concurrent.duration._
 
 
 object TestApp extends App {
@@ -26,19 +29,17 @@ object TestApp extends App {
 
   log.info("Calculate tree")
   val tree = MerkleTree.fromFile(datasetFile, treeDirName, Parameters.segmentSize)
-  assert(tree.nonEmptyBlocks == Parameters.n, s"${tree.nonEmptyBlocks} == ${Parameters.n}")
+  require(tree.nonEmptyBlocks == Parameters.n, s"${tree.nonEmptyBlocks} == ${Parameters.n}")
 
   log.info("start actor system")
   protected lazy val actorSystem = ActorSystem("lagonaki")
   val dealer = actorSystem.actorOf(Props(new TrustedDealer(tree)))
-  val miners: Seq[ActorRef] = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], dealer, tree.rootHash)))
+  val miners = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], dealer, tree.rootHash), s"m-$x"))
 
-  miners.foreach(minerRef => minerRef ! Initialize)
+  implicit val timeout = Timeout(1 minute)
 
-  Thread.sleep(2000)
+  val blockchainBuilder = actorSystem.actorOf(Props(classOf[BlockchainBuilder], miners), "BlockchainBuilder")
+  blockchainBuilder ! SendWorkToMiners
 
-  log.info("start BlockchainBuilder")
 
-  val blockchainBuilder = actorSystem.actorOf(Props(classOf[BlockchainBuilder], miners))
-  blockchainBuilder ! BlockchainBuilderSpec.SendWorkToMiners
 }

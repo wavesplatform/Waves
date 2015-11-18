@@ -3,17 +3,20 @@ package scorex.perma.actors
 import java.security.SecureRandom
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.pattern.ask
+import akka.util.Timeout
 import scorex.crypto.CryptographicHash._
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
-import scorex.crypto.ads.merkle.{MerkleTree, AuthDataBlock}
 import scorex.crypto._
+import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.perma.BlockchainBuilderSpec.WinningTicket
 import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
 
-
-import scala.util.Try
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.{Success, Try}
 
 case class PartialProof(signature: Signature, segmentIndex: Int, segment: AuthDataBlock[Parameters.DataSegment])
 
@@ -26,19 +29,28 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
   import Miner._
 
   private val keyPair = EllipticCurveImpl.createKeyPair(randomBytes(32))
+  private implicit val timeout = Timeout(1 minute)
 
   private var segments: Subset = Map()
 
   override def receive = {
 
     case Initialize =>
-      log.info("Initialize")
+      log.debug("Initialize")
 
       val segmentIdsToDownload = 1.to(Parameters.l).map { i =>
         u(keyPair._2, i - 1)
       }.toArray
 
-      trustedDealerRef ! SegmentsRequest(segmentIdsToDownload)
+      val s = sender()
+
+      trustedDealerRef ? SegmentsRequest(segmentIdsToDownload) onComplete {
+        case Success(m) =>
+          self ! m
+          s ! Initialized
+        case _ =>
+          context.stop(self)
+      }
 
     case SegmentsToStore(sgs) =>
       log.debug("SegmentsToStore({})", sgs)
@@ -148,7 +160,9 @@ object MinerSpec {
   type Index = Int
   type Subset = Map[Index, AuthDataBlock[Parameters.DataSegment]]
 
-  case class Initialize()
+  case object Initialize
+
+  case object Initialized
 
   case class TicketGeneration(difficulty: BigInt, puz: Array[Byte])
 

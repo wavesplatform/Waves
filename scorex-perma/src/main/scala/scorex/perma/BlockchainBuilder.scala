@@ -1,7 +1,7 @@
 package scorex.perma
 
 import akka.actor.{Actor, ActorRef}
-import scorex.perma.actors.MinerSpec.TicketGeneration
+import scorex.perma.actors.MinerSpec.{Initialize, Initialized, TicketGeneration}
 import scorex.perma.actors.Ticket
 import scorex.utils.ScorexLogging
 
@@ -12,9 +12,11 @@ import scala.util.Random
 case class BlockHeaderLike(difficulty: BigInt, puz: Array[Byte], ticket: Ticket)
 
 class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging {
+
   import BlockchainBuilderSpec._
 
   var puz: Array[Byte] = calcPuz
+  var initialized = 0
 
   val InitialDifficulty = BigInt(1, Array.fill(33)(1: Byte))
   val blockchainLike = mutable.Buffer[BlockHeaderLike]()
@@ -25,9 +27,21 @@ class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging 
   def difficulty = blockchainLike.headOption.map(_.difficulty).getOrElse(InitialDifficulty)
 
   override def receive = {
+    case Initialized =>
+      initialized = initialized + 1
+      if (initialized == miners.length) {
+        log.info("start BlockchainBuilder")
+        Thread.sleep(2000)
+        self ! SendWorkToMiners
+      }
+
     case SendWorkToMiners =>
       miners.foreach { minerRef =>
-        minerRef ! TicketGeneration(difficulty, puz)
+        if (initialized == miners.length) {
+          minerRef ! TicketGeneration(difficulty, puz)
+        } else {
+          minerRef ! Initialize
+        }
       }
 
     //miners are honest (lol) in our setting, so no validation here
