@@ -27,15 +27,10 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
       @tailrec
       def calculateTreePath(n: Int, currentLevel: Int, acc: Seq[Digest] = Seq()): Seq[Digest] = {
         if (currentLevel < level) {
+          //TODO remove get? it should exists when (index < nonEmptyBlocks && index > 0)
           if (n % 2 == 0) {
-            getHash((currentLevel, n + 1)) match {
-              case Some(v) =>
-                calculateTreePath(n / 2, currentLevel + 1, v +: acc)
-              case None =>
-                acc.reverse
-            }
+            calculateTreePath(n / 2, currentLevel + 1, getHash((currentLevel, n + 1)).get +: acc)
           } else {
-            //TODO remove get? it should exists when (index < nonEmptyBlocks && index > 0)
             calculateTreePath(n / 2, currentLevel + 1, getHash((currentLevel, n - 1)).get +: acc)
           }
         } else {
@@ -52,6 +47,8 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
     }
   }
 
+  private lazy val emptyHash = hash.hash("".getBytes)
+
   def getHash(key: Storage.Key): Option[Digest] = {
     storage.get(key) match {
       case None =>
@@ -60,9 +57,9 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
           val h2 = getHash((key._1 - 1, key._2 * 2 + 1))
           (h1, h2) match {
             case (Some(hash1), Some(hash2)) => Some(hash.hash(hash1 ++ hash2))
-            case (Some(h), _) => h1
-            case (_, Some(h)) => h2
-            case _ => None
+            case (Some(h), _) => Some(hash.hash(h ++ emptyHash))
+            case (_, Some(h)) => Some(hash.hash(emptyHash ++ h))
+            case _ => Some(emptyHash)
           }
         } else {
           None
@@ -70,7 +67,6 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
       case digest =>
         digest
     }
-
   }
 
 
