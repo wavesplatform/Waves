@@ -47,7 +47,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.json4s" % "json4s-jackson_2.11" % "3.2.11",
   "org.json4s" % "json4s-native_2.11" % "3.2.11",
   "org.jvnet.mimepull" % "mimepull" % "1.9.5",
-  "org.mapdb" % "mapdb" % "2.0-beta10",
+  "org.mapdb" % "mapdb" % "2.0-beta11",
   "org.parboiled" % "parboiled-core" % "1.1.7",
   "org.parboiled" % "parboiled-scala_2.11" % "1.1.7",
   "org.scala-lang.modules" % "scala-parser-combinators_2.11" % "1.0.1",
