@@ -20,17 +20,18 @@ object TestApp extends App {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
-  log.info("Generating random data set")
   val treeDirName = "/tmp/scorex/testApp/"
 
-  log.info("Calculate tree")
   val tree = if (Files.exists(Paths.get(treeDirName + "/tree.mapDB"))) {
+    log.info("Get existing tree")
     new MerkleTree(treeDirName, Parameters.n)
   } else {
+    log.info("Generating random data set")
     val treeDir = new File(treeDirName)
     treeDir.mkdirs()
     val datasetFile = treeDirName + "/data.file"
     new RandomAccessFile(datasetFile, "rw").setLength(Parameters.n * Parameters.segmentSize)
+    log.info("Calculate tree")
     val tree = MerkleTree.fromFile(datasetFile, treeDirName, Parameters.segmentSize)
     require(tree.nonEmptyBlocks == Parameters.n, s"${tree.nonEmptyBlocks} == ${Parameters.n}")
     tree

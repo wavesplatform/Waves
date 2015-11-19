@@ -31,7 +31,6 @@ class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging 
       initialized = initialized + 1
       if (initialized == miners.length) {
         log.info("start BlockchainBuilder")
-        Thread.sleep(2000)
         self ! SendWorkToMiners
       }
 
