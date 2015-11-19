@@ -19,26 +19,22 @@ case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
     def calculateHash(i: Position, nodeHash: Digest, path: Seq[Digest]): Digest = {
       if (i % 2 == 0) {
         val hash = hashFunction.hash(nodeHash ++ path.head)
-        if (path.size == 1) {
+        if (path.size == 1)
           hash
-        } else {
+        else
           calculateHash(i / 2, hash, path.tail)
-        }
       } else {
         val hash = hashFunction.hash(path.head ++ nodeHash)
-        if (path.size == 1) {
+        if (path.size == 1)
           hash
-        } else {
+        else
           calculateHash(i / 2, hash, path.tail)
-        }
       }
     }
     if (merklePath.nonEmpty) {
       val calculated = calculateHash(index, hashFunction.hash(data.asInstanceOf[Message]), merklePath)
       calculated.mkString == rootHash.mkString
-    } else {
-      true
-    }
+    } else true
   }
 }
 
