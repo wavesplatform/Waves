@@ -19,7 +19,7 @@ class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDri
       val (treeDirName: String, treeDir: File, tempFile: String) = generateFile(blocks)
 
       val tree = MerkleTree.fromFile(tempFile, treeDirName)
-      val index = Random.nextInt(tree.nonEmptyBlocks)
+      val index = Random.nextInt(tree.nonEmptyBlocks.asInstanceOf[Int])
 
       val leaf = tree.byIndex(index).get
       val resp = leaf.check(index, tree.rootHash)(Sha256)

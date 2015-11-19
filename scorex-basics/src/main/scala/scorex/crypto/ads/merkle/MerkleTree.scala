@@ -4,12 +4,13 @@ import java.io.{File, FileOutputStream, RandomAccessFile}
 import java.nio.file.{Files, Paths}
 
 import scorex.crypto.CryptographicHash.Digest
+import scorex.crypto.ads.merkle.Storage.Position
 import scorex.crypto.{CryptographicHash, Sha256}
 
 import scala.annotation.tailrec
 
 class MerkleTree[H <: CryptographicHash](treeFolder: String,
-                                         val nonEmptyBlocks: Int,
+                                         val nonEmptyBlocks: Position,
                                          blockSize: Int = 1024,
                                          hash: H = Sha256
                                         ) {
@@ -24,10 +25,10 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
 
   storage.commit()
 
-  def byIndex(index: Int): Option[AuthDataBlock[Block]] = {
+  def byIndex(index: Position): Option[AuthDataBlock[Block]] = {
     if (index < nonEmptyBlocks && index >= 0) {
       @tailrec
-      def calculateTreePath(n: Int, currentLevel: Int, acc: Seq[Digest] = Seq()): Seq[Digest] = {
+      def calculateTreePath(n: Position, currentLevel: Int, acc: Seq[Digest] = Seq()): Seq[Digest] = {
         if (currentLevel < level) {
           //TODO remove get? it should exists when (index < nonEmptyBlocks && index > 0)
           if (n % 2 == 0) {
@@ -87,16 +88,9 @@ object MerkleTree {
                                       ): MerkleTree[H] = {
     lazy val storage: Storage = new MapDBStorage(new File(treeFolder + "/tree.mapDB"))
 
-    def processBlock(block: Block, i: Int): Unit = {
-      val fos = new FileOutputStream(treeFolder + "/" + i)
-      fos.write(block)
-      fos.close()
-      storage.set((0, i), hash.hash(block))
-    }
-
     val byteBuffer = new Array[Byte](blockSize)
 
-    def readLines(bigDataFilePath: String, chunkIndex: Int): Array[Byte] = {
+    def readLines(bigDataFilePath: String, chunkIndex: Position): Array[Byte] = {
       val randomAccessFile = new RandomAccessFile(fileName, "r")
       try {
         val seek = chunkIndex * blockSize
@@ -108,7 +102,7 @@ object MerkleTree {
       }
     }
 
-    val nonEmptyBlocks = {
+    val nonEmptyBlocks: Position = {
       val randomAccessFile = new RandomAccessFile(fileName, "r")
       try {
         (randomAccessFile.length / blockSize).toInt
@@ -117,11 +111,18 @@ object MerkleTree {
       }
     }
 
-    for (i <- 0 to (nonEmptyBlocks - 1)) {
-      val block = readLines(fileName, i)
-      processBlock(block, i)
+    def processBlocks(currentBlock: Position = 0): Unit = {
+      val block: Block = readLines(fileName, currentBlock)
+      val fos = new FileOutputStream(treeFolder + "/" + currentBlock)
+      fos.write(block)
+      fos.close()
+      storage.set((0, currentBlock), hash.hash(block))
+      if (currentBlock < nonEmptyBlocks) {
+        processBlocks(currentBlock + 1)
+      }
     }
 
+    processBlocks()
 
     storage.commit()
     storage.close()
@@ -132,7 +133,7 @@ object MerkleTree {
 
   private def log2(x: Double): Double = math.log(x) / math.log(2)
 
-  def calculateRequiredLevel(numberOfDataBlocks: Int): Int = {
+  def calculateRequiredLevel(numberOfDataBlocks: Position): Int = {
 
     math.ceil(log2(numberOfDataBlocks)).toInt
   }

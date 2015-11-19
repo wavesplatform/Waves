@@ -1,5 +1,6 @@
 package scorex.crypto.ads.merkle
 
+import scorex.crypto.ads.merkle.Storage.Position
 import scorex.crypto.{Sha256, CryptographicHash}
 import scorex.crypto.CryptographicHash._
 
@@ -11,11 +12,11 @@ import scala.annotation.tailrec
   */
 case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
 
-  def check[Hash <: CryptographicHash](index: Int, rootHash: Digest)
+  def check[Hash <: CryptographicHash](index: Position, rootHash: Digest)
                                       (hashFunction: Hash = Sha256): Boolean = {
 
     @tailrec
-    def calculateHash(i: Int, nodeHash: Digest, path: Seq[Digest]): Digest = {
+    def calculateHash(i: Position, nodeHash: Digest, path: Seq[Digest]): Digest = {
       if (i % 2 == 0) {
         val hash = hashFunction.hash(nodeHash ++ path.head)
         if (path.size == 1) {
@@ -32,7 +33,7 @@ case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
         }
       }
     }
-    if(merklePath.nonEmpty) {
+    if (merklePath.nonEmpty) {
       val calculated = calculateHash(index, hashFunction.hash(data.asInstanceOf[Message]), merklePath)
       calculated.mkString == rootHash.mkString
     } else {
