@@ -22,7 +22,7 @@ object TestApp extends App {
 
   val treeDirName = "/tmp/scorex/testApp/"
 
-  val tree = if (Files.exists(Paths.get(treeDirName + "/tree.mapDB"))) {
+  val tree = if (Files.exists(Paths.get(treeDirName + "/tree0.mapDB"))) {
     log.info("Get existing tree")
     new MerkleTree(treeDirName, Parameters.n)
   } else {
@@ -41,6 +41,8 @@ object TestApp extends App {
   val index = Parameters.n - 3
   val leaf = tree.byIndex(index).get
   require(leaf.check(index, tree.rootHash)(Sha256))
+
+  log.info("Success: " + tree.rootHash.mkString)
 
   log.info("start actor system")
   protected lazy val actorSystem = ActorSystem("lagonaki")

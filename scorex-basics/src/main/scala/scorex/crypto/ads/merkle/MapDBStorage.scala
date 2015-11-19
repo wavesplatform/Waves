@@ -6,43 +6,52 @@ import org.mapdb.{DBMaker, HTreeMap, Serializer}
 import org.slf4j.LoggerFactory
 import scorex.crypto.CryptographicHash.Digest
 
-import scala.util.{Success, Failure, Try}
+import scala.util.{Failure, Success, Try}
 
-class MapDBStorage(file: File) extends Storage {
+class MapDBStorage(fileName: String, levels: Int) extends Storage {
 
   import Storage._
 
   private val log = LoggerFactory.getLogger(this.getClass)
 
-  private val db = DBMaker.fileDB(file)
-    .fileMmapEnableIfSupported()
-    .closeOnJvmShutdown()
-    .checksumEnable()
-    .make()
+  private val dbs =
+    (0 to levels) map { n: Int =>
+      DBMaker.fileDB(new File(fileName + n + ".mapDB"))
+        .fileMmapEnableIfSupported()
+        .closeOnJvmShutdown()
+        .checksumEnable()
+        .make()
+    }
 
-  def mapsStream(n: Int): Stream[HTreeMap[Long, Digest]] = Stream.cons(
-    db.hashMapCreate("map_" + n)
-      .keySerializer(Serializer.LONG)
-      .valueSerializer(Serializer.BYTE_ARRAY)
-      .makeOrGet(),
-    mapsStream(n + 1)
-  )
-
-  private val maps = mapsStream(0)
-
+  private val maps: Map[Int, HTreeMap[Long, Digest]] = {
+    val t = (0 to levels) map { n: Int =>
+      val m: HTreeMap[Long, Digest] = dbs(n).hashMapCreate("map_" + n)
+        .keySerializer(Serializer.LONG)
+        .valueSerializer(Serializer.BYTE_ARRAY)
+        .makeOrGet()
+      n -> m
+    }
+    t.toMap
+  }
 
   override def set(key: Key, value: Digest): Unit = {
-    maps(key._1.asInstanceOf[Int]).put(key._2, value)
+    val map = maps(key._1.asInstanceOf[Int])
+    val t = Try {
+      map.put(key._2, value)
+    }
+    if (t.isFailure) {
+      log.warn("Failed to set key:" + key)
+    }
   }
 
 
   override def commit(): Unit = {
-    db.commit()
+    dbs.map(_.commit())
   }
 
   override def close(): Unit = {
     commit()
-    db.close()
+    dbs.map(_.close())
   }
 
   override def get(key: Key): Option[Digest] = {
@@ -50,7 +59,9 @@ class MapDBStorage(file: File) extends Storage {
       maps(key._1).get(key._2)
     } match {
       case Failure(e) =>
-        log.debug("Enable to load key: " + key)
+        if (key._1 == 0) {
+          log.debug("Enable to load key for level 0: " + key)
+        }
         None
       case Success(v) =>
         Option(v)

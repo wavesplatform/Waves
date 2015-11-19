@@ -17,9 +17,9 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
 
   import MerkleTree._
 
-  lazy val storage: Storage = new MapDBStorage(new File(treeFolder + "/tree.mapDB"))
-
   val level = calculateRequiredLevel(nonEmptyBlocks)
+
+  lazy val storage: Storage = new MapDBStorage(treeFolder + "/tree", level)
 
   val rootHash: Digest = getHash((level, 0)).get
 
@@ -86,8 +86,6 @@ object MerkleTree {
                                        blockSize: Int = 1024,
                                        hash: H = Sha256
                                       ): MerkleTree[H] = {
-    lazy val storage: Storage = new MapDBStorage(new File(treeFolder + "/tree.mapDB"))
-
     val byteBuffer = new Array[Byte](blockSize)
 
     def readLines(bigDataFilePath: String, chunkIndex: Position): Array[Byte] = {
@@ -110,6 +108,10 @@ object MerkleTree {
         randomAccessFile.close()
       }
     }
+
+    val level = calculateRequiredLevel(nonEmptyBlocks)
+
+    lazy val storage: Storage = new MapDBStorage(treeFolder + "/tree", level)
 
     def processBlocks(currentBlock: Position = 0): Unit = {
       val block: Block = readLines(fileName, currentBlock)

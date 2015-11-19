@@ -18,17 +18,18 @@ class MapDBStorageSpecification extends PropSpec with PropertyChecks with Genera
   val treeDir = new File(treeDirName)
   treeDir.mkdirs()
   val dbFile = new File(treeDirName + "/db.file")
+  val maxLevel = 50
   dbFile.delete()
 
   val keyVal = for {
-    level: Int <- Gen.choose(1, 50)
+    level: Int <- Gen.choose(1, maxLevel)
     key: Long <- Arbitrary.arbitrary[Long]
     value <- Arbitrary.arbitrary[String]
-  } yield ((level, key), value.getBytes)
+  } yield ((level, math.abs(key)), value.getBytes)
 
 
   property("set value and get it") {
-    lazy val storage: Storage = new MapDBStorage(dbFile)
+    lazy val storage: Storage = new MapDBStorage(treeDirName + "/test_db", maxLevel)
 
     forAll(keyVal) { x =>
       val key: Key = x._1
