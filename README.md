@@ -1,18 +1,18 @@
 Scorex - Lagonaki Release
 =========================
 
-**The universal blockchain database framework**
+**The modular blockchain framework**
 
 Motivation
 ----------
 
 There are two huge problems around cryptocurrencies development project Scorex aims to weaken:
 
-* Bitcoin source code contains more 100K lines of code(80K of C++ only), Nxt is about more than 45K
- line of Java code. All parts of the design(network/transactions/consensus layers) are mixed in a hard way.
- So researchers & developers are not in good start positions to make experiments.
+* Bitcoin source code contains more 100K lines of code(80K of C++ only), Nxt is more than 45K
+ line of Java code. All parts of the design(network/transactional/consensus protocols) are mixed in a hard way.
+ So researchers and developers are not in good start positions to make experiments.
 
- In opposite, Scorex is less than 4K lines of Scala code. Transactions layer is as simple as that. Consensus algo
+ In opposite, Scorex is less than 4K lines of Scala code. Transactional layer is as simple as that. Consensus algo
  could be switched easily(with two consensus algos out of the box, one could be replaced with an another with
   just one line of code edited!)
 
@@ -23,11 +23,12 @@ There are two huge problems around cryptocurrencies development project Scorex a
 Features
 --------
 
-* Compact, functional, actors-powered code
+* Compact, functional code
 * Modular design
+* Scala language
 * Two 100% Proof-of-Stake consensus algos out of the box, Nxt-like and Qora-like. One algo could be replaced
 with an another with just one line of code edited (in Constants.scala)
-* Simplest transactions model
+* Simplest transactional model
 * Asynchronous network layer on top of TCP
 * JSON API
 * Command line client for the JSON API
