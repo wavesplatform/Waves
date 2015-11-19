@@ -8,7 +8,7 @@ trait Storage {
 
   import Storage._
 
-  def set(key: Key, value: Digest): Try[Digest]
+  def set(key: Key, value: Digest): Unit
 
   def get(key: Key): Option[Digest]
 
@@ -19,7 +19,7 @@ trait Storage {
 
 object Storage {
   type Level = Int
-  type Position = Int
+  type Position = Long
   type Key = (Level, Position)
 
 }

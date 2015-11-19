@@ -1,29 +1,38 @@
 package scorex.crypto.ads.merkle
 
 import java.io.File
-import java.util.concurrent.ConcurrentNavigableMap
 
-import org.mapdb.DBMaker
+import org.mapdb.{DBMaker, HTreeMap, Serializer}
+import org.slf4j.LoggerFactory
 import scorex.crypto.CryptographicHash.Digest
 
-import scala.util.Try
+import scala.util.{Success, Failure, Try}
 
 class MapDBStorage(file: File) extends Storage {
 
   import Storage._
 
-  val db = DBMaker.fileDB(file)
+  private val log = LoggerFactory.getLogger(this.getClass)
+
+  private val db = DBMaker.fileDB(file)
     .fileMmapEnableIfSupported()
     .closeOnJvmShutdown()
     .checksumEnable()
     .make()
 
-  val map: ConcurrentNavigableMap[String, Digest] = db.treeMap("tree")
+  def mapsStream(n: Int): Stream[HTreeMap[Long, Digest]] = Stream.cons(
+    db.hashMapCreate("map_" + n)
+      .keySerializer(Serializer.LONG)
+      .valueSerializer(Serializer.BYTE_ARRAY)
+      .makeOrGet(),
+    mapsStream(n + 1)
+  )
 
-  override def set(key: Key, value: Digest): Try[Digest] = {
-    Try {
-      map.put(stringKey(key), value)
-    }
+  private val maps = mapsStream(0)
+
+
+  override def set(key: Key, value: Digest): Unit = {
+    maps(key._1.asInstanceOf[Int]).put(key._2, value)
   }
 
 
@@ -37,10 +46,15 @@ class MapDBStorage(file: File) extends Storage {
   }
 
   override def get(key: Key): Option[Digest] = {
-    Option(map.get(stringKey(key)))
+    Try {
+      maps(key._1).get(key._2)
+    } match {
+      case Failure(e) =>
+        log.debug("Enable to load key: " + key)
+        None
+      case Success(v) =>
+        Option(v)
+    }
   }
 
-  private def stringKey(key: Key): String = {
-    key._1 + "_" + key._2
-  }
 }

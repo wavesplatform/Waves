@@ -1,0 +1,45 @@
+package scorex.props
+
+import java.io.{File, FileOutputStream}
+
+import org.scalacheck.{Arbitrary, Gen}
+import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.{Matchers, PropSpec}
+import scorex.crypto.CryptographicHash.Digest
+import scorex.crypto.Sha256
+import scorex.crypto.ads.merkle.Storage.Key
+import scorex.crypto.ads.merkle.{MapDBStorage, Storage, MerkleTree}
+
+import scala.util.Random
+
+class MapDBStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
+
+  val treeDirName = "/tmp/scorex/test/MapDBStorageSpecification/"
+  val treeDir = new File(treeDirName)
+  treeDir.mkdirs()
+  val dbFile = new File(treeDirName + "/db.file")
+  dbFile.delete()
+
+  val keyVal = for {
+    level: Int <- Gen.choose(1, 50)
+    key: Long <- Arbitrary.arbitrary[Long]
+    value <- Arbitrary.arbitrary[String]
+  } yield ((level, key), value.getBytes)
+
+
+  property("set value and get it") {
+    lazy val storage: Storage = new MapDBStorage(dbFile)
+
+    forAll(keyVal) { x =>
+      val key: Key = x._1
+      val value: Digest = x._2
+      whenever(key._1 >= 0.toLong && key._2 >= 0.toLong) {
+        storage.set(key, value)
+
+        assert(storage.get(key).get sameElements value)
+      }
+    }
+    storage.close()
+  }
+
+}
