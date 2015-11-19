@@ -2,8 +2,6 @@ package scorex.crypto.ads.merkle
 
 import scorex.crypto.CryptographicHash.Digest
 
-import scala.util.Try
-
 trait Storage {
 
   import Storage._
@@ -21,5 +19,4 @@ object Storage {
   type Level = Int
   type Position = Long
   type Key = (Level, Position)
-
 }

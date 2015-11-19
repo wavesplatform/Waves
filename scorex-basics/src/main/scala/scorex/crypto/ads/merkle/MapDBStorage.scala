@@ -36,35 +36,33 @@ class MapDBStorage(fileName: String, levels: Int) extends Storage {
 
   override def set(key: Key, value: Digest): Unit = {
     val map = maps(key._1.asInstanceOf[Int])
-    val t = Try {
+    Try {
       map.put(key._2, value)
-    }
-    if (t.isFailure) {
-      log.warn("Failed to set key:" + key)
+    }.recoverWith{case t: Throwable =>
+      log.warn("Failed to set key:" + key, t)
+      Failure(t)
     }
   }
 
-
-  override def commit(): Unit = {
-    dbs.map(_.commit())
-  }
+  override def commit(): Unit = dbs.foreach(_.commit())
 
   override def close(): Unit = {
     commit()
-    dbs.map(_.close())
+    dbs.foreach(_.close())
   }
 
   override def get(key: Key): Option[Digest] = {
     Try {
       maps(key._1).get(key._2)
     } match {
+      case Success(v) =>
+        Option(v)
+
       case Failure(e) =>
         if (key._1 == 0) {
           log.debug("Enable to load key for level 0: " + key)
         }
         None
-      case Success(v) =>
-        Option(v)
     }
   }
 

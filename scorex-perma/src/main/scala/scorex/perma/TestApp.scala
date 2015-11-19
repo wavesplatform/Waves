@@ -53,6 +53,4 @@ object TestApp extends App {
 
   val blockchainBuilder = actorSystem.actorOf(Props(classOf[BlockchainBuilder], miners), "BlockchainBuilder")
   blockchainBuilder ! SendWorkToMiners
-
-
 }

@@ -1,6 +1,6 @@
 package scorex.crypto.ads.merkle
 
-import java.io.{File, FileOutputStream, RandomAccessFile}
+import java.io.{FileOutputStream, RandomAccessFile}
 import java.nio.file.{Files, Paths}
 
 import scorex.crypto.CryptographicHash.Digest
@@ -73,13 +73,11 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
         digest
     }
   }
-
-
 }
+
 
 object MerkleTree {
   type Block = Array[Byte]
-
 
   def fromFile[H <: CryptographicHash](fileName: String,
                                        treeFolder: String,
@@ -130,15 +128,11 @@ object MerkleTree {
     storage.close()
 
     new MerkleTree(treeFolder, nonEmptyBlocks, blockSize, hash)
-
   }
 
   private def log2(x: Double): Double = math.log(x) / math.log(2)
 
   def calculateRequiredLevel(numberOfDataBlocks: Position): Int = {
-
     math.ceil(log2(numberOfDataBlocks)).toInt
   }
-
-
 }

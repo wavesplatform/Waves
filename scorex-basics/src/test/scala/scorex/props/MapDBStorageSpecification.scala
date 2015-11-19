@@ -1,16 +1,14 @@
 package scorex.props
 
-import java.io.{File, FileOutputStream}
+import java.io.File
 
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.CryptographicHash.Digest
-import scorex.crypto.Sha256
 import scorex.crypto.ads.merkle.Storage.Key
-import scorex.crypto.ads.merkle.{MapDBStorage, Storage, MerkleTree}
+import scorex.crypto.ads.merkle.{MapDBStorage, Storage}
 
-import scala.util.Random
 
 class MapDBStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
@@ -42,5 +40,4 @@ class MapDBStorageSpecification extends PropSpec with PropertyChecks with Genera
     }
     storage.close()
   }
-
 }

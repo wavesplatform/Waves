@@ -1,6 +1,5 @@
 package scorex.perma
 
-
 object Parameters {
 
   type DataSegment = Array[Byte]

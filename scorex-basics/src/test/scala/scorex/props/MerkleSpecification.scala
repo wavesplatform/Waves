@@ -1,6 +1,6 @@
 package scorex.props
 
-import java.io.{File, FileInputStream, FileOutputStream}
+import java.io.{File, FileOutputStream}
 
 import org.scalacheck.Gen
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
@@ -11,6 +11,7 @@ import scorex.crypto.ads.merkle.MerkleTree
 import scala.util.Random
 
 class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
+
   val smallInteger = Gen.choose(100, 500)
 
 
