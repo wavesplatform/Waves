@@ -14,6 +14,9 @@ class AuthDataStorage(fileName: String) extends Storage[Long, AuthDataBlock[Data
 
   private val log = LoggerFactory.getLogger(this.getClass)
 
+  //TODO https://github.com/jankotek/mapdb/issues/634 workaround
+  private var commitNeeded = false
+
   private val db =
     DBMaker.appendFileDB(new File(fileName + ".mapDB"))
       .fileMmapEnableIfSupported()
@@ -28,18 +31,20 @@ class AuthDataStorage(fileName: String) extends Storage[Long, AuthDataBlock[Data
   override def set(key: Long, value: AuthDataBlock[DataSegment]): Unit = {
     Try {
       map.put(key, value)
+
     }.recoverWith { case t: Throwable =>
       log.warn("Failed to set key:" + key, t)
       Failure(t)
     }
   }
 
-  override def commit(): Unit = db.commit()
-
-  override def close(): Unit = {
-    commit()
-    db.close()
+  override def commit(): Unit = if (commitNeeded) {
+    db.commit()
+    commitNeeded = false
   }
+
+  override def close(): Unit = db.close()
+
 
   override def containsKey(key: Long): Boolean = {
     map.containsKey(key)
