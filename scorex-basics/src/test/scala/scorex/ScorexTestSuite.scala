@@ -10,5 +10,6 @@ class ScorexTestSuite extends Suites (
   new unit.Sha256Specification,
 
   new props.SigningFunctionsSpecification,
-  new props.MerkleSpecification
+  new props.MerkleSpecification,
+  new props.TreeStorageSpecification
 )

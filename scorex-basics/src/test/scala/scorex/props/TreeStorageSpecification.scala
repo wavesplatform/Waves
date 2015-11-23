@@ -7,10 +7,10 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.CryptographicHash.Digest
 import scorex.crypto.ads.merkle.TreeStorage.Key
-import scorex.crypto.ads.merkle.TreeStorage$
+import scorex.crypto.ads.merkle.TreeStorage
 
 
-class MapDBStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
+class TreeStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
   val treeDirName = "/tmp/scorex/test/MapDBStorageSpecification/"
   val treeDir = new File(treeDirName)

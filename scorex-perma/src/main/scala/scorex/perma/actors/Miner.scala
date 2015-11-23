@@ -12,6 +12,7 @@ import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.ads.merkle.MerkleTree.Block
 import scorex.perma.BlockchainBuilderSpec.WinningTicket
 import scorex.perma.Parameters
+import scorex.perma.Storage.AuthDataStorage
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
 
@@ -31,8 +32,6 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
 
   private val keyPair = EllipticCurveImpl.createKeyPair(randomBytes(32))
   private implicit val timeout = Timeout(1 minute)
-
-  private var segments: Subset = Map()
 
   private lazy val segmentIds = 1.to(Parameters.l).map { i =>
     u(keyPair._2, i - 1)
@@ -56,11 +55,12 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
 
     case SegmentsToStore(sgs) =>
       log.debug("SegmentsToStore({})", sgs)
-      segments = sgs
+      sgs.map(s => storage.set(s._1, s._2))
+      storage.commit()
 
     case TicketGeneration(difficulty, puz) =>
       log.debug("TicketGeneration({})", puz)
-      val ticket = generate(keyPair, puz, segments)
+      val ticket = generate(keyPair, puz)
 
       val check = validate(keyPair._2, puz, difficulty, ticket, rootHash)
       val score = ticketScore(ticket)
@@ -99,11 +99,10 @@ object Miner {
     r
   }
 
-//  def segments(index: Index, storage: Storage): AuthDataBlock[Block] = {
-//
-//  }
+  //TODO take file name from config
+  val storage = new AuthDataStorage("/tmp/scorex/testApp/segmentsStorage.mapDB")
 
-  def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte], segments: Subset): Ticket = {
+  def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Ticket = {
 
     val (privateKey, publicKey) = keyPair
 
@@ -112,18 +111,17 @@ object Miner {
 
     val sig0 = NoSig
     val r1 = u(publicKey, (BigInt(1, Sha256.hash(puz ++ publicKey ++ s)) % Parameters.l).toInt)
-      .ensuring(r => segments.keySet.contains(r))
 
-    val proofs = 1.to(Parameters.k).foldLeft(
+    val proofs:IndexedSeq[PartialProof] = 1.to(Parameters.k).foldLeft(
       (r1, sig0, Seq[PartialProof]())
     ) {
       case ((ri, sig_prev, seq), _) =>
-        val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
+        val segment = storage.get(ri).get
+        val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segment.data)
         val sig = EllipticCurveImpl.sign(privateKey, hi)
         val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
-          .ensuring(r => segments.keySet.contains(r))
 
-        (r_next, sig, seq :+ PartialProof(sig, ri, segments(ri)))
+        (r_next, sig, seq :+ PartialProof(sig, ri, segment))
     }._3.toIndexedSeq.ensuring(_.size == Parameters.k)
 
     Ticket(publicKey, s, proofs)
