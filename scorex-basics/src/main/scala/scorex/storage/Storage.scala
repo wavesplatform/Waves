@@ -9,4 +9,9 @@ trait Storage[Key, Value] {
   def commit(): Unit
 
   def close(): Unit
+
+  def containsKey(key: Key): Boolean = {
+    get(key).isDefined
+  }
+  
 }

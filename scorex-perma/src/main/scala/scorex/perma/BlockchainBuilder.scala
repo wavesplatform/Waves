@@ -1,17 +1,19 @@
 package scorex.perma
 
 import akka.actor.{Actor, ActorRef}
-import scorex.perma.actors.MinerSpec.{Initialize, Initialized, TicketGeneration}
+import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.Ticket
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.util.Random
 
 
 case class BlockHeaderLike(difficulty: BigInt, puz: Array[Byte], ticket: Ticket)
 
-class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging {
+class BlockchainBuilder(miners: Seq[ActorRef], dealer: ActorRef) extends Actor with ScorexLogging {
 
   import BlockchainBuilderSpec._
 
@@ -26,11 +28,17 @@ class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging 
   def difficulty = blockchainLike.headOption.map(_.difficulty).getOrElse(InitialDifficulty)
 
   override def receive = {
-    case Initialized =>
-      initialized = initialized + 1
-      if (initialized == miners.length) {
-        log.info("start BlockchainBuilder")
-        self ! SendWorkToMiners
+    case s: MinerStatus =>
+      s match {
+        case Initialized =>
+          initialized = initialized + 1
+          if (initialized == miners.length) {
+            log.info("All miners initialized")
+            self ! SendWorkToMiners
+          }
+        case LoadingData =>
+          sender() ! Initialize(Seq(dealer))
+          context.system.scheduler.scheduleOnce(200 millis, sender(), GetStatus)
       }
 
     case SendWorkToMiners =>
@@ -38,7 +46,8 @@ class BlockchainBuilder(miners: Seq[ActorRef]) extends Actor with ScorexLogging 
         if (initialized == miners.length) {
           minerRef ! TicketGeneration(difficulty, puz)
         } else {
-          minerRef ! Initialize
+          minerRef ! Initialize(miners)
+          context.system.scheduler.scheduleOnce(200 millis, minerRef, GetStatus)
         }
       }
 

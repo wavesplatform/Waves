@@ -3,60 +3,85 @@ package scorex.perma.actors
 import java.security.SecureRandom
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
-import akka.pattern.ask
 import akka.util.Timeout
 import scorex.crypto.CryptographicHash._
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
 import scorex.crypto._
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.crypto.ads.merkle.MerkleTree.Block
 import scorex.perma.BlockchainBuilderSpec.WinningTicket
 import scorex.perma.Parameters
 import scorex.perma.Storage.AuthDataStorage
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.{Success, Try}
+import scala.util.Try
 
-case class PartialProof(signature: Signature, segmentIndex: Int, segment: AuthDataBlock[Parameters.DataSegment])
+case class PartialProof(signature: Signature, segmentIndex: Long, segment: AuthDataBlock[Parameters.DataSegment])
 
 case class Ticket(publicKey: PublicKey,
                   s: Array[Byte],
                   proofs: IndexedSeq[PartialProof])
 
-class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with ActorLogging {
+class Miner(rootHash: Digest) extends Actor with ActorLogging {
 
   import Miner._
 
   private val keyPair = EllipticCurveImpl.createKeyPair(randomBytes(32))
   private implicit val timeout = Timeout(1 minute)
 
-  private lazy val segmentIds = 1.to(Parameters.l).map { i =>
+  private val segmentIds: Seq[Long] = 1.to(Parameters.l).map { i =>
     u(keyPair._2, i - 1)
-  }.toArray
+  }.toSeq
+
+  //Mutable list of ids, remaining to download
+  private var segmentToDownload: ListBuffer[Long] = segmentIds.to[ListBuffer]
 
   override def receive = {
 
-    case Initialize =>
+    case Initialize(miners) =>
       log.debug("Initialize")
 
       val s = sender()
 
-      //TODO request other miners first
-      trustedDealerRef ? SegmentsRequest(segmentIds) onComplete {
-        case Success(m) =>
-          self ! m
-          s ! Initialized
-        case _ =>
-          context.stop(self)
+      segmentToDownload foreach { s =>
+        if (authDataStorage.containsKey(s)) {
+          segmentToDownload -= s
+        }
       }
+
+      if (segmentToDownload.nonEmpty) {
+        miners.foreach(_ ! SegmentsRequest(segmentToDownload))
+      }
+
+    case GetStatus =>
+      log.debug("Get status")
+      if (segmentToDownload.isEmpty) {
+        sender ! Initialized
+      } else {
+        sender ! LoadingData
+      }
+
+    case SegmentsRequest(ids) =>
+      val segments: Subset = ids.map { x =>
+        x -> authDataStorage.get(x)
+      }.toMap.collect {
+        case (key, Some(value)) => key -> value
+      }
+      log.info(s"Miner SegmentsRequest for ${ids.length} blocks returns ${segments.size} blocks")
+      sender ! SegmentsToStore(segments)
 
     case SegmentsToStore(sgs) =>
       log.debug("SegmentsToStore({})", sgs)
-      sgs.map(s => storage.set(s._1, s._2))
-      storage.commit()
+      sgs.foreach { s =>
+        if (segmentToDownload.contains(s._1) && s._2.check(s._1, rootHash)(Parameters.hash)) {
+          authDataStorage.set(s._1, s._2)
+          segmentToDownload -= s._1
+        }
+      }
+      authDataStorage.commit()
 
     case TicketGeneration(difficulty, puz) =>
       log.debug("TicketGeneration({})", puz)
@@ -69,8 +94,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
       if (check) {
         sender() ! WinningTicket(puz, score, ticket)
       } else {
-        Thread.sleep(100)
-        self ! TicketGeneration(difficulty, puz)
+        context.system.scheduler.scheduleOnce(200 millis, self, TicketGeneration(difficulty, puz))
       }
 
     case TicketValidation(difficulty, puz, t: Ticket) =>
@@ -86,9 +110,9 @@ object Miner {
   val NoSig = Array[Byte]()
 
   //calculate index of i-th segment
-  private def u(pubKey: PublicKey, i: Int): Int = {
+  private def u(pubKey: PublicKey, i: Int): Long = {
     val h = Sha256.hash(pubKey ++ BigInt(i).toByteArray)
-    BigInt(1, h).mod(Parameters.n).toInt
+    BigInt(1, h).mod(Parameters.n).toLong
   }
 
 
@@ -100,7 +124,7 @@ object Miner {
   }
 
   //TODO take file name from config
-  val storage = new AuthDataStorage("/tmp/scorex/testApp/segmentsStorage.mapDB")
+  val authDataStorage = new AuthDataStorage("/tmp/scorex/testApp/segmentsStorage.mapDB")
 
   def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Ticket = {
 
@@ -112,11 +136,11 @@ object Miner {
     val sig0 = NoSig
     val r1 = u(publicKey, (BigInt(1, Sha256.hash(puz ++ publicKey ++ s)) % Parameters.l).toInt)
 
-    val proofs:IndexedSeq[PartialProof] = 1.to(Parameters.k).foldLeft(
+    val proofs: IndexedSeq[PartialProof] = 1.to(Parameters.k).foldLeft(
       (r1, sig0, Seq[PartialProof]())
     ) {
       case ((ri, sig_prev, seq), _) =>
-        val segment = storage.get(ri).get
+        val segment = authDataStorage.get(ri).get
         val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segment.data)
         val sig = EllipticCurveImpl.sign(privateKey, hi)
         val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
@@ -160,15 +184,22 @@ object Miner {
 
 object MinerSpec {
 
-  type Index = Int
+  type Index = Long
   type Subset = Map[Index, AuthDataBlock[Parameters.DataSegment]]
 
-  case object Initialize
-
-  case object Initialized
+  case class Initialize(miners: Seq[ActorRef])
 
   case class TicketGeneration(difficulty: BigInt, puz: Array[Byte])
 
   case class TicketValidation(difficulty: BigInt, puz: Array[Byte], ticket: Ticket)
+
+  case object GetStatus
+
+  sealed trait MinerStatus
+
+  case object Initialized extends MinerStatus
+
+  case object LoadingData extends MinerStatus
+
 
 }

@@ -41,6 +41,10 @@ class AuthDataStorage(fileName: String) extends Storage[Long, AuthDataBlock[Data
     db.close()
   }
 
+  override def containsKey(key: Long): Boolean = {
+    map.containsKey(key)
+  }
+
   override def get(key: Long): Option[AuthDataBlock[DataSegment]] = {
     Try {
       map.get(key)

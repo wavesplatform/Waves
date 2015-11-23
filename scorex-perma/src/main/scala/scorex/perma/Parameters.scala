@@ -1,5 +1,7 @@
 package scorex.perma
 
+import scorex.crypto.Sha256
+
 object Parameters {
 
   type DataSegment = Array[Byte]
@@ -11,4 +13,6 @@ object Parameters {
   val l = 1024 //how many segments to store for an each miner
 
   val k = 4 //number of iterations during scratch-off phase
+
+  val hash = Sha256
 }

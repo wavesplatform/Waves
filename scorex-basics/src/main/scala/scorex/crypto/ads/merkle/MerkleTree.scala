@@ -117,7 +117,7 @@ object MerkleTree {
       fos.write(block)
       fos.close()
       storage.set((0, currentBlock), hash.hash(block))
-      if (currentBlock < nonEmptyBlocks) {
+      if (currentBlock < nonEmptyBlocks - 1) {
         processBlocks(currentBlock + 1)
       }
     }
