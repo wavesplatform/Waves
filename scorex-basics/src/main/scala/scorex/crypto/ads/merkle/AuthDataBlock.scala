@@ -1,7 +1,7 @@
 package scorex.crypto.ads.merkle
 
 import scorex.crypto.CryptographicHash._
-import scorex.crypto.ads.merkle.MapDBStorage.Position
+import scorex.crypto.ads.merkle.TreeStorage.Position
 import scorex.crypto.{CryptographicHash, Sha256}
 
 import scala.annotation.tailrec

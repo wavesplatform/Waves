@@ -5,12 +5,13 @@ import java.io.File
 import org.mapdb.{DBMaker, HTreeMap, Serializer}
 import org.slf4j.LoggerFactory
 import scorex.crypto.CryptographicHash.Digest
+import scorex.storage.Storage
 
 import scala.util.{Failure, Success, Try}
 
-class MapDBStorage(fileName: String, levels: Int) extends Storage[Tuple2[Int, Long], Array[Byte]] {
+class TreeStorage(fileName: String, levels: Int) extends Storage[Tuple2[Int, Long], Array[Byte]] {
 
-  import MapDBStorage._
+  import TreeStorage._
 
   private val log = LoggerFactory.getLogger(this.getClass)
 
@@ -68,7 +69,7 @@ class MapDBStorage(fileName: String, levels: Int) extends Storage[Tuple2[Int, Lo
 
 }
 
-object MapDBStorage {
+object TreeStorage {
   type Level = Int
   type Position = Long
   type Key = (Level, Position)

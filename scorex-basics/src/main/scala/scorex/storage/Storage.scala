@@ -1,4 +1,4 @@
-package scorex.crypto.ads.merkle
+package scorex.storage
 
 trait Storage[Key, Value] {
 

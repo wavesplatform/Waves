@@ -8,7 +8,7 @@ import akka.util.Timeout
 import scorex.crypto.CryptographicHash._
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
 import scorex.crypto._
-import scorex.crypto.ads.merkle.{Storage, AuthDataBlock}
+import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.ads.merkle.MerkleTree.Block
 import scorex.perma.BlockchainBuilderSpec.WinningTicket
 import scorex.perma.Parameters
