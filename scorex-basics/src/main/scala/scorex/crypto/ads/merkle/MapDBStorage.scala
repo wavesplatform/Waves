@@ -8,9 +8,9 @@ import scorex.crypto.CryptographicHash.Digest
 
 import scala.util.{Failure, Success, Try}
 
-class MapDBStorage(fileName: String, levels: Int) extends Storage {
+class MapDBStorage(fileName: String, levels: Int) extends Storage[Tuple2[Int, Long], Array[Byte]] {
 
-  import Storage._
+  import MapDBStorage._
 
   private val log = LoggerFactory.getLogger(this.getClass)
 
@@ -38,7 +38,7 @@ class MapDBStorage(fileName: String, levels: Int) extends Storage {
     val map = maps(key._1.asInstanceOf[Int])
     Try {
       map.put(key._2, value)
-    }.recoverWith{case t: Throwable =>
+    }.recoverWith { case t: Throwable =>
       log.warn("Failed to set key:" + key, t)
       Failure(t)
     }
@@ -65,5 +65,13 @@ class MapDBStorage(fileName: String, levels: Int) extends Storage {
         None
     }
   }
+
+}
+
+object MapDBStorage {
+  type Level = Int
+  type Position = Long
+  type Key = (Level, Position)
+  type Value = Digest
 
 }

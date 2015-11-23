@@ -12,7 +12,7 @@ import scala.util.Random
 
 class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
-  val smallInteger = Gen.choose(100, 500)
+  val smallInteger = Gen.choose(8, 128)
 
 
   property("value returned from byIndex() is valid for random dataset") {

@@ -1,22 +1,12 @@
 package scorex.crypto.ads.merkle
 
-import scorex.crypto.CryptographicHash.Digest
+trait Storage[Key, Value] {
 
-trait Storage {
+  def set(key: Key, value: Value): Unit
 
-  import Storage._
-
-  def set(key: Key, value: Digest): Unit
-
-  def get(key: Key): Option[Digest]
+  def get(key: Key): Option[Value]
 
   def commit(): Unit
 
   def close(): Unit
-}
-
-object Storage {
-  type Level = Int
-  type Position = Long
-  type Key = (Level, Position)
 }

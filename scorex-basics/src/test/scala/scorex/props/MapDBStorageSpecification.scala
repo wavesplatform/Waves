@@ -6,7 +6,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.CryptographicHash.Digest
-import scorex.crypto.ads.merkle.Storage.Key
+import scorex.crypto.ads.merkle.MapDBStorage.Key
 import scorex.crypto.ads.merkle.{MapDBStorage, Storage}
 
 
@@ -27,7 +27,7 @@ class MapDBStorageSpecification extends PropSpec with PropertyChecks with Genera
 
 
   property("set value and get it") {
-    lazy val storage: Storage = new MapDBStorage(treeDirName + "/test_db", maxLevel)
+    lazy val storage = new MapDBStorage(treeDirName + "/test_db", maxLevel)
 
     forAll(keyVal) { x =>
       val key: Key = x._1

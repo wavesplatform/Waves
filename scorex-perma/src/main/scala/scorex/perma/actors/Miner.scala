@@ -8,7 +8,8 @@ import akka.util.Timeout
 import scorex.crypto.CryptographicHash._
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
 import scorex.crypto._
-import scorex.crypto.ads.merkle.AuthDataBlock
+import scorex.crypto.ads.merkle.{Storage, AuthDataBlock}
+import scorex.crypto.ads.merkle.MerkleTree.Block
 import scorex.perma.BlockchainBuilderSpec.WinningTicket
 import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
@@ -33,18 +34,19 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
 
   private var segments: Subset = Map()
 
+  private lazy val segmentIds = 1.to(Parameters.l).map { i =>
+    u(keyPair._2, i - 1)
+  }.toArray
+
   override def receive = {
 
     case Initialize =>
       log.debug("Initialize")
 
-      val segmentIdsToDownload = 1.to(Parameters.l).map { i =>
-        u(keyPair._2, i - 1)
-      }.toArray
-
       val s = sender()
 
-      trustedDealerRef ? SegmentsRequest(segmentIdsToDownload) onComplete {
+      //TODO request other miners first
+      trustedDealerRef ? SegmentsRequest(segmentIds) onComplete {
         case Success(m) =>
           self ! m
           s ! Initialized
@@ -54,7 +56,6 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
 
     case SegmentsToStore(sgs) =>
       log.debug("SegmentsToStore({})", sgs)
-      require(segments.isEmpty)
       segments = sgs
 
     case TicketGeneration(difficulty, puz) =>
@@ -85,7 +86,7 @@ object Miner {
   val NoSig = Array[Byte]()
 
   //calculate index of i-th segment
-  private def u(pubKey: SigningFunctions.PublicKey, i: Int): Int = {
+  private def u(pubKey: PublicKey, i: Int): Int = {
     val h = Sha256.hash(pubKey ++ BigInt(i).toByteArray)
     BigInt(1, h).mod(Parameters.n).toInt
   }
@@ -97,6 +98,10 @@ object Miner {
     new SecureRandom().nextBytes(r) //overrides s
     r
   }
+
+//  def segments(index: Index, storage: Storage): AuthDataBlock[Block] = {
+//
+//  }
 
   def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte], segments: Subset): Ticket = {
 

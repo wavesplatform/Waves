@@ -4,7 +4,7 @@ import java.io.{FileOutputStream, RandomAccessFile}
 import java.nio.file.{Files, Paths}
 
 import scorex.crypto.CryptographicHash.Digest
-import scorex.crypto.ads.merkle.Storage.Position
+import scorex.crypto.ads.merkle.MapDBStorage.Position
 import scorex.crypto.{CryptographicHash, Sha256}
 
 import scala.annotation.tailrec
@@ -19,7 +19,7 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
 
   val level = calculateRequiredLevel(nonEmptyBlocks)
 
-  lazy val storage: Storage = new MapDBStorage(treeFolder + "/tree", level)
+  lazy val storage = new MapDBStorage(treeFolder + "/tree", level)
 
   val rootHash: Digest = getHash((level, 0)).get
 
@@ -52,7 +52,7 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
 
   private lazy val emptyHash = hash.hash("".getBytes)
 
-  def getHash(key: Storage.Key): Option[Digest] = {
+  def getHash(key: MapDBStorage.Key): Option[Digest] = {
     storage.get(key) match {
       case None =>
         if (key._1 > 0) {
@@ -109,7 +109,7 @@ object MerkleTree {
 
     val level = calculateRequiredLevel(nonEmptyBlocks)
 
-    lazy val storage: Storage = new MapDBStorage(treeFolder + "/tree", level)
+    lazy val storage = new MapDBStorage(treeFolder + "/tree", level)
 
     def processBlocks(currentBlock: Position = 0): Unit = {
       val block: Block = readLines(fileName, currentBlock)
