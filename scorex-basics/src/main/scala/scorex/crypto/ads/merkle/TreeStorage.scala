@@ -3,17 +3,15 @@ package scorex.crypto.ads.merkle
 import java.io.File
 
 import org.mapdb.{DBMaker, HTreeMap, Serializer}
-import org.slf4j.LoggerFactory
 import scorex.crypto.CryptographicHash.Digest
 import scorex.storage.Storage
+import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
 
-class TreeStorage(fileName: String, levels: Int) extends Storage[Tuple2[Int, Long], Array[Byte]] {
+class TreeStorage(fileName: String, levels: Int) extends Storage[Tuple2[Int, Long], Array[Byte]] with ScorexLogging {
 
   import TreeStorage._
-
-  private val log = LoggerFactory.getLogger(this.getClass)
 
   private val dbs =
     (0 to levels) map { n: Int =>

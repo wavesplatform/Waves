@@ -3,9 +3,9 @@ package scorex.perma.actors
 import akka.actor.{Actor, ActorLogging}
 import scorex.crypto.CryptographicHash
 import scorex.crypto.ads.merkle.MerkleTree
-import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec.Subset
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
+import scorex.perma.settings.Constants
 
 
 class TrustedDealer[H <: CryptographicHash](val tree: MerkleTree[H]) extends Actor with ActorLogging {

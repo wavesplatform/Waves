@@ -5,42 +5,44 @@ import java.nio.file.{Files, Paths}
 
 import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
-import org.slf4j.LoggerFactory
 import scorex.crypto.ads.merkle.MerkleTree
 import scorex.perma.BlockchainBuilderSpec.SendWorkToMiners
 import scorex.perma.actors.MinerSpec.Initialize
 import scorex.perma.actors.{Miner, TrustedDealer}
+import scorex.perma.settings.{Constants, PermaSettings}
+import scorex.settings.Settings
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
 
 
-object TestApp extends App {
+object TestApp extends App with ScorexLogging {
 
   val MinersCount = 10
 
-  val log = LoggerFactory.getLogger(this.getClass)
+  implicit val settings = new Settings with PermaSettings {
+    val filename = "settings.json"
+  }
 
-  val treeDirName = "/tmp/scorex/testApp/"
-
-  val tree = if (Files.exists(Paths.get(treeDirName + "/tree0.mapDB"))) {
+  val tree = if (Files.exists(Paths.get(settings.treeDir + "/tree0.mapDB"))) {
     log.info("Get existing tree")
-    new MerkleTree(treeDirName, Parameters.n, Parameters.segmentSize, Parameters.hash)
+    new MerkleTree(settings.treeDir, Constants.n, Constants.segmentSize, Constants.hash)
   } else {
     log.info("Generating random data set")
-    val treeDir = new File(treeDirName)
+    val treeDir = new File(settings.treeDir)
     treeDir.mkdirs()
-    val datasetFile = treeDirName + "/data.file"
-    new RandomAccessFile(datasetFile, "rw").setLength(Parameters.n * Parameters.segmentSize)
+    val datasetFile = settings.treeDir + "/data.file"
+    new RandomAccessFile(datasetFile, "rw").setLength(Constants.n * Constants.segmentSize)
     log.info("Calculate tree")
-    val tree = MerkleTree.fromFile(datasetFile, treeDirName, Parameters.segmentSize, Parameters.hash)
-    require(tree.nonEmptyBlocks == Parameters.n, s"${tree.nonEmptyBlocks} == ${Parameters.n}")
+    val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, Constants.segmentSize, Constants.hash)
+    require(tree.nonEmptyBlocks == Constants.n, s"${tree.nonEmptyBlocks} == ${Constants.n}")
     tree
   }
 
   log.info("test tree")
-  val index = Parameters.n - 3
+  val index = Constants.n - 3
   val leaf = tree.byIndex(index).get
-  require(leaf.check(index, tree.rootHash)(Parameters.hash))
+  require(leaf.check(index, tree.rootHash)(Constants.hash))
 
   log.info("Success: " + tree.rootHash.mkString)
 

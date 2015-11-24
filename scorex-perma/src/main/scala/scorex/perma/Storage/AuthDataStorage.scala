@@ -3,16 +3,16 @@ package scorex.perma.Storage
 import java.io.File
 
 import org.mapdb.{DBMaker, HTreeMap, Serializer}
-import org.slf4j.LoggerFactory
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.perma.Parameters.DataSegment
+import scorex.perma.settings.Constants
+import scorex.perma.settings.Constants.DataSegment
 import scorex.storage.Storage
+import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
 
-class AuthDataStorage(fileName: String) extends Storage[Long, AuthDataBlock[DataSegment]] {
+class AuthDataStorage(fileName: String) extends Storage[Long, AuthDataBlock[DataSegment]] with ScorexLogging {
 
-  private val log = LoggerFactory.getLogger(this.getClass)
 
   //TODO https://github.com/jankotek/mapdb/issues/634 workaround
   private var commitNeeded = false

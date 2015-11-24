@@ -19,7 +19,7 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
 
   val level = calculateRequiredLevel(nonEmptyBlocks)
 
-  lazy val storage = new TreeStorage(treeFolder + "/tree", level)
+  lazy val storage = new TreeStorage(treeFolder + TreeFileName, level)
 
   val rootHash: Digest = getHash((level, 0)).get
 
@@ -79,6 +79,8 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
 object MerkleTree {
   type Block = Array[Byte]
 
+  val TreeFileName = "/hashTree"
+
   def fromFile[H <: CryptographicHash](fileName: String,
                                        treeFolder: String,
                                        blockSize: Int = 1024,
@@ -109,7 +111,7 @@ object MerkleTree {
 
     val level = calculateRequiredLevel(nonEmptyBlocks)
 
-    lazy val storage = new TreeStorage(treeFolder + "/tree", level)
+    lazy val storage = new TreeStorage(treeFolder + TreeFileName, level)
 
     def processBlocks(currentBlock: Position = 0): Unit = {
       val block: Block = readLines(fileName, currentBlock)
