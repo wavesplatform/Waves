@@ -27,7 +27,7 @@ case class Ticket(publicKey: PublicKey,
                   s: Array[Byte],
                   proofs: IndexedSeq[PartialProof])
 
-class Miner(rootHash: Digest) extends Actor with ActorLogging {
+class Miner(rootHash: Digest)(implicit settings: PermaSettings) extends Actor with ActorLogging {
 
   import Miner._
 
@@ -127,7 +127,7 @@ object Miner {
 
   def authDataStorage(implicit settings: PermaSettings) = new AuthDataStorage(settings.authDataStorage)
 
-  def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Ticket = {
+  def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte])(implicit settings: PermaSettings): Ticket = {
 
     val (privateKey, publicKey) = keyPair
 
