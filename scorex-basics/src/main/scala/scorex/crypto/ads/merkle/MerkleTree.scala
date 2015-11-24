@@ -6,6 +6,7 @@ import java.nio.file.{Files, Paths}
 import scorex.crypto.CryptographicHash.Digest
 import scorex.crypto.ads.merkle.TreeStorage.Position
 import scorex.crypto.{CryptographicHash, Sha256}
+import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
 
@@ -13,7 +14,7 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
                                          val nonEmptyBlocks: Position,
                                          blockSize: Int = 1024,
                                          hash: H = Sha256
-                                        ) {
+                                        ) extends ScorexLogging {
 
   import MerkleTree._
 
@@ -30,11 +31,15 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
       @tailrec
       def calculateTreePath(n: Position, currentLevel: Int, acc: Seq[Digest] = Seq()): Seq[Digest] = {
         if (currentLevel < level) {
-          //TODO remove get? it should exists when (index < nonEmptyBlocks && index > 0)
-          if (n % 2 == 0) {
-            calculateTreePath(n / 2, currentLevel + 1, getHash((currentLevel, n + 1)).get +: acc)
-          } else {
-            calculateTreePath(n / 2, currentLevel + 1, getHash((currentLevel, n - 1)).get +: acc)
+          val hashOpt = if (n % 2 == 0) getHash((currentLevel, n + 1)) else getHash((currentLevel, n - 1))
+          hashOpt match {
+            case Some(h) =>
+              calculateTreePath(n / 2, currentLevel + 1, h +: acc)
+            case None if currentLevel == 0 && index == nonEmptyBlocks - 1 =>
+              calculateTreePath(n / 2, currentLevel + 1, emptyHash +: acc)
+            case None =>
+              log.error(s"Enable to get hash for lev=$currentLevel, position=$n")
+              acc.reverse
           }
         } else {
           acc.reverse
@@ -50,7 +55,7 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
     }
   }
 
-  private lazy val emptyHash = hash.hash("".getBytes)
+  private lazy val emptyHash = hash.hash("")
 
   def getHash(key: TreeStorage.Key): Option[Digest] = {
     storage.get(key) match {

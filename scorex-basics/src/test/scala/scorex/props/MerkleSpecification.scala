@@ -12,25 +12,27 @@ import scala.util.Random
 
 class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
-  val smallInteger = Gen.choose(8, 128)
-
 
   property("value returned from byIndex() is valid for random dataset") {
-    forAll(smallInteger) { (blocks: Int) =>
+    //fix block numbers for faster tests
+    for (blocks <- List(7, 8, 9, 128)) {
+      val smallInteger = Gen.choose(0, blocks - 1)
       val (treeDirName: String, _, tempFile: String) = generateFile(blocks)
-
       val tree = MerkleTree.fromFile(tempFile, treeDirName)
-      val index = Random.nextInt(tree.nonEmptyBlocks.asInstanceOf[Int])
-
-      val leaf = tree.byIndex(index).get
-      val resp = leaf.check(index, tree.rootHash)(Sha256)
+      forAll(smallInteger) { (index: Int) =>
+        val leafOption = tree.byIndex(index)
+        leafOption should not be None
+        val leaf = leafOption.get
+        val resp = leaf.check(index, tree.rootHash)(Sha256)
+        resp shouldBe true
+      }
       tree.storage.close()
-      resp shouldBe true
     }
   }
 
   property("hash root is the same") {
-    forAll(smallInteger) { (blocks: Int) =>
+    //fix block numbers for faster tests
+    for (blocks <- List(7, 8, 9, 128)) {
       val (treeDirName: String, _, tempFile: String) = generateFile(blocks, "2")
 
       val fileTree = MerkleTree.fromFile(tempFile, treeDirName)

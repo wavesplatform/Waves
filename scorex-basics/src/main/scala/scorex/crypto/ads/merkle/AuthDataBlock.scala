@@ -31,6 +31,6 @@ case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
     if (merklePath.nonEmpty)
       calculateHash(index, hashFunction.hash(data.asInstanceOf[Message]), merklePath) sameElements rootHash
     else
-      true
+      false
   }
 }
