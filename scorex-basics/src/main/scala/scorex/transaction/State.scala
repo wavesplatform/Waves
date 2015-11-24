@@ -7,4 +7,6 @@ import scorex.block.Block
  */
 trait State {
   def processBlock(block: Block, reversal: Boolean): Unit
+
+  def processBlock(block: Block): Unit = processBlock(block, reversal = false)
 }

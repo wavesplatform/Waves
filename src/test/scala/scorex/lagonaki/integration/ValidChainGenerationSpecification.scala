@@ -6,7 +6,8 @@ import org.scalatest.FunSuite
 import scorex.lagonaki.TestingCommons
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.block.Block
-import scorex.lagonaki.network.message.{BlockMessage, Message}
+import scorex.network.BlockMessage
+import scorex.network.message.Message
 
 class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
   ignore("retroactive chain test") {
@@ -19,15 +20,15 @@ class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
     require(application.wallet.privateKeyAccounts().nonEmpty)
 
     Thread.sleep(5000)
-    val bh = application.blockchainImpl.height()
+    val bh = application.history.height()
 
     //chain validity check
     (2 to bh).foreach { h =>
-      assert(application.blockchainImpl.blockAt(h).get.isValid)
+      assert(application.history.blockAt(h).get.isValid)
     }
 
-    val b1 = application.blockchainImpl.blockAt(1).get
-    val b2 = application.blockchainImpl.blockAt(2).get
+    val b1 = application.history.blockAt(1).get
+    val b2 = application.history.blockAt(2).get
 
     //toBytes/parse roundtrip test
     val bb2 = Block.parse(b2.bytes).get

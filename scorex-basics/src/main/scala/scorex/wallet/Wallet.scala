@@ -1,4 +1,4 @@
-package scorex.transaction.state.wallet
+package scorex.wallet
 
 import java.io.File
 
@@ -11,6 +11,7 @@ import scorex.utils.ScorexLogging
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 
+//todo: add accs txs?
 //todo: XOR priv keys with seed in db?
 class Wallet(walletFileOpt: Option[File],
              password: String,

@@ -9,7 +9,7 @@ class AdressesRoutingSpecification extends RouteTest {
 
   val application = new LagonakiApplication("settings-test.json")
   application.checkGenesis()
-  val adressesRoute = AddressApiRoute(application.wallet, application.storedState).route
+  val adressesRoute = AddressApiRoute(application.wallet, application.state).route
 
   "adressesRouting" should "handle root request" in {
     Get("/addresses/") ~> adressesRoute ~> check {

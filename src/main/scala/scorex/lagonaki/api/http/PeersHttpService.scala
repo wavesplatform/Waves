@@ -8,8 +8,9 @@ import akka.pattern.ask
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.lagonaki.network.NetworkController.PeerData
-import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
+import scorex.network.{BlockchainSyncer, NetworkController}
+import NetworkController.PeerData
+import scorex.lagonaki.network.NetworkController
 import scorex.lagonaki.server.LagonakiApplication
 import spray.http.MediaTypes._
 

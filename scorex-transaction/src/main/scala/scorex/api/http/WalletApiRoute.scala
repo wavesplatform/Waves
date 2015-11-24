@@ -6,7 +6,7 @@ import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.crypto.Base58
-import scorex.transaction.state.wallet.Wallet
+import scorex.wallet.Wallet
 
 
 @Api(value = "/wallet", description = "Wallet-related calls")

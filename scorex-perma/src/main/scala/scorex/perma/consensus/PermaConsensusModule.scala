@@ -8,6 +8,7 @@ import scorex.transaction.TransactionModule
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.Try
 
 /**
   * Data and functions related to a consensus algo
@@ -52,7 +53,7 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
   override def consensusBlockData(block: Block): PermaLikeConsensusBlockData =
     block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData]
 
-  override def parseBlockData(bytes: Array[Byte]): BlockField[PermaLikeConsensusBlockData] = ???
+  override def parseBlockData(bytes: Array[Byte]): Try[BlockField[PermaLikeConsensusBlockData]] = ???
 
   /*
     PermaConsensusBlockField(new PermaLikeConsensusBlockData{

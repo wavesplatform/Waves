@@ -1,14 +1,12 @@
-package scorex.lagonaki.network
+package scorex.network
 
 import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
-import scorex.lagonaki.server.LagonakiApplication
-import scorex.lagonaki.network.NetworkController.UpdateBlockchainScore
-import scorex.lagonaki.network.message.{Message, _}
-import scorex.transaction.LagonakiTransaction.TransactionType
+import scorex.app.Application
+import scorex.network.peer.PeerManager
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,7 +14,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 
-class PeerConnectionHandler(application: LagonakiApplication,
+class PeerConnectionHandler(application: Application,
                             connection: ActorRef,
                             remote: InetSocketAddress) extends Actor with ScorexLogging {
 
@@ -24,20 +22,19 @@ class PeerConnectionHandler(application: LagonakiApplication,
 
   private var best = false
 
-  private lazy val blockchainStorage = application.blockchainImpl
-  private lazy val networkController = application.networkController
-
   private lazy val settings = application.settings
   private lazy val peerManager = new PeerManager(settings)
 
   private implicit lazy val consensusModule = application.consensusModule
   private implicit lazy val transactionModule = application.transactionModule
 
+  private lazy val networkController = application.networkController
+
   context watch connection
 
   context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
 
-  private def handleMessage(message: Message) = {
+  private def handleMessage(message: message.Message[_]) = {
     log.debug("Handling message: " + message)
     message match {
 
@@ -108,7 +105,7 @@ class PeerConnectionHandler(application: LagonakiApplication,
     case SendBlockchainScore =>
       self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score())
 
-    case msg: Message =>
+    case msg: message.Message =>
       self ! ByteString(msg.bytes)
 
     case data: ByteString =>
@@ -120,7 +117,7 @@ class PeerConnectionHandler(application: LagonakiApplication,
       connection ! Close
 
     case Received(data) =>
-      Message.parse(data.toByteBuffer) match {
+      application.messagesHandler.parse(data.toByteBuffer) match {
         case Success(message) =>
           log.info("received message " + message.getClass.getSimpleName + " from " + remote)
           handleMessage(message)
@@ -160,5 +157,4 @@ object PeerConnectionHandler {
   case object Blacklist
 
   case class BestPeer(remote: InetSocketAddress, betterThanLocal: Boolean)
-
 }

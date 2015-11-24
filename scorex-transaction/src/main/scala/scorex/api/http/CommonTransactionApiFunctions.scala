@@ -2,7 +2,7 @@ package scorex.api.http
 
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.account.Account
-import scorex.transaction.state.wallet.Wallet
+import scorex.wallet.Wallet
 
 
 trait CommonTransactionApiFunctions extends CommonApiFunctions {

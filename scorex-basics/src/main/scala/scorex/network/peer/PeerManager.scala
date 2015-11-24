@@ -1,13 +1,13 @@
-package scorex.lagonaki.network
+package scorex.network.peer
 
 import java.net.InetSocketAddress
-import scorex.lagonaki.server.LagonakiSettings
-import scorex.transaction.state.database.PeerDatabaseImpl
+
+import scorex.settings.Settings
 import scorex.utils.ScorexLogging
 
 import scala.util.Random
 
-class PeerManager(settings: LagonakiSettings) extends ScorexLogging {
+class PeerManager(settings: Settings) extends ScorexLogging {
   private val DatabasePeersAmount = 1000
 
   def knownPeers(): Seq[InetSocketAddress] = {
@@ -20,9 +20,8 @@ class PeerManager(settings: LagonakiSettings) extends ScorexLogging {
     } else knownPeers
   }
 
-  def peerConnected(peer: InetSocketAddress): Unit = {
+  def peerConnected(peer: InetSocketAddress): Unit =
     PeerDatabaseImpl.addConnectedPeer(peer)
-  }
 
   def peerDisconnected(peer: InetSocketAddress): Unit =
     PeerDatabaseImpl.removeConnectedPeer(peer)

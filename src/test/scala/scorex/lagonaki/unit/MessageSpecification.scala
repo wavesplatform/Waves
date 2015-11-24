@@ -6,6 +6,8 @@ import org.scalatest.FunSuite
 import scorex.lagonaki.server.LagonakiSettings
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.lagonaki.network.message._
+import scorex.network.message.Message
+import scorex.network.{GetSignaturesMessage, SignaturesMessage, ScoreMessage}
 import scorex.transaction.SimpleTransactionModule
 
 import scorex.crypto.EllipticCurveImpl.SignatureLength

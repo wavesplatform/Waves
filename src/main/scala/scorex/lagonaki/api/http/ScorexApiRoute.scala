@@ -6,9 +6,9 @@ import com.wordnik.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.lagonaki.network.BlockchainSyncer
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.lagonaki.server.settings.Constants
+import scorex.network.BlockchainSyncer
 import spray.http.MediaTypes._
 
 import scala.concurrent.ExecutionContext.Implicits.global

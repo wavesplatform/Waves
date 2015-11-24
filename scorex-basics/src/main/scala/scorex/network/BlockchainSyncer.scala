@@ -1,12 +1,11 @@
-package scorex.lagonaki.network
+package scorex.network
 
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, FSM}
+import scorex.app.Application
 import scorex.block.Block
-import scorex.lagonaki.network.BlockchainSyncer._
-import scorex.lagonaki.network.message.{BlockMessage, GetSignaturesMessage}
-import scorex.lagonaki.server.LagonakiApplication
+import scorex.network.BlockchainSyncer._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -15,7 +14,10 @@ import scala.util.{Failure, Success}
 
 case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 
-class BlockchainSyncer(application: LagonakiApplication, networkController: ActorRef) extends FSM[Status, Unit] {
+class BlockchainSyncer(application: Application, networkController: ActorRef) extends FSM[Status, Unit] {
+
+  implicit val consensusModule = application.consensusModule
+  implicit val transactionalModule = application.transactionModule
 
   private val stateTimeout = 1.second
 
@@ -37,7 +39,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
       processMaxScore(
         scoreOpt,
         onMax = () => {
-          val sigs = application.blockchainImpl.lastSignatures(application.settings.MaxBlocksChunks)
+          val sigs = application.history.lastSignatures(application.settings.MaxBlocksChunks)
           val msg = GetSignaturesMessage(sigs)
           networkController ! NetworkController.SendMessageToBestPeer(msg)
           stay()
@@ -90,10 +92,13 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
                        onLocal: () => State = () => goto(Generating),
                        onMax: () => State = () => goto(Syncing),
                        onNone: () => State = () =>
-                         if (application.settings.offlineGeneration) goto(Generating).using(Unit) else goto(Offline)
+                         if (application.settings.offlineGeneration)
+                           goto(Generating).using(Unit)
+                         else
+                           goto(Offline)
                      ): State = scoreOpt match {
     case Some(maxScore) =>
-      val localScore = application.blockchainImpl.score()
+      val localScore = application.history.score()
       log.info(s"maxScore: $maxScore, localScore: $localScore")
       if (maxScore > localScore) onMax() else onLocal()
     case None =>
@@ -104,11 +109,11 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
     val fromStr = remoteOpt.map(_.toString).getOrElse("local")
     if (block.isValid) {
       log.info(s"New block: $block from $fromStr")
-      application.storedState.processBlock(block)
-      application.blockchainImpl.appendBlock(block)
+      application.state.processBlock(block)
+      application.history.appendBlock(block)
 
       block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-      val height = application.blockchainImpl.height()
+      val height = application.history.height()
 
       //broadcast block only if it is generated locally
       if (remoteOpt.isEmpty) {
@@ -119,16 +124,13 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
     }
   }
 
-  def tryToGenerateABlock() = {
-    val consModule = application.consensusModule
-    implicit val transModule = application.transactionModule
-
+  def tryToGenerateABlock(): Unit = {
     log.info("Trying to generate a new block")
     val accounts = application.wallet.privateKeyAccounts()
-    consModule.generateNextBlocks(accounts)(transModule) onComplete {
+    application.consensusModule.generateNextBlocks(accounts)(application.transactionModule) onComplete {
       case Success(blocks: Seq[Block]) =>
         if (blocks.nonEmpty) {
-          val bestBlock = blocks.maxBy(consModule.blockScore)
+          val bestBlock = blocks.maxBy(application.consensusModule.blockScore)
           self ! NewBlock(bestBlock, None)
         }
       case Failure(ex) => log.error("Failed to generate new block: {}", ex)

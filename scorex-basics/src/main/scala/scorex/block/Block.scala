@@ -114,14 +114,14 @@ object Block extends ScorexLogging {
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val cBytes = bytes.slice(position, position + cBytesLength)
-    val consBlockField = consModule.parseBlockData(cBytes)
+    val consBlockField = consModule.parseBlockData(cBytes).get
     position += cBytesLength
 
 
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val tBytes = bytes.slice(position, position + tBytesLength)
-    val txBlockField = transModule.parseBlockData(tBytes)
+    val txBlockField = transModule.parseBlockData(tBytes).get
     position += tBytesLength
 
     val genPK = bytes.slice(position, position + EllipticCurveImpl.KeyLength)

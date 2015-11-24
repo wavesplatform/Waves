@@ -61,4 +61,7 @@ trait History {
     heightOf(block).map(height() - _)
 
   def generatedBy(account: Account): Seq[Block]
+
+  //todo: remove argument?
+  def lastSignatures(howMany: Int): Seq[Block.BlockId]
 }

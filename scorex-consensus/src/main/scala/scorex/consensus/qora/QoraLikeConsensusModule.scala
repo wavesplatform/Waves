@@ -4,14 +4,15 @@ import com.google.common.primitives.{Bytes, Longs}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockField}
 import scorex.consensus.{ConsensusModule, LagonakiConsensusModule}
-import scorex.crypto.Sha256._
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.Sha256._
 import scorex.transaction._
 import scorex.utils.NTP
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Try
 
 
 class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusBlockData] {
@@ -85,7 +86,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
 
   def getNextBlockGeneratingBalance(history: History): Long = {
     val lastBlock = history.asInstanceOf[BlockChain].lastBlock
-    getNextBlockGeneratingBalance(lastBlock,history)
+    getNextBlockGeneratingBalance(lastBlock, history)
   }
 
   override def generators(block: Block): Seq[Account] = Seq(block.signerDataField.value.generator)
@@ -138,11 +139,12 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     } else Future(None)
   }
 
-  override def parseBlockData(bytes: Array[Byte]): BlockField[QoraLikeConsensusBlockData] =
+  override def parseBlockData(bytes: Array[Byte]): Try[BlockField[QoraLikeConsensusBlockData]] = Try {
     QoraConsensusBlockField(new QoraLikeConsensusBlockData {
       override val generatingBalance: Long = Longs.fromByteArray(bytes.take(GeneratingBalanceLength))
       override val generatorSignature: Array[Byte] = bytes.takeRight(GeneratorSignatureLength)
     })
+  }
 
   override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = {
     val history = transactionModule.history

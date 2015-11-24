@@ -10,7 +10,7 @@ import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.{EllipticCurveImpl, Base58}
 import scorex.transaction.state.LagonakiState
-import scorex.transaction.state.wallet.Wallet
+import scorex.wallet.Wallet
 import spray.http.MediaTypes._
 
 import scala.util.{Failure, Success, Try}

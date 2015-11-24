@@ -1,13 +1,16 @@
-package scorex.lagonaki.network
+package scorex.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import scorex.lagonaki.server.LagonakiApplication
-import scorex.lagonaki.network.BlockchainSyncer.GetMaxChainScore
-import scorex.lagonaki.network.message.{Message, _}
+import scorex.app.Application
+import scorex.consensus.ConsensusModule
+import scorex.network.message.BasicMessagesRepo
+import scorex.network.peer.PeerManager
+import scorex.settings.Settings
+import scorex.transaction.TransactionModule
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -16,15 +19,16 @@ import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
 //must be singleton
-class NetworkController(application: LagonakiApplication) extends Actor with ScorexLogging {
+class NetworkController(application:Application) extends Actor with ScorexLogging {
 
   import NetworkController._
 
   private implicit val system = context.system
 
-  private val settings = application.settings
-  private lazy val blockchainSyncer = application.blockchainSyncer
-  private lazy val peerManager = new PeerManager(application.settings)
+  private lazy val settings = application.settings
+  private lazy val transModule = application.transactionModule
+
+  private lazy val peerManager = new PeerManager(settings)
 
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerData]()
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
@@ -45,7 +49,7 @@ class NetworkController(application: LagonakiApplication) extends Actor with Sco
 
     if (score > prevBestScore) {
       connectedPeers.foreach { case (_, PeerData(handler, _)) =>
-        handler ! PeerConnectionHandler.BestPeer(remote, score > application.blockchainImpl.score)
+        handler ! PeerConnectionHandler.BestPeer(remote, score > transModule.history.score)
       }
     }
   }
@@ -79,7 +83,7 @@ class NetworkController(application: LagonakiApplication) extends Actor with Sco
       log.info(s"Connected to $remote")
       connectingPeers -= remote
       val connection = sender()
-      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
+      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], connection, remote))
       connection ! Register(handler)
       connectedPeers += remote -> PeerData(handler, None)
       peerManager.peerConnected(remote)
@@ -103,11 +107,8 @@ class NetworkController(application: LagonakiApplication) extends Actor with Sco
       peerManager.peerDisconnected(remote)
 
     case AskForPeers =>
-      val handlers = connectedPeers.values.toList
-      if (handlers.nonEmpty) {
-        val randomHandler = handlers(Random.nextInt(handlers.size)).handler
-        randomHandler ! GetPeersMessage
-      }
+      self ! SendMessageToRandomPeer(BasicMessagesRepo.GetPeersMessage)
+
 
     case BroadcastMessage(message, exceptOf) =>
       log.info(s"Broadcasting message $message")
@@ -122,15 +123,21 @@ class NetworkController(application: LagonakiApplication) extends Actor with Sco
         handler ! message
       }
 
+    case SendMessageToRandomPeer(message) =>
+      val handlers = connectedPeers.values.toList
+      if (handlers.nonEmpty) {
+        val randomHandler = handlers(Random.nextInt(handlers.size)).handler
+        randomHandler ! message
+      }
+
     case GetPeers => sender() ! connectedPeers.toMap
 
     case GetMaxChainScore =>
       sender() ! BlockchainSyncer.MaxChainScore(maxPeerScore())
 
     case NewBlock(block, Some(sndr)) =>
-      blockchainSyncer ! NewBlock(block, Some(sndr))
-      val height = application.blockchainImpl.height()
-      self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
+      application.blockchainSyncer ! NewBlock(block, Some(sndr))
+      self ! BroadcastMessage(BlockMessage(block), List(sndr))
 
     case UpdateBlockchainScore(remote, height, score) => updateScore(remote, height, score)
 
@@ -156,7 +163,10 @@ object NetworkController {
 
   case class UpdateBlockchainScore(remote: InetSocketAddress, height: Int, score: BigInt)
 
-  case class SendMessageToBestPeer(message: Message)
+  case class SendMessageToBestPeer(msg: message.Message[_])
 
-  case class BroadcastMessage(message: Message, exceptOf: List[InetSocketAddress] = List())
+  case class SendMessageToRandomPeer(msg: message.Message[_])
+
+  case class BroadcastMessage(msg: message.Message[_], exceptOf: Seq[InetSocketAddress] = List())
+
 }

@@ -3,7 +3,8 @@ package scorex.lagonaki.integration
 import akka.actor.ActorSystem
 import akka.testkit._
 import org.scalatest.{Matchers, WordSpecLike}
-import scorex.lagonaki.network.BlockchainSyncer.{Generating, GetStatus, Offline}
+import scorex.network.BlockchainSyncer
+import BlockchainSyncer.{Generating, GetStatus, Offline}
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.utils.untilTimeout
 import scala.concurrent.duration._

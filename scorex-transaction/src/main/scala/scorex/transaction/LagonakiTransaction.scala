@@ -1,9 +1,12 @@
 package scorex.transaction
 
-import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.Base58
 import scorex.transaction.LagonakiTransaction.{ValidationResult, _}
+
+import play.api.libs.json.Json
+
+import scala.util.Try
 
 
 abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
@@ -82,13 +85,15 @@ object LagonakiTransaction {
     val PaymentTransaction = Value(2)
   }
 
-  def parse(data: Array[Byte]): LagonakiTransaction = data.head match {
-    case txType: Byte if txType == TransactionType.GenesisTransaction.id =>
-      GenesisTransaction.parse(data.tail)
+  def parse(data: Array[Byte]): Try[LagonakiTransaction] = Try {
+    data.head match {
+      case txType: Byte if txType == TransactionType.GenesisTransaction.id =>
+        GenesisTransaction.parse(data.tail)
 
-    case txType: Byte if txType == TransactionType.PaymentTransaction.id =>
-      PaymentTransaction.parse(data.tail)
+      case txType: Byte if txType == TransactionType.PaymentTransaction.id =>
+        PaymentTransaction.parse(data.tail)
 
-    case txType => throw new Exception(s"Invalid transaction type: $txType")
+      case txType => throw new Exception(s"Invalid transaction type: $txType")
+    }
   }
 }

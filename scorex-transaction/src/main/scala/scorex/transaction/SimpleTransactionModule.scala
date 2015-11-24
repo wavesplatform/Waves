@@ -10,6 +10,8 @@ import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 import scorex.utils.ScorexLogging
 
+import scala.util.Try
+
 case class TransactionsBlockField(override val value: Seq[Transaction])
   extends BlockField[Seq[Transaction]] {
 
@@ -44,7 +46,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
    * @param bytes - serialized sequence of transaction
    * @return
    */
-  override def parseBlockData(bytes: Array[Byte]): TransactionsBlockField = {
+  override def parseBlockData(bytes: Array[Byte]): Try[TransactionsBlockField] = Try {
     bytes.isEmpty match {
       case true => TransactionsBlockField(Seq())
       case false =>
@@ -54,7 +56,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
           val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
           val transactionLength = Ints.fromByteArray(transactionLengthBytes)
           val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
-          val transaction = LagonakiTransaction.parse(transactionBytes)
+          val transaction = LagonakiTransaction.parse(transactionBytes).get
 
           (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
         }._2)

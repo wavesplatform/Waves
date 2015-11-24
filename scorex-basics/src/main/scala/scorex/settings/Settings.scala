@@ -1,11 +1,11 @@
 package scorex.settings
 
-import java.net.{InetAddress, InetSocketAddress}
-
-import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.Base58
 import scorex.utils.ScorexLogging
 
+import play.api.libs.json.{JsObject, Json}
+
+import java.net.{InetAddress, InetSocketAddress}
 import scala.util.Try
 
 /**

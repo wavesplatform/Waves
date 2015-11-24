@@ -121,11 +121,12 @@ class NxtLikeConsensusModule
   private def bounded(value: BigInt, min: BigInt, max: BigInt): BigInt =
     if (value < min) min else if (value > max) max else value
 
-  override def parseBlockData(bytes: Array[Byte]): BlockField[NxtLikeConsensusBlockData] =
+  override def parseBlockData(bytes: Array[Byte]): Try[BlockField[NxtLikeConsensusBlockData]] = Try {
     NxtConsensusBlockField(new NxtLikeConsensusBlockData {
       override val baseTarget: Long = Longs.fromByteArray(bytes.take(BaseTargetLength))
       override val generationSignature: Array[Byte] = bytes.takeRight(GeneratorSignatureLength)
     })
+  }
 
   override def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val baseTarget = block.consensusDataField.asInstanceOf[NxtConsensusBlockField].value.baseTarget

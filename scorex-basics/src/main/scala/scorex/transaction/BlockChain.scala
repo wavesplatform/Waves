@@ -21,7 +21,7 @@ trait BlockChain extends History with ScorexLogging {
       (h + 1).to(Math.min(height(), h + howMany: Int)).flatMap(blockAt).map(_.uniqueId)
     }.getOrElse(Seq())
 
-  def lastSignatures(howMany: Int): Seq[Block.BlockId] = {
+  override def lastSignatures(howMany: Int): Seq[Block.BlockId] = {
     val h = height()
     h.to(Math.max(h - howMany, 1), -1).flatMap { h =>
       blockAt(h).map(_.uniqueId)

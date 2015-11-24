@@ -1,32 +1,28 @@
 package scorex.lagonaki.server
 
-import akka.actor.Props
-import akka.io.IO
 import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
 import scorex.app.Application
-import scorex.consensus.LagonakiConsensusModule
-import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.consensus.qora.api.http.QoraConsensusApiRoute
-import scorex.lagonaki.api.http.{PeersHttpService, PaymentApiRoute, ScorexApiRoute}
-import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
+import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.QoraLikeConsensusModule
-import scorex.lagonaki.network.message._
-import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
+import scorex.consensus.qora.api.http.QoraConsensusApiRoute
+import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRoute}
+import scorex.network.{TransactionalMessagesRepo, NetworkController}
+import scorex.network.message.{BasicMessagesRepo, MessageHandler}
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.wallet.{Payment, Wallet}
-import scorex.utils.{NTP, ScorexLogging}
-import spray.can.Http
+import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.state.wallet.Payment
+import scorex.utils.NTP
+
 import scala.reflect.runtime.universe._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class LagonakiApplication(val settingsFilename: String)
-  extends Application with ScorexLogging {
+  extends Application {
 
   override val applicationName = "lagonaki"
 
@@ -47,32 +43,26 @@ class LagonakiApplication(val settingsFilename: String)
 
   override implicit val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
 
-  lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
-  lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this, networkController))
-
-  private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
-  implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
-
-  lazy val storedState = transactionModule.state
-  lazy val blockchainImpl = transactionModule.history
+  override lazy val state: StoredState = transactionModule.state
+  override lazy val history: BlockChain = transactionModule.history
 
   val consensusApiRoute = consensusModule match {
     case ncm: NxtLikeConsensusModule =>
-      new NxtConsensusApiRoute(ncm, blockchainImpl)
+      new NxtConsensusApiRoute(ncm, history)
     case qcm: QoraLikeConsensusModule =>
-      new QoraConsensusApiRoute(qcm, blockchainImpl)
+      new QoraConsensusApiRoute(qcm, history)
   }
 
   override lazy val apiRoutes = Seq(
-    BlocksApiRoute(blockchainImpl, wallet),
-    TransactionsApiRoute(storedState),
+    BlocksApiRoute(history, wallet),
+    TransactionsApiRoute(state),
     consensusApiRoute,
     WalletApiRoute(wallet),
     PaymentApiRoute(this),
     ScorexApiRoute(this),
     SeedApiRoute(),
     PeersHttpService(this),
-    AddressApiRoute(wallet, storedState)
+    AddressApiRoute(wallet, state)
   )
 
   override lazy val apiTypes = Seq(
@@ -90,49 +80,14 @@ class LagonakiApplication(val settingsFilename: String)
     typeOf[AddressApiRoute]
   )
 
-  def checkGenesis(): Unit = {
-    if (blockchainImpl.isEmpty) {
-      val genesisBlock = Block.genesis()
-      storedState.processBlock(genesisBlock)
-      blockchainImpl.appendBlock(genesisBlock).ensuring(_.height() == 1)
-      log.info("Genesis block has been added to the state")
-    }
-  }.ensuring(blockchainImpl.height() >= 1)
+  override val messagesHandler = MessageHandler(BasicMessagesRepo.specs ++ new TransactionalMessagesRepo())
 
-  def run() {
-    require(transactionModule.balancesSupport)
-    require(transactionModule.accountWatchingSupport)
+  //checks
+  require(transactionModule.balancesSupport)
+  require(transactionModule.accountWatchingSupport)
 
-    checkGenesis()
 
-    blockchainSyncer ! Unit //initializing
-
-    IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
-
-    //CLOSE ON UNEXPECTED SHUTDOWN
-    Runtime.getRuntime.addShutdownHook(new Thread() {
-      override def run() {
-        stopAll()
-      }
-    })
-  }
-
-  def stopAll() = synchronized {
-    log.info("Stopping message processor")
-    networkController ! NetworkController.ShutdownNetwork
-
-    log.info("Stopping actors (incl. block generator)")
-    actorSystem.terminate().onComplete { _ =>
-      //CLOSE WALLET
-      log.info("Closing wallet")
-      wallet.close()
-
-      //FORCE CLOSE
-      log.info("Exiting from the app...")
-      System.exit(0)
-    }
-
-  }
+  //move away methods below?
 
   def onNewOffchainTransaction(transaction: LagonakiTransaction) =
     if (UnconfirmedTransactionsDatabaseImpl.putIfNew(transaction)) {

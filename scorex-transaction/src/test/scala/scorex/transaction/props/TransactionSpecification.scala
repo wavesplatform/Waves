@@ -73,7 +73,7 @@ with Matchers {
       val sender = new PrivateKeyAccount(senderSeed)
       val recipient = new PrivateKeyAccount(recipientSeed)
       val tx = PaymentTransaction(sender, recipient, amount, fee, time)
-      val txAfter = LagonakiTransaction.parse(tx.bytes())
+      val txAfter = LagonakiTransaction.parse(tx.bytes()).get
 
       txAfter.getClass.shouldBe(tx.getClass)
 
