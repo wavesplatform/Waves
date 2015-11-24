@@ -28,9 +28,9 @@ case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
         calculateHash(i / 2, hash, path.tail)
     }
 
-    if (merklePath.nonEmpty) {
-      val calculated = calculateHash(index, hashFunction.hash(data.asInstanceOf[Message]), merklePath)
-      calculated.mkString == rootHash.mkString
-    } else true
+    if (merklePath.nonEmpty)
+      calculateHash(index, hashFunction.hash(data.asInstanceOf[Message]), merklePath) sameElements rootHash
+    else
+      true
   }
 }
