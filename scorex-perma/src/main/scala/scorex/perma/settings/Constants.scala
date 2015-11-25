@@ -6,20 +6,20 @@ import scorex.utils.ScorexLogging
 
 object Constants extends ScorexLogging {
 
-  private val appConf = ConfigFactory.load().getConfig("perma")
+  private val permaConf = ConfigFactory.load("perma").getConfig("perma")
 
   type DataSegment = Array[Byte]
 
   //few segments to be stored in a block, so segment size shouldn't be big
-  val segmentSize = appConf.getInt("segmentSize") //segment size in bytes
+  val segmentSize = permaConf.getInt("segmentSize") //segment size in bytes
 
-  val n = appConf.getLong("n") //how many segments in a dataset in total
+  val n = permaConf.getLong("n") //how many segments in a dataset in total
 
-  val l = appConf.getInt("l") //how many segments to store for an each miner
+  val l = permaConf.getInt("l") //how many segments to store for an each miner
 
-  val k = appConf.getInt("k") //number of iterations during scratch-off phase
+  val k = permaConf.getInt("k") //number of iterations during scratch-off phase
 
-  val hash = appConf.getString("hash") match {
+  val hash = permaConf.getString("hash") match {
     case s: String if s.equalsIgnoreCase("sha256") =>
       Sha256
     case hashFunction =>
