@@ -1,5 +1,7 @@
 package scorex
 
+import java.security.SecureRandom
+
 import scala.annotation.tailrec
 
 import scala.concurrent.duration._
@@ -19,4 +21,11 @@ package object utils {
       case util.Failure(e) => throw e
     }
   }
+
+  def randomBytes(howMany: Int) = {
+    val r = new Array[Byte](howMany)
+    new SecureRandom().nextBytes(r) //overrides r
+    r
+  }
+
 }

@@ -1,7 +1,5 @@
 package scorex.perma.actors
 
-import java.security.SecureRandom
-
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.util.Timeout
 import scorex.crypto.CryptographicHash._
@@ -10,12 +8,12 @@ import scorex.crypto._
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.ads.merkle.TreeStorage.Position
 import scorex.perma.BlockchainBuilderSpec.WinningTicket
-import scorex.perma.Storage.AuthDataStorage
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants.DataSegment
 import scorex.storage.Storage
+import scorex.utils._
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -34,7 +32,7 @@ class Miner(rootHash: Digest)(implicit val authDataStorage: Storage[Long, AuthDa
   import Miner._
 
   private val keyPair = EllipticCurveImpl.createKeyPair(randomBytes(32))
-  private implicit val timeout = Timeout(1 minute)
+  private implicit val timeout = Timeout(1.minute)
 
   private val segmentIds: Seq[Long] = 1.to(Constants.l).map { i =>
     u(keyPair._2, i - 1)
@@ -47,8 +45,6 @@ class Miner(rootHash: Digest)(implicit val authDataStorage: Storage[Long, AuthDa
 
     case Initialize(miners) =>
       log.debug("Initialize")
-
-      val s = sender()
 
       segmentToDownload foreach { s =>
         if (authDataStorage.containsKey(s)) {
@@ -98,7 +94,7 @@ class Miner(rootHash: Digest)(implicit val authDataStorage: Storage[Long, AuthDa
       if (check) {
         sender() ! WinningTicket(puz, score, ticket)
       } else {
-        context.system.scheduler.scheduleOnce(200 millis, self, TicketGeneration(difficulty, puz))
+        context.system.scheduler.scheduleOnce(200.millis, self, TicketGeneration(difficulty, puz))
       }
 
     case TicketValidation(difficulty, puz, t: Ticket) =>
@@ -117,14 +113,6 @@ object Miner {
   private def u(pubKey: PublicKey, i: Int): Long = {
     val h = Sha256.hash(pubKey ++ BigInt(i).toByteArray)
     BigInt(1, h).mod(Constants.n).toLong
-  }
-
-
-  //todo: move to utils
-  def randomBytes(howMany: Int) = {
-    val r = new Array[Byte](howMany)
-    new SecureRandom().nextBytes(r) //overrides s
-    r
   }
 
   def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte])
