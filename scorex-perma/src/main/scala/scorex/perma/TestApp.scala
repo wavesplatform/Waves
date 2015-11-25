@@ -7,6 +7,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
 import scorex.crypto.ads.merkle.MerkleTree
 import scorex.perma.BlockchainBuilderSpec.SendWorkToMiners
+import scorex.perma.Storage.AuthDataStorage
 import scorex.perma.actors.MinerSpec.Initialize
 import scorex.perma.actors.{Miner, TrustedDealer}
 import scorex.perma.settings.{Constants, PermaSettings}
@@ -49,7 +50,8 @@ object TestApp extends App with ScorexLogging {
   log.info("start actor system")
   protected lazy val actorSystem = ActorSystem("lagonaki")
   val dealer = actorSystem.actorOf(Props(new TrustedDealer(tree)))
-  val miners = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], tree.rootHash), s"m-$x"))
+  val storage = new AuthDataStorage(settings.authDataStorage)
+  val miners = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], tree.rootHash, storage), s"m-$x"))
 
   implicit val timeout = Timeout(1 minute)
 

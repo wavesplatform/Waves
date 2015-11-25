@@ -13,8 +13,9 @@ import scorex.perma.BlockchainBuilderSpec.WinningTicket
 import scorex.perma.Storage.AuthDataStorage
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
-import scorex.perma.settings.{PermaSettings, Constants}
+import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants.DataSegment
+import scorex.storage.Storage
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -27,7 +28,8 @@ case class Ticket(publicKey: PublicKey,
                   s: Array[Byte],
                   proofs: IndexedSeq[PartialProof])
 
-class Miner(rootHash: Digest)(implicit settings: PermaSettings) extends Actor with ActorLogging {
+class Miner(rootHash: Digest)(implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
+  extends Actor with ActorLogging {
 
   import Miner._
 
@@ -125,9 +127,8 @@ object Miner {
     r
   }
 
-  def authDataStorage(implicit settings: PermaSettings) = new AuthDataStorage(settings.authDataStorage)
-
-  def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte])(implicit settings: PermaSettings): Ticket = {
+  def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte])
+              (implicit authDataStorage: Storage[Long, AuthDataBlock[DataSegment]]): Ticket = {
 
     val (privateKey, publicKey) = keyPair
 
