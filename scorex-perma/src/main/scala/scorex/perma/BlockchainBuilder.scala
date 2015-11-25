@@ -1,9 +1,10 @@
 package scorex.perma
 
 import akka.actor.{Actor, ActorRef}
+import scorex.crypto.{Sha256, CryptographicHash}
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.Ticket
-import scorex.utils.ScorexLogging
+import scorex.utils._
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -17,15 +18,20 @@ class BlockchainBuilder(miners: Seq[ActorRef], dealer: ActorRef) extends Actor w
 
   import BlockchainBuilderSpec._
 
-  var puz: Array[Byte] = calcPuz
   var initialized = 0
 
   val InitialDifficulty = BigInt(1, Array.fill(33)(1: Byte))
   val blockchainLike = mutable.Buffer[BlockHeaderLike]()
 
-  private def calcPuz = 1.to(32).toArray.map(_ => Random.nextInt(256).toByte)
-
   def difficulty = blockchainLike.headOption.map(_.difficulty).getOrElse(InitialDifficulty)
+
+  def calcPuz(block: Option[BlockHeaderLike], hash: CryptographicHash = Sha256): Array[Byte] = block match {
+    case Some(b) =>
+      hash.hash(b.puz ++ b.ticket.s ++ b.ticket.publicKey
+        ++ b.ticket.proofs.foldLeft(Array.empty: Array[Byte])((b, a) => b ++ a.signature))
+    case None =>
+      hash.hash("Scorex perma genesis")
+  }
 
   override def receive = {
     case s: MinerStatus =>
@@ -44,7 +50,7 @@ class BlockchainBuilder(miners: Seq[ActorRef], dealer: ActorRef) extends Actor w
     case SendWorkToMiners =>
       miners.foreach { minerRef =>
         if (initialized == miners.length) {
-          minerRef ! TicketGeneration(difficulty, puz)
+          minerRef ! TicketGeneration(difficulty, calcPuz(blockchainLike.lastOption))
         } else {
           minerRef ! Initialize(miners)
           context.system.scheduler.scheduleOnce(200 millis, minerRef, GetStatus)
@@ -53,11 +59,11 @@ class BlockchainBuilder(miners: Seq[ActorRef], dealer: ActorRef) extends Actor w
 
     //miners are honest (lol) in our setting, so no validation here
     case WinningTicket(minerPuz, score, ticket) =>
+      val puz = calcPuz(blockchainLike.lastOption)
       if (minerPuz sameElements puz) {
         val newBlock = BlockHeaderLike(score, puz, ticket)
         log.info(s"Block generated: $newBlock, blockchain size: ${blockchainLike.size}")
         blockchainLike += newBlock
-        puz = calcPuz
         self ! SendWorkToMiners
       } else {
         sender() ! TicketGeneration(difficulty, puz)
