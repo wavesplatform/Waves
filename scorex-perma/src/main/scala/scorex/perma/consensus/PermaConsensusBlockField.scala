@@ -1,31 +1,22 @@
 package scorex.perma.consensus
 
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json._
 import scorex.block.BlockField
-import scorex.crypto.Base58
 
 
 case class PermaConsensusBlockField(override val value: PermaLikeConsensusBlockData)
   extends BlockField[PermaLikeConsensusBlockData] {
 
 
-  override val name: String = "perma-consensus"
+  override val name: String = PermaConsensusBlockField.fieldName
 
-  //TODO hash from bytes?
-  override def bytes: Array[Byte] = {
-    value.difficulty.toByteArray ++ value.puz ++ value.ticket.s ++ value.ticket.publicKey ++
-      value.ticket.proofs.foldLeft(Array.empty: Array[Byte])((b, a) => b ++ a.signature)
-  }
+  override def bytes: Array[Byte] = json.toString().getBytes
 
-  override def json: JsObject = Json.obj(name -> Json.obj(
-    "difficulty" -> value.difficulty.toString(),
-    "puz" -> value.puz,
-    "s" -> value.ticket.s,
-    "segments" -> value.ticket.proofs.map { proof =>
-      Json.obj(
-        "data" -> proof.segment.data,
-        "path" -> Json.arr(proof.segment.merklePath.map(Base58.encode))
-      )
-    }
-  ))
+  override def json: JsObject = Json.obj(name -> Json.toJson(value))
+}
+
+object PermaConsensusBlockField {
+
+  val fieldName: String = "perma-consensus"
+
 }

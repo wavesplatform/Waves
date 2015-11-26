@@ -3,7 +3,7 @@ package scorex.perma
 import akka.actor.{Actor, ActorRef}
 import scorex.crypto.{Sha256, CryptographicHash}
 import scorex.perma.actors.MinerSpec._
-import scorex.perma.actors.Ticket
+import scorex.perma.consensus.Ticket
 import scorex.utils._
 
 import scala.collection.mutable

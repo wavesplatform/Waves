@@ -3,8 +3,8 @@ package scorex.perma.consensus
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
-import scorex.perma.actors.Ticket
 import scorex.transaction.TransactionModule
+import play.api.libs.json.{JsObject, Json}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -16,7 +16,7 @@ import scala.concurrent.Future
 class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] {
 
   val MiningReward = 1000000
-  val InitialDifficulty = BigInt(Array.fill(32)(1: Byte))
+  val InitialDifficulty = BigInt(Array.fill(32)(1: Byte)).toLong
   val GenesisCreator = new PublicKeyAccount(Array())
 
   private def blockGenerator(block: Block) = block.signerDataField.value.generator
@@ -52,7 +52,11 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
   override def consensusBlockData(block: Block): PermaLikeConsensusBlockData =
     block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData]
 
-  override def parseBlockData(bytes: Array[Byte]): BlockField[PermaLikeConsensusBlockData] = ???
+  override def parseBlockData(bytes: Array[Byte]): BlockField[PermaLikeConsensusBlockData] = {
+    val json = Json.parse(bytes)
+    ???
+  }
+
 
   /*
     PermaConsensusBlockField(new PermaLikeConsensusBlockData{
@@ -60,11 +64,11 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
     })*/
 
   override def genesisData: BlockField[PermaLikeConsensusBlockData] =
-    PermaConsensusBlockField(new PermaLikeConsensusBlockData {
-      override val difficulty = InitialDifficulty
-      override val puz = Array[Byte]()
-      override val ticket = Ticket(GenesisCreator.publicKey, Array(), IndexedSeq())
-    })
+    PermaConsensusBlockField(PermaLikeConsensusBlockData(
+      InitialDifficulty,
+      Array[Byte](),
+      Ticket(GenesisCreator.publicKey, Array(), IndexedSeq())
+    ))
 
   /*
     PermaConsensusBlockField(new PermaLikeConsensusBlockData {

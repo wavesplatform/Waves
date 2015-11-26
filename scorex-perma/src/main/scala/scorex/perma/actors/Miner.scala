@@ -10,6 +10,7 @@ import scorex.crypto.ads.merkle.TreeStorage.Position
 import scorex.perma.BlockchainBuilderSpec.WinningTicket
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
+import scorex.perma.consensus.{PartialProof, Ticket}
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants.DataSegment
 import scorex.storage.Storage
@@ -19,12 +20,6 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Try
-
-case class PartialProof(signature: Signature, segmentIndex: Long, segment: AuthDataBlock[DataSegment])
-
-case class Ticket(publicKey: PublicKey,
-                  s: Array[Byte],
-                  proofs: IndexedSeq[PartialProof])
 
 class Miner(rootHash: Digest)(implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
   extends Actor with ActorLogging {

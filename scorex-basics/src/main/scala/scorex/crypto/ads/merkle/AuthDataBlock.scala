@@ -1,5 +1,6 @@
 package scorex.crypto.ads.merkle
 
+import play.api.libs.json._
 import scorex.crypto.CryptographicHash._
 import scorex.crypto.ads.merkle.TreeStorage.Position
 import scorex.crypto.{CryptographicHash, Sha256}
@@ -34,3 +35,30 @@ case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
       false
   }
 }
+
+object AuthDataBlock {
+
+  implicit def authDataBlockReads[T](implicit fmt: Reads[T]): Reads[AuthDataBlock[T]] = new Reads[AuthDataBlock[T]] {
+    def reads(json: JsValue): JsResult[AuthDataBlock[T]] = JsSuccess(AuthDataBlock[T](
+      (json \ "data").get match {
+        case JsString(ts) => ts.getBytes.asInstanceOf[T]
+        case _ => throw new RuntimeException("Data MUST be a string")
+      },
+      (json \ "merklePath").get match {
+        case JsArray(ts) => ts.map(t => t.as[String].getBytes)
+        case _ => throw new RuntimeException("MerklePath MUST be a list")
+      }
+    ))
+  }
+
+  implicit def authDataBlockWrites[T](implicit fmt: Writes[T]): Writes[AuthDataBlock[T]] = new Writes[AuthDataBlock[T]] {
+    def writes(ts: AuthDataBlock[T]) = JsObject(Seq(
+      "data" -> JsString(new String(ts.data.asInstanceOf[Array[Byte]])),
+      "merklePath" -> JsArray(
+        ts.merklePath.map(digest => JsString(new String(digest)))
+      )
+    ))
+  }
+
+}
+
