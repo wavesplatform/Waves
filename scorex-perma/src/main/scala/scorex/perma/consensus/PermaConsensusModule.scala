@@ -56,7 +56,7 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
   //TODO return Try
   override def parseBlockData(bytes: Array[Byte]): PermaConsensusBlockField = PermaConsensusBlockField.parse(bytes)
 
-  override def genesisData: BlockField[PermaLikeConsensusBlockData] =
+  override def genesisData: PermaConsensusBlockField =
     PermaConsensusBlockField(PermaLikeConsensusBlockData(
       InitialDifficulty,
       Array[Byte](),

@@ -23,15 +23,25 @@ class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks
       ))
       val parsedBlock = PermaConsensusBlockField.parse(initialBlock.bytes)
 
-      parsedBlock.value.difficulty shouldBe initialBlock.value.difficulty
-      assert(parsedBlock.value.puz sameElements initialBlock.value.puz)
-      assert(parsedBlock.value.ticket.publicKey sameElements initialBlock.value.ticket.publicKey)
-      assert(parsedBlock.value.ticket.s sameElements initialBlock.value.ticket.s)
-      parsedBlock.value.ticket.proofs.size shouldBe initialBlock.value.ticket.proofs.size
+      checkAll(initialBlock, parsedBlock)
+
+    }
+
+    val initialBlock = consensus.genesisData
+    val parsedBlock = PermaConsensusBlockField.parse(initialBlock.bytes)
+    checkAll(initialBlock, parsedBlock)
+  }
+
+  def checkAll(initialBlock: PermaConsensusBlockField, parsedBlock: PermaConsensusBlockField): Unit = {
+    parsedBlock.value.difficulty shouldBe initialBlock.value.difficulty
+    assert(parsedBlock.value.puz sameElements initialBlock.value.puz)
+    assert(parsedBlock.value.ticket.publicKey sameElements initialBlock.value.ticket.publicKey)
+    assert(parsedBlock.value.ticket.s sameElements initialBlock.value.ticket.s)
+    parsedBlock.value.ticket.proofs.size shouldBe initialBlock.value.ticket.proofs.size
+    if(parsedBlock.value.ticket.proofs.nonEmpty) {
       assert(parsedBlock.value.ticket.proofs.head.signature sameElements initialBlock.value.ticket.proofs.head.signature)
       assert(parsedBlock.value.ticket.proofs.head.segmentIndex == initialBlock.value.ticket.proofs.head.segmentIndex)
       assert(parsedBlock.value.ticket.proofs.head.segment.data sameElements initialBlock.value.ticket.proofs.head.segment.data)
-
     }
   }
 }
