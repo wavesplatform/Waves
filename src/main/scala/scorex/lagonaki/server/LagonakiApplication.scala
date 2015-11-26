@@ -15,6 +15,8 @@ import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.lagonaki.network.message._
 import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
+import scorex.perma.consensus.PermaConsensusModule
+import scorex.perma.consensus.http.PermaConsensusApiRoute
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
@@ -40,6 +42,8 @@ class LagonakiApplication(val settingsFilename: String)
         new NxtLikeConsensusModule
       case s: String if s.equalsIgnoreCase("qora") =>
         new QoraLikeConsensusModule
+      case s: String if s.equalsIgnoreCase("perma") =>
+        new PermaConsensusModule
       case algo =>
         log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
         new NxtLikeConsensusModule
@@ -61,6 +65,10 @@ class LagonakiApplication(val settingsFilename: String)
       new NxtConsensusApiRoute(ncm, blockchainImpl)
     case qcm: QoraLikeConsensusModule =>
       new QoraConsensusApiRoute(qcm, blockchainImpl)
+    case pcm: PermaConsensusModule =>
+      new PermaConsensusApiRoute(pcm, blockchainImpl)
+
+
   }
 
   override lazy val apiRoutes = Seq(
@@ -81,6 +89,7 @@ class LagonakiApplication(val settingsFilename: String)
     consensusApiRoute match {
       case nxt: NxtConsensusApiRoute => typeOf[NxtConsensusApiRoute]
       case qora: QoraConsensusApiRoute => typeOf[QoraConsensusApiRoute]
+      case pcm: PermaConsensusApiRoute => typeOf[PermaConsensusApiRoute]
     },
     typeOf[WalletApiRoute],
     typeOf[PaymentApiRoute],

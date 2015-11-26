@@ -11,9 +11,10 @@ case class PermaConsensusBlockField(override val value: PermaLikeConsensusBlockD
 
   override val name: String = "perma-consensus"
 
+  //TODO hash from bytes?
   override def bytes: Array[Byte] = {
-    //todo: implement
-    ???
+    value.difficulty.toByteArray ++ value.puz ++ value.ticket.s ++ value.ticket.publicKey ++
+      value.ticket.proofs.foldLeft(Array.empty: Array[Byte])((b, a) => b ++ a.signature)
   }
 
   override def json: JsObject = Json.obj(name -> Json.obj(
