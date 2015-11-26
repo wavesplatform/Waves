@@ -1,10 +1,11 @@
 package scorex.perma.consensus
 
+import com.google.common.primitives.Longs
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
 import scorex.transaction.TransactionModule
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsSuccess, JsResult, JsObject, Json}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -52,16 +53,8 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
   override def consensusBlockData(block: Block): PermaLikeConsensusBlockData =
     block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData]
 
-  override def parseBlockData(bytes: Array[Byte]): BlockField[PermaLikeConsensusBlockData] = {
-    val json = Json.parse(bytes)
-    ???
-  }
-
-
-  /*
-    PermaConsensusBlockField(new PermaLikeConsensusBlockData{
-      ???
-    })*/
+  //TODO return Try
+  override def parseBlockData(bytes: Array[Byte]): PermaConsensusBlockField = PermaConsensusBlockField.parse(bytes)
 
   override def genesisData: BlockField[PermaLikeConsensusBlockData] =
     PermaConsensusBlockField(PermaLikeConsensusBlockData(

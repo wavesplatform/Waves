@@ -1,5 +1,6 @@
 package scorex.perma.consensus
 
+import com.google.common.primitives.{Longs, Bytes}
 import play.api.libs.json._
 import scorex.block.BlockField
 
@@ -18,5 +19,13 @@ case class PermaConsensusBlockField(override val value: PermaLikeConsensusBlockD
 object PermaConsensusBlockField {
 
   val fieldName: String = "perma-consensus"
+
+  def parse(bytes: Array[Byte]): PermaConsensusBlockField = {
+    (Json.parse(bytes) \ fieldName).validate[PermaLikeConsensusBlockData] match {
+      case JsSuccess(block, _) => PermaConsensusBlockField(block)
+      case m => throw new RuntimeException("enable to parse block data")
+    }
+  }
+
 
 }
