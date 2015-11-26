@@ -4,9 +4,14 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
 import scorex.crypto.SigningFunctions._
+import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.{CryptographicHash, EllipticCurveImpl, Sha256}
-import scorex.perma.settings.Constants
-import scorex.transaction.TransactionModule
+import scorex.perma.Storage.AuthDataStorage
+import scorex.perma.settings.{PermaSettings, Constants}
+import scorex.perma.settings.Constants._
+import scorex.storage.Storage
+import scorex.transaction.{BalanceSheet, BlockChain, TransactionModule}
+import scorex.utils._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -15,13 +20,17 @@ import scala.util.Try
 /**
   * Data and functions related to a consensus algo
   */
+class PermaConsensusModule(hash: CryptographicHash = Sha256)(implicit val settings: PermaSettings)
+  extends ConsensusModule[PermaLikeConsensusBlockData] with ScorexLogging {
 
-class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] {
-
-  val MiningReward = 1000000
   val InitialDifficulty = BigInt(Array.fill(32)(1: Byte)).toLong
   val GenesisCreator = new PublicKeyAccount(Array())
+  val Version: Byte = 1
   val RootHash: Array[Byte] = "".getBytes
+  lazy val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
+  implicit val consensusModule: ConsensusModule[PermaLikeConsensusBlockData] = this
+
+  def miningReward(block: Block) = 1000000
 
   private def blockGenerator(block: Block) = block.signerDataField.value.generator
 
@@ -29,6 +38,7 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
     val f = block.consensusDataField.asInstanceOf[PermaConsensusBlockField]
     val publicKey = blockGenerator(block).publicKey
     validate(publicKey, f.value.puz, f.value.difficulty, f.value.ticket, RootHash)
+    //TODO check puz and previous block
   }
 
   /**
@@ -36,7 +46,7 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
     * Meni Rosenfeld's Proof-of-Activity proposal http://eprint.iacr.org/2014/452.pdf
     */
   def feesDistribution(block: Block): Map[Account, Long] =
-    Map(blockGenerator(block) -> MiningReward)
+    Map(blockGenerator(block) -> (miningReward(block) + block.transactions.map(_.fee).sum))
 
   /**
     * Get block producers(miners/forgers). Usually one miner produces a block, but in some proposals not
@@ -52,14 +62,40 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
 
   def generateNextBlock[TT](account: PrivateKeyAccount)
                            (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
-    //TODO
-    Future(None)
+
+    val lastBlock = transactionModule.history.asInstanceOf[BlockChain].lastBlock
+    val lastBlockKernelData = lastBlock.consensusDataField.asInstanceOf[PermaConsensusBlockField].value
+    val lastBlockTime = lastBlock.timestampField.value
+
+    val eta = (NTP.correctedTime() - lastBlockTime) / 1000
+    val puz = generatePuz(lastBlock)
+
+    log.debug(s"eta $eta, " +
+      s"account:  $account " +
+      s"account balance: ${transactionModule.state.asInstanceOf[BalanceSheet].generationBalance(account)}"
+    )
+
+    val keyPair = (account.privateKey, account.publicKey)
+    val ticket = generate(keyPair, puz)
+    val difficulty = calcDifficulty(lastBlock)
+
+    if (validate(keyPair._2, puz, difficulty, ticket, RootHash)) {
+      val timestamp = NTP.correctedTime()
+      val consensusData = PermaLikeConsensusBlockData(difficulty, puz, ticket)
+
+      Future(Some(Block.buildAndSign(Version,
+        timestamp,
+        lastBlock.uniqueId,
+        consensusData,
+        transactionModule.packUnconfirmed(),
+        account)))
+
+    } else Future(None)
   }
 
   override def consensusBlockData(block: Block): PermaLikeConsensusBlockData =
     block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData]
 
-  //TODO return Try
   override def parseBlockData(bytes: Array[Byte]): PermaConsensusBlockField = PermaConsensusBlockField.parse(bytes)
 
   override def genesisData: PermaConsensusBlockField =
@@ -99,6 +135,45 @@ class PermaConsensusModule extends ConsensusModule[PermaLikeConsensusBlockData] 
     partialProofsCheck && (ticketScore(t) < difficulty)
   }.getOrElse(false)
 
+  private def generatePuz(block: Block) = hash.hash(block.bytes)
+
   private def ticketScore(t: Ticket): BigInt = BigInt(1, Sha256.hash(t.proofs.map(_.signature).reduce(_ ++ _)))
+
+  private def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Ticket = {
+
+    val (privateKey, publicKey) = keyPair
+
+    //scratch-off for the Local-POR lottery
+    val s = randomBytes(32)
+
+    val sig0 = NoSig
+    val r1 = u(publicKey, (BigInt(1, Sha256.hash(puz ++ publicKey ++ s)) % Constants.l).toInt)
+
+    val proofs: IndexedSeq[PartialProof] = 1.to(Constants.k).foldLeft(
+      (r1, sig0, Seq[PartialProof]())
+    ) {
+      case ((ri, sig_prev, seq), _) =>
+        val segment = authDataStorage.get(ri).get
+        val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segment.data)
+        val sig = EllipticCurveImpl.sign(privateKey, hi)
+        val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Constants.l).toInt)
+
+        (r_next, sig, seq :+ PartialProof(sig, ri, segment))
+    }._3.toIndexedSeq.ensuring(_.size == Constants.k)
+
+    Ticket(publicKey, s, proofs)
+  }
+
+  //calculate index of i-th segment
+  private def u(pubKey: PublicKey, i: Int): Long = {
+    val h = Sha256.hash(pubKey ++ BigInt(i).toByteArray)
+    BigInt(1, h).mod(Constants.n).toLong
+  }
+
+  //TODO implement
+  private def calcDifficulty(lastBlock: Block): Long = {
+    InitialDifficulty
+  }
+
 
 }

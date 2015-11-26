@@ -5,9 +5,14 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.perma.consensus._
 import scorex.perma.settings.Constants.DataSegment
+import scorex.perma.settings.PermaSettings
+import scorex.settings.Settings
 
 class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
+  implicit val settings = new Settings with PermaSettings {
+    val filename = "settings-test.json"
+  }
   val consensus = new PermaConsensusModule
 
   property("set value and get it") {

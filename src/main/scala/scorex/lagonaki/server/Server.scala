@@ -45,6 +45,8 @@ object Server extends App with ScorexLogging {
     Thread.sleep(3000)
 
     val genesisBlock = application.blockchainImpl.blockAt(1)
+    println("!!!!!!!!!!!!!!!!!GENESIS")
+    println(genesisBlock)
     val genesisAccs = genesisBlock.get.transactions.flatMap { tx => tx match {
       case gtx: GenesisTransaction =>
         Some(gtx.recipient)
