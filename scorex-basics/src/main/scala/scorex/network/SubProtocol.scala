@@ -1,9 +1,7 @@
 package scorex.network
 
-import scorex.network.message.MessageSpec
 
-import scala.concurrent.duration.Duration
-import scala.util.{Failure, Success, Try}
+import scorex.network.message.MessageSpec
 
 //todo: anti-ddos
 
@@ -12,14 +10,14 @@ trait Interaction
 trait StatelessInteraction {
 }
 
-trait OnewayInteraction[MsgType] extends StatelessInteraction {
+trait SimplexInteraction[MsgType] extends StatelessInteraction {
   val msgSpec: MessageSpec[MsgType]
 }
 
-trait IncomingInteraction[ReqMsg] extends OnewayInteraction[ReqMsg] {
+trait IncomingInteraction[ReqMsg] extends SimplexInteraction[ReqMsg] {
 }
 
-trait OutcoimngInteraction[RepMsg] extends OnewayInteraction[RepMsg] {
+trait OutcomingInteraction[RepMsg] extends SimplexInteraction[RepMsg] {
 
 }
 
@@ -27,8 +25,8 @@ trait StatefulInteraction {
 
 }
 
-trait DuplexInteraction[ReqMsg, RepMsg] extends StatefulInteraction{
 
+trait DuplexInteraction[ReqMsg, RepMsg] extends StatefulInteraction{
   val reqSpec: MessageSpec[ReqMsg]
   val repSpec: MessageSpec[RepMsg]
 
