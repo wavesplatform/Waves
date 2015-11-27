@@ -127,6 +127,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
     val accounts = application.wallet.privateKeyAccounts()
     consModule.generateNextBlocks(accounts)(transModule) onComplete {
       case Success(blocks: Seq[Block]) =>
+        log.info(blocks.size + " blocks created")
         if (blocks.nonEmpty) {
           val bestBlock = blocks.maxBy(consModule.blockScore)
           self ! NewBlock(bestBlock, None)

@@ -79,6 +79,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
     val difficulty = calcDifficulty(lastBlock)
 
     if (validate(keyPair._2, puz, difficulty, ticket, rootHash)) {
+      log.info("New valid ticket created. Current score:" + transactionModule.history.asInstanceOf[BlockChain].score())
       val timestamp = NTP.correctedTime()
       val consensusData = PermaLikeConsensusBlockData(difficulty, puz, ticket)
 
@@ -89,7 +90,10 @@ class PermaConsensusModule(rootHash: Array[Byte])
         transactionModule.packUnconfirmed(),
         account)))
 
-    } else Future(None)
+    } else {
+      log.info("Invalid ticket created. Current score:" + transactionModule.history.asInstanceOf[BlockChain].score())
+      Future(None)
+    }
   }.recoverWith { case t: Throwable =>
     log.error("Error when creating new block", t)
     t.printStackTrace()
@@ -140,7 +144,12 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
   private def generatePuz(block: Block) = hash.hash(block.bytes)
 
-  private def ticketScore(t: Ticket): BigInt = BigInt(1, hash.hash(t.proofs.map(_.signature).reduce(_ ++ _)))
+  private def ticketScore(t: Ticket): BigInt = if(t.proofs.nonEmpty) {
+    BigInt(1, hash.hash(t.proofs.map(_.signature).reduce(_ ++ _)))
+  } else {
+    //Genesis block contains empty ticket
+    0
+  }
 
   private def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Ticket = {
 
