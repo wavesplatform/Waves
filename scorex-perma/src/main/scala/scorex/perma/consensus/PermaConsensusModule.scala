@@ -7,8 +7,8 @@ import scorex.crypto.SigningFunctions._
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.{CryptographicHash, EllipticCurveImpl, Sha256}
 import scorex.perma.Storage.AuthDataStorage
-import scorex.perma.settings.{PermaSettings, Constants}
 import scorex.perma.settings.Constants._
+import scorex.perma.settings.{Constants, PermaSettings}
 import scorex.storage.Storage
 import scorex.transaction.{BalanceSheet, BlockChain, TransactionModule}
 import scorex.utils._
@@ -61,7 +61,7 @@ class PermaConsensusModule(hash: CryptographicHash = Sha256)(implicit val settin
   }
 
   def generateNextBlock[TT](account: PrivateKeyAccount)
-                           (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
+                           (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = Try {
 
     val lastBlock = transactionModule.history.asInstanceOf[BlockChain].lastBlock
     val lastBlockKernelData = lastBlock.consensusDataField.asInstanceOf[PermaConsensusBlockField].value
@@ -91,7 +91,11 @@ class PermaConsensusModule(hash: CryptographicHash = Sha256)(implicit val settin
         account)))
 
     } else Future(None)
-  }
+  }.recoverWith { case t: Throwable =>
+    log.error("Error when creating new block", t)
+    t.printStackTrace()
+    Try(Future(None))
+  }.getOrElse(Future(None))
 
   override def consensusBlockData(block: Block): PermaLikeConsensusBlockData =
     block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData]
