@@ -1,7 +1,7 @@
 package scorex.lagonaki.server
 
-import java.io.{RandomAccessFile, File}
-import java.nio.file.{Paths, Files}
+import java.io.{File, RandomAccessFile}
+import java.nio.file.{Files, Paths}
 
 import akka.actor.Props
 import akka.io.IO
@@ -9,18 +9,16 @@ import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
 import scorex.app.Application
-import scorex.consensus.LagonakiConsensusModule
-import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.consensus.qora.api.http.QoraConsensusApiRoute
-import scorex.crypto.ads.merkle.{MerkleTree, AuthDataBlock}
-import scorex.lagonaki.api.http.{PeersHttpService, PaymentApiRoute, ScorexApiRoute}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
+import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.QoraLikeConsensusModule
+import scorex.consensus.qora.api.http.QoraConsensusApiRoute
+import scorex.crypto.ads.merkle.{AuthDataBlock, MerkleTree}
+import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRoute}
 import scorex.lagonaki.network.message._
 import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
 import scorex.perma.Storage.AuthDataStorage
-import scorex.perma.TestApp._
 import scorex.perma.consensus.PermaConsensusModule
 import scorex.perma.consensus.http.PermaConsensusApiRoute
 import scorex.perma.settings.Constants
@@ -32,9 +30,9 @@ import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.wallet.{Payment, Wallet}
 import scorex.utils.{NTP, ScorexLogging}
 import spray.can.Http
-import scala.reflect.runtime.universe._
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.reflect.runtime.universe._
 
 class LagonakiApplication(val settingsFilename: String)
   extends Application with ScorexLogging {

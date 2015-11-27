@@ -18,6 +18,8 @@ case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 class BlockchainSyncer(application: LagonakiApplication, networkController: ActorRef) extends FSM[Status, Unit] {
 
   private val stateTimeout = 1.second
+  //TODO get from config
+  val blockGenerationDelay = 10.millis
 
   startWith(Offline, Unit)
 
@@ -60,10 +62,13 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
         scoreOpt,
         onNone = () => {
           tryToGenerateABlock()
+          context.system.scheduler.scheduleOnce(blockGenerationDelay, networkController, GetMaxChainScore)
           stay()
         },
         onLocal = () => {
           tryToGenerateABlock()
+          networkController ! GetMaxChainScore
+          context.system.scheduler.scheduleOnce(blockGenerationDelay, networkController, GetMaxChainScore)
           stay()
         }
       )
@@ -106,7 +111,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
       application.storedState.processBlock(block)
       application.blockchainImpl.appendBlock(block)
       log.info(s"New block: $block from $fromStr. New size: ${application.blockchainImpl.height()}, " +
-        s"score: ${application.blockchainImpl.score()}")
+        s"score: ${application.blockchainImpl.score()}, timestamp: ${block.timestampField.value}")
 
       block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
       val height = application.blockchainImpl.height()

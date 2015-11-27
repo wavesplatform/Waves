@@ -3,18 +3,19 @@ package scorex.perma.consensus
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
+import scorex.crypto.CryptographicHash.Digest
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.SigningFunctions._
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.CryptographicHash.Digest
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.storage.Storage
-import scorex.transaction.{BalanceSheet, BlockChain, TransactionModule}
+import scorex.transaction.{BlockChain, TransactionModule}
 import scorex.utils._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.Try
 
 /**
@@ -24,7 +25,11 @@ class PermaConsensusModule(rootHash: Array[Byte])
                           (implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ConsensusModule[PermaLikeConsensusBlockData] with ScorexLogging {
 
-  val InitialDifficulty:BigInt = BigInt(Array.fill(36)(1: Byte))
+  val InitialDifficulty: BigInt = BigInt(Array.fill(36)(1: Byte))
+  val initialDifficultyPow: BigInt = log2(InitialDifficulty)
+  val AvgDelay = 2.seconds.toSeconds
+  val DifficultyRecalculation = 30
+
   val GenesisCreator = new PublicKeyAccount(Array())
   val Version: Byte = 1
   val hash = Constants.hash
@@ -37,9 +42,17 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
   def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = {
     val f = block.consensusDataField.asInstanceOf[PermaConsensusBlockField]
-    val publicKey = blockGenerator(block).publicKey
-    validate(publicKey, f.value.puz, f.value.difficulty, f.value.ticket, rootHash)
-    //TODO check puz and previous block
+    val trans = transactionModule.history.asInstanceOf[BlockChain]
+    trans.parent(block) match {
+      case Some(parent) =>
+        lazy val publicKey = blockGenerator(block).publicKey
+        lazy val puzIsValid = f.value.puz sameElements generatePuz(parent)
+        lazy val difficultyIsValid = f.value.difficulty == calcDifficulty(parent)
+        lazy val ticketIsValid = validate(publicKey, f.value.puz, f.value.difficulty, f.value.ticket, rootHash)
+        puzIsValid && difficultyIsValid && ticketIsValid
+      case None =>
+        true
+    }
   }
 
   /**
@@ -55,26 +68,21 @@ class PermaConsensusModule(rootHash: Array[Byte])
     */
   def generators(block: Block): Seq[Account] = Seq(blockGenerator(block))
 
-  def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = BigInt(1)
+  def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
+    val score = initialDifficultyPow -
+      log2(block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].difficulty)
+    if (score > 0) score else 1
+  }
 
   def generateNextBlock[TT](account: PrivateKeyAccount)
                            (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = Try {
 
-    val lastBlock = transactionModule.history.asInstanceOf[BlockChain].lastBlock
-    val lastBlockKernelData = lastBlock.consensusDataField.asInstanceOf[PermaConsensusBlockField].value
-    val lastBlockTime = lastBlock.timestampField.value
-
-    val eta = (NTP.correctedTime() - lastBlockTime) / 1000
-    val puz = generatePuz(lastBlock)
-
-    log.debug(s"eta $eta, " +
-      s"account:  $account " +
-      s"account balance: ${transactionModule.state.asInstanceOf[BalanceSheet].generationBalance(account)}"
-    )
+    val parent = transactionModule.history.asInstanceOf[BlockChain].lastBlock
+    val puz = generatePuz(parent)
 
     val keyPair = (account.privateKey, account.publicKey)
     val ticket = generate(keyPair, puz)
-    val difficulty = calcDifficulty(lastBlock)
+    val difficulty = calcDifficulty(parent)
 
     if (validate(keyPair._2, puz, difficulty, ticket, rootHash)) {
       val timestamp = NTP.correctedTime()
@@ -82,7 +90,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
       Future(Some(Block.buildAndSign(Version,
         timestamp,
-        lastBlock.uniqueId,
+        parent.uniqueId,
         consensusData,
         transactionModule.packUnconfirmed(),
         account)))
@@ -140,7 +148,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
   private def generatePuz(block: Block) = hash.hash(block.bytes)
 
-  private def ticketScore(t: Ticket): BigInt = if(t.proofs.nonEmpty) {
+  private def ticketScore(t: Ticket): BigInt = if (t.proofs.nonEmpty) {
     BigInt(1, hash.hash(t.proofs.map(_.signature).reduce(_ ++ _)))
   } else {
     //Genesis block contains empty ticket
@@ -178,10 +186,30 @@ class PermaConsensusModule(rootHash: Array[Byte])
     BigInt(1, h).mod(Constants.n).toLong
   }
 
-  //TODO implement
-  private def calcDifficulty(lastBlock: Block): BigInt = {
-    InitialDifficulty
+  private def calcDifficulty(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
+    val trans = transactionModule.history.asInstanceOf[BlockChain]
+    lazy val currentDiff = block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].difficulty
+    trans.heightOf(block) match {
+      case Some(height) =>
+        if (height < DifficultyRecalculation + 1) {
+          InitialDifficulty
+        } else if (height % DifficultyRecalculation == 0) {
+          val lastBlocks = (0 until DifficultyRecalculation).flatMap(i => trans.blockAt(height - i)).reverse
+          require(lastBlocks.length == DifficultyRecalculation)
+          val lastAvgDuration: Long = (0 until DifficultyRecalculation - 1).map { i =>
+            lastBlocks(i + 1).timestampField.value - lastBlocks(i).timestampField.value
+          }.sum / (DifficultyRecalculation - 1)
+          val newDiff = currentDiff * lastAvgDuration / 1000 / AvgDelay
+          log.debug(s"Height: $height, newDiff: $newDiff, currentDiff:$currentDiff, lastAvgDuration:$lastAvgDuration")
+          newDiff
+        } else {
+          currentDiff
+        }
+      case None =>
+        log.warn(s"Enable to get height of block ${block.uniqueId}")
+        currentDiff
+    }
   }
 
-
+  private def log2(i: BigInt): BigInt = BigDecimal(math.log(i.doubleValue()) / math.log(2)).toBigInt()
 }
