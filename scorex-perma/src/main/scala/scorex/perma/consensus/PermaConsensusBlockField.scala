@@ -1,6 +1,5 @@
 package scorex.perma.consensus
 
-import com.google.common.primitives.{Longs, Bytes}
 import play.api.libs.json._
 import scorex.block.BlockField
 
@@ -26,6 +25,4 @@ object PermaConsensusBlockField {
       case m => throw new RuntimeException("enable to parse block data")
     }
   }
-
-
 }
