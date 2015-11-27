@@ -23,14 +23,14 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe" % "config" % "1.3.0",
   "com.typesafe.akka" % "akka-actor_2.11" % "2.4.0",
   "com.typesafe.akka" % "akka-testkit_2.11" % "2.3.9",
-  "com.typesafe.play" % "play-datacommons_2.11" % "2.4.3",
-  "com.typesafe.play" % "play-functional_2.11" % "2.4.3",
-  "com.typesafe.play" % "play-iteratees_2.11" % "2.4.3",
-  "com.typesafe.play" % "play-json_2.11" % "2.4.3",
+  "com.typesafe.play" % "play-datacommons_2.11" % "2.4.4",
+  "com.typesafe.play" % "play-functional_2.11" % "2.4.4",
+  "com.typesafe.play" % "play-iteratees_2.11" % "2.4.4",
+  "com.typesafe.play" % "play-json_2.11" % "2.4.4",
   "com.typesafe.scala-logging" % "scala-logging_2.11" % "3.1.0",
   "com.wordnik" % "swagger-annotations" % "1.3.12",
   "com.wordnik" % "swagger-core_2.11" % "1.3.12",
-  "commons-net" % "commons-net" % "3.3",
+  "commons-net" % "commons-net" % "3.4",
   "io.spray" % "spray-can_2.11" % "1.3.3",
   "io.spray" % "spray-http_2.11" % "1.3.3",
   "io.spray" % "spray-httpx_2.11" % "1.3.3",
@@ -47,7 +47,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.json4s" % "json4s-jackson_2.11" % "3.2.11",
   "org.json4s" % "json4s-native_2.11" % "3.2.11",
   "org.jvnet.mimepull" % "mimepull" % "1.9.5",
-  "org.mapdb" % "mapdb" % "2.0-beta11",
+  "org.mapdb" % "mapdb" % "2.0-beta12",
   "org.parboiled" % "parboiled-core" % "1.1.7",
   "org.parboiled" % "parboiled-scala_2.11" % "1.1.7",
   "org.scala-lang.modules" % "scala-parser-combinators_2.11" % "1.0.1",
@@ -60,4 +60,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.slf4j" % "slf4j-api" % "1.7.7",
   "org.whispersystems" % "curve25519-java" % "0.2.4"
 )
-// LIBRARY_DEPENDENCIES_HASH 2c4136cc7cf36dbf51d6526b95d4108981b4f155
+// LIBRARY_DEPENDENCIES_HASH 1f76c25b6a9ee24549380d7d2c54980d568d3919
