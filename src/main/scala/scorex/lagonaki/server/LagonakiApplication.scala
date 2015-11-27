@@ -1,5 +1,7 @@
 package scorex.lagonaki.server
 
+import java.io.File
+
 import akka.actor.Props
 import akka.io.IO
 import com.typesafe.config.ConfigFactory
@@ -9,14 +11,18 @@ import scorex.app.Application
 import scorex.consensus.LagonakiConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
+import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.lagonaki.api.http.{PeersHttpService, PaymentApiRoute, ScorexApiRoute}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.lagonaki.network.message._
 import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
+import scorex.perma.Storage.AuthDataStorage
 import scorex.perma.consensus.PermaConsensusModule
 import scorex.perma.consensus.http.PermaConsensusApiRoute
+import scorex.perma.settings.Constants._
+import scorex.storage.Storage
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
@@ -43,7 +49,10 @@ class LagonakiApplication(val settingsFilename: String)
       case s: String if s.equalsIgnoreCase("qora") =>
         new QoraLikeConsensusModule
       case s: String if s.equalsIgnoreCase("perma") =>
-        new PermaConsensusModule
+        new File(settings.treeDir).mkdirs()
+        val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
+        val rootHash = "".getBytes
+        new PermaConsensusModule(rootHash)(authDataStorage)
       case algo =>
         log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
         new NxtLikeConsensusModule

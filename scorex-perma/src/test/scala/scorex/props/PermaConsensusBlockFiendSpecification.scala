@@ -3,17 +3,20 @@ package scorex.props
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.ads.merkle.AuthDataBlock
+import scorex.perma.Storage.AuthDataStorage
 import scorex.perma.consensus._
 import scorex.perma.settings.Constants.DataSegment
 import scorex.perma.settings.PermaSettings
 import scorex.settings.Settings
+import scorex.storage.Storage
 
 class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
   implicit val settings = new Settings with PermaSettings {
     val filename = "settings-test.json"
   }
-  val consensus = new PermaConsensusModule
+  implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
+  val consensus = new PermaConsensusModule("test".getBytes)
 
   property("set value and get it") {
     forAll { (diff: Long, puz: Array[Byte], pubkey: Array[Byte], s: Array[Byte], signature: Array[Byte], segmentIndex: Long) =>

@@ -6,9 +6,8 @@ import scorex.consensus.ConsensusModule
 import scorex.crypto.SigningFunctions._
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.{CryptographicHash, EllipticCurveImpl, Sha256}
-import scorex.perma.Storage.AuthDataStorage
+import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
-import scorex.perma.settings.{Constants, PermaSettings}
 import scorex.storage.Storage
 import scorex.transaction.{BalanceSheet, BlockChain, TransactionModule}
 import scorex.utils._
@@ -20,14 +19,14 @@ import scala.util.Try
 /**
   * Data and functions related to a consensus algo
   */
-class PermaConsensusModule(hash: CryptographicHash = Sha256)(implicit val settings: PermaSettings)
+class PermaConsensusModule(rootHash: Array[Byte], hash: CryptographicHash = Sha256)
+                          (implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ConsensusModule[PermaLikeConsensusBlockData] with ScorexLogging {
 
   val InitialDifficulty = BigInt(Array.fill(32)(1: Byte)).toLong
   val GenesisCreator = new PublicKeyAccount(Array())
   val Version: Byte = 1
-  val RootHash: Array[Byte] = "".getBytes
-  lazy val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
+
   implicit val consensusModule: ConsensusModule[PermaLikeConsensusBlockData] = this
 
   def miningReward(block: Block) = 1000000
@@ -37,7 +36,7 @@ class PermaConsensusModule(hash: CryptographicHash = Sha256)(implicit val settin
   def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = {
     val f = block.consensusDataField.asInstanceOf[PermaConsensusBlockField]
     val publicKey = blockGenerator(block).publicKey
-    validate(publicKey, f.value.puz, f.value.difficulty, f.value.ticket, RootHash)
+    validate(publicKey, f.value.puz, f.value.difficulty, f.value.ticket, rootHash)
     //TODO check puz and previous block
   }
 
@@ -51,8 +50,6 @@ class PermaConsensusModule(hash: CryptographicHash = Sha256)(implicit val settin
   /**
     * Get block producers(miners/forgers). Usually one miner produces a block, but in some proposals not
     * (see e.g. Meni Rosenfeld's Proof-of-Activity paper http://eprint.iacr.org/2014/452.pdf)
-    * @param block
-    * @return
     */
   def generators(block: Block): Seq[Account] = Seq(blockGenerator(block))
 
@@ -79,7 +76,7 @@ class PermaConsensusModule(hash: CryptographicHash = Sha256)(implicit val settin
     val ticket = generate(keyPair, puz)
     val difficulty = calcDifficulty(lastBlock)
 
-    if (validate(keyPair._2, puz, difficulty, ticket, RootHash)) {
+    if (validate(keyPair._2, puz, difficulty, ticket, rootHash)) {
       val timestamp = NTP.correctedTime()
       val consensusData = PermaLikeConsensusBlockData(difficulty, puz, ticket)
 
