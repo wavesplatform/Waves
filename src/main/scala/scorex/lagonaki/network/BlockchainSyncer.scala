@@ -103,9 +103,10 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
   def processNewBlock(block: Block, remoteOpt: Option[InetSocketAddress]) = {
     val fromStr = remoteOpt.map(_.toString).getOrElse("local")
     if (block.isValid) {
-      log.info(s"New block: $block from $fromStr")
       application.storedState.processBlock(block)
       application.blockchainImpl.appendBlock(block)
+      log.info(s"New block: $block from $fromStr. New size: ${application.blockchainImpl.height()}, " +
+        s"score: ${application.blockchainImpl.score()}")
 
       block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
       val height = application.blockchainImpl.height()
@@ -127,7 +128,6 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
     val accounts = application.wallet.privateKeyAccounts()
     consModule.generateNextBlocks(accounts)(transModule) onComplete {
       case Success(blocks: Seq[Block]) =>
-        log.info(blocks.size + " blocks created")
         if (blocks.nonEmpty) {
           val bestBlock = blocks.maxBy(consModule.blockScore)
           self ! NewBlock(bestBlock, None)

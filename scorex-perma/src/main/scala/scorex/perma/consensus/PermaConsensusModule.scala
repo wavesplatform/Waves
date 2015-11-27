@@ -24,7 +24,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
                           (implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ConsensusModule[PermaLikeConsensusBlockData] with ScorexLogging {
 
-  val InitialDifficulty = BigInt(Array.fill(32)(1: Byte)).toLong
+  val InitialDifficulty:BigInt = BigInt(Array.fill(36)(1: Byte))
   val GenesisCreator = new PublicKeyAccount(Array())
   val Version: Byte = 1
   val hash = Constants.hash
@@ -79,7 +79,6 @@ class PermaConsensusModule(rootHash: Array[Byte])
     val difficulty = calcDifficulty(lastBlock)
 
     if (validate(keyPair._2, puz, difficulty, ticket, rootHash)) {
-      log.info("New valid ticket created. Current score:" + transactionModule.history.asInstanceOf[BlockChain].score())
       val timestamp = NTP.correctedTime()
       val consensusData = PermaLikeConsensusBlockData(difficulty, puz, ticket)
 
@@ -91,7 +90,6 @@ class PermaConsensusModule(rootHash: Array[Byte])
         account)))
 
     } else {
-      log.info("Invalid ticket created. Current score:" + transactionModule.history.asInstanceOf[BlockChain].score())
       Future(None)
     }
   }.recoverWith { case t: Throwable =>
@@ -183,7 +181,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
   }
 
   //TODO implement
-  private def calcDifficulty(lastBlock: Block): Long = {
+  private def calcDifficulty(lastBlock: Block): BigInt = {
     InitialDifficulty
   }
 
