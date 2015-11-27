@@ -5,7 +5,8 @@ import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
 import scorex.crypto.SigningFunctions._
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.crypto.{CryptographicHash, EllipticCurveImpl, Sha256}
+import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.CryptographicHash.Digest
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.storage.Storage
@@ -19,13 +20,14 @@ import scala.util.Try
 /**
   * Data and functions related to a consensus algo
   */
-class PermaConsensusModule(rootHash: Array[Byte], hash: CryptographicHash = Sha256)
+class PermaConsensusModule(rootHash: Array[Byte])
                           (implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ConsensusModule[PermaLikeConsensusBlockData] with ScorexLogging {
 
   val InitialDifficulty = BigInt(Array.fill(32)(1: Byte)).toLong
   val GenesisCreator = new PublicKeyAccount(Array())
   val Version: Byte = 1
+  val hash = Constants.hash
 
   implicit val consensusModule: ConsensusModule[PermaLikeConsensusBlockData] = this
 
@@ -116,7 +118,7 @@ class PermaConsensusModule(rootHash: Array[Byte], hash: CryptographicHash = Sha2
                        puz: Array[Byte],
                        difficulty: BigInt,
                        t: Ticket,
-                       rootHash: CryptographicHash.Digest): Boolean = Try {
+                       rootHash: Digest): Boolean = Try {
     val proofs = t.proofs
     require(proofs.size == Constants.k)
 
@@ -129,7 +131,7 @@ class PermaConsensusModule(rootHash: Array[Byte], hash: CryptographicHash = Sha2
       val segment = proofs(i - 1).segment
 
       segment.check(ris(i - 1), rootHash)() || {
-        val hi = Sha256.hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
+        val hi = hash.hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
         EllipticCurveImpl.verify(sigs(i), hi, publicKey)
       }
     }
@@ -138,7 +140,7 @@ class PermaConsensusModule(rootHash: Array[Byte], hash: CryptographicHash = Sha2
 
   private def generatePuz(block: Block) = hash.hash(block.bytes)
 
-  private def ticketScore(t: Ticket): BigInt = BigInt(1, Sha256.hash(t.proofs.map(_.signature).reduce(_ ++ _)))
+  private def ticketScore(t: Ticket): BigInt = BigInt(1, hash.hash(t.proofs.map(_.signature).reduce(_ ++ _)))
 
   private def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Ticket = {
 
@@ -148,16 +150,16 @@ class PermaConsensusModule(rootHash: Array[Byte], hash: CryptographicHash = Sha2
     val s = randomBytes(32)
 
     val sig0 = NoSig
-    val r1 = u(publicKey, (BigInt(1, Sha256.hash(puz ++ publicKey ++ s)) % Constants.l).toInt)
+    val r1 = u(publicKey, (BigInt(1, hash.hash(puz ++ publicKey ++ s)) % Constants.l).toInt)
 
     val proofs: IndexedSeq[PartialProof] = 1.to(Constants.k).foldLeft(
       (r1, sig0, Seq[PartialProof]())
     ) {
       case ((ri, sig_prev, seq), _) =>
         val segment = authDataStorage.get(ri).get
-        val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segment.data)
+        val hi = hash.hash(puz ++ publicKey ++ sig_prev ++ segment.data)
         val sig = EllipticCurveImpl.sign(privateKey, hi)
-        val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Constants.l).toInt)
+        val r_next = u(publicKey, BigInt(1, hash.hash(puz ++ publicKey ++ sig)).mod(Constants.l).toInt)
 
         (r_next, sig, seq :+ PartialProof(sig, ri, segment))
     }._3.toIndexedSeq.ensuring(_.size == Constants.k)
@@ -167,7 +169,7 @@ class PermaConsensusModule(rootHash: Array[Byte], hash: CryptographicHash = Sha2
 
   //calculate index of i-th segment
   private def u(pubKey: PublicKey, i: Int): Long = {
-    val h = Sha256.hash(pubKey ++ BigInt(i).toByteArray)
+    val h = hash.hash(pubKey ++ BigInt(i).toByteArray)
     BigInt(1, h).mod(Constants.n).toLong
   }
 

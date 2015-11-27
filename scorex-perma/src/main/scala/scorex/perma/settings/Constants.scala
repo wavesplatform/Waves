@@ -23,7 +23,7 @@ object Constants extends ScorexLogging {
     case s: String if s.equalsIgnoreCase("sha256") =>
       Sha256
     case hashFunction =>
-      log.error(s"Unknown hash function: $hashFunction. Use Sha256 instead.")
+      log.warn(s"Unknown hash function: $hashFunction. Use Sha256 instead.")
       Sha256
   }
 
