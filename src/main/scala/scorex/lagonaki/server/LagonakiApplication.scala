@@ -1,6 +1,7 @@
 package scorex.lagonaki.server
 
-import java.io.File
+import java.io.{RandomAccessFile, File}
+import java.nio.file.{Paths, Files}
 
 import akka.actor.Props
 import akka.io.IO
@@ -11,7 +12,7 @@ import scorex.app.Application
 import scorex.consensus.LagonakiConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
-import scorex.crypto.ads.merkle.AuthDataBlock
+import scorex.crypto.ads.merkle.{MerkleTree, AuthDataBlock}
 import scorex.lagonaki.api.http.{PeersHttpService, PaymentApiRoute, ScorexApiRoute}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
@@ -19,8 +20,10 @@ import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.lagonaki.network.message._
 import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
 import scorex.perma.Storage.AuthDataStorage
+import scorex.perma.TestApp._
 import scorex.perma.consensus.PermaConsensusModule
 import scorex.perma.consensus.http.PermaConsensusApiRoute
+import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.storage.Storage
 import scorex.transaction.LagonakiTransaction.ValidationResult
@@ -49,10 +52,39 @@ class LagonakiApplication(val settingsFilename: String)
       case s: String if s.equalsIgnoreCase("qora") =>
         new QoraLikeConsensusModule
       case s: String if s.equalsIgnoreCase("perma") =>
+        val tree = if (Files.exists(Paths.get(settings.treeDir + "/tree0.mapDB"))) {
+          log.info("Get existing tree")
+          new MerkleTree(settings.treeDir, Constants.n, Constants.segmentSize, Constants.hash)
+        } else {
+          log.info("Generating random data set")
+          val treeDir = new File(settings.treeDir)
+          treeDir.mkdirs()
+          val datasetFile = settings.treeDir + "/data.file"
+          new RandomAccessFile(datasetFile, "rw").setLength(Constants.n * Constants.segmentSize)
+          log.info("Calculate tree")
+          val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, Constants.segmentSize, Constants.hash)
+          require(tree.nonEmptyBlocks == Constants.n, s"${tree.nonEmptyBlocks} == ${Constants.n}")
+          tree
+        }
+
+        log.info("Test tree")
+        val index = Constants.n - 3
+        val leaf = tree.byIndex(index).get
+        require(leaf.check(index, tree.rootHash)(Constants.hash))
+
+        log.info("Put ALL data to local storage")
         new File(settings.treeDir).mkdirs()
         val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
-        val rootHash = "".getBytes
-        new PermaConsensusModule(rootHash)(authDataStorage)
+        def addBlock(i: Long): Unit = {
+          authDataStorage.set(i, tree.byIndex(i).get)
+          if (i > 0) {
+            addBlock(i - 1)
+          }
+        }
+        addBlock(Constants.n - 1)
+
+        log.info("Create consensus module")
+        new PermaConsensusModule(tree.rootHash)(authDataStorage)
       case algo =>
         log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
         new NxtLikeConsensusModule
