@@ -6,11 +6,8 @@ import akka.actor.{Actor, ActorRef, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import scorex.app.Application
-import scorex.consensus.ConsensusModule
 import scorex.network.message.BasicMessagesRepo
 import scorex.network.peer.PeerManager
-import scorex.settings.Settings
-import scorex.transaction.TransactionModule
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -19,7 +16,7 @@ import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
 //must be singleton
-class NetworkController(application:Application) extends Actor with ScorexLogging {
+class NetworkController(application: Application) extends Actor with ScorexLogging {
 
   import NetworkController._
 
