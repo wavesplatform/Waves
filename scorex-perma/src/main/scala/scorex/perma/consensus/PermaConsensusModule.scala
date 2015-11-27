@@ -55,9 +55,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
     */
   def generators(block: Block): Seq[Account] = Seq(blockGenerator(block))
 
-  def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
-    ticketScore(block.consensusDataField.asInstanceOf[PermaConsensusBlockField].value.ticket)
-  }
+  def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = BigInt(1)
 
   def generateNextBlock[TT](account: PrivateKeyAccount)
                            (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = Try {
