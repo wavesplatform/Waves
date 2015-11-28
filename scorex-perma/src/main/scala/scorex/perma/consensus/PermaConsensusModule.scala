@@ -15,7 +15,7 @@ import scorex.utils._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Success, Try}
 
 /**
   * Data and functions related to a consensus algo
@@ -197,27 +197,22 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
   private def calcTarget(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val trans = transactionModule.history.asInstanceOf[BlockChain]
-    lazy val currentTarget = block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].target
-    trans.heightOf(block) match {
-      case Some(height) =>
-        if (height < TargetRecalculation + 1) {
-          InitialTarget
-        } else if (height % TargetRecalculation == 0) {
-          val lastBlocks = (0 until TargetRecalculation).flatMap(i => trans.blockAt(height - i)).reverse
-          require(lastBlocks.length == TargetRecalculation)
-          val lastAvgDuration: Long = (0 until TargetRecalculation - 1).map { i =>
-            lastBlocks(i + 1).timestampField.value - lastBlocks(i).timestampField.value
-          }.sum / (TargetRecalculation - 1)
-          val newTarget = currentTarget * lastAvgDuration / 1000 / AvgDelay
-          log.debug(s"Height: $height, target:$newTarget vs $currentTarget, lastAvgDuration:$lastAvgDuration")
-          newTarget
-        } else {
-          currentTarget
-        }
-      case None =>
-        log.warn(s"Enable to get height of block ${block.uniqueId}")
+    val currentTarget = block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].target
+    Try {
+      val height = trans.heightOf(block).get
+      if (height % TargetRecalculation == 0 && height > TargetRecalculation) {
+        val lastAvgDuration: BigInt = averageDelay(block, TargetRecalculation).get
+        val newTarget = currentTarget * lastAvgDuration / 1000 / AvgDelay
+        log.debug(s"Height: $height, target:$newTarget vs $currentTarget, lastAvgDuration:$lastAvgDuration")
+        newTarget
+      } else {
         currentTarget
-    }
+      }
+    }.recoverWith { case t: Throwable =>
+      log.error(s"Error when calculating target: ${t.getMessage}")
+      t.printStackTrace()
+      Success(currentTarget)
+    }.getOrElse(currentTarget)
   }
 
   private def log2(i: BigInt): BigInt = BigDecimal(math.log(i.doubleValue()) / math.log(2)).toBigInt()
