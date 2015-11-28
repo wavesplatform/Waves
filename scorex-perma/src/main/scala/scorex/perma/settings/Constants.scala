@@ -19,6 +19,12 @@ object Constants extends ScorexLogging {
 
   val k = permaConf.getInt("k") //number of iterations during scratch-off phase
 
+  val initialTarget = BigInt(permaConf.getString("initialTarget"))
+
+  val targetRecalculation = permaConf.getInt("targetRecalculation")
+
+  val averageDelay = permaConf.getInt("averageDelay")
+
   val hash = permaConf.getString("hash") match {
     case s: String if s.equalsIgnoreCase("sha256") =>
       Sha256
