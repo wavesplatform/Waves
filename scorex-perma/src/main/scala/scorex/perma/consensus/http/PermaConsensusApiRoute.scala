@@ -18,8 +18,38 @@ class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockchain: 
 
   override val route: Route =
     pathPrefix("consensus") {
-      algo
+      algo ~ target
     }
+
+  @Path("/target")
+  @ApiOperation(value = "Last target", notes = "Target of a last block", httpMethod = "GET")
+  def target = {
+    path("target") {
+      jsonRoute {
+        val lastBlock = blockchain.lastBlock
+        val bt = consensusModule.consensusBlockData(lastBlock).target
+        Json.obj("target" -> bt.toString).toString
+      }
+    }
+  }
+
+  @Path("/target/{blockId}")
+  @ApiOperation(value = "Target of selected block", notes = "Target of a block with specified id", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "String", paramType = "path")
+  ))
+  def baseTargetId = {
+    path("target" / Segment) { case encodedSignature =>
+      jsonRoute {
+        withBlock(blockchain, encodedSignature) { block =>
+          Json.obj(
+            "target" -> consensusModule.consensusBlockData(block).target.toString
+          )
+        }.toString
+      }
+    }
+  }
+
 
   @Path("/algo")
   @ApiOperation(value = "Consensus algo", notes = "Shows which consensus algo being using", httpMethod = "GET")
