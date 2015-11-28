@@ -20,20 +20,21 @@ class PeerConnectionHandler(application: Application,
 
   import PeerConnectionHandler._
 
-  private var best = false
+  //private var best = false
 
-  private lazy val settings = application.settings
-  private lazy val peerManager = new PeerManager(settings)
+  //private lazy val settings = application.settings
+  //private lazy val peerManager = new PeerManager(settings)
 
-  private implicit lazy val consensusModule = application.consensusModule
-  private implicit lazy val transactionModule = application.transactionModule
+  //private implicit lazy val consensusModule = application.consensusModule
+  //private implicit lazy val transactionModule = application.transactionModule
 
   private lazy val networkController = application.networkController
 
   context watch connection
 
-  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
+//  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
 
+  /*
   private def handleMessage(message: message.Message[_]) = {
     log.debug("Handling message: " + message)
     message match {
@@ -98,7 +99,7 @@ class PeerConnectionHandler(application: Application,
 
       case nonsense: Any => log.warn(s"PeerConnectionHandler: got something strange $nonsense")
     }
-  }
+  } */
 
   override def receive = {
 

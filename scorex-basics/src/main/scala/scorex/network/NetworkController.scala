@@ -15,6 +15,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
+
 //must be singleton
 class NetworkController(application: Application) extends Actor with ScorexLogging {
 
@@ -142,6 +143,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   }
 }
 
+
 object NetworkController {
 
   private case object CheckPeers
@@ -167,3 +169,41 @@ object NetworkController {
   case class BroadcastMessage(msg: message.Message[_], exceptOf: Seq[InetSocketAddress] = List())
 
 }
+
+
+trait SendingStrategy {
+
+}
+
+object SendToRandom extends SendingStrategy
+
+object Broadcast extends SendingStrategy
+
+
+case class Rule(sendingStrategy: SendingStrategy,
+                interaction: Interaction,
+                scheduler: Option[(FiniteDuration, FiniteDuration)]) //initial delay, delay
+
+//get peers
+
+trait NetworkApplicationLogic {
+
+  val peerManager: PeerManager
+
+  val peers: Seq[PeerConnectionHandler]
+
+  object peersExchange extends Rule(SendToRandom, PeersInteraction(peerManager), Some(1.second -> 3.seconds))
+
+  val rules: Seq[Rule] = Seq(peersExchange)
+}
+
+
+trait BlockchainApplicationLogic extends NetworkApplicationLogic {
+
+  object newBlock extends Rule(Broadcast, BlockInteraction, None)
+
+
+
+  override val rules = super.rules ++ Seq()
+}
+

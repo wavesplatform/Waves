@@ -14,10 +14,12 @@ import scala.util.{Failure, Success}
 
 case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 
-class BlockchainSyncer(application: Application, networkController: ActorRef) extends FSM[Status, Unit] {
+class BlockchainSyncer(application: Application) extends FSM[Status, Unit] {
 
-  implicit val consensusModule = application.consensusModule
-  implicit val transactionalModule = application.transactionModule
+  implicit lazy val consensusModule = application.consensusModule
+  implicit lazy val transactionalModule = application.transactionModule
+
+  lazy val networkController = application.networkController
 
   private val stateTimeout = 1.second
 
