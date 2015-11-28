@@ -25,10 +25,10 @@ class PermaConsensusModule(rootHash: Array[Byte])
                           (implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ConsensusModule[PermaLikeConsensusBlockData] with ScorexLogging {
 
-  val InitialDifficulty: BigInt = BigInt(Array.fill(36)(1: Byte))
-  val initialDifficultyPow: BigInt = log2(InitialDifficulty)
+  val InitialTarget = BigInt("108789072715742611466048832036162432282119640008661078894418176744671493285459")
+  val initialTargetPow: BigInt = log2(InitialTarget)
+  val TargetRecalculation = 10
   val AvgDelay = 2.seconds.toSeconds
-  val DifficultyRecalculation = 30
 
   val GenesisCreator = new PublicKeyAccount(Array())
   val Version: Byte = 1
@@ -47,9 +47,9 @@ class PermaConsensusModule(rootHash: Array[Byte])
       case Some(parent) =>
         lazy val publicKey = blockGenerator(block).publicKey
         lazy val puzIsValid = f.value.puz sameElements generatePuz(parent)
-        lazy val difficultyIsValid = f.value.difficulty == calcDifficulty(parent)
-        lazy val ticketIsValid = validate(publicKey, f.value.puz, f.value.difficulty, f.value.ticket, rootHash)
-        puzIsValid && difficultyIsValid && ticketIsValid
+        lazy val target = f.value.target == calcTarget(parent)
+        lazy val ticketIsValid = validate(publicKey, f.value.puz, f.value.target, f.value.ticket, rootHash)
+        puzIsValid && target && ticketIsValid
       case None =>
         true
     }
@@ -69,8 +69,8 @@ class PermaConsensusModule(rootHash: Array[Byte])
   def generators(block: Block): Seq[Account] = Seq(blockGenerator(block))
 
   def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
-    val score = initialDifficultyPow -
-      log2(block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].difficulty)
+    val score = initialTargetPow -
+      log2(block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].target)
     if (score > 0) score else 1
   }
 
@@ -82,11 +82,11 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
     val keyPair = (account.privateKey, account.publicKey)
     val ticket = generate(keyPair, puz)
-    val difficulty = calcDifficulty(parent)
+    val target = calcTarget(parent)
 
-    if (validate(keyPair._2, puz, difficulty, ticket, rootHash)) {
+    if (validate(keyPair._2, puz, target, ticket, rootHash)) {
       val timestamp = NTP.correctedTime()
-      val consensusData = PermaLikeConsensusBlockData(difficulty, puz, ticket)
+      val consensusData = PermaLikeConsensusBlockData(target, puz, ticket)
 
       Future(Some(Block.buildAndSign(Version,
         timestamp,
@@ -111,7 +111,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
   override def genesisData: PermaConsensusBlockField =
     PermaConsensusBlockField(PermaLikeConsensusBlockData(
-      InitialDifficulty,
+      InitialTarget,
       Array[Byte](),
       Ticket(GenesisCreator.publicKey, Array(), IndexedSeq())
     ))
@@ -124,7 +124,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
   //todo: validate r\i
   private def validate(publicKey: PublicKey,
                        puz: Array[Byte],
-                       difficulty: BigInt,
+                       target: BigInt,
                        t: Ticket,
                        rootHash: Digest): Boolean = Try {
     val proofs = t.proofs
@@ -143,7 +143,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
         EllipticCurveImpl.verify(sigs(i), hi, publicKey)
       }
     }
-    partialProofsCheck && (ticketScore(t) < difficulty)
+    partialProofsCheck && (ticketScore(t) < target)
   }.getOrElse(false)
 
   private def generatePuz(block: Block) = hash.hash(block.bytes)
@@ -186,28 +186,28 @@ class PermaConsensusModule(rootHash: Array[Byte])
     BigInt(1, h).mod(Constants.n).toLong
   }
 
-  private def calcDifficulty(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
+  private def calcTarget(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val trans = transactionModule.history.asInstanceOf[BlockChain]
-    lazy val currentDiff = block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].difficulty
+    lazy val currentTarget = block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].target
     trans.heightOf(block) match {
       case Some(height) =>
-        if (height < DifficultyRecalculation + 1) {
-          InitialDifficulty
-        } else if (height % DifficultyRecalculation == 0) {
-          val lastBlocks = (0 until DifficultyRecalculation).flatMap(i => trans.blockAt(height - i)).reverse
-          require(lastBlocks.length == DifficultyRecalculation)
-          val lastAvgDuration: Long = (0 until DifficultyRecalculation - 1).map { i =>
+        if (height < TargetRecalculation + 1) {
+          InitialTarget
+        } else if (height % TargetRecalculation == 0) {
+          val lastBlocks = (0 until TargetRecalculation).flatMap(i => trans.blockAt(height - i)).reverse
+          require(lastBlocks.length == TargetRecalculation)
+          val lastAvgDuration: Long = (0 until TargetRecalculation - 1).map { i =>
             lastBlocks(i + 1).timestampField.value - lastBlocks(i).timestampField.value
-          }.sum / (DifficultyRecalculation - 1)
-          val newDiff = currentDiff * lastAvgDuration / 1000 / AvgDelay
-          log.debug(s"Height: $height, newDiff: $newDiff, currentDiff:$currentDiff, lastAvgDuration:$lastAvgDuration")
-          newDiff
+          }.sum / (TargetRecalculation - 1)
+          val newTarget = currentTarget * lastAvgDuration / 1000 / AvgDelay
+          log.debug(s"Height: $height, target:$newTarget vs $currentTarget, lastAvgDuration:$lastAvgDuration")
+          newTarget
         } else {
-          currentDiff
+          currentTarget
         }
       case None =>
         log.warn(s"Enable to get height of block ${block.uniqueId}")
-        currentDiff
+        currentTarget
     }
   }
 

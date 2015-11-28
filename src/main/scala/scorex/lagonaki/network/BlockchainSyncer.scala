@@ -19,7 +19,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
 
   private val stateTimeout = 1.second
   //TODO get from config
-  val blockGenerationDelay = 10.millis
+  val blockGenerationDelay = 1.hour
 
   startWith(Offline, Unit)
 

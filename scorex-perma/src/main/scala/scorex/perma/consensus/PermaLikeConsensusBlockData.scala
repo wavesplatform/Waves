@@ -3,7 +3,7 @@ package scorex.perma.consensus
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class PermaLikeConsensusBlockData(difficulty: BigInt, puz: Array[Byte], ticket: Ticket)
+case class PermaLikeConsensusBlockData(target: BigInt, puz: Array[Byte], ticket: Ticket)
 
 object PermaLikeConsensusBlockData {
   implicit val bigIntWrites = new Writes[BigInt] {

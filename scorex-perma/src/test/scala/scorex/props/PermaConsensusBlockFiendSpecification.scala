@@ -41,7 +41,7 @@ class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks
   }
 
   def checkAll(initialBlock: PermaConsensusBlockField, parsedBlock: PermaConsensusBlockField): Unit = {
-    parsedBlock.value.difficulty shouldBe initialBlock.value.difficulty
+    parsedBlock.value.target shouldBe initialBlock.value.target
     assert(parsedBlock.value.puz sameElements initialBlock.value.puz)
     assert(parsedBlock.value.ticket.publicKey sameElements initialBlock.value.ticket.publicKey)
     assert(parsedBlock.value.ticket.s sameElements initialBlock.value.ticket.s)
