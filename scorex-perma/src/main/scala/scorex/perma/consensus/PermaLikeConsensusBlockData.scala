@@ -10,13 +10,13 @@ object PermaLikeConsensusBlockData extends JsonSerialization {
 
   implicit val writes: Writes[PermaLikeConsensusBlockData] = (
     (JsPath \ "difficulty").write[BigInt] and
-      (JsPath \ "puz").write[Array[Byte]] and
+      (JsPath \ "puz").write[Bytes] and
       (JsPath \ "ticket").write[Ticket]
     ) (unlift(PermaLikeConsensusBlockData.unapply))
 
   implicit val reads: Reads[PermaLikeConsensusBlockData] = (
     (JsPath \ "difficulty").read[BigInt] and
-      (JsPath \ "puz").read[Array[Byte]] and
+      (JsPath \ "puz").read[Bytes] and
       (JsPath \ "ticket").read[Ticket]
     ) (PermaLikeConsensusBlockData.apply _)
 
