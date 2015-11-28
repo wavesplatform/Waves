@@ -47,9 +47,17 @@ class PermaConsensusModule(rootHash: Array[Byte])
       case Some(parent) =>
         lazy val publicKey = blockGenerator(block).publicKey
         lazy val puzIsValid = f.value.puz sameElements generatePuz(parent)
-        lazy val target = f.value.target == calcTarget(parent)
+        lazy val targetIsValid = f.value.target == calcTarget(parent)
         lazy val ticketIsValid = validate(publicKey, f.value.puz, f.value.target, f.value.ticket, rootHash)
-        puzIsValid && target && ticketIsValid
+        if (puzIsValid && targetIsValid && ticketIsValid)
+          true
+        else {
+          log.debug(
+            s"Non-valid block: puzIsValid=$puzIsValid, targetIsValid=$targetIsValid && ticketIsValid=$ticketIsValid"
+          )
+          false
+        }
+
       case None =>
         true
     }

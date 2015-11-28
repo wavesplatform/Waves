@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, FSM}
 import scorex.block.Block
+import scorex.crypto.EllipticCurveImpl
 import scorex.lagonaki.network.BlockchainSyncer._
 import scorex.lagonaki.network.message.{BlockMessage, GetSignaturesMessage}
 import scorex.lagonaki.server.LagonakiApplication
