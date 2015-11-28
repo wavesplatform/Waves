@@ -21,7 +21,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.google.guava" % "guava" % "15.0",
   "com.thoughtworks.paranamer" % "paranamer" % "2.6",
   "com.typesafe" % "config" % "1.3.0",
-  "com.typesafe.akka" % "akka-actor_2.11" % "2.4.0",
+  "com.typesafe.akka" % "akka-actor_2.11" % "2.4.1",
   "com.typesafe.akka" % "akka-testkit_2.11" % "2.3.9",
   "com.typesafe.play" % "play-datacommons_2.11" % "2.4.4",
   "com.typesafe.play" % "play-functional_2.11" % "2.4.4",
@@ -60,4 +60,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.slf4j" % "slf4j-api" % "1.7.7",
   "org.whispersystems" % "curve25519-java" % "0.2.4"
 )
-// LIBRARY_DEPENDENCIES_HASH 1f76c25b6a9ee24549380d7d2c54980d568d3919
+// LIBRARY_DEPENDENCIES_HASH 2c4136cc7cf36dbf51d6526b95d4108981b4f155
