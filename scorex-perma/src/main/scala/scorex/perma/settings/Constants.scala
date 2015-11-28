@@ -21,9 +21,9 @@ object Constants extends ScorexLogging {
 
   val initialTarget = BigInt(permaConf.getString("initialTarget"))
 
-  val targetRecalculation = permaConf.getInt("targetRecalculation")
+  val targetRecalculation = permaConf.getInt("targetRecalculation") //recalculate target every targetRecalculation blocks
 
-  val averageDelay = permaConf.getInt("averageDelay")
+  val averageDelay = permaConf.getInt("averageDelay") //average delay between blocks in seconds
 
   val hash = permaConf.getString("hash") match {
     case s: String if s.equalsIgnoreCase("sha256") =>

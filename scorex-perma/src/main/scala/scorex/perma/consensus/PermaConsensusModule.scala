@@ -15,7 +15,6 @@ import scorex.utils._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.util.Try
 
 /**
@@ -30,6 +29,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
   val TargetRecalculation = Constants.targetRecalculation
   val AvgDelay = Constants.averageDelay
   val Hash = Constants.hash
+  val SSize = Hash.ValueSize
 
   val GenesisCreator = new PublicKeyAccount(Array())
   val Version: Byte = 1
@@ -129,6 +129,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
                        rootHash: Digest): Boolean = Try {
     val proofs = t.proofs
     require(proofs.size == Constants.k)
+    require(t.s.length <= SSize)
 
     //Local-POR lottery verification
 
@@ -160,7 +161,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
     val (privateKey, publicKey) = keyPair
 
     //scratch-off for the Local-POR lottery
-    val s = randomBytes(32)
+    val s = randomBytes(SSize)
 
     val sig0 = NoSig
     val r1 = u(publicKey, (BigInt(1, Hash.hash(puz ++ publicKey ++ s)) % Constants.l).toInt)
