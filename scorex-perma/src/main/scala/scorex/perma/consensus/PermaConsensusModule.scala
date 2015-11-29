@@ -30,8 +30,9 @@ class PermaConsensusModule(rootHash: Array[Byte])
   val AvgDelay = Constants.averageDelay
   val Hash = Constants.hash
   val SSize = Hash.ValueSize
+  require(SSize == PermaConsensusBlockField.SLength)
 
-  val GenesisCreator = new PublicKeyAccount(Array())
+  val GenesisCreator = new PublicKeyAccount(Array.fill(PermaConsensusBlockField.PublicKeyLength)(0: Byte))
   val Version: Byte = 1
 
   implicit val consensusModule: ConsensusModule[PermaLikeConsensusBlockData] = this
@@ -120,8 +121,8 @@ class PermaConsensusModule(rootHash: Array[Byte])
   override def genesisData: PermaConsensusBlockField =
     PermaConsensusBlockField(PermaLikeConsensusBlockData(
       InitialTarget,
-      Array[Byte](),
-      Ticket(GenesisCreator.publicKey, Array(), IndexedSeq())
+      Array.fill(PermaConsensusBlockField.PuzLength)(0: Byte),
+      Ticket(GenesisCreator.publicKey, Array.fill(PermaConsensusBlockField.SLength)(0: Byte), IndexedSeq())
     ))
 
   override def formBlockData(data: PermaLikeConsensusBlockData): BlockField[PermaLikeConsensusBlockData] =
@@ -139,7 +140,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
                        rootHash: Digest): Boolean = Try {
     val proofs = t.proofs
     require(proofs.size == Constants.k)
-    require(t.s.length <= SSize)
+    require(t.s.length == SSize)
 
     //Local-POR lottery verification
 
