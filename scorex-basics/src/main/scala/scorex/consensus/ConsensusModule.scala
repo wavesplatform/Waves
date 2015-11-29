@@ -2,11 +2,10 @@ package scorex.consensus
 
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockProcessingModule}
-import scorex.transaction.{BlockChain, TransactionModule}
+import scorex.transaction.TransactionModule
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.Try
 
 
 trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[ConsensusBlockData] {
@@ -38,19 +37,5 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
   }
 
   def consensusBlockData(block: Block): ConsensusBlockData
-
-  /**
-    * Average delay between last $blockNum blocks starting from $block
-    */
-  def averageDelay(block: Block, blockNum: Int)
-                  (implicit transactionModule: TransactionModule[_]): Try[Long] = Try {
-    val trans = transactionModule.history.asInstanceOf[BlockChain]
-    val height: Int = trans.heightOf(block).get
-    val lastBlocks = (0 until blockNum).flatMap(i => trans.blockAt(height - i)).reverse
-    require(lastBlocks.length == blockNum)
-    (0 until blockNum - 1).map { i =>
-      lastBlocks(i + 1).timestampField.value - lastBlocks(i).timestampField.value
-    }.sum / (blockNum - 1)
-  }
 
 }

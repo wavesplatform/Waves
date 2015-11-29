@@ -201,7 +201,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
     Try {
       val height = trans.heightOf(block).get
       if (height % TargetRecalculation == 0 && height > TargetRecalculation) {
-        val lastAvgDuration: BigInt = averageDelay(block, TargetRecalculation).get
+        val lastAvgDuration: BigInt = trans.averageDelay(block, TargetRecalculation).get
         val newTarget = currentTarget * lastAvgDuration / 1000 / AvgDelay
         log.debug(s"Height: $height, target:$newTarget vs $currentTarget, lastAvgDuration:$lastAvgDuration")
         newTarget
