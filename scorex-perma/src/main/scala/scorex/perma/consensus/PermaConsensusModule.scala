@@ -127,6 +127,8 @@ class PermaConsensusModule(rootHash: Array[Byte])
   override def formBlockData(data: PermaLikeConsensusBlockData): BlockField[PermaLikeConsensusBlockData] =
     PermaConsensusBlockField(data)
 
+  def generatePuz(block: Block) = Hash.hash(block.bytes)
+
   private val NoSig = Array[Byte]()
 
   //todo: validate r\i
@@ -154,8 +156,6 @@ class PermaConsensusModule(rootHash: Array[Byte])
     }
     partialProofsCheck && (ticketScore(t) < target)
   }.getOrElse(false)
-
-  private def generatePuz(block: Block) = Hash.hash(block.bytes)
 
   private def ticketScore(t: Ticket): BigInt = if (t.proofs.nonEmpty) {
     BigInt(1, Hash.hash(t.proofs.map(_.signature).reduce(_ ++ _)))

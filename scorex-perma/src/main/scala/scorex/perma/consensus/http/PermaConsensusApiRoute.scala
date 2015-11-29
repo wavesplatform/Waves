@@ -6,6 +6,7 @@ import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
+import scorex.crypto.Base58
 import scorex.perma.consensus.PermaConsensusModule
 import scorex.transaction.BlockChain
 import spray.routing.Route
@@ -18,7 +19,7 @@ class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockchain: 
 
   override val route: Route =
     pathPrefix("consensus") {
-      algo ~ target
+      algo ~ target ~ targetId ~ puz ~ puzId
     }
 
   @Path("/target")
@@ -26,9 +27,7 @@ class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockchain: 
   def target = {
     path("target") {
       jsonRoute {
-        val lastBlock = blockchain.lastBlock
-        val bt = consensusModule.consensusBlockData(lastBlock).target
-        Json.obj("target" -> bt.toString).toString
+        Json.obj("target" -> consensusModule.consensusBlockData(blockchain.lastBlock).target.toString).toString
       }
     }
   }
@@ -38,12 +37,39 @@ class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockchain: 
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "String", paramType = "path")
   ))
-  def baseTargetId = {
+  def targetId = {
     path("target" / Segment) { case encodedSignature =>
       jsonRoute {
         withBlock(blockchain, encodedSignature) { block =>
           Json.obj(
             "target" -> consensusModule.consensusBlockData(block).target.toString
+          )
+        }.toString
+      }
+    }
+  }
+
+  @Path("/puz")
+  @ApiOperation(value = "Current puzzle", notes = "Current puzzle", httpMethod = "GET")
+  def puz = {
+    path("puz") {
+      jsonRoute {
+        Json.obj("puz" -> Base58.encode(consensusModule.generatePuz(blockchain.lastBlock))).toString
+      }
+    }
+  }
+
+  @Path("/puz/{blockId}")
+  @ApiOperation(value = "Puzzle of selected block", notes = "Puzzle of a block with specified id", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "String", paramType = "path")
+  ))
+  def puzId = {
+    path("puz" / Segment) { case encodedSignature =>
+      jsonRoute {
+        withBlock(blockchain, encodedSignature) { block =>
+          Json.obj(
+            "puz" -> Base58.encode(consensusModule.consensusBlockData(block).puz)
           )
         }.toString
       }
