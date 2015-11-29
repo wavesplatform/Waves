@@ -16,7 +16,7 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
 
   override lazy val route =
     pathPrefix("blocks") {
-      signature ~ first ~ last ~ at ~ height ~ heightEncoded ~ child ~ address
+      signature ~ first ~ last ~ at ~ height ~ heightEncoded ~ child ~ address ~ delay
     }
 
   @Path("/address/{address}")
@@ -45,6 +45,26 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
         withBlock(blockchain, encodedSignature) { block =>
           blockchain.children(block).head.json
         }.toString()
+      }
+    }
+  }
+
+  @Path("/delay/{height}/{blockNum}")
+  @ApiOperation(value = "Average delay", notes = "Average delay in milliseconds between last $blockNum blocks starting from $height", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "height", value = "Height of block", required = true, dataType = "String", paramType = "path"),
+    new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "String", paramType = "path")
+  ))
+  def delay: Route = {
+    path("delay" / IntNumber / IntNumber) { case (height, count) =>
+      jsonRoute {
+        blockchain.blockAt(height) match {
+          case Some(block) =>
+            blockchain.averageDelay(block, count).map(d => Json.obj("delay" -> d))
+              .getOrElse(Json.obj("status" -> "error", "details" -> "Internal error")).toString
+          case None =>
+            Json.obj("status" -> "error", "details" -> "No block for this height").toString()
+        }
       }
     }
   }

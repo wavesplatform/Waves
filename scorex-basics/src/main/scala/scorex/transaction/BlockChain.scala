@@ -31,7 +31,7 @@ trait BlockChain extends History with ScorexLogging {
   }
 
   /**
-    * Average delay between last $blockNum blocks starting from $block
+    * Average delay in milliseconds between last $blockNum blocks starting from $block
     */
   def averageDelay(block: Block, blockNum: Int): Try[Long] = Try {
     val height: Int = heightOf(block).get
