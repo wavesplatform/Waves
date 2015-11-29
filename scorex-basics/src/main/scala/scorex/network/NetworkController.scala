@@ -23,11 +23,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   private implicit val system = context.system
 
-  private lazy val settings = application.settings
-  private lazy val transModule = application.transactionModule
-
-  private lazy val peerManager = new PeerManager(settings)
-
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerData]()
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
 
@@ -143,6 +138,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   }
 }
 
+case class PeerData(peer: PeerConnectionHandler, blockchainScore: Option[BigInt])
 
 object NetworkController {
 
@@ -156,8 +152,6 @@ object NetworkController {
 
   case object GetMaxBlockchainScore
 
-  case class PeerData(handler: ActorRef, blockchainScore: Option[BigInt])
-
   case class PeerDisconnected(address: InetSocketAddress)
 
   case class UpdateBlockchainScore(remote: InetSocketAddress, height: Int, score: BigInt)
@@ -167,17 +161,8 @@ object NetworkController {
   case class SendMessageToRandomPeer(msg: message.Message[_])
 
   case class BroadcastMessage(msg: message.Message[_], exceptOf: Seq[InetSocketAddress] = List())
-
 }
 
-
-trait SendingStrategy {
-
-}
-
-object SendToRandom extends SendingStrategy
-
-object Broadcast extends SendingStrategy
 
 
 case class Rule(sendingStrategy: SendingStrategy,
@@ -202,7 +187,7 @@ trait BlockchainApplicationLogic extends NetworkApplicationLogic {
 
   object newBlock extends Rule(Broadcast, BlockInteraction, None)
 
-
+  //object bestExtension extends Rule(BestPeer, SignaturesInteraction, None)
 
   override val rules = super.rules ++ Seq()
 }

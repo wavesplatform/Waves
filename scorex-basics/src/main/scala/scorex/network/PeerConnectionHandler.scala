@@ -20,14 +20,6 @@ class PeerConnectionHandler(application: Application,
 
   import PeerConnectionHandler._
 
-  //private var best = false
-
-  //private lazy val settings = application.settings
-  //private lazy val peerManager = new PeerManager(settings)
-
-  //private implicit lazy val consensusModule = application.consensusModule
-  //private implicit lazy val transactionModule = application.transactionModule
-
   private lazy val networkController = application.networkController
 
   context watch connection
@@ -103,8 +95,8 @@ class PeerConnectionHandler(application: Application,
 
   override def receive = {
 
-    case SendBlockchainScore =>
-      self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score())
+//    case SendBlockchainScore =>
+//      self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score())
 
     case msg: message.Message =>
       self ! ByteString(msg.bytes)
@@ -143,8 +135,6 @@ class PeerConnectionHandler(application: Application,
     //  PeerManager.blacklistPeer(remote)
     //  connection ! Close
 
-    case BestPeer(peer, betterThanLocal) => best = betterThanLocal && (peer == remote)
-
     case nonsense: Any => log.warn(s"Strange input: $nonsense")
   }
 }
@@ -156,6 +146,4 @@ object PeerConnectionHandler {
   case object CloseConnection
 
   case object Blacklist
-
-  case class BestPeer(remote: InetSocketAddress, betterThanLocal: Boolean)
 }
