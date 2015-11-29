@@ -32,7 +32,7 @@ trait BlockChain extends History with ScorexLogging {
 
   def removeAfter(signature: Block.BlockId) = while (!lastSignature().sameElements(signature)) discardBlock()
 
-  def score() =
+  def score(): History.BlockchainScore =
     (1 to height()).foldLeft(0: BigInt) { case (sc, h) =>
       sc + blockAt(h).map { bl: Block =>
         bl.consensusModule.blockScore(bl)(bl.transactionModule)
