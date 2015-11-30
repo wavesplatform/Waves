@@ -6,6 +6,8 @@ import scorex.block.BlockField
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.perma.settings.Constants
 
+import scala.annotation.tailrec
+
 case class PermaConsensusBlockField(override val value: PermaLikeConsensusBlockData)
   extends BlockField[PermaLikeConsensusBlockData] {
 
@@ -41,16 +43,41 @@ object PermaConsensusBlockField {
   val PublicKeyLength = 32
   val SLength = 32
   val HashLength = 32
-  val DigestLength = 32
   val SignatureLength = 64
-  //TODO FIX FOR non-first proof
-  val SingleProofSize = 0
 
   def parse(bytes: Array[Byte]): PermaConsensusBlockField = {
+    @tailrec
+    def parseProofs(from: Int, total: Int, current: Int, acc: IndexedSeq[PartialProof]): IndexedSeq[PartialProof] = {
+      if (current < total) {
+        val proofsStart = from
+        val signatureStart = proofsStart + SignatureLength
+        val dataStart = signatureStart + 8
+        val merklePathStart = dataStart + Constants.segmentSize
+
+        val signature = bytes.slice(proofsStart, proofsStart + SignatureLength)
+        val signatureIndex = Longs.fromByteArray(bytes.slice(signatureStart, signatureStart + 8))
+        val blockData = bytes.slice(dataStart, dataStart + Constants.segmentSize)
+        val merklePathSize = Ints.fromByteArray(bytes.slice(merklePathStart, merklePathStart + 4))
+        val merklePath = (0 until merklePathSize).map { i =>
+          bytes.slice(merklePathStart + 4 + i * HashLength, merklePathStart + 4 + (i + 1) * HashLength)
+        }
+        parseProofs(
+          merklePathStart + 4 + merklePathSize * HashLength,
+          total,
+          current + 1,
+          PartialProof(signature, signatureIndex, AuthDataBlock(blockData, merklePath)) +: acc
+        )
+      } else {
+        acc.reverse
+      }
+    }
+
+
     val targetSize = Ints.fromByteArray(bytes.take(4))
     val targetLength = 4 + targetSize
     val proofsSize = Ints.fromByteArray(bytes.slice(
       PuzLength + targetLength + PublicKeyLength + SLength, PuzLength + targetLength + PublicKeyLength + SLength + 4))
+
 
     PermaConsensusBlockField(PermaLikeConsensusBlockData(
       BigInt(bytes.slice(4, targetLength)),
@@ -58,21 +85,7 @@ object PermaConsensusBlockField {
       Ticket(
         bytes.slice(PuzLength + targetLength, PuzLength + targetLength + PublicKeyLength),
         bytes.slice(PuzLength + targetLength + PublicKeyLength, PuzLength + targetLength + PublicKeyLength + SLength),
-        (0 until proofsSize).map { i =>
-          val proofsStart = PuzLength + targetLength + PublicKeyLength + SLength + 4 + i * SingleProofSize
-          val signatureStart = proofsStart + SignatureLength
-          val dataStart = signatureStart + 8
-          val merklePathStart = dataStart + Constants.segmentSize
-
-          val signature = bytes.slice(proofsStart, proofsStart + SignatureLength)
-          val signatureIndex = Longs.fromByteArray(bytes.slice(signatureStart, signatureStart + 8))
-          val blockData = bytes.slice(dataStart, dataStart + Constants.segmentSize)
-          val merklePathSize = Ints.fromByteArray(bytes.slice(merklePathStart, merklePathStart + 4))
-          val merklePath = (0 until merklePathSize).map { i =>
-            bytes.slice(merklePathStart + 4 + i * DigestLength, merklePathStart + 4 + (i + 1) * DigestLength)
-          }
-          PartialProof(signature, signatureIndex, AuthDataBlock(blockData, merklePath))
-        }
+        parseProofs(PuzLength + targetLength + PublicKeyLength + SLength + 4, proofsSize, 0, IndexedSeq.empty)
       )
     ))
   }
