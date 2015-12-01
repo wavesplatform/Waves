@@ -21,5 +21,4 @@ object PartialProof extends JsonSerialization {
       (JsPath \ "segmentIndex").read[Long] and
       (JsPath \ "segment").read[AuthDataBlock[DataSegment]]
     ) (PartialProof.apply _)
-
 }

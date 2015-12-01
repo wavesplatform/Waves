@@ -37,5 +37,4 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
   }
 
   def consensusBlockData(block: Block): ConsensusBlockData
-
 }

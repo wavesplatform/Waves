@@ -13,12 +13,12 @@ import scala.annotation.tailrec
   */
 case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
 
-  def check[Hash <: CryptographicHash](index: Position, rootHash: Digest)
-                                      (hashFunction: Hash = Sha256): Boolean = {
+  def check[HashImpl <: CryptographicHash](index: Position, rootHash: Digest)
+                                      (hashFunction: HashImpl = Sha256): Boolean = {
 
     @tailrec
-    def calculateHash(i: Position, nodeHash: Digest, path: Seq[Digest]): Digest = {
-      val hash = if (i % 2 == 0)
+    def calculateHash(idx: Position, nodeHash: Digest, path: Seq[Digest]): Digest = {
+      val hash = if (idx % 2 == 0)
         hashFunction.hash(nodeHash ++ path.head)
       else
         hashFunction.hash(path.head ++ nodeHash)
@@ -26,7 +26,7 @@ case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
       if (path.size == 1)
         hash
       else
-        calculateHash(i / 2, hash, path.tail)
+        calculateHash(idx / 2, hash, path.tail)
     }
 
     if (merklePath.nonEmpty)
@@ -69,6 +69,5 @@ object AuthDataBlock {
       )
     ))
   }
-
 }
 

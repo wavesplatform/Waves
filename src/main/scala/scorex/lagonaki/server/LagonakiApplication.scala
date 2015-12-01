@@ -106,8 +106,6 @@ class LagonakiApplication(val settingsFilename: String)
       new QoraConsensusApiRoute(qcm, blockchainImpl)
     case pcm: PermaConsensusModule =>
       new PermaConsensusApiRoute(pcm, blockchainImpl)
-
-
   }
 
   override lazy val apiRoutes = Seq(
