@@ -4,10 +4,10 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, FSM}
 import scorex.block.Block
-import scorex.crypto.EllipticCurveImpl
 import scorex.lagonaki.network.BlockchainSyncer._
 import scorex.lagonaki.network.message.{BlockMessage, GetSignaturesMessage}
 import scorex.lagonaki.server.LagonakiApplication
+import scorex.settings.Settings
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -16,11 +16,11 @@ import scala.util.{Failure, Success}
 
 case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 
-class BlockchainSyncer(application: LagonakiApplication, networkController: ActorRef) extends FSM[Status, Unit] {
+class BlockchainSyncer(application: LagonakiApplication, networkController: ActorRef, settings: Settings)
+  extends FSM[Status, Unit] {
 
   private val stateTimeout = 1.second
-  //TODO get from config
-  val blockGenerationDelay = 1.hour
+  val blockGenerationDelay = settings.blockGenerationDelay
 
   startWith(Offline, Unit)
 
@@ -130,7 +130,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
     val consModule = application.consensusModule
     implicit val transModule = application.transactionModule
 
-    log.info("Trying to generate a new block")
+//    log.info("Trying to generate a new block")
     val accounts = application.wallet.privateKeyAccounts()
     consModule.generateNextBlocks(accounts)(transModule) onComplete {
       case Success(blocks: Seq[Block]) =>

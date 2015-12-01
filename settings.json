@@ -1,18 +1,19 @@
 {
-  "bindAddress" : "127.0.0.1",
-  "knownpeers":[
+  "bindAddress": "127.0.0.1",
+  "knownpeers": [
     "5.9.86.168"
   ],
-  "walletdir" : "/tmp/scorex/wallet",
-  "walletpassword" : "cookies",
-  "walletseed" : "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
-  "datadir" : "/tmp/scorex/data",
+  "walletdir": "/tmp/scorex/wallet",
+  "walletpassword": "cookies",
+  "walletseed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
+  "datadir": "/tmp/scorex/data",
   "minconnections": 10,
-  "rpcport" : 9085,
-  "rpcallowed":[
+  "rpcport": 9085,
+  "rpcallowed": [
     "127.0.0.1",
     "123.123.123.123"
   ],
-  "max-rollback" : 100,
-  "offline-generation" : true
+  "max-rollback": 100,
+  "blockGenerationDelay": 0,
+  "offline-generation": true
 }
