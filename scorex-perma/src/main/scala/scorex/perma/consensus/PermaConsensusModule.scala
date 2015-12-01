@@ -29,7 +29,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
   val TargetRecalculation = Constants.targetRecalculation
   val AvgDelay = Constants.averageDelay
   val Hash = Constants.hash
-  val SSize = Hash.ValueSize
+  val SSize = Hash.DigestSize
   require(SSize == PermaConsensusBlockField.SLength)
 
   val GenesisCreator = new PublicKeyAccount(Array.fill(PermaConsensusBlockField.PublicKeyLength)(0: Byte))

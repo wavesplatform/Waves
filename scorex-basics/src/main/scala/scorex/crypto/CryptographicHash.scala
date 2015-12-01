@@ -21,7 +21,7 @@ import java.security.MessageDigest
 trait CryptographicHash {
   import CryptographicHash._
 
-  val ValueSize: Int //in bytes
+  val DigestSize: Int //in bytes
 
   def hash(input: Message): Digest
 
@@ -39,7 +39,7 @@ object CryptographicHash {
  * Hashing functions implementation with sha256 impl from Java SDK
  */
 object Sha256 extends CryptographicHash {
-  override val ValueSize = 32
+  override val DigestSize = 32
 
   override def hash(input: Array[Byte]) = MessageDigest.getInstance("SHA-256").digest(input)
 }

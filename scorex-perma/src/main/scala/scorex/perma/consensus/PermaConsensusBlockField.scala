@@ -3,7 +3,7 @@ package scorex.perma.consensus
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json._
 import scorex.block.BlockField
-import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.{Sha256, EllipticCurveImpl}
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.perma.settings.Constants
 
@@ -43,8 +43,8 @@ object PermaConsensusBlockField {
   val PuzLength = 32
   val PublicKeyLength = EllipticCurveImpl.KeyLength
   val SLength = 32
-  val HashLength = 32
-  val SignatureLength = 64
+  val HashLength = Sha256.DigestSize
+  val SignatureLength = EllipticCurveImpl.SignatureLength
 
   def parse(bytes: Array[Byte]): PermaConsensusBlockField = {
     @tailrec
@@ -73,12 +73,10 @@ object PermaConsensusBlockField {
       }
     }
 
-
     val targetSize = Ints.fromByteArray(bytes.take(4))
     val targetLength = 4 + targetSize
     val proofsSize = Ints.fromByteArray(bytes.slice(
       PuzLength + targetLength + PublicKeyLength + SLength, PuzLength + targetLength + PublicKeyLength + SLength + 4))
-
 
     PermaConsensusBlockField(PermaLikeConsensusBlockData(
       BigInt(bytes.slice(4, targetLength)),
