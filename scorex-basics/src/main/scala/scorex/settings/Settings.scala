@@ -6,17 +6,18 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.Base58
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.duration._
 import scala.util.Try
 
 /**
- * Settings
- */
+  * Settings
+  */
 
 trait Settings extends ScorexLogging {
 
   lazy val Port = 9084
 
-  val filename:String
+  val filename: String
 
   lazy val settingsJSON: JsObject = Try {
     val jsonString = scala.io.Source.fromFile(filename).mkString
@@ -53,6 +54,8 @@ trait Settings extends ScorexLogging {
   lazy val pingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DefaultPingInterval)
   lazy val offlineGeneration = (settingsJSON \ "offline-generation").asOpt[Boolean].getOrElse(false)
   lazy val bindAddress = (settingsJSON \ "bindAddress").asOpt[String].getOrElse(DefaultBindAddress)
+  lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
+    .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)
 
   lazy val walletDirOpt = (settingsJSON \ "walletdir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
@@ -72,4 +75,7 @@ trait Settings extends ScorexLogging {
   //API
   private val DefaultRpcPort = 9085
   private val DefaultRpcAllowed = "127.0.0.1"
+
+  private val DefaultBlockGenerationDelay: FiniteDuration = 1.second
+
 }

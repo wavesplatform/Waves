@@ -7,6 +7,7 @@ import scorex.block.Block
 import scorex.lagonaki.network.BlockchainSyncer._
 import scorex.lagonaki.network.message.{BlockMessage, GetSignaturesMessage}
 import scorex.lagonaki.server.LagonakiApplication
+import scorex.settings.Settings
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -15,9 +16,11 @@ import scala.util.{Failure, Success}
 
 case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 
-class BlockchainSyncer(application: LagonakiApplication, networkController: ActorRef) extends FSM[Status, Unit] {
+class BlockchainSyncer(application: LagonakiApplication, networkController: ActorRef, settings: Settings)
+  extends FSM[Status, Unit] {
 
   private val stateTimeout = 1.second
+  val blockGenerationDelay = settings.blockGenerationDelay
 
   startWith(Offline, Unit)
 
@@ -60,10 +63,13 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
         scoreOpt,
         onNone = () => {
           tryToGenerateABlock()
+          context.system.scheduler.scheduleOnce(blockGenerationDelay, networkController, GetMaxChainScore)
           stay()
         },
         onLocal = () => {
           tryToGenerateABlock()
+          networkController ! GetMaxChainScore
+          context.system.scheduler.scheduleOnce(blockGenerationDelay, networkController, GetMaxChainScore)
           stay()
         }
       )
@@ -103,9 +109,10 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
   def processNewBlock(block: Block, remoteOpt: Option[InetSocketAddress]) = {
     val fromStr = remoteOpt.map(_.toString).getOrElse("local")
     if (block.isValid) {
-      log.info(s"New block: $block from $fromStr")
       application.storedState.processBlock(block)
       application.blockchainImpl.appendBlock(block)
+      log.info(s"New block: $block from $fromStr. New size: ${application.blockchainImpl.height()}, " +
+        s"score: ${application.blockchainImpl.score()}, timestamp: ${block.timestampField.value}")
 
       block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
       val height = application.blockchainImpl.height()
@@ -123,7 +130,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
     val consModule = application.consensusModule
     implicit val transModule = application.transactionModule
 
-    log.info("Trying to generate a new block")
+//    log.info("Trying to generate a new block")
     val accounts = application.wallet.privateKeyAccounts()
     consModule.generateNextBlocks(accounts)(transModule) onComplete {
       case Success(blocks: Seq[Block]) =>
