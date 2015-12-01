@@ -1,5 +1,6 @@
 package scorex.network.message
 
+import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
@@ -17,7 +18,10 @@ trait MessageSpec[Content] {
 }
 
 
-case class Message[Content](spec: MessageSpec[Content], input: Either[Array[Byte], Content]) {
+case class Message[Content](spec: MessageSpec[Content],
+                            input: Either[Array[Byte], Content],
+                            source: Option[InetSocketAddress]
+                           ) {
 
   import Message._
 
@@ -64,7 +68,7 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
       .ensuring(m => m.size == specs.size, "Duplicate message codes")
   }
 
-  def parse(bytes: ByteBuffer): Try[Message[_]] = Try {
+  def parse(bytes: ByteBuffer, sourceOpt: Option[InetSocketAddress]): Try[Message[_]] = Try {
     val magic = new Array[Byte](MagicLength)
     bytes.get(magic)
 
@@ -97,7 +101,7 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
 
     val spec = specsMap.get(msgCode).ensuring(_.isDefined, "No message handler").get
 
-    Message(spec, Left(msgData))
+    Message(spec, Left(msgData), sourceOpt)
   }
 }
 

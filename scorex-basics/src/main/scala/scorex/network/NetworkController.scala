@@ -2,22 +2,24 @@ package scorex.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import scorex.app.Application
-import scorex.network.message.BasicMessagesRepo
+import akka.util.ByteString
+import scorex.network.message.{BasicMessagesRepo, Message}
 import scorex.network.peer.PeerManager
+import scorex.settings.Settings
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.{Random, Try}
+import scala.util.Random
 
 
 //must be singleton
-class NetworkController(application: Application) extends Actor with ScorexLogging {
+class NetworkController(settings: Settings,
+                        peerManager: PeerManager) extends Actor with ScorexLogging {
 
   import NetworkController._
 
@@ -26,11 +28,42 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerData]()
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
 
-  private def maxPeerScore() = Try(connectedPeers.maxBy(_._2.blockchainScore)._2.blockchainScore).toOption.flatten
-
-  private def maxScoreHandler() = Try(connectedPeers.maxBy(_._2.blockchainScore)._2.handler).toOption
+  private val startedInteractions = mutable.Map[InetSocketAddress, Seq[InteractionBox[_, _, _]]]()
 
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.Port))
+
+  val rules = PeersLogic(peerManager).rules
+
+  lazy val interactions = rules.map(_.interaction)
+
+  rules.filter(_.scheduler.isDefined).foreach { rule =>
+    val initialDelay = rule.scheduler.get._1
+    val interval = rule.scheduler.get._2
+
+    system.scheduler.schedule(initialDelay, interval) {
+      val sendTo = rule.sendingStrategy.choose(connectedPeers.values.toSeq)
+
+      rule.interaction match {
+        case interaction: ProduceableInteraction =>
+          val dataToSend = interaction.produce()
+          val bytes = interaction.reqSpec.serializeData(dataToSend)
+          val toSend = ByteString(bytes)
+          sendTo.foreach { peer =>
+            interaction match {
+              case di: DuplexInteraction[_, _] =>
+                val box = InteractionBox(dataToSend, di.repSpec.messageCode, di)
+                startedInteractions.put(peer.remote, Seq(box))
+              case _ =>
+            }
+            peer ! toSend
+          }
+
+
+        case _ => sys.error(s"Cant' produce request for ${rule.interaction}")
+      }
+    }
+  }
+
 
   private def updateScore(remote: InetSocketAddress, height: Int, score: BigInt) = {
     val prevBestScore = maxPeerScore().getOrElse(0: BigInt)
@@ -99,6 +132,26 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       connectedPeers -= remote
       peerManager.peerDisconnected(remote)
 
+    case Message(spec, Left(msgData), Some(remote)) =>
+      val msgId = spec.messageCode
+      startedInteractions.get(remote).map(_.filter(_.respId == msgId)).flatten match{
+        case Some(InteractionBox(_, _, _)) =>
+
+        case None =>
+          interactions.find(_.respId == msgId) match {
+            case Some(int:SimplexInteraction[_]) =>
+
+
+            case _ =>
+              log.error("wrong message passed in")
+          }
+      }
+
+
+
+
+
+
     case AskForPeers =>
       self ! SendMessageToRandomPeer(BasicMessagesRepo.GetPeersMessage)
 
@@ -161,33 +214,39 @@ object NetworkController {
   case class SendMessageToRandomPeer(msg: message.Message[_])
 
   case class BroadcastMessage(msg: message.Message[_], exceptOf: Seq[InetSocketAddress] = List())
+
 }
 
 
+case class OutcomingMessagingRule(sendingStrategy: SendingStrategy,
+                                  interaction: Interaction,
+                                  scheduler: Option[(FiniteDuration, FiniteDuration)])
 
-case class Rule(sendingStrategy: SendingStrategy,
-                interaction: Interaction,
-                scheduler: Option[(FiniteDuration, FiniteDuration)]) //initial delay, delay
+//initial delay, delay
 
 //get peers
 
 trait NetworkApplicationLogic {
+  val rules: Seq[OutcomingMessagingRule]
+}
 
-  val peerManager: PeerManager
+case class PeersLogic(peerManager: PeerManager) extends NetworkApplicationLogic {
 
-  val peers: Seq[PeerConnectionHandler]
+  private object peersExchange extends OutcomingMessagingRule(
+    SendToRandom,
+    PeersInteraction(peerManager),
+    Some(1.second -> 3.seconds)
+  )
 
-  object peersExchange extends Rule(SendToRandom, PeersInteraction(peerManager), Some(1.second -> 3.seconds))
-
-  val rules: Seq[Rule] = Seq(peersExchange)
+  override val rules: Seq[OutcomingMessagingRule] = Seq(peersExchange)
 }
 
 
-trait BlockchainApplicationLogic extends NetworkApplicationLogic {
+trait BlockchainLogic extends NetworkApplicationLogic {
 
-  object newBlock extends Rule(Broadcast, BlockInteraction, None)
+  object newBlock extends OutcomingMessagingRule(Broadcast, BlockInteraction, None)
 
-  //object bestExtension extends Rule(BestPeer, SignaturesInteraction, None)
+  //object bestExtension extends OutcomingMessagingRule(BestPeer, SignaturesInteraction, None)
 
   override val rules = super.rules ++ Seq()
 }

@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 
-class PeerConnectionHandler(application: Application,
+case class PeerConnectionHandler(application: Application,
                             connection: ActorRef,
                             remote: InetSocketAddress) extends Actor with ScorexLogging {
 
@@ -110,10 +110,10 @@ class PeerConnectionHandler(application: Application,
       connection ! Close
 
     case Received(data) =>
-      application.messagesHandler.parse(data.toByteBuffer) match {
+      application.messagesHandler.parse(data.toByteBuffer, Some(remote)) match {
         case Success(message) =>
           log.info("received message " + message.getClass.getSimpleName + " from " + remote)
-          handleMessage(message)
+          networkController ! message
 
         case Failure(e) =>
           log.info(s"Corrupted data from: " + remote + " : " + e.getMessage)

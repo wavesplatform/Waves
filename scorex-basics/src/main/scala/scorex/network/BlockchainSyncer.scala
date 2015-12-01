@@ -2,7 +2,7 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, FSM}
+import akka.actor.FSM
 import scorex.app.Application
 import scorex.block.Block
 import scorex.network.BlockchainSyncer._
