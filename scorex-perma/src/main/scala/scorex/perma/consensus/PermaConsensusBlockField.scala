@@ -3,6 +3,7 @@ package scorex.perma.consensus
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json._
 import scorex.block.BlockField
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.perma.settings.Constants
 
@@ -40,7 +41,7 @@ object PermaConsensusBlockField {
 
   val fieldName: String = "perma-consensus"
   val PuzLength = 32
-  val PublicKeyLength = 32
+  val PublicKeyLength = EllipticCurveImpl.KeyLength
   val SLength = 32
   val HashLength = 32
   val SignatureLength = 64
