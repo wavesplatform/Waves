@@ -14,7 +14,7 @@ case class PermaConsensusBlockField(override val value: PermaLikeConsensusBlockD
 
   import PermaConsensusBlockField._
 
-  override val name: String = PermaConsensusBlockField.fieldName
+  override val name: String = PermaConsensusBlockField.FieldName
 
   override def bytes: Array[Byte] =
     Bytes.ensureCapacity(Ints.toByteArray(value.target.toByteArray.length), 4, 0) ++ value.target.toByteArray ++
@@ -39,7 +39,7 @@ case class PermaConsensusBlockField(override val value: PermaLikeConsensusBlockD
 
 object PermaConsensusBlockField {
 
-  val fieldName: String = "perma-consensus"
+  val FieldName = "perma-consensus"
   val PuzLength = 32
   val PublicKeyLength = EllipticCurveImpl.KeyLength
   val SLength = 32
