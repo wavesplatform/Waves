@@ -19,7 +19,7 @@ import scala.util.Try
 //publish-subscribe?
 //anti-ddos?
 
-case class ListenForUpdate[V](spec: MessageSpec[V], listener: ActorRef)
+case class ListenForUpdate[V](spec: MessageSpec[V], listener: ActorRef)(implicit ev:V)
 
 case object UpdateNetworkView
 
@@ -50,7 +50,7 @@ trait NetworkObject[V] extends Actor with ScorexLogging {
     localComponentRef ! lfu
   }
 
-  override def receive = {
+  override def receive: Receive = ({
     //update from network
     case Message(spec: MessageSpec[V], Right(value: V), Some(remote)) =>
       candidates += remote -> value
@@ -67,7 +67,9 @@ trait NetworkObject[V] extends Actor with ScorexLogging {
         case None =>
           log.error("No chance to ask the network")
       }
-  }
+  }: Receive).orElse(additionalLogic)
+
+  def additionalLogic: Receive
 }
 
 
@@ -82,11 +84,13 @@ class NetworkScore(override val networkControllerRef: ActorRef, blockchainSyncer
     candidates.filter(_._2 == consideredValue)
   }
 
-  def toExtension: NetworkBlockchainExtension = new NetworkBlockchainExtension(networkControllerRef, blockchainSyncerRef)
-
   override val localComponentRef: ActorRef = blockchainSyncerRef
   override val reqSpecOpt = None
   override val messageSpec: MessageSpec[BlockchainScore] = ScoreMessageSpec
+
+  override def additionalLogic: Receive = {
+
+  }
 }
 
 //todo: get signatures <-> signatures
@@ -108,6 +112,10 @@ class NetworkBlockchainExtension(override val networkControllerRef: ActorRef,
   override val localComponentRef: ActorRef = blockchainSyncerRef
   override val messageSpec: MessageSpec[Seq[BlockId]] = SignaturesSpec
   override val reqSpecOpt: Option[MessageSpec[_]] = Some(GetSignaturesSpec)
+
+  override def additionalLogic: Receive = {
+    case _ =>
+  }
 }
 
 
