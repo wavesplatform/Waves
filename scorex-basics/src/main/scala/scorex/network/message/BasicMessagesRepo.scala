@@ -8,6 +8,7 @@ import scorex.block.Block
 import scorex.crypto.{EllipticCurveImpl, SigningFunctions}
 import scorex.crypto.SigningFunctions._
 import scorex.network.message.Message._
+import scorex.transaction.History
 
 import scala.util.Try
 
@@ -122,22 +123,18 @@ object BasicMessagesRepo {
     override def deserializeData(bytes: Array[Byte]): Try[Block] = Block.parse(bytes)
   }
 
-  object ScoreMessageSpec extends MessageSpec[(Int, BigInt)] {
+  object ScoreMessageSpec extends MessageSpec[History.BlockchainScore] {
     override val messageCode: MessageCode = 24: Byte
 
-    override def serializeData(heightAndScore: (Int, BigInt)): Array[Byte] = {
-      val scoreBytes = heightAndScore._2.toByteArray
+    override def serializeData(score: History.BlockchainScore): Array[Byte] = {
+      val scoreBytes = score.toByteArray
       val bb = java.nio.ByteBuffer.allocate(4 + scoreBytes.length)
-      bb.putInt(heightAndScore._1)
       bb.put(scoreBytes)
       bb.array()
     }
 
-    override def deserializeData(bytes: Array[Byte]): Try[(Int, BigInt)] = Try {
-      val heightBytes = bytes.take(4)
-      val height = Ints.fromByteArray(heightBytes)
-      val score = BigInt(bytes.takeRight(bytes.length - 4))
-      (height, score)
+    override def deserializeData(bytes: Array[Byte]): Try[History.BlockchainScore] = Try {
+      BigInt(1, bytes)
     }
   }
 

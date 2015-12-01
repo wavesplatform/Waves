@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.crypto.Sha256._
+import scorex.network.PeerConnectionHandler
 
 import scala.util.{Success, Try}
 
@@ -20,7 +21,7 @@ trait MessageSpec[Content] {
 
 case class Message[Content](spec: MessageSpec[Content],
                             input: Either[Array[Byte], Content],
-                            source: Option[InetSocketAddress]
+                            source: Option[PeerConnectionHandler]
                            ) {
 
   import Message._
