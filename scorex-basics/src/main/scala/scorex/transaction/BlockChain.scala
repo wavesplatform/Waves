@@ -35,11 +35,7 @@ trait BlockChain extends History with ScorexLogging {
     */
   def averageDelay(block: Block, blockNum: Int): Try[Long] = Try {
     val height: Int = heightOf(block).get
-    val lastBlocks = (0 until blockNum).flatMap(i => blockAt(height - i)).reverse
-    require(lastBlocks.length == blockNum)
-    (0 until blockNum - 1).map { i =>
-      lastBlocks(i + 1).timestampField.value - lastBlocks(i).timestampField.value
-    }.sum / (blockNum - 1)
+    (blockAt(height).get.timestampField.value - blockAt(height - blockNum).get.timestampField.value) / (blockNum - 1)
   }
 
   def lastSignature(): Block.BlockId = lastBlock.uniqueId
