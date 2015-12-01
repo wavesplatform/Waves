@@ -91,7 +91,7 @@ class LagonakiApplication(val settingsFilename: String)
   override implicit val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
 
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
-  lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this, networkController))
+  lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this, networkController, settings))
 
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
