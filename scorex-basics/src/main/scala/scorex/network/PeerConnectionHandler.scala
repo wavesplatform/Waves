@@ -6,23 +6,21 @@ import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
 import scorex.app.Application
-import scorex.network.peer.PeerManager
 import scorex.utils.ScorexLogging
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 
-case class PeerConnectionHandler(application: Application,
+case class ConnectedPeer(remote: InetSocketAddress, handlerRef: ActorRef)
+
+case class PeerConnectionHandler(application:Application,
                             connection: ActorRef,
                             remote: InetSocketAddress) extends Actor with ScorexLogging {
 
   import PeerConnectionHandler._
 
-  private lazy val networkController = application.networkController
-
   context watch connection
+
+  private lazy val networkControllerRef: ActorRef = application.networkController
 
 //  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
 
@@ -98,7 +96,7 @@ case class PeerConnectionHandler(application: Application,
 //    case SendBlockchainScore =>
 //      self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score())
 
-    case msg: message.Message =>
+    case msg: message.Message[_] =>
       self ! ByteString(msg.bytes)
 
     case data: ByteString =>
@@ -113,7 +111,7 @@ case class PeerConnectionHandler(application: Application,
       application.messagesHandler.parse(data.toByteBuffer, Some(remote)) match {
         case Success(message) =>
           log.info("received message " + message.getClass.getSimpleName + " from " + remote)
-          networkController ! message
+          networkControllerRef ! message
 
         case Failure(e) =>
           log.info(s"Corrupted data from: " + remote + " : " + e.getMessage)
@@ -122,7 +120,7 @@ case class PeerConnectionHandler(application: Application,
       }
 
     case cc: ConnectionClosed =>
-      networkController ! NetworkController.PeerDisconnected(remote)
+      networkControllerRef ! NetworkController.PeerDisconnected(remote)
       log.info("Connection closed to : " + remote + ": " + cc.getErrorCause)
 
     case CloseConnection =>
@@ -141,7 +139,7 @@ case class PeerConnectionHandler(application: Application,
 
 object PeerConnectionHandler {
 
-  case object SendBlockchainScore
+//  case object SendBlockchainScore
 
   case object CloseConnection
 

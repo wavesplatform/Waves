@@ -5,34 +5,35 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import akka.util.ByteString
-import scorex.network.message.{BasicMessagesRepo, Message}
+import scorex.app.Application
+import scorex.network.message.{MessageSpec, BasicMessagesRepo, Message}
 import scorex.network.peer.PeerManager
-import scorex.settings.Settings
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Random
+import scala.util.{Failure, Success, Random}
 
 
 //must be singleton
-class NetworkController(settings: Settings,
-                        peerManager: PeerManager) extends Actor with ScorexLogging {
+class NetworkController(application: Application) extends Actor with ScorexLogging {
 
   import NetworkController._
 
   private implicit val system = context.system
 
-  private val connectedPeers = mutable.Map[InetSocketAddress, PeerConnectionHandler]()
+  private lazy val settings = application.settings
+  private lazy val peerManager = application.peerManager
+
+  private val connectedPeers = mutable.Map[InetSocketAddress, ConnectedPeer]()
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
 
-  private val startedInteractions = mutable.Map[InetSocketAddress, Seq[InteractionBox[_, _, _]]]()
+  private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.Port))
 
-  val rules = PeersLogic(peerManager).rules
+/*  val rules = PeersLogic(peerManager).rules
 
   lazy val interactions = rules.map(_.interaction)
 
@@ -62,9 +63,9 @@ class NetworkController(settings: Settings,
         case _ => sys.error(s"Cant' produce request for ${rule.interaction}")
       }
     }
-  }
+  }*/
 
-
+/*
   private def updateScore(remote: InetSocketAddress, height: Int, score: BigInt) = {
     val prevBestScore = maxPeerScore().getOrElse(0: BigInt)
 
@@ -78,13 +79,13 @@ class NetworkController(settings: Settings,
         handler ! PeerConnectionHandler.BestPeer(remote, score > transModule.history.score)
       }
     }
-  }
+  } */
 
   override def receive = {
     case b@Bound(localAddress) =>
       log.info("Successfully bound to the port " + settings.Port)
-      context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)
-      context.system.scheduler.schedule(1500.millis, 10.seconds)(self ! AskForPeers)
+    //  context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)
+    //  context.system.scheduler.schedule(1500.millis, 10.seconds)(self ! AskForPeers)
 
     case CommandFailed(_: Bind) =>
       log.error("Network port " + settings.Port + " already in use!")
@@ -109,9 +110,9 @@ class NetworkController(settings: Settings,
       log.info(s"Connected to $remote")
       connectingPeers -= remote
       val connection = sender()
-      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], connection, remote))
+      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
       connection ! Register(handler)
-      connectedPeers += remote -> PeerData(handler, None)
+      connectedPeers += remote -> ConnectedPeer(remote, handler)
       peerManager.peerConnected(remote)
 
     case CommandFailed(c: Connect) =>
@@ -124,7 +125,7 @@ class NetworkController(settings: Settings,
 
     case ShutdownNetwork =>
       log.info("Going to shutdown all connections & unbind port")
-      connectedPeers.values.foreach(_.handler ! PeerConnectionHandler.CloseConnection)
+      connectedPeers.values.foreach(_.handlerRef ! PeerConnectionHandler.CloseConnection)
       self ! Unbind
       context stop self
 
@@ -132,9 +133,29 @@ class NetworkController(settings: Settings,
       connectedPeers -= remote
       peerManager.peerDisconnected(remote)
 
-    case Message(spec, Left(msgData), Some(remote)) =>
+
+    case RegisterMessagesHandler(specs, handler) =>
+      messageHandlers += specs.map(_.messageCode) -> handler
+
+
+
+    case Message(spec, Left(msgBytes), Some(remote)) =>
       val msgId = spec.messageCode
-      startedInteractions.get(remote).map(_.filter(_.respId == msgId)).flatten match{
+
+      spec.deserializeData(msgBytes) match {
+        case Success(content) =>
+          messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
+            case Some(handler) =>
+              handler ! DataFromPeer(content, remote)
+
+            case None => //todo: ???
+          }
+        case Failure(e) =>
+          //todo: ban peer
+      }
+
+
+      /*startedInteractions.get(remote).map(_.filter(_.respId == msgId)).flatten match{
         case Some(InteractionBox(_, _, _)) =>
 
         case None =>
@@ -145,14 +166,10 @@ class NetworkController(settings: Settings,
             case _ =>
               log.error("wrong message passed in")
           }
-      }
+      }*/
 
 
-
-
-
-
-    case AskForPeers =>
+  /*  case AskForPeers =>
       self ! SendMessageToRandomPeer(BasicMessagesRepo.GetPeersMessage)
 
 
@@ -174,56 +191,64 @@ class NetworkController(settings: Settings,
       if (handlers.nonEmpty) {
         val randomHandler = handlers(Random.nextInt(handlers.size)).handler
         randomHandler ! message
-      }
+      } */
 
     case GetPeers => sender() ! connectedPeers.toMap
 
-    case GetMaxChainScore =>
-      sender() ! BlockchainSyncer.MaxChainScore(maxPeerScore())
+    /* case GetMaxChainScore =>
+      sender() ! BlockGenerator.MaxChainScore(maxPeerScore())
 
     case NewBlock(block, Some(sndr)) =>
       application.blockchainSyncer ! NewBlock(block, Some(sndr))
       self ! BroadcastMessage(BlockMessage(block), List(sndr))
 
     case UpdateBlockchainScore(remote, height, score) => updateScore(remote, height, score)
+    */
 
     case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
   }
 }
 
 object NetworkController {
+  case class RegisterMessagesHandler(specs: Seq[MessageSpec[_]], handler: ActorRef)
+  case class DataFromPeer[V](data:V, source:ConnectedPeer)
+  case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
+
 
   private case object CheckPeers
 
-  private case object AskForPeers
+//  private case object AskForPeers
 
   case object ShutdownNetwork
 
   case object GetPeers
 
-  case object GetMaxBlockchainScore
+  // case object GetMaxBlockchainScore
 
   case class PeerDisconnected(address: InetSocketAddress)
 
-  case class UpdateBlockchainScore(remote: InetSocketAddress, height: Int, score: BigInt)
+  //case class UpdateBlockchainScore(remote: InetSocketAddress, height: Int, score: BigInt)
 
+  /*
   case class SendMessageToBestPeer(msg: message.Message[_])
 
   case class SendMessageToRandomPeer(msg: message.Message[_])
 
   case class BroadcastMessage(msg: message.Message[_], exceptOf: Seq[InetSocketAddress] = List())
-
+  */
 }
 
-
+/*
 case class OutcomingMessagingRule(sendingStrategy: SendingStrategy,
                                   interaction: Interaction,
                                   scheduler: Option[(FiniteDuration, FiniteDuration)])
+*/
 
 //initial delay, delay
 
 //get peers
 
+/*
 trait NetworkApplicationLogic {
   val rules: Seq[OutcomingMessagingRule]
 }
@@ -247,5 +272,5 @@ trait BlockchainLogic extends NetworkApplicationLogic {
   //object bestExtension extends OutcomingMessagingRule(BestPeer, SignaturesInteraction, None)
 
   override val rules = super.rules ++ Seq()
-}
+} */
 

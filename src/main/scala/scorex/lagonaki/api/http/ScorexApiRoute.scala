@@ -8,7 +8,7 @@ import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.lagonaki.server.settings.Constants
-import scorex.network.BlockchainSyncer
+import scorex.network.BlockchainGenerator$
 import spray.http.MediaTypes._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -52,7 +52,7 @@ case class ScorexApiRoute(application: LagonakiApplication)(implicit val context
     get {
       respondWithMediaType(`application/json`) {
         onComplete {
-          (application.blockchainSyncer ? BlockchainSyncer.GetStatus).map { status =>
+          (application.blockchainSyncer ? BlockchainGenerator.GetStatus).map { status =>
             Json.obj("status" -> status.asInstanceOf[String]).toString()
           }
         } {

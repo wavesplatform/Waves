@@ -24,9 +24,6 @@ object BasicMessagesRepo {
     override def serializeData(data: Unit) = Array()
   }
 
-  object GetPeersMessage extends Message(GetPeersSpec, Right(Unit))
-
-
   object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
     private val AddressLength = 4
     private val PortLength = 4
@@ -103,12 +100,12 @@ object BasicMessagesRepo {
     override val messageCode: MessageCode = 21: Byte
   }
 
-  object GetBlockSpec extends MessageSpec[SigningFunctions.Signature] {
+  object GetBlockSpec extends MessageSpec[Block.BlockId] {
     override val messageCode: MessageCode = 22: Byte
 
-    override def serializeData(signature: Signature): Array[Byte] = signature
+    override def serializeData(signature: Block.BlockId): Array[Byte] = signature
 
-    override def deserializeData(bytes: Array[Byte]): Try[Signature] = Try {
+    override def deserializeData(bytes: Array[Byte]): Try[Block.BlockId] = Try {
       require(bytes.length == EllipticCurveImpl.SignatureLength, "Data does not match length")
       bytes
     }

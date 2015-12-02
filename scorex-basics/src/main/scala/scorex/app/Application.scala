@@ -5,8 +5,9 @@ import akka.io.IO
 import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
-import scorex.network.message.{BasicMessagesRepo, MessageHandler}
-import scorex.network.{BlockchainSyncer, NetworkController}
+import scorex.network.message.MessageHandler
+import scorex.network.peer.PeerManager
+import scorex.network.{BlockGenerator$, BlockchainGenerator$, NetworkController}
 import scorex.settings.Settings
 import scorex.transaction.{History, State, TransactionModule}
 import scorex.utils.ScorexLogging
@@ -38,8 +39,10 @@ trait Application extends ScorexLogging {
   //p2p
   val messagesHandler:MessageHandler
 
+  lazy val peerManager = new PeerManager(settings)
+
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
-  lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this, networkController))
+  lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockGenerator], this))
 
   //wallet
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))

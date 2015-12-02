@@ -8,7 +8,7 @@ import akka.pattern.ask
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.network.{BlockchainSyncer, NetworkController}
+import scorex.network.{BlockchainGenerator$, NetworkController}
 import NetworkController.PeerData
 import scorex.lagonaki.network.NetworkController
 import scorex.lagonaki.server.LagonakiApplication
@@ -58,7 +58,7 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
     get {
       respondWithMediaType(`application/json`) {
         onComplete {
-          (application.blockchainSyncer ? BlockchainSyncer.GetMaxChainScore).map { peerHeightsRaw =>
+          (application.blockchainSyncer ? BlockchainGenerator.GetMaxChainScore).map { peerHeightsRaw =>
             val peerHeights = peerHeightsRaw.asInstanceOf[Map[InetSocketAddress, Int]]
             Json.arr(peerHeights.map { case (peer, h) =>
               Json.obj("peer" -> peer.getAddress.getHostAddress, "score" -> h)

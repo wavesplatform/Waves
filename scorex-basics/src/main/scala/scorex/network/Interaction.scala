@@ -1,6 +1,6 @@
 package scorex.network
 
-
+/*
 import java.net.InetSocketAddress
 
 import scorex.block.Block
@@ -70,4 +70,4 @@ case class PeersInteraction(peerManager: PeerManager)
   override def requestHandler(request: Unit): Seq[InetSocketAddress] = peerManager.knownPeers()
 
   override def responseHandler(peers: Seq[InetSocketAddress]): Unit = peers.foreach(peerManager.addPeer)
-}
+} */

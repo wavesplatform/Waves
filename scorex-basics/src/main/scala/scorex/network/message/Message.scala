@@ -1,11 +1,10 @@
 package scorex.network.message
 
-import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.crypto.Sha256._
-import scorex.network.PeerConnectionHandler
+import scorex.network.ConnectedPeer
 
 import scala.util.{Success, Try}
 
@@ -21,7 +20,7 @@ trait MessageSpec[Content] {
 
 case class Message[Content](spec: MessageSpec[Content],
                             input: Either[Array[Byte], Content],
-                            source: Option[PeerConnectionHandler]
+                            source: Option[ConnectedPeer]
                            ) {
 
   import Message._
@@ -69,7 +68,7 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
       .ensuring(m => m.size == specs.size, "Duplicate message codes")
   }
 
-  def parse(bytes: ByteBuffer, sourceOpt: Option[InetSocketAddress]): Try[Message[_]] = Try {
+  def parse(bytes: ByteBuffer, sourceOpt: Option[ConnectedPeer]): Try[Message[_]] = Try {
     val magic = new Array[Byte](MagicLength)
     bytes.get(magic)
 
