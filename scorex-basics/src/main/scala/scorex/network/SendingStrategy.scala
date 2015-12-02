@@ -3,20 +3,18 @@ package scorex.network
 import scala.util.Random
 
 trait SendingStrategy {
-  def choose(peers: Seq[PeerData]): Seq[PeerConnectionHandler]
+  def choose(peers: Seq[PeerConnectionHandler]): Seq[PeerConnectionHandler]
 }
 
 object SendToRandom extends SendingStrategy {
-  override def choose(peers: Seq[PeerData]): Seq[PeerConnectionHandler] =
-    Seq(peers(Random.nextInt(peers.length)).peer)
+  override def choose(peers: Seq[PeerConnectionHandler]): Seq[PeerConnectionHandler] =
+    Seq(peers(Random.nextInt(peers.length)))
 }
 
 object Broadcast extends SendingStrategy {
-  override def choose(peers: Seq[PeerData]): Seq[PeerConnectionHandler] = peers.map(_.peer)
+  override def choose(peers: Seq[PeerConnectionHandler]): Seq[PeerConnectionHandler] = peers
 }
 
-//todo: pass metadata
-object BestPeer extends SendingStrategy {
-  override def choose(peers: Seq[PeerData]): Seq[PeerConnectionHandler] =
-    Seq(peers.maxBy(_.blockchainScore).peer)
+case class SendToChosen(chosenPeers: Seq[PeerConnectionHandler]) extends SendingStrategy {
+  override def choose(peers: Seq[PeerConnectionHandler]): Seq[PeerConnectionHandler] = chosenPeers
 }

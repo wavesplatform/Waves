@@ -25,7 +25,7 @@ class NetworkController(settings: Settings,
 
   private implicit val system = context.system
 
-  private val connectedPeers = mutable.Map[InetSocketAddress, PeerData]()
+  private val connectedPeers = mutable.Map[InetSocketAddress, PeerConnectionHandler]()
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
 
   private val startedInteractions = mutable.Map[InetSocketAddress, Seq[InteractionBox[_, _, _]]]()
@@ -190,8 +190,6 @@ class NetworkController(settings: Settings,
     case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
   }
 }
-
-case class PeerData(peer: PeerConnectionHandler, blockchainScore: Option[BigInt])
 
 object NetworkController {
 

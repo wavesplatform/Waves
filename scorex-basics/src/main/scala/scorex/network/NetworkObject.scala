@@ -19,19 +19,20 @@ import scala.util.Try
 //publish-subscribe?
 //anti-ddos?
 
-case class ListenForUpdate[V](spec: MessageSpec[V], listener: ActorRef)(implicit ev:V)
+case class ListenForUpdate[V](spec: MessageSpec[V], listener: ActorRef)(implicit ev: V)
 
 case object UpdateNetworkView
 
 
 trait NetworkObject[V] extends Actor with ScorexLogging {
 
-
   protected val networkControllerRef: ActorRef
   val localComponentRef: ActorRef
 
   val messageSpec: MessageSpec[V]
   val reqSpecOpt: Option[MessageSpec[_]]
+
+  val sendingStrategy: SendingStrategy
 
   //mutable
   private var candidates = Map[PeerConnectionHandler, V]()
@@ -60,6 +61,9 @@ trait NetworkObject[V] extends Actor with ScorexLogging {
 
     case localUpdate: Option[V] =>
       localValue = localUpdate
+      localUpdate.foreach { lv =>
+        networkControllerRef !(lv, sendingStrategy)
+      }
 
     case UpdateNetworkView =>
       reqSpecOpt match {
@@ -69,7 +73,9 @@ trait NetworkObject[V] extends Actor with ScorexLogging {
       }
   }: Receive).orElse(additionalLogic)
 
-  def additionalLogic: Receive
+  def additionalLogic: Receive = {
+    case _ =>
+  }
 }
 
 
@@ -88,9 +94,7 @@ class NetworkScore(override val networkControllerRef: ActorRef, blockchainSyncer
   override val reqSpecOpt = None
   override val messageSpec: MessageSpec[BlockchainScore] = ScoreMessageSpec
 
-  override def additionalLogic: Receive = {
-
-  }
+  override val sendingStrategy: SendingStrategy = SendToRandom
 }
 
 //todo: get signatures <-> signatures
@@ -99,7 +103,8 @@ class NetworkScore(override val networkControllerRef: ActorRef, blockchainSyncer
 //todo: download few chains, compare
 //todo: download headers, to compare blockscore
 class NetworkBlockchainExtension(override val networkControllerRef: ActorRef,
-                                 blockchainSyncerRef: ActorRef) extends NetworkObject[Seq[Block.BlockId]] {
+                                 blockchainSyncerRef: ActorRef,
+                                 chosenPeers: Seq[PeerConnectionHandler]) extends NetworkObject[Seq[Block.BlockId]] {
   override def consider(candidates: Map[PeerConnectionHandler, Seq[Block.BlockId]]): Option[Seq[Block.BlockId]] = {
     candidates.headOption.map(_._2)
   }
@@ -113,9 +118,7 @@ class NetworkBlockchainExtension(override val networkControllerRef: ActorRef,
   override val messageSpec: MessageSpec[Seq[BlockId]] = SignaturesSpec
   override val reqSpecOpt: Option[MessageSpec[_]] = Some(GetSignaturesSpec)
 
-  override def additionalLogic: Receive = {
-    case _ =>
-  }
+  override val sendingStrategy: SendingStrategy = SendToChosen(chosenPeers)
 }
 
 
