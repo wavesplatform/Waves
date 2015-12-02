@@ -2,15 +2,12 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, FSM}
+import akka.actor.FSM
 import scorex.app.Application
 import scorex.block.Block
 import scorex.network.BlockGenerator._
-import scorex.network.message.MessageSpec
-import scorex.transaction.History
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 
@@ -20,24 +17,22 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
 
   startWith(Syncing, Unit)
 
-
-
   when(Syncing) {
     case Event(NewBlock(block, remoteOpt), _) =>
       assert(remoteOpt.isDefined, "Local generation attempt while syncing")
-      processNewBlock(block, remoteOpt)
       stay()
   }
 
   when(Synced) {
     case Event(NewBlock(block, remoteOpt), _) =>
-
       stay()
   }
 
   initialize()
 
   def tryToGenerateABlock(): Unit = {
+    implicit val transactionalModule = application.transactionModule
+
     log.info("Trying to generate a new block")
     val accounts = application.wallet.privateKeyAccounts()
     application.consensusModule.generateNextBlocks(accounts)(application.transactionModule) onComplete {

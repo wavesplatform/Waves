@@ -6,7 +6,7 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef, FSM}
 import scorex.app.Application
 import scorex.block.Block
-import scorex.network.NetworkController.DataFromPeer
+import scorex.network.NetworkController.{SendToNetwork, DataFromPeer}
 import scorex.network.NetworkObject.ConsideredValue
 import scorex.network.message.BasicMessagesRepo._
 import scorex.network.message.{Message, MessageSpec}
@@ -80,11 +80,13 @@ object NetworkObject {
 
 class ScoreNetworkObject(//override val networkControllerRef: ActorRef,
                          override val localComponentRef: ActorRef) extends NetworkObject[History.BlockchainScore] {
+
   override def consider(candidates: Map[ConnectedPeer, BlockchainScore])
   : (Option[BlockchainScore], Map[ConnectedPeer, BlockchainScore]) = {
     val bestNetworkScore = candidates.maxBy(_._2)._2
     (Some(bestNetworkScore), candidates.filter(_._2 == bestNetworkScore))
   }
+
 }
 
 /*  Synchronizing network & local views of an object, e.g. history(blockchain or blocktree), known peers list,
@@ -123,6 +125,8 @@ class HistorySynchronizer(application: Application)
   lazy val scoreSyncer = new ScoreNetworkObject(self)
 
   lazy val history = application.history
+
+  lazy val networkControllerRef = application.networkController
 
   startWith(ScoreNotCompared, Unit)
 
@@ -172,14 +176,14 @@ class HistorySynchronizer(application: Application)
     if (block.isValid) {
       log.info(s"New block: $block from $fromStr")
       application.state.processBlock(block)
-      application.history.appendBlock(block)
+      history.appendBlock(block)
 
       block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-      val height = application.history.height()
 
       //broadcast block only if it is generated locally
       if (remoteOpt.isEmpty) {
-        networkController ! NetworkController.BroadcastMessage(BlockMessage(height, block))
+        val blockMsg = Message(BlockMessageSpec, Right(block), None)
+        networkControllerRef ! SendToNetwork(blockMsg, Broadcast)
       }
     } else {
       log.warning(s"Non-valid block: $block from $fromStr")

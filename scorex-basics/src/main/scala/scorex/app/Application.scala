@@ -7,7 +7,7 @@ import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.network.message.MessageHandler
 import scorex.network.peer.PeerManager
-import scorex.network.{BlockGenerator$, BlockchainGenerator$, NetworkController}
+import scorex.network.{BlockGenerator, NetworkController}
 import scorex.settings.Settings
 import scorex.transaction.{History, State, TransactionModule}
 import scorex.utils.ScorexLogging
