@@ -84,8 +84,10 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   if (signaturesIndex.size() > 0) database.rollback()
 
   override def appendBlock(block: Block): BlockChain = synchronized {
-    val lastBlock = blockStorage.readBlock(height()).map(_.uniqueId)
-    if (lastBlock.getOrElse(block.uniqueId) sameElements block.referenceField.value) {
+    val lastBlock = blockStorage.readBlock(height())
+    require(height() == 0 || lastBlock.isDefined, "Should be able to get last block")
+    val parent = block.referenceField
+    if ((height() == 0) || (lastBlock.get.uniqueId sameElements parent.value)) {
       val h = height() + 1
       blockStorage.writeBlock(h, block)
         .flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
@@ -94,7 +96,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
       }
     } else {
       log.error("Appending block with parent different from last block in current blockchain:\n" +
-        s"parent: ${lastBlock.getOrElse("empty".getBytes).mkString}\n" +
+        s"parent: ${lastBlock.map(_.uniqueId).getOrElse("empty".getBytes).mkString}\n" +
         s"current: ${block.referenceField.value.mkString}")
     }
     this
