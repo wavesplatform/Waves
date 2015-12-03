@@ -3,7 +3,6 @@ package scorex.network.redone
 import akka.actor.{Actor, ActorRef}
 import scorex.network.NetworkController
 import scorex.network.message.MessageSpec
-import scorex.utils.ScorexLogging
 
 
 /*  Synchronizing network & local views of an object, e.g. history(blockchain or blocktree), known peers list,
@@ -12,7 +11,7 @@ import scorex.utils.ScorexLogging
  */
 
 //todo: anti-ddos?
-trait ViewSynchronizer extends Actor{
+trait ViewSynchronizer extends Actor {
 
   protected val networkControllerRef: ActorRef
 
