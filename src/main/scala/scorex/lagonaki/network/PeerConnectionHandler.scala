@@ -69,7 +69,7 @@ class PeerConnectionHandler(application: LagonakiApplication,
         val common = signaturesGot.head
         require(blockchainStorage.contains(common))
 
-        blockchainStorage.removeAfter(common)
+        application.blockStorage.removeAfter(common)
 
         signaturesGot.tail.foreach { case sig =>
           self ! GetBlockMessage(sig)

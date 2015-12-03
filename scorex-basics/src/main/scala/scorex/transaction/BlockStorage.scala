@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import scorex.block.Block
+import scorex.block.Block.BlockId
 
 import scala.util.Try
 
@@ -18,5 +19,14 @@ trait BlockStorage {
     history.appendBlock(block)
     Try()
   }
+
+  def removeAfter(signature: BlockId): Unit = synchronized {
+    while (!history.lastSignature().sameElements(signature)) {
+      val lastBlock = history.lastBlock
+      state.processBlock(lastBlock, reversal = true)
+      history.discardBlock()
+    }
+  }
+
 
 }

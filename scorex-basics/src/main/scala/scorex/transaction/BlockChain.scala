@@ -40,8 +40,6 @@ trait BlockChain extends History with ScorexLogging {
 
   def lastSignature(): Block.BlockId = lastBlock.uniqueId
 
-  def removeAfter(signature: Block.BlockId) = while (!lastSignature().sameElements(signature)) discardBlock()
-
   def score() =
     (1 to height()).foldLeft(0: BigInt) { case (sc, h) =>
       sc + blockAt(h).map { bl: Block =>
