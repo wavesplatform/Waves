@@ -11,6 +11,7 @@ import scorex.network.message.Message
 import scorex.network.redone.NetworkObject.ConsideredValue
 import scorex.transaction.History
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 

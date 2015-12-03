@@ -7,6 +7,7 @@ import scorex.network.{SendToRandom, NetworkController}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.Message
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 
@@ -22,7 +23,7 @@ class PeerSynchronizer(application:Application) extends ViewSynchronizer {
   override def preStart = {
     super.preStart()
 
-    val ntwMsg = Message(GetPeersSpec, Right(Unit), None)
+    val ntwMsg = Message(GetPeersSpec, Right(), None)
     val stn = NetworkController.SendToNetwork(ntwMsg, SendToRandom)
     context.system.scheduler.schedule(2.seconds, 1.second)(networkControllerRef ! stn)
   }
