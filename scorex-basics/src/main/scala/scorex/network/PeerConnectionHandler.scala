@@ -10,7 +10,7 @@ import scorex.utils.ScorexLogging
 import scala.util.{Failure, Success}
 
 
-case class ConnectedPeer(remote: InetSocketAddress, handlerRef: ActorRef)
+case class ConnectedPeer(address: InetSocketAddress, handlerRef: ActorRef)
 
 case class PeerConnectionHandler(application:Application,
                             connection: ActorRef,
