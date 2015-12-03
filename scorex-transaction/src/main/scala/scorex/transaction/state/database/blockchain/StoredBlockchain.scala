@@ -4,8 +4,9 @@ import better.files._
 import org.mapdb.DBMaker
 import scorex.account.Account
 import scorex.block.Block
+import scorex.block.Block._
 import scorex.consensus.ConsensusModule
-import scorex.transaction.{BlockChain, TransactionModule}
+import scorex.transaction.{ShouldBranchFrom, BlockChain, TransactionModule}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
@@ -86,12 +87,20 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   override private[transaction] def appendBlock(block: Block): Try[BlockChain] = synchronized {
     Try {
       val parent = block.referenceField
-      require((height() == 0) || (lastBlock.uniqueId sameElements parent.value),
-        "Appending block with parent different from last block in current blockchain:\n")
-      val h = height() + 1
-      blockStorage.writeBlock(h, block).flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
-        case Success(_) => database.commit()
-        case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
+      if((height() == 0) || (lastBlock.uniqueId sameElements parent.value)) {
+        val h = height() + 1
+        blockStorage.writeBlock(h, block).flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
+          case Success(_) => database.commit()
+          case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
+        }
+      } else blockById(parent.value) match {
+        case Some(commonBlock) =>
+          val branchPoint = heightOf(commonBlock).get
+          val blockScore = consensusModule.blockScore(commonBlock)
+          val currentScore = (branchPoint to height()).map(i => consensusModule.blockScore(blockAt(i).get)).sum
+          //TODO should not be able to rollback infinitely
+          if(blockScore > currentScore) throw new ShouldBranchFrom(commonBlock.uniqueId)
+        case None => throw new Error(s"Appending block ${block.json} which parent is not in blockchain")
       }
       this
     }
