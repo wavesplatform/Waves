@@ -5,7 +5,8 @@ import java.net.InetSocketAddress
 import akka.actor.FSM
 import scorex.app.Application
 import scorex.block.Block
-import scorex.network.{SendToChosen, ConnectedPeer, Broadcast, NetworkController}
+import scorex.network.redone.NetworkObject.ConsideredValue
+import scorex.network._
 import scorex.network.NetworkController.{SendToNetwork, DataFromPeer}
 import scorex.network.message.BasicMessagesRepo._
 import scorex.network.message.Message
@@ -26,6 +27,8 @@ class HistorySynchronizer(application: Application)
   lazy val history = application.history
 
   lazy val networkControllerRef = application.networkController
+
+  lazy val blockGenerator = application.blockGenerator
 
   startWith(ScoreNotCompared, Seq())
 
@@ -67,10 +70,19 @@ class HistorySynchronizer(application: Application)
     case Event(ConsideredValue(networkScore: History.BlockchainScore, witnesses), _) =>
       val localScore = history.score()
       if (networkScore > localScore) {
+        log.info("networkScore > localScore")
         val msg = Message(GetSignaturesSpec, Right(history.lastSignatures(100)), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
         goto(GettingExtension) using witnesses
       } else goto(Synced) using Seq()
+  }
+
+  onTransition{
+    case _ -> Synced =>
+      blockGenerator ! BlockGenerator.StartGeneration
+
+    case Synced -> _ =>
+      blockGenerator ! BlockGenerator.StopGeneration
   }
 
   initialize()

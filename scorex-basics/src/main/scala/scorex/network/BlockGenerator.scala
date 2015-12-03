@@ -7,6 +7,7 @@ import scorex.app.Application
 import scorex.block.Block
 import scorex.network.BlockGenerator._
 
+import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
@@ -17,15 +18,16 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
 
   startWith(Syncing, Unit)
 
-  when(Syncing) {
-    case Event(NewBlock(block, remoteOpt), _) =>
-      assert(remoteOpt.isDefined, "Local generation attempt while syncing")
-      stay()
+  when(Syncing){
+    case Event(StartGeneration, _) => goto(Generating)
   }
 
-  when(Synced) {
-    case Event(NewBlock(block, remoteOpt), _) =>
+  when(Generating, 1.second) {
+    case Event(StateTimeout, _) =>
+      tryToGenerateABlock()
       stay()
+
+    case Event(StopGeneration, _) => goto(Syncing)
   }
 
   initialize()
@@ -57,9 +59,13 @@ object BlockGenerator {
     override val name = "syncing"
   }
 
-  case object Synced extends Status {
+  case object Generating extends Status {
     override val name = "generating"
   }
 
   case object GetStatus
+
+  case object StartGeneration
+
+  case object StopGeneration
 }

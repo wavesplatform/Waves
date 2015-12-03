@@ -22,6 +22,8 @@ case class PeerConnectionHandler(application:Application,
 
   private lazy val networkControllerRef: ActorRef = application.networkController
 
+
+
 //  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
 
   /*
@@ -104,7 +106,8 @@ case class PeerConnectionHandler(application:Application,
 
     case CommandFailed(w: Write) =>
       log.info(s"Write failed : $w " + remote)
-      peerManager.blacklistPeer(remote)
+      //todo: blacklisting
+      //peerManager.blacklistPeer(remote)
       connection ! Close
 
     case Received(data) =>

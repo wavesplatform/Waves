@@ -42,7 +42,7 @@ trait Application extends ScorexLogging {
   lazy val peerManager = new PeerManager(settings)
 
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
-  lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockGenerator], this))
+  lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGenerator], this))
 
   //wallet
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
@@ -56,7 +56,7 @@ trait Application extends ScorexLogging {
   def run() {
     checkGenesis()
 
-    blockchainSyncer ! Unit //initializing
+    blockGenerator ! Unit //initializing
 
     IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
 
