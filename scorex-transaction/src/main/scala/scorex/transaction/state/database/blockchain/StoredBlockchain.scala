@@ -83,7 +83,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   //if there are some uncommited changes from last run, discard'em
   if (signaturesIndex.size() > 0) database.rollback()
 
-  override def appendBlock(block: Block): BlockChain = synchronized {
+  override private[transaction] def appendBlock(block: Block): BlockChain = synchronized {
     val lastBlock = blockStorage.readBlock(height())
     require(height() == 0 || lastBlock.isDefined, "Should be able to get last block")
     val parent = block.referenceField
@@ -102,7 +102,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
     this
   }
 
-  override def discardBlock(): BlockChain = synchronized {
+  override private[transaction] def discardBlock(): BlockChain = synchronized {
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
     blockStorage.deleteBlock(h)

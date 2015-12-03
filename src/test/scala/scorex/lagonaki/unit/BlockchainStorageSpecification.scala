@@ -1,12 +1,11 @@
 package scorex.lagonaki.unit
 
-import org.scalatest.{Matchers, FunSuite}
-import play.api.libs.json.{Json, JsObject}
+import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.lagonaki.TestingCommons
+import scorex.transaction.SimpleTransactionModule
 import scorex.transaction.state.database.blockchain.StoredBlockchain
-import scorex.transaction.{SimpleTransactionModule, TransactionSettings}
 
 
 class BlockchainStorageSpecification extends FunSuite with Matchers with TestingCommons {
@@ -18,7 +17,7 @@ class BlockchainStorageSpecification extends FunSuite with Matchers with Testing
 
 
   test("genesis block save & find") {
-    blockchainStorage.appendBlock(Block.genesis())
-    blockchainStorage.height() should be (1)
+    transactionModule.blockStorage.appendBlock(Block.genesis())
+    blockchainStorage.height() should be(1)
   }
 }

@@ -53,7 +53,7 @@ trait History {
     * @param block - block to append
     * @return Modified version of history
     */
-  def appendBlock(block: Block): History
+  private[transaction] def appendBlock(block: Block): History
 
   def parent(block: Block): Option[Block]
 
