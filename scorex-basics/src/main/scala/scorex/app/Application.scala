@@ -7,6 +7,7 @@ import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
+import scorex.network.redone.{PeerSynchronizer, HistorySynchronizer}
 import scorex.network.{BlockGenerator, NetworkController}
 import scorex.settings.Settings
 import scorex.transaction.{History, State, TransactionModule}
@@ -60,9 +61,11 @@ trait Application extends ScorexLogging {
   def run() {
     checkGenesis()
 
-    blockGenerator ! Unit //initializing
-
     IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
+
+    val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this))
+    val peersSynchronizer = actorSystem.actorOf(Props(classOf[PeerSynchronizer], this))
+
 
     //CLOSE ON UNEXPECTED SHUTDOWN
     Runtime.getRuntime.addShutdownHook(new Thread() {

@@ -3,6 +3,7 @@ package scorex.network.redone
 import java.net.InetSocketAddress
 
 import scorex.app.Application
+import scorex.network.{SendToRandom, NetworkController}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.Message
 
@@ -22,7 +23,8 @@ class PeerSynchronizer(application:Application) extends ViewSynchronizer {
     super.preStart()
 
     val ntwMsg = Message(GetPeersSpec, Right(Unit), None)
-    context.system.scheduler.schedule(2.seconds, 1.second)(networkControllerRef ! ntwMsg)
+    val stn = NetworkController.SendToNetwork(ntwMsg, SendToRandom)
+    context.system.scheduler.schedule(2.seconds, 1.second)(networkControllerRef ! stn)
   }
 
   override def receive = {

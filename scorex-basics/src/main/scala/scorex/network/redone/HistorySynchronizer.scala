@@ -5,10 +5,10 @@ import java.net.InetSocketAddress
 import akka.actor.FSM
 import scorex.app.Application
 import scorex.block.Block
-import scorex.network.redone.NetworkObject.ConsideredValue
+import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network._
-import scorex.network.NetworkController.{SendToNetwork, DataFromPeer}
 import scorex.network.message.Message
+import scorex.network.redone.NetworkObject.ConsideredValue
 import scorex.transaction.History
 
 import scala.concurrent.duration._
@@ -23,6 +23,7 @@ class HistorySynchronizer(application: Application)
   implicit val transactionalModule = application.transactionModule
 
   import application.basicMessagesSpecsRepo._
+
   override val messageSpecs = Seq(ScoreMessageSpec, GetSignaturesSpec, SignaturesSpec, BlockMessageSpec, GetBlockSpec)
 
   lazy val scoreSyncer = new ScoreNetworkObject(self)
@@ -32,6 +33,15 @@ class HistorySynchronizer(application: Application)
   lazy val networkControllerRef = application.networkController
 
   lazy val blockGenerator = application.blockGenerator
+
+  override def preStart = {
+    super.preStart()
+    context.system.scheduler.schedule(1.second, 1.seconds) {
+      val ntwMsg = Message(ScoreMessageSpec, Right(history.score()), None)
+      val stn = NetworkController.SendToNetwork(ntwMsg, SendToRandom)
+      networkControllerRef ! stn
+    }
+  }
 
   startWith(ScoreNotCompared, Seq())
 
@@ -80,7 +90,7 @@ class HistorySynchronizer(application: Application)
       } else goto(Synced) using Seq()
   }
 
-  onTransition{
+  onTransition {
     case _ -> Synced =>
       blockGenerator ! BlockGenerator.StartGeneration
 
@@ -111,6 +121,7 @@ class HistorySynchronizer(application: Application)
 }
 
 object HistorySynchronizer {
+
   sealed trait Status
 
   case object ScoreNotCompared extends Status
@@ -118,4 +129,5 @@ object HistorySynchronizer {
   case object GettingExtension extends Status
 
   case object Synced extends Status
+
 }
