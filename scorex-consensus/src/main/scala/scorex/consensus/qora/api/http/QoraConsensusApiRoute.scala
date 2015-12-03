@@ -7,13 +7,13 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidNotNumber}
 import scorex.consensus.qora.QoraLikeConsensusModule
-import scorex.transaction.BlockChain
+import scorex.transaction.BlockStorage
 import spray.routing.Route
 
 import scala.util.Try
 
 @Api(value = "/consensus", description = "Consensus-related calls")
-case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, blockchain: BlockChain)
+case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, blockStorage: BlockStorage)
                                 (implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
@@ -30,7 +30,7 @@ case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, block
   def generating = {
     path("generatingbalance" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(blockchain, encodedSignature) { block =>
+        withBlock(blockStorage.history, encodedSignature) { block =>
           Json.obj(
             "generatingbalance" -> consensusModule.consensusBlockData(block).generatingBalance
           )
@@ -44,7 +44,7 @@ case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, block
   def nextGenerating = {
     path("generatingbalance") {
       jsonRoute {
-        val generatingBalance = consensusModule.getNextBlockGeneratingBalance(blockchain)
+        val generatingBalance = consensusModule.getNextBlockGeneratingBalance(blockStorage.history)
         Json.obj("generatingbalance" -> generatingBalance).toString()
       }
     }
@@ -72,7 +72,7 @@ case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, block
   def time = {
     path("time") {
       jsonRoute {
-        val block = blockchain.lastBlock
+        val block = blockStorage.history.lastBlock
         val genBalance = consensusModule.consensusBlockData(block).generatingBalance
         val timePerBlock = consensusModule.getBlockTime(genBalance)
         Json.obj("time" -> timePerBlock).toString()

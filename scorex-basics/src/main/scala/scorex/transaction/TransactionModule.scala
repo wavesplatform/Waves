@@ -8,6 +8,8 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   val history: History
 
+  val blockStorage: BlockStorage
+
   def isValid(block: Block): Boolean
 
   def transactions(block: Block): Seq[Transaction]

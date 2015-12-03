@@ -97,19 +97,19 @@ class LagonakiApplication(val settingsFilename: String)
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
   lazy val storedState = transactionModule.state
-  lazy val blockchainImpl = transactionModule.history
+  lazy val blockStorage = transactionModule.blockStorage
 
   val consensusApiRoute = consensusModule match {
     case ncm: NxtLikeConsensusModule =>
-      new NxtConsensusApiRoute(ncm, blockchainImpl)
+      new NxtConsensusApiRoute(ncm, blockStorage)
     case qcm: QoraLikeConsensusModule =>
-      new QoraConsensusApiRoute(qcm, blockchainImpl)
+      new QoraConsensusApiRoute(qcm, blockStorage)
     case pcm: PermaConsensusModule =>
-      new PermaConsensusApiRoute(pcm, blockchainImpl)
+      new PermaConsensusApiRoute(pcm, blockStorage)
   }
 
   override lazy val apiRoutes = Seq(
-    BlocksApiRoute(blockchainImpl, wallet),
+    BlocksApiRoute(blockStorage.history, wallet),
     TransactionsApiRoute(storedState),
     consensusApiRoute,
     WalletApiRoute(wallet),
@@ -137,13 +137,12 @@ class LagonakiApplication(val settingsFilename: String)
   )
 
   def checkGenesis(): Unit = {
-    if (blockchainImpl.isEmpty) {
+    if (blockStorage.history.isEmpty) {
       val genesisBlock = Block.genesis()
-      storedState.processBlock(genesisBlock)
-      blockchainImpl.appendBlock(genesisBlock).ensuring(_.height() == 1)
+      transactionModule.blockStorage.appendBlock(genesisBlock)
       log.info("Genesis block has been added to the state")
     }
-  }.ensuring(blockchainImpl.height() >= 1)
+  }.ensuring(blockStorage.history.height() >= 1)
 
   def run() {
     require(transactionModule.balancesSupport)

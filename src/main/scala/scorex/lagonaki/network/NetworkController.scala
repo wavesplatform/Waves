@@ -45,7 +45,7 @@ class NetworkController(application: LagonakiApplication) extends Actor with Sco
 
     if (score > prevBestScore) {
       connectedPeers.foreach { case (_, PeerData(handler, _)) =>
-        handler ! PeerConnectionHandler.BestPeer(remote, score > application.blockchainImpl.score)
+        handler ! PeerConnectionHandler.BestPeer(remote, score > application.blockStorage.history.score)
       }
     }
   }
@@ -129,7 +129,7 @@ class NetworkController(application: LagonakiApplication) extends Actor with Sco
 
     case NewBlock(block, Some(sndr)) =>
       blockchainSyncer ! NewBlock(block, Some(sndr))
-      val height = application.blockchainImpl.height()
+      val height = application.blockStorage.history.height()
       self ! BroadcastMessage(BlockMessage(height, block), List(sndr))
 
     case UpdateBlockchainScore(remote, height, score) => updateScore(remote, height, score)

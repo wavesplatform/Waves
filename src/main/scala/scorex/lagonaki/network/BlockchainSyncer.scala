@@ -40,7 +40,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
       processMaxScore(
         scoreOpt,
         onMax = () => {
-          val sigs = application.blockchainImpl.lastSignatures(application.settings.MaxBlocksChunks)
+          val sigs = application.blockStorage.history.lastSignatures(application.settings.MaxBlocksChunks)
           val msg = GetSignaturesMessage(sigs)
           networkController ! NetworkController.SendMessageToBestPeer(msg)
           stay()
@@ -99,7 +99,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
                          if (application.settings.offlineGeneration) goto(Generating).using(Unit) else goto(Offline)
                      ): State = scoreOpt match {
     case Some(maxScore) =>
-      val localScore = application.blockchainImpl.score()
+      val localScore = application.blockStorage.history.score()
       log.info(s"maxScore: $maxScore, localScore: $localScore")
       if (maxScore > localScore) onMax() else onLocal()
     case None =>
@@ -109,13 +109,12 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
   def processNewBlock(block: Block, remoteOpt: Option[InetSocketAddress]) = {
     val fromStr = remoteOpt.map(_.toString).getOrElse("local")
     if (block.isValid) {
-      application.storedState.processBlock(block)
-      application.blockchainImpl.appendBlock(block)
-      log.info(s"New block: $block from $fromStr. New size: ${application.blockchainImpl.height()}, " +
-        s"score: ${application.blockchainImpl.score()}, timestamp: ${block.timestampField.value}")
+      application.blockStorage.appendBlock(block)
+      log.info(s"New block: $block from $fromStr. New size: ${application.blockStorage.history.height()}, " +
+        s"score: ${application.blockStorage.history.score()}, timestamp: ${block.timestampField.value}")
 
       block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-      val height = application.blockchainImpl.height()
+      val height = application.blockStorage.history.height()
 
       //broadcast block only if it is generated locally
       if (remoteOpt.isEmpty) {

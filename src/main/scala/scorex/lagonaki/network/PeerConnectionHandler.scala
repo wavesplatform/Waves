@@ -24,7 +24,7 @@ class PeerConnectionHandler(application: LagonakiApplication,
 
   private var best = false
 
-  private lazy val blockchainStorage = application.blockchainImpl
+  private lazy val blockchainStorage = application.blockStorage.history
   private lazy val networkController = application.networkController
 
   private lazy val settings = application.settings
@@ -56,7 +56,7 @@ class PeerConnectionHandler(application: LagonakiApplication,
         log.info(s"Got GetSignaturesMessage with ${signaturesGot.length} sigs within")
 
         signaturesGot.exists { parent =>
-          val headers = application.blockchainImpl.getSignatures(parent, settings.MaxBlocksChunks)
+          val headers = application.blockStorage.history.getSignatures(parent, settings.MaxBlocksChunks)
           if (headers.nonEmpty) {
             self ! SignaturesMessage(Seq(parent) ++ headers)
             true
