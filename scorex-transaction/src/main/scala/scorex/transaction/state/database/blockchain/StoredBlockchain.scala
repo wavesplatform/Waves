@@ -97,9 +97,10 @@ class StoredBlockchain(dataFolderOpt: Option[String])
         case Some(commonBlock) =>
           val branchPoint = heightOf(commonBlock).get
           val blockScore = consensusModule.blockScore(commonBlock)
-          val currentScore = (branchPoint to height()).map(i => consensusModule.blockScore(blockAt(i).get)).sum
+          val currentScore = ((branchPoint + 1) to height()).map(i => consensusModule.blockScore(blockAt(i).get)).sum
           //TODO should not be able to rollback infinitely
           if(blockScore > currentScore) throw new ShouldBranchFrom(commonBlock.uniqueId)
+          else log.info("Don't add new block with smaller score")
         case None => throw new Error(s"Appending block ${block.json} which parent is not in blockchain")
       }
       this
