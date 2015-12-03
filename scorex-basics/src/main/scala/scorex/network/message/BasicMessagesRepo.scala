@@ -4,16 +4,22 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
+import scorex.app.Application
 import scorex.block.Block
-import scorex.crypto.{EllipticCurveImpl, SigningFunctions}
+import scorex.consensus.ConsensusModule
 import scorex.crypto.SigningFunctions._
+import scorex.crypto.{EllipticCurveImpl, SigningFunctions}
 import scorex.network.message.Message._
-import scorex.transaction.History
+import scorex.transaction.{TransactionModule, History}
 
 import scala.util.Try
 
 
-object BasicMessagesRepo {
+class BasicMessagesRepo(application: Application) {
+
+  private implicit lazy val transactionalModule = application.transactionModule
+  private implicit lazy val consensusModule = application.consensusModule
+
 
   object GetPeersSpec extends MessageSpec[Unit] {
     override val messageCode: Message.MessageCode = 1: Byte

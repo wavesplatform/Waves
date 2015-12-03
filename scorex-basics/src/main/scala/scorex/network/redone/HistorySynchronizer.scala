@@ -8,7 +8,6 @@ import scorex.block.Block
 import scorex.network.redone.NetworkObject.ConsideredValue
 import scorex.network._
 import scorex.network.NetworkController.{SendToNetwork, DataFromPeer}
-import scorex.network.message.BasicMessagesRepo._
 import scorex.network.message.Message
 import scorex.transaction.History
 
@@ -20,6 +19,10 @@ class HistorySynchronizer(application: Application)
 
   import HistorySynchronizer._
 
+  implicit val consensusModule = application.consensusModule
+  implicit val transactionalModule = application.transactionModule
+
+  import application.basicMessagesSpecsRepo._
   override val messageSpecs = Seq(ScoreMessageSpec, GetSignaturesSpec, SignaturesSpec, BlockMessageSpec, GetBlockSpec)
 
   lazy val scoreSyncer = new ScoreNetworkObject(self)

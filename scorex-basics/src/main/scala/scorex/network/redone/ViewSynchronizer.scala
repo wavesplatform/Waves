@@ -12,7 +12,7 @@ import scorex.utils.ScorexLogging
  */
 
 //todo: anti-ddos?
-trait ViewSynchronizer extends Actor with ScorexLogging {
+trait ViewSynchronizer extends Actor{
 
   protected val networkControllerRef: ActorRef
 

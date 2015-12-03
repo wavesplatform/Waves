@@ -9,8 +9,6 @@ import scorex.transaction.LagonakiTransaction
 import scorex.transaction.state.LagonakiState
 import scorex.utils.ScorexLogging
 
-import scala.util.Try
-
 
 /** Store current balances only, and balances changes within effective balance depth.
   * Store transactions for selected accounts only.
@@ -80,7 +78,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
-  def processBlock(block: Block): Unit = processBlock(block, reversal = false)
+  override def processBlock(block: Block): Unit = processBlock(block, reversal = false)
 
   override def processBlock(block: Block, reversal: Boolean): Unit = {
     val balanceChanges = block.transactionModule.transactions(block)

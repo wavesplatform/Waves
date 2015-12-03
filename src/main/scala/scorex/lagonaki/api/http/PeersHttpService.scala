@@ -8,9 +8,7 @@ import akka.pattern.ask
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.network.{BlockchainGenerator$, NetworkController}
-import NetworkController.PeerData
-import scorex.lagonaki.network.NetworkController
+import scorex.network.{ConnectedPeer, NetworkController}
 import scorex.lagonaki.server.LagonakiApplication
 import spray.http.MediaTypes._
 
@@ -23,7 +21,7 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
 
   override lazy val route =
     pathPrefix("peers") {
-      peers ~ height
+      peers ~ score
     }
 
   @Path("/")
@@ -36,8 +34,8 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
       respondWithMediaType(`application/json`) {
         onComplete {
           (application.networkController ? NetworkController.GetPeers).map { peers =>
-            Json.obj("peers" -> Json.arr(peers.asInstanceOf[Map[InetSocketAddress, PeerData]]
-              .map(_._1.getAddress.toString))).toString()
+            Json.obj("peers" -> Json.arr(peers.asInstanceOf[Seq[ConnectedPeer]]
+              .map(_.address.toString))).toString()
           }
         } {
           case Success(value) => complete(value)
@@ -53,7 +51,7 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
     new ApiResponse(code = 200, message = "Json with response or error"),
     new ApiResponse(code = 500, message = "Internal error")
   ))
-  def height = path("score") {
+  def score = path("score") {
     //todo:fix
     get {
       respondWithMediaType(`application/json`) {

@@ -1,11 +1,11 @@
 package scorex.app
 
-import akka.actor.{Props, ActorSystem}
+import akka.actor.{ActorSystem, Props}
 import akka.io.IO
 import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
-import scorex.network.message.MessageHandler
+import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
 import scorex.network.{BlockGenerator, NetworkController}
 import scorex.settings.Settings
@@ -13,19 +13,19 @@ import scorex.transaction.{History, State, TransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import spray.can.Http
-import scala.reflect.runtime.universe.Type
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.reflect.runtime.universe.Type
 
 
 trait Application extends ScorexLogging {
-  val applicationName:String
+  val applicationName: String
 
   //settings
   implicit val settings: Settings
 
   //modules
-  implicit val consensusModule : ConsensusModule[_]
+  implicit val consensusModule: ConsensusModule[_]
   implicit val transactionModule: TransactionModule[_]
 
   //api
@@ -36,8 +36,12 @@ trait Application extends ScorexLogging {
   lazy val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], apiTypes, apiRoutes), "api")
 
 
+  protected val additionalSpecs: Seq[MessageSpec[_]]
+
+  lazy val basicMessagesSpecsRepo = new BasicMessagesRepo(this)
+
   //p2p
-  val messagesHandler:MessageHandler
+  lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalSpecs)
 
   lazy val peerManager = new PeerManager(settings)
 

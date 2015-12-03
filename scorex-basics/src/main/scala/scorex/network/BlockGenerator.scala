@@ -7,8 +7,8 @@ import scorex.app.Application
 import scorex.block.Block
 import scorex.network.BlockGenerator._
 
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 
@@ -18,7 +18,7 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
 
   startWith(Syncing, Unit)
 
-  when(Syncing){
+  when(Syncing) {
     case Event(StartGeneration, _) => goto(Generating)
   }
 
@@ -28,6 +28,12 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
       stay()
 
     case Event(StopGeneration, _) => goto(Syncing)
+  }
+
+  whenUnhandled {
+    case Event(GetStatus, _) =>
+      sender() ! stateName.name
+      stay()
   }
 
   initialize()

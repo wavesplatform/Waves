@@ -80,8 +80,6 @@ class LagonakiApplication(val settingsFilename: String)
     typeOf[AddressApiRoute]
   )
 
-  override val messagesHandler = MessageHandler(BasicMessagesRepo.specs ++ new TransactionalMessagesRepo())
-
   //checks
   require(transactionModule.balancesSupport)
   require(transactionModule.accountWatchingSupport)

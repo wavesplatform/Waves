@@ -22,6 +22,7 @@ case class PeerConnectionHandler(application:Application,
 
   private lazy val networkControllerRef: ActorRef = application.networkController
 
+  val selfPeer = ConnectedPeer(remote, self)
 
 
 //  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
@@ -111,7 +112,7 @@ case class PeerConnectionHandler(application:Application,
       connection ! Close
 
     case Received(data) =>
-      application.messagesHandler.parse(data.toByteBuffer, Some(remote)) match {
+      application.messagesHandler.parse(data.toByteBuffer, Some(selfPeer)) match {
         case Success(message) =>
           log.info("received message " + message.getClass.getSimpleName + " from " + remote)
           networkControllerRef ! message

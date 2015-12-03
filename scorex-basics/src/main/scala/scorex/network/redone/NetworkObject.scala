@@ -69,12 +69,13 @@ trait NetworkObject[V] {
 
 
 class ScoreNetworkObject(//override val networkControllerRef: ActorRef,
-                         override val localComponentRef: ActorRef) extends NetworkObject[History.BlockchainScore] {
+                         override val localComponentRef: ActorRef) extends NetworkObject[BlockchainScore] {
 
   override def consider(candidates: Map[ConnectedPeer, BlockchainScore])
-  : (Option[BlockchainScore], Map[ConnectedPeer, BlockchainScore]) = {
+  : (Option[BlockchainScore], Seq[ConnectedPeer], Map[ConnectedPeer, BlockchainScore]) = {
     val bestNetworkScore = candidates.maxBy(_._2)._2
-    (Some(bestNetworkScore), candidates.filter(_._2 == bestNetworkScore))
+    val witnesses = candidates.filter(_._2 == bestNetworkScore).keys.toSeq
+    (Some(bestNetworkScore), witnesses, candidates.filter(_._2 == bestNetworkScore))
   }
 
 }

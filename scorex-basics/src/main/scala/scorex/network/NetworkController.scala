@@ -193,7 +193,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
         randomHandler ! message
       } */
 
-    case GetPeers => sender() ! connectedPeers.toMap
+    case GetPeers => sender() ! connectedPeers.values.toSeq
 
     /* case GetMaxChainScore =>
       sender() ! BlockGenerator.MaxChainScore(maxPeerScore())
