@@ -82,13 +82,13 @@ trait Block extends ScorexLogging {
   def isValid: Boolean = {
     val v = consensusModule.isValid(this) &&
       transactionModule.isValid(this) &&
-      transactionModule.history.contains(referenceField.value) &&
+      transactionModule.blockStorage.history.contains(referenceField.value) &&
       EllipticCurveImpl.verify(signerDataField.value.signature,
         bytesWithoutSignature,
         signerDataField.value.generator.publicKey)
     if (!v) log.debug(
       s"Block checks: ${consensusModule.isValid(this)} && ${transactionModule.isValid(this)} && " +
-        s"${transactionModule.history.contains(referenceField.value)} && " +
+        s"${transactionModule.blockStorage.history.contains(referenceField.value)} && " +
         EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
           signerDataField.value.generator.publicKey)
     )

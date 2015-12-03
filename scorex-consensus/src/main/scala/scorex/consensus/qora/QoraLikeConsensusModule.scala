@@ -94,8 +94,8 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
                                     (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
     val version = 1: Byte
 
-    val history = transactionModule.history
-    val state = transactionModule.state
+    val history = transactionModule.blockStorage.history
+    val state = transactionModule.blockStorage.state
 
     require(state.isInstanceOf[State with BalanceSheet])
     val generationBalance = state.asInstanceOf[State with BalanceSheet].generationBalance(account)
@@ -145,8 +145,8 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     })
 
   override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = {
-    val history = transactionModule.history
-    val state = transactionModule.state
+    val history = transactionModule.blockStorage.history
+    val state = transactionModule.blockStorage.state
 
     val data = block.consensusDataField.asInstanceOf[QoraConsensusBlockField].value
 

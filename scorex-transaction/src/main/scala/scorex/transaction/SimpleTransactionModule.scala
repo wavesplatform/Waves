@@ -36,15 +36,14 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
 
   val TransactionSizeLength = 4
 
-  override val history = new StoredBlockchain(settings.dataDirOpt)(consensusModule, this)
-  override val state = new StoredState(settings.dataDirOpt)
-  override val blockStorage = new StoredBlockStorage(history, state)
+  override val blockStorage = new StoredBlockStorage(new StoredBlockchain(settings.dataDirOpt)(consensusModule, this),
+    new StoredState(settings.dataDirOpt))
 
   /**
-   * In Lagonaki, transaction-related data is just sequence of transactions. No Merkle-tree root of txs / state etc
-   * @param bytes - serialized sequence of transaction
-   * @return
-   */
+    * In Lagonaki, transaction-related data is just sequence of transactions. No Merkle-tree root of txs / state etc
+    * @param bytes - serialized sequence of transaction
+    * @return
+    */
   override def parseBlockData(bytes: Array[Byte]): TransactionsBlockField = {
     bytes.isEmpty match {
       case true => TransactionsBlockField(Seq())
@@ -78,9 +77,9 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
       case None =>
     })
 
-    val height = history.height()
+    val height = blockStorage.history.height()
     if (height > MaxBlocksForUnconfirmed + 1) {
-      val time10 = history.blockAt(height - MaxBlocksForUnconfirmed).get.timestampField.value
+      val time10 = blockStorage.history.blockAt(height - MaxBlocksForUnconfirmed).get.timestampField.value
       UnconfirmedTransactionsDatabaseImpl.all().foreach { tx =>
         if (tx.timestamp < time10) UnconfirmedTransactionsDatabaseImpl.remove(tx)
       }
@@ -116,7 +115,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     case ptx: PaymentTransaction =>
       ptx.isSignatureValid() && ptx.validate()(this) == ValidationResult.ValidateOke
     case gtx: GenesisTransaction =>
-      history.heightOf(block).getOrElse(0) == 1
+      blockStorage.history.heightOf(block).getOrElse(0) == 1
     case otx: Any =>
       log.error(s"Wrong kind of tx: $otx")
       false
