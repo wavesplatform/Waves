@@ -5,9 +5,11 @@ import java.io.{DataInput, DataOutput, File}
 import org.mapdb.{DB, DBMaker, DataIO, Serializer}
 import scorex.account.Account
 import scorex.block.Block
-import scorex.transaction.LagonakiTransaction
 import scorex.transaction.state.LagonakiState
+import scorex.transaction.{LagonakiTransaction, State}
 import scorex.utils.ScorexLogging
+
+import scala.util.Try
 
 
 /** Store current balances only, and balances changes within effective balance depth.
@@ -78,7 +80,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
-  override def processBlock(block: Block, reversal: Boolean): Unit = {
+  override def processBlock(block: Block, reversal: Boolean): Try[State] = Try {
     val balanceChanges = block.transactionModule.transactions(block)
       .foldLeft(block.consensusModule.feesDistribution(block)) { case (changes, atx) => atx match {
         case tx: LagonakiTransaction =>
@@ -94,10 +96,10 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
             iChanges.updated(acc, newChange)
           }
 
-        case _ =>
-          log.error("Wrong transaction type in pattern-matching")
-          changes
-      }}
+        case m =>
+          throw new Error("Wrong transaction type in pattern-matching" + m)
+      }
+      }
 
     balanceChanges.foreach { case (acc, delta) =>
       val balance = Option(balances.get(acc)).getOrElse(0L)
@@ -108,6 +110,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
     val newHeight = (if (!reversal) stateHeight() + 1 else stateHeight() - 1).ensuring(_ > 0)
     setStateHeight(newHeight)
     database.commit()
+    this
   }
 
   //todo: confirmations

@@ -3,6 +3,8 @@ package scorex.transaction
 import scorex.account.Account
 import scorex.block.Block
 
+import scala.util.Try
+
 /**
   * History of a blockchain system is some blocktree in fact(like this: http://image.slidesharecdn.com/sfbitcoindev-chepurnoy-2015-150322043044-conversion-gate01/95/proofofstake-its-improvements-san-francisco-bitcoin-devs-hackathon-12-638.jpg),
   * where longest chain is being considered as canonical one, containing right kind of history.
@@ -53,7 +55,7 @@ trait History {
     * @param block - block to append
     * @return Modified version of history
     */
-  private[transaction] def appendBlock(block: Block): History
+  private[transaction] def appendBlock(block: Block): Try[History]
 
   def parent(block: Block): Option[Block]
 

@@ -3,7 +3,7 @@ package scorex.transaction
 import scorex.block.Block
 import scorex.block.Block.BlockId
 
-import scala.util.Try
+import scala.util.{Success, Failure, Try}
 
 /**
   * Storage interface combining both history(blockchain/blocktree) and state
@@ -14,10 +14,14 @@ trait BlockStorage {
   val history: BlockChain
   val state: State
 
-  def appendBlock(block: Block): Try[Unit] = synchronized {
-    state.processBlock(block)
-    history.appendBlock(block)
-    Try()
+  def appendBlock(block: Block): Try[History] = synchronized {
+    state.processBlock(block) match {
+      case Success(_) => history.appendBlock(block).recoverWith { case t: Throwable =>
+        state.processBlock(block, reversal = true)
+        Failure(t)
+      }
+      case Failure(ex) => Failure(ex)
+    }
   }
 
   def removeAfter(signature: BlockId): Unit = synchronized {
