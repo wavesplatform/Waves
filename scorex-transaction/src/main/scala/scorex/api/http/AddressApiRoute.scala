@@ -86,7 +86,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "Message",
+      dataType = "SignedMessage",
       defaultValue = "{\n\t\"message\":\"Base58-encoded message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
     )
   ))
@@ -105,7 +105,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "Message",
+      dataType = "SignedMessage",
       defaultValue = "{\n\t\"message\":\"Plain message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
     )
   ))
@@ -270,10 +270,10 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
         entity(as[String]) { jsText =>
           complete {
             val parsed = Try(Json.parse(jsText)).getOrElse(WrongJson.json)
-            val jsRes = parsed.validate[Message] match {
+            val jsRes = parsed.validate[SignedMessage] match {
               case err: JsError =>
                 WrongJson.json
-              case JsSuccess(m: Message, _) =>
+              case JsSuccess(m: SignedMessage, _) =>
                 if (!Account.isValidAddress(address)) {
                   InvalidAddress.json
                 } else {
@@ -301,19 +301,19 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   // Workaround to show datatype of post request without using it in another route
   // Related: https://github.com/swagger-api/swagger-core/issues/606
   // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
-  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[Message])
+  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[SignedMessage])
   protected def messagesModel = Unit
 
 }
 
-case class Message(message: String, signature: String, publickey: String)
+case class SignedMessage(message: String, signature: String, publickey: String)
 
-object Message {
+object SignedMessage {
 
-  implicit val messageReads: Reads[Message] = (
+  implicit val messageReads: Reads[SignedMessage] = (
     (JsPath \ "message").read[String] and
       (JsPath \ "signature").read[String] and
       (JsPath \ "publickey").read[String]
-    ) (Message.apply _)
+    ) (SignedMessage.apply _)
 
 }

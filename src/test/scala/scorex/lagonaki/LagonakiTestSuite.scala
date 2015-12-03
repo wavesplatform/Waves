@@ -1,7 +1,7 @@
 package scorex.lagonaki
 
 import org.scalatest.{BeforeAndAfterAll, Suites}
-import scorex.lagonaki.integration.{BlockchainSyncerSpecification, BlocksRoutingSpecification, ValidChainGenerationSpecification}
+import scorex.lagonaki.integration.{BlockGeneratorSpecification, BlocksRoutingSpecification, ValidChainGenerationSpecification}
 import scorex.lagonaki.unit._
 
 class LagonakiTestSuite extends Suites(
@@ -10,7 +10,7 @@ class LagonakiTestSuite extends Suites(
   , new BlockSpecification
   , new BlockchainStorageSpecification
   , new WalletSpecification
-  , new BlockchainSyncerSpecification
+  , new BlockGeneratorSpecification
   , new BlocksRoutingSpecification
 
   //integration tests - slow!

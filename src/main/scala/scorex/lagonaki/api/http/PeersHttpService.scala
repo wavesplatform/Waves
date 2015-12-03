@@ -21,7 +21,7 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
 
   override lazy val route =
     pathPrefix("peers") {
-      peers ~ score
+      peers // todo: fix ~ score
     }
 
   @Path("/")
@@ -44,6 +44,9 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
       }
     }
   }
+
+  /*
+  todo: fix
 
   @Path("/score")
   @ApiOperation(value = "Score", notes = "Node with a maximum blockchain score", httpMethod = "GET")
@@ -68,6 +71,6 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
         }
       }
     }
-  }
+  } */
 
 }

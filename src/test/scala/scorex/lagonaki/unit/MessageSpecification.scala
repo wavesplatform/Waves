@@ -5,9 +5,7 @@ import java.nio.ByteBuffer
 import org.scalatest.FunSuite
 import scorex.lagonaki.server.LagonakiSettings
 import scorex.consensus.nxt.NxtLikeConsensusModule
-import scorex.lagonaki.network.message._
 import scorex.network.message.Message
-import scorex.network.{GetSignaturesMessage, SignaturesMessage, ScoreMessage}
 import scorex.transaction.SimpleTransactionModule
 
 import scorex.crypto.EllipticCurveImpl.SignatureLength
@@ -18,10 +16,9 @@ class MessageSpecification extends FunSuite {
   implicit val transactionModule = new SimpleTransactionModule
 
   test("ScoreMessage roundtrip 1") {
-    val h1 = 1
     val s1 = BigInt(2)
 
-    val msg = ScoreMessage(h1, s1)
+    val msg = ScoreMessage(s1)
     val parsed = Message.parse(ByteBuffer.wrap(msg.bytes)).get
 
     assert(parsed.isInstanceOf[ScoreMessage])

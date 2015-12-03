@@ -9,8 +9,8 @@ import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
 import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRoute}
-import scorex.network.{TransactionalMessagesRepo, NetworkController}
-import scorex.network.message.{BasicMessagesRepo, MessageHandler}
+import scorex.network.message.Message
+import scorex.network.{Broadcast, TransactionalMessagesRepo, NetworkController}
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
@@ -80,6 +80,9 @@ class LagonakiApplication(val settingsFilename: String)
     typeOf[AddressApiRoute]
   )
 
+  //todo: is it needed at all ???
+  override lazy val additionalSpecs = TransactionalMessagesRepo.specs
+
   //checks
   require(transactionModule.balancesSupport)
   require(transactionModule.accountWatchingSupport)
@@ -89,7 +92,9 @@ class LagonakiApplication(val settingsFilename: String)
 
   def onNewOffchainTransaction(transaction: LagonakiTransaction) =
     if (UnconfirmedTransactionsDatabaseImpl.putIfNew(transaction)) {
-      networkController ! NetworkController.BroadcastMessage(TransactionMessage(transaction))
+      val spec = TransactionalMessagesRepo.TransactionMessageSpec
+      val ntwMsg = Message(spec, Right(transaction), None)
+      networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
     }
 
   def createPayment(payment: Payment): Option[PaymentTransaction] = {
