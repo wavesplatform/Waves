@@ -114,11 +114,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
   override def isValid(block: Block): Boolean = transactions(block)
     .forall(isValid(_, blockStorage.history.heightOf(block).getOrElse(0) == 1))
 
-  def isValid(transaction: Transaction, idGenesisBlock: Boolean = false): Boolean = transaction match {
+  def isValid(transaction: Transaction, isGenesisBlock: Boolean = false): Boolean = transaction match {
     case ptx: PaymentTransaction =>
       ptx.isSignatureValid() && ptx.validate()(this) == ValidationResult.ValidateOke
     case gtx: GenesisTransaction =>
-      idGenesisBlock
+      isGenesisBlock
     case otx: Any =>
       log.error(s"Wrong kind of tx: $otx")
       false
