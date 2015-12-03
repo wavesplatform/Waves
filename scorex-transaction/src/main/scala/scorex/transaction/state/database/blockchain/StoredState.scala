@@ -110,10 +110,6 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
     database.commit()
   }
 
-  def appendBlock(block: Block): Unit = processBlock(block, reversal = false)
-
-  def discardBlock(block: Block): Unit = processBlock(block, reversal = true)
-
   //todo: confirmations
   override def balance(address: String, confirmations: Int): Long = {
     val acc = new Account(address)

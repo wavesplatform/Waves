@@ -14,10 +14,6 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   def transactions(block: Block): Seq[Transaction]
 
-  def process(block: Block): Unit = state.processBlock(block, reversal = false)
-
-  def popOff(block: Block): Unit = state.processBlock(block, reversal = true)
-
   def packUnconfirmed(): TransactionBlockData
 
   def clearFromUnconfirmed(data: TransactionBlockData): Unit

@@ -96,7 +96,6 @@ class LagonakiApplication(val settingsFilename: String)
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
-  lazy val storedState = transactionModule.state
   lazy val blockStorage = transactionModule.blockStorage
 
   val consensusApiRoute = consensusModule match {
@@ -110,14 +109,14 @@ class LagonakiApplication(val settingsFilename: String)
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(blockStorage.history, wallet),
-    TransactionsApiRoute(storedState),
+    TransactionsApiRoute(blockStorage.state),
     consensusApiRoute,
     WalletApiRoute(wallet),
     PaymentApiRoute(this),
     ScorexApiRoute(this),
     SeedApiRoute(),
     PeersHttpService(this),
-    AddressApiRoute(wallet, storedState)
+    AddressApiRoute(wallet, blockStorage.state)
   )
 
   override lazy val apiTypes = Seq(
