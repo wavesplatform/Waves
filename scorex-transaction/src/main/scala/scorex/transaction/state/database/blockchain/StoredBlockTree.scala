@@ -34,15 +34,14 @@ class StoredBlockTree(dataFolderOpt: Option[String])
       parent match {
         case Some(p) =>
           val s = p._2 + blockScore
-          if (s > score()) {
-            bestBlockId = block.uniqueId
-          }
+          if (s > score()) bestBlockId = block.uniqueId
           memStorage.put(block.uniqueId, (block, s, p._3 + 1))
-        case None => if (memStorage.isEmpty) {
-          bestBlockId = block.uniqueId
-          memStorage.put(block.uniqueId, (block, blockScore, 1))
-        } else {
-          throw new Error("Parent block is not in tree")
+        case None => memStorage.isEmpty match {
+          case true =>
+            bestBlockId = block.uniqueId
+            memStorage.put(block.uniqueId, (block, blockScore, 1))
+          case false =>
+            throw new Error("Parent block is not in tree")
         }
       }
     }
@@ -60,7 +59,6 @@ class StoredBlockTree(dataFolderOpt: Option[String])
       }
       iterate(readBlock(bestBlockId).get, f)
     }
-
   }
 
   private val blockStorage = dataFolderOpt match {
