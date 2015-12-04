@@ -15,17 +15,21 @@ trait BlockStorage extends ScorexLogging {
   val history: BlockChain
   val state: State
 
-  def appendBlock(block: Block): Try[History] = synchronized {
+  def appendBlock(block: Block): Try[Unit] = synchronized {
     state.processBlock(block) match {
-      case Success(_) => history.appendBlock(block).recoverWith {
-        case ShouldBranchFrom(sig) =>
-          log.info(s"Better chain detected, rollback to ${sig.mkString}")
-          removeAfter(sig)
-          appendBlock(block)
-        case t: Throwable =>
-          state.processBlock(block, reversal = true)
-          Failure(t)
-      }
+      case Success(newState) =>
+        history.appendBlock(block) match {
+          case Success(newHistory) => Success()
+          case Failure(e) => e match {
+            case ShouldBranchFrom(sig) =>
+              log.info(s"Better chain detected, rollback to ${sig.mkString}")
+              removeAfter(sig)
+              appendBlock(block)
+            case t: Throwable =>
+              state.processBlock(block, reversal = true)
+              Failure(t)
+          }
+        }
       case Failure(ex) => Failure(ex)
     }
   }
