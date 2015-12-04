@@ -6,8 +6,6 @@ import org.scalatest.FunSuite
 import scorex.lagonaki.TestingCommons
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.block.Block
-import scorex.network.BlockMessage
-import scorex.network.message.Message
 
 class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
   ignore("retroactive chain test") {
@@ -38,9 +36,12 @@ class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
 
     //serialization/deserialization  thru BlockMessage roundtrip test
 
-    val restored = Message.parse(ByteBuffer.wrap(b2.bytes)).get.asInstanceOf[BlockMessage].block
-    assert(restored.timestampField.value == b2.timestampField.value)
-    assert(restored.isValid)
+    application.messagesHandler.parse(ByteBuffer.wrap(b2.bytes), None).get.data.get match {
+      case restored:Block =>
+          assert (restored.timestampField.value == b2.timestampField.value)
+          assert (restored.isValid)
+      case _ => fail("wrong data type")
+    }
 
     application.stopAll()
   }

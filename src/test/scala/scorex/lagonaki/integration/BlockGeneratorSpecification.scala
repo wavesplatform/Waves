@@ -7,11 +7,14 @@ import scorex.lagonaki.server.LagonakiApplication
 import scorex.utils.untilTimeout
 import scala.concurrent.duration._
 
+//todo: props test: in any state startgenerating->stopgenerating sequence leads to Syncing state
 class BlockGeneratorSpecification(_system: ActorSystem)
   extends TestKit(_system)
   with ImplicitSender
   with WordSpecLike
   with Matchers {
+
+  import scorex.network.BlockGenerator._
 
   def this() = this(ActorSystem("MySpec"))
 
@@ -19,12 +22,13 @@ class BlockGeneratorSpecification(_system: ActorSystem)
   val bcs = application.blockGenerator
 
   "BlockGenerator actor" must {
-    "be offline on load" in {
+    "be syncing on start" in {
       bcs ! GetStatus
-      expectMsg(Offline.name)
+      expectMsg(Syncing.name)
     }
+
     "generate after downloading state" in {
-      bcs ! Unit
+      bcs ! StartGeneration
       //Wait up to 5 seconds to download blockchain and become generating
       untilTimeout(5.seconds) {
         bcs ! GetStatus

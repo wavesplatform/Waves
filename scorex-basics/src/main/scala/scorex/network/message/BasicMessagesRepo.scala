@@ -4,7 +4,6 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.crypto.SigningFunctions._
@@ -15,11 +14,8 @@ import scorex.transaction.{TransactionModule, History}
 import scala.util.Try
 
 
-class BasicMessagesRepo(application: Application) {
-
-  private implicit lazy val transactionalModule = application.transactionModule
-  private implicit lazy val consensusModule = application.consensusModule
-
+class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
+                          consensusModule: ConsensusModule[_]) {
 
   object GetPeersSpec extends MessageSpec[Unit] {
     override val messageCode: Message.MessageCode = 1: Byte

@@ -3,51 +3,47 @@ package scorex.lagonaki.unit
 import java.nio.ByteBuffer
 
 import org.scalatest.FunSuite
-import scorex.lagonaki.server.LagonakiSettings
+import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
-import scorex.network.message.Message
-import scorex.transaction.SimpleTransactionModule
-
 import scorex.crypto.EllipticCurveImpl.SignatureLength
+import scorex.lagonaki.server.LagonakiSettings
+import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler}
+import scorex.transaction.{History, SimpleTransactionModule}
 
 class MessageSpecification extends FunSuite {
-  implicit val consensusModule = new NxtLikeConsensusModule
-  implicit val settings = new LagonakiSettings("settings-test.json")
-  implicit val transactionModule = new SimpleTransactionModule
+  implicit lazy val settings = new LagonakiSettings("settings-test.json")
+  implicit lazy val consensusModule = new NxtLikeConsensusModule
+  implicit lazy val transactionModule = new SimpleTransactionModule
+
+  private lazy val repo = new BasicMessagesRepo()
+  private lazy val handler = new MessageHandler(repo.specs)
 
   test("ScoreMessage roundtrip 1") {
-    val s1 = BigInt(2)
+    val s1 = BigInt(Long.MaxValue) * 10000000
 
-    val msg = ScoreMessage(s1)
-    val parsed = Message.parse(ByteBuffer.wrap(msg.bytes)).get
+    val msg = Message(repo.ScoreMessageSpec, Right(s1), None)
 
-    assert(parsed.isInstanceOf[ScoreMessage])
-    assert(parsed.asInstanceOf[ScoreMessage].height == h1)
-    assert(parsed.asInstanceOf[ScoreMessage].score == s1)
-  }
+    handler.parse(ByteBuffer.wrap(msg.bytes), None).get.data.get match {
+      case scoreRestored: History.BlockchainScore =>
+        assert(s1 == scoreRestored)
 
-  test("ScoreMessage roundtrip 2") {
-    val h1 = Int.MaxValue - 1
-    val s1 = BigInt(Long.MaxValue) + 100
-
-    val msg = ScoreMessage(h1, s1)
-    val parsed = Message.parse(ByteBuffer.wrap(msg.bytes)).get
-
-    assert(parsed.isInstanceOf[ScoreMessage])
-    assert(parsed.asInstanceOf[ScoreMessage].height == h1)
-    assert(parsed.asInstanceOf[ScoreMessage].score == s1)
+      case _ =>
+        fail("wrong data type restored")
+    }
   }
 
   test("GetSignaturesMessage roundtrip 1") {
     val e1 = 33: Byte
     val e2 = 34: Byte
-    val s1 = e2 +: Array.fill(SignatureLength - 1)(e1)
+    val s1: Block.BlockId = e2 +: Array.fill(SignatureLength - 1)(e1)
 
-    val msg = GetSignaturesMessage(Seq(s1))
-    val parsed = Message.parse(ByteBuffer.wrap(msg.bytes)).get
-
-    assert(parsed.isInstanceOf[GetSignaturesMessage])
-    assert(parsed.asInstanceOf[GetSignaturesMessage].signatures.head.sameElements(s1))
+    val msg = Message(repo.GetSignaturesSpec, Right(Seq(s1)), None)
+    handler.parse(ByteBuffer.wrap(msg.bytes), None).get.data.get match {
+      case ss: Seq[Block.BlockId] =>
+        assert(ss.head.sameElements(s1))
+      case _ =>
+        fail("wrong data type restored")
+    }
   }
 
   test("SignaturesMessage roundtrip 1") {
@@ -56,11 +52,13 @@ class MessageSpecification extends FunSuite {
     val s1 = e2 +: Array.fill(SignatureLength - 1)(e1)
     val s2 = e1 +: Array.fill(SignatureLength - 1)(e2)
 
-    val msg = SignaturesMessage(Seq(s1, s2))
-    val parsed = Message.parse(ByteBuffer.wrap(msg.bytes)).get
-
-    assert(parsed.isInstanceOf[SignaturesMessage])
-    assert(parsed.asInstanceOf[SignaturesMessage].signatures.head.sameElements(s1))
-    assert(parsed.asInstanceOf[SignaturesMessage].signatures.tail.head.sameElements(s2))
+    val msg = Message(repo.SignaturesSpec, Right(Seq(s1, s2)), None)
+    handler.parse(ByteBuffer.wrap(msg.bytes), None).get.data.get match {
+      case ss: Seq[Block.BlockId] =>
+        assert(ss.head.sameElements(s1))
+        assert(ss.tail.head.sameElements(s2))
+      case _ =>
+        fail("wrong data type restored")
+    }
   }
 }
