@@ -15,6 +15,8 @@ trait MessageSpec[Content] {
   def deserializeData(bytes: Array[Byte]): Try[Content]
 
   def serializeData(data: Content): Array[Byte]
+
+  override def toString = s"MessageSpec($messageCode)"
 }
 
 
