@@ -2,13 +2,14 @@ package scorex.lagonaki
 
 import org.scalatest.{BeforeAndAfterAll, Suites}
 import scorex.lagonaki.integration.{BlockchainSyncerSpecification, BlocksRoutingSpecification, ValidChainGenerationSpecification}
+import scorex.lagonaki.props.BlockStorageSpecification
 import scorex.lagonaki.unit._
 
 class LagonakiTestSuite extends Suites(
   //unit tests
   new MessageSpecification
   , new BlockSpecification
-  , new BlockchainStorageSpecification
+  , new BlockStorageSpecification
   , new WalletSpecification
   , new BlockchainSyncerSpecification
   , new BlocksRoutingSpecification
