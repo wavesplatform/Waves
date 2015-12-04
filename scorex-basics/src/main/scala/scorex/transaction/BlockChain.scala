@@ -16,7 +16,7 @@ trait BlockChain extends History with ScorexLogging {
 
   private[transaction] def discardBlock(): BlockChain
 
-  def lastBlock: Block = blockAt(height()).get
+  override def lastBlock: Block = blockAt(height()).get
 
   def getSignatures(parentSignature: Block.BlockId, howMany: Int): Seq[Block.BlockId] =
     heightOf(parentSignature).map { h =>
@@ -29,6 +29,8 @@ trait BlockChain extends History with ScorexLogging {
       blockAt(h).map(_.uniqueId)
     }
   }
+
+  def children(block: Block): Seq[Block]
 
   /**
     * Average delay in milliseconds between last $blockNum blocks starting from $block

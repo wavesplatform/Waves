@@ -43,7 +43,11 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
     path("child" / Segment) { case encodedSignature =>
       jsonRoute {
         withBlock(blockchain, encodedSignature) { block =>
-          blockchain.children(block).head.json
+          if (blockchain.isInstanceOf[BlockChain]) {
+            blockchain.asInstanceOf[BlockChain].children(block).head.json
+          } else {
+            Json.obj("status" -> "error", "details" -> "Not available for blocktree storage")
+          }
         }.toString()
       }
     }

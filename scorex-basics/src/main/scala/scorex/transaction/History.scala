@@ -2,6 +2,7 @@ package scorex.transaction
 
 import scorex.account.Account
 import scorex.block.Block
+import scorex.block.Block.BlockId
 
 import scala.util.Try
 
@@ -35,9 +36,9 @@ trait History {
     */
   def isEmpty: Boolean = height() == 0
 
-  def contains(block: Block): Boolean
+  def contains(block: Block): Boolean = contains(block.uniqueId)
 
-  def contains(id: Block.BlockId): Boolean
+  def contains(id: BlockId): Boolean = blockById(id).isDefined
 
   def blockById(blockId: Block.BlockId): Option[Block]
 
@@ -59,10 +60,13 @@ trait History {
 
   def parent(block: Block): Option[Block]
 
-  def children(block: Block): Seq[Block]
-
   def confirmations(block: Block): Option[Int] =
     heightOf(block).map(height() - _)
 
   def generatedBy(account: Account): Seq[Block]
+
+  /**
+    * Block with maximum blockchain score
+    */
+  def lastBlock: Block
 }

@@ -122,8 +122,6 @@ class StoredBlockchain(dataFolderOpt: Option[String])
     blockStorage.readBlock(height)
   }
 
-  override def contains(block: Block): Boolean = contains(block.uniqueId)
-
   override def contains(signature: Array[Byte]): Boolean =
     signaturesIndex.exists(_._2.sameElements(signature))
 
