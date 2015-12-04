@@ -33,58 +33,11 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.Port))
 
-/*  val rules = PeersLogic(peerManager).rules
-
-  lazy val interactions = rules.map(_.interaction)
-
-  rules.filter(_.scheduler.isDefined).foreach { rule =>
-    val initialDelay = rule.scheduler.get._1
-    val interval = rule.scheduler.get._2
-
-    system.scheduler.schedule(initialDelay, interval) {
-      val sendTo = rule.sendingStrategy.choose(connectedPeers.values.toSeq)
-
-      rule.interaction match {
-        case interaction: ProduceableInteraction =>
-          val dataToSend = interaction.produce()
-          val bytes = interaction.reqSpec.serializeData(dataToSend)
-          val toSend = ByteString(bytes)
-          sendTo.foreach { peer =>
-            interaction match {
-              case di: DuplexInteraction[_, _] =>
-                val box = InteractionBox(dataToSend, di.repSpec.messageCode, di)
-                startedInteractions.put(peer.remote, Seq(box))
-              case _ =>
-            }
-            peer ! toSend
-          }
-
-
-        case _ => sys.error(s"Cant' produce request for ${rule.interaction}")
-      }
-    }
-  }*/
-
-/*
-  private def updateScore(remote: InetSocketAddress, height: Int, score: BigInt) = {
-    val prevBestScore = maxPeerScore().getOrElse(0: BigInt)
-
-    connectedPeers.get(remote).foreach { peerData =>
-      connectedPeers.put(remote, peerData.copy(blockchainScore = Some(score)))
-      log.info(s"Score updated for $remote: h. $height -- $score")
-    }
-
-    if (score > prevBestScore) {
-      connectedPeers.foreach { case (_, PeerData(handler, _)) =>
-        handler ! PeerConnectionHandler.BestPeer(remote, score > transModule.history.score)
-      }
-    }
-  } */
 
   override def receive = {
     case b@Bound(localAddress) =>
       log.info("Successfully bound to the port " + settings.Port)
-    //  context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)
+      context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)
     //  context.system.scheduler.schedule(1500.millis, 10.seconds)(self ! AskForPeers)
 
     case CommandFailed(_: Bind) =>
