@@ -137,8 +137,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     case RegisterMessagesHandler(specs, handler) =>
       messageHandlers += specs.map(_.messageCode) -> handler
 
-
-
     case Message(spec, Left(msgBytes), Some(remote)) =>
       val msgId = spec.messageCode
 

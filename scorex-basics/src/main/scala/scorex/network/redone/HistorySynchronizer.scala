@@ -93,6 +93,10 @@ class HistorySynchronizer(application: Application)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
         goto(GettingExtension) using witnesses
       } else goto(Synced) using Seq()
+
+    case nonsense: Any =>
+      log.warning(s"NetworkController: got something strange $nonsense")
+      stay()
   }
 
   onTransition {
