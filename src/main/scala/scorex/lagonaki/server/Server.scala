@@ -16,7 +16,7 @@ object Server extends App with ScorexLogging {
 
     log.debug("LagonakiApplication has been started")
     application.run()
-    Thread.sleep(3000)
+    Thread.sleep(30000)
     testingScript(application)
   } match {
     case Failure(e) =>
@@ -45,14 +45,13 @@ object Server extends App with ScorexLogging {
     Thread.sleep(3000)
 
     val genesisBlock = application.history.blockAt(1)
-    val genesisAccs = genesisBlock.get.transactions.flatMap { tx => tx match {
+    val genesisAccs = genesisBlock.get.transactions.flatMap(tx => tx match {
       case gtx: GenesisTransaction =>
         Some(gtx.recipient)
       case _ =>
         log.error("Non-genesis tx in the genesis block!")
         None
-    }
-    }
+    })
 
     (1 to Int.MaxValue).foreach { _ =>
       Thread.sleep(1000)
