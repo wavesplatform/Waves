@@ -1,5 +1,8 @@
 package scorex.transaction.state.database.blockchain
 
+import java.io.File
+
+import org.mapdb.{DBMaker, HTreeMap, Serializer}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -9,7 +12,7 @@ import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
   * If no datafolder provided, blocktree lives in RAM (useful for tests)
@@ -19,17 +22,93 @@ class StoredBlockTree(dataFolderOpt: Option[String])
                       transactionModule: TransactionModule[_])
   extends BlockTree with ScorexLogging {
 
-  private var bestBlockId: BlockId = "".getBytes
+  //TODO keep in DB
+  private var bestBlockId: BlockId = Array.empty
 
-  object MemoryBlockTreePersistence {
+  trait BlockTreePersistence {
     type Score = BigInt
     type Height = Int
     type StoredBlock = (Block, Score, Height)
+
+    def writeBlock(block: Block): Try[Unit]
+
+    def readBlock(id: BlockId): Option[StoredBlock]
+
+    def filter(f: Block => Boolean): Seq[StoredBlock] = {
+      @tailrec
+      def iterate(b: StoredBlock, f: Block => Boolean, acc: Seq[StoredBlock] = Seq.empty): Seq[StoredBlock] = {
+        val newAcc: Seq[StoredBlock] = if (f(b._1)) b +: acc else acc
+        readBlock(b._1.referenceField.value) match {
+          case Some(parent) => iterate(parent, f, newAcc)
+          case None => newAcc
+        }
+      }
+      iterate(readBlock(bestBlockId).get, f)
+    }
+
+    def exists(block: Block): Boolean = exists(block.uniqueId)
+
+    def exists(blockId: BlockId): Boolean = readBlock(blockId).isDefined
+
+  }
+
+  object FileBlockTreePersistence extends BlockTreePersistence {
+    type MapDBStoredBlock = (Array[Byte], Score, Height)
+
+    //TODO move to config
+    private val folder = "/tmp/scorex"
+    new File(folder).mkdirs()
+    private val file = new File(folder + "blocktree.mapDB")
+
+    private lazy val db =
+      DBMaker.appendFileDB(file)
+        .fileMmapEnableIfSupported()
+        .closeOnJvmShutdown()
+        .checksumEnable()
+        .make()
+
+    private lazy val map: HTreeMap[BlockId, MapDBStoredBlock] = db.hashMapCreate("segments").keySerializer(Serializer.BYTE_ARRAY)
+      .makeOrGet()
+
+    override def writeBlock(block: Block): Try[Unit] = Try {
+      if (exists(block)) throw new Error("Block is already in storage")
+      val parent = readBlock(block.referenceField.value)
+      lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
+      parent match {
+        case Some(p) =>
+          val s = p._2 + blockScore
+          if (s > score()) bestBlockId = block.uniqueId
+          map.put(block.uniqueId, (block.bytes, s, p._3 + 1))
+        case None => map.isEmpty match {
+          case true =>
+            bestBlockId = block.uniqueId
+            map.put(block.uniqueId, (block.bytes, blockScore, 1))
+          case false =>
+            throw new Error(s"Parent ${block.referenceField.value.mkString} block is not in tree")
+        }
+      }
+    }
+
+    override def exists(blockId: BlockId): Boolean = map.containsKey(blockId)
+
+    override def readBlock(key: BlockId): Option[StoredBlock] = Try {
+      val stored = map.get(key)
+      (Block.parse(stored._1).get, stored._2, stored._3)
+    } match {
+      case Success(v) =>
+        Some(v)
+      case Failure(e) =>
+        log.debug("Enable readBlock for key: " + key.mkString)
+        None
+    }
+  }
+
+  object MemoryBlockTreePersistence extends BlockTreePersistence {
     private val memStorage = TrieMap[BlockId, StoredBlock]()
 
-
     def writeBlock(block: Block): Try[Unit] = Try {
-      val parent = memStorage.find(_._1.sameElements(block.referenceField.value)).map(_._2)
+      if (exists(block)) throw new Error("Block is already in storage")
+      val parent = readBlock(block.referenceField.value)
       lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
       parent match {
         case Some(p) =>
@@ -48,21 +127,10 @@ class StoredBlockTree(dataFolderOpt: Option[String])
 
     def readBlock(id: BlockId): Option[StoredBlock] = memStorage.find(_._1.sameElements(id)).map(_._2)
 
-    def filter(f: Block => Boolean): Seq[StoredBlock] = {
-      @tailrec
-      def iterate(b: StoredBlock, f: Block => Boolean, acc: Seq[StoredBlock] = Seq.empty): Seq[StoredBlock] = {
-        val newAcc: Seq[StoredBlock] = if (f(b._1)) b +: acc else acc
-        readBlock(b._1.referenceField.value) match {
-          case Some(parent) => iterate(parent, f, newAcc)
-          case None => newAcc
-        }
-      }
-      iterate(readBlock(bestBlockId).get, f)
-    }
   }
 
-  private val blockStorage = dataFolderOpt match {
-    case Some(dataFolder) => ???
+  private val blockStorage: BlockTreePersistence = dataFolderOpt match {
+    case Some(dataFolder) => FileBlockTreePersistence
     case None => MemoryBlockTreePersistence
   }
 
@@ -99,4 +167,7 @@ class StoredBlockTree(dataFolderOpt: Option[String])
   override def score(): BigInt = blockStorage.readBlock(bestBlockId).map(_._2).getOrElse(BigInt(0))
 
   override def parent(block: Block): Option[Block] = blockStorage.readBlock(block.referenceField.value).map(_._1)
+
+  override def contains(id: BlockId): Boolean = blockStorage.exists(id)
+
 }

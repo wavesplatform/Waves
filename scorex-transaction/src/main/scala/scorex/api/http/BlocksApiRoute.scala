@@ -116,8 +116,8 @@ case class BlocksApiRoute(history: History, wallet: Wallet)(implicit val context
           case blockchain: BlockChain =>
             blockchain
               .blockAt(height)
-              .map(_.json.toString())
-              .getOrElse(Json.obj("status" -> "error", "details" -> "No block for this height").toString())
+              .map(_.json)
+              .getOrElse(Json.obj("status" -> "error", "details" -> "No block for this height")).toString()
           case _ =>
             Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain").toString()
         }
