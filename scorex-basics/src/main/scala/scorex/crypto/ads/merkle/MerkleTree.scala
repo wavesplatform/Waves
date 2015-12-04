@@ -77,7 +77,7 @@ object MerkleTree {
 
       leaves.lift(index).flatMap(l =>
         l match {
-          case Leaf(data: Block) =>
+          case Leaf(data) =>
             val treePath = calculateTreePath(index, rootNode, Size)
             Some(AuthDataBlock(data, treePath))
           case _ =>

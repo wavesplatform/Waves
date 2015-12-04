@@ -10,6 +10,8 @@ import scorex.lagonaki.server.LagonakiSettings
 import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler}
 import scorex.transaction.{History, SimpleTransactionModule}
 
+import shapeless.Typeable._
+
 class MessageSpecification extends FunSuite {
   implicit lazy val settings = new LagonakiSettings("settings-test.json")
   implicit lazy val consensusModule = new NxtLikeConsensusModule
@@ -38,12 +40,8 @@ class MessageSpecification extends FunSuite {
     val s1: Block.BlockId = e2 +: Array.fill(SignatureLength - 1)(e1)
 
     val msg = Message(repo.GetSignaturesSpec, Right(Seq(s1)), None)
-    handler.parse(ByteBuffer.wrap(msg.bytes), None).get.data.get match {
-      case ss: Seq[Block.BlockId] =>
-        assert(ss.head.sameElements(s1))
-      case _ =>
-        fail("wrong data type restored")
-    }
+    val ss = handler.parse(ByteBuffer.wrap(msg.bytes), None).get.data.get.cast[Seq[Block.BlockId]].get
+    assert(ss.head.sameElements(s1))
   }
 
   test("SignaturesMessage roundtrip 1") {
@@ -53,12 +51,8 @@ class MessageSpecification extends FunSuite {
     val s2 = e1 +: Array.fill(SignatureLength - 1)(e2)
 
     val msg = Message(repo.SignaturesSpec, Right(Seq(s1, s2)), None)
-    handler.parse(ByteBuffer.wrap(msg.bytes), None).get.data.get match {
-      case ss: Seq[Block.BlockId] =>
-        assert(ss.head.sameElements(s1))
-        assert(ss.tail.head.sameElements(s2))
-      case _ =>
-        fail("wrong data type restored")
-    }
+    val ss = handler.parse(ByteBuffer.wrap(msg.bytes), None).get.data.get.cast[Seq[Block.BlockId]].get
+    assert(ss.head.sameElements(s1))
+    assert(ss.tail.head.sameElements(s2))
   }
 }

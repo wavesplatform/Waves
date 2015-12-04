@@ -9,7 +9,7 @@ import scorex.network.message.Message
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-
+import shapeless.Typeable._
 
 class PeerSynchronizer(application:Application) extends ViewSynchronizer {
 
@@ -28,8 +28,10 @@ class PeerSynchronizer(application:Application) extends ViewSynchronizer {
     context.system.scheduler.schedule(2.seconds, 1.second)(networkControllerRef ! stn)
   }
 
+  //todo: write tests
   override def receive = {
-    case DataFromPeer(peers: Seq[InetSocketAddress], remote) =>
+    case DataFromPeer(peers: Seq[InetSocketAddress] @unchecked, remote)
+      if peers.cast[Seq[InetSocketAddress]].isDefined  =>
       peers.foreach(peerManager.addPeer)
 
     case DataFromPeer(Unit, remote) =>
