@@ -4,7 +4,7 @@
 dependencyOverrides in ThisBuild ++= Set(
   "ch.qos.logback" % "logback-classic" % "1.1.3",
   "ch.qos.logback" % "logback-core" % "1.1.3",
-  "com.chuusai" % "shapeless_2.11" % "2.2.5",
+  "com.chuusai" % "shapeless_2.11" % "1.2.4",
   "com.fasterxml.jackson.core" % "jackson-annotations" % "2.5.4",
   "com.fasterxml.jackson.core" % "jackson-core" % "2.5.4",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.5.4",
@@ -60,4 +60,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.slf4j" % "slf4j-api" % "1.7.7",
   "org.whispersystems" % "curve25519-java" % "0.2.4"
 )
-// LIBRARY_DEPENDENCIES_HASH 91a7f450da7ac4e7d90dc3216f48ce2575319d6c
+// LIBRARY_DEPENDENCIES_HASH 2c4136cc7cf36dbf51d6526b95d4108981b4f155
