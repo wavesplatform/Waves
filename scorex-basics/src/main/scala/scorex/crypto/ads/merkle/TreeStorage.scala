@@ -72,5 +72,4 @@ object TreeStorage {
   type Position = Long
   type Key = (Level, Position)
   type Value = Digest
-
 }

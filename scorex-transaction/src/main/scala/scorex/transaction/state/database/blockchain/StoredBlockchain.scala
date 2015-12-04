@@ -4,7 +4,6 @@ import better.files._
 import org.mapdb.DBMaker
 import scorex.account.Account
 import scorex.block.Block
-import scorex.block.Block._
 import scorex.consensus.ConsensusModule
 import scorex.transaction.{ShouldBranchFrom, BlockChain, TransactionModule}
 import scorex.utils.ScorexLogging
@@ -22,7 +21,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
                        transactionModule: TransactionModule[_])
   extends BlockChain with ScorexLogging {
 
-  trait BlockStorage {
+  trait BlockchainPersistence {
     def writeBlock(height: Int, block: Block): Try[Unit]
 
     def readBlock(height: Int): Option[Block]
@@ -30,7 +29,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
     def deleteBlock(height: Int): Unit
   }
 
-  case class FileBlockStorage(dataFolder: String) extends BlockStorage {
+  case class FileBlockchainPersistence(dataFolder: String) extends BlockchainPersistence {
     private def blockFile(height: Int) = File(dataFolder + s"/block-$height")
 
     override def writeBlock(height: Int, block: Block): Try[Unit] = Try {
@@ -56,7 +55,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
       }
   }
 
-  object MemoryBlockStorage extends BlockStorage {
+  object MemoryBlockchainPersistence$ extends BlockchainPersistence {
     private val memStorage = TrieMap[Int, Block]()
 
     override def writeBlock(height: Int, block: Block): Try[Unit] =
@@ -69,14 +68,14 @@ class StoredBlockchain(dataFolderOpt: Option[String])
 
   private val (blockStorage, database) = dataFolderOpt match {
     case Some(dataFolder) =>
-      (FileBlockStorage(dataFolder),
+      (FileBlockchainPersistence(dataFolder),
         DBMaker.appendFileDB(new java.io.File(dataFolder + s"/signatures"))
           .fileMmapEnableIfSupported()
           .closeOnJvmShutdown()
           .checksumEnable()
           .make())
     case None =>
-      (MemoryBlockStorage, DBMaker.memoryDB().make())
+      (MemoryBlockchainPersistence$, DBMaker.memoryDB().make())
   }
 
   private val signaturesIndex = database.treeMap[Int, Array[Byte]]("signatures")
