@@ -152,6 +152,9 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
           //todo: ban peer
       }
 
+    case SendToNetwork(message, sendingStrategy) =>
+      sendingStrategy.choose(connectedPeers.values.toSeq).foreach(_.handlerRef ! message)
+
 
       /*startedInteractions.get(remote).map(_.filter(_.respId == msgId)).flatten match{
         case Some(InteractionBox(_, _, _)) =>
