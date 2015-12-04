@@ -7,7 +7,7 @@ import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.database.blockchain.{StoredBlockStorage, StoredBlockchain, StoredState}
+import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 import scorex.utils.ScorexLogging
 
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -36,8 +36,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
 
   val TransactionSizeLength = 4
 
-  override val blockStorage = new StoredBlockStorage(new StoredBlockchain(settings.dataDirOpt)(consensusModule, this),
-    new StoredState(settings.dataDirOpt))
+  private val instance = this
+  override val blockStorage = new BlockStorage {
+    override val history = new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
+    override val state = new StoredState(settings.dataDirOpt)
+  }
 
   /**
     * In Lagonaki, transaction-related data is just sequence of transactions. No Merkle-tree root of txs / state etc
