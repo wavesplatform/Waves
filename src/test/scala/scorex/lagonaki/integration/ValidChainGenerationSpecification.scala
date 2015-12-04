@@ -11,7 +11,6 @@ import scorex.transaction.BlockChain
 
 class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
   ignore("retroactive chain test") {
-    val application = new LagonakiApplication(SettingsFilename)
     implicit val consensusModule = application.consensusModule
     implicit val transactionModule = application.transactionModule
 

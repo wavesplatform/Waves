@@ -6,8 +6,6 @@ import scorex.lagonaki.server.LagonakiApplication
 
 
 class BlocksRoutingSpecification extends RouteTest {
-   val application = new LagonakiApplication("settings-test.json")
-
    application.checkGenesis()
 
    val blocksRoute = BlocksApiRoute(application.blockStorage.history, application.wallet).route
