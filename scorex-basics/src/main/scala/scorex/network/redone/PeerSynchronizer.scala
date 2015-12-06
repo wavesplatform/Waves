@@ -3,7 +3,7 @@ package scorex.network.redone
 import java.net.InetSocketAddress
 
 import scorex.app.Application
-import scorex.network.{SendToRandom, NetworkController}
+import scorex.network.{SendToChosen, SendToRandom, NetworkController}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.Message
 import scorex.utils.ScorexLogging
@@ -12,6 +12,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import shapeless.Typeable._
 
+//todo: avoid connecting to self
 class PeerSynchronizer(application:Application) extends ViewSynchronizer with ScorexLogging {
 
   import application.basicMessagesSpecsRepo._
@@ -38,7 +39,8 @@ class PeerSynchronizer(application:Application) extends ViewSynchronizer with Sc
     //boxed Unit match
     case DataFromPeer((), remote) =>
       val peers = peerManager.knownPeers().take(3) // make configurable, check on receiving
-      networkControllerRef ! Message(PeersSpec, Right(peers), None)
+      val msg = Message(PeersSpec, Right(peers), None)
+      networkControllerRef ! SendToChosen(Seq(remote))
 
     case nonsense: Any => log.warn(s"PeerSynchronizer: got something strange $nonsense")
   }
