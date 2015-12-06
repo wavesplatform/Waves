@@ -38,7 +38,7 @@ class PeerSynchronizer(application:Application) extends ViewSynchronizer with Sc
 
     //boxed Unit match
     case DataFromPeer((), remote) =>
-      val peers = peerManager.knownPeers().take(3) // make configurable, check on receiving
+      val peers = peerManager.knownPeers().take(3) //todo: make configurable, check on receiving
       val msg = Message(PeersSpec, Right(peers), None)
       networkControllerRef ! SendToChosen(Seq(remote))
 
