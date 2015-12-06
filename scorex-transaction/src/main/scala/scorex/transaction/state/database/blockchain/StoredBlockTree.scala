@@ -53,11 +53,9 @@ class StoredBlockTree(dataFolderOpt: Option[String])
 
   }
 
-  object FileBlockTreePersistence extends BlockTreePersistence {
+  class FileBlockTreePersistence(folder: String) extends BlockTreePersistence {
     type MapDBStoredBlock = (Array[Byte], Score, Height)
 
-    //TODO move to config
-    private val folder = "/tmp/scorex"
     new File(folder).mkdirs()
     private val file = new File(folder + "blocktree.mapDB")
 
@@ -149,7 +147,7 @@ class StoredBlockTree(dataFolderOpt: Option[String])
   }
 
   private val blockStorage: BlockTreePersistence = dataFolderOpt match {
-    case Some(dataFolder) => FileBlockTreePersistence
+    case Some(dataFolder) => new FileBlockTreePersistence(dataFolder)
     case None => MemoryBlockTreePersistence
   }
 
