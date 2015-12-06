@@ -6,14 +6,13 @@ import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import scorex.app.Application
-import scorex.network.message.{MessageSpec, BasicMessagesRepo, Message}
-import scorex.network.peer.PeerManager
+import scorex.network.message.{MessageSpec, Message}
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Random}
+import scala.util.{Failure, Success}
 
 
 //must be singleton
@@ -107,20 +106,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
     case SendToNetwork(message, sendingStrategy) =>
       sendingStrategy.choose(connectedPeers.values.toSeq).foreach(_.handlerRef ! message)
-
-
-      /*startedInteractions.get(remote).map(_.filter(_.respId == msgId)).flatten match{
-        case Some(InteractionBox(_, _, _)) =>
-
-        case None =>
-          interactions.find(_.respId == msgId) match {
-            case Some(int:SimplexInteraction[_]) =>
-
-
-            case _ =>
-              log.error("wrong message passed in")
-          }
-      }*/
 
 
   /*  case AskForPeers =>
