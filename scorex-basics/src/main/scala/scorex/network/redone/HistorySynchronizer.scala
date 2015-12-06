@@ -85,7 +85,7 @@ class HistorySynchronizer(application: Application)
       scoreSyncer.networkUpdate(remote, content)
       stay()
 
-    case Event(ConsideredValue(networkScore: History.BlockchainScore, witnesses), _) =>
+    case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
       val localScore = history.score()
       if (networkScore > localScore) {
         log.info("networkScore > localScore")

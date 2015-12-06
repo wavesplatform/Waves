@@ -4,15 +4,11 @@ import akka.actor.ActorRef
 import scorex.network.ConnectedPeer
 import scorex.network.message.MessageSpec
 import scorex.network.redone.NetworkObject.ConsideredValue
-import scorex.transaction.History
 import scorex.transaction.History._
 
-/**
-  * Created by kushti on 03.12.15.
-  */
 object NetworkObject {
 
-  case class ConsideredValue[V](value: V, witnesses: Seq[ConnectedPeer])
+  case class ConsideredValue[V](value: Option[V], witnesses: Seq[ConnectedPeer])
 
   // case class LocalUpdate[V](localUpdate: Option[V])
   //case class NetworkUpdate[V](remote: ConnectedPeer, value: V)
