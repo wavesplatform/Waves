@@ -22,9 +22,6 @@ class StoredBlockTree(dataFolderOpt: Option[String])
                       transactionModule: TransactionModule[_])
   extends BlockTree with ScorexLogging {
 
-  //TODO keep in DB
-  private var bestBlockId: BlockId = Array.empty
-
   trait BlockTreePersistence {
     type Score = BigInt
     type Height = Int
@@ -43,12 +40,16 @@ class StoredBlockTree(dataFolderOpt: Option[String])
           case None => newAcc
         }
       }
-      iterate(readBlock(bestBlockId).get, f)
+      iterate(readBlock(getBestBlockId).get, f)
     }
 
     def exists(block: Block): Boolean = exists(block.uniqueId)
 
     def exists(blockId: BlockId): Boolean = readBlock(blockId).isDefined
+
+    def bestBlock: Option[StoredBlock] = readBlock(getBestBlockId)
+
+    protected def getBestBlockId: BlockId
 
   }
 
@@ -67,8 +68,20 @@ class StoredBlockTree(dataFolderOpt: Option[String])
         .checksumEnable()
         .make()
 
-    private lazy val map: HTreeMap[BlockId, MapDBStoredBlock] = db.hashMapCreate("segments").keySerializer(Serializer.BYTE_ARRAY)
-      .makeOrGet()
+    private lazy val map: HTreeMap[BlockId, MapDBStoredBlock] = db.hashMapCreate("segments")
+      .keySerializer(Serializer.BYTE_ARRAY).makeOrGet()
+
+    private lazy val bestBlockStorage: HTreeMap[Int, BlockId] = db.hashMapCreate("bestBlock")
+      .keySerializer(Serializer.INTEGER).valueSerializer(Serializer.BYTE_ARRAY).makeOrGet()
+
+    private var bestBlockId: BlockId = Option(bestBlockStorage.get(0)).getOrElse(Array.empty)
+
+    override protected def getBestBlockId: BlockId = bestBlockId
+
+    private def setBestBlockId(newId: BlockId) = {
+      bestBlockId = newId
+      bestBlockStorage.put(0, newId)
+    }
 
     override def writeBlock(block: Block): Try[Unit] = Try {
       if (exists(block)) throw new Error("Block is already in storage")
@@ -77,11 +90,11 @@ class StoredBlockTree(dataFolderOpt: Option[String])
       parent match {
         case Some(p) =>
           val s = p._2 + blockScore
-          if (s > score()) bestBlockId = block.uniqueId
+          if (s > score()) setBestBlockId(block.uniqueId)
           map.put(block.uniqueId, (block.bytes, s, p._3 + 1))
         case None => map.isEmpty match {
           case true =>
-            bestBlockId = block.uniqueId
+            setBestBlockId(block.uniqueId)
             map.put(block.uniqueId, (block.bytes, blockScore, 1))
           case false =>
             throw new Error(s"Parent ${block.referenceField.value.mkString} block is not in tree")
@@ -106,6 +119,12 @@ class StoredBlockTree(dataFolderOpt: Option[String])
   object MemoryBlockTreePersistence extends BlockTreePersistence {
     private val memStorage = TrieMap[BlockId, StoredBlock]()
 
+    private var bestBlockId: BlockId = Array.empty
+
+    private def setBestBlockId(newId: BlockId) = bestBlockId = newId
+
+    override def getBestBlockId: BlockId = bestBlockId
+
     def writeBlock(block: Block): Try[Unit] = Try {
       if (exists(block)) throw new Error("Block is already in storage")
       val parent = readBlock(block.referenceField.value)
@@ -113,11 +132,11 @@ class StoredBlockTree(dataFolderOpt: Option[String])
       parent match {
         case Some(p) =>
           val s = p._2 + blockScore
-          if (s > score()) bestBlockId = block.uniqueId
+          if (s > score()) setBestBlockId(block.uniqueId)
           memStorage.put(block.uniqueId, (block, s, p._3 + 1))
         case None => memStorage.isEmpty match {
           case true =>
-            bestBlockId = block.uniqueId
+            setBestBlockId(block.uniqueId)
             memStorage.put(block.uniqueId, (block, blockScore, 1))
           case false =>
             throw new Error("Parent block is not in tree")
@@ -137,7 +156,7 @@ class StoredBlockTree(dataFolderOpt: Option[String])
   /**
     * Height of the a chain, or a longest chain in the explicit block-tree
     */
-  override def height(): Int = blockStorage.readBlock(bestBlockId).map(_._3).getOrElse(0)
+  override def height(): Int = blockStorage.bestBlock.map(_._3).getOrElse(0)
 
 
   /**
@@ -158,13 +177,13 @@ class StoredBlockTree(dataFolderOpt: Option[String])
     consensusModule.generators(b).contains(account)
   }.map(_._1)
 
-  override def lastBlock: Block = blockStorage.readBlock(bestBlockId).map(_._1).get
+  override def lastBlock: Block = blockStorage.bestBlock.map(_._1).get
 
   /**
     * Quality score of a best chain, e.g. cumulative difficulty in case of Bitcoin / Nxt
     * @return
     */
-  override def score(): BigInt = blockStorage.readBlock(bestBlockId).map(_._2).getOrElse(BigInt(0))
+  override def score(): BigInt = blockStorage.bestBlock.map(_._2).getOrElse(BigInt(0))
 
   override def parent(block: Block): Option[Block] = blockStorage.readBlock(block.referenceField.value).map(_._1)
 
