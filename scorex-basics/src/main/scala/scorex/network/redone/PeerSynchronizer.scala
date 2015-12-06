@@ -35,10 +35,11 @@ class PeerSynchronizer(application:Application) extends ViewSynchronizer with Sc
       if peers.cast[Seq[InetSocketAddress]].isDefined  =>
       peers.foreach(peerManager.addPeer)
 
-    case DataFromPeer(Unit, remote) =>
+    //boxed Unit match
+    case DataFromPeer((), remote) =>
       val peers = peerManager.knownPeers().take(3) // make configurable, check on receiving
       networkControllerRef ! Message(PeersSpec, Right(peers), None)
 
-    case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
+    case nonsense: Any => log.warn(s"PeerSynchronizer: got something strange $nonsense")
   }
 }

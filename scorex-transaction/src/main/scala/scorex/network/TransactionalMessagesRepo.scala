@@ -12,6 +12,8 @@ object TransactionalMessagesRepo{
   object TransactionMessageSpec extends MessageSpec[Transaction] {
     override val messageCode: MessageCode = 25: Byte
 
+    override val messageName: String = "Transaction message"
+
     override def deserializeData(bytes: Array[MessageCode]): Try[Transaction] =
       LagonakiTransaction.parse(bytes)
 

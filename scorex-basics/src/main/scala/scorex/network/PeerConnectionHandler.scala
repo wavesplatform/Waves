@@ -100,10 +100,7 @@ case class PeerConnectionHandler(application:Application,
 //      self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score())
 
     case msg: message.Message[_] =>
-      self ! ByteString(msg.bytes)
-
-    case data: ByteString =>
-      connection ! Write(data)
+      connection ! Write(ByteString(msg.bytes))
 
     case CommandFailed(w: Write) =>
       log.info(s"Write failed : $w " + remote)
@@ -114,7 +111,7 @@ case class PeerConnectionHandler(application:Application,
     case Received(data) =>
       application.messagesHandler.parse(data.toByteBuffer, Some(selfPeer)) match {
         case Success(message) =>
-          log.info("received message " + message.getClass.getSimpleName + " from " + remote)
+          log.info("received message " + message.spec + " from " + remote)
           networkControllerRef ! message
 
         case Failure(e) =>
@@ -137,7 +134,7 @@ case class PeerConnectionHandler(application:Application,
     //  PeerManager.blacklistPeer(remote)
     //  connection ! Close
 
-    case nonsense: Any => log.warn(s"Strange input: $nonsense")
+    case nonsense: Any => log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
   }
 }
 

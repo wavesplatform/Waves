@@ -20,6 +20,8 @@ class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
   object GetPeersSpec extends MessageSpec[Unit] {
     override val messageCode: Message.MessageCode = 1: Byte
 
+    override val messageName: String = "GetPeers message"
+
     override def deserializeData(bytes: Array[Byte]): Try[Unit] =
       Try(require(bytes.isEmpty, "Non-empty data for GetPeers"))
 
@@ -32,6 +34,8 @@ class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
     private val DataLength = 4
 
     override val messageCode: Message.MessageCode = 2: Byte
+
+    override val messageName: String = "Peers message"
 
     override def deserializeData(bytes: Array[Byte]): Try[Seq[InetSocketAddress]] = Try {
       require(bytes.isEmpty, "Non-empty data for GetPeers")
@@ -96,14 +100,17 @@ class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
 
   object GetSignaturesSpec extends SignaturesSeqSpec {
     override val messageCode: MessageCode = 20: Byte
+    override val messageName: String = "GetSignatures message"
   }
 
   object SignaturesSpec extends SignaturesSeqSpec {
     override val messageCode: MessageCode = 21: Byte
+    override val messageName: String = "Signatures message"
   }
 
   object GetBlockSpec extends MessageSpec[Block.BlockId] {
     override val messageCode: MessageCode = 22: Byte
+    override val messageName: String = "GetBlock message"
 
     override def serializeData(signature: Block.BlockId): Array[Byte] = signature
 
@@ -117,6 +124,8 @@ class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
   object BlockMessageSpec extends MessageSpec[Block] {
     override val messageCode: MessageCode = 23: Byte
 
+    override val messageName: String = "Block message"
+
     override def serializeData(block: Block): Array[Byte] = block.bytes
 
     override def deserializeData(bytes: Array[Byte]): Try[Block] = Block.parse(bytes)
@@ -124,6 +133,8 @@ class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
 
   object ScoreMessageSpec extends MessageSpec[History.BlockchainScore] {
     override val messageCode: MessageCode = 24: Byte
+
+    override val messageName: String = "Score message"
 
     override def serializeData(score: History.BlockchainScore): Array[Byte] = {
       val scoreBytes = score.toByteArray

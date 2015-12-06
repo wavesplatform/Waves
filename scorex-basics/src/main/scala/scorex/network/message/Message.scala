@@ -11,12 +11,13 @@ import scala.util.{Success, Try}
 
 trait MessageSpec[Content] {
   val messageCode: Message.MessageCode
+  val messageName: String
 
   def deserializeData(bytes: Array[Byte]): Try[Content]
 
   def serializeData(data: Content): Array[Byte]
 
-  override def toString = s"MessageSpec($messageCode)"
+  override def toString = s"MessageSpec($messageCode: $messageName)"
 }
 
 

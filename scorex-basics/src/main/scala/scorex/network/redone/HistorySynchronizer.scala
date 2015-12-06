@@ -95,7 +95,7 @@ class HistorySynchronizer(application: Application)
       } else goto(Synced) using Seq()
 
     case nonsense: Any =>
-      log.warning(s"NetworkController: got something strange $nonsense")
+      log.warning(s"HistorySynchronized: got something strange $nonsense")
       stay()
   }
 
