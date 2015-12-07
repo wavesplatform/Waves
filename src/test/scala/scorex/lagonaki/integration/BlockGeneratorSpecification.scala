@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.testkit._
 import org.scalatest.{Matchers, WordSpecLike}
 import scorex.lagonaki.server.LagonakiApplication
-import scorex.utils.untilTimeout
+import scorex.TimeUtils.untilTimeout
 import scala.concurrent.duration._
 
 //todo: props test: in any state startgenerating->stopgenerating sequence leads to Syncing state

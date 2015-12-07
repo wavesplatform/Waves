@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 
 import scala.concurrent.duration._
 
-package object utils {
+package object TimeUtils {
 
   @tailrec
   final def untilTimeout[T](timeout: FiniteDuration,
