@@ -64,6 +64,8 @@ trait History {
 
   def generatedBy(account: Account): Seq[Block]
 
+  def removeAfter(signature: Block.BlockId)
+
   //todo: remove argument?
   def lastSignatures(howMany: Int): Seq[Block.BlockId]
 }
