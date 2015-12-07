@@ -86,6 +86,11 @@ trait Block {
       EllipticCurveImpl.verify(signerDataField.value.signature,
         bytesWithoutSignature,
         signerDataField.value.generator.publicKey)
+
+  override def equals(obj: scala.Any): Boolean = {
+    import shapeless.Typeable._
+    obj.cast[Block].exists(_.uniqueId.sameElements(this.uniqueId))
+  }
 }
 
 
