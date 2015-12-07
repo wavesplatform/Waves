@@ -53,7 +53,7 @@ class NxtLikeConsensusModule
     //check hit < target
     calcHit(prevBlockData, generator) < calcTarget(prevBlockData, prevTime, generator)
   }.recoverWith { case t =>
-    log.error("Error while generating a block", t)
+    log.error("Error while checking a block", t)
     Failure(t)
   }.getOrElse(false)
 
