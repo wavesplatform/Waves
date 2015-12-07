@@ -65,6 +65,10 @@ class HistorySynchronizer(application: Application)
     case Event(DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, remote), _)
       if msgId == SignaturesSpec.messageCode && blockIds.cast[Seq[Block.BlockId]].isDefined =>
 
+      log.info(s"Got SignaturesMessage with ${blockIds.length} sigs")
+      val common = blockIds.head
+      assert(application.history.contains(common))  //todo: ?
+      application.history.removeAfter(common)
       blockIds.tail.foreach { blockId =>
         networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), SendToChosen(Seq(remote)))
       }
@@ -185,5 +189,4 @@ object HistorySynchronizer {
   case object GettingExtension extends Status
 
   case object Synced extends Status
-
 }
