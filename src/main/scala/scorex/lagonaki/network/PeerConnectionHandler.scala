@@ -5,9 +5,10 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
-import scorex.lagonaki.server.LagonakiApplication
 import scorex.lagonaki.network.NetworkController.UpdateBlockchainScore
 import scorex.lagonaki.network.message.{Message, _}
+import scorex.lagonaki.server.LagonakiApplication
+import scorex.transaction.BlockChain
 import scorex.transaction.LagonakiTransaction.TransactionType
 import scorex.utils.ScorexLogging
 
@@ -69,7 +70,10 @@ class PeerConnectionHandler(application: LagonakiApplication,
         val common = signaturesGot.head
         require(blockchainStorage.contains(common))
 
-        application.blockStorage.removeAfter(common)
+        application.blockStorage.history match {
+          case h: BlockChain => application.blockStorage.removeAfter(common)
+          case _ =>
+        }
 
         signaturesGot.tail.foreach { case sig =>
           self ! GetBlockMessage(sig)

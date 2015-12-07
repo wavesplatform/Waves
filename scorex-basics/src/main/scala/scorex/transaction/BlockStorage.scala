@@ -11,8 +11,7 @@ import scala.util.{Failure, Success, Try}
   */
 trait BlockStorage extends ScorexLogging {
 
-  //TODO replace BlockChain with History
-  val history: BlockChain
+  val history: History
   val state: State
 
   def appendBlock(block: Block): Try[Unit] = synchronized {
@@ -34,10 +33,16 @@ trait BlockStorage extends ScorexLogging {
     }
   }
 
+  //Should be used for linear blockchain only
   def removeAfter(signature: BlockId): Unit = synchronized {
-    while (!history.lastSignature().sameElements(signature)) {
-      state.processBlock(history.lastBlock, reversal = true)
-      history.discardBlock()
+    history match {
+      case h: BlockChain =>
+        while (!h.lastSignature().sameElements(signature)) {
+          state.processBlock(history.lastBlock, reversal = true)
+          h.discardBlock()
+        }
+      case _ =>
+        throw new RuntimeException("Not available for other option than linear blockchain")
     }
   }
 

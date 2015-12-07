@@ -58,7 +58,7 @@ trait History {
     */
   private[transaction] def appendBlock(block: Block): Try[History]
 
-  def parent(block: Block): Option[Block]
+  def parent(block: Block, back: Int = 1): Option[Block]
 
   def confirmations(block: Block): Option[Int] =
     heightOf(block).map(height() - _)
@@ -69,4 +69,12 @@ trait History {
     * Block with maximum blockchain score
     */
   def lastBlock: Block
+
+  /**
+    * Average delay in milliseconds between last $blockNum blocks starting from $block
+    */
+  def averageDelay(block: Block, blockNum: Int): Try[Long] = Try {
+    (block.timestampField.value - parent(block, blockNum).get.timestampField.value) / blockNum
+  }
+
 }

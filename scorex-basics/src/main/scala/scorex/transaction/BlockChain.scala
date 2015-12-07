@@ -11,8 +11,10 @@ trait BlockChain extends History with ScorexLogging {
 
   def genesisBlock = blockAt(1)
 
-  override def parent(block: Block): Option[Block] =
-    heightOf(block.referenceField.value).flatMap(blockAt)
+  override def parent(block: Block, back: Int = 1): Option[Block] = {
+    require(back > 0)
+    heightOf(block.referenceField.value).flatMap(referenceHeight => blockAt(referenceHeight - back + 1))
+  }
 
   private[transaction] def discardBlock(): BlockChain
 
@@ -31,14 +33,6 @@ trait BlockChain extends History with ScorexLogging {
   }
 
   def children(block: Block): Seq[Block]
-
-  /**
-    * Average delay in milliseconds between last $blockNum blocks starting from $block
-    */
-  def averageDelay(block: Block, blockNum: Int): Try[Long] = Try {
-    val height: Int = heightOf(block).get
-    (blockAt(height).get.timestampField.value - blockAt(height - blockNum).get.timestampField.value) / blockNum
-  }
 
   def lastSignature(): Block.BlockId = lastBlock.uniqueId
 

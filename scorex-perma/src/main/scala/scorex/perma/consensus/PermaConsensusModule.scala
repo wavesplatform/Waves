@@ -43,7 +43,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
   def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = {
     val f = block.consensusDataField.asInstanceOf[PermaConsensusBlockField]
-    val trans = transactionModule.blockStorage.history.asInstanceOf[BlockChain]
+    val trans = transactionModule.blockStorage.history
     trans.parent(block) match {
       case Some(parent) =>
         lazy val publicKey = blockGenerator(block).publicKey
@@ -86,7 +86,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
   def generateNextBlock[TT](account: PrivateKeyAccount)
                            (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = Try {
 
-    val parent = transactionModule.blockStorage.history.asInstanceOf[BlockChain].lastBlock
+    val parent = transactionModule.blockStorage.history.lastBlock
     val puz = generatePuz(parent)
 
     val keyPair = (account.privateKey, account.publicKey)
@@ -197,7 +197,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
   }
 
   private def calcTarget(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
-    val trans = transactionModule.blockStorage.history.asInstanceOf[BlockChain]
+    val trans = transactionModule.blockStorage.history
     val currentTarget = block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].target
     Try {
       val height = trans.heightOf(block).get

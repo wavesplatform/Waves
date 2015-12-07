@@ -183,7 +183,15 @@ class StoredBlockTree(dataFolderOpt: Option[String])
     */
   override def score(): BigInt = blockStorage.bestBlock.map(_._2).getOrElse(BigInt(0))
 
-  override def parent(block: Block): Option[Block] = blockStorage.readBlock(block.referenceField.value).map(_._1)
+  override def parent(block: Block, back: Int = 1): Option[Block] = {
+    require(back > 0)
+    val p = blockStorage.readBlock(block.referenceField.value).map(_._1)
+    (back, p) match {
+      case (1, _) => p
+      case (m, Some(parentBlock)) => parent(parentBlock, m - 1)
+      case _ => None
+    }
+  }
 
   override def contains(id: BlockId): Boolean = blockStorage.exists(id)
 
