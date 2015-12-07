@@ -32,28 +32,6 @@ case class PeerConnectionHandler(application:Application,
     log.debug("Handling message: " + message)
     message match {
 
-      case GetPeersMessage =>
-        self ! PeersMessage(peerManager.knownPeers().filter(_ != remote)) //excluding sender
-
-      case PeersMessage(peers) =>
-        peers.foreach { peer =>
-          peerManager.addPeer(peer)
-        }
-
-      case ScoreMessage(height, score) =>
-        networkController ! UpdateBlockchainScore(remote, height, score)
-
-      case GetSignaturesMessage(signaturesGot) =>
-        log.info(s"Got GetSignaturesMessage with ${signaturesGot.length} sigs within")
-
-        signaturesGot.exists { parent =>
-          val headers = application.blockchainImpl.getSignatures(parent, settings.MaxBlocksChunks)
-          if (headers.nonEmpty) {
-            self ! SignaturesMessage(Seq(parent) ++ headers)
-            true
-          } else false
-        }
-
       case SignaturesMessage(signaturesGot) =>
         log.info(s"Got SignaturesMessage with ${signaturesGot.length} sigs")
 
