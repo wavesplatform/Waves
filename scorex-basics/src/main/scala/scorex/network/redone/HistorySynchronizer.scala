@@ -50,9 +50,9 @@ class HistorySynchronizer(application: Application)
     case false => startWith(ScoreNotCompared, Seq())
   }
 
-  when(ScoreNotCompared){
+  when(ScoreNotCompared) {
     //init signal(boxed Unit) matching
-    case Event((), _) =>
+    case Event(Unit, _) =>
       stay()
   }
 
@@ -99,10 +99,10 @@ class HistorySynchronizer(application: Application)
         val msg = Message(GetSignaturesSpec, Right(history.lastSignatures(100)), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
         goto(GettingExtension) using witnesses
-      } else goto(Synced) using Seq()    //todo: avoid goto if already in state
+      } else goto(Synced) using Seq() //todo: avoid goto if already in state
 
     case nonsense: Any =>
-      log.warning(s"HistorySynchronized: got something strange $nonsense")
+      log.warning(s"HistorySynchronizer: got something strange in the state:$stateName - $nonsense")
       stay()
   }
 
