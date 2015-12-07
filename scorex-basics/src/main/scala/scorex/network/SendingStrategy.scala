@@ -25,3 +25,8 @@ case class BroadcastExceptOf(exceptOf: Seq[ConnectedPeer]) extends SendingStrate
 case class SendToChosen(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy {
   override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = chosenPeers
 }
+
+case class SendToRandomFromChosen(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy {
+  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] =
+    Seq(chosenPeers(Random.nextInt(peers.length)))
+}
