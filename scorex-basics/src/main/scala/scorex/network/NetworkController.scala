@@ -106,31 +106,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     case SendToNetwork(message, sendingStrategy) =>
       sendingStrategy.choose(connectedPeers.values.toSeq).foreach(_.handlerRef ! message)
 
-
-  /*  case AskForPeers =>
-      self ! SendMessageToRandomPeer(BasicMessagesRepo.GetPeersMessage)
-
-
-    case BroadcastMessage(message, exceptOf) =>
-      log.info(s"Broadcasting message $message")
-      connectedPeers.foreach { case (remote, PeerData(handler, _)) =>
-        if (!exceptOf.contains(remote)) handler ! message
-      }
-      log.info("Broadcasting end")
-
-    case SendMessageToBestPeer(message) =>
-      maxScoreHandler().foreach { handler =>
-        log.info(s"Sending $message to a best peer ${handler.path}")
-        handler ! message
-      }
-
-    case SendMessageToRandomPeer(message) =>
-      val handlers = connectedPeers.values.toList
-      if (handlers.nonEmpty) {
-        val randomHandler = handlers(Random.nextInt(handlers.size)).handler
-        randomHandler ! message
-      } */
-
     case GetPeers => sender() ! connectedPeers.values.toSeq
 
     /* case GetMaxChainScore =>
@@ -155,8 +130,6 @@ object NetworkController {
 
   private case object CheckPeers
 
-//  private case object AskForPeers
-
   case object ShutdownNetwork
 
   case object GetPeers
@@ -164,51 +137,4 @@ object NetworkController {
   // case object GetMaxBlockchainScore
 
   case class PeerDisconnected(address: InetSocketAddress)
-
-  //case class UpdateBlockchainScore(remote: InetSocketAddress, height: Int, score: BigInt)
-
-  /*
-  case class SendMessageToBestPeer(msg: message.Message[_])
-
-  case class SendMessageToRandomPeer(msg: message.Message[_])
-
-  case class BroadcastMessage(msg: message.Message[_], exceptOf: Seq[InetSocketAddress] = List())
-  */
 }
-
-/*
-case class OutcomingMessagingRule(sendingStrategy: SendingStrategy,
-                                  interaction: Interaction,
-                                  scheduler: Option[(FiniteDuration, FiniteDuration)])
-*/
-
-//initial delay, delay
-
-//get peers
-
-/*
-trait NetworkApplicationLogic {
-  val rules: Seq[OutcomingMessagingRule]
-}
-
-case class PeersLogic(peerManager: PeerManager) extends NetworkApplicationLogic {
-
-  private object peersExchange extends OutcomingMessagingRule(
-    SendToRandom,
-    PeersInteraction(peerManager),
-    Some(1.second -> 3.seconds)
-  )
-
-  override val rules: Seq[OutcomingMessagingRule] = Seq(peersExchange)
-}
-
-
-trait BlockchainLogic extends NetworkApplicationLogic {
-
-  object newBlock extends OutcomingMessagingRule(Broadcast, BlockInteraction, None)
-
-  //object bestExtension extends OutcomingMessagingRule(BestPeer, SignaturesInteraction, None)
-
-  override val rules = super.rules ++ Seq()
-} */
-
