@@ -67,7 +67,7 @@ class HistorySynchronizer(application: Application)
 
       log.info(s"Got SignaturesMessage with ${blockIds.length} sigs")
       val common = blockIds.head
-      assert(application.history.contains(common))  //todo: ?
+      assert(application.history.contains(common)) //todo: ?
       application.history.removeAfter(common)
       blockIds.tail.foreach { blockId =>
         networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), SendToChosen(Seq(remote)))
@@ -144,9 +144,8 @@ class HistorySynchronizer(application: Application)
         goto(GettingExtension) using witnesses
       } else goto(Synced) using Seq() //todo: avoid goto if already in state
 
-
     case nonsense: Any =>
-      log.warning(s"HistorySynchronizer: got something strange in the state:$stateName - $nonsense")
+      log.warning(s"HistorySynchronizer: got something strange in the state ($stateName) :: $nonsense")
       stay()
   }
 
@@ -189,4 +188,5 @@ object HistorySynchronizer {
   case object GettingExtension extends Status
 
   case object Synced extends Status
+
 }
