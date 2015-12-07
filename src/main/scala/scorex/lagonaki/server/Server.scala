@@ -4,6 +4,7 @@ import scorex.transaction.GenesisTransaction
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Random, Try}
+import scala.concurrent.duration._
 
 
 object Server extends App with ScorexLogging {
@@ -16,8 +17,12 @@ object Server extends App with ScorexLogging {
 
     log.debug("LagonakiApplication has been started")
     application.run()
-    Thread.sleep(30000)
-    testingScript(application)
+    if(application.settings.offlineGeneration) {
+      testingScript(application)
+    } else {
+      Thread.sleep(30.seconds.toMillis)
+      testingScript(application)
+    }
   } match {
     case Failure(e) =>
       e.printStackTrace()
@@ -31,10 +36,12 @@ object Server extends App with ScorexLogging {
     log.info("Going to execute testing scenario")
     val wallet = application.wallet
 
-    wallet.generateNewAccounts(10)
-    println("pkas:")
-    wallet.privateKeyAccounts().toList.map(_.address).foreach(println)
-    wallet.privateKeyAccounts().takeRight(5).foreach(wallet.deleteAccount)
+    if(wallet.privateKeyAccounts().isEmpty) {
+      wallet.generateNewAccounts(10)
+      println("pkas:")
+      wallet.privateKeyAccounts().toList.map(_.address).foreach(println)
+      wallet.privateKeyAccounts().takeRight(5).foreach(wallet.deleteAccount)
+    }
 
     log.info("Executing testing scenario with accounts" +
       s"(${wallet.privateKeyAccounts().size}) : "

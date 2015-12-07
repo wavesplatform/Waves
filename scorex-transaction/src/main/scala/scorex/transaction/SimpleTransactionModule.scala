@@ -42,10 +42,10 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
   override val state = new StoredState(settings.dataDirOpt)
 
   /**
-   * In Lagonaki, transaction-related data is just sequence of transactions. No Merkle-tree root of txs / state etc
-   * @param bytes - serialized sequence of transaction
-   * @return
-   */
+    * In Lagonaki, transaction-related data is just sequence of transactions. No Merkle-tree root of txs / state etc
+    * @param bytes - serialized sequence of transaction
+    * @return
+    */
   override def parseBlockData(bytes: Array[Byte]): Try[TransactionsBlockField] = Try {
     bytes.isEmpty match {
       case true => TransactionsBlockField(Seq())
@@ -91,16 +91,16 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
 
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
     val ipoMembers = List(
-      "27ZjrCKQP66AZsUGwud8c3ahcj13cVaX4cF",
-      "2KhD4L7tknTHe7yZoVbhujPUVkQDdhA3QGS",
-      "2G7PDfxdJG8jTDX8mM5uSbW8JFqpCMgQ5Xk",
-      "2GqbZk5UHagTFn7jhwohSCj3RaZrkj8Trcs",
-      "22AVpTZnZEav2SWGBZAHR3Vdrxojd59ETkX",
-      "61fcGqP9ULkoEhzdsRCbYmZmxzqK95b3Un",
-      "NNtdNKMeASKPNxM22abQWv8LEw9NzXpthq",
-      "2UNCFoaXLeZwpr1n6BfSi1qKhrVLMXPzedM",
-      "UDiEjY7hHhobG5188YB7DfQ2eZgaDaU8jS",
-      "XUU8gXPDyWGRPkRnLrR24cCryyRZhghdHo"
+      "QTwpq6La1CzXrwbFbcxncb4kv5g2UNFiY2",
+      "QSwv4GoR3UjwXKSZN5eoAhHqPcEWTKzomD",
+      "QhcAVCVWbWVV1zR3YGFXpbqPdC3f9U9Vk8",
+      "QQBe83C4re58s7RPTJADw2uqD8jBubebof",
+      "QPsvHmzarLsHDRzjqpGRuLKJMh5WWf6KSp",
+      "QN7q77Szn3dXaWXFJigGN7KdyegFEGNj8J",
+      "QgN6AT5yrnB12U42QptidCWQkhUEsQaTTp",
+      "QNpF56FwQ6xuVynpMndcUEeam3JmPt7tj4",
+      "Qa9cNprVTsYPeuxzVjad5p1CvzAezYffdd",
+      "QZkTyUfZFLjPiKzQuJNZo4kV959YZkoYe3"
     )
 
     val timestamp = 0L
