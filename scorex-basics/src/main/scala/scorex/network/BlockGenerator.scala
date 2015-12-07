@@ -1,7 +1,5 @@
 package scorex.network
 
-import java.net.InetSocketAddress
-
 import akka.actor.FSM
 import scorex.app.Application
 import scorex.block.Block
@@ -11,8 +9,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-
-case class NewBlock(block: Block, sender: Option[InetSocketAddress])
 
 class BlockGenerator(application: Application) extends FSM[Status, Unit] {
 
@@ -27,10 +23,15 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
       tryToGenerateABlock()
       stay()
 
+    case Event(newBlock: Block, _) =>
+      application.historySynchronizer ! newBlock
+      stay()
+
     case Event(StopGeneration, _) => goto(Syncing)
   }
 
   whenUnhandled {
+
     case Event(GetStatus, _) =>
       sender() ! stateName.name
       stay()
@@ -47,7 +48,7 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
       case Success(blocks: Seq[Block]) =>
         if (blocks.nonEmpty) {
           val bestBlock = blocks.maxBy(application.consensusModule.blockScore)
-          self ! NewBlock(bestBlock, None)
+          self ! bestBlock
         }
       case Failure(ex) => log.error("Failed to generate new block: {}", ex)
       case m => log.error("Unexpected message: {}", m)
@@ -74,4 +75,5 @@ object BlockGenerator {
   case object StartGeneration
 
   case object StopGeneration
+
 }

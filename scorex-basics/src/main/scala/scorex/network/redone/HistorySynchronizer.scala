@@ -50,7 +50,11 @@ class HistorySynchronizer(application: Application)
     case false => startWith(ScoreNotCompared, Seq())
   }
 
-  when(ScoreNotCompared)(FSM.NullFunction)
+  when(ScoreNotCompared){
+    //init signal(boxed Unit) matching
+    case Event((), _) =>
+      stay()
+  }
 
   when(GettingExtension, 1.minute) {
     case Event(StateTimeout, _) =>

@@ -57,12 +57,14 @@ trait Application extends ScorexLogging {
   val history: History
   val state: State
 
+  lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this))
+
   def run() {
     checkGenesis()
 
     IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
 
-    actorSystem.actorOf(Props(classOf[HistorySynchronizer], this))
+    historySynchronizer ! Unit
     actorSystem.actorOf(Props(classOf[PeerSynchronizer], this))
 
     //CLOSE ON UNEXPECTED SHUTDOWN
