@@ -61,15 +61,16 @@ class HistorySynchronizer(application: Application)
       stay() //todo: fix
 
     //todo: aggregating function for block ids (like score has)
-    case Event(DataFromPeer(blockIds: Seq[Block.BlockId]@unchecked, remote), _)
-      if blockIds.cast[Seq[Block.BlockId]].isDefined =>
+    case Event(DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, remote), _)
+      if msgId == SignaturesSpec.messageCode && blockIds.cast[Seq[Block.BlockId]].isDefined =>
+
       blockIds.foreach { blockId =>
         networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), SendToChosen(Seq(remote)))
       }
       stay()
 
-    case Event(DataFromPeer(block: Block@unchecked, remote), _)
-      if block.cast[Block].isDefined =>
+    case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
+      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
 
       processNewBlock(block, Some(remote.address))
       stay()
@@ -77,7 +78,9 @@ class HistorySynchronizer(application: Application)
 
   //accept only new block from local or remote
   when(Synced) {
-    case Event(DataFromPeer(block: Block, remote), _) =>
+    case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
+      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
+
       processNewBlock(block, Some(remote.address))
       stay()
 
@@ -88,9 +91,13 @@ class HistorySynchronizer(application: Application)
 
   //common logic for all the states
   whenUnhandled {
-    case Event(DataFromPeer(content: History.BlockchainScore, remote), _) =>
+    case Event(DataFromPeer(msgId, content: History.BlockchainScore, remote), _)
+        if msgId == ScoreMessageSpec.messageCode =>
       scoreSyncer.networkUpdate(remote, content)
       stay()
+
+    //case Event(DataFromPeer(), remote), _) =>
+//      stay()
 
     case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
       val localScore = history.score()
@@ -100,6 +107,8 @@ class HistorySynchronizer(application: Application)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
         goto(GettingExtension) using witnesses
       } else goto(Synced) using Seq() //todo: avoid goto if already in state
+
+
 
     case nonsense: Any =>
       log.warning(s"HistorySynchronizer: got something strange in the state:$stateName - $nonsense")

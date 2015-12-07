@@ -32,12 +32,11 @@ class PeerSynchronizer(application:Application) extends ViewSynchronizer with Sc
 
   //todo: write tests
   override def receive = {
-    case DataFromPeer(peers: Seq[InetSocketAddress] @unchecked, remote)
-      if peers.cast[Seq[InetSocketAddress]].isDefined  =>
+    case DataFromPeer(msgId, peers: Seq[InetSocketAddress] @unchecked, remote)
+      if msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined  =>
       peers.foreach(peerManager.addPeer)
 
-    //boxed Unit match
-    case DataFromPeer((), remote) =>
+    case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
       val peers = peerManager.knownPeers().take(3) //todo: make configurable, check on receiving
       val msg = Message(PeersSpec, Right(peers), None)
       networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))

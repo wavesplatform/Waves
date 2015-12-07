@@ -95,7 +95,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
         case Success(content) =>
           messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
             case Some(handler) =>
-              handler ! DataFromPeer(content, remote)
+              handler ! DataFromPeer(msgId, content, remote)
 
             case None => //todo: ???
           }
@@ -124,7 +124,9 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
 object NetworkController {
   case class RegisterMessagesHandler(specs: Seq[MessageSpec[_]], handler: ActorRef)
-  case class DataFromPeer[V](data:V, source:ConnectedPeer)
+
+  //todo: more stricter solution for messageType than number?
+  case class DataFromPeer[V](messageType: Message.MessageCode, data:V, source:ConnectedPeer)
   case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
 
 
