@@ -36,9 +36,8 @@ class LagonakiApplication(val settingsFilename: String)
         new NxtLikeConsensusModule
       case s: String if s.equalsIgnoreCase("qora") =>
         new QoraLikeConsensusModule
-      case algo =>
-        log.error(s"Unknown consensus algo: $algo. Use NxtLikeConsensusModule instead.")
-        new NxtLikeConsensusModule
+      case nonsense =>
+        sys.error(s"Unknown consensus algo: $nonsense")
     }
 
   override implicit val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
