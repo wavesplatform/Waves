@@ -64,7 +64,7 @@ class HistorySynchronizer(application: Application)
     case Event(DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, remote), _)
       if msgId == SignaturesSpec.messageCode && blockIds.cast[Seq[Block.BlockId]].isDefined =>
 
-      blockIds.foreach { blockId =>
+      blockIds.tail.foreach { blockId =>
         networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), SendToChosen(Seq(remote)))
       }
       stay()
@@ -78,6 +78,10 @@ class HistorySynchronizer(application: Application)
 
   //accept only new block from local or remote
   when(Synced) {
+    //init signal(boxed Unit) matching
+    case Event(Unit, _) =>
+      stay()
+
     case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
 
