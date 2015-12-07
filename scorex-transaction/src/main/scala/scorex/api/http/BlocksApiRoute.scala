@@ -54,27 +54,19 @@ case class BlocksApiRoute(history: History, wallet: Wallet)(implicit val context
     }
   }
 
-  @Path("/delay/{height}/{blockNum}")
+  @Path("/delay/{signature}/{blockNum}")
   @ApiOperation(value = "Average delay", notes = "Average delay in milliseconds between last $blockNum blocks starting from $height", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "height", value = "Height of block", required = true, dataType = "String", paramType = "path"),
+    new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "String", paramType = "path"),
     new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "String", paramType = "path")
   ))
   def delay: Route = {
-    path("delay" / IntNumber / IntNumber) { case (height, count) =>
+    path("delay" / Segment / IntNumber) { case (encodedSignature, count) =>
       jsonRoute {
-        history match {
-          case blockchain: BlockChain =>
-            blockchain.blockAt(height) match {
-              case Some(block) =>
-                blockchain.averageDelay(block, count).map(d => Json.obj("delay" -> d))
-                  .getOrElse(Json.obj("status" -> "error", "details" -> "Internal error")).toString
-              case None =>
-                Json.obj("status" -> "error", "details" -> "No block for this height").toString()
-            }
-          case _ =>
-            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain").toString()
-        }
+        withBlock(history, encodedSignature) { block =>
+          history.averageDelay(block, count).map(d => Json.obj("delay" -> d))
+            .getOrElse(Json.obj("status" -> "error", "details" -> "Internal error"))
+        }.toString
       }
     }
   }
