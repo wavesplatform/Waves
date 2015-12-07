@@ -10,10 +10,10 @@ import scorex.network._
 import scorex.network.message.Message
 import scorex.network.redone.NetworkObject.ConsideredValue
 import scorex.transaction.History
+import shapeless.Typeable._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import shapeless.Typeable._
 
 
 class HistorySynchronizer(application: Application)
@@ -45,7 +45,10 @@ class HistorySynchronizer(application: Application)
     }
   }
 
-  startWith(ScoreNotCompared, Seq())
+  application.settings.offlineGeneration match {
+    case true => startWith(Synced, Seq())
+    case false => startWith(ScoreNotCompared, Seq())
+  }
 
   when(ScoreNotCompared)(FSM.NullFunction)
 
@@ -54,14 +57,14 @@ class HistorySynchronizer(application: Application)
       stay() //todo: fix
 
     //todo: aggregating function for block ids (like score has)
-    case Event(DataFromPeer(blockIds: Seq[Block.BlockId] @unchecked, remote), _)
-        if blockIds.cast[Seq[Block.BlockId]].isDefined  =>
+    case Event(DataFromPeer(blockIds: Seq[Block.BlockId]@unchecked, remote), _)
+      if blockIds.cast[Seq[Block.BlockId]].isDefined =>
       blockIds.foreach { blockId =>
         networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), SendToChosen(Seq(remote)))
       }
       stay()
 
-    case Event(DataFromPeer(block: Block @unchecked, remote), _)
+    case Event(DataFromPeer(block: Block@unchecked, remote), _)
       if block.cast[Block].isDefined =>
 
       processNewBlock(block, Some(remote.address))
