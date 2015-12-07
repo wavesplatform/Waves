@@ -7,8 +7,10 @@ import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
+import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
 import scorex.utils.ScorexLogging
+
+import scala.concurrent.duration._
 
 case class TransactionsBlockField(override val value: Seq[Transaction])
   extends BlockField[Seq[Transaction]] {
@@ -38,7 +40,15 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
 
   private val instance = this
   override val blockStorage = new BlockStorage {
-    override val history = new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
+    override val history: History = settings.history match {
+      case s: String if s.equalsIgnoreCase("blockchain") =>
+        new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
+      case s: String if s.equalsIgnoreCase("blocktree") =>
+        new StoredBlockTree(settings.dataDirOpt)(consensusModule, instance)
+      case s =>
+        log.error(s"Unknown history storage: $s. Use StoredBlockTree instead.")
+        new StoredBlockTree(settings.dataDirOpt)(consensusModule, instance)
+    }
     override val state = new StoredState(settings.dataDirOpt)
   }
 
@@ -80,13 +90,9 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
       case None =>
     })
 
-    val height = blockStorage.history.height()
-    if (height > MaxBlocksForUnconfirmed + 1) {
-      val time10 = blockStorage.history.blockAt(height - MaxBlocksForUnconfirmed).get.timestampField.value
-      UnconfirmedTransactionsDatabaseImpl.all().foreach { tx =>
-        if (tx.timestamp < time10) UnconfirmedTransactionsDatabaseImpl.remove(tx)
-      }
-
+    val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
+    UnconfirmedTransactionsDatabaseImpl.all().foreach { tx =>
+      if ((lastBlockTs - tx.timestamp).seconds > MaxTimeForUnconfirmed) UnconfirmedTransactionsDatabaseImpl.remove(tx)
     }
   }
 
@@ -131,6 +137,6 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
 object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
-  val MaxBlocksForUnconfirmed = 10
+  val MaxTimeForUnconfirmed: Duration = 1.hour
   val MaxTransactionsPerBlock = 4096
 }

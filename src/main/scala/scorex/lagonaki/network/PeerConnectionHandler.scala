@@ -57,7 +57,7 @@ class PeerConnectionHandler(application: LagonakiApplication,
         log.info(s"Got GetSignaturesMessage with ${signaturesGot.length} sigs within")
 
         signaturesGot.exists { parent =>
-          val headers = application.blockStorage.history.getSignatures(parent, settings.MaxBlocksChunks)
+          val headers = application.blockStorage.history.lookForward(parent, settings.MaxBlocksChunks)
           if (headers.nonEmpty) {
             self ! SignaturesMessage(Seq(parent) ++ headers)
             true

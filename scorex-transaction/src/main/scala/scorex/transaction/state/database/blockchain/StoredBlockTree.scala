@@ -98,6 +98,7 @@ class StoredBlockTree(dataFolderOpt: Option[String])
             throw new Error(s"Parent ${block.referenceField.value.mkString} block is not in tree")
         }
       }
+      db.commit()
     }
 
     override def exists(blockId: BlockId): Boolean = map.containsKey(blockId)
@@ -177,6 +178,18 @@ class StoredBlockTree(dataFolderOpt: Option[String])
 
   override def lastBlock: Block = blockStorage.bestBlock.map(_._1).get
 
+  override def lastBlocks(howMany: Int): Seq[Block] = {
+    def loop(block: Block, i: Int, acc: Seq[Block]): Seq[Block] = {
+      lazy val p = parent(block)
+      (i, p) match {
+        case (0, _) => acc
+        case (m, Some(parentBlock)) => loop(parentBlock, i-1, parentBlock +: acc)
+        case _ => acc
+      }
+    }
+    loop(lastBlock, howMany, Seq.empty).reverse
+  }
+
   /**
     * Quality score of a best chain, e.g. cumulative difficulty in case of Bitcoin / Nxt
     * @return
@@ -192,6 +205,8 @@ class StoredBlockTree(dataFolderOpt: Option[String])
       case _ => None
     }
   }
+
+  override def lookForward(parentSignature: BlockId, howMany: Int): Seq[BlockId] = ???
 
   override def contains(id: BlockId): Boolean = blockStorage.exists(id)
 

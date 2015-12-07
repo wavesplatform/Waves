@@ -68,7 +68,14 @@ trait History {
   /**
     * Block with maximum blockchain score
     */
-  def lastBlock: Block
+  def lastBlock: Block = lastBlocks(1).head
+
+  def lastBlocks(howMany: Int): Seq[Block]
+
+  /**
+    * Return $howMany blocks starting from $parentSignature
+    */
+  def lookForward(parentSignature: BlockId, howMany: Int): Seq[BlockId]
 
   /**
     * Average delay in milliseconds between last $blockNum blocks starting from $block
@@ -76,5 +83,14 @@ trait History {
   def averageDelay(block: Block, blockNum: Int): Try[Long] = Try {
     (block.timestampField.value - parent(block, blockNum).get.timestampField.value) / blockNum
   }
+
+  lazy val genesis: Block = {
+    def deeper(b: Block): Block = parent(b) match {
+      case Some(parentBlock) => deeper(parentBlock)
+      case None => b
+    }
+    deeper(lastBlock)
+  }
+
 
 }

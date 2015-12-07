@@ -10,6 +10,8 @@ trait TransactionSettings {
     res.foreach(folder => new java.io.File(folder).mkdirs())
     res
   }
-  //BLOCKCHAIN
-  lazy val maxRollback = 100
+
+  private val DefaultHistory = "blocktree"
+  lazy val history = (settingsJSON \ "history").asOpt[String].getOrElse(DefaultHistory)
+
 }

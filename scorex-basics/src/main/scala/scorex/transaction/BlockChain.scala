@@ -1,9 +1,8 @@
 package scorex.transaction
 
 import scorex.block.Block
+import scorex.block.Block.BlockId
 import scorex.utils.ScorexLogging
-
-import scala.util.Try
 
 trait BlockChain extends History with ScorexLogging {
 
@@ -18,23 +17,16 @@ trait BlockChain extends History with ScorexLogging {
 
   private[transaction] def discardBlock(): BlockChain
 
-  override def lastBlock: Block = blockAt(height()).get
+  override def lastBlocks(howMany: Int): Seq[Block] =
+    (Math.max(1, height() - howMany + 1) to height()).flatMap(blockAt(_)).reverse
 
-  def getSignatures(parentSignature: Block.BlockId, howMany: Int): Seq[Block.BlockId] =
+
+  def lookForward(parentSignature: BlockId, howMany: Int): Seq[BlockId] =
     heightOf(parentSignature).map { h =>
       (h + 1).to(Math.min(height(), h + howMany: Int)).flatMap(blockAt).map(_.uniqueId)
     }.getOrElse(Seq())
 
-  def lastSignatures(howMany: Int): Seq[Block.BlockId] = {
-    val h = height()
-    h.to(Math.max(h - howMany, 1), -1).flatMap { h =>
-      blockAt(h).map(_.uniqueId)
-    }
-  }
-
   def children(block: Block): Seq[Block]
-
-  def lastSignature(): Block.BlockId = lastBlock.uniqueId
 
   def score() =
     (1 to height()).foldLeft(0: BigInt) { case (sc, h) =>
@@ -42,4 +34,6 @@ trait BlockChain extends History with ScorexLogging {
         bl.consensusModule.blockScore(bl)(bl.transactionModule)
       }.getOrElse(0: BigInt)
     }
+
+  override lazy val genesis: Block = blockAt(1).get
 }

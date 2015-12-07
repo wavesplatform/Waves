@@ -37,7 +37,7 @@ trait BlockStorage extends ScorexLogging {
   def removeAfter(signature: BlockId): Unit = synchronized {
     history match {
       case h: BlockChain =>
-        while (!h.lastSignature().sameElements(signature)) {
+        while (!h.lastBlock.uniqueId.sameElements(signature)) {
           state.processBlock(history.lastBlock, reversal = true)
           h.discardBlock()
         }

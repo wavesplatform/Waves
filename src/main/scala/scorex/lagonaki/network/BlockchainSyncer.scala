@@ -40,7 +40,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
       processMaxScore(
         scoreOpt,
         onMax = () => {
-          val sigs = application.blockStorage.history.lastSignatures(application.settings.MaxBlocksChunks)
+          val sigs = application.blockStorage.history.lastBlocks(application.settings.MaxBlocksChunks).map(_.uniqueId)
           val msg = GetSignaturesMessage(sigs)
           networkController ! NetworkController.SendMessageToBestPeer(msg)
           stay()
@@ -129,7 +129,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
     val consModule = application.consensusModule
     implicit val transModule = application.transactionModule
 
-//    log.info("Trying to generate a new block")
+    //    log.info("Trying to generate a new block")
     val accounts = application.wallet.privateKeyAccounts()
     consModule.generateNextBlocks(accounts)(transModule) onComplete {
       case Success(blocks: Seq[Block]) =>

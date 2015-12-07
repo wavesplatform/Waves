@@ -7,6 +7,7 @@ import scorex.lagonaki.TestingCommons
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.block.Block
 import scorex.lagonaki.network.message.{BlockMessage, Message}
+import scorex.transaction.BlockChain
 
 class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
   ignore("retroactive chain test") {
@@ -21,26 +22,29 @@ class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
     Thread.sleep(5000)
     val bh = application.blockStorage.history.height()
 
-    //chain validity check
-    (2 to bh).foreach { h =>
-      assert(application.blockStorage.history.blockAt(h).get.isValid)
+    application.blockStorage.history match {
+      case blochchain: BlockChain =>
+        //chain validity check
+        (2 to bh).foreach { h =>
+          assert(blochchain.blockAt(h).get.isValid)
+        }
+
+        val b1 = blochchain.blockAt(1).get
+        val b2 = blochchain.blockAt(2).get
+
+        //toBytes/parse roundtrip test
+        val bb2 = Block.parse(b2.bytes).get
+        assert(bb2.timestampField.value == b2.timestampField.value)
+        assert(b1.timestampField.value != b2.timestampField.value)
+        assert(b1 != b2)
+
+        //serialization/deserialization  thru BlockMessage roundtrip test
+
+        val restored = Message.parse(ByteBuffer.wrap(b2.bytes)).get.asInstanceOf[BlockMessage].block
+        assert(restored.timestampField.value == b2.timestampField.value)
+        assert(restored.isValid)
+      case _ => ???
     }
-
-    val b1 = application.blockStorage.history.blockAt(1).get
-    val b2 = application.blockStorage.history.blockAt(2).get
-
-    //toBytes/parse roundtrip test
-    val bb2 = Block.parse(b2.bytes).get
-    assert(bb2.timestampField.value == b2.timestampField.value)
-    assert(b1.timestampField.value != b2.timestampField.value)
-    assert(b1 != b2)
-
-    //serialization/deserialization  thru BlockMessage roundtrip test
-
-    val restored = Message.parse(ByteBuffer.wrap(b2.bytes)).get.asInstanceOf[BlockMessage].block
-    assert(restored.timestampField.value == b2.timestampField.value)
-    assert(restored.isValid)
-
     application.stopAll()
   }
 }
