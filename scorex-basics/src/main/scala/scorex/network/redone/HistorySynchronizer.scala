@@ -95,7 +95,7 @@ class HistorySynchronizer(application: Application)
         val msg = Message(GetSignaturesSpec, Right(history.lastSignatures(100)), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
         goto(GettingExtension) using witnesses
-      } else goto(Synced) using Seq()
+      } else goto(Synced) using Seq()    //todo: avoid goto if already in state
 
     case nonsense: Any =>
       log.warning(s"HistorySynchronized: got something strange $nonsense")
