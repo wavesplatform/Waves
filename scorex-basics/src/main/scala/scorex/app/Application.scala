@@ -7,7 +7,7 @@ import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
-import scorex.network.redone.{PeerSynchronizer, HistorySynchronizer}
+import scorex.network.redone.{HistorySynchronizer, PeerSynchronizer}
 import scorex.network.{BlockGenerator, NetworkController}
 import scorex.settings.Settings
 import scorex.transaction.{History, State, TransactionModule}
@@ -56,7 +56,6 @@ trait Application extends ScorexLogging {
   //interface to append log and state
   val history: History
   val state: State
-
 
   def run() {
     checkGenesis()
