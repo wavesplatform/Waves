@@ -110,12 +110,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
     /* case GetMaxChainScore =>
       sender() ! BlockGenerator.MaxChainScore(maxPeerScore())
-
-    case NewBlock(block, Some(sndr)) =>
-      application.blockchainSyncer ! NewBlock(block, Some(sndr))
-      self ! BroadcastMessage(BlockMessage(block), List(sndr))
-
-    case UpdateBlockchainScore(remote, height, score) => updateScore(remote, height, score)
     */
 
     case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")

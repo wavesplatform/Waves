@@ -9,7 +9,7 @@ import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network._
 import scorex.network.message.Message
 import scorex.network.redone.NetworkObject.ConsideredValue
-import scorex.transaction.History
+import scorex.transaction.{BlockChain, History}
 import shapeless.Typeable._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -91,13 +91,28 @@ class HistorySynchronizer(application: Application)
 
   //common logic for all the states
   whenUnhandled {
+    //todo: check sender
     case Event(DataFromPeer(msgId, content: History.BlockchainScore, remote), _)
         if msgId == ScoreMessageSpec.messageCode =>
       scoreSyncer.networkUpdate(remote, content)
       stay()
 
-    //case Event(DataFromPeer(), remote), _) =>
-//      stay()
+    //todo: check sender
+    case Event(DataFromPeer(msgId, otherSigs:Seq[Block.BlockId]@unchecked, remote), _)
+      if msgId == GetSignaturesSpec.messageCode && otherSigs.cast[Seq[Block.BlockId]].isDefined =>
+
+      log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
+
+      otherSigs.exists { parent =>
+        val headers = application.history.asInstanceOf[BlockChain].getSignatures(parent, application.settings.MaxBlocksChunks)
+        if (headers.nonEmpty) {
+          val msg = Message(SignaturesSpec, Right(Seq(parent) ++ headers), None)
+          val ss = SendToChosen(Seq(remote))
+          networkControllerRef ! SendToNetwork(msg, ss)
+          true
+        } else false
+      }
+      stay()
 
     case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
       val localScore = history.score()
