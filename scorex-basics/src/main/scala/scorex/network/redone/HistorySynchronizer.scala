@@ -61,6 +61,7 @@ class HistorySynchronizer(application: Application)
       stay() //todo: fix
 
     //todo: aggregating function for block ids (like score has)
+    //todo: check sender
     case Event(DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, remote), _)
       if msgId == SignaturesSpec.messageCode && blockIds.cast[Seq[Block.BlockId]].isDefined =>
 
@@ -97,12 +98,12 @@ class HistorySynchronizer(application: Application)
   whenUnhandled {
     //todo: check sender
     case Event(DataFromPeer(msgId, content: History.BlockchainScore, remote), _)
-        if msgId == ScoreMessageSpec.messageCode =>
+      if msgId == ScoreMessageSpec.messageCode =>
       scoreSyncer.networkUpdate(remote, content)
       stay()
 
     //todo: check sender
-    case Event(DataFromPeer(msgId, otherSigs:Seq[Block.BlockId]@unchecked, remote), _)
+    case Event(DataFromPeer(msgId, otherSigs: Seq[Block.BlockId]@unchecked, remote), _)
       if msgId == GetSignaturesSpec.messageCode && otherSigs.cast[Seq[Block.BlockId]].isDefined =>
 
       log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
@@ -118,6 +119,18 @@ class HistorySynchronizer(application: Application)
       }
       stay()
 
+
+    //todo: check sender
+    case Event(DataFromPeer(msgId, sig: Block.BlockId@unchecked, remote), _)
+      if msgId == GetBlockSpec.messageCode =>
+
+      application.history.blockById(sig).foreach { b =>
+        val msg = Message(BlockMessageSpec, Right(b), None)
+        val ss = SendToChosen(Seq(remote))
+        networkControllerRef ! SendToNetwork(msg, ss)
+      }
+      stay()
+
     case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
       val localScore = history.score()
       if (networkScore > localScore) {
@@ -126,7 +139,6 @@ class HistorySynchronizer(application: Application)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
         goto(GettingExtension) using witnesses
       } else goto(Synced) using Seq() //todo: avoid goto if already in state
-
 
 
     case nonsense: Any =>
