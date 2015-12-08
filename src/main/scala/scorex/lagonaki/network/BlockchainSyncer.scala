@@ -100,7 +100,7 @@ class BlockchainSyncer(application: LagonakiApplication, networkController: Acto
                      ): State = scoreOpt match {
     case Some(maxScore) =>
       val localScore = application.blockStorage.history.score()
-      log.info(s"maxScore: $maxScore, localScore: $localScore")
+      log.debug(s"maxScore: $maxScore, localScore: $localScore")
       if (maxScore > localScore) onMax() else onLocal()
     case None =>
       onNone()
