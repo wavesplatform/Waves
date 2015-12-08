@@ -55,11 +55,12 @@ class HistorySynchronizer(application: Application)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
         goto(GettingExtension) using witnesses
       } else goto(Synced) using Seq()
+
   }
 
   private val blocksToReceive = mutable.Queue[BlockId]()
 
-  when(GettingExtension, 1.minutes) {
+  when(GettingExtension, 15.seconds) {
     case Event(StateTimeout, _) =>
       goto(Syncing)
 
@@ -67,7 +68,7 @@ class HistorySynchronizer(application: Application)
     case Event(DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, remote), witnesses)
       if msgId == SignaturesSpec.messageCode &&
         blockIds.cast[Seq[Block.BlockId]].isDefined &&
-        witnesses.contains(remote) =>  //todo: ban if non-expected sender
+        witnesses.contains(remote) => //todo: ban if non-expected sender
 
       log.info(s"Got SignaturesMessage with ${blockIds.length} sigs")
       val common = blockIds.head
@@ -82,7 +83,20 @@ class HistorySynchronizer(application: Application)
 
       val firstReq = blockIds.tail.head
       networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(firstReq), None), SendToChosen(Seq(remote)))
+      goto(GettingBlock)
 
+    case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
+      stay()
+  }
+
+  when(GettingBlock) {
+
+    case Event(CheckBlock(blockId), witnesses) =>
+      if(blocksToReceive.front.sameElements(blockId)) {
+        val ss = SendToRandomFromChosen(witnesses)
+        val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
+        networkControllerRef ! stn
+      }
       stay()
 
     case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
@@ -100,13 +114,14 @@ class HistorySynchronizer(application: Application)
         if (blocksToReceive.isEmpty) {
           goto(Syncing) using Seq()
         } else {
-          val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blocksToReceive.front), None), SendToChosen(Seq(remote)))
+          val blockId = blocksToReceive.front
+          val ss = SendToRandomFromChosen(Seq(remote))
+          val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
           networkControllerRef ! stn
+          context.system.scheduler.scheduleOnce(5.seconds)(self ! CheckBlock(blockId))
           stay()
         }
-      } else {
-        stay()
-      }
+      } else stay()
 
     case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
       stay()
@@ -213,6 +228,10 @@ object HistorySynchronizer {
 
   case object GettingExtension extends Status
 
+  case object GettingBlock extends Status
+
   case object Synced extends Status
 
+
+  case class CheckBlock(id:BlockId)
 }
