@@ -25,6 +25,7 @@ with TestingCommons {
   val genesis = Block.genesis()
   val dirName = "/tmp/scorex/test/"
   val dir = new File(dirName)
+  dir.mkdir()
   for (file <- dir.listFiles) file.delete
 
   testTree(new StoredBlockTree(None), "Memory")
