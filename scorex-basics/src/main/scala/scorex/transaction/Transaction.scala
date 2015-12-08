@@ -4,8 +4,7 @@ import play.api.libs.json.JsObject
 
 
 /**
- * A transaction is an atomic state modifier.
- *
+ * A transaction is an atomic state modifier
  */
 
 trait Transaction {

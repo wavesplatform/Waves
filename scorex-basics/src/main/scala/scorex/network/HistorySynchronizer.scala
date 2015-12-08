@@ -1,13 +1,12 @@
-package scorex.network.redone
+package scorex.network
 
 import akka.actor.FSM
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
-import scorex.network._
 import scorex.network.message.Message
-import scorex.network.redone.NetworkObject.ConsideredValue
+import scorex.network.NetworkObject.ConsideredValue
 import scorex.transaction.{BlockChain, History}
 import shapeless.Typeable._
 
@@ -55,7 +54,6 @@ class HistorySynchronizer(application: Application)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
         goto(GettingExtension) using witnesses
       } else goto(Synced) using Seq()
-
   }
 
   private val blocksToReceive = mutable.Queue[BlockId]()
@@ -187,6 +185,11 @@ class HistorySynchronizer(application: Application)
   }
 
   onTransition {
+    case _ -> Syncing =>
+      scoreSyncer.consideredValue.foreach{cv =>
+        self ! cv
+      }
+
     case _ -> Synced =>
       blockGenerator ! BlockGenerator.StartGeneration
 

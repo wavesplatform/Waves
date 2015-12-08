@@ -7,8 +7,7 @@ import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
-import scorex.network.redone.{HistorySynchronizer, PeerSynchronizer}
-import scorex.network.{BlockGenerator, NetworkController}
+import scorex.network.{BlockGenerator, NetworkController, HistorySynchronizer, PeerSynchronizer}
 import scorex.settings.Settings
 import scorex.transaction.{History, State, TransactionModule}
 import scorex.utils.ScorexLogging

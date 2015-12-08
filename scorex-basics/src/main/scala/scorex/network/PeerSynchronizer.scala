@@ -1,9 +1,8 @@
-package scorex.network.redone
+package scorex.network
 
 import java.net.InetSocketAddress
 
 import scorex.app.Application
-import scorex.network.{SendToChosen, SendToRandom, NetworkController}
 import scorex.network.NetworkController.{SendToNetwork, DataFromPeer}
 import scorex.network.message.Message
 import scorex.utils.ScorexLogging

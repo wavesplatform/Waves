@@ -1,8 +1,7 @@
-package scorex.network.redone
+package scorex.network
 
 import akka.actor.ActorRef
-import scorex.network.ConnectedPeer
-import scorex.network.redone.NetworkObject.ConsideredValue
+import scorex.network.NetworkObject.ConsideredValue
 import scorex.transaction.History._
 
 case object UpdateNetworkView

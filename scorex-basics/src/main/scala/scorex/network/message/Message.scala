@@ -66,10 +66,8 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
 
   import Message._
 
-  private val specsMap = {
-    Map(specs.map(s => s.messageCode -> s): _*)
-      .ensuring(m => m.size == specs.size, "Duplicate message codes")
-  }
+  private val specsMap = Map(specs.map(s => s.messageCode -> s): _*)
+    .ensuring(m => m.size == specs.size, "Duplicate message codes")
 
   //MAGIC ++ Array(spec.messageCode) ++ Ints.toByteArray(dataLength) ++ dataWithChecksum
   def parse(bytes: ByteBuffer, sourceOpt: Option[ConnectedPeer]): Try[Message[_]] = Try {

@@ -3,7 +3,6 @@ package scorex.network
 import scorex.app.Application
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
-import scorex.network.redone.ViewSynchronizer
 import scorex.transaction.Transaction
 import scorex.utils.ScorexLogging
 

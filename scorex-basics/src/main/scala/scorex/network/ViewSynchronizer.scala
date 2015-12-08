@@ -1,7 +1,6 @@
-package scorex.network.redone
+package scorex.network
 
 import akka.actor.{Actor, ActorRef}
-import scorex.network.NetworkController
 import scorex.network.message.MessageSpec
 
 
