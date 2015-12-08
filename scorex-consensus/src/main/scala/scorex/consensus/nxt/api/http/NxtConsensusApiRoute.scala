@@ -79,7 +79,6 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: 
         Json.obj("base-target" -> bt).toString()
       }
     }
-
   }
 
   @Path("/algo")

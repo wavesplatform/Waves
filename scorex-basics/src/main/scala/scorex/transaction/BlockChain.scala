@@ -3,6 +3,8 @@ package scorex.transaction
 import scorex.block.Block
 import scorex.utils.ScorexLogging
 
+import scala.util.Try
+
 trait BlockChain extends History with ScorexLogging {
 
   def blockAt(height: Int): Option[Block]
@@ -26,6 +28,14 @@ trait BlockChain extends History with ScorexLogging {
     h.to(Math.max(h - howMany, 1), -1).flatMap { h =>
       blockAt(h).map(_.uniqueId)
     }
+  }
+
+  /**
+    * Average delay in milliseconds between last $blockNum blocks starting from $block
+    */
+  def averageDelay(block: Block, blockNum: Int): Try[Long] = Try {
+    val height: Int = heightOf(block).get
+    (blockAt(height).get.timestampField.value - blockAt(height - blockNum).get.timestampField.value) / blockNum
   }
 
   def lastSignature(): Block.BlockId = lastBlock.uniqueId

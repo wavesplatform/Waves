@@ -1,11 +1,23 @@
 package scorex.perma.consensus
 
-import scorex.perma.actors.Ticket
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
+import scorex.utils.JsonSerialization
 
-//case class BlockHeaderLike(difficulty: BigInt, puz: Array[Byte], ticket: Ticket)
+case class PermaLikeConsensusBlockData(target: BigInt, puz: Array[Byte], ticket: Ticket)
 
-trait PermaLikeConsensusBlockData {
-  val difficulty: BigInt
-  val puz: Array[Byte]
-  val ticket: Ticket
+object PermaLikeConsensusBlockData extends JsonSerialization {
+
+  implicit val writes: Writes[PermaLikeConsensusBlockData] = (
+    (JsPath \ "difficulty").write[BigInt] and
+      (JsPath \ "puz").write[Bytes] and
+      (JsPath \ "ticket").write[Ticket]
+    ) (unlift(PermaLikeConsensusBlockData.unapply))
+
+  implicit val reads: Reads[PermaLikeConsensusBlockData] = (
+    (JsPath \ "difficulty").read[BigInt] and
+      (JsPath \ "puz").read[Bytes] and
+      (JsPath \ "ticket").read[Ticket]
+    ) (PermaLikeConsensusBlockData.apply _)
+
 }

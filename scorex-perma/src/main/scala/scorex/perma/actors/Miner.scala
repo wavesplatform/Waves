@@ -1,53 +1,86 @@
 package scorex.perma.actors
 
-import java.security.SecureRandom
-
 import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.util.Timeout
 import scorex.crypto.CryptographicHash._
 import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey, Signature}
-import scorex.crypto.ads.merkle.{MerkleTree, AuthDataBlock}
 import scorex.crypto._
+import scorex.crypto.ads.merkle.AuthDataBlock
+import scorex.crypto.ads.merkle.TreeStorage.Position
 import scorex.perma.BlockchainBuilderSpec.WinningTicket
-import scorex.perma.Parameters
 import scorex.perma.actors.MinerSpec._
 import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
+import scorex.perma.consensus.{PartialProof, Ticket}
+import scorex.perma.settings.Constants
+import scorex.perma.settings.Constants.DataSegment
+import scorex.storage.Storage
+import scorex.utils._
 
-
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.util.Try
 
-case class PartialProof(signature: Signature, segmentIndex: Int, segment: AuthDataBlock[Parameters.DataSegment])
-
-case class Ticket(publicKey: PublicKey,
-                  s: Array[Byte],
-                  proofs: IndexedSeq[PartialProof])
-
-class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with ActorLogging {
+class Miner(rootHash: Digest)(implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
+  extends Actor with ActorLogging {
 
   import Miner._
 
   private val keyPair = EllipticCurveImpl.createKeyPair(randomBytes(32))
+  private implicit val timeout = Timeout(1.minute)
 
-  private var segments: Subset = Map()
+  private val segmentIds: Seq[Long] = 1.to(Constants.l).map { i =>
+    u(keyPair._2, i - 1)
+  }.toSeq
+
+  //Mutable list of ids, remaining to download
+  private var segmentToDownload: ListBuffer[Long] = segmentIds.to[ListBuffer]
 
   override def receive = {
 
-    case Initialize =>
-      log.info("Initialize")
+    case Initialize(miners) =>
+      log.debug("Initialize")
 
-      val segmentIdsToDownload = 1.to(Parameters.l).map { i =>
-        u(keyPair._2, i - 1)
-      }.toArray
+      segmentToDownload foreach { s =>
+        if (authDataStorage.containsKey(s)) {
+          segmentToDownload -= s
+        }
+      }
 
-      trustedDealerRef ! SegmentsRequest(segmentIdsToDownload)
+      if (segmentToDownload.nonEmpty) {
+        miners.foreach(_ ! SegmentsRequest(segmentToDownload))
+      }
+
+    case GetStatus =>
+      log.debug("Get status")
+      if (segmentToDownload.isEmpty) {
+        sender ! Initialized
+      } else {
+        sender ! LoadingData
+      }
+
+    case SegmentsRequest(ids) =>
+      val segments: Subset = ids.map { x =>
+        x -> authDataStorage.get(x)
+      }.toMap.collect {
+        case (key, Some(value)) => key -> value
+      }
+      log.info(s"Miner SegmentsRequest for ${ids.length} blocks returns ${segments.size} blocks")
+      sender ! SegmentsToStore(segments)
 
     case SegmentsToStore(sgs) =>
       log.debug("SegmentsToStore({})", sgs)
-      require(segments.isEmpty)
-      segments = sgs
+      sgs.foreach { s =>
+        if (segmentToDownload.contains(s._1) && s._2.check(s._1, rootHash)(Constants.hash)) {
+          authDataStorage.set(s._1, s._2)
+          segmentToDownload -= s._1
+        }
+      }
+      authDataStorage.commit()
 
     case TicketGeneration(difficulty, puz) =>
       log.debug("TicketGeneration({})", puz)
-      val ticket = generate(keyPair, puz, segments)
+      val ticket = generate(keyPair, puz)
 
       val check = validate(keyPair._2, puz, difficulty, ticket, rootHash)
       val score = ticketScore(ticket)
@@ -56,8 +89,7 @@ class Miner(trustedDealerRef: ActorRef, rootHash: Digest) extends Actor with Act
       if (check) {
         sender() ! WinningTicket(puz, score, ticket)
       } else {
-        Thread.sleep(100)
-        self ! TicketGeneration(difficulty, puz)
+        context.system.scheduler.scheduleOnce(200.millis, self, TicketGeneration(difficulty, puz))
       }
 
     case TicketValidation(difficulty, puz, t: Ticket) =>
@@ -73,20 +105,13 @@ object Miner {
   val NoSig = Array[Byte]()
 
   //calculate index of i-th segment
-  private def u(pubKey: SigningFunctions.PublicKey, i: Int): Int = {
+  private def u(pubKey: PublicKey, i: Int): Long = {
     val h = Sha256.hash(pubKey ++ BigInt(i).toByteArray)
-    BigInt(1, h).mod(Parameters.n).toInt
+    BigInt(1, h).mod(Constants.n).toLong
   }
 
-
-  //todo: move to utils
-  def randomBytes(howMany: Int) = {
-    val r = new Array[Byte](howMany)
-    new SecureRandom().nextBytes(r) //overrides s
-    r
-  }
-
-  def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte], segments: Subset): Ticket = {
+  def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte])
+              (implicit authDataStorage: Storage[Long, AuthDataBlock[DataSegment]]): Ticket = {
 
     val (privateKey, publicKey) = keyPair
 
@@ -94,20 +119,19 @@ object Miner {
     val s = randomBytes(32)
 
     val sig0 = NoSig
-    val r1 = u(publicKey, (BigInt(1, Sha256.hash(puz ++ publicKey ++ s)) % Parameters.l).toInt)
-      .ensuring(r => segments.keySet.contains(r))
+    val r1 = u(publicKey, (BigInt(1, Sha256.hash(puz ++ publicKey ++ s)) % Constants.l).toInt)
 
-    val proofs = 1.to(Parameters.k).foldLeft(
+    val proofs: IndexedSeq[PartialProof] = 1.to(Constants.k).foldLeft(
       (r1, sig0, Seq[PartialProof]())
     ) {
       case ((ri, sig_prev, seq), _) =>
-        val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segments(ri).data)
+        val segment = authDataStorage.get(ri).get
+        val hi = Sha256.hash(puz ++ publicKey ++ sig_prev ++ segment.data)
         val sig = EllipticCurveImpl.sign(privateKey, hi)
-        val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Parameters.l).toInt)
-          .ensuring(r => segments.keySet.contains(r))
+        val r_next = u(publicKey, BigInt(1, Sha256.hash(puz ++ publicKey ++ sig)).mod(Constants.l).toInt)
 
-        (r_next, sig, seq :+ PartialProof(sig, ri, segments(ri)))
-    }._3.toIndexedSeq.ensuring(_.size == Parameters.k)
+        (r_next, sig, seq :+ PartialProof(sig, ri, segment))
+    }._3.toIndexedSeq.ensuring(_.size == Constants.k)
 
     Ticket(publicKey, s, proofs)
   }
@@ -119,17 +143,17 @@ object Miner {
                t: Ticket,
                rootHash: CryptographicHash.Digest): Boolean = Try {
     val proofs = t.proofs
-    require(proofs.size == Parameters.k)
+    require(proofs.size == Constants.k)
 
     //Local-POR lottery verification
 
     val sigs = NoSig +: proofs.map(_.signature)
     val ris = proofs.map(_.segmentIndex)
 
-    val partialProofsCheck = 1.to(Parameters.k).foldLeft(true) { case (partialResult, i) =>
+    val partialProofsCheck = 1.to(Constants.k).foldLeft(true) { case (partialResult, i) =>
       val segment = proofs(i - 1).segment
 
-      MerkleTree.check(ris(i - 1), rootHash, segment)() || {
+      segment.check(ris(i - 1), rootHash)() || {
         val hi = Sha256.hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
         EllipticCurveImpl.verify(sigs(i), hi, publicKey)
       }
@@ -145,13 +169,21 @@ object Miner {
 
 object MinerSpec {
 
-  type Index = Int
-  type Subset = Map[Index, AuthDataBlock[Parameters.DataSegment]]
+  type Subset = Map[Position, AuthDataBlock[DataSegment]]
 
-  case class Initialize()
+  case class Initialize(miners: Seq[ActorRef])
 
   case class TicketGeneration(difficulty: BigInt, puz: Array[Byte])
 
   case class TicketValidation(difficulty: BigInt, puz: Array[Byte], ticket: Ticket)
+
+  case object GetStatus
+
+  sealed trait MinerStatus
+
+  case object Initialized extends MinerStatus
+
+  case object LoadingData extends MinerStatus
+
 
 }
