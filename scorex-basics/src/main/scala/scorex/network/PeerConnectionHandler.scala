@@ -10,7 +10,13 @@ import scorex.utils.ScorexLogging
 import scala.util.{Failure, Success}
 
 
-case class ConnectedPeer(address: InetSocketAddress, handlerRef: ActorRef)
+class ConnectedPeer(val address: InetSocketAddress, val handlerRef: ActorRef){
+  import shapeless.Typeable._
+
+  override def equals(obj: scala.Any): Boolean = obj.cast[ConnectedPeer].exists(_.address == this.address)
+
+  override def toString: String = super.toString
+}
 
 case class PeerConnectionHandler(application:Application,
                             connection: ActorRef,
@@ -22,7 +28,7 @@ case class PeerConnectionHandler(application:Application,
 
   private lazy val networkControllerRef: ActorRef = application.networkController
 
-  val selfPeer = ConnectedPeer(remote, self)
+  val selfPeer = new ConnectedPeer(remote, self)
 
 
 //  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)

@@ -15,16 +15,15 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-
+//todo: write tests
 class HistorySynchronizer(application: Application)
   extends ViewSynchronizer with FSM[HistorySynchronizer.Status, Seq[ConnectedPeer]] {
 
   import HistorySynchronizer._
-
-  implicit val consensusModule = application.consensusModule
-  implicit val transactionalModule = application.transactionModule
-
   import application.basicMessagesSpecsRepo._
+
+  private implicit val consensusModule = application.consensusModule
+  private implicit val transactionalModule = application.transactionModule
 
   override val messageSpecs = Seq(ScoreMessageSpec, GetSignaturesSpec, SignaturesSpec, BlockMessageSpec, GetBlockSpec)
 
@@ -32,34 +31,20 @@ class HistorySynchronizer(application: Application)
 
   lazy val history = application.history
 
-  lazy val networkControllerRef = application.networkController
+  override lazy val networkControllerRef = application.networkController
 
   lazy val blockGenerator = application.blockGenerator
 
   override def preStart = {
     super.preStart()
     context.system.scheduler.schedule(1.second, 1.seconds) {
-      val ntwMsg = Message(ScoreMessageSpec, Right(history.score()), None)
-      val stn = NetworkController.SendToNetwork(ntwMsg, SendToRandom)
-      networkControllerRef ! stn
+      val msg = Message(ScoreMessageSpec, Right(history.score()), None)
+      networkControllerRef ! NetworkController.SendToNetwork(msg, SendToRandom)
     }
   }
 
-  application.settings.offlineGeneration match {
-    case true => startWith(Synced, Seq())
-    case false => startWith(ScoreNotCompared, Seq())
-  }
-
-  when(ScoreNotCompared) {
-    //init signal(boxed Unit) matching
-    case Event(Unit, _) =>
-      stay()
-
-    case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
-      val localScore = history.score()
-      if (networkScore > localScore) goto(Syncing) using witnesses
-      else goto(Synced) using Seq()
-  }
+  val initialState = if (application.settings.offlineGeneration) Synced else Syncing
+  startWith(initialState, Seq())
 
   when(Syncing) {
     case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
@@ -79,13 +64,14 @@ class HistorySynchronizer(application: Application)
       goto(Syncing)
 
     //todo: aggregating function for block ids (like score has)
-    //todo: check sender
-    case Event(DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, remote), _)
-      if msgId == SignaturesSpec.messageCode && blockIds.cast[Seq[Block.BlockId]].isDefined =>
+    case Event(DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, remote), witnesses)
+      if msgId == SignaturesSpec.messageCode &&
+        blockIds.cast[Seq[Block.BlockId]].isDefined &&
+        witnesses.contains(remote) =>  //todo: ban if non-expected sender
 
       log.info(s"Got SignaturesMessage with ${blockIds.length} sigs")
       val common = blockIds.head
-      assert(application.history.contains(common)) //todo: ?
+      assert(application.history.contains(common)) //todo: what if not?
       application.history.removeAfter(common)
 
       blocksToReceive.clear()
@@ -128,13 +114,8 @@ class HistorySynchronizer(application: Application)
 
   //accept only new block from local or remote
   when(Synced) {
-    //init signal(boxed Unit) matching
-    case Event(Unit, _) =>
-      stay()
-
     case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
-
       processNewBlock(block, local = false)
       stay()
 
@@ -150,6 +131,10 @@ class HistorySynchronizer(application: Application)
 
   //common logic for all the states
   whenUnhandled {
+    //init signal(boxed Unit) matching
+    case Event(Unit, _) if stateName == initialState =>
+      stay()
+
     //todo: check sender
     case Event(DataFromPeer(msgId, content: History.BlockchainScore, remote), _)
       if msgId == ScoreMessageSpec.messageCode =>
@@ -200,6 +185,7 @@ class HistorySynchronizer(application: Application)
 
   initialize()
 
+
   def processNewBlock(block: Block, local: Boolean) = {
     if (block.isValid) {
       log.info(s"New block: $block local: $local")
@@ -222,8 +208,6 @@ class HistorySynchronizer(application: Application)
 object HistorySynchronizer {
 
   sealed trait Status
-
-  case object ScoreNotCompared extends Status
 
   case object Syncing extends Status
 
