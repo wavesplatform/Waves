@@ -84,13 +84,9 @@ class HistorySynchronizer(application: Application)
       val firstReq = blockIds.tail.head
       networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(firstReq), None), SendToChosen(Seq(remote)))
       goto(GettingBlock)
-
-    case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
-      stay()
   }
 
   when(GettingBlock) {
-
     case Event(CheckBlock(blockId), witnesses) =>
       if(blocksToReceive.front.sameElements(blockId)) {
         val ss = SendToRandomFromChosen(witnesses)
@@ -122,9 +118,6 @@ class HistorySynchronizer(application: Application)
           stay()
         }
       } else stay()
-
-    case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
-      stay()
   }
 
   //accept only new block from local or remote
@@ -183,6 +176,9 @@ class HistorySynchronizer(application: Application)
         val ss = SendToChosen(Seq(remote))
         networkControllerRef ! SendToNetwork(msg, ss)
       }
+      stay()
+
+    case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
       stay()
 
     case nonsense: Any =>
