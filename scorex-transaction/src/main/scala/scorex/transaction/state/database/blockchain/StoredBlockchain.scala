@@ -5,7 +5,8 @@ import org.mapdb.DBMaker
 import scorex.account.Account
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
-import scorex.transaction.{ShouldBranchFrom, BlockChain, TransactionModule}
+import scorex.transaction.BlockStorage._
+import scorex.transaction.{BlockChain, TransactionModule}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
@@ -83,28 +84,45 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   //if there are some uncommited changes from last run, discard'em
   if (signaturesIndex.size() > 0) database.rollback()
 
-  override private[transaction] def appendBlock(block: Block): Try[BlockChain] = synchronized {
+  override private[transaction] def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
     Try {
       val parent = block.referenceField
-      if((height() == 0) || (lastBlock.uniqueId sameElements parent.value)) {
+      if ((height() == 0) || (lastBlock.uniqueId sameElements parent.value)) {
         val h = height() + 1
         blockStorage.writeBlock(h, block).flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
-          case Success(_) => database.commit()
+          case Success(_) =>
+            database.commit()
+            Seq((block, Forward))
           case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
         }
       } else blockById(parent.value) match {
         case Some(commonBlock) =>
           val branchPoint = heightOf(commonBlock).get
           val blockScore = consensusModule.blockScore(commonBlock)
-          val currentScore = ((branchPoint + 1) to height()).map(i => consensusModule.blockScore(blockAt(i).get)).sum
-          //TODO should not be able to rollback infinitely
-          if(blockScore > currentScore) throw new ShouldBranchFrom(commonBlock.uniqueId)
-          else log.info("Don't add new block with smaller score")
+          val blocksFromBranchPoint = ((branchPoint + 1) to height()).map(i => blockAt(i).get).reverse
+          val currentScore = blocksFromBranchPoint.map(b => consensusModule.blockScore(b)).sum
+          if (blockScore > currentScore) {
+            val toRollback = blocksFromBranchPoint map { b =>
+              val h = heightOf(b).get
+              blockStorage.deleteBlock(h)
+              signaturesIndex.remove(h)
+              (b, Reversed)
+            }
+            val h = height() + 1
+            blockStorage.writeBlock(h, block).flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
+              case Success(_) =>
+                database.commit()
+                toRollback ++ Seq((block, Forward))
+              case Failure(t) =>
+                database.rollback()
+                throw new Error("Error while storing blockchain a change: " + t)
+            }
+          } else Seq.empty
         case None => throw new Error(s"Appending block ${block.json} which parent is not in blockchain")
       }
-      this
     }
   }
+
 
   override private[transaction] def discardBlock(): BlockChain = synchronized {
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")

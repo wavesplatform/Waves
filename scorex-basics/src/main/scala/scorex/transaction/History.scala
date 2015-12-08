@@ -3,6 +3,7 @@ package scorex.transaction
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.transaction.BlockStorage.BlocksToProcess
 
 import scala.util.Try
 
@@ -56,7 +57,7 @@ trait History {
     * @param block - block to append
     * @return Modified version of history
     */
-  private[transaction] def appendBlock(block: Block): Try[History]
+  private[transaction] def appendBlock(block: Block): Try[BlocksToProcess]
 
   def parent(block: Block, back: Int = 1): Option[Block]
 

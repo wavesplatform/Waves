@@ -4,7 +4,7 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.utils.ScorexLogging
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 /**
   * Storage interface combining both history(blockchain/blocktree) and state
@@ -15,21 +15,10 @@ trait BlockStorage extends ScorexLogging {
   val state: State
 
   def appendBlock(block: Block): Try[Unit] = synchronized {
-    state.processBlock(block) match {
-      case Success(newState) =>
-        history.appendBlock(block) match {
-          case Success(newHistory) => Success()
-          case Failure(e) => e match {
-            case ShouldBranchFrom(sig) =>
-              log.info(s"Better chain detected, rollback to ${sig.mkString}")
-              removeAfter(sig)
-              appendBlock(block)
-            case t: Throwable =>
-              state.processBlock(block, reversal = true)
-              Failure(t)
-          }
-        }
-      case Failure(ex) => Failure(ex)
+    history.appendBlock(block).map { blocks =>
+      blocks foreach { b =>
+        state.processBlock(b._1, b._2)
+      }
     }
   }
 
@@ -49,4 +38,16 @@ trait BlockStorage extends ScorexLogging {
 
 }
 
-case class ShouldBranchFrom(s: BlockId) extends Error
+object BlockStorage {
+
+  sealed trait Direction
+
+  case object Forward extends Direction
+
+  case object Reversed extends Direction
+
+  /*
+ * Block and direction to process it
+ */
+  type BlocksToProcess = Seq[(Block, Direction)]
+}
