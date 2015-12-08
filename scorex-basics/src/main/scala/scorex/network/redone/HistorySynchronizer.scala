@@ -159,7 +159,7 @@ class HistorySynchronizer(application: Application)
       stay()
 
 
-    //todo: check sender
+    //todo: check sender?
     case Event(DataFromPeer(msgId, sig: Block.BlockId@unchecked, remote), _)
       if msgId == GetBlockSpec.messageCode =>
 

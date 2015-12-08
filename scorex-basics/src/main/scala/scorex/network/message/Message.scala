@@ -26,7 +26,7 @@ case class Message[Content](spec: MessageSpec[Content],
                             source: Option[ConnectedPeer]
                            ) {
 
-  import Message._
+  import Message.{ChecksumLength, MAGIC}
 
   lazy val dataBytes = input match {
     case Left(db) => db
@@ -108,4 +108,3 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
     Message(spec, Left(msgData), sourceOpt)
   }
 }
-

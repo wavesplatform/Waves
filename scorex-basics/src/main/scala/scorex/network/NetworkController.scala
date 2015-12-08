@@ -52,7 +52,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
               val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
               IO(Tcp) ! Connect(peer, timeout = connTimeout)
             }
-
           case None =>
         }
       }
@@ -122,7 +121,6 @@ object NetworkController {
   //todo: more stricter solution for messageType than number?
   case class DataFromPeer[V](messageType: Message.MessageCode, data:V, source:ConnectedPeer)
   case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
-
 
   private case object CheckPeers
 

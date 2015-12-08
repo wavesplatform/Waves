@@ -27,7 +27,7 @@ class PeerSynchronizer(application:Application) extends ViewSynchronizer with Sc
 
     val ntwMsg = Message(GetPeersSpec, Right(), None)
     val stn = NetworkController.SendToNetwork(ntwMsg, SendToRandom)
-    context.system.scheduler.schedule(2.seconds, 1.second)(networkControllerRef ! stn)
+    context.system.scheduler.schedule(2.seconds, 5.seconds)(networkControllerRef ! stn)
   }
 
   //todo: write tests
