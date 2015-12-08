@@ -21,7 +21,7 @@ class NxtLikeConsensusModule
 
   implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = this
 
-  val AvgDelay = 2.seconds.toSeconds
+  val AvgDelay = 15.seconds.toSeconds
 
   val version = 1: Byte
 
