@@ -11,7 +11,7 @@ import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.storage.Storage
 import scorex.transaction.{BlockChain, TransactionModule}
-import scorex.utils._
+import scorex.utils.{NTP, ScorexLogging, randomBytes}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -116,7 +116,8 @@ class PermaConsensusModule(rootHash: Array[Byte])
   override def consensusBlockData(block: Block): PermaLikeConsensusBlockData =
     block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData]
 
-  override def parseBlockData(bytes: Array[Byte]): PermaConsensusBlockField = PermaConsensusBlockField.parse(bytes)
+  override def parseBlockData(bytes: Array[Byte]): Try[PermaConsensusBlockField] =
+    PermaConsensusBlockField.parse(bytes)
 
   override def genesisData: PermaConsensusBlockField =
     PermaConsensusBlockField(PermaLikeConsensusBlockData(

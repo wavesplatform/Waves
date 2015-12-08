@@ -8,6 +8,7 @@ import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.perma.settings.Constants
 
 import scala.annotation.tailrec
+import scala.util.Try
 
 case class PermaConsensusBlockField(override val value: PermaLikeConsensusBlockData)
   extends BlockField[PermaLikeConsensusBlockData] {
@@ -46,7 +47,7 @@ object PermaConsensusBlockField {
   val HashLength = Sha256.DigestSize
   val SignatureLength = EllipticCurveImpl.SignatureLength
 
-  def parse(bytes: Array[Byte]): PermaConsensusBlockField = {
+  def parse(bytes: Array[Byte]): Try[PermaConsensusBlockField] = Try {
     @tailrec
     def parseProofs(from: Int, total: Int, current: Int, acc: IndexedSeq[PartialProof]): IndexedSeq[PartialProof] = {
       if (current < total) {

@@ -4,19 +4,19 @@ import java.io.{File, RandomAccessFile}
 import java.nio.file.{Files, Paths}
 
 import akka.actor.Props
-import akka.io.IO
 import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
 import scorex.app.Application
-import scorex.block.Block
+
 import scorex.consensus.nxt.NxtLikeConsensusModule
+import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
 import scorex.crypto.ads.merkle.{AuthDataBlock, MerkleTree}
 import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRoute}
-import scorex.lagonaki.network.message._
-import scorex.lagonaki.network.{BlockchainSyncer, NetworkController}
+import scorex.network.message.Message
+import scorex.network._
 import scorex.perma.Storage.AuthDataStorage
 import scorex.perma.consensus.PermaConsensusModule
 import scorex.perma.consensus.http.PermaConsensusApiRoute
@@ -26,11 +26,9 @@ import scorex.storage.Storage
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.wallet.{Payment, Wallet}
-import scorex.utils.{NTP, ScorexLogging}
-import spray.can.Http
-
-import scala.concurrent.ExecutionContext.Implicits.global
+import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.state.wallet.Payment
+import scorex.utils.NTP
 import scala.reflect.runtime.universe._
 
 class LagonakiApplication(val settingsFilename: String)
@@ -88,22 +86,16 @@ class LagonakiApplication(val settingsFilename: String)
 
   override implicit val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
 
-  lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
-  lazy val blockchainSyncer = actorSystem.actorOf(Props(classOf[BlockchainSyncer], this, networkController, settings))
-
-  private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
-  implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
-
-  lazy val state: StoredState = transactionModule.state
-  lazy val history: BlockChain = transactionModule.history
+  override lazy val state: StoredState = transactionModule.state
+  override lazy val history: BlockChain = transactionModule.history
 
   val consensusApiRoute = consensusModule match {
     case ncm: NxtLikeConsensusModule =>
-      new NxtConsensusApiRoute(ncm, blockchainImpl)
+      new NxtConsensusApiRoute(ncm, history)
     case qcm: QoraLikeConsensusModule =>
-      new QoraConsensusApiRoute(qcm, blockchainImpl)
+      new QoraConsensusApiRoute(qcm, history)
     case pcm: PermaConsensusModule =>
-      new PermaConsensusApiRoute(pcm, blockchainImpl)
+      new PermaConsensusApiRoute(pcm, history)
   }
 
   override lazy val apiRoutes = Seq(

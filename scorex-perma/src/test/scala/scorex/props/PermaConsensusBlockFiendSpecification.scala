@@ -45,7 +45,7 @@ class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks
       ))
       val parsedBlock = PermaConsensusBlockField.parse(initialBlock.bytes)
 
-      checkAll(initialBlock, parsedBlock)
+      checkAll(initialBlock, parsedBlock.get)
 
     }
   }
@@ -53,7 +53,7 @@ class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks
   property("Encode to bytes round-trip for genesis") {
     val initialBlock = consensus.genesisData
     val parsedBlock = PermaConsensusBlockField.parse(initialBlock.bytes)
-    checkAll(initialBlock, parsedBlock)
+    checkAll(initialBlock, parsedBlock.get)
   }
 
   def checkAll(initialBlock: PermaConsensusBlockField, parsedBlock: PermaConsensusBlockField): Unit = {
