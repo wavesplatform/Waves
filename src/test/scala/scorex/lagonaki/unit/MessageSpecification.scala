@@ -21,7 +21,7 @@ class MessageSpecification extends FunSuite {
   private lazy val handler = new MessageHandler(repo.specs)
 
   test("ScoreMessage roundtrip 1") {
-    val s1 = BigInt(Long.MaxValue) * 10000000
+    val s1 = BigInt(Long.MaxValue) * 1000000000L
 
     val msg = Message(repo.ScoreMessageSpec, Right(s1), None)
 

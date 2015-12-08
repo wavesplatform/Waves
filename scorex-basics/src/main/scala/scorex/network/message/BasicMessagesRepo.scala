@@ -138,7 +138,7 @@ class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
 
     override def serializeData(score: History.BlockchainScore): Array[Byte] = {
       val scoreBytes = score.toByteArray
-      val bb = java.nio.ByteBuffer.allocate(4 + scoreBytes.length)
+      val bb = java.nio.ByteBuffer.allocate(scoreBytes.length)
       bb.put(scoreBytes)
       bb.array()
     }
