@@ -2,64 +2,45 @@ package scorex.network.redone
 
 import akka.actor.ActorRef
 import scorex.network.ConnectedPeer
-import scorex.network.message.MessageSpec
 import scorex.network.redone.NetworkObject.ConsideredValue
 import scorex.transaction.History._
 
-object NetworkObject {
-
-  case class ConsideredValue[V](value: Option[V], witnesses: Seq[ConnectedPeer])
-
-  // case class LocalUpdate[V](localUpdate: Option[V])
-  //case class NetworkUpdate[V](remote: ConnectedPeer, value: V)
-}
-
-
-case class ListenForNetworkMessages(specs: Seq[MessageSpec[_]], listener: ActorRef)
-
 case object UpdateNetworkView
 
-//todo: typed actor?
 //not thread-safe!!!
 trait NetworkObject[V] {
 
-  //val networkControllerRef: ActorRef
   val localComponentRef: ActorRef
 
-  //mutable
+  def consider(candidates: Map[ConnectedPeer, V]): (Option[V], Seq[ConnectedPeer], Map[ConnectedPeer, V])
+
   private var candidates = Map[ConnectedPeer, V]()
 
-  //private var localValue: Option[V] = None
+  private var _consideredValue: Option[ConsideredValue[V]] = None
 
-  def consider(candidates: Map[ConnectedPeer, V]): (Option[V], Seq[ConnectedPeer], Map[ConnectedPeer, V])
+  def consideredValue = _consideredValue
+
+  def betterThan(newValue: Option[V], oldValue: Option[V]):Boolean
 
   def networkUpdate(remote: ConnectedPeer, value: V) = {
     candidates += remote -> value
     val ct = consider(candidates)
     candidates = ct._3
 
-    val consideredValue = ct._1
+    val cValue = ct._1
     val witnesses = ct._2
 
-    //todo: cache considered value and send signal only if that > previous
-    localComponentRef ! ConsideredValue(consideredValue, witnesses)
+    if(betterThan(cValue, _consideredValue.flatMap(_.value))) {
+      //todo: cache considered value and send signal only if that > previous
+      val cv = ConsideredValue(cValue, witnesses)
+      _consideredValue = Some(cv)
+      localComponentRef ! cv
+    }
   }
+}
 
-  /*
-  override def receive = {
-    case LocalUpdate(localUpdate: Option[V]) =>
-      localValue = localUpdate
-      localUpdate.foreach { lv =>
-        networkControllerRef ! (messageSpec, sendingStrategy)
-      }
-
-    case NetworkUpdate(remote: ConnectedPeer, value: V) =>
-      candidates += remote -> value
-      val ct = consider(candidates)
-      consideredValue = ct._1
-      candidates = ct._2
-      localComponentRef ! value
-  } */
+object NetworkObject {
+  case class ConsideredValue[V](value: Option[V], witnesses: Seq[ConnectedPeer])
 }
 
 
@@ -74,4 +55,7 @@ class ScoreNetworkObject(//override val networkControllerRef: ActorRef,
     (Some(bestNetworkScore), witnesses, candidates.filter(_._2 == bestNetworkScore))
   }
 
+  override def betterThan(newValue: Option[BlockchainScore],
+                          oldValue: Option[BlockchainScore]): Boolean =
+    newValue.getOrElse(BigInt(0)) > oldValue.getOrElse(BigInt(0))
 }
