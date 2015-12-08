@@ -56,7 +56,7 @@ with BlockTestingCommons {
       }
     }
 
-    property(s"$prefix: Add non-linear blocks in chain") {
+    property(s"$prefix: Add non-linear blocks in tree") {
       val branchPoint = blockTree.lastBlock
 
       //Add block to best chain

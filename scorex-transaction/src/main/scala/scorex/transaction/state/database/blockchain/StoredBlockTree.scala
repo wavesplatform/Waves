@@ -89,7 +89,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
       lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
       parent match {
         case Some(p) =>
-          if(height() - p._3 > MaxRollback) {
+          if (height() - p._3 > MaxRollback) {
             throw new Error(s"Trying to add block with too old parent")
           } else {
             val s = p._2 + blockScore
@@ -192,9 +192,9 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
           case true =>
             branchBlock(oldLast, block, MaxRollback) match {
               case Some(node) =>
-                val toReverse = lastBlocks(oldLast, heightOf(oldLast).get - heightOf(node).get + 1).map((_, Reversed))
-                val toProcess = lastBlocks(block, heightOf(block).get - heightOf(node).get + 1).map((_, Forward))
-                toReverse ++ toProcess
+                val toReverse = (oldLast +: lastBlocks(oldLast, heightOf(oldLast).get - heightOf(node).get - 1))
+                val toProcess = (block +: lastBlocks(block, heightOf(block).get - heightOf(node).get - 1))
+                toReverse.map((_, Reversed)) ++ toProcess.map((_, Forward))
               case None => ??? //Should never rich this point if we don't keep older then MaxRollback side chains
             }
           case false => Seq.empty
@@ -228,6 +228,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
   } else None
 
   def lastBlocks(block: Block, howMany: Int): Seq[Block] = {
+    require(howMany >= 0)
     def loop(block: Block, i: Int, acc: Seq[Block] = Seq.empty): Seq[Block] = {
       lazy val p = parent(block)
       (i, p) match {

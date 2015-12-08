@@ -24,7 +24,7 @@ trait BlockTestingCommons extends TestingCommons {
     val reference = parentId.getOrElse(lastBlockId)
 
     val sender = new PrivateKeyAccount(seed)
-    val tx: Transaction = PaymentTransaction(sender, gen, 5, 1000, System.currentTimeMillis() - 5000)
+    val tx: Transaction = PaymentTransaction(sender, gen, 5, bt, System.currentTimeMillis() - 5000)
 
     val tbd = Seq(tx)
     val cbd = new NxtLikeConsensusBlockData {

@@ -3,9 +3,10 @@ package scorex.lagonaki.props
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
+import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.lagonaki.BlockTestingCommons
-import scorex.transaction.BlockChain
+import scorex.utils._
 
 class BlockStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
 with BlockTestingCommons {
@@ -23,38 +24,52 @@ with BlockTestingCommons {
   property("Add correct blocks") {
     forAll(blockGen) { (block: Block) =>
       val prevH = storage.history.height()
+      val prevTx = storage.state.accountTransactions(gen).length
       storage.appendBlock(block).isSuccess shouldBe true
       storage.history.height() shouldBe prevH + 1
+      storage.state.accountTransactions(gen).length shouldBe prevTx + 1
     }
   }
 
   property("Don't add incorrect blocks") {
     val wrongBlockId = Some("wrong".getBytes)
     forAll { (gb: Long, gs: Array[Byte], seed: Array[Byte]) =>
+      val prevTx = storage.state.accountTransactions(gen).length
       val block = genBlock(gb, gs, seed, wrongBlockId)
       val prevH = storage.history.height()
       storage.appendBlock(block).isSuccess shouldBe false
       storage.history.height() shouldBe prevH
+      storage.state.accountTransactions(gen).length shouldBe prevTx
     }
   }
 
-  property("Remove after") {
-    storage.history match {
-      case b: BlockChain =>
-        forAll { (gb: Long, gs: Array[Byte], seed: Array[Byte]) =>
-          lastBlockId = storage.history.lastBlock.uniqueId
-          val block = genBlock(gb, gs, seed, Some(lastBlockId))
-          val prevH = storage.history.height()
-          storage.appendBlock(block).isSuccess shouldBe true
-          storage.history.height() shouldBe prevH + 1
-          storage.removeAfter(block.referenceField.value)
-          storage.history.height() shouldBe prevH
-        }
-        storage.history.height() should be > 1
-        storage.removeAfter(genesis.uniqueId)
-        storage.history.height() shouldBe 1
-      case _ =>
-    }
+  property("Update to branch with better score") {
+    val branchPoint = storage.history.lastBlock
+    val senderSeed = randomBytes(32)
+    val sender = new PrivateKeyAccount(senderSeed)
+    val bt = 20
+    val biggerBt = 19
+
+    //Add block to best chain
+    val firstBlock = genBlock(bt, randomBytes(32), senderSeed, Some(branchPoint.uniqueId))
+    storage.appendBlock(firstBlock).isSuccess shouldBe true
+    storage.history.lastBlock.uniqueId should contain theSameElementsAs firstBlock.uniqueId
+    storage.state.accountTransactions(sender).length shouldBe  1
+    storage.state.accountTransactions(sender).head.fee shouldBe bt
+
+    //Add block with the same score to branch point
+    val branchedBlock = genBlock(bt, randomBytes(32), senderSeed, Some(branchPoint.uniqueId))
+    storage.appendBlock(branchedBlock).isSuccess shouldBe true
+    storage.history.lastBlock.uniqueId should contain theSameElementsAs firstBlock.uniqueId
+    storage.state.accountTransactions(sender).length shouldBe  1
+    storage.state.accountTransactions(sender).head.fee shouldBe bt
+
+    //Add block with the better score to branch point
+    val bestBlock = genBlock(biggerBt, randomBytes(32), senderSeed, Some(branchPoint.uniqueId))
+    storage.appendBlock(bestBlock).isSuccess shouldBe true
+    storage.history.lastBlock.uniqueId should contain theSameElementsAs bestBlock.uniqueId
+    storage.state.accountTransactions(sender).length shouldBe  1
+    storage.state.accountTransactions(sender).head.fee shouldBe biggerBt
 
   }
 
