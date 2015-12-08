@@ -57,6 +57,7 @@ class StoredBlockTree(dataFolderOpt: Option[String])
 
   }
 
+  //TODO remove old blocks
   class FileBlockTreePersistence(folder: String) extends BlockTreePersistence {
     type MapDBStoredBlock = (Array[Byte], Score, Height)
 
@@ -194,7 +195,7 @@ class StoredBlockTree(dataFolderOpt: Option[String])
                 val toReverse = lastBlocks(oldLast, heightOf(oldLast).get - heightOf(node).get + 1).map((_, Reversed))
                 val toProcess = lastBlocks(block, heightOf(block).get - heightOf(node).get + 1).map((_, Forward))
                 toReverse ++ toProcess
-              case None => ???
+              case None => ??? //Should never rich this point if we don't keep older then MaxRollback side chains
             }
           case false => Seq.empty
         }
