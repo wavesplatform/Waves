@@ -184,8 +184,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     val parent = block.referenceField
     val h = height()
     if ((h == 0) || (lastBlock.uniqueId sameElements block.referenceField.value)) {
-      blockStorage.writeBlock(block)
-      Success(Seq((block, Forward)))
+      blockStorage.writeBlock(block).map(x => Seq((block, Forward)))
     } else blockById(parent.value) match {
       case Some(commonBlock) =>
         val oldLast = lastBlock
