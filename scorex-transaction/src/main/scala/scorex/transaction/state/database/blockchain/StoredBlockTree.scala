@@ -89,13 +89,17 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
       lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
       parent match {
         case Some(p) =>
-          val s = p._2 + blockScore
-          map.put(block.uniqueId, (block.bytes, s, p._3 + 1))
-          db.commit()
-          if (s > score()) {
-            setBestBlockId(block.uniqueId)
-            true
-          } else false
+          if(height() - p._3 > MaxRollback) {
+            throw new Error(s"Trying to add block with too old parent")
+          } else {
+            val s = p._2 + blockScore
+            map.put(block.uniqueId, (block.bytes, s, p._3 + 1))
+            db.commit()
+            if (s > score()) {
+              setBestBlockId(block.uniqueId)
+              true
+            } else false
+          }
         case None => map.isEmpty match {
           case true =>
             setBestBlockId(block.uniqueId)
