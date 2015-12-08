@@ -188,7 +188,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
       Success(Seq((block, Forward)))
     } else blockById(parent.value) match {
       case Some(commonBlock) =>
-        lazy val oldLast = lastBlock
+        val oldLast = lastBlock
         blockStorage.writeBlock(block) map {
           case true =>
             branchBlock(oldLast, block, MaxRollback) match {
@@ -206,7 +206,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
 
   def branchBlock(b1: Block, b2: Block, in: Int): Option[Block] = {
     val b1LastBlocks = lastBlocks(b1, in)
-    find(b2, in)(b1LastBlocks.contains(_))
+    find(b2, in)(b => b1LastBlocks.exists(x => x.uniqueId sameElements b.uniqueId))
   }
 
   override def heightOf(blockId: BlockId): Option[Int] = blockStorage.readBlock(blockId).map(_._3)

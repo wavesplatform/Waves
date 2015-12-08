@@ -1,5 +1,7 @@
 package scorex.transaction.state.database.blockchain
 
+import java.io.File
+
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
@@ -21,9 +23,12 @@ with TestingCommons {
   val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
   val gen = new PrivateKeyAccount(reference)
   val genesis = Block.genesis()
+  val dirName = "/tmp/scorex/test/"
+  val dir = new File(dirName)
+  for (file <- dir.listFiles) file.delete
 
   testTree(new StoredBlockTree(None), "Memory")
-  testTree(new StoredBlockTree(Some("/tmp/scorex/test")), "File")
+  testTree(new StoredBlockTree(Some(dirName)), "File")
 
   def testTree(blockTree: StoredBlockTree, prefix: String): Unit = {
 
