@@ -88,7 +88,8 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
             //check whether account is watched, add tx to its txs list if so
             val prevTxs = accountTransactions.getOrDefault(acc, Array())
-            accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
+            if (!reversal) accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
+            else accountTransactions.put(acc, prevTxs.filter(t => !(t.signature sameElements tx.signature)))
 
             //update balances sheet
             val currentChange = iChanges.getOrElse(acc, 0L)
