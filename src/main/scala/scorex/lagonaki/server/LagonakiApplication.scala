@@ -1,5 +1,6 @@
 package scorex.lagonaki.server
 
+import akka.actor.Props
 import com.typesafe.config.ConfigFactory
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
@@ -10,7 +11,7 @@ import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
 import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRoute}
 import scorex.network.message.Message
-import scorex.network.{Broadcast, TransactionalMessagesRepo, NetworkController}
+import scorex.network.{UnconfirmedPoolSynchronizer, Broadcast, TransactionalMessagesRepo, NetworkController}
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
@@ -85,6 +86,9 @@ class LagonakiApplication(val settingsFilename: String)
   //checks
   require(transactionModule.balancesSupport)
   require(transactionModule.accountWatchingSupport)
+
+  //todo: move to Application?
+  actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], this))
 
 
   //move away methods below?
