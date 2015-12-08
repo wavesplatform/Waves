@@ -5,24 +5,15 @@ import java.io.File
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-import scorex.block.Block.BlockId
-import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
-import scorex.lagonaki.TestingCommons
-import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
-
-import scala.util.Random
+import scorex.lagonaki.BlockTestingCommons
 import scorex.utils._
 
-class BlockTreeSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
-with TestingCommons {
+import scala.util.Failure
 
-  implicit val consensusModule = new NxtLikeConsensusModule()
-  implicit val transactionModule = new SimpleTransactionModule()
-  val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
-  val gen = new PrivateKeyAccount(reference)
-  val genesis = Block.genesis()
+class BlockTreeSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
+with BlockTestingCommons {
+
   val dirName = "/tmp/scorex/test/"
   val dir = new File(dirName)
   dir.mkdir()
@@ -32,30 +23,6 @@ with TestingCommons {
   testTree(new StoredBlockTree(Some(dirName)), "File")
 
   def testTree(blockTree: StoredBlockTree, prefix: String): Unit = {
-
-    var lastBlockId: BlockId = genesis.uniqueId
-
-    def genBlock(bt: Long, gs: Array[Byte], seed: Array[Byte], parentId: Option[BlockId] = None)
-                (implicit consensusModule: NxtLikeConsensusModule, transactionModule: SimpleTransactionModule): Block = {
-
-      val reference = parentId.getOrElse(lastBlockId)
-
-      val sender = new PrivateKeyAccount(seed)
-      val tx: Transaction = PaymentTransaction(sender, gen, 5, 1000, System.currentTimeMillis() - 5000)
-
-      val tbd = Seq(tx)
-      val cbd = new NxtLikeConsensusBlockData {
-        override val generationSignature: Array[Byte] = gs
-        override val baseTarget: Long = math.max(math.abs(bt), 1)
-      }
-
-      val version = 1: Byte
-      val timestamp = System.currentTimeMillis()
-
-      val block = Block.buildAndSign(version, timestamp, reference, cbd, tbd, gen)
-      lastBlockId = block.uniqueId
-      block
-    }
 
     val blockGen: Gen[Block] = for {
       gb <- Arbitrary.arbitrary[Long]
@@ -71,6 +38,7 @@ with TestingCommons {
 
     property(s"$prefix: Add linear blocks in chain") {
       blockTree.height() shouldBe 1
+      lastBlockId = blockTree.lastBlock.uniqueId
 
       forAll(blockGen) { (block: Block) =>
         val prevH = blockTree.height()
