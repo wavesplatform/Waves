@@ -44,10 +44,10 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
       case s: String if s.equalsIgnoreCase("blockchain") =>
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
       case s: String if s.equalsIgnoreCase("blocktree") =>
-        new StoredBlockTree(settings.dataDirOpt)(consensusModule, instance)
+        new StoredBlockTree(settings.dataDirOpt, settings.MaxRollback)(consensusModule, instance)
       case s =>
         log.error(s"Unknown history storage: $s. Use StoredBlockTree instead.")
-        new StoredBlockTree(settings.dataDirOpt)(consensusModule, instance)
+        new StoredBlockTree(settings.dataDirOpt, settings.MaxRollback)(consensusModule, instance)
     }
     override val state = new StoredState(settings.dataDirOpt)
   }
