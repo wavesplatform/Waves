@@ -128,5 +128,5 @@ object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
   val MaxBlocksForUnconfirmed = 10
-  val MaxTransactionsPerBlock = 4096
+  val MaxTransactionsPerBlock = 100:Byte
 }
