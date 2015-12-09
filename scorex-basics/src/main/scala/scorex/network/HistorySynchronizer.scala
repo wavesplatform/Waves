@@ -1,6 +1,7 @@
 package scorex.network
 
 import akka.actor.FSM
+import org.omg.CORBA.TRANSACTION_UNAVAILABLE
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -50,7 +51,8 @@ class HistorySynchronizer(application: Application)
       val localScore = history.score()
       if (networkScore > localScore) {
         log.info("networkScore > localScore")
-        val msg = Message(GetSignaturesSpec, Right(history.lastSignatures(100)), None)
+        val lastIds = history.lastBlocks(100).map(_.uniqueId)
+        val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
         goto(GettingExtension) using witnesses
       } else goto(Synced) using Seq()
@@ -71,7 +73,7 @@ class HistorySynchronizer(application: Application)
       log.info(s"Got SignaturesMessage with ${blockIds.length} sigs")
       val common = blockIds.head
       assert(application.history.contains(common)) //todo: what if not?
-      application.history.removeAfter(common)
+      //application.history.removeAfter(common)
 
       blocksToReceive.clear()
 
@@ -154,7 +156,9 @@ class HistorySynchronizer(application: Application)
       log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
 
       otherSigs.exists { parent =>
-        val headers = application.history.asInstanceOf[BlockChain].getSignatures(parent, application.settings.MaxBlocksChunks)
+        val headers = application.history
+          .lookForward(parent, application.settings.MaxBlocksChunks)
+
         if (headers.nonEmpty) {
           val msg = Message(SignaturesSpec, Right(Seq(parent) ++ headers), None)
           val ss = SendToChosen(Seq(remote))
@@ -203,8 +207,7 @@ class HistorySynchronizer(application: Application)
   def processNewBlock(block: Block, local: Boolean) = {
     if (block.isValid) {
       log.info(s"New block: $block local: $local")
-      application.state.processBlock(block)
-      history.appendBlock(block)
+      transactionalModule.blockStorage.appendBlock(block)
 
       block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
 

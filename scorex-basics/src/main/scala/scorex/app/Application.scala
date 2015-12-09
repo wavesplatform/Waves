@@ -9,7 +9,7 @@ import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
 import scorex.network.{BlockGenerator, NetworkController, HistorySynchronizer, PeerSynchronizer}
 import scorex.settings.Settings
-import scorex.transaction.{History, State, TransactionModule}
+import scorex.transaction.{BlockStorage, History, State, TransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import spray.can.Http
@@ -53,8 +53,10 @@ trait Application extends ScorexLogging {
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
   //interface to append log and state
-  val history: History
-  val state: State
+  val blockStorage:BlockStorage
+
+  lazy val history: History = blockStorage.history
+  lazy val state: State = blockStorage.state
 
   lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this))
 
@@ -91,11 +93,9 @@ trait Application extends ScorexLogging {
   }
 
   def checkGenesis(): Unit = {
-    if (transactionModule.history.isEmpty) {
-      val genesisBlock = Block.genesis()
-      transactionModule.state.processBlock(genesisBlock)
-      transactionModule.history.appendBlock(genesisBlock).ensuring(_.height() == 1)
+    if (transactionModule.blockStorage.history.isEmpty) {
+      transactionModule.blockStorage.appendBlock(Block.genesis())
       log.info("Genesis block has been added to the state")
     }
-  }.ensuring(transactionModule.history.height() >= 1)
+  }.ensuring(transactionModule.blockStorage.history.height() >= 1)
 }

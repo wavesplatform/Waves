@@ -26,7 +26,6 @@ import scorex.storage.Storage
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet.Payment
 import scorex.utils.NTP
 import scala.reflect.runtime.universe._
@@ -39,6 +38,8 @@ class LagonakiApplication(val settingsFilename: String)
   private val appConf = ConfigFactory.load().getConfig("app")
 
   override implicit val settings = new LagonakiSettings(settingsFilename)
+
+  override val blockStorage = transactionModule.blockStorage
 
   override implicit val consensusModule =
     appConf.getString("consensusAlgo") match {
@@ -85,8 +86,6 @@ class LagonakiApplication(val settingsFilename: String)
     }
 
   override implicit val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
-
-  lazy val blockStorage = transactionModule.blockStorage
 
   val consensusApiRoute = consensusModule match {
     case ncm: NxtLikeConsensusModule =>

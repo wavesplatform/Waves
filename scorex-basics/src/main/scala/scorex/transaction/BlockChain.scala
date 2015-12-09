@@ -18,7 +18,7 @@ trait BlockChain extends History with ScorexLogging {
   private[transaction] def discardBlock(): BlockChain
 
   override def lastBlocks(howMany: Int): Seq[Block] =
-    (Math.max(1, height() - howMany + 1) to height()).flatMap(blockAt(_)).reverse
+    (Math.max(1, height() - howMany + 1) to height()).flatMap(blockAt).reverse
 
 
   def lookForward(parentSignature: BlockId, howMany: Int): Seq[BlockId] =

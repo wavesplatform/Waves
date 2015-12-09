@@ -4,8 +4,6 @@ import akka.actor.ActorSystem
 import akka.testkit._
 import org.scalatest.{Matchers, WordSpecLike}
 import scorex.lagonaki.TestingCommons
-import scorex.lagonaki.network.BlockchainSyncer.{Generating, GetStatus, Offline}
-import scorex.lagonaki.server.LagonakiApplication
 import scorex.utils.untilTimeout
 import scala.concurrent.duration._
 
@@ -21,19 +19,19 @@ class BlockGeneratorSpecification(_system: ActorSystem)
 
   def this() = this(ActorSystem("MySpec"))
 
-  val bcs = application.blockchainSyncer
+  val bg = application.blockGenerator
 
   "BlockGenerator actor" must {
     "be syncing on start" in {
-      bcs ! GetStatus
+      bg ! GetStatus
       expectMsg(Syncing.name)
     }
 
     "generate after downloading state" in {
-      bcs ! StartGeneration
+      bg ! StartGeneration
       //Wait up to 5 seconds to download blockchain and become generating
       untilTimeout(5.seconds) {
-        bcs ! GetStatus
+        bg ! GetStatus
         expectMsg(Generating.name)
       }
     }

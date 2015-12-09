@@ -3,10 +3,8 @@ package scorex.lagonaki.integration
 import java.nio.ByteBuffer
 
 import org.scalatest.FunSuite
-import scorex.lagonaki.TestingCommons
-import scorex.lagonaki.server.LagonakiApplication
 import scorex.block.Block
-import scorex.lagonaki.network.message.{BlockMessage, Message}
+import scorex.lagonaki.TestingCommons
 import scorex.transaction.BlockChain
 
 class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
@@ -30,8 +28,6 @@ class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
 
         val b1 = blochchain.blockAt(1).get
         val b2 = blochchain.blockAt(2).get
-    val b1 = application.history.blockAt(1).get
-    val b2 = application.history.blockAt(2).get
 
         //toBytes/parse roundtrip test
         val bb2 = Block.parse(b2.bytes).get
@@ -41,13 +37,14 @@ class ValidChainGenerationSpecification extends FunSuite with TestingCommons {
 
         //serialization/deserialization  thru BlockMessage roundtrip test
 
-    application.messagesHandler.parse(ByteBuffer.wrap(b2.bytes), None).get.data.get match {
-      case restored:Block =>
-          assert (restored.timestampField.value == b2.timestampField.value)
-          assert (restored.isValid)
-      case _ => fail("wrong data type")
-    }
+        application.messagesHandler.parse(ByteBuffer.wrap(b2.bytes), None).get.data.get match {
+          case restored: Block =>
+            assert(restored.timestampField.value == b2.timestampField.value)
+            assert(restored.isValid)
+          case _ => fail("wrong data type")
+        }
 
-    application.stopAll()
+        application.stopAll()
+    }
   }
 }

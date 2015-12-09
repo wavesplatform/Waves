@@ -1,7 +1,6 @@
 package scorex.lagonaki
 
 import org.scalatest.{BeforeAndAfterAll, Suites}
-import scorex.lagonaki.integration.{BlockchainSyncerSpecification, BlocksRoutingSpecification, ValidChainGenerationSpecification}
 import scorex.lagonaki.props.BlockStorageSpecification
 import scorex.lagonaki.integration.{BlockGeneratorSpecification, BlocksRoutingSpecification, ValidChainGenerationSpecification}
 import scorex.lagonaki.unit._

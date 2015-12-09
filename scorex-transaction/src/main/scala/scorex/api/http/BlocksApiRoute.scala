@@ -5,8 +5,8 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.transaction.state.wallet.Wallet
 import scorex.transaction.{BlockChain, History}
+import scorex.wallet.Wallet
 import spray.routing.Route
 
 

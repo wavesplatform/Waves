@@ -3,8 +3,8 @@ package scorex.lagonaki.server
 import scorex.transaction.GenesisTransaction
 import scorex.utils.ScorexLogging
 
-import scala.util.{Failure, Random, Try}
 import scala.concurrent.duration._
+import scala.util.{Failure, Random, Try}
 
 
 object Server extends App with ScorexLogging {
@@ -17,7 +17,7 @@ object Server extends App with ScorexLogging {
 
     log.debug("LagonakiApplication has been started")
     application.run()
-    if(application.settings.offlineGeneration) {
+    if (application.settings.offlineGeneration) {
       testingScript(application)
     } else {
       Thread.sleep(30.seconds.toMillis)
@@ -36,7 +36,7 @@ object Server extends App with ScorexLogging {
     log.info("Going to execute testing scenario")
     val wallet = application.wallet
 
-    if(wallet.privateKeyAccounts().isEmpty) {
+    if (wallet.privateKeyAccounts().isEmpty) {
       wallet.generateNewAccounts(10)
       println("pkas:")
       wallet.privateKeyAccounts().toList.map(_.address).foreach(println)
@@ -52,7 +52,7 @@ object Server extends App with ScorexLogging {
     Thread.sleep(3000)
 
     val genesisBlock = application.blockStorage.history.genesis
-    val genesisAccs = genesisBlock.transactions.flatMap { tx => tx match {
+    val genesisAccs = genesisBlock.transactions.flatMap(_ match {
       case gtx: GenesisTransaction =>
         Some(gtx.recipient)
       case _ =>

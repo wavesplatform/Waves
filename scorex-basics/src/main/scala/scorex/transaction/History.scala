@@ -95,7 +95,7 @@ trait History {
     deeper(lastBlock)
   }
 
-  def removeAfter(signature: Block.Bl)ockId
+  //def removeAfter(signature: Block.BlockId)
 }
 
 object History {
