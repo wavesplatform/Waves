@@ -1,8 +1,5 @@
 {
     "bindAddress" : "127.0.0.1",
-	"knownpeers":[
-		"127.0.0.2"
-	],
   	"walletdir" : "/tmp/scorex/wallet1",
     "walletpassword" : "cookies",
     "walletseed" : "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",

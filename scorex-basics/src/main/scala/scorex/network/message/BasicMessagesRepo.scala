@@ -38,8 +38,6 @@ class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
     override val messageName: String = "Peers message"
 
     override def deserializeData(bytes: Array[Byte]): Try[Seq[InetSocketAddress]] = Try {
-      require(bytes.isEmpty, "Non-empty data for GetPeers")
-
       //READ LENGTH
       val lengthBytes = util.Arrays.copyOfRange(bytes, 0, DataLength)
       val length = Ints.fromByteArray(lengthBytes)
