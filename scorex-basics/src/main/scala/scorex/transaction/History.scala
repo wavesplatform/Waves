@@ -2,6 +2,10 @@ package scorex.transaction
 
 import scorex.account.Account
 import scorex.block.Block
+import scorex.block.Block.BlockId
+import scorex.transaction.BlockStorage.BlocksToProcess
+
+import scala.util.Try
 
 /**
   * History of a blockchain system is some blocktree in fact(like this: http://image.slidesharecdn.com/sfbitcoindev-chepurnoy-2015-150322043044-conversion-gate01/95/proofofstake-its-improvements-san-francisco-bitcoin-devs-hackathon-12-638.jpg),
@@ -35,9 +39,9 @@ trait History {
     */
   def isEmpty: Boolean = height() == 0
 
-  def contains(block: Block): Boolean
+  def contains(block: Block): Boolean = contains(block.uniqueId)
 
-  def contains(id: Block.BlockId): Boolean
+  def contains(id: BlockId): Boolean = blockById(id).isDefined
 
   def blockById(blockId: Block.BlockId): Option[Block]
 
@@ -49,27 +53,50 @@ trait History {
   def heightOf(blockId: Block.BlockId): Option[Int]
 
   /**
+    * Use BlockStorage.appendBlock(block: Block) if you want to automatically update state
+    *
     * Append block to a chain, based on it's reference
     * @param block - block to append
     * @return Modified version of history
     */
-  def appendBlock(block: Block): History
+  private[transaction] def appendBlock(block: Block): Try[BlocksToProcess]
 
-  def parent(block: Block): Option[Block]
-
-  def children(block: Block): Seq[Block]
+  def parent(block: Block, back: Int = 1): Option[Block]
 
   def confirmations(block: Block): Option[Int] =
     heightOf(block).map(height() - _)
 
   def generatedBy(account: Account): Seq[Block]
 
-  def removeAfter(signature: Block.BlockId)
+  /**
+    * Block with maximum blockchain score
+    */
+  def lastBlock: Block = lastBlocks(1).head
 
-  //todo: remove argument?
-  def lastSignatures(howMany: Int): Seq[Block.BlockId]
+  def lastBlocks(howMany: Int): Seq[Block]
+
+  /**
+    * Return $howMany blocks starting from $parentSignature
+    */
+  def lookForward(parentSignature: BlockId, howMany: Int): Seq[BlockId]
+
+  /**
+    * Average delay in milliseconds between last $blockNum blocks starting from $block
+    */
+  def averageDelay(block: Block, blockNum: Int): Try[Long] = Try {
+    (block.timestampField.value - parent(block, blockNum).get.timestampField.value) / blockNum
+  }
+
+  lazy val genesis: Block = {
+    def deeper(b: Block): Block = parent(b) match {
+      case Some(parentBlock) => deeper(parentBlock)
+      case None => b
+    }
+    deeper(lastBlock)
+  }
+
+  def removeAfter(signature: Block.Bl)ockId
 }
-
 
 object History {
   type BlockchainScore = BigInt

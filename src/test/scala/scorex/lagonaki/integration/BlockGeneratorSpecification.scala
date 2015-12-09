@@ -3,6 +3,8 @@ package scorex.lagonaki.integration
 import akka.actor.ActorSystem
 import akka.testkit._
 import org.scalatest.{Matchers, WordSpecLike}
+import scorex.lagonaki.TestingCommons
+import scorex.lagonaki.network.BlockchainSyncer.{Generating, GetStatus, Offline}
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.utils.untilTimeout
 import scala.concurrent.duration._
@@ -12,14 +14,14 @@ class BlockGeneratorSpecification(_system: ActorSystem)
   extends TestKit(_system)
   with ImplicitSender
   with WordSpecLike
-  with Matchers {
+  with Matchers
+  with TestingCommons {
 
   import scorex.network.BlockGenerator._
 
   def this() = this(ActorSystem("MySpec"))
 
-  val application = new LagonakiApplication("settings-test.json")
-  val bcs = application.blockGenerator
+  val bcs = application.blockchainSyncer
 
   "BlockGenerator actor" must {
     "be syncing on start" in {

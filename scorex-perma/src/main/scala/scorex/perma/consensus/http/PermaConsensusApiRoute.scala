@@ -8,14 +8,16 @@ import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.crypto.Base58
 import scorex.perma.consensus.PermaConsensusModule
-import scorex.transaction.BlockChain
+import scorex.transaction.{BlockStorage, BlockChain}
 import spray.routing.Route
 
 
 @Api(value = "/consensus", description = "Consensus-related calls")
-class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockchain: BlockChain)
+class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockStorage: BlockStorage)
                             (implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
+
+  val blockchain = blockStorage.history
 
   override val route: Route =
     pathPrefix("consensus") {

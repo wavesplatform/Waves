@@ -2,14 +2,14 @@ package scorex.lagonaki.integration
 
 import play.api.libs.json.Json
 import scorex.api.http.AddressApiRoute
+import scorex.lagonaki.TestingCommons
 import scorex.lagonaki.server.LagonakiApplication
 
 
 class AdressesRoutingSpecification extends RouteTest {
 
-  val application = new LagonakiApplication("settings-test.json")
   application.checkGenesis()
-  val adressesRoute = AddressApiRoute(application.wallet, application.state).route
+  val adressesRoute = AddressApiRoute(application.wallet, application.blockStorage.state).route
 
   "adressesRouting" should "handle root request" in {
     Get("/addresses/") ~> adressesRoute ~> check {

@@ -8,12 +8,12 @@ import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.crypto.Base58
-import scorex.transaction.{BlockChain, History}
+import scorex.transaction.{BlockStorage, BlockChain, History}
 import spray.routing.Route
 
 
 @Api(value = "/consensus", description = "Consensus-related calls")
-class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: BlockChain)
+class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockStorage: BlockStorage)
                           (implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
@@ -30,7 +30,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: 
   def generationSignatureId = {
     path("generationsignature" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(blockchain, encodedSignature) { block =>
+        withBlock(blockStorage.history, encodedSignature) { block =>
           val gs = consensusModule.consensusBlockData(block).generationSignature
           Json.obj(
             "generation-signature" -> Base58.encode(gs)
@@ -45,7 +45,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: 
   def generationSignature = {
     path("generationsignature") {
       jsonRoute {
-        val lastBlock = blockchain.lastBlock
+        val lastBlock = blockStorage.history.lastBlock
         val gs = consensusModule.consensusBlockData(lastBlock).generationSignature
         Json.obj("generation-signature" -> Base58.encode(gs)).toString()
       }
@@ -60,7 +60,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: 
   def baseTargetId = {
     path("basetarget" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(blockchain, encodedSignature) { block =>
+        withBlock(blockStorage.history, encodedSignature) { block =>
           Json.obj(
             "base-target" -> consensusModule.consensusBlockData(block).baseTarget
           )
@@ -74,7 +74,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockchain: 
   def basetarget = {
     path("basetarget") {
       jsonRoute {
-        val lastBlock = blockchain.lastBlock
+        val lastBlock = blockStorage.history.lastBlock
         val bt = consensusModule.consensusBlockData(lastBlock).baseTarget
         Json.obj("base-target" -> bt).toString()
       }

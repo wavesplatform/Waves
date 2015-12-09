@@ -5,13 +5,13 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.transaction.BlockChain
-import scorex.wallet.Wallet
+import scorex.transaction.state.wallet.Wallet
+import scorex.transaction.{BlockChain, History}
 import spray.routing.Route
 
 
 @Api(value = "/blocks", description = "Info about blockchain & individual blocks within it")
-case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val context: ActorRefFactory)
+case class BlocksApiRoute(history: History, wallet: Wallet)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   override lazy val route =
@@ -28,7 +28,7 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
     path("address" / Segment) { case address =>
       jsonRoute {
         withPrivateKeyAccount(wallet, address) { account =>
-          Json.arr(blockchain.generatedBy(account).map(_.json))
+          Json.arr(history.generatedBy(account).map(_.json))
         }.toString()
       }
     }
@@ -42,29 +42,31 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def child: Route = {
     path("child" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(blockchain, encodedSignature) { block =>
-          blockchain.children(block).head.json
+        withBlock(history, encodedSignature) { block =>
+          history match {
+            case blockchain: BlockChain =>
+              blockchain.children(block).head.json
+            case _ =>
+              Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")
+          }
         }.toString()
       }
     }
   }
 
-  @Path("/delay/{height}/{blockNum}")
+  @Path("/delay/{signature}/{blockNum}")
   @ApiOperation(value = "Average delay", notes = "Average delay in milliseconds between last $blockNum blocks starting from $height", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "height", value = "Height of block", required = true, dataType = "String", paramType = "path"),
+    new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "String", paramType = "path"),
     new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "String", paramType = "path")
   ))
   def delay: Route = {
-    path("delay" / IntNumber / IntNumber) { case (height, count) =>
+    path("delay" / Segment / IntNumber) { case (encodedSignature, count) =>
       jsonRoute {
-        blockchain.blockAt(height) match {
-          case Some(block) =>
-            blockchain.averageDelay(block, count).map(d => Json.obj("delay" -> d))
-              .getOrElse(Json.obj("status" -> "error", "details" -> "Internal error")).toString
-          case None =>
-            Json.obj("status" -> "error", "details" -> "No block for this height").toString()
-        }
+        withBlock(history, encodedSignature) { block =>
+          history.averageDelay(block, count).map(d => Json.obj("delay" -> d))
+            .getOrElse(Json.obj("status" -> "error", "details" -> "Internal error"))
+        }.toString
       }
     }
   }
@@ -77,8 +79,8 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def heightEncoded: Route = {
     path("height" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(blockchain, encodedSignature) { block =>
-          Json.obj("height" -> blockchain.heightOf(block))
+        withBlock(history, encodedSignature) { block =>
+          Json.obj("height" -> history.heightOf(block))
         }.toString()
       }
     }
@@ -89,7 +91,7 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def height: Route = {
     path("height") {
       jsonRoute {
-        Json.obj("height" -> blockchain.height()).toString()
+        Json.obj("height" -> history.height()).toString()
       }
     }
   }
@@ -102,11 +104,15 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def at: Route = {
     path("at" / IntNumber) { case height =>
       jsonRoute {
-        val res = blockchain
-          .blockAt(height)
-          .map(_.json.toString())
-          .getOrElse(Json.obj("status" -> "error", "details" -> "No block for this height").toString())
-        res
+        history match {
+          case blockchain: BlockChain =>
+            blockchain
+              .blockAt(height)
+              .map(_.json)
+              .getOrElse(Json.obj("status" -> "error", "details" -> "No block for this height")).toString()
+          case _ =>
+            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain").toString()
+        }
       }
     }
   }
@@ -116,7 +122,7 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def last: Route = {
     path("last") {
       jsonRoute {
-        blockchain.lastBlock.json.toString()
+        history.lastBlock.json.toString()
       }
     }
   }
@@ -126,7 +132,12 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def first: Route = {
     path("first") {
       jsonRoute {
-        blockchain.blockAt(1).get.json.toString()
+        history match {
+          case blockchain: BlockChain =>
+            blockchain.blockAt(1).get.json.toString()
+          case _ =>
+            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain").toString()
+        }
       }
     }
   }
@@ -139,7 +150,7 @@ case class BlocksApiRoute(blockchain: BlockChain, wallet: Wallet)(implicit val c
   def signature: Route = {
     path("signature" / Segment) { case encodedSignature =>
       jsonRoute {
-        withBlock(blockchain, encodedSignature)(_.json).toString()
+        withBlock(history, encodedSignature)(_.json).toString()
       }
     }
   }

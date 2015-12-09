@@ -5,6 +5,7 @@ import org.mapdb.DBMaker
 import scorex.account.Account
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
+import scorex.transaction.BlockStorage._
 import scorex.transaction.{BlockChain, TransactionModule}
 import scorex.utils.ScorexLogging
 
@@ -21,7 +22,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
                        transactionModule: TransactionModule[_])
   extends BlockChain with ScorexLogging {
 
-  trait BlockStorage {
+  trait BlockchainPersistence {
     def writeBlock(height: Int, block: Block): Try[Unit]
 
     def readBlock(height: Int): Option[Block]
@@ -29,7 +30,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
     def deleteBlock(height: Int): Unit
   }
 
-  case class FileBlockStorage(dataFolder: String) extends BlockStorage {
+  case class FileBlockchainPersistence(dataFolder: String) extends BlockchainPersistence {
     private def blockFile(height: Int) = File(dataFolder + s"/block-$height")
 
     override def writeBlock(height: Int, block: Block): Try[Unit] = Try {
@@ -55,7 +56,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
       }
   }
 
-  object MemoryBlockStorage extends BlockStorage {
+  object MemoryBlockchainPersistence$ extends BlockchainPersistence {
     private val memStorage = TrieMap[Int, Block]()
 
     override def writeBlock(height: Int, block: Block): Try[Unit] =
@@ -68,14 +69,14 @@ class StoredBlockchain(dataFolderOpt: Option[String])
 
   private val (blockStorage, database) = dataFolderOpt match {
     case Some(dataFolder) =>
-      (FileBlockStorage(dataFolder),
+      (FileBlockchainPersistence(dataFolder),
         DBMaker.appendFileDB(new java.io.File(dataFolder + s"/signatures"))
           .fileMmapEnableIfSupported()
           .closeOnJvmShutdown()
           .checksumEnable()
           .make())
     case None =>
-      (MemoryBlockStorage, DBMaker.memoryDB().make())
+      (MemoryBlockchainPersistence$, DBMaker.memoryDB().make())
   }
 
   private val signaturesIndex = database.treeMap[Int, Array[Byte]]("signatures")
@@ -83,26 +84,47 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   //if there are some uncommited changes from last run, discard'em
   if (signaturesIndex.size() > 0) database.rollback()
 
-  override def appendBlock(block: Block): BlockChain = synchronized {
-    val lastBlock = blockStorage.readBlock(height())
-    require(height() == 0 || lastBlock.isDefined, "Should be able to get last block")
-    val parent = block.referenceField
-    if ((height() == 0) || (lastBlock.get.uniqueId sameElements parent.value)) {
-      val h = height() + 1
-      blockStorage.writeBlock(h, block)
-        .flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
-        case Success(_) => database.commit()
-        case Failure(t) => log.error("Error while storing blockchain a change: ", t)
+  override private[transaction] def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
+    Try {
+      val parent = block.referenceField
+      if ((height() == 0) || (lastBlock.uniqueId sameElements parent.value)) {
+        val h = height() + 1
+        blockStorage.writeBlock(h, block).flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
+          case Success(_) =>
+            database.commit()
+            Seq((block, Forward))
+          case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
+        }
+      } else blockById(parent.value) match {
+        case Some(commonBlock) =>
+          val branchPoint = heightOf(commonBlock).get
+          val blockScore = consensusModule.blockScore(commonBlock)
+          val blocksFromBranchPoint = ((branchPoint + 1) to height()).map(i => blockAt(i).get).reverse
+          val currentScore = blocksFromBranchPoint.map(b => consensusModule.blockScore(b)).sum
+          if (blockScore > currentScore) {
+            val toRollback = blocksFromBranchPoint map { b =>
+              val h = heightOf(b).get
+              blockStorage.deleteBlock(h)
+              signaturesIndex.remove(h)
+              (b, Reversed)
+            }
+            val h = height() + 1
+            blockStorage.writeBlock(h, block).flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
+              case Success(_) =>
+                database.commit()
+                toRollback ++ Seq((block, Forward))
+              case Failure(t) =>
+                database.rollback()
+                throw new Error("Error while storing blockchain a change: " + t)
+            }
+          } else Seq.empty
+        case None => throw new Error(s"Appending block ${block.json} which parent is not in blockchain")
       }
-    } else {
-      log.error("Appending block with parent different from last block in current blockchain:\n" +
-        s"parent: ${lastBlock.map(_.uniqueId).getOrElse("empty".getBytes).mkString}\n" +
-        s"current: ${block.referenceField.value.mkString}")
     }
-    this
   }
 
-  override def discardBlock(): BlockChain = synchronized {
+
+  override private[transaction] def discardBlock(): BlockChain = synchronized {
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
     blockStorage.deleteBlock(h)
@@ -117,8 +139,6 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   override def blockAt(height: Int): Option[Block] = synchronized {
     blockStorage.readBlock(height)
   }
-
-  override def contains(block: Block): Boolean = contains(block.uniqueId)
 
   override def contains(signature: Array[Byte]): Boolean =
     signaturesIndex.exists(_._2.sameElements(signature))

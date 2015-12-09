@@ -51,8 +51,8 @@ object Server extends App with ScorexLogging {
 
     Thread.sleep(3000)
 
-    val genesisBlock = application.history.blockAt(1)
-    val genesisAccs = genesisBlock.get.transactions.flatMap(tx => tx match {
+    val genesisBlock = application.blockStorage.history.genesis
+    val genesisAccs = genesisBlock.transactions.flatMap { tx => tx match {
       case gtx: GenesisTransaction =>
         Some(gtx.recipient)
       case _ =>

@@ -51,7 +51,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   override def validate()(implicit transactionModule: SimpleTransactionModule) =
     if (!Account.isValidAddress(recipient.address)) {
       ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (transactionModule.state.balance(sender.address) < amount + fee) {
+    } else if (transactionModule.blockStorage.state.balance(sender.address) < amount + fee) {
       ValidationResult.NoBalance //CHECK IF SENDER HAS ENOUGH MONEY
     } else if (amount <= 0) {
       ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
@@ -75,7 +75,6 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   override def balanceChanges(): Map[Account, Long] =
     Map(sender -> -amount, recipient -> amount)
 }
-
 
 object PaymentTransaction {
 

@@ -86,28 +86,27 @@ class LagonakiApplication(val settingsFilename: String)
 
   override implicit val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
 
-  override lazy val state: StoredState = transactionModule.state
-  override lazy val history: BlockChain = transactionModule.history
+  lazy val blockStorage = transactionModule.blockStorage
 
   val consensusApiRoute = consensusModule match {
     case ncm: NxtLikeConsensusModule =>
-      new NxtConsensusApiRoute(ncm, history)
+      new NxtConsensusApiRoute(ncm, blockStorage)
     case qcm: QoraLikeConsensusModule =>
-      new QoraConsensusApiRoute(qcm, history)
+      new QoraConsensusApiRoute(qcm, blockStorage)
     case pcm: PermaConsensusModule =>
-      new PermaConsensusApiRoute(pcm, history)
+      new PermaConsensusApiRoute(pcm, blockStorage)
   }
 
   override lazy val apiRoutes = Seq(
-    BlocksApiRoute(history, wallet),
-    TransactionsApiRoute(state),
+    BlocksApiRoute(blockStorage.history, wallet),
+    TransactionsApiRoute(blockStorage.state),
     consensusApiRoute,
     WalletApiRoute(wallet),
     PaymentApiRoute(this),
     ScorexApiRoute(this),
     SeedApiRoute(),
     PeersHttpService(this),
-    AddressApiRoute(wallet, state)
+    AddressApiRoute(wallet, blockStorage.state)
   )
 
   override lazy val apiTypes = Seq(

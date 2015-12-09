@@ -27,7 +27,7 @@ class NxtLikeConsensusModule
 
   override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
 
-    val history = transactionModule.history
+    val history = transactionModule.blockStorage.history
 
     val blockTime = block.timestampField.value
 
@@ -61,7 +61,7 @@ class NxtLikeConsensusModule
   override def generateNextBlock[TT](account: PrivateKeyAccount)
                                     (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
 
-    val lastBlock = transactionModule.history.asInstanceOf[BlockChain].lastBlock
+    val lastBlock = transactionModule.blockStorage.history.lastBlock
     val lastBlockKernelData = lastBlock.consensusDataField.asInstanceOf[NxtConsensusBlockField].value
 
     val lastBlockTime = lastBlock.timestampField.value
@@ -73,7 +73,7 @@ class NxtLikeConsensusModule
 
     log.debug(s"hit: $h, target: $t, generating ${h < t}, eta $eta, " +
       s"account:  $account " +
-      s"account balance: ${transactionModule.state.asInstanceOf[BalanceSheet].generationBalance(account)}"
+      s"account balance: ${transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(account)}"
     )
 
     if (h < t) {
@@ -114,7 +114,7 @@ class NxtLikeConsensusModule
                          lastBlockTimestamp: Long,
                          generator: PublicKeyAccount)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val eta = (NTP.correctedTime() - lastBlockTimestamp) / 1000 //in seconds
-    val effBalance = transactionModule.state.asInstanceOf[BalanceSheet].generationBalance(generator)
+    val effBalance = transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(generator)
     BigInt(lastBlockData.baseTarget) * eta * effBalance
   }
 
@@ -131,7 +131,7 @@ class NxtLikeConsensusModule
   override def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val baseTarget = block.consensusDataField.asInstanceOf[NxtConsensusBlockField].value.baseTarget
     BigInt("18446744073709551616") / baseTarget
-  }
+  }.ensuring(_ > 0)
 
   override def generators(block: Block): Seq[Account] = Seq(block.signerDataField.value.generator)
 
