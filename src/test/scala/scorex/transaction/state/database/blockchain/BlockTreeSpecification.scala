@@ -9,10 +9,8 @@ import scorex.block.Block
 import scorex.lagonaki.BlockTestingCommons
 import scorex.utils._
 
-import scala.util.Failure
-
-class BlockTreeSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
-with BlockTestingCommons {
+class BlockTreeSpecification extends PropSpec with PropertyChecks
+  with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
 
   val dirName = "/tmp/scorex/test/"
   val dir = new File(dirName)
@@ -95,7 +93,6 @@ with BlockTestingCommons {
       blockTree.score() shouldBe prevS
       blockTree.lastBlock.uniqueId should contain theSameElementsAs prevB.uniqueId
     }
-
 
   }
 }
