@@ -1,14 +1,13 @@
 package scorex.network
 
 import akka.actor.FSM
-import org.omg.CORBA.TRANSACTION_UNAVAILABLE
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.Message
 import scorex.network.NetworkObject.ConsideredValue
-import scorex.transaction.{BlockChain, History}
+import scorex.transaction.History
 import shapeless.Typeable._
 
 import scala.collection.mutable
