@@ -37,11 +37,9 @@ class LagonakiApplication(val settingsFilename: String)
 
   private val appConf = ConfigFactory.load().getConfig("app")
 
-  override implicit val settings = new LagonakiSettings(settingsFilename)
+  override implicit lazy val settings = new LagonakiSettings(settingsFilename)
 
-  override val blockStorage = transactionModule.blockStorage
-
-  override implicit val consensusModule =
+  override implicit lazy val consensusModule =
     appConf.getString("consensusAlgo") match {
       case s: String if s.equalsIgnoreCase("nxt") =>
         new NxtLikeConsensusModule
@@ -85,9 +83,11 @@ class LagonakiApplication(val settingsFilename: String)
         sys.error(s"Unknown consensus algo: $nonsense")
     }
 
-  override implicit val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
+  override implicit lazy val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
 
-  val consensusApiRoute = consensusModule match {
+  override lazy val blockStorage = transactionModule.blockStorage
+
+  lazy val consensusApiRoute = consensusModule match {
     case ncm: NxtLikeConsensusModule =>
       new NxtConsensusApiRoute(ncm, blockStorage)
     case qcm: QoraLikeConsensusModule =>

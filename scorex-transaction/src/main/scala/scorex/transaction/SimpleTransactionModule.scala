@@ -11,7 +11,6 @@ import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBloc
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
-
 import scala.util.Try
 
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -41,6 +40,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
   val TransactionSizeLength = 4
 
   private val instance = this
+
   override val blockStorage = new BlockStorage {
     override val history: History = settings.history match {
       case s: String if s.equalsIgnoreCase("blockchain") =>
@@ -48,8 +48,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
       case s: String if s.equalsIgnoreCase("blocktree") =>
         new StoredBlockTree(settings.dataDirOpt, settings.MaxRollback)(consensusModule, instance)
       case s =>
-        log.error(s"Unknown history storage: $s. Use StoredBlockTree instead.")
-        new StoredBlockTree(settings.dataDirOpt, settings.MaxRollback)(consensusModule, instance)
+        log.error(s"Unknown history storage: $s. Use StoredBlockchain...")
+        new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
     override val state = new StoredState(settings.dataDirOpt)
   }
@@ -140,5 +140,5 @@ object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
   val MaxTimeForUnconfirmed: Duration = 1.hour
-  val MaxTransactionsPerBlock =100:Byte
+  val MaxTransactionsPerBlock = 100: Byte
 }

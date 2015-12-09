@@ -73,7 +73,7 @@ class HistorySynchronizer(application: Application)
       log.info(s"Got SignaturesMessage with ${blockIds.length} sigs")
       val common = blockIds.head
       assert(application.history.contains(common)) //todo: what if not?
-      //application.history.removeAfter(common)
+      application.blockStorage.removeAfter(common)
 
       blocksToReceive.clear()
 
