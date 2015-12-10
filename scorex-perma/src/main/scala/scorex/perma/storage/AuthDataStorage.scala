@@ -1,4 +1,4 @@
-package scorex.perma.Storage
+package scorex.perma.storage
 
 import java.io.File
 

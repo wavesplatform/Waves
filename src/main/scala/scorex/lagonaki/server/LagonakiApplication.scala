@@ -17,9 +17,9 @@ import scorex.crypto.ads.merkle.{AuthDataBlock, MerkleTree}
 import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRoute}
 import scorex.network.message.Message
 import scorex.network._
-import scorex.perma.Storage.AuthDataStorage
+import scorex.perma.storage.AuthDataStorage
 import scorex.perma.consensus.PermaConsensusModule
-import scorex.perma.consensus.http.PermaConsensusApiRoute
+import scorex.perma.api.http.PermaConsensusApiRoute
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.storage.Storage

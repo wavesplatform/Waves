@@ -1,14 +1,13 @@
-package scorex.props
+package scorex.perma.consensus
 
 import java.io.File
 
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.perma.Storage.AuthDataStorage
-import scorex.perma.consensus._
 import scorex.perma.settings.Constants.DataSegment
 import scorex.perma.settings.{Constants, PermaSettings}
+import scorex.perma.storage.AuthDataStorage
 import scorex.settings.Settings
 import scorex.storage.Storage
 import scorex.utils._

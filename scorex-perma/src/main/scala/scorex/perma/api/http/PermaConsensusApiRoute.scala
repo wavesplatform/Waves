@@ -1,4 +1,4 @@
-package scorex.perma.consensus.http
+package scorex.perma.api.http
 
 import javax.ws.rs.Path
 

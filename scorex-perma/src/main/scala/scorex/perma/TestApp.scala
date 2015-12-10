@@ -7,7 +7,7 @@ import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
 import scorex.crypto.ads.merkle.MerkleTree
 import scorex.perma.BlockchainBuilderSpec.SendWorkToMiners
-import scorex.perma.Storage.AuthDataStorage
+import scorex.perma.storage.AuthDataStorage
 import scorex.perma.actors.MinerSpec.Initialize
 import scorex.perma.actors.{Miner, TrustedDealer}
 import scorex.perma.settings.{Constants, PermaSettings}
