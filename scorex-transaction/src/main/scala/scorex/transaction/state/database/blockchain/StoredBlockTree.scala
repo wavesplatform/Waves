@@ -12,12 +12,13 @@ import scorex.transaction.{BlockTree, TransactionModule}
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
+import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
 /**
   * If no datafolder provided, blocktree lives in RAM (useful for tests)
   */
-class StoredBlockTree(dataFolder: String, MaxRollback: Int = 100)
+class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
                      (implicit consensusModule: ConsensusModule[_],
                       transactionModule: TransactionModule[_])
   extends BlockTree with ScorexLogging {
@@ -162,7 +163,51 @@ class StoredBlockTree(dataFolder: String, MaxRollback: Int = 100)
     }
   }
 
-  private val blockStorage: BlockTreePersistence = new FileBlockTreePersistence(dataFolder)
+  //Memory storage suitable for tests only
+  object MemoryBlockTreePersistence extends BlockTreePersistence {
+    private val memStorage = TrieMap[BlockId, StoredBlock]()
+
+    private var bestBlockId: BlockId = Array.empty
+
+    private def setBestBlockId(newId: BlockId) = bestBlockId = newId
+
+    override def getBestBlockId: BlockId = bestBlockId
+
+    def writeBlock(block: Block): Try[Boolean] = Try {
+      if (exists(block)) throw new Error("Block is already in storage")
+      val parent = readBlock(block.referenceField.value)
+      lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
+      parent match {
+        case Some(p) =>
+          val s = p._2 + blockScore
+          memStorage.put(block.uniqueId, (block, s, p._3 + 1))
+          if (s > score()) {
+            setBestBlockId(block.uniqueId)
+            true
+          } else false
+        case None => memStorage.isEmpty match {
+          case true =>
+            setBestBlockId(block.uniqueId)
+            memStorage.put(block.uniqueId, (block, blockScore, 1))
+            true
+          case false =>
+            throw new Error("Parent block is not in tree")
+        }
+      }
+    }
+
+    def readBlock(id: BlockId): Option[StoredBlock] = memStorage.find(_._1.sameElements(id)).map(_._2)
+
+    override def changeBestChain(changes: Seq[(Block, Direction)]): Try[Unit] = Failure(new NotImplementedError)
+
+    override def lookForward(parentSignature: BlockId, howMany: Height): Seq[BlockId] = Seq()
+  }
+
+
+  private val blockStorage: BlockTreePersistence = dataFolderOpt match {
+    case Some(dataFolder) => new FileBlockTreePersistence(dataFolder)
+    case _ =>  MemoryBlockTreePersistence
+  }
 
   /**
     * Height of the a chain, or a longest chain in the explicit block-tree
