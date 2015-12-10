@@ -56,10 +56,8 @@ case class TransactionBlockField(override val name: String, override val value: 
   override lazy val bytes: Array[Byte] = value.bytes()
 }
 
-
 case class SignerData(generator: PublicKeyAccount, signature: Array[Byte])
 
-//todo: Seq[SignerData] to support multiple signers?
 case class SignerDataBlockField(override val name: String, override val value: SignerData)
   extends BlockField[SignerData] {
 
