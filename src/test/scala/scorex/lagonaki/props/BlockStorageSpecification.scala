@@ -70,8 +70,5 @@ with BlockTestingCommons {
     storage.history.lastBlock.uniqueId should contain theSameElementsAs bestBlock.uniqueId
     storage.state.accountTransactions(sender).length shouldBe  1
     storage.state.accountTransactions(sender).head.fee shouldBe biggerBt
-
   }
-
-
 }

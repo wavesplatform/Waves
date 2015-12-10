@@ -14,8 +14,9 @@ trait BlockTestingCommons extends TestingCommons {
   implicit val transactionModule = new SimpleTransactionModule()
 
   val genesis: Block = Block.genesis()
-  var lastBlockId: BlockId = genesis.uniqueId
   val gen = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(Byte.MaxValue).toByte))
+
+  protected var lastBlockId: BlockId = genesis.uniqueId
 
   def genBlock(bt: Long, gs: Array[Byte], seed: Array[Byte], parentId: Option[BlockId] = None)
               (implicit consensusModule: NxtLikeConsensusModule, transactionModule: SimpleTransactionModule): Block = {
