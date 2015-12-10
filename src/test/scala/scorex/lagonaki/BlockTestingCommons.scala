@@ -15,8 +15,7 @@ trait BlockTestingCommons extends TestingCommons {
 
   val genesis: Block = Block.genesis()
   var lastBlockId: BlockId = genesis.uniqueId
-  val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
-  val gen = new PrivateKeyAccount(reference)
+  val gen = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(Byte.MaxValue).toByte))
 
   def genBlock(bt: Long, gs: Array[Byte], seed: Array[Byte], parentId: Option[BlockId] = None)
               (implicit consensusModule: NxtLikeConsensusModule, transactionModule: SimpleTransactionModule): Block = {
@@ -39,6 +38,4 @@ trait BlockTestingCommons extends TestingCommons {
     lastBlockId = block.uniqueId
     block
   }
-
 }
-
