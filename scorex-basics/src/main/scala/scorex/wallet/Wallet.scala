@@ -12,7 +12,6 @@ import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 
 //todo: add accs txs?
-//todo: XOR priv keys with seed in db?
 class Wallet(walletFileOpt: Option[File],
              password: String,
              seed: Array[Byte]) extends ScorexLogging {

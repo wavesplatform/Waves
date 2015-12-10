@@ -49,8 +49,8 @@ trait Curve25519 extends EllipticCurve with ScorexLogging {
   override val SignatureLength = 64
   override val KeyLength = 32
 
-  //todo: dirty hack, switch to logic as described in WhisperSystem's Curve25519 tutorial as
-  //todo: it will be possible to pass a random seed from outside
+  //todo: dirty hack, switch to logic as described in WhisperSystem's Curve25519 tutorial
+  //todo: when it'll be possible to pass a random seed from outside
   //todo: https://github.com/WhisperSystems/curve25519-java/pull/7
 
   private val provider: OpportunisticCurve25519Provider = {
