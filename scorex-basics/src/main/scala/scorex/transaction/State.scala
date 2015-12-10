@@ -17,4 +17,15 @@ trait State {
   }
 
   private[transaction] def processBlock(block: Block): Try[State] = processBlock(block, reversal = false)
+
+
+  /**
+    * State is needed to determine whether a transaction was already processed or not.
+    * Otherwise, full blockchain scan or storing unique transaction ids is needed and both methods
+    * are impractical
+    * @param tx - a transaction to check
+    * @return whether transaction is already included into a state or not
+    */
+  //TODO: implement
+  def included(tx: Transaction):Boolean = ???
 }
