@@ -8,7 +8,7 @@ import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.crypto.Base58
 import scorex.perma.consensus.PermaConsensusModule
-import scorex.transaction.{BlockStorage, BlockChain}
+import scorex.transaction.BlockStorage
 import spray.routing.Route
 
 
