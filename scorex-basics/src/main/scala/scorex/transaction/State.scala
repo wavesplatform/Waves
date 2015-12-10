@@ -27,5 +27,5 @@ trait State {
     * @return whether transaction is already included into a state or not
     */
   //TODO: implement
-  def included(tx: Transaction):Boolean = ???
+  def included(tx: Transaction): Boolean = ???
 }
