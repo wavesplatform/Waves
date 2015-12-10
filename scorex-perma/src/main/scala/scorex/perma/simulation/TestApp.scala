@@ -1,4 +1,4 @@
-package scorex.perma
+package scorex.perma.simulation
 
 import java.io.{File, RandomAccessFile}
 import java.nio.file.{Files, Paths}
@@ -6,11 +6,10 @@ import java.nio.file.{Files, Paths}
 import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
 import scorex.crypto.ads.merkle.MerkleTree
-import scorex.perma.BlockchainBuilderSpec.SendWorkToMiners
-import scorex.perma.storage.AuthDataStorage
-import scorex.perma.actors.MinerSpec.Initialize
-import scorex.perma.actors.{Miner, TrustedDealer}
+import BlockchainBuilderSpec.SendWorkToMiners
+import scorex.perma.simulation.MinerSpec.Initialize
 import scorex.perma.settings.{Constants, PermaSettings}
+import scorex.perma.storage.AuthDataStorage
 import scorex.settings.Settings
 import scorex.utils.ScorexLogging
 

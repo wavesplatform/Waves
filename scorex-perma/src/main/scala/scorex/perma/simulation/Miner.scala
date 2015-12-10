@@ -1,4 +1,4 @@
-package scorex.perma.actors
+package scorex.perma.simulation
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.util.Timeout
@@ -7,9 +7,9 @@ import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey}
 import scorex.crypto._
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.ads.merkle.TreeStorage.Position
-import scorex.perma.BlockchainBuilderSpec.WinningTicket
-import scorex.perma.actors.MinerSpec._
-import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
+import BlockchainBuilderSpec.WinningTicket
+import scorex.perma.simulation.MinerSpec._
+import scorex.perma.simulation.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
 import scorex.perma.consensus.{PartialProof, Ticket}
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants.DataSegment

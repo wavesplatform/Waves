@@ -1,10 +1,10 @@
-package scorex.perma.actors
+package scorex.perma.simulation
 
 import akka.actor.{Actor, ActorLogging}
 import scorex.crypto.CryptographicHash
 import scorex.crypto.ads.merkle.MerkleTree
-import scorex.perma.actors.MinerSpec.Subset
-import scorex.perma.actors.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
+import scorex.perma.simulation.MinerSpec.Subset
+import scorex.perma.simulation.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
 import scorex.perma.settings.Constants
 
 

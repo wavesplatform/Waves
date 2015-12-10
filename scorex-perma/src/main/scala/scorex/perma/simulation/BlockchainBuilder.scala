@@ -1,8 +1,8 @@
-package scorex.perma
+package scorex.perma.simulation
 
 import akka.actor.{Actor, ActorRef}
-import scorex.crypto.{Sha256, CryptographicHash}
-import scorex.perma.actors.MinerSpec._
+import scorex.crypto.{CryptographicHash, Sha256}
+import scorex.perma.simulation.MinerSpec._
 import scorex.perma.consensus.Ticket
 import scorex.utils._
 
