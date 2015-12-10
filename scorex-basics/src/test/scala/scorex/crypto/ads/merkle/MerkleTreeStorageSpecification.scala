@@ -1,4 +1,4 @@
-package scorex.props
+package scorex.crypto.ads.merkle
 
 import java.io.File
 
@@ -7,7 +7,6 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.CryptographicHash.Digest
 import scorex.crypto.ads.merkle.TreeStorage.Key
-import scorex.crypto.ads.merkle.TreeStorage
 
 
 class MerkleTreeStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {

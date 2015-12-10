@@ -1,16 +1,14 @@
-package scorex.perma
+package scorex.perma.simulation
 
 import akka.actor.{Actor, ActorRef}
-import scorex.crypto.{Sha256, CryptographicHash}
-import scorex.perma.actors.MinerSpec._
+import scorex.crypto.{CryptographicHash, Sha256}
+import scorex.perma.simulation.MinerSpec._
 import scorex.perma.consensus.Ticket
 import scorex.utils._
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Random
-
 
 case class BlockHeaderLike(difficulty: BigInt, puz: Array[Byte], ticket: Ticket)
 
@@ -44,7 +42,7 @@ class BlockchainBuilder(miners: Seq[ActorRef], dealer: ActorRef) extends Actor w
           }
         case LoadingData =>
           sender() ! Initialize(Seq(dealer))
-          context.system.scheduler.scheduleOnce(200 millis, sender(), GetStatus)
+          context.system.scheduler.scheduleOnce(200.millis, sender(), GetStatus)
       }
 
     case SendWorkToMiners =>
@@ -53,7 +51,7 @@ class BlockchainBuilder(miners: Seq[ActorRef], dealer: ActorRef) extends Actor w
           minerRef ! TicketGeneration(difficulty, calcPuz(blockchainLike.lastOption))
         } else {
           minerRef ! Initialize(miners)
-          context.system.scheduler.scheduleOnce(200 millis, minerRef, GetStatus)
+          context.system.scheduler.scheduleOnce(200.millis, minerRef, GetStatus)
         }
       }
 

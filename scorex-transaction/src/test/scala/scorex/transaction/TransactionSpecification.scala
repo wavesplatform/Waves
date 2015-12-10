@@ -1,9 +1,8 @@
-package scorex.transaction.props
+package scorex.transaction
 
-import org.scalatest.{PropSpec, Matchers}
-import org.scalatest.prop.{PropertyChecks, GeneratorDrivenPropertyChecks}
+import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
-import scorex.transaction.{LagonakiTransaction, PaymentTransaction}
 
 
 class TransactionSpecification extends PropSpec
@@ -14,32 +13,32 @@ with Matchers {
   property("transaction signature should be valid in a valid flow") {
     forAll { (senderSeed: Array[Byte],
               recipientSeed: Array[Byte],
-              time:Long,
-              amount:Long,
-              fee:Long) =>
+              time: Long,
+              amount: Long,
+              fee: Long) =>
       val sender = new PrivateKeyAccount(senderSeed)
       val recipient = new PrivateKeyAccount(recipientSeed)
 
       val tx = PaymentTransaction(sender, recipient, amount, fee, time)
-      tx.isSignatureValid() should be (true)
+      tx.isSignatureValid() should be(true)
     }
   }
 
   property("wrong transaction signature should be invalid") {
     forAll { (senderSeed: Array[Byte],
               recipientSeed: Array[Byte],
-              time:Long,
-              amount:Long,
-              fee:Long) =>
+              time: Long,
+              amount: Long,
+              fee: Long) =>
       val sender = new PrivateKeyAccount(senderSeed)
       val recipient = new PrivateKeyAccount(recipientSeed)
 
       val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
 
-      PaymentTransaction(sender, recipient, amount, fee+1, time, sig).isSignatureValid() should be (false)
-      PaymentTransaction(sender, recipient, amount, fee, time+1, sig).isSignatureValid() should be (false)
-      PaymentTransaction(sender, recipient, amount+1, fee, time+1, sig).isSignatureValid() should be (false)
-      PaymentTransaction(recipient, sender, amount+1, fee, time+1, sig).isSignatureValid() should be (false)
+      PaymentTransaction(sender, recipient, amount, fee + 1, time, sig).isSignatureValid() should be(false)
+      PaymentTransaction(sender, recipient, amount, fee, time + 1, sig).isSignatureValid() should be(false)
+      PaymentTransaction(sender, recipient, amount + 1, fee, time + 1, sig).isSignatureValid() should be(false)
+      PaymentTransaction(recipient, sender, amount + 1, fee, time + 1, sig).isSignatureValid() should be(false)
     }
   }
 
