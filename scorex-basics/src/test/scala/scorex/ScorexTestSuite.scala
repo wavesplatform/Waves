@@ -11,5 +11,5 @@ class ScorexTestSuite extends Suites (
 
   new props.SigningFunctionsSpecification,
   new props.MerkleSpecification,
-  new props.TreeStorageSpecification
+  new props.MerkleTreeStorageSpecification
 )

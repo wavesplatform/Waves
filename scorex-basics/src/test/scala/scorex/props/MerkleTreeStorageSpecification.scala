@@ -10,7 +10,7 @@ import scorex.crypto.ads.merkle.TreeStorage.Key
 import scorex.crypto.ads.merkle.TreeStorage
 
 
-class TreeStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
+class MerkleTreeStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
   val treeDirName = "/tmp/scorex/test/MapDBStorageSpecification/"
   val treeDir = new File(treeDirName)
@@ -29,12 +29,9 @@ class TreeStorageSpecification extends PropSpec with PropertyChecks with Generat
   property("set value and get it") {
     lazy val storage = new TreeStorage(treeDirName + "/test_db", maxLevel)
 
-    forAll(keyVal) { x =>
-      val key: Key = x._1
-      val value: Digest = x._2
+    forAll(keyVal) { case(key: Key, value: Digest) =>
       whenever(key._1 >= 0.toLong && key._2 >= 0.toLong) {
         storage.set(key, value)
-
         assert(storage.get(key).get sameElements value)
       }
     }
