@@ -16,6 +16,7 @@ class BlockGeneratorSpecification(_system: ActorSystem)
   with TestingCommons {
 
   import scorex.network.BlockGenerator._
+  import TestingCommons._
 
   def this() = this(ActorSystem("MySpec"))
 
