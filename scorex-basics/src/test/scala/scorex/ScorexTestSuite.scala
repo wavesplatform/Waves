@@ -1,15 +1,13 @@
 package scorex
 
 import org.scalatest.Suites
+import scorex.crypto.{SigningFunctionsSpecification, Sha256Specification, Base58Specification}
+import scorex.crypto.ads.merkle.{MerkleTreeStorageSpecification, MerkleSpecification}
 
 class ScorexTestSuite extends Suites (
-  new props.Base58Specification,
-  new unit.Base58Specification,
-
-  new props.Sha256Specification,
-  new unit.Sha256Specification,
-
-  new props.SigningFunctionsSpecification,
-  new props.MerkleSpecification,
-  new props.MerkleTreeStorageSpecification
+  new Base58Specification,
+  new Sha256Specification,
+  new SigningFunctionsSpecification,
+  new MerkleSpecification,
+  new MerkleTreeStorageSpecification
 )
