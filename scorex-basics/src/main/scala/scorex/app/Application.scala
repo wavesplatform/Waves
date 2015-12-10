@@ -36,12 +36,13 @@ trait Application extends ScorexLogging {
   lazy val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], apiTypes, apiRoutes), "api")
 
 
-  protected val additionalSpecs: Seq[MessageSpec[_]]
+
+  protected val additionalMessageSpecs: Seq[MessageSpec[_]]
 
   lazy val basicMessagesSpecsRepo = new BasicMessagesRepo()
 
   //p2p
-  lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalSpecs)
+  lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
 
   lazy val peerManager = new PeerManager(settings)
 

@@ -124,8 +124,7 @@ class LagonakiApplication(val settingsFilename: String)
     typeOf[AddressApiRoute]
   )
 
-  //todo: is it needed at all ???
-  override lazy val additionalSpecs = TransactionalMessagesRepo.specs
+  override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
 
   //checks
   require(transactionModule.balancesSupport)
