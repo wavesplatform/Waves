@@ -17,8 +17,7 @@ class BlockTreeSpecification extends PropSpec with PropertyChecks
   dir.mkdir()
   for (file <- dir.listFiles) file.delete
 
-  testTree(new StoredBlockTree(None), "Memory")
-  testTree(new StoredBlockTree(Some(dirName)), "File")
+  testTree(new StoredBlockTree(dirName), "File")
 
   def testTree(blockTree: StoredBlockTree, prefix: String): Unit = {
 

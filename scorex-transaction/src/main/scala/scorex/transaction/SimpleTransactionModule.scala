@@ -46,7 +46,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
       case s: String if s.equalsIgnoreCase("blockchain") =>
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
       case s: String if s.equalsIgnoreCase("blocktree") =>
-        new StoredBlockTree(settings.dataDirOpt, settings.MaxRollback)(consensusModule, instance)
+        new StoredBlockTree(settings.dataDirOpt.get, settings.MaxRollback)(consensusModule, instance)
       case s =>
         log.error(s"Unknown history storage: $s. Use StoredBlockchain...")
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)

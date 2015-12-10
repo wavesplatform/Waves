@@ -12,13 +12,12 @@ import scorex.transaction.{BlockTree, TransactionModule}
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
-import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
 /**
   * If no datafolder provided, blocktree lives in RAM (useful for tests)
   */
-class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
+class StoredBlockTree(dataFolder: String, MaxRollback: Int = 100)
                      (implicit consensusModule: ConsensusModule[_],
                       transactionModule: TransactionModule[_])
   extends BlockTree with ScorexLogging {
@@ -52,6 +51,10 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
 
     protected def getBestBlockId: BlockId
 
+    def changeBestChain(changes: Seq[(Block, Direction)]): Try[Unit]
+
+    def lookForward(parentSignature: BlockId, howMany: Int): Seq[BlockId]
+
   }
 
   //TODO remove old blocks
@@ -68,11 +71,14 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
         .checksumEnable()
         .make()
 
-    private lazy val map: HTreeMap[BlockId, MapDBStoredBlock] = db.hashMapCreate("segments")
+    private lazy val map: HTreeMap[BlockId, MapDBStoredBlock] = db.hashMapCreate("blocks")
       .keySerializer(Serializer.BYTE_ARRAY).makeOrGet()
 
     private lazy val bestBlockStorage: HTreeMap[Int, BlockId] = db.hashMapCreate("bestBlock")
       .keySerializer(Serializer.INTEGER).valueSerializer(Serializer.BYTE_ARRAY).makeOrGet()
+
+    private lazy val bestChainStorage: HTreeMap[BlockId, (BlockId, Option[BlockId])] = db.hashMapCreate("bestChain")
+      .keySerializer(Serializer.BYTE_ARRAY).makeOrGet()
 
     private var bestBlockId: BlockId = Option(bestBlockStorage.get(0)).getOrElse(Array.empty)
 
@@ -81,6 +87,36 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     private def setBestBlockId(newId: BlockId) = {
       bestBlockId = newId
       bestBlockStorage.put(0, newId)
+    }
+
+    override def lookForward(parentSignature: BlockId, howMany: Height): Seq[BlockId] = Try {
+      def loop(parentSignature: BlockId, howMany: Height, acc: Seq[BlockId]): Seq[BlockId] = howMany match {
+        case 0 => acc
+        case _ =>
+          val block = bestChainStorage.get(parentSignature)
+          block._2 match {
+            case Some(blockId) => loop(blockId, howMany - 1, blockId +: acc)
+            case None => acc
+          }
+      }
+
+      Seq()
+    }.getOrElse(Seq.empty)
+
+    override def changeBestChain(changes: Seq[(Block, Direction)]): Try[Unit] = Try {
+      changes.map { c =>
+        val parentId = c._1.referenceField.value
+        c._2 match {
+          case Forward =>
+            bestChainStorage.put(c._1.uniqueId, (parentId, None))
+            val prev = bestChainStorage.get(parentId)
+            bestChainStorage.put(parentId, (prev._1, Some(c._1.uniqueId)))
+          case Reversed =>
+            bestChainStorage.remove(c._1.uniqueId)
+            val prev = bestChainStorage.get(parentId)
+            bestChainStorage.put(parentId, (prev._1, None))
+        }
+      }
     }
 
     override def writeBlock(block: Block): Try[Boolean] = Try {
@@ -126,46 +162,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     }
   }
 
-  object MemoryBlockTreePersistence extends BlockTreePersistence {
-    private val memStorage = TrieMap[BlockId, StoredBlock]()
-
-    private var bestBlockId: BlockId = Array.empty
-
-    private def setBestBlockId(newId: BlockId) = bestBlockId = newId
-
-    override def getBestBlockId: BlockId = bestBlockId
-
-    def writeBlock(block: Block): Try[Boolean] = Try {
-      if (exists(block)) throw new Error("Block is already in storage")
-      val parent = readBlock(block.referenceField.value)
-      lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
-      parent match {
-        case Some(p) =>
-          val s = p._2 + blockScore
-          memStorage.put(block.uniqueId, (block, s, p._3 + 1))
-          if (s > score()) {
-            setBestBlockId(block.uniqueId)
-            true
-          } else false
-        case None => memStorage.isEmpty match {
-          case true =>
-            setBestBlockId(block.uniqueId)
-            memStorage.put(block.uniqueId, (block, blockScore, 1))
-            true
-          case false =>
-            throw new Error("Parent block is not in tree")
-        }
-      }
-    }
-
-    def readBlock(id: BlockId): Option[StoredBlock] = memStorage.find(_._1.sameElements(id)).map(_._2)
-
-  }
-
-  private val blockStorage: BlockTreePersistence = dataFolderOpt match {
-    case Some(dataFolder) => new FileBlockTreePersistence(dataFolder)
-    case None => MemoryBlockTreePersistence
-  }
+  private val blockStorage: BlockTreePersistence = new FileBlockTreePersistence(dataFolder)
 
   /**
     * Height of the a chain, or a longest chain in the explicit block-tree
@@ -192,9 +189,11 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
           case true =>
             branchBlock(oldLast, block, MaxRollback) match {
               case Some(node) =>
-                val toReverse = (oldLast +: lastBlocks(oldLast, heightOf(oldLast).get - heightOf(node).get - 1))
-                val toProcess = (block +: lastBlocks(block, heightOf(block).get - heightOf(node).get - 1))
-                toReverse.map((_, Reversed)) ++ toProcess.map((_, Forward))
+                val toReverse = oldLast +: lastBlocks(oldLast, heightOf(oldLast).get - heightOf(node).get - 1)
+                val toProcess = block +: lastBlocks(block, heightOf(block).get - heightOf(node).get - 1)
+                val stateChanges = toReverse.map((_, Reversed)) ++ toProcess.map((_, Forward))
+                blockStorage.changeBestChain(stateChanges)
+                stateChanges
               case None => ??? //Should never rich this point if we don't keep older then MaxRollback side chains
             }
           case false => Seq.empty
@@ -260,7 +259,8 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     }
   }
 
-  override def lookForward(parentSignature: BlockId, howMany: Int): Seq[BlockId] = ???
+  override def lookForward(parentSignature: BlockId, howMany: Int): Seq[BlockId] =
+    blockStorage.lookForward(parentSignature, howMany)
 
   override def contains(id: BlockId): Boolean = blockStorage.exists(id)
 
