@@ -98,7 +98,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
       } else blockById(parent.value) match {
         case Some(commonBlock) =>
           val branchPoint = heightOf(commonBlock).get
-          val blockScore = consensusModule.blockScore(commonBlock)
+          val blockScore = consensusModule.blockScore(block)
           val blocksFromBranchPoint = ((branchPoint + 1) to height()).map(i => blockAt(i).get).reverse
           val currentScore = blocksFromBranchPoint.map(b => consensusModule.blockScore(b)).sum
           if (blockScore > currentScore) {
