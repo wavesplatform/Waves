@@ -44,8 +44,7 @@ object NetworkObject {
 
 
 
-class ScoreNetworkObject(//override val networkControllerRef: ActorRef,
-                         override val localComponentRef: ActorRef) extends NetworkObject[BlockchainScore] {
+class ScoreNetworkObject(override val localComponentRef: ActorRef) extends NetworkObject[BlockchainScore] {
 
   override def consider(candidates: Map[ConnectedPeer, BlockchainScore])
   : (Option[BlockchainScore], Seq[ConnectedPeer], Map[ConnectedPeer, BlockchainScore]) = {
