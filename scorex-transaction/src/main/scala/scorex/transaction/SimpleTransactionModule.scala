@@ -83,7 +83,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value //todo: asInstanceOf
 
   override def packUnconfirmed(): SimpleTransactionModule.StoredInBlock =
-    UnconfirmedTransactionsDatabaseImpl.all().filter(isValid(_))
+    UnconfirmedTransactionsDatabaseImpl.all().filter(isValid(_)).filter(!blockStorage.state.included(_))
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: SimpleTransactionModule.StoredInBlock): Unit = {
@@ -122,8 +122,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     TransactionsBlockField(txs)
   }
 
-  override def isValid(block: Block): Boolean = transactions(block)
-    .forall(isValid(_, blockStorage.history.heightOf(block).getOrElse(0) == 1))
+  override def isValid(block: Block): Boolean = transactions(block).forall(isValid(_, blockStorage.history.heightOf(block).getOrElse(0) == 1))
 
   def isValid(transaction: Transaction, isGenesisBlock: Boolean = false): Boolean = transaction match {
     case ptx: PaymentTransaction =>

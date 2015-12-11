@@ -2,11 +2,11 @@ package scorex.transaction.state.database.blockchain
 
 import java.io.{DataInput, DataOutput, File}
 
-import org.mapdb.{DB, DBMaker, DataIO, Serializer}
+import org.mapdb._
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.state.LagonakiState
-import scorex.transaction.{LagonakiTransaction, State}
+import scorex.transaction.{LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
 
 import scala.util.Try
@@ -45,7 +45,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
         val txSize = DataIO.unpackInt(dataInput)
         val b = new Array[Byte](txSize)
         dataInput.readFully(b)
-        LagonakiTransaction.parse(b).get  //todo: .get w/out catching
+        LagonakiTransaction.parse(b).get //todo: .get w/out catching
       }
     }
   }
@@ -70,6 +70,11 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
   private val balances = database.hashMap[Account, Long]("balances")
 
+  private val includedTx: HTreeMap[Array[Byte], Array[Byte]] = database.hashMapCreate("segments")
+    .keySerializer(Serializer.BYTE_ARRAY)
+    .valueSerializer(Serializer.BYTE_ARRAY)
+    .makeOrGet()
+
   private val accountTransactions = database.hashMap(
     "watchedTxs",
     AccSerializer,
@@ -81,16 +86,20 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
   override def processBlock(block: Block, reversal: Boolean): Try[State] = Try {
-    val balanceChanges = block.transactionModule.transactions(block)
-      .foldLeft(block.consensusModule.feesDistribution(block)) { case (changes, atx) => atx match {
+    val trans = block.transactionModule.transactions(block)
+    trans foreach { tx =>
+      if (!reversal && includedTx.containsKey(tx.signature)) throw new Error("Trying to add transaction twice")
+      else if (!reversal) includedTx.put(tx.signature, block.uniqueId)
+      else includedTx.remove(tx.signature, block.uniqueId)
+    }
+    val balanceChanges = trans.foldLeft(block.consensusModule.feesDistribution(block)) { case (changes, atx) =>
+      atx match {
         case tx: LagonakiTransaction =>
           tx.balanceChanges().foldLeft(changes) { case (iChanges, (acc, delta)) =>
-
             //check whether account is watched, add tx to its txs list if so
             val prevTxs = accountTransactions.getOrDefault(acc, Array())
             if (!reversal) accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
             else accountTransactions.put(acc, prevTxs.filter(t => !(t.signature sameElements tx.signature)))
-
             //update balances sheet
             val currentChange = iChanges.getOrElse(acc, 0L)
             val newChange = currentChange + delta
@@ -100,7 +109,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
         case m =>
           throw new Error("Wrong transaction type in pattern-matching" + m)
       }
-      }
+    }
 
     balanceChanges.foreach { case (acc, delta) =>
       val balance = Option(balances.get(acc)).getOrElse(0L)
@@ -128,8 +137,11 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
   override def watchAccountTransactions(account: Account): Unit = accountTransactions.put(account, Array())
 
+
   //initialization
   setStateHeight(0)
+
+  override def included(tx: Transaction): Boolean = includedTx.containsKey(tx.signature)
 
   //for debugging purposes only
   override def toString = {

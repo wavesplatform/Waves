@@ -28,6 +28,7 @@ with BlockTestingCommons {
       storage.appendBlock(block).isSuccess shouldBe true
       storage.history.height() shouldBe prevH + 1
       storage.state.accountTransactions(gen).length shouldBe prevTx + 1
+      storage.state.included(block.transactions.head) shouldBe true
     }
   }
 
