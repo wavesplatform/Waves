@@ -6,7 +6,7 @@ import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import scorex.app.Application
-import scorex.network.message.{MessageSpec, Message}
+import scorex.network.message.{Message, MessageSpec}
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -96,10 +96,13 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
             case Some(handler) =>
               handler ! DataFromPeer(msgId, content, remote)
 
-            case None => //todo: ???
+            case None =>
+              log.error("No handlers found for message: " + msgId)
+            //todo: ???
           }
         case Failure(e) =>
-          //todo: ban peer
+          log.error("Failed to deserialize data: " + e.getMessage)
+        //todo: ban peer
       }
 
     case SendToNetwork(message, sendingStrategy) =>
@@ -116,10 +119,12 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 }
 
 object NetworkController {
+
   case class RegisterMessagesHandler(specs: Seq[MessageSpec[_]], handler: ActorRef)
 
   //todo: more stricter solution for messageType than number?
-  case class DataFromPeer[V](messageType: Message.MessageCode, data:V, source:ConnectedPeer)
+  case class DataFromPeer[V](messageType: Message.MessageCode, data: V, source: ConnectedPeer)
+
   case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
 
   private case object CheckPeers
@@ -131,4 +136,5 @@ object NetworkController {
   // case object GetMaxBlockchainScore
 
   case class PeerDisconnected(address: InetSocketAddress)
+
 }
