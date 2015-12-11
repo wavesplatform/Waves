@@ -10,7 +10,7 @@ import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.storage.Storage
-import scorex.transaction.{BlockChain, TransactionModule}
+import scorex.transaction.TransactionModule
 import scorex.utils.{NTP, ScorexLogging, randomBytes}
 
 import scala.concurrent.ExecutionContext.Implicits.global
