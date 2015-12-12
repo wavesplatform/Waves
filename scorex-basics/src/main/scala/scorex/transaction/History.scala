@@ -57,7 +57,7 @@ trait History {
     *
     * Append block to a chain, based on it's reference
     * @param block - block to append
-    * @return Modified version of history
+    * @return Blocks to process in state
     */
   private[transaction] def appendBlock(block: Block): Try[BlocksToProcess]
 

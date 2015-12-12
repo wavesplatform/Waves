@@ -162,18 +162,8 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     case _ => new MapDBBlockTreePersistence(DBMaker.memoryDB().make())
   }
 
-  /**
-    * Height of the a chain, or a longest chain in the explicit block-tree
-    */
   override def height(): Int = blockStorage.bestBlock.map(_._3).getOrElse(0)
 
-  /**
-    * Use BlockStorage.appendBlock(block: Block) if you want to automatically update state
-    *
-    * Append block to a chain, based on it's reference
-    * @param block - block to append
-    * @return Modified version of history
-    */
   override private[transaction] def appendBlock(block: Block): Try[BlocksToProcess] = {
     val parent = block.referenceField
     val h = height()
@@ -240,10 +230,6 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     lastBlocks(lastBlock, howMany).reverse
   }
 
-  /**
-    * Quality score of a best chain, e.g. cumulative difficulty in case of Bitcoin / Nxt
-    * @return
-    */
   override def score(): BigInt = blockStorage.bestBlock.map(_._2).getOrElse(BigInt(0))
 
   override def parent(block: Block, back: Int = 1): Option[Block] = {
