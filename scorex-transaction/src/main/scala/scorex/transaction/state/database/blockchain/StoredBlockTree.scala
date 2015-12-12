@@ -2,7 +2,7 @@ package scorex.transaction.state.database.blockchain
 
 import java.io.File
 
-import org.mapdb.{DBMaker, HTreeMap, Serializer}
+import org.mapdb.{DB, DBMaker, HTreeMap, Serializer}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -59,18 +59,8 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
   }
 
   //TODO remove old blocks
-  class FileBlockTreePersistence(folder: String) extends BlockTreePersistence {
+  class MapDBBlockTreePersistence(db: DB) extends BlockTreePersistence {
     type MapDBStoredBlock = (Array[Byte], Score, Height)
-
-    new File(folder).mkdirs()
-    private val file = new File(folder + "blocktree.mapDB")
-
-    private lazy val db =
-      DBMaker.appendFileDB(file)
-        .fileMmapEnableIfSupported()
-        .closeOnJvmShutdown()
-        .checksumEnable()
-        .make()
 
     private lazy val map: HTreeMap[BlockId, MapDBStoredBlock] = db.hashMapCreate("blocks")
       .keySerializer(Serializer.BYTE_ARRAY).makeOrGet()
@@ -163,57 +153,19 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     }
   }
 
-  //Memory storage suitable for tests only
-  object MemoryBlockTreePersistence extends BlockTreePersistence {
-    private val memStorage = TrieMap[BlockId, StoredBlock]()
-
-    private var bestBlockId: BlockId = Array.empty
-
-    private def setBestBlockId(newId: BlockId) = bestBlockId = newId
-
-    override def getBestBlockId: BlockId = bestBlockId
-
-    def writeBlock(block: Block): Try[Boolean] = Try {
-      if (exists(block)) throw new Error("Block is already in storage")
-      val parent = readBlock(block.referenceField.value)
-      lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
-      parent match {
-        case Some(p) =>
-          val s = p._2 + blockScore
-          memStorage.put(block.uniqueId, (block, s, p._3 + 1))
-          if (s > score()) {
-            setBestBlockId(block.uniqueId)
-            true
-          } else false
-        case None => memStorage.isEmpty match {
-          case true =>
-            setBestBlockId(block.uniqueId)
-            memStorage.put(block.uniqueId, (block, blockScore, 1))
-            true
-          case false =>
-            throw new Error("Parent block is not in tree")
-        }
-      }
-    }
-
-    def readBlock(id: BlockId): Option[StoredBlock] = memStorage.find(_._1.sameElements(id)).map(_._2)
-
-    override def changeBestChain(changes: Seq[(Block, Direction)]): Try[Unit] = Failure(new NotImplementedError)
-
-    override def lookForward(parentSignature: BlockId, howMany: Height): Seq[BlockId] = Seq()
-  }
-
-
   private val blockStorage: BlockTreePersistence = dataFolderOpt match {
-    case Some(dataFolder) => new FileBlockTreePersistence(dataFolder)
-    case _ =>  MemoryBlockTreePersistence
+    case Some(dataFolder) =>
+      new File(dataFolder).mkdirs()
+      val file = new File(dataFolder + "blocktree.mapDB")
+      val db = DBMaker.appendFileDB(file).fileMmapEnableIfSupported().closeOnJvmShutdown().checksumEnable().make()
+      new MapDBBlockTreePersistence(db)
+    case _ => new MapDBBlockTreePersistence(DBMaker.memoryDB().make())
   }
 
   /**
     * Height of the a chain, or a longest chain in the explicit block-tree
     */
   override def height(): Int = blockStorage.bestBlock.map(_._3).getOrElse(0)
-
 
   /**
     * Use BlockStorage.appendBlock(block: Block) if you want to automatically update state
