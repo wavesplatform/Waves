@@ -6,6 +6,7 @@ import scorex.account.Account
 import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
 import scorex.transaction.LagonakiTransaction.ValidationResult
+import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
 import scorex.utils.ScorexLogging
@@ -33,7 +34,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 
 class SimpleTransactionModule(implicit val settings: TransactionSettings,
                               consensusModule: ConsensusModule[_])
-  extends TransactionModule[SimpleTransactionModule.StoredInBlock] with ScorexLogging {
+  extends TransactionModule[StoredInBlock] with ScorexLogging {
 
   import SimpleTransactionModule._
 
@@ -76,17 +77,17 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     }
   }
 
-  override def formBlockData(transactions: SimpleTransactionModule.StoredInBlock): TransactionsBlockField =
+  override def formBlockData(transactions: StoredInBlock): TransactionsBlockField =
     TransactionsBlockField(transactions)
 
-  override def transactions(block: Block): SimpleTransactionModule.StoredInBlock =
+  override def transactions(block: Block): StoredInBlock =
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value //todo: asInstanceOf
 
-  override def packUnconfirmed(): SimpleTransactionModule.StoredInBlock =
+  override def packUnconfirmed(): StoredInBlock =
     UnconfirmedTransactionsDatabaseImpl.all().filter(isValid(_)).filter(!blockStorage.state.included(_))
 
   //todo: check: clear unconfirmed txs on receiving a block
-  override def clearFromUnconfirmed(data: SimpleTransactionModule.StoredInBlock): Unit = {
+  override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
     data.foreach(tx => UnconfirmedTransactionsDatabaseImpl.getBySignature(tx.signature) match {
       case Some(unconfirmedTx) => UnconfirmedTransactionsDatabaseImpl.remove(unconfirmedTx)
       case None =>
@@ -98,7 +99,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     }
   }
 
-  override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
+  override def genesisData: BlockField[StoredInBlock] = {
     val ipoMembers = List(
       "QTwpq6La1CzXrwbFbcxncb4kv5g2UNFiY2",
       "QSwv4GoR3UjwXKSZN5eoAhHqPcEWTKzomD",
