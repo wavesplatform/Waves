@@ -10,7 +10,7 @@ import scorex.lagonaki.BlockTestingCommons
 import scorex.utils._
 
 class BlockTreeSpecification extends PropSpec with PropertyChecks
-  with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
+with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
 
   val dirName = "/tmp/scorex/test/"
   val dir = new File(dirName)
@@ -94,5 +94,10 @@ class BlockTreeSpecification extends PropSpec with PropertyChecks
       blockTree.lastBlock.uniqueId should contain theSameElementsAs prevB.uniqueId
     }
 
+    property(s"$prefix: Look forward") {
+      assert(blockTree.height() > 1)
+      val newBlocks = blockTree.lookForward(genesis.uniqueId, 10)
+      assert(newBlocks.nonEmpty)
+    }
   }
 }

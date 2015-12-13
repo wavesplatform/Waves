@@ -13,6 +13,7 @@ import shapeless.Typeable._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.util.Try
 
 //todo: write tests
 class HistorySynchronizer(application: Application)
@@ -72,7 +73,7 @@ class HistorySynchronizer(application: Application)
       log.info(s"Got SignaturesMessage with ${blockIds.length} sigs")
       val common = blockIds.head
       assert(application.history.contains(common)) //todo: what if not?
-      application.blockStorage.removeAfter(common)
+      Try{application.blockStorage.removeAfter(common)} //todo we don't need this call for blockTree
 
       blocksToReceive.clear()
 
@@ -87,7 +88,7 @@ class HistorySynchronizer(application: Application)
 
   when(GettingBlock) {
     case Event(CheckBlock(blockId), witnesses) =>
-      if(blocksToReceive.front.sameElements(blockId)) {
+      if (blocksToReceive.front.sameElements(blockId)) {
         val ss = SendToRandomFromChosen(witnesses)
         val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
         networkControllerRef ! stn
@@ -155,8 +156,7 @@ class HistorySynchronizer(application: Application)
       log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
 
       otherSigs.exists { parent =>
-        val headers = application.history
-          .lookForward(parent, application.settings.MaxBlocksChunks)
+        val headers = application.history.lookForward(parent, application.settings.MaxBlocksChunks)
 
         if (headers.nonEmpty) {
           val msg = Message(SignaturesSpec, Right(Seq(parent) ++ headers), None)
@@ -189,7 +189,7 @@ class HistorySynchronizer(application: Application)
 
   onTransition {
     case _ -> Syncing =>
-      scoreSyncer.consideredValue.foreach{cv =>
+      scoreSyncer.consideredValue.foreach { cv =>
         self ! cv
       }
 
@@ -205,7 +205,7 @@ class HistorySynchronizer(application: Application)
 
   def processNewBlock(block: Block, local: Boolean) = {
     if (block.isValid) {
-      log.info(s"New block: $block local: $local")
+      log.info(s"New block: ${block.json} local: $local")
       transactionalModule.blockStorage.appendBlock(block)
 
       block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
@@ -216,7 +216,7 @@ class HistorySynchronizer(application: Application)
         networkControllerRef ! SendToNetwork(blockMsg, Broadcast)
       }
     } else {
-      log.warning(s"Non-valid block: $block local: $local")
+      log.warning(s"Non-valid block: ${block.json} local: $local")
     }
   }
 }
@@ -234,5 +234,6 @@ object HistorySynchronizer {
   case object Synced extends Status
 
 
-  case class CheckBlock(id:BlockId)
+  case class CheckBlock(id: BlockId)
+
 }

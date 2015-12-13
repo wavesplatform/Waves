@@ -12,7 +12,6 @@ import scorex.transaction.{BlockTree, TransactionModule}
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
-import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -84,14 +83,23 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
       def loop(parentSignature: BlockId, howMany: Height, acc: Seq[BlockId]): Seq[BlockId] = howMany match {
         case 0 => acc
         case _ =>
-          val block = bestChainStorage.get(parentSignature)
-          block._2 match {
-            case Some(blockId) => loop(blockId, howMany - 1, blockId +: acc)
-            case None => acc
+          Option(bestChainStorage.get(parentSignature)) match {
+            case Some(block) =>
+              block._2 match {
+                case Some(blockId) => loop(blockId, howMany - 1, blockId +: acc)
+                case None => acc
+              }
+            case None =>
+              log.error(s"Failed to get block ${parentSignature.mkString} from best chain storage")
+              acc
           }
       }
 
-      Seq()
+      loop(parentSignature, howMany, Seq.empty).reverse
+    }.recoverWith { case t: Throwable =>
+      log.error("Error when getting blocks", t)
+      t.printStackTrace()
+      Try(Seq.empty)
     }.getOrElse(Seq.empty)
 
     override def changeBestChain(changes: Seq[(Block, Direction)]): Try[Unit] = Try {
@@ -168,6 +176,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     val parent = block.referenceField
     val h = height()
     if ((h == 0) || (lastBlock.uniqueId sameElements block.referenceField.value)) {
+      blockStorage.changeBestChain(Seq((block, Forward)))
       blockStorage.writeBlock(block).map(x => Seq((block, Forward)))
     } else blockById(parent.value) match {
       case Some(commonBlock) =>
