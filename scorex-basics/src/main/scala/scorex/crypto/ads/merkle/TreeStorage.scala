@@ -9,7 +9,7 @@ import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
 
-class TreeStorage(fileName: String, levels: Int) extends Storage[Tuple2[Int, Long], Array[Byte]] with ScorexLogging {
+class TreeStorage(fileName: String, levels: Int) extends Storage[(Int, Long), Array[Byte]] with ScorexLogging {
 
   import TreeStorage._
 
@@ -33,14 +33,11 @@ class TreeStorage(fileName: String, levels: Int) extends Storage[Tuple2[Int, Lon
     t.toMap
   }
 
-  override def set(key: Key, value: Digest): Unit = {
-    val map = maps(key._1.asInstanceOf[Int])
-    Try {
-      map.put(key._2, value)
-    }.recoverWith { case t: Throwable =>
-      log.warn("Failed to set key:" + key, t)
-      Failure(t)
-    }
+  override def set(key: Key, value: Digest): Unit = Try {
+    maps(key._1.asInstanceOf[Int]).put(key._2, value)
+  }.recoverWith { case t: Throwable =>
+    log.warn("Failed to set key:" + key, t)
+    Failure(t)
   }
 
   override def commit(): Unit = dbs.foreach(_.commit())

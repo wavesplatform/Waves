@@ -52,7 +52,7 @@ object TestApp extends App with ScorexLogging {
   val storage = new AuthDataStorage(settings.authDataStorage)
   val miners = (1 to MinersCount).map(x => actorSystem.actorOf(Props(classOf[Miner], tree.rootHash, storage), s"m-$x"))
 
-  implicit val timeout = Timeout(1 minute)
+  implicit val timeout = Timeout(1.minute)
 
   //Test, that miners download data from each other
   miners.head ! Initialize(Seq(dealer))

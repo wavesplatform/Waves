@@ -31,7 +31,6 @@ class AuthDataStorage(fileName: String) extends Storage[Long, AuthDataBlock[Data
   override def set(key: Long, value: AuthDataBlock[DataSegment]): Unit = {
     Try {
       map.put(key, value)
-
     }.recoverWith { case t: Throwable =>
       log.warn("Failed to set key:" + key, t)
       Failure(t)
