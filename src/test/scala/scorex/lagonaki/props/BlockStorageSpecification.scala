@@ -59,7 +59,7 @@ with BlockTestingCommons {
     val firstBlockTransaction = firstBlock.transactions.head
     storage.appendBlock(firstBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs firstBlock.uniqueId
-    storage.state.accountTransactions(sender).length shouldBe  1
+    storage.state.accountTransactions(sender).length shouldBe 1
     storage.state.accountTransactions(sender).head.fee shouldBe bt
     storage.state.included(firstBlockTransaction) shouldBe true
 
@@ -67,7 +67,7 @@ with BlockTestingCommons {
     val branchedBlock = genBlock(bt, randomBytes(32), senderSeed, Some(branchPoint.uniqueId))
     storage.appendBlock(branchedBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs firstBlock.uniqueId
-    storage.state.accountTransactions(sender).length shouldBe  1
+    storage.state.accountTransactions(sender).length shouldBe 1
     storage.state.accountTransactions(sender).head.fee shouldBe bt
     storage.state.included(firstBlockTransaction) shouldBe true
 
@@ -75,7 +75,7 @@ with BlockTestingCommons {
     val bestBlock = genBlock(biggerBt, randomBytes(32), senderSeed, Some(branchPoint.uniqueId))
     storage.appendBlock(bestBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs bestBlock.uniqueId
-    storage.state.accountTransactions(sender).length shouldBe  1
+    storage.state.accountTransactions(sender).length shouldBe 1
     storage.state.accountTransactions(sender).head.fee shouldBe biggerBt
     storage.state.included(firstBlockTransaction) shouldBe false
   }

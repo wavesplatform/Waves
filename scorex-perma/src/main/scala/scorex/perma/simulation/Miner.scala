@@ -7,12 +7,12 @@ import scorex.crypto.SigningFunctions.{PrivateKey, PublicKey}
 import scorex.crypto._
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.ads.merkle.TreeStorage.Position
-import BlockchainBuilderSpec.WinningTicket
-import scorex.perma.simulation.MinerSpec._
-import scorex.perma.simulation.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
 import scorex.perma.consensus.{PartialProof, Ticket}
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants.DataSegment
+import scorex.perma.simulation.BlockchainBuilderSpec.WinningTicket
+import scorex.perma.simulation.MinerSpec._
+import scorex.perma.simulation.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
 import scorex.storage.Storage
 import scorex.utils.randomBytes
 

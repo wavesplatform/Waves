@@ -3,7 +3,6 @@ package scorex
 import java.security.SecureRandom
 
 import scala.annotation.tailrec
-
 import scala.concurrent.duration._
 
 package object utils {

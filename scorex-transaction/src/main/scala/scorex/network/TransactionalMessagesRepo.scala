@@ -6,7 +6,7 @@ import scorex.transaction.{LagonakiTransaction, Transaction}
 
 import scala.util.Try
 
-object TransactionalMessagesRepo{
+object TransactionalMessagesRepo {
 
 
   object TransactionMessageSpec extends MessageSpec[Transaction] {

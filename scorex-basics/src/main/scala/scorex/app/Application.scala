@@ -7,7 +7,7 @@ import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
-import scorex.network.{BlockGenerator, NetworkController, HistorySynchronizer, PeerSynchronizer}
+import scorex.network.{BlockGenerator, HistorySynchronizer, NetworkController, PeerSynchronizer}
 import scorex.settings.Settings
 import scorex.transaction.{BlockStorage, History, State, TransactionModule}
 import scorex.utils.ScorexLogging
@@ -35,8 +35,6 @@ trait Application extends ScorexLogging {
   protected implicit lazy val actorSystem = ActorSystem("lagonaki")
   lazy val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], apiTypes, apiRoutes), "api")
 
-
-
   protected val additionalMessageSpecs: Seq[MessageSpec[_]]
 
   lazy val basicMessagesSpecsRepo = new BasicMessagesRepo()
@@ -54,7 +52,7 @@ trait Application extends ScorexLogging {
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
 
   //interface to append log and state
-  val blockStorage:BlockStorage
+  val blockStorage: BlockStorage
 
   lazy val history: History = blockStorage.history
   lazy val state: State = blockStorage.state

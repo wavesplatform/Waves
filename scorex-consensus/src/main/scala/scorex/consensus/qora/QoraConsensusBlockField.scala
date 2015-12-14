@@ -16,7 +16,7 @@ case class QoraConsensusBlockField(override val value: QoraLikeConsensusBlockDat
       value.generatorSignature
 
 
-  override def json: JsObject = Json.obj(name -> Json.obj (
+  override def json: JsObject = Json.obj(name -> Json.obj(
     "base-target" -> value.generatingBalance,
     "generation-signature" -> Base58.encode(value.generatorSignature)
   ))

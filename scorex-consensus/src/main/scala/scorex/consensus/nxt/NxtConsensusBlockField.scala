@@ -1,7 +1,7 @@
 package scorex.consensus.nxt
 
-import com.google.common.primitives.{Longs, Bytes}
-import play.api.libs.json.{Json, JsObject}
+import com.google.common.primitives.{Bytes, Longs}
+import play.api.libs.json.{JsObject, Json}
 import scorex.block.BlockField
 import scorex.crypto.Base58
 
@@ -16,7 +16,7 @@ case class NxtConsensusBlockField(override val value: NxtLikeConsensusBlockData)
       value.generationSignature
 
 
-  override def json: JsObject = Json.obj(name -> Json.obj (
+  override def json: JsObject = Json.obj(name -> Json.obj(
     "base-target" -> value.baseTarget,
     "generation-signature" -> Base58.encode(value.generationSignature)
   ))

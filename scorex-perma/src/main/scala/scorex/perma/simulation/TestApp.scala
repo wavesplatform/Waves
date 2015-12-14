@@ -6,9 +6,9 @@ import java.nio.file.{Files, Paths}
 import akka.actor.{ActorSystem, Props}
 import akka.util.Timeout
 import scorex.crypto.ads.merkle.MerkleTree
-import BlockchainBuilderSpec.SendWorkToMiners
-import scorex.perma.simulation.MinerSpec.Initialize
 import scorex.perma.settings.{Constants, PermaSettings}
+import scorex.perma.simulation.BlockchainBuilderSpec.SendWorkToMiners
+import scorex.perma.simulation.MinerSpec.Initialize
 import scorex.perma.storage.AuthDataStorage
 import scorex.settings.Settings
 import scorex.utils.ScorexLogging

@@ -5,7 +5,6 @@ import scorex.crypto.CryptographicHash
 import scorex.crypto.ads.merkle.MerkleTree
 import scorex.perma.simulation.MinerSpec.Subset
 import scorex.perma.simulation.TrustedDealerSpec.{SegmentsRequest, SegmentsToStore}
-import scorex.perma.settings.Constants
 
 
 class TrustedDealer[H <: CryptographicHash](val tree: MerkleTree[H]) extends Actor with ActorLogging {

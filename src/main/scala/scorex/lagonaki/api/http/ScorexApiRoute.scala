@@ -1,9 +1,10 @@
 package scorex.lagonaki.api.http
 
+import javax.ws.rs.Path
+
 import akka.actor.ActorRefFactory
 import akka.pattern.ask
 import com.wordnik.swagger.annotations._
-import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.lagonaki.server.LagonakiApplication

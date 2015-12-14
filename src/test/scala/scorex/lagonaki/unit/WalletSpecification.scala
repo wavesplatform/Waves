@@ -30,7 +30,7 @@ class WalletSpecification extends FunSuite {
     assert(w.privateKeyAccounts().isEmpty)
   }
 
-  test("reopening"){
+  test("reopening") {
 
     //todo read folder from settings
     val walletFile = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")

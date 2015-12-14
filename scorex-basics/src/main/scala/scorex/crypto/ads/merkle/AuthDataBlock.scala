@@ -14,7 +14,7 @@ import scala.annotation.tailrec
 case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
 
   def check[HashImpl <: CryptographicHash](index: Position, rootHash: Digest)
-                                      (hashFunction: HashImpl = Sha256): Boolean = {
+                                          (hashFunction: HashImpl = Sha256): Boolean = {
 
     @tailrec
     def calculateHash(idx: Position, nodeHash: Digest, path: Seq[Digest]): Digest = {

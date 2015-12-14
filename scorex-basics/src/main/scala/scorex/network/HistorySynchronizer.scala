@@ -5,8 +5,8 @@ import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
-import scorex.network.message.Message
 import scorex.network.NetworkObject.ConsideredValue
+import scorex.network.message.Message
 import scorex.transaction.History
 import shapeless.Typeable._
 
@@ -73,7 +73,7 @@ class HistorySynchronizer(application: Application)
       log.info(s"Got SignaturesMessage with ${blockIds.length} sigs")
       val common = blockIds.head
       assert(application.history.contains(common)) //todo: what if not?
-      Try{application.blockStorage.removeAfter(common)} //todo we don't need this call for blockTree
+      Try(application.blockStorage.removeAfter(common)) //todo we don't need this call for blockTree
 
       blocksToReceive.clear()
 

@@ -1,6 +1,6 @@
 package scorex.lagonaki.integration
 
-import org.scalatest.{Matchers, FlatSpec}
+import org.scalatest.{FlatSpec, Matchers}
 import scorex.lagonaki.TestingCommons
 import spray.routing.HttpService
 import spray.testkit.ScalatestRouteTest

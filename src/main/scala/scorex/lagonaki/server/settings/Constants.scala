@@ -1,14 +1,11 @@
 package scorex.lagonaki.server.settings
 
 import com.typesafe.config.ConfigFactory
-import scorex.consensus._
-import scorex.consensus.nxt.NxtLikeConsensusModule
-import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.utils.ScorexLogging
 
 /**
- * System constants here.
- */
+  * System constants here.
+  */
 
 object Constants extends ScorexLogging {
   private val appConf = ConfigFactory.load().getConfig("app")

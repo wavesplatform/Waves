@@ -5,7 +5,7 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.{EllipticCurveImpl, Base58}
+import scorex.crypto.{Base58, EllipticCurveImpl}
 import scorex.transaction.LagonakiTransaction.TransactionType
 
 case class PaymentTransaction(sender: PublicKeyAccount,
@@ -16,8 +16,8 @@ case class PaymentTransaction(sender: PublicKeyAccount,
                               override val signature: Array[Byte])
   extends LagonakiTransaction(TransactionType.PaymentTransaction, recipient, amount, fee, timestamp, signature) {
 
-  import scorex.transaction.PaymentTransaction._
   import scorex.transaction.LagonakiTransaction._
+  import scorex.transaction.PaymentTransaction._
 
   override lazy val dataLength = TypeLength + BaseLength
 
@@ -60,13 +60,13 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     } else ValidationResult.ValidateOke
 
 
-  override def involvedAmount(account: Account):Long = {
+  override def involvedAmount(account: Account): Long = {
     val address = account.address
 
     if (address.equals(sender.address) && address.equals(recipient.address)) {
       -fee
     } else if (address.equals(sender.address)) {
-      -amount-fee
+      -amount - fee
     } else if (address.equals(recipient.address)) {
       amount
     } else 0

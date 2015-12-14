@@ -7,10 +7,12 @@ import akka.io.Tcp._
 import akka.util.ByteString
 import scorex.app.Application
 import scorex.utils.ScorexLogging
+
 import scala.util.{Failure, Success}
 
 
-class ConnectedPeer(val address: InetSocketAddress, val handlerRef: ActorRef){
+class ConnectedPeer(val address: InetSocketAddress, val handlerRef: ActorRef) {
+
   import shapeless.Typeable._
 
   override def equals(obj: scala.Any): Boolean = obj.cast[ConnectedPeer].exists(_.address == this.address)
@@ -18,9 +20,9 @@ class ConnectedPeer(val address: InetSocketAddress, val handlerRef: ActorRef){
   override def toString: String = super.toString
 }
 
-case class PeerConnectionHandler(application:Application,
-                            connection: ActorRef,
-                            remote: InetSocketAddress) extends Actor with ScorexLogging {
+case class PeerConnectionHandler(application: Application,
+                                 connection: ActorRef,
+                                 remote: InetSocketAddress) extends Actor with ScorexLogging {
 
   import PeerConnectionHandler._
 
@@ -31,7 +33,7 @@ case class PeerConnectionHandler(application:Application,
   val selfPeer = new ConnectedPeer(remote, self)
 
 
-//  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
+  //  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
 
   /*
   private def handleMessage(message: message.Message[_]) = {
@@ -80,8 +82,8 @@ case class PeerConnectionHandler(application:Application,
 
   override def receive = {
 
-//    case SendBlockchainScore =>
-//      self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score())
+    //    case SendBlockchainScore =>
+    //      self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score())
 
     case msg: message.Message[_] =>
       connection ! Write(ByteString(msg.bytes))
@@ -124,9 +126,10 @@ case class PeerConnectionHandler(application:Application,
 
 object PeerConnectionHandler {
 
-//  case object SendBlockchainScore
+  //  case object SendBlockchainScore
 
   case object CloseConnection
 
   case object Blacklist
+
 }

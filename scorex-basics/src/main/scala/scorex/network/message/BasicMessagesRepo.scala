@@ -9,12 +9,12 @@ import scorex.consensus.ConsensusModule
 import scorex.crypto.SigningFunctions._
 import scorex.crypto.{EllipticCurveImpl, SigningFunctions}
 import scorex.network.message.Message._
-import scorex.transaction.{TransactionModule, History}
+import scorex.transaction.{History, TransactionModule}
 
 import scala.util.Try
 
 
-class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
+class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_],
                           consensusModule: ConsensusModule[_]) {
 
   object GetPeersSpec extends MessageSpec[Unit] {

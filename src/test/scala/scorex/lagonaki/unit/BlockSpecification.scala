@@ -1,12 +1,12 @@
 package scorex.lagonaki.unit
 
-import org.scalatest.{Matchers, FunSuite}
+import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
 import scorex.consensus.qora.{QoraLikeConsensusBlockData, QoraLikeConsensusModule}
 import scorex.lagonaki.TestingCommons
-import scorex.transaction.{Transaction, PaymentTransaction, SimpleTransactionModule}
+import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 
 import scala.util.Random
 
@@ -27,7 +27,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     val gs = Array.fill(NxtLikeConsensusModule.GeneratorSignatureLength)(Random.nextInt(100).toByte)
 
     val sender = new PrivateKeyAccount(reference.dropRight(2))
-    val tx:Transaction = PaymentTransaction(sender, gen, 5, 1000, System.currentTimeMillis() - 5000)
+    val tx: Transaction = PaymentTransaction(sender, gen, 5, 1000, System.currentTimeMillis() - 5000)
 
     val tbd = Seq(tx)
     val cbd = new NxtLikeConsensusBlockData {
@@ -35,7 +35,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
       override val baseTarget: Long = bt
     }
 
-    val version = 1:Byte
+    val version = 1: Byte
     val timestamp = System.currentTimeMillis()
 
     val block = Block.buildAndSign(version, timestamp, reference, cbd, tbd, gen)
@@ -57,7 +57,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     val gs = Array.fill(QoraLikeConsensusModule.GeneratorSignatureLength)(Random.nextInt(100).toByte)
 
     val sender = new PrivateKeyAccount(reference.dropRight(2))
-    val tx:Transaction = PaymentTransaction(sender, gen, 5, 1000, System.currentTimeMillis() - 5000)
+    val tx: Transaction = PaymentTransaction(sender, gen, 5, 1000, System.currentTimeMillis() - 5000)
 
     val tbd = Seq(tx)
     val cbd = new QoraLikeConsensusBlockData {
@@ -68,7 +68,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     val cbdBytes = consensusModule.formBlockData(cbd).bytes
     assert(cbdBytes.takeRight(QoraLikeConsensusModule.GeneratorSignatureLength).sameElements(gs))
 
-    val version = 1:Byte
+    val version = 1: Byte
     val timestamp = System.currentTimeMillis()
 
     val block = Block.buildAndSign(version, timestamp, reference, cbd, tbd, gen)

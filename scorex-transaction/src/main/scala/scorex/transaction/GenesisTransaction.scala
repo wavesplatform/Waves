@@ -4,8 +4,8 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.Base58
-import scorex.transaction.LagonakiTransaction.TransactionType
 import scorex.crypto.Sha256._
+import scorex.transaction.LagonakiTransaction.TransactionType
 
 
 case class GenesisTransaction(override val recipient: Account,

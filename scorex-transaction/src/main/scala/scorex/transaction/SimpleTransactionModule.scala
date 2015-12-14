@@ -64,8 +64,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     bytes.isEmpty match {
       case true => TransactionsBlockField(Seq())
       case false =>
+        val txData = bytes.tail
         val txCount = bytes.head // so 255 txs max
-      val txData = bytes.tail
         formBlockData((1 to txCount).foldLeft((0: Int, Seq[LagonakiTransaction]())) { case ((pos, txs), _) =>
           val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
           val transactionLength = Ints.fromByteArray(transactionLengthBytes)

@@ -37,7 +37,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
   implicit val consensusModule: ConsensusModule[PermaLikeConsensusBlockData] = this
 
-  def miningReward(block: Block) = if(blockGenerator(block).publicKey sameElements GenesisCreator.publicKey) 0
+  def miningReward(block: Block) = if (blockGenerator(block).publicKey sameElements GenesisCreator.publicKey) 0
   else 1000000
 
   private def blockGenerator(block: Block) = block.signerDataField.value.generator

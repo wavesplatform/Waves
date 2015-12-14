@@ -1,6 +1,5 @@
 package scorex.lagonaki.api.http
 
-import java.net.InetSocketAddress
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
@@ -8,8 +7,8 @@ import akka.pattern.ask
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.network.{ConnectedPeer, NetworkController}
 import scorex.lagonaki.server.LagonakiApplication
+import scorex.network.{ConnectedPeer, NetworkController}
 import spray.http.MediaTypes._
 
 import scala.concurrent.ExecutionContext.Implicits.global

@@ -19,7 +19,7 @@ trait NetworkObject[V] {
 
   def consideredValue = _consideredValue
 
-  def betterThan(newValue: Option[V], oldValue: Option[V]):Boolean
+  def betterThan(newValue: Option[V], oldValue: Option[V]): Boolean
 
   def networkUpdate(remote: ConnectedPeer, value: V) = {
     candidates += remote -> value
@@ -29,7 +29,7 @@ trait NetworkObject[V] {
     val cValue = ct._1
     val witnesses = ct._2
 
-    if(betterThan(cValue, _consideredValue.flatMap(_.value))) {
+    if (betterThan(cValue, _consideredValue.flatMap(_.value))) {
       //todo: cache considered value and send signal only if that > previous
       val cv = ConsideredValue(cValue, witnesses)
       _consideredValue = Some(cv)
@@ -39,9 +39,10 @@ trait NetworkObject[V] {
 }
 
 object NetworkObject {
-  case class ConsideredValue[V](value: Option[V], witnesses: Seq[ConnectedPeer])
-}
 
+  case class ConsideredValue[V](value: Option[V], witnesses: Seq[ConnectedPeer])
+
+}
 
 
 class ScoreNetworkObject(override val localComponentRef: ActorRef) extends NetworkObject[BlockchainScore] {

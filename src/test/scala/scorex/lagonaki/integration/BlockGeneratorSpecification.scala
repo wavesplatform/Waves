@@ -5,6 +5,7 @@ import akka.testkit._
 import org.scalatest.{Matchers, WordSpecLike}
 import scorex.lagonaki.TestingCommons
 import scorex.utils.untilTimeout
+
 import scala.concurrent.duration._
 
 //todo: props test: in any state startgenerating->stopgenerating sequence leads to Syncing state
@@ -15,8 +16,8 @@ class BlockGeneratorSpecification(_system: ActorSystem)
   with Matchers
   with TestingCommons {
 
-  import scorex.network.BlockGenerator._
   import TestingCommons._
+  import scorex.network.BlockGenerator._
 
   def this() = this(ActorSystem("MySpec"))
 

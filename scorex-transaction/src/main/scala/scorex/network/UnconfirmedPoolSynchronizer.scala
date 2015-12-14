@@ -15,7 +15,8 @@ class UnconfirmedPoolSynchronizer(application: Application) extends ViewSynchron
 
   override def receive = {
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
-      println(s"got tx: $tx")
-      //todo: check / put to pool
+      application.transactionModule.
+        println(s"got tx: $tx")
+    //todo: check / put to pool
   }
 }

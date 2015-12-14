@@ -3,8 +3,8 @@ package scorex.block
 import scala.util.Try
 
 /**
- * A generic interface having functions to convert data into a part of a block and vice versa.
- */
+  * A generic interface having functions to convert data into a part of a block and vice versa.
+  */
 
 trait BlockProcessingModule[BlockPartDataType] {
   def parseBlockData(bytes: Array[Byte]): Try[BlockField[BlockPartDataType]]

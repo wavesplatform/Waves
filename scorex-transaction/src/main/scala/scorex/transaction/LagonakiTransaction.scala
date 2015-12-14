@@ -1,10 +1,9 @@
 package scorex.transaction
 
+import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.Base58
 import scorex.transaction.LagonakiTransaction.{ValidationResult, _}
-
-import play.api.libs.json.Json
 
 import scala.util.Try
 

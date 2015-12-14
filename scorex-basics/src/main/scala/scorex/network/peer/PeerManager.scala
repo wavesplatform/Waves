@@ -28,7 +28,7 @@ class PeerManager(settings: Settings) extends ScorexLogging {
 
   def randomPeer(): Option[InetSocketAddress] = {
     val peers = knownPeers()
-    if(peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
+    if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
     else None
   }
 
