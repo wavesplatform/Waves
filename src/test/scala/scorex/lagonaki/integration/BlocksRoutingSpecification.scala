@@ -2,7 +2,10 @@ package scorex.lagonaki.integration
 
 import play.api.libs.json.Json
 import scorex.api.http.BlocksApiRoute
+import scorex.block.Block
+import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.lagonaki.TestingCommons
+import scorex.transaction.SimpleTransactionModule
 
 
 class BlocksRoutingSpecification extends RouteTest {
@@ -10,6 +13,8 @@ class BlocksRoutingSpecification extends RouteTest {
   import TestingCommons._
 
   application.checkGenesis()
+  implicit val consensusModule = application.consensusModule
+  implicit val transactionModule = application.transactionModule
 
   val blocksRoute = BlocksApiRoute(application.blockStorage.history, application.wallet).route
 
@@ -19,7 +24,7 @@ class BlocksRoutingSpecification extends RouteTest {
       (js \ "fee").as[Int] shouldBe 0
       (js \ "version").as[Int] should be >= 1
       (js \ "transactions").toOption should not be None
-      //TODO check concrete block?
+      js.toString() shouldBe Block.genesis().json.toString()
     }
   }
 
