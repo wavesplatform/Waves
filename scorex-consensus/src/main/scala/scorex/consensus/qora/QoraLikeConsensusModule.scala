@@ -85,7 +85,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
   }
 
   def getNextBlockGeneratingBalance(history: History): Long = {
-    val lastBlock = history.asInstanceOf[BlockChain].lastBlock
+    val lastBlock = history.lastBlock
     getNextBlockGeneratingBalance(lastBlock, history)
   }
 
@@ -103,7 +103,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     require(generationBalance > 0, "Zero generating balance in generateNextBlock")
     require(history.isInstanceOf[BlockChain])
 
-    val lastBlock = history.asInstanceOf[BlockChain].lastBlock
+    val lastBlock = history.lastBlock
 
     val signature = calculateSignature(lastBlock, history, account)
     val h = hash(signature)
@@ -150,7 +150,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     val history = transactionModule.blockStorage.history
     val state = transactionModule.blockStorage.state
 
-    val data = block.consensusDataField.asInstanceOf[QoraConsensusBlockField].value
+    val data = consensusBlockData(block)
 
     if (data.generatingBalance != getNextBlockGeneratingBalance(history.parent(block).get, history)) {
       //CHECK IF GENERATING BALANCE IS CORRECT
@@ -186,9 +186,11 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
 
   override def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = BigInt(1)
 
-  //todo: asInstanceOf ?
-  override def consensusBlockData(block: Block): QoraLikeConsensusBlockData =
-    block.consensusDataField.value.asInstanceOf[QoraLikeConsensusBlockData]
+  override def consensusBlockData(block: Block): QoraLikeConsensusBlockData = block.consensusDataField.value match {
+    case b: QoraLikeConsensusBlockData => b
+    case m => throw new AssertionError(s"Only QoraLikeConsensusBlockData is available, $m given")
+  }
+
 }
 
 
