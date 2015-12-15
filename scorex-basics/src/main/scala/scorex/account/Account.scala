@@ -27,8 +27,6 @@ object Account {
   val AddressVersion: Byte = 58
   val ChecksumLength = 4
 
-  def fromBytes(bytes: Array[Byte]): Account = new Account(Base58.encode(bytes))
-
   def fromPubkey(publicKey: Array[Byte]): String = {
     val publicKeyHash = new RIPEMD160().digest(hash(publicKey))
     val withoutChecksum = AddressVersion +: publicKeyHash //prepend ADDRESS_VERSION
