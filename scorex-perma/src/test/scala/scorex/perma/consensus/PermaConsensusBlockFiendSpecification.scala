@@ -34,7 +34,7 @@ class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks
       val hash2 = randomBytes(PermaConsensusBlockField.HashLength)
 
       val authDataBlock: AuthDataBlock[DataSegment] = AuthDataBlock(blockdata, Seq(hash1, hash2))
-      val initialBlock = PermaConsensusBlockField(PermaLikeConsensusBlockData(
+      val initialBlock = PermaConsensusBlockField(PermaConsensusBlockData(
         math.abs(diff),
         puz,
         Ticket(pubkey, s, IndexedSeq(

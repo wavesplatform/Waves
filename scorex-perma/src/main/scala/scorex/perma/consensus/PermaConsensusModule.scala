@@ -22,7 +22,7 @@ import scala.util.{Success, Try}
   */
 class PermaConsensusModule(rootHash: Array[Byte])
                           (implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
-  extends ConsensusModule[PermaLikeConsensusBlockData] with ScorexLogging {
+  extends ConsensusModule[PermaConsensusBlockData] with ScorexLogging {
 
   val InitialTarget = Constants.initialTarget
   val initialTargetPow: BigInt = log2(InitialTarget)
@@ -35,7 +35,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
   val GenesisCreator = new PublicKeyAccount(Array.fill(PermaConsensusBlockField.PublicKeyLength)(0: Byte))
   val Version: Byte = 1
 
-  implicit val consensusModule: ConsensusModule[PermaLikeConsensusBlockData] = this
+  implicit val consensusModule: ConsensusModule[PermaConsensusBlockData] = this
 
   def miningReward(block: Block) = if (blockGenerator(block).publicKey sameElements GenesisCreator.publicKey) 0
   else 1000000
@@ -43,14 +43,14 @@ class PermaConsensusModule(rootHash: Array[Byte])
   private def blockGenerator(block: Block) = block.signerDataField.value.generator
 
   def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = {
-    val f = block.consensusDataField.asInstanceOf[PermaConsensusBlockField]
+    val f = consensusBlockData(block)
     val trans = transactionModule.blockStorage.history
     trans.parent(block) match {
       case Some(parent) =>
         lazy val publicKey = blockGenerator(block).publicKey
-        lazy val puzIsValid = f.value.puz sameElements generatePuz(parent)
-        lazy val targetIsValid = f.value.target == calcTarget(parent)
-        lazy val ticketIsValid = validate(publicKey, f.value.puz, f.value.target, f.value.ticket, rootHash)
+        lazy val puzIsValid = f.puz sameElements generatePuz(parent)
+        lazy val targetIsValid = f.target == calcTarget(parent)
+        lazy val ticketIsValid = validate(publicKey, f.puz, f.target, f.ticket, rootHash)
         if (puzIsValid && targetIsValid && ticketIsValid)
           true
         else {
@@ -80,7 +80,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
   def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val score = initialTargetPow -
-      log2(block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].target)
+      log2(consensusBlockData(block).target)
     if (score > 0) score else 1
   }
 
@@ -96,7 +96,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
     if (validate(keyPair._2, puz, target, ticket, rootHash)) {
       val timestamp = NTP.correctedTime()
-      val consensusData = PermaLikeConsensusBlockData(target, puz, ticket)
+      val consensusData = PermaConsensusBlockData(target, puz, ticket)
 
       Future(Some(Block.buildAndSign(Version,
         timestamp,
@@ -114,20 +114,22 @@ class PermaConsensusModule(rootHash: Array[Byte])
     Try(Future(None))
   }.getOrElse(Future(None))
 
-  override def consensusBlockData(block: Block): PermaLikeConsensusBlockData =
-    block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData]
+  override def consensusBlockData(block: Block): PermaConsensusBlockData = block.consensusDataField.value match {
+    case b: PermaConsensusBlockData => b
+    case m => throw new AssertionError(s"Only PermaLikeConsensusBlockData is available, $m given")
+  }
 
   override def parseBlockData(bytes: Array[Byte]): Try[PermaConsensusBlockField] =
     PermaConsensusBlockField.parse(bytes)
 
   override def genesisData: PermaConsensusBlockField =
-    PermaConsensusBlockField(PermaLikeConsensusBlockData(
+    PermaConsensusBlockField(PermaConsensusBlockData(
       InitialTarget,
       Array.fill(PermaConsensusBlockField.PuzLength)(0: Byte),
       Ticket(GenesisCreator.publicKey, Array.fill(PermaConsensusBlockField.SLength)(0: Byte), IndexedSeq())
     ))
 
-  override def formBlockData(data: PermaLikeConsensusBlockData): BlockField[PermaLikeConsensusBlockData] =
+  override def formBlockData(data: PermaConsensusBlockData): BlockField[PermaConsensusBlockData] =
     PermaConsensusBlockField(data)
 
   def generatePuz(block: Block) = Hash.hash(block.bytes)
@@ -200,7 +202,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
   private def calcTarget(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val trans = transactionModule.blockStorage.history
-    val currentTarget = block.consensusDataField.value.asInstanceOf[PermaLikeConsensusBlockData].target
+    val currentTarget = consensusBlockData(block).target
     Try {
       val height = trans.heightOf(block).get
       if (height % TargetRecalculation == 0 && height > TargetRecalculation) {

@@ -10,8 +10,8 @@ import scorex.perma.settings.Constants
 import scala.annotation.tailrec
 import scala.util.Try
 
-case class PermaConsensusBlockField(override val value: PermaLikeConsensusBlockData)
-  extends BlockField[PermaLikeConsensusBlockData] {
+case class PermaConsensusBlockField(override val value: PermaConsensusBlockData)
+  extends BlockField[PermaConsensusBlockData] {
 
   import PermaConsensusBlockField._
 
@@ -79,7 +79,7 @@ object PermaConsensusBlockField {
     val proofsSize = Ints.fromByteArray(bytes.slice(
       PuzLength + targetLength + PublicKeyLength + SLength, PuzLength + targetLength + PublicKeyLength + SLength + 4))
 
-    PermaConsensusBlockField(PermaLikeConsensusBlockData(
+    PermaConsensusBlockField(PermaConsensusBlockData(
       BigInt(bytes.slice(4, targetLength)),
       bytes.slice(targetLength, PuzLength + targetLength),
       Ticket(
