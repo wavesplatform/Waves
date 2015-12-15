@@ -158,7 +158,6 @@ object Block extends ScorexLogging {
 
       override val consensusDataField: BlockField[ConsensusDataType] = consBlockField
 
-      //todo: more generic approach!
       override val uniqueId: BlockId = signature
 
       override val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
@@ -193,7 +192,7 @@ object Block extends ScorexLogging {
       override val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", SignerData(generator, signature))
       override val consensusDataField: BlockField[CDT] = consensusModule.formBlockData(consensusData)
 
-      override val uniqueId: BlockId = signature //todo:wrong
+      override val uniqueId: BlockId = signature
 
       override val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
     }
