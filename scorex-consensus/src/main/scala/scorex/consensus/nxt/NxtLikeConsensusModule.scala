@@ -34,8 +34,8 @@ class NxtLikeConsensusModule
     val prev = history.parent(block).get
     val prevTime = prev.timestampField.value
 
-    val prevBlockData = prev.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData]
-    val blockData = block.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData]
+    val prevBlockData = consensusBlockData(prev)
+    val blockData = consensusBlockData(block)
     val generator = block.signerDataField.value.generator
 
     //check baseTarget
@@ -62,7 +62,7 @@ class NxtLikeConsensusModule
                                     (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
 
     val lastBlock = transactionModule.blockStorage.history.lastBlock
-    val lastBlockKernelData = lastBlock.consensusDataField.asInstanceOf[NxtConsensusBlockField].value
+    val lastBlockKernelData = consensusBlockData(lastBlock)
 
     val lastBlockTime = lastBlock.timestampField.value
 
@@ -129,7 +129,7 @@ class NxtLikeConsensusModule
   }
 
   override def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
-    val baseTarget = block.consensusDataField.asInstanceOf[NxtConsensusBlockField].value.baseTarget
+    val baseTarget = consensusBlockData(block).baseTarget
     BigInt("18446744073709551616") / baseTarget
   }.ensuring(_ > 0)
 
@@ -144,9 +144,10 @@ class NxtLikeConsensusModule
   override def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] =
     NxtConsensusBlockField(data)
 
-  //todo: asInstanceOf ?
-  override def consensusBlockData(block: Block): NxtLikeConsensusBlockData =
-    block.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData]
+  override def consensusBlockData(block: Block): NxtLikeConsensusBlockData = block.consensusDataField.value match {
+    case b: NxtLikeConsensusBlockData => b
+    case m => throw new AssertionError(s"Only NxtLikeConsensusBlockData is available, $m given")
+  }
 }
 
 
