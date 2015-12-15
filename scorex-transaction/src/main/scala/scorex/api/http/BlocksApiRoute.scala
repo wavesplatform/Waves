@@ -132,12 +132,7 @@ case class BlocksApiRoute(history: History, wallet: Wallet)(implicit val context
   def first: Route = {
     path("first") {
       jsonRoute {
-        history match {
-          case blockchain: BlockChain =>
-            blockchain.blockAt(1).get.json.toString()
-          case _ =>
-            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain").toString()
-        }
+        history.genesis.json.toString()
       }
     }
   }

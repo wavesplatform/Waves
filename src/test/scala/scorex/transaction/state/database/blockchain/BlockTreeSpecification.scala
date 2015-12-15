@@ -32,6 +32,7 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
       blockTree.height() shouldBe 0
       blockTree.appendBlock(genesis).isSuccess shouldBe true
       blockTree.height() shouldBe 1
+      blockTree.blockById(genesis.uniqueId) should not be None
     }
 
     property(s"$prefix: Add linear blocks in chain") {
