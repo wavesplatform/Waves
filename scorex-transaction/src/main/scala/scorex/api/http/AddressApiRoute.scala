@@ -151,7 +151,12 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
     }
   }
 
-  //TODO describe
+  @Path("/balance/{address}/{confirmations}")
+  @ApiOperation(value = "Confirmed balance", notes = "Balance of {address} after {confirmations}", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path"),
+    new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "Int", paramType = "path")
+  ))
   def confirmationBalance = {
     path("balance" / Segment / IntNumber) { case (address, confirmations) =>
       //todo: confirmations parameter doesn't work atm
