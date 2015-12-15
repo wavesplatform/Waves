@@ -29,7 +29,6 @@ object Account {
 
   def fromBytes(bytes: Array[Byte]): Account = new Account(Base58.encode(bytes))
 
-  //todo: props test for: isValidAddress(fromPubkey(any)) == true
   def fromPubkey(publicKey: Array[Byte]): String = {
     val publicKeyHash = new RIPEMD160().digest(hash(publicKey))
     val withoutChecksum = AddressVersion +: publicKeyHash //prepend ADDRESS_VERSION
