@@ -8,7 +8,6 @@ import scorex.utils.untilTimeout
 
 import scala.concurrent.duration._
 
-//todo: props test: in any state startgenerating->stopgenerating sequence leads to Syncing state
 class BlockGeneratorSpecification(_system: ActorSystem)
   extends TestKit(_system)
   with ImplicitSender
@@ -36,6 +35,25 @@ class BlockGeneratorSpecification(_system: ActorSystem)
         bg ! GetStatus
         expectMsg(Generating.name)
       }
+    }
+    "StopGeneration command change state to syncing from generating" in {
+      bg ! StartGeneration
+      untilTimeout(5.seconds) {
+        bg ! GetStatus
+        expectMsg(Generating.name)
+      }
+      bg ! StopGeneration
+      bg ! GetStatus
+      expectMsg(Syncing.name)
+    }
+    "StopGeneration command don't change state from syncing" in {
+      bg ! StartGeneration
+      bg ! StopGeneration
+      bg ! GetStatus
+      expectMsg(Syncing.name)
+      bg ! StopGeneration
+      bg ! GetStatus
+      expectMsg(Syncing.name)
     }
   }
 }
