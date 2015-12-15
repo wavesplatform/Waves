@@ -20,7 +20,7 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
 
   override lazy val route =
     pathPrefix("peers") {
-      peers // todo: fix ~ score
+      peers // TODO implement and fix ~ score
     }
 
   @Path("/")
@@ -44,17 +44,13 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
     }
   }
 
-  /*
-  todo: fix
-
-  @Path("/score")
+/*  @Path("/score")
   @ApiOperation(value = "Score", notes = "Node with a maximum blockchain score", httpMethod = "GET")
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error"),
     new ApiResponse(code = 500, message = "Internal error")
   ))
   def score = path("score") {
-    //todo:fix
     get {
       respondWithMediaType(`application/json`) {
         onComplete {
@@ -70,6 +66,6 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
         }
       }
     }
-  } */
+  }*/
 
 }
