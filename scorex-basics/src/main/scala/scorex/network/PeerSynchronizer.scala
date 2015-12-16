@@ -17,7 +17,6 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
   import application.basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq(GetPeersSpec, PeersSpec)
-
   override val networkControllerRef = application.networkController
 
   private val peerManager = application.peerManager
@@ -35,7 +34,6 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
     .map(_.getAddress)
     .toSeq
 
-  //todo: write tests
   override def receive = {
     case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)
       if msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
