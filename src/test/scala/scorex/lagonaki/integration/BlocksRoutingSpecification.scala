@@ -74,6 +74,14 @@ class BlocksRoutingSpecification extends RouteTest {
     }
   }
 
+  it should "return return error when there are no children" in {
+    Get(s"/blocks/child/$signature") ~> blocksRoute ~> check {
+      val js = Json.parse(responseAs[String])
+      (js \ "status").as[String] shouldBe "error"
+    }
+  }
+
   //TODO test route /blocks/child/$encodedSignature
   //TODO test route /blocks/address/$address
+  //TODO test blocks other then genesis
 }

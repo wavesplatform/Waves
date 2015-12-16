@@ -45,7 +45,8 @@ case class BlocksApiRoute(history: History, wallet: Wallet)(implicit val context
         withBlock(history, encodedSignature) { block =>
           history match {
             case blockchain: BlockChain =>
-              blockchain.children(block).head.json
+              blockchain.children(block).headOption.map(_.json).getOrElse(
+                Json.obj("status" -> "error", "details" -> "No child blocks"))
             case _ =>
               Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")
           }
