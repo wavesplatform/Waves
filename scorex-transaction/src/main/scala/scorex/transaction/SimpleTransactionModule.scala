@@ -79,8 +79,10 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
 
   override def formBlockData(transactions: StoredInBlock): TransactionsBlockField = TransactionsBlockField(transactions)
 
-  override def transactions(block: Block): StoredInBlock =
-    block.transactionDataField.asInstanceOf[TransactionsBlockField].value //todo: asInstanceOf
+  override def transactions(block: Block): StoredInBlock = block.transactionDataField match {
+    case b: TransactionsBlockField => b.value
+    case m => throw new RuntimeException
+  }
 
   override def packUnconfirmed(): StoredInBlock =
     UnconfirmedTransactionsDatabaseImpl.all().filter(isValid(_)).filter(!blockStorage.state.included(_))
