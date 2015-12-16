@@ -35,6 +35,13 @@ class BlocksRoutingSpecification extends RouteTest {
     }
   }
 
+  it should "return block height for correct signature" in {
+    Get(s"/blocks/height/$signature") ~> blocksRoute ~> check {
+      val js = Json.parse(responseAs[String])
+      (js \ "height").as[Int] shouldBe 1
+    }
+  }
+
   it should "return last block" in {
     Get("/blocks/last") ~> blocksRoute ~> check {
       val js = Json.parse(responseAs[String])
@@ -67,7 +74,6 @@ class BlocksRoutingSpecification extends RouteTest {
     }
   }
 
-  //TODO test route /blocks/height/$encodedSignature
   //TODO test route /blocks/child/$encodedSignature
   //TODO test route /blocks/address/$address
 }
