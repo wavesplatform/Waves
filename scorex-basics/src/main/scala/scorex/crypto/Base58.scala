@@ -13,12 +13,14 @@ object Base58 {
   def encode(input: Array[Byte]): String = {
     var bi = BigInt(1, input)
     val s = new StringBuilder()
-    while (bi >= Base) {
-      val mod = bi.mod(Base)
-      s.insert(0, Alphabet.charAt(mod.intValue()))
-      bi = (bi - mod) / Base
+    if (bi > 0) {
+      while (bi >= Base) {
+        val mod = bi.mod(Base)
+        s.insert(0, Alphabet.charAt(mod.intValue()))
+        bi = (bi - mod) / Base
+      }
+      s.insert(0, Alphabet.charAt(bi.intValue()))
     }
-    s.insert(0, Alphabet.charAt(bi.intValue()))
     // Convert leading zeros too.
     input.takeWhile(_ == 0).foldLeft(s) { case (ss, _) =>
       ss.insert(0, Alphabet.charAt(0))
@@ -30,7 +32,7 @@ object Base58 {
 
     val decoded = decodeToBigInteger(input)
 
-    val bytes = decoded.toByteArray
+    val bytes: Array[Byte] = if (decoded == BigInt(0)) Array.empty else decoded.toByteArray
     // We may have got one more byte than we wanted, if the high bit of the next-to-last byte was not zero.
     // This  is because BigIntegers are represented with twos-compliment notation,
     // thus if the high bit of the last  byte happens to be 1 another 8 zero bits will be added to

@@ -8,6 +8,7 @@ with PropertyChecks
 with GeneratorDrivenPropertyChecks
 with Matchers {
 
+
   property("Base58 encoding then decoding preserves data") {
     forAll { data: Array[Byte] =>
       whenever(data.length > 0 && data.head != 0) {
@@ -16,6 +17,15 @@ with Matchers {
         restored shouldBe data
       }
     }
+  }
+
+  property("Base58 encoding then decoding for genesis signature") {
+    val data = Array.fill(64)(0: Byte)
+    val encoded = Base58.encode(data)
+    encoded shouldBe "1111111111111111111111111111111111111111111111111111111111111111"
+    val restored = Base58.decode(encoded).get
+    restored.length shouldBe data.length
+    restored shouldBe data
   }
 
   property("base58 sample") {

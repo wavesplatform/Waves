@@ -30,8 +30,7 @@ import scorex.utils.NTP
 
 import scala.reflect.runtime.universe._
 
-class LagonakiApplication(val settingsFilename: String)
-  extends Application {
+class LagonakiApplication(val settingsFilename: String) extends Application {
 
   override val applicationName = "lagonaki"
 
