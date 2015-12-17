@@ -211,7 +211,7 @@ class HistorySynchronizer(application: Application)
       block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
 
       //broadcast block only if it is generated locally
-      if (!local) {
+      if (local) {
         val blockMsg = Message(BlockMessageSpec, Right(block), None)
         networkControllerRef ! SendToNetwork(blockMsg, Broadcast)
       }
