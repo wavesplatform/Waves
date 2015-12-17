@@ -137,7 +137,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
   private val NoSig = Array[Byte]()
 
   //todo: validate r\i
-  private def validate(publicKey: PublicKey,
+  private[consensus] def validate(publicKey: PublicKey,
                        puz: Array[Byte],
                        target: BigInt,
                        t: Ticket,
@@ -154,7 +154,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
     val partialProofsCheck = 1.to(Constants.k).foldLeft(true) { case (partialResult, i) =>
       val segment = proofs(i - 1).segment
 
-      segment.check(ris(i - 1), rootHash)() || {
+      segment.check(ris(i - 1), rootHash)() && {
         val hi = Hash.hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
         EllipticCurveImpl.verify(sigs(i), hi, publicKey)
       }
@@ -162,14 +162,14 @@ class PermaConsensusModule(rootHash: Array[Byte])
     partialProofsCheck && (ticketScore(t) < target)
   }.getOrElse(false)
 
-  private def ticketScore(t: Ticket): BigInt = if (t.proofs.nonEmpty) {
+  private[consensus] def ticketScore(t: Ticket): BigInt = if (t.proofs.nonEmpty) {
     BigInt(1, Hash.hash(t.proofs.map(_.signature).reduce(_ ++ _)))
   } else {
     //Genesis block contains empty ticket
     0
   }
 
-  private def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Ticket = {
+  private[consensus] def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Ticket = {
 
     val (privateKey, publicKey) = keyPair
 
