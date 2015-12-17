@@ -256,4 +256,6 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
 
   override def contains(id: BlockId): Boolean = blockStorage.exists(id)
 
+  override lazy val genesis: Block = blockById(Block.genesis().uniqueId).get
+
 }
