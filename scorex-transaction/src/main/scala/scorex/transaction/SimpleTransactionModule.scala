@@ -101,23 +101,22 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
 
   override def genesisData: BlockField[StoredInBlock] = {
     val ipoMembers = List(
-      "QTwpq6La1CzXrwbFbcxncb4kv5g2UNFiY2",
-      "QSwv4GoR3UjwXKSZN5eoAhHqPcEWTKzomD",
+      //peer 1 accounts
       "QhcAVCVWbWVV1zR3YGFXpbqPdC3f9U9Vk8",
       "QQBe83C4re58s7RPTJADw2uqD8jBubebof",
-      "QPsvHmzarLsHDRzjqpGRuLKJMh5WWf6KSp",
       "QN7q77Szn3dXaWXFJigGN7KdyegFEGNj8J",
-      "QgN6AT5yrnB12U42QptidCWQkhUEsQaTTp",
-      "QNpF56FwQ6xuVynpMndcUEeam3JmPt7tj4",
-      "Qa9cNprVTsYPeuxzVjad5p1CvzAezYffdd",
-      "QZkTyUfZFLjPiKzQuJNZo4kV959YZkoYe3"
+      //peer 2 accounts
+      "QNCJZRiaqEbo8FW87epkrLYgTkxbkRzjC5",
+      "QWEiv5uhbKz6MSjrAZUzQ8q4v9yNA4Jh8y",
+      "QTreMnKdaCKS513vWHMRoVfE9E1ojP15PG"
     )
 
     val timestamp = 0L
+    val totalBalance = 60000000000L
 
     val txs = ipoMembers.map { addr =>
       val recipient = new Account(addr)
-      GenesisTransaction(recipient, 1000000000L, timestamp)
+      GenesisTransaction(recipient, totalBalance / ipoMembers.length, timestamp)
     }
 
     TransactionsBlockField(txs)

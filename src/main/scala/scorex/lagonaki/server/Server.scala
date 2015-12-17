@@ -37,10 +37,8 @@ object Server extends App with ScorexLogging {
     val wallet = application.wallet
 
     if (wallet.privateKeyAccounts().isEmpty) {
-      wallet.generateNewAccounts(10)
-      println("pkas:")
-      wallet.privateKeyAccounts().toList.map(_.address).foreach(println)
-      wallet.privateKeyAccounts().takeRight(5).foreach(wallet.deleteAccount)
+      wallet.generateNewAccounts(3)
+      log.info("Generated Accounts:\n" + wallet.privateKeyAccounts().toList.map(_.address).mkString("\n"))
     }
 
     log.info("Executing testing scenario with accounts" +
