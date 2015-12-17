@@ -5,7 +5,6 @@ import java.nio.file.{Files, Paths}
 
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http._
 import scorex.app.Application
 import scorex.consensus.nxt.NxtLikeConsensusModule
@@ -15,18 +14,13 @@ import scorex.consensus.qora.api.http.QoraConsensusApiRoute
 import scorex.crypto.ads.merkle.{AuthDataBlock, MerkleTree}
 import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRoute}
 import scorex.network._
-import scorex.network.message.Message
 import scorex.perma.api.http.PermaConsensusApiRoute
 import scorex.perma.consensus.PermaConsensusModule
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.perma.storage.AuthDataStorage
 import scorex.storage.Storage
-import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.wallet.Payment
-import scorex.utils.NTP
 
 import scala.reflect.runtime.universe._
 
@@ -82,7 +76,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
         sys.error(s"Unknown consensus algo: $nonsense")
     }
 
-  override implicit lazy val transactionModule: SimpleTransactionModule = new SimpleTransactionModule
+  override implicit lazy val transactionModule: SimpleTransactionModule = new SimpleTransactionModule()(settings, this)
 
   override lazy val blockStorage = transactionModule.blockStorage
 
@@ -131,30 +125,4 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
 
   //todo: move to Application?
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], this))
-
-
-  //move away methods below?
-
-  def onNewOffchainTransaction(transaction: LagonakiTransaction) =
-    if (UnconfirmedTransactionsDatabaseImpl.putIfNew(transaction)) {
-      val spec = TransactionalMessagesRepo.TransactionMessageSpec
-      val ntwMsg = Message(spec, Right(transaction), None)
-      networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
-    }
-
-  def createPayment(payment: Payment): Option[PaymentTransaction] = {
-    wallet.privateKeyAccount(payment.sender).map { sender =>
-      createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
-    }
-  }
-
-  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
-    val time = NTP.correctedTime()
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
-    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
-    if (payment.validate() == ValidationResult.ValidateOke) {
-      onNewOffchainTransaction(payment)
-    }
-    payment
-  }
 }

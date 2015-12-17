@@ -2,14 +2,18 @@ package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.Account
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.app.Application
 import scorex.block.{Block, BlockField}
-import scorex.consensus.ConsensusModule
+import scorex.network.message.Message
+import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
-import scorex.utils.ScorexLogging
+import scorex.transaction.state.wallet.Payment
+import scorex.utils.{NTP, ScorexLogging}
+import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -33,8 +37,11 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 }
 
 class SimpleTransactionModule(implicit val settings: TransactionSettings,
-                              consensusModule: ConsensusModule[_])
+                              application: Application)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
+
+  val consensusModule = application.consensusModule
+  val networkController = application.networkController
 
   import SimpleTransactionModule._
 
@@ -98,6 +105,30 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
       if ((lastBlockTs - tx.timestamp).seconds > MaxTimeForUnconfirmed) UnconfirmedTransactionsDatabaseImpl.remove(tx)
     }
   }
+
+  override def onNewOffchainTransaction(transaction: Transaction): Unit =
+    if (UnconfirmedTransactionsDatabaseImpl.putIfNew(transaction)) {
+      val spec = TransactionalMessagesRepo.TransactionMessageSpec
+      val ntwMsg = Message(spec, Right(transaction), None)
+      networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
+    }
+
+  def createPayment(payment: Payment, wallet: Wallet): Option[PaymentTransaction] = {
+    wallet.privateKeyAccount(payment.sender).map { sender =>
+      createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
+    }
+  }
+
+  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
+    val time = NTP.correctedTime()
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
+    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
+    if (payment.validate()(this) == ValidationResult.ValidateOke) {
+      onNewOffchainTransaction(payment)
+    }
+    payment
+  }
+
 
   override def genesisData: BlockField[StoredInBlock] = {
     val ipoMembers = List(

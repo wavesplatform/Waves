@@ -16,6 +16,8 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   def clearFromUnconfirmed(data: TransactionBlockData): Unit
 
+  def onNewOffchainTransaction(transaction: Transaction): Unit
+
   lazy val balancesSupport: Boolean = blockStorage.state match {
     case _: State with BalanceSheet => true
     case _ => false

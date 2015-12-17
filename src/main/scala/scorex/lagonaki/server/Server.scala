@@ -67,7 +67,7 @@ object Server extends App with ScorexLogging {
       val amt = Random.nextInt(100000).toLong
       val fee = Random.nextInt(5).toLong
 
-      val tx = application.createPayment(senderAcc, recipientAcc, amt, fee)
+      val tx = application.transactionModule.createPayment(senderAcc, recipientAcc, amt, fee)
       log.info(s"Payment created: $tx")
     }
   }

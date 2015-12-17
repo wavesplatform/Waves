@@ -15,10 +15,11 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
   ignore("block generation then validation") {
   }
 
+  import TestingCommons._
 
   test("Nxt block with txs bytes/parse roundtrip") {
     implicit val consensusModule = new NxtLikeConsensusModule()
-    implicit val transactionModule = new SimpleTransactionModule()
+    implicit val transactionModule = new SimpleTransactionModule()(application.settings, application)
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
     val gen = new PrivateKeyAccount(reference)
@@ -48,7 +49,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
 
   test("Qora block with txs bytes/parse roundtrip") {
     implicit val consensusModule = new QoraLikeConsensusModule()
-    implicit val transactionModule = new SimpleTransactionModule()
+    implicit val transactionModule = new SimpleTransactionModule()(application.settings, application)
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
     val gen = new PrivateKeyAccount(reference)

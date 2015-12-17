@@ -44,7 +44,7 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
                 case err: JsError =>
                   err
                 case JsSuccess(payment: Payment, _) =>
-                  val txOpt = application.createPayment(payment)
+                  val txOpt = application.transactionModule.createPayment(payment, wallet)
                   txOpt match {
                     case Some(tx) =>
                       tx.validate() match {
