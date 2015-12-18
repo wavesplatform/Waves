@@ -136,38 +136,35 @@ class PermaConsensusModule(rootHash: Array[Byte])
 
   private val NoSig = Array[Byte]()
 
-  //todo: validate r\i
   private[consensus] def validate(publicKey: PublicKey,
-                       puz: Array[Byte],
-                       target: BigInt,
-                       t: Ticket,
-                       rootHash: Digest): Boolean = Try {
+                                  puz: Array[Byte],
+                                  target: BigInt,
+                                  t: Ticket,
+                                  rootHash: Digest): Boolean = Try {
     val proofs = t.proofs
     require(proofs.size == Constants.k)
     require(t.s.length == SSize)
 
-    //Local-POR lottery verification
-
     val sigs = NoSig +: proofs.map(_.signature)
     val ris = proofs.map(_.segmentIndex)
+    require(ris(0) == calculateIndex(publicKey, (BigInt(1, Hash.hash(puz ++ publicKey ++ t.s)) % Constants.l).toInt))
 
     val partialProofsCheck = 1.to(Constants.k).foldLeft(true) { case (partialResult, i) =>
       val segment = proofs(i - 1).segment
+      val rc = calculateIndex(publicKey,
+        BigInt(1, Hash.hash(puz ++ publicKey ++ proofs(i - 1).signature)).mod(Constants.l).toInt)
 
       segment.check(ris(i - 1), rootHash)() && {
         val hi = Hash.hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
         EllipticCurveImpl.verify(sigs(i), hi, publicKey)
-      }
+      } && (ris.length == i || rc == ris(i))
     }
     partialProofsCheck && (ticketScore(t) < target)
   }.getOrElse(false)
 
   private[consensus] def ticketScore(t: Ticket): BigInt = if (t.proofs.nonEmpty) {
     BigInt(1, Hash.hash(t.proofs.map(_.signature).reduce(_ ++ _)))
-  } else {
-    //Genesis block contains empty ticket
-    0
-  }
+  } else 0
 
   private[consensus] def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Ticket = {
 
@@ -177,7 +174,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
     val s = randomBytes(SSize)
 
     val sig0 = NoSig
-    val r1 = u(publicKey, (BigInt(1, Hash.hash(puz ++ publicKey ++ s)) % Constants.l).toInt)
+    val r1 = calculateIndex(publicKey, (BigInt(1, Hash.hash(puz ++ publicKey ++ s)) % Constants.l).toInt)
 
     val proofs: IndexedSeq[PartialProof] = 1.to(Constants.k).foldLeft(
       (r1, sig0, Seq[PartialProof]())
@@ -186,16 +183,16 @@ class PermaConsensusModule(rootHash: Array[Byte])
         val segment = authDataStorage.get(ri).get
         val hi = Hash.hash(puz ++ publicKey ++ sig_prev ++ segment.data)
         val sig = EllipticCurveImpl.sign(privateKey, hi)
-        val r_next = u(publicKey, BigInt(1, Hash.hash(puz ++ publicKey ++ sig)).mod(Constants.l).toInt)
+        val rNext = calculateIndex(publicKey, BigInt(1, Hash.hash(puz ++ publicKey ++ sig)).mod(Constants.l).toInt)
 
-        (r_next, sig, seq :+ PartialProof(sig, ri, segment))
+        (rNext, sig, seq :+ PartialProof(sig, ri, segment))
     }._3.toIndexedSeq.ensuring(_.size == Constants.k)
 
     Ticket(publicKey, s, proofs)
   }
 
   //calculate index of i-th segment
-  private def u(pubKey: PublicKey, i: Int): Long = {
+  private[consensus] def calculateIndex(pubKey: PublicKey, i: Int): Long = {
     val h = Hash.hash(pubKey ++ BigInt(i).toByteArray)
     BigInt(1, h).mod(Constants.n).toLong
   }
