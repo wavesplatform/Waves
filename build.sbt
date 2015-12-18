@@ -113,9 +113,8 @@ dockerfile in docker := {
     // copy settings
     copy(settingsPath, "/app/settings.json")
     // persist data beyond the lifetime of a container session
-    // todo: probably would be better to define uniq scorex folder inside /tmp
-    run("mkdir", "-p", "/tmp")
-    volume("/tmp")
+    run("mkdir", "-p", "/tmp/scorex")
+    volume("/tmp/scorex")
     // run scorex as:
     // /usr/bin/java -jar scorex.jar
     workDir("/app")
