@@ -16,7 +16,7 @@ class Wallet(walletFileOpt: Option[File],
              password: String,
              seed: Array[Byte]) extends ScorexLogging {
 
-  private val NONCE = "nonce"
+  private val NonceFieldName = "nonce"
 
   private val database = walletFileOpt match {
     case Some(walletFile) =>
@@ -95,9 +95,9 @@ class Wallet(walletFileOpt: Option[File],
 
   def accounts() = accountsCache.values.toSeq
 
-  def nonce(): Int = database.atomicInteger(NONCE).intValue()
+  def nonce(): Int = database.atomicInteger(NonceFieldName).intValue()
 
-  def setNonce(nonce: Int) = database.atomicInteger(NONCE).set(nonce)
+  def setNonce(nonce: Int) = database.atomicInteger(NonceFieldName).set(nonce)
 
-  def getAndIncrementNonce(): Int = database.atomicInteger(NONCE).getAndIncrement()
+  def getAndIncrementNonce(): Int = database.atomicInteger(NonceFieldName).getAndIncrement()
 }
