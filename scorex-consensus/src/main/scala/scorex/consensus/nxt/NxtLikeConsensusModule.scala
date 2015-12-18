@@ -41,8 +41,7 @@ class NxtLikeConsensusModule
     //check baseTarget
     val cbt = calcBaseTarget(prevBlockData, prevTime, blockTime)
     val bbt = blockData.baseTarget
-    require(cbt == bbt,
-      s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
+    require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
 
     //check generation signature
     val calcGs = calcGeneratorSignature(prevBlockData, generator)

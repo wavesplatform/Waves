@@ -43,8 +43,7 @@ case class GenesisTransaction(override val recipient: Account,
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GenesisTransaction.id), TypeLength, 0)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
-    val data = Bytes.concat(typeBytes, timestampBytes,
-      Base58.decode(recipient.address).get, amountBytes)
+    val data = Bytes.concat(typeBytes, timestampBytes, Base58.decode(recipient.address).get, amountBytes)
 
     val h = hash(data)
     Bytes.concat(h, h).sameElements(signature)
@@ -57,8 +56,7 @@ case class GenesisTransaction(override val recipient: Account,
       ValidationResult.InvalidAddress
     } else ValidationResult.ValidateOke
 
-  override def involvedAmount(account: Account): Long =
-    if (recipient.address.equals(account.address)) amount else 0
+  override def involvedAmount(account: Account): Long = if (recipient.address.equals(account.address)) amount else 0
 
   override def balanceChanges(): Map[Account, Long] = Map(recipient -> amount)
 }
