@@ -8,6 +8,7 @@ object Constants extends ScorexLogging {
 
   private val permaConf = ConfigFactory.load("perma").getConfig("perma")
 
+  type DataSegmentIndex = Long
   type DataSegment = Array[Byte]
 
   //few segments to be stored in a block, so segment size shouldn't be big

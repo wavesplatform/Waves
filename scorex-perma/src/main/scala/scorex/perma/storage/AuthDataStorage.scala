@@ -4,13 +4,13 @@ import java.io.File
 
 import org.mapdb.{DBMaker, HTreeMap, Serializer}
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.perma.settings.Constants.DataSegment
+import scorex.perma.settings.Constants.{DataSegmentIndex, DataSegment}
 import scorex.storage.Storage
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
 
-class AuthDataStorage(fileName: String) extends Storage[Long, AuthDataBlock[DataSegment]] with ScorexLogging {
+class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDataBlock[DataSegment]] with ScorexLogging {
 
 
   //TODO https://github.com/jankotek/mapdb/issues/634 workaround
@@ -23,11 +23,11 @@ class AuthDataStorage(fileName: String) extends Storage[Long, AuthDataBlock[Data
       .checksumEnable()
       .make()
 
-  private val map: HTreeMap[Long, AuthDataBlock[DataSegment]] = db.hashMapCreate("segments")
+  private val map: HTreeMap[DataSegmentIndex, AuthDataBlock[DataSegment]] = db.hashMapCreate("segments")
     .keySerializer(Serializer.LONG)
     .makeOrGet()
 
-  override def set(key: Long, value: AuthDataBlock[DataSegment]): Unit = {
+  override def set(key: DataSegmentIndex, value: AuthDataBlock[DataSegment]): Unit = {
     Try {
       map.put(key, value)
     }.recoverWith { case t: Throwable =>
@@ -44,11 +44,11 @@ class AuthDataStorage(fileName: String) extends Storage[Long, AuthDataBlock[Data
   override def close(): Unit = db.close()
 
 
-  override def containsKey(key: Long): Boolean = {
+  override def containsKey(key: DataSegmentIndex): Boolean = {
     map.containsKey(key)
   }
 
-  override def get(key: Long): Option[AuthDataBlock[DataSegment]] = {
+  override def get(key: DataSegmentIndex): Option[AuthDataBlock[DataSegment]] = {
     Try {
       map.get(key)
     } match {
