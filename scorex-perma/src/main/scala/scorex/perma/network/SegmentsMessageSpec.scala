@@ -13,13 +13,13 @@ class SegmentsMessageSpec extends MessageSpec[Map[DataSegmentIndex, DataSegment]
 
   override def deserializeData(bytes: Array[Byte]): Try[Map[DataSegmentIndex, DataSegment]] = ???
 
-  override val messageName: String = _
+  override val messageName: String = "SegmentsMessage"
 }
 
 class GetSegmentsMessageSpec extends MessageSpec[Seq[DataSegmentIndex]] {
   override val messageCode: MessageCode = 52: Byte
 
-  override val messageName: String = _
+  override val messageName: String = "GetSegmentsMessage"
 
   override def serializeData(data: Seq[DataSegmentIndex]): Array[MessageCode] = ???
 
