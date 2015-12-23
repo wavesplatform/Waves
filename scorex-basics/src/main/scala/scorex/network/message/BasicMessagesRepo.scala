@@ -46,7 +46,7 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
       if (bytes.length != DataLength + (length * (AddressLength + PortLength)))
         throw new Exception("Data does not match length")
 
-      (0 to length - 1).map { i =>
+      (0 until length).map { i =>
         val position = lengthBytes.length + (i * (AddressLength + PortLength))
         val addressBytes = util.Arrays.copyOfRange(bytes, position, position + AddressLength)
         val address = InetAddress.getByAddress(addressBytes)

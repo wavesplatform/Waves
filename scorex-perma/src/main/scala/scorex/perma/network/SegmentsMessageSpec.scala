@@ -1,5 +1,6 @@
 package scorex.perma.network
 
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import scorex.network.message.Message.MessageCode
 import scorex.network.message.MessageSpec
 import scorex.perma.settings.Constants.{DataSegment, DataSegmentIndex}
@@ -21,7 +22,23 @@ class GetSegmentsMessageSpec extends MessageSpec[Seq[DataSegmentIndex]] {
 
   override val messageName: String = "GetSegmentsMessage"
 
-  override def serializeData(data: Seq[DataSegmentIndex]): Array[MessageCode] = ???
+  private val DataLength = 8
 
-  override def deserializeData(bytes: Array[MessageCode]): Try[Seq[DataSegmentIndex]] = ???
+  override def serializeData(idexes: Seq[DataSegmentIndex]): Array[Byte] = {
+    val length = idexes.size
+    val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), 4, 0)
+
+    idexes.foldLeft(lengthBytes) { case (bs, index) =>
+      Bytes.concat(bs, Bytes.ensureCapacity(Longs.toByteArray(index), DataLength, 0))
+    }
+  }
+
+  override def deserializeData(bytes: Array[MessageCode]): Try[Seq[DataSegmentIndex]] = Try {
+    val length = Ints.fromByteArray(bytes.slice(0, 4))
+    require(bytes.length == 4 + (length * DataLength))
+    (0 until length).map { i =>
+      val position = 4 + i * DataLength
+      Longs.fromByteArray(bytes.slice(position, position + DataLength))
+    }
+  }
 }
