@@ -87,6 +87,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     case RegisterMessagesHandler(specs, handler) =>
       messageHandlers += specs.map(_.messageCode) -> handler
 
+    //a message coming in from another peer
     case Message(spec, Left(msgBytes), Some(remote)) =>
       val msgId = spec.messageCode
 
@@ -110,10 +111,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
     case GetPeers => sender() ! connectedPeers.values.toSeq
 
-    /* case GetMaxChainScore =>
-      sender() ! BlockGenerator.MaxChainScore(maxPeerScore())
-    */
-
     case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
   }
 }
@@ -132,8 +129,6 @@ object NetworkController {
   case object ShutdownNetwork
 
   case object GetPeers
-
-  // case object GetMaxBlockchainScore
 
   case class PeerDisconnected(address: InetSocketAddress)
 
