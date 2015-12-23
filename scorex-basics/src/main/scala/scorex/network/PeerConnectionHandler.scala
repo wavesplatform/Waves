@@ -32,58 +32,7 @@ case class PeerConnectionHandler(application: Application,
 
   val selfPeer = new ConnectedPeer(remote, self)
 
-
-  //  context.system.scheduler.schedule(1.second, 5.seconds)(self ! SendBlockchainScore)
-
-  /*
-  private def handleMessage(message: message.Message[_]) = {
-    log.debug("Handling message: " + message)
-    message match {
-
-      case SignaturesMessage(signaturesGot) =>
-        log.info(s"Got SignaturesMessage with ${signaturesGot.length} sigs")
-
-        val common = signaturesGot.head
-        require(blockchainStorage.contains(common))
-
-        blockchainStorage.removeAfter(common)
-
-        signaturesGot.tail.foreach { case sig =>
-          self ! GetBlockMessage(sig)
-        }
-
-      case GetBlockMessage(signature) =>
-        blockchainStorage.blockById(signature) match {
-          case Some(block) => self ! BlockMessage(blockchainStorage.heightOf(block).get, block)
-          case None => self ! Blacklist
-        }
-
-      case BlockMessage(height, block) =>
-        require(block != null)
-        log.info(s"Got block, height $height , local height: " + blockchainStorage.height())
-
-        if (height == blockchainStorage.height() + 1) {
-          if (block.isValid)
-            networkController ! NewBlock(block, Some(remote))
-          else
-            log.info(s"Got non-valid block (height of a block: $height")
-        }
-
-      case TransactionMessage(transaction) =>
-        if (!transaction.isSignatureValid || transaction.transactionType == TransactionType.GenesisTransaction) {
-          self ! Blacklist
-        } else if (transaction.hasMinimumFee && transaction.hasMinimumFeePerByte) {
-          application.onNewOffchainTransaction(transaction)
-        }
-
-      case nonsense: Any => log.warn(s"PeerConnectionHandler: got something strange $nonsense")
-    }
-  } */
-
   override def receive = {
-
-    //    case SendBlockchainScore =>
-    //      self ! ScoreMessage(blockchainStorage.height(), blockchainStorage.score())
 
     case msg: message.Message[_] =>
       connection ! Write(ByteString(msg.bytes))
@@ -125,11 +74,6 @@ case class PeerConnectionHandler(application: Application,
 }
 
 object PeerConnectionHandler {
-
-  //  case object SendBlockchainScore
-
   case object CloseConnection
-
   case object Blacklist
-
 }
