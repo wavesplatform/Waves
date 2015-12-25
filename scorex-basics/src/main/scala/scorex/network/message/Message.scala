@@ -3,7 +3,8 @@ package scorex.network.message
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
-import scorex.crypto.Sha256._
+import scorex.crypto.hash.Sha256
+import Sha256._
 import scorex.network.ConnectedPeer
 
 import scala.util.{Success, Try}

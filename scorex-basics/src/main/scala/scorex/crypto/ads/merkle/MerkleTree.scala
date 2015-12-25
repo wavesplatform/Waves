@@ -3,9 +3,10 @@ package scorex.crypto.ads.merkle
 import java.io.{FileOutputStream, RandomAccessFile}
 import java.nio.file.{Files, Paths}
 
-import scorex.crypto.CryptographicHash.Digest
+import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.crypto.ads.merkle.TreeStorage.Position
-import scorex.crypto.{CryptographicHash, Sha256}
+import scorex.crypto.hash.CryptographicHash
+import scorex.crypto.hash.Sha256
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec

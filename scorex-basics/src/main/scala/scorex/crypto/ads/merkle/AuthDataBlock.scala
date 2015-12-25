@@ -1,10 +1,11 @@
 package scorex.crypto.ads.merkle
 
 import play.api.libs.json._
-import scorex.crypto.CryptographicHash._
+import scorex.crypto.hash.CryptographicHash._
 import scorex.crypto.ads.merkle.TreeStorage.Position
 import scorex.crypto.encode.Base58
-import scorex.crypto.{CryptographicHash, Sha256}
+import scorex.crypto.hash.CryptographicHash
+import scorex.crypto.hash.Sha256
 
 import scala.annotation.tailrec
 

@@ -5,7 +5,8 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockField}
 import scorex.consensus.{ConsensusModule, LagonakiConsensusModule}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.Sha256._
+import scorex.crypto.hash.Sha256
+import Sha256._
 import scorex.transaction._
 import scorex.utils.NTP
 

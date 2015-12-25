@@ -2,6 +2,7 @@ package scorex.account
 
 import scorex.crypto.RIPEMD160
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.Sha256
 
 
 class Account(val address: String) extends Serializable {
@@ -21,7 +22,7 @@ class Account(val address: String) extends Serializable {
 
 object Account {
 
-  import scorex.crypto.Sha256._
+  import Sha256._
 
   val AddressLength = 25
 

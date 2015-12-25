@@ -4,7 +4,8 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json._
 import scorex.block.BlockField
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.crypto.{EllipticCurveImpl, Sha256}
+import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.hash.Sha256
 import scorex.perma.settings.Constants
 
 import scala.annotation.tailrec

@@ -5,7 +5,8 @@ import java.io.File
 import com.google.common.primitives.{Bytes, Ints}
 import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.Sha256._
+import scorex.crypto.hash.Sha256
+import Sha256._
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._

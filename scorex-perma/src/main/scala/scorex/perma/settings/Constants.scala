@@ -1,7 +1,7 @@
 package scorex.perma.settings
 
 import com.typesafe.config.ConfigFactory
-import scorex.crypto.Sha256
+import scorex.crypto.hash.Sha256
 import scorex.utils.ScorexLogging
 
 object Constants extends ScorexLogging {
