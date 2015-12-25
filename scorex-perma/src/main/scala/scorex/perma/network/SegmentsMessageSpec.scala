@@ -11,18 +11,16 @@ import scala.util.Try
 
 object SegmentsMessageSpec extends MessageSpec[Map[DataSegmentIndex, AuthDataBlock[DataSegment]]] {
   override val messageCode: MessageCode = 51: Byte
-  private lazy val SegmentSize = Constants.segmentSize
-
 
   override def serializeData(data: Map[DataSegmentIndex, AuthDataBlock[DataSegment]]): Array[Byte] = {
     val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(data.size), 4, 0)
     if (data.nonEmpty) {
-      val authDataBlockSize = Bytes.ensureCapacity(Ints.toByteArray(AuthDataBlock.encode(data.head._2).length), 4, 0)
+      val authDataBlockSize = AuthDataBlock.encode(data.head._2).length
+      val authDataBlockSizeBytes = Bytes.ensureCapacity(Ints.toByteArray(authDataBlockSize), 4, 0)
 
-      data.foldLeft(lengthBytes) { case (bs, dataSegment) =>
-        Bytes.concat(bs,
-          Bytes.ensureCapacity(Longs.toByteArray(dataSegment._1), 8, 0),
-          Bytes.ensureCapacity(AuthDataBlock.encode(dataSegment._2), SegmentSize, 0))
+      data.foldLeft(lengthBytes ++ authDataBlockSizeBytes) { case (bs, dataSegment) =>
+        bs ++ Bytes.ensureCapacity(Longs.toByteArray(dataSegment._1), 8, 0) ++
+          Bytes.ensureCapacity(AuthDataBlock.encode(dataSegment._2), authDataBlockSize, 0)
       }
     } else {
       lengthBytes
@@ -37,7 +35,7 @@ object SegmentsMessageSpec extends MessageSpec[Map[DataSegmentIndex, AuthDataBlo
       (0 until length).map { i =>
         val position = 8 + i * (8 + authDataBlockSize)
         val index = Longs.fromByteArray(bytes.slice(position, position + 8))
-        index -> AuthDataBlock.decode(bytes.slice(position + 8, position + 8 + SegmentSize)).get
+        index -> AuthDataBlock.decode(bytes.slice(position + 8, position + 8 + authDataBlockSize)).get
       }.toMap
     } else {
       Map.empty
