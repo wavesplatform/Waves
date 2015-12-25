@@ -6,7 +6,7 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 
 @Api(value = "/seed", description = "Seed generation functions", position = 3)
 case class SeedApiRoute()(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions {

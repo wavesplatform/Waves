@@ -1,7 +1,7 @@
 package scorex.utils
 
 import play.api.libs.json._
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 
 import scala.util.{Failure, Success}
 

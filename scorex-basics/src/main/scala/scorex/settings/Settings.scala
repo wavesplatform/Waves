@@ -3,7 +3,7 @@ package scorex.settings
 import java.net.{InetAddress, InetSocketAddress}
 
 import play.api.libs.json.{JsObject, Json}
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._

@@ -1,7 +1,7 @@
 package scorex.lagonaki.unit
 
 import org.scalatest.FunSuite
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 import scorex.wallet.Wallet
 
 import scala.util.Random

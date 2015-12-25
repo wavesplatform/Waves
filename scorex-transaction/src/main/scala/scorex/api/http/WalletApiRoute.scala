@@ -5,7 +5,7 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 import scorex.wallet.Wallet
 
 

@@ -7,7 +7,7 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.consensus.nxt.NxtLikeConsensusModule
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 import scorex.transaction.BlockStorage
 import spray.routing.Route
 

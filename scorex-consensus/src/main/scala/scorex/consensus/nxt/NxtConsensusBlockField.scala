@@ -3,7 +3,7 @@ package scorex.consensus.nxt
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.block.BlockField
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 
 
 case class NxtConsensusBlockField(override val value: NxtLikeConsensusBlockData)

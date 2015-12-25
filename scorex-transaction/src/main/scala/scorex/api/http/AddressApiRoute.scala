@@ -8,7 +8,8 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.crypto.{Base58, EllipticCurveImpl}
+import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
 import scorex.transaction.state.LagonakiState
 import scorex.wallet.Wallet
 import spray.http.MediaTypes._
