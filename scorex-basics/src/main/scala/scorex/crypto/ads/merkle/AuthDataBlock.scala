@@ -1,5 +1,6 @@
 package scorex.crypto.ads.merkle
 
+import com.google.common.primitives.{Ints, Bytes}
 import play.api.libs.json._
 import scorex.crypto.hash.CryptographicHash._
 import scorex.crypto.ads.merkle.TreeStorage.Position
@@ -8,6 +9,7 @@ import scorex.crypto.hash.CryptographicHash
 import scorex.crypto.hash.Sha256
 
 import scala.annotation.tailrec
+import scala.util.Try
 
 /**
   * @param data - data block
@@ -39,6 +41,29 @@ case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
 }
 
 object AuthDataBlock {
+
+  def encode(b: AuthDataBlock[Array[Byte]]): Array[Byte] = {
+    require(b.merklePath.nonEmpty, "Merkle path cannot be empty")
+    val dataSize = Bytes.ensureCapacity(Ints.toByteArray(b.data.length), 4, 0)
+    val merklePathLength = Bytes.ensureCapacity(Ints.toByteArray(b.merklePath.length), 4, 0)
+    val merklePathSize = Bytes.ensureCapacity(Ints.toByteArray(b.merklePath.head.length), 4, 0)
+    val merklePath = b.merklePath.foldLeft(Array.empty: Array[Byte])((b, mp) => b ++ mp)
+    dataSize ++ merklePathLength ++ merklePathSize ++ b.data ++ merklePath
+  }
+
+  def decode(bytes: Array[Byte]): Try[AuthDataBlock[Array[Byte]]] = Try {
+    val length = Ints.fromByteArray(bytes.slice(0, 4))
+
+    val dataSize = Ints.fromByteArray(bytes.slice(0, 4))
+    val merklePathLength = Ints.fromByteArray(bytes.slice(4, 8))
+    val merklePathSize = Ints.fromByteArray(bytes.slice(8, 12))
+    val data = bytes.slice(12, 12 + dataSize)
+    val merklePathStart = 12 + dataSize
+    val merklePath = (0 until merklePathSize).map { i =>
+      bytes.slice(merklePathStart + i * merklePathSize, merklePathStart + (i + 1) * merklePathSize)
+    }
+    AuthDataBlock(data, merklePath)
+  }
 
   implicit def authDataBlockReads[T](implicit fmt: Reads[T]): Reads[AuthDataBlock[T]] = new Reads[AuthDataBlock[T]] {
     def reads(json: JsValue): JsResult[AuthDataBlock[T]] = JsSuccess(AuthDataBlock[T](
