@@ -8,7 +8,7 @@ import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.{SendToChosen, ViewSynchronizer}
 import scorex.perma.settings.Constants._
-import scorex.perma.settings.PermaSettings
+import scorex.perma.settings.{Constants, PermaSettings}
 import scorex.perma.storage.AuthDataStorage
 import shapeless.Typeable._
 
@@ -32,19 +32,20 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte])(impl
   override def receive: Receive = {
     case DataFromPeer(msgId, indexes: Seq[DataSegmentIndex]@unchecked, remote)
       if msgId == GetSegmentsMessageSpec.messageCode && indexes.cast[Seq[DataSegmentIndex]].isDefined =>
-      ???
-//
-//      val segments:Seq[AuthDataBlock[DataSegment]] = indexes.flatMap(i => storage.get(i))
-//      val msg = Message(SegmentsMessageSpec, Right(segments), None)
-//      networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
-//
-//    case DataFromPeer(msgId, segments:  Map[DataSegmentIndex, AuthDataBlock[DataSegment]]@unchecked, remote)
-//      if msgId == SegmentsMessageSpec.messageCode && segments.cast[Map[DataSegmentIndex, AuthDataBlock[DataSegment]]].isDefined =>
 
-//      segments.forall(s => s._2)
-//      val segments = indexes.flatMap(i => storage.get(i))
-//      val msg = Message(SegmentsMessageSpec, Right(segments), None)
-//      networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
+      val segments: Map[DataSegmentIndex, AuthDataBlock[DataSegment]] =
+        indexes.map(i => i -> storage.get(i)).filter(_._2.isDefined).map(x => (x._1, x._2.get)).toMap
+      val msg = Message(SegmentsMessageSpec, Right(segments), None)
+      networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
+
+    case DataFromPeer(msgId, segments: Map[DataSegmentIndex, AuthDataBlock[DataSegment]]@unchecked, remote)
+      if msgId == SegmentsMessageSpec.messageCode && segments.cast[Map[DataSegmentIndex, AuthDataBlock[DataSegment]]].isDefined =>
+
+      if (segments.forall(s => s._2.check(s._1, rootHash)(Constants.hash))) {
+        segments.foreach(s => storage.set(s._1, s._2))
+      } else {
+        //TODO blacklisting
+      }
 
     case _ => ???
   }
