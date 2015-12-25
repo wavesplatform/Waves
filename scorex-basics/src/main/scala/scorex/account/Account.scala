@@ -32,9 +32,7 @@ object Account {
   def fromPubkey(publicKey: Array[Byte]): String = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: publicKeyHash //prepend ADDRESS_VERSION
-    val checkSum = hash(withoutChecksum).take(ChecksumLength)
-
-    Base58.encode(withoutChecksum ++ checkSum)
+    Base58.encode(withoutChecksum ++ calcCheckSum(withoutChecksum))
   }
 
   def isValidAddress(address: String): Boolean =
@@ -44,10 +42,12 @@ object Account {
       else {
         val checkSum = addressBytes.takeRight(ChecksumLength)
 
-        val dh = CryptographicHashImpl.hash(addressBytes.dropRight(ChecksumLength))
-        val checkSumGenerated = dh.take(ChecksumLength)
+        val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
 
         checkSum.sameElements(checkSumGenerated)
       }
     }.getOrElse(false)
+
+  private def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = hash(withoutChecksum).take(ChecksumLength)
+
 }
