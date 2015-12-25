@@ -56,7 +56,7 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
     }
   }
 
-  private lazy val emptyHash = hash.hash("")
+  private lazy val emptyHash = hash("")
 
   def getHash(key: TreeStorage.Key): Option[Digest] = {
     storage.get(key) match {
@@ -65,9 +65,9 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
           val h1 = getHash((key._1 - 1, key._2 * 2))
           val h2 = getHash((key._1 - 1, key._2 * 2 + 1))
           val calculatedHash = (h1, h2) match {
-            case (Some(hash1), Some(hash2)) => hash.hash(hash1 ++ hash2)
-            case (Some(h), _) => hash.hash(h ++ emptyHash)
-            case (_, Some(h)) => hash.hash(emptyHash ++ h)
+            case (Some(hash1), Some(hash2)) => hash(hash1 ++ hash2)
+            case (Some(h), _) => hash(h ++ emptyHash)
+            case (_, Some(h)) => hash(emptyHash ++ h)
             case _ => emptyHash
           }
           storage.set(key, calculatedHash)
@@ -124,7 +124,7 @@ object MerkleTree {
       val fos = new FileOutputStream(treeFolder + "/" + currentBlock)
       fos.write(block)
       fos.close()
-      storage.set((0, currentBlock), hash.hash(block))
+      storage.set((0, currentBlock), hash(block))
       if (currentBlock < nonEmptyBlocks - 1) {
         processBlocks(currentBlock + 1)
       }

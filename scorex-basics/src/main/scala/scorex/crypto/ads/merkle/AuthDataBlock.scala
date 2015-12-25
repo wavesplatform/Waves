@@ -23,9 +23,9 @@ case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
     @tailrec
     def calculateHash(idx: Position, nodeHash: Digest, path: Seq[Digest]): Digest = {
       val hash = if (idx % 2 == 0)
-        hashFunction.hash(nodeHash ++ path.head)
+        hashFunction(nodeHash ++ path.head)
       else
-        hashFunction.hash(path.head ++ nodeHash)
+        hashFunction(path.head ++ nodeHash)
 
       if (path.size == 1)
         hash
@@ -34,7 +34,7 @@ case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
     }
 
     if (merklePath.nonEmpty)
-      calculateHash(index, hashFunction.hash(data.asInstanceOf[Message]), merklePath) sameElements rootHash
+      calculateHash(index, hashFunction(data.asInstanceOf[Message]), merklePath) sameElements rootHash
     else
       false
   }

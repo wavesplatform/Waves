@@ -70,7 +70,7 @@ class Wallet(walletFileOpt: Option[File],
   }
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
-    CryptographicHashImpl.hash(Bytes.concat(Ints.toByteArray(nonce), seed))
+    CryptographicHashImpl(Bytes.concat(Ints.toByteArray(nonce), seed))
 
 
   def deleteAccount(account: PrivateKeyAccount): Boolean = synchronized {

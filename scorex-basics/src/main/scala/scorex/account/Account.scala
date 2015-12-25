@@ -1,6 +1,7 @@
 package scorex.account
 
 import scorex.crypto.CryptographicHashImpl
+import CryptographicHashImpl._
 import scorex.crypto.encode.Base58
 
 
@@ -20,9 +21,6 @@ class Account(val address: String) extends Serializable {
 
 
 object Account {
-
-  import CryptographicHashImpl._
-
 
   val AddressVersion: Byte = 1
   val ChecksumLength = 4
