@@ -10,6 +10,7 @@ import scorex.network.{SendToChosen, ViewSynchronizer}
 import scorex.perma.settings.Constants._
 import scorex.perma.settings.{Constants, PermaSettings}
 import scorex.perma.storage.AuthDataStorage
+import scorex.storage.Storage
 import scorex.utils.ScorexLogging
 import shapeless.Typeable._
 
@@ -21,14 +22,12 @@ import shapeless.Typeable._
   * @param application - application
   */
 
-class SegmentsSynchronizer(application: Application, rootHash: Array[Byte])(implicit settings: PermaSettings)
+class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], storage:Storage[Long, AuthDataBlock[DataSegment]])
   extends ViewSynchronizer with ScorexLogging {
 
   override protected val networkControllerRef: ActorRef = application.networkController
 
   override val messageSpecs: Seq[MessageSpec[_]] = Seq()
-
-  private val storage = new AuthDataStorage(settings.authDataStorage)
 
   override def receive: Receive = {
     case DataFromPeer(msgId, indexes: Seq[DataSegmentIndex]@unchecked, remote)

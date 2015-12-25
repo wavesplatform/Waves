@@ -16,6 +16,7 @@ import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRou
 import scorex.network._
 import scorex.perma.api.http.PermaConsensusApiRoute
 import scorex.perma.consensus.PermaConsensusModule
+import scorex.perma.network.SegmentsSynchronizer
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.perma.storage.AuthDataStorage
@@ -39,39 +40,44 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
       case s: String if s.equalsIgnoreCase("qora") =>
         new QoraLikeConsensusModule
       case s: String if s.equalsIgnoreCase("perma") =>
-        val tree = if (Files.exists(Paths.get(settings.treeDir + "/tree0.mapDB"))) {
-          log.info("Get existing tree")
-          new MerkleTree(settings.treeDir, Constants.n, Constants.segmentSize, Constants.hash)
-        } else {
-          log.info("Generating random data set")
-          val treeDir = new File(settings.treeDir)
-          treeDir.mkdirs()
-          val datasetFile = settings.treeDir + "/data.file"
-          new RandomAccessFile(datasetFile, "rw").setLength(Constants.n * Constants.segmentSize)
-          log.info("Calculate tree")
-          val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, Constants.segmentSize, Constants.hash)
-          require(tree.nonEmptyBlocks == Constants.n, s"${tree.nonEmptyBlocks} == ${Constants.n}")
-          tree
-        }
-
-        log.info("Test tree")
-        val index = Constants.n - 3
-        val leaf = tree.byIndex(index).get
-        require(leaf.check(index, tree.rootHash)(Constants.hash))
-
-        log.info("Put ALL data to local storage")
-        new File(settings.treeDir).mkdirs()
         val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
-        def addBlock(i: Long): Unit = {
-          authDataStorage.set(i, tree.byIndex(i).get)
-          if (i > 0) {
-            addBlock(i - 1)
+        if (settings.isTrustedDealer) {
+          val tree = if (Files.exists(Paths.get(settings.treeDir + "/tree0.mapDB"))) {
+            log.info("Get existing tree")
+            new MerkleTree(settings.treeDir, Constants.n, Constants.segmentSize, Constants.hash)
+          } else {
+            log.info("Generating random data set")
+            val treeDir = new File(settings.treeDir)
+            treeDir.mkdirs()
+            val datasetFile = settings.treeDir + "/data.file"
+            new RandomAccessFile(datasetFile, "rw").setLength(Constants.n * Constants.segmentSize)
+            log.info("Calculate tree")
+            val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, Constants.segmentSize, Constants.hash)
+            require(tree.nonEmptyBlocks == Constants.n, s"${tree.nonEmptyBlocks} == ${Constants.n}")
+            tree
           }
+          require(settings.rootHash sameElements tree.rootHash, "Tree root hash differs from root hash in settings")
+          log.info("Test tree")
+          val index = Constants.n - 3
+          val leaf = tree.byIndex(index).get
+          require(leaf.check(index, tree.rootHash)(Constants.hash))
+
+          log.info("Put ALL data to local storage")
+          new File(settings.treeDir).mkdirs()
+          def addBlock(i: Long): Unit = {
+            authDataStorage.set(i, tree.byIndex(i).get)
+            if (i > 0) {
+              addBlock(i - 1)
+            }
+          }
+          addBlock(Constants.n - 1)
         }
-        addBlock(Constants.n - 1)
+        val rootHash = settings.rootHash
+
+        actorSystem.actorOf(Props(classOf[SegmentsSynchronizer], this, rootHash, authDataStorage))
 
         log.info("Create consensus module")
-        new PermaConsensusModule(tree.rootHash)(authDataStorage)
+        new PermaConsensusModule(rootHash)(authDataStorage)
       case nonsense =>
         sys.error(s"Unknown consensus algo: $nonsense")
     }
