@@ -5,6 +5,7 @@ import java.io.File
 import com.google.common.primitives.{Bytes, Ints}
 import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
+import scorex.crypto.CryptographicHashImpl
 import scorex.crypto.hash.Sha256
 import Sha256._
 import scorex.utils.ScorexLogging
@@ -68,10 +69,9 @@ class Wallet(walletFileOpt: Option[File],
     } else None
   }
 
-  def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] = {
-    val nonceBytes = Ints.toByteArray(nonce)
-    doubleHash(Bytes.concat(nonceBytes, seed, nonceBytes))
-  }
+  def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
+    CryptographicHashImpl.hash(Bytes.concat(Ints.toByteArray(nonce), seed))
+
 
   def deleteAccount(account: PrivateKeyAccount): Boolean = synchronized {
     val res = accountsPersistence.remove(account.seed)

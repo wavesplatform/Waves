@@ -1,6 +1,6 @@
 package scorex.account
 
-import scorex.crypto.RIPEMD160
+import scorex.crypto.{CryptographicHashImpl, RIPEMD160}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.Sha256
 
@@ -32,7 +32,7 @@ object Account {
   def fromPubkey(publicKey: Array[Byte]): String = {
     val publicKeyHash = new RIPEMD160().digest(hash(publicKey))
     val withoutChecksum = AddressVersion +: publicKeyHash //prepend ADDRESS_VERSION
-    val checkSum = doubleHash(withoutChecksum).take(ChecksumLength)
+    val checkSum = CryptographicHashImpl.hash(withoutChecksum).take(ChecksumLength)
 
     Base58.encode(withoutChecksum ++ checkSum)
   }
@@ -44,7 +44,7 @@ object Account {
       else {
         val checkSum = addressBytes.takeRight(ChecksumLength)
 
-        val dh = doubleHash(addressBytes.dropRight(ChecksumLength))
+        val dh = CryptographicHashImpl.hash(addressBytes.dropRight(ChecksumLength))
         val checkSumGenerated = dh.take(ChecksumLength)
 
         checkSum.sameElements(checkSumGenerated)
