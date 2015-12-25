@@ -133,13 +133,13 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
   override def genesisData: BlockField[StoredInBlock] = {
     val ipoMembers = List(
       //peer 1 accounts
-      "QhcAVCVWbWVV1zR3YGFXpbqPdC3f9U9Vk8",
-      "QQBe83C4re58s7RPTJADw2uqD8jBubebof",
-      "QN7q77Szn3dXaWXFJigGN7KdyegFEGNj8J",
+      "m5wmESgmcBWApt5SF5RoFYNG8Mw54AWop",
+      "QWimeyZ1KyvTR2dCa6g8Q1wGzaDbQgo5B",
+      "m4Sgw2JDKap4gFySPP1KkmbeK9e3PPrny",
       //peer 2 accounts
-      "QNCJZRiaqEbo8FW87epkrLYgTkxbkRzjC5",
-      "QWEiv5uhbKz6MSjrAZUzQ8q4v9yNA4Jh8y",
-      "QTreMnKdaCKS513vWHMRoVfE9E1ojP15PG"
+      "XiaiasSGegcE7zgAT9B51msY5w2jx2G7M",
+      "dGXYKZMcvYXz1WRBc7sY2xSSJWmhVUa2P",
+      "ivA64TYH73Ztz9brwUPyze7NbYQLfPoWt"
     )
 
     val timestamp = 0L

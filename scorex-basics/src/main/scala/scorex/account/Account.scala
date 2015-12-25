@@ -1,8 +1,7 @@
 package scorex.account
 
-import scorex.crypto.{CryptographicHashImpl, RIPEMD160}
+import scorex.crypto.CryptographicHashImpl
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.Sha256
 
 
 class Account(val address: String) extends Serializable {
@@ -22,17 +21,18 @@ class Account(val address: String) extends Serializable {
 
 object Account {
 
-  import Sha256._
+  import CryptographicHashImpl._
 
-  val AddressLength = 25
 
-  val AddressVersion: Byte = 58
+  val AddressVersion: Byte = 1
   val ChecksumLength = 4
+  val HashLength = 20
+  val AddressLength = 1 + ChecksumLength + HashLength
 
   def fromPubkey(publicKey: Array[Byte]): String = {
-    val publicKeyHash = new RIPEMD160().digest(hash(publicKey))
+    val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: publicKeyHash //prepend ADDRESS_VERSION
-    val checkSum = CryptographicHashImpl.hash(withoutChecksum).take(ChecksumLength)
+    val checkSum = hash(withoutChecksum).take(ChecksumLength)
 
     Base58.encode(withoutChecksum ++ checkSum)
   }

@@ -5,7 +5,7 @@ import java.io.File
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.CryptographicHash.Digest
+import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.crypto.ads.merkle.TreeStorage.Key
 
 
