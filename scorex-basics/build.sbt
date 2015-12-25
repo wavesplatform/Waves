@@ -1,5 +1,7 @@
 name := "scorex-basics"
 
+resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
+
 libraryDependencies ++=
     Dependencies.serizalization ++
     Dependencies.akka ++
@@ -8,6 +10,6 @@ libraryDependencies ++=
     Dependencies.testKit ++
     Dependencies.db ++
     Dependencies.logging ++ Seq(
-      "org.whispersystems" % "curve25519-java" % "+",
+      "org.consensusresearch" %% "scrypto" % "1.0.1",
       "commons-net" % "commons-net" % "3.+"
   )
