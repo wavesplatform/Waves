@@ -10,6 +10,7 @@ import scorex.network.{SendToChosen, ViewSynchronizer}
 import scorex.perma.settings.Constants._
 import scorex.perma.settings.{Constants, PermaSettings}
 import scorex.perma.storage.AuthDataStorage
+import scorex.utils.ScorexLogging
 import shapeless.Typeable._
 
 /**
@@ -21,7 +22,7 @@ import shapeless.Typeable._
   */
 
 class SegmentsSynchronizer(application: Application, rootHash: Array[Byte])(implicit settings: PermaSettings)
-  extends ViewSynchronizer {
+  extends ViewSynchronizer with ScorexLogging {
 
   override protected val networkControllerRef: ActorRef = application.networkController
 
@@ -32,7 +33,7 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte])(impl
   override def receive: Receive = {
     case DataFromPeer(msgId, indexes: Seq[DataSegmentIndex]@unchecked, remote)
       if msgId == GetSegmentsMessageSpec.messageCode && indexes.cast[Seq[DataSegmentIndex]].isDefined =>
-
+      log.info("GetSegmentsMessage")
       val segments: Map[DataSegmentIndex, AuthDataBlock[DataSegment]] =
         indexes.map(i => i -> storage.get(i)).filter(_._2.isDefined).map(x => (x._1, x._2.get)).toMap
       val msg = Message(SegmentsMessageSpec, Right(segments), None)
@@ -40,6 +41,7 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte])(impl
 
     case DataFromPeer(msgId, segments: Map[DataSegmentIndex, AuthDataBlock[DataSegment]]@unchecked, remote)
       if msgId == SegmentsMessageSpec.messageCode && segments.cast[Map[DataSegmentIndex, AuthDataBlock[DataSegment]]].isDefined =>
+      log.info(s"SegmentsMessage with ${segments.size} segments")
 
       if (segments.forall(s => s._2.check(s._1, rootHash)(Constants.hash))) {
         segments.foreach(s => storage.set(s._1, s._2))
@@ -47,6 +49,6 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte])(impl
         //TODO blacklisting
       }
 
-    case _ => ???
+    case m => log.error(s"Unexpected message $m")
   }
 }
