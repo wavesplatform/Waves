@@ -6,8 +6,9 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
-import scorex.crypto.SigningFunctions._
-import scorex.crypto.{EllipticCurveImpl, SigningFunctions}
+import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.singing.SigningFunctions
+import scorex.crypto.singing.SigningFunctions.Signature
 import scorex.network.message.Message._
 import scorex.transaction.{History, TransactionModule}
 

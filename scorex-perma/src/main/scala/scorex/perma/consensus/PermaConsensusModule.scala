@@ -5,8 +5,8 @@ import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
 import scorex.crypto.CryptographicHash.Digest
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.SigningFunctions._
 import scorex.crypto.ads.merkle.AuthDataBlock
+import scorex.crypto.singing.SigningFunctions.{PrivateKey, PublicKey}
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.storage.Storage
