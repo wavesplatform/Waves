@@ -4,8 +4,7 @@ import com.google.common.primitives.Longs
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
 import scorex.consensus.{ConsensusModule, LagonakiConsensusModule}
-import scorex.crypto.hash.Sha256
-import Sha256._
+import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 

@@ -12,6 +12,7 @@ import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
 import scorex.crypto.ads.merkle.{AuthDataBlock, MerkleTree}
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRoute}
 import scorex.network._
 import scorex.perma.api.http.PermaConsensusApiRoute
@@ -44,7 +45,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
         if (settings.isTrustedDealer) {
           val tree = if (Files.exists(Paths.get(settings.treeDir + "/tree0.mapDB"))) {
             log.info("Get existing tree")
-            new MerkleTree(settings.treeDir, Constants.n, Constants.segmentSize, Constants.hash)
+            new MerkleTree(settings.treeDir, Constants.n, Constants.segmentSize, FastCryptographicHash)
           } else {
             log.info("Generating random data set")
             val treeDir = new File(settings.treeDir)
@@ -52,7 +53,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
             val datasetFile = settings.treeDir + "/data.file"
             new RandomAccessFile(datasetFile, "rw").setLength(Constants.n * Constants.segmentSize)
             log.info("Calculate tree")
-            val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, Constants.segmentSize, Constants.hash)
+            val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, Constants.segmentSize, FastCryptographicHash)
             require(tree.nonEmptyBlocks == Constants.n, s"${tree.nonEmptyBlocks} == ${Constants.n}")
             tree
           }
@@ -60,7 +61,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
           log.info("Test tree")
           val index = Constants.n - 3
           val leaf = tree.byIndex(index).get
-          require(leaf.check(index, tree.rootHash)(Constants.hash))
+          require(leaf.check(index, tree.rootHash)(FastCryptographicHash))
 
           log.info("Put ALL data to local storage")
           new File(settings.treeDir).mkdirs()

@@ -6,6 +6,7 @@ import scorex.consensus.ConsensusModule
 import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.ads.merkle.AuthDataBlock
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.crypto.singing.SigningFunctions.{PrivateKey, PublicKey}
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
@@ -28,7 +29,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
   val initialTargetPow: BigInt = log2(InitialTarget)
   val TargetRecalculation = Constants.targetRecalculation
   val AvgDelay = Constants.averageDelay
-  val Hash = Constants.hash
+  val Hash = FastCryptographicHash
   val SSize = Hash.DigestSize
   require(SSize == PermaConsensusBlockField.SLength)
 

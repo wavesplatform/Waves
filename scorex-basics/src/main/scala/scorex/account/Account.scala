@@ -1,8 +1,9 @@
 package scorex.account
 
-import scorex.crypto.CryptographicHashImpl
-import CryptographicHashImpl._
+import scorex.crypto.hash.SecureCryptographicHash
+import SecureCryptographicHash._
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.SecureCryptographicHash
 
 
 class Account(val address: String) extends Serializable {

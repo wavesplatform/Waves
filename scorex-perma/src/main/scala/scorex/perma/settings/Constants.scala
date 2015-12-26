@@ -1,7 +1,6 @@
 package scorex.perma.settings
 
 import com.typesafe.config.ConfigFactory
-import scorex.crypto.hash.Sha256
 import scorex.utils.ScorexLogging
 
 object Constants extends ScorexLogging {
@@ -25,13 +24,5 @@ object Constants extends ScorexLogging {
   val targetRecalculation = permaConf.getInt("targetRecalculation") //recalculate target every targetRecalculation blocks
 
   val averageDelay = permaConf.getInt("averageDelay") //average delay between blocks in seconds
-
-  val hash = permaConf.getString("hash") match {
-    case s: String if s.equalsIgnoreCase("sha256") =>
-      Sha256
-    case hashFunction =>
-      log.warn(s"Unknown hash function: $hashFunction. Use Sha256 instead.")
-      Sha256
-  }
 
 }

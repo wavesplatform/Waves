@@ -6,6 +6,7 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.ads.merkle.{AuthDataBlock, MerkleTree}
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.perma.settings.Constants.DataSegment
 import scorex.perma.settings.{Constants, PermaSettings}
 import scorex.perma.storage.AuthDataStorage
@@ -25,13 +26,13 @@ with Matchers with ScorexLogging {
   val datasetFile = settings.treeDir + "/data.file"
   new RandomAccessFile(datasetFile, "rw").setLength(Constants.n * Constants.segmentSize)
   log.info("Calculate tree")
-  val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, Constants.segmentSize, Constants.hash)
+  val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, Constants.segmentSize, FastCryptographicHash)
   require(tree.nonEmptyBlocks == Constants.n, s"${tree.nonEmptyBlocks} == ${Constants.n}")
 
   log.info("Test tree")
   val index = Constants.n - 3
   val leaf = tree.byIndex(index).get
-  require(leaf.check(index, tree.rootHash)(Constants.hash))
+  require(leaf.check(index, tree.rootHash)(FastCryptographicHash))
 
   log.info("Put ALL data to local storage")
   new File(settings.treeDir).mkdirs()

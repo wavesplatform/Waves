@@ -1,10 +1,10 @@
-package scorex.crypto
+package scorex.crypto.hash
 
+import scorex.crypto._
 import scorex.crypto.hash.CryptographicHash._
-import scorex.crypto.hash._
 
 
-object CryptographicHashImpl extends CryptographicHash {
+object SecureCryptographicHash extends CryptographicHash {
 
   override val DigestSize: Int = 32
 

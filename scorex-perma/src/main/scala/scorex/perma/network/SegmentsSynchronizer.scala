@@ -4,6 +4,7 @@ package scorex.perma.network
 import akka.actor.ActorRef
 import scorex.app.Application
 import scorex.crypto.ads.merkle.AuthDataBlock
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.{SendToChosen, ViewSynchronizer}
@@ -42,7 +43,7 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], stor
       if msgId == SegmentsMessageSpec.messageCode && segments.cast[Map[DataSegmentIndex, AuthDataBlock[DataSegment]]].isDefined =>
       log.info(s"SegmentsMessage with ${segments.size} segments")
 
-      if (segments.forall(s => s._2.check(s._1, rootHash)(Constants.hash))) {
+      if (segments.forall(s => s._2.check(s._1, rootHash)(FastCryptographicHash))) {
         segments.foreach(s => storage.set(s._1, s._2))
       } else {
         //TODO blacklisting

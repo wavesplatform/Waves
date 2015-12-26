@@ -3,10 +3,9 @@ package scorex.crypto.ads.merkle
 import java.io.{FileOutputStream, RandomAccessFile}
 import java.nio.file.{Files, Paths}
 
-import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.crypto.ads.merkle.TreeStorage.Position
-import scorex.crypto.hash.CryptographicHash
-import scorex.crypto.hash.Sha256
+import scorex.crypto.hash.CryptographicHash.Digest
+import scorex.crypto.hash.{CryptographicHash, FastCryptographicHash}
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
@@ -14,7 +13,7 @@ import scala.annotation.tailrec
 class MerkleTree[H <: CryptographicHash](treeFolder: String,
                                          val nonEmptyBlocks: Position,
                                          blockSize: Int = 1024,
-                                         hash: H = Sha256
+                                         hash: H = FastCryptographicHash
                                         ) extends ScorexLogging {
 
   import MerkleTree._
@@ -90,7 +89,7 @@ object MerkleTree {
   def fromFile[H <: CryptographicHash](fileName: String,
                                        treeFolder: String,
                                        blockSize: Int = 1024,
-                                       hash: H = Sha256
+                                       hash: H = FastCryptographicHash
                                       ): MerkleTree[H] = {
     val byteBuffer = new Array[Byte](blockSize)
 

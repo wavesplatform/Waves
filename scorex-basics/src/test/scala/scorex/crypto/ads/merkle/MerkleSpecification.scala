@@ -5,7 +5,7 @@ import java.io.{File, FileOutputStream}
 import org.scalacheck.Gen
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.hash.Sha256
+import scorex.crypto.hash.FastCryptographicHash
 
 import scala.util.Random
 
@@ -22,7 +22,7 @@ class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDri
         val leafOption = tree.byIndex(index)
         leafOption should not be None
         val leaf = leafOption.get
-        val resp = leaf.check(index, tree.rootHash)(Sha256)
+        val resp = leaf.check(index, tree.rootHash)(FastCryptographicHash)
         resp shouldBe true
       }
       tree.storage.close()

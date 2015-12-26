@@ -5,9 +5,7 @@ import java.io.File
 import com.google.common.primitives.{Bytes, Ints}
 import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.CryptographicHashImpl
-import scorex.crypto.hash.Sha256
-import Sha256._
+import scorex.crypto.hash.SecureCryptographicHash
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
@@ -70,7 +68,7 @@ class Wallet(walletFileOpt: Option[File],
   }
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
-    CryptographicHashImpl(Bytes.concat(Ints.toByteArray(nonce), seed))
+    SecureCryptographicHash(Bytes.concat(Ints.toByteArray(nonce), seed))
 
 
   def deleteAccount(account: PrivateKeyAccount): Boolean = synchronized {

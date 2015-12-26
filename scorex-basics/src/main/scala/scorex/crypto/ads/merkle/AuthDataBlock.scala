@@ -1,12 +1,11 @@
 package scorex.crypto.ads.merkle
 
-import com.google.common.primitives.{Ints, Bytes}
+import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json._
-import scorex.crypto.hash.CryptographicHash._
 import scorex.crypto.ads.merkle.TreeStorage.Position
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.CryptographicHash
-import scorex.crypto.hash.Sha256
+import scorex.crypto.hash.{FastCryptographicHash, CryptographicHash}
+import scorex.crypto.hash.CryptographicHash._
 
 import scala.annotation.tailrec
 import scala.util.Try
@@ -18,7 +17,7 @@ import scala.util.Try
 case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
 
   def check[HashImpl <: CryptographicHash](index: Position, rootHash: Digest)
-                                          (hashFunction: HashImpl = Sha256): Boolean = {
+                                          (hashFunction: HashImpl = FastCryptographicHash): Boolean = {
 
     @tailrec
     def calculateHash(idx: Position, nodeHash: Digest, path: Seq[Digest]): Digest = {

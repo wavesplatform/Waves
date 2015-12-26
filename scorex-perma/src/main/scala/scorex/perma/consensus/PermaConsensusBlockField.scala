@@ -5,7 +5,7 @@ import play.api.libs.json._
 import scorex.block.BlockField
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.hash.Sha256
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.perma.settings.Constants
 
 import scala.annotation.tailrec
@@ -45,7 +45,7 @@ object PermaConsensusBlockField {
   val PuzLength = 32
   val PublicKeyLength = EllipticCurveImpl.KeyLength
   val SLength = 32
-  val HashLength = Sha256.DigestSize
+  val HashLength = FastCryptographicHash.DigestSize
   val SignatureLength = EllipticCurveImpl.SignatureLength
 
   def parse(bytes: Array[Byte]): Try[PermaConsensusBlockField] = Try {
