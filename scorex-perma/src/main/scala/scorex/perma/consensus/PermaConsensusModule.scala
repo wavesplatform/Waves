@@ -1,5 +1,6 @@
 package scorex.perma.consensus
 
+import akka.actor.ActorRef
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
@@ -8,6 +9,10 @@ import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.crypto.singing.SigningFunctions.{PrivateKey, PublicKey}
+import scorex.network.Broadcast
+import scorex.network.NetworkController.SendToNetwork
+import scorex.network.message.Message
+import scorex.perma.network.GetSegmentsMessageSpec
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.storage.Storage
@@ -21,7 +26,7 @@ import scala.util.{Failure, Success, Try}
 /**
   * Data and functions related to a consensus algo
   */
-class PermaConsensusModule(rootHash: Array[Byte])
+class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[ActorRef] = None)
                           (implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ConsensusModule[PermaConsensusBlockData] with ScorexLogging {
 
@@ -108,7 +113,15 @@ class PermaConsensusModule(rootHash: Array[Byte])
           None
         }
       case Failure(t) =>
-        log.warn("Failed to generate new ticket", t)
+        val segmentIds: Seq[DataSegmentIndex] = 1.to(Constants.l).map(i => calculateIndex(account.publicKey, i - 1))
+          .filterNot(authDataStorage.containsKey(_))
+        if (segmentIds.nonEmpty) {
+          val blockMsg = Message(GetSegmentsMessageSpec, Right(segmentIds), None)
+          if (networkControllerOpt.isDefined) {
+            networkControllerOpt.get ! SendToNetwork(blockMsg, Broadcast)
+          }
+          log.warn(s"Failed to generate new ticket, ${segmentIds.length} segments required")
+        } else log.warn(s"Failed to generate new ticket", t)
         None
     }
   }.recoverWith { case t: Throwable =>

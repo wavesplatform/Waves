@@ -45,6 +45,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
         treeDir.mkdirs()
         val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
         if (settings.isTrustedDealer) {
+          log.info("TrustedDealer node")
           val tree = if (Files.exists(Paths.get(settings.treeDir + "/tree0.mapDB"))) {
             log.info("Get existing tree")
             new MerkleTree(settings.treeDir, Constants.n, Constants.segmentSize, FastCryptographicHash)
@@ -78,7 +79,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
         actorSystem.actorOf(Props(classOf[SegmentsSynchronizer], this, rootHash, authDataStorage))
 
         log.info("Create consensus module")
-        new PermaConsensusModule(rootHash)(authDataStorage)
+        new PermaConsensusModule(rootHash, Some(networkController))(authDataStorage)
       case nonsense =>
         sys.error(s"Unknown consensus algo: $nonsense")
     }
