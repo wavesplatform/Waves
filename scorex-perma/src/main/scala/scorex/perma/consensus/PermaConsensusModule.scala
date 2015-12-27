@@ -16,7 +16,7 @@ import scorex.utils.{NTP, ScorexLogging, randomBytes}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 /**
   * Data and functions related to a consensus algo
@@ -92,22 +92,25 @@ class PermaConsensusModule(rootHash: Array[Byte])
     val puz = generatePuz(parent)
 
     val keyPair = (account.privateKey, account.publicKey)
-    val ticket = generate(keyPair, puz)
-    val target = calcTarget(parent)
-
-    if (validate(keyPair._2, puz, target, ticket, rootHash)) {
-      val timestamp = NTP.correctedTime()
-      val consensusData = PermaConsensusBlockData(target, puz, ticket)
-
-      Future(Some(Block.buildAndSign(Version,
-        timestamp,
-        parent.uniqueId,
-        consensusData,
-        transactionModule.packUnconfirmed(),
-        account)))
-
-    } else {
-      Future(None)
+    val ticketTry = generate(keyPair, puz)
+    ticketTry match {
+      case Success(ticket) =>
+        val target = calcTarget(parent)
+        if (validate(keyPair._2, puz, target, ticket, rootHash)) {
+          val timestamp = NTP.correctedTime()
+          val consensusData = PermaConsensusBlockData(target, puz, ticket)
+          Future(Some(Block.buildAndSign(Version,
+            timestamp,
+            parent.uniqueId,
+            consensusData,
+            transactionModule.packUnconfirmed(),
+            account)))
+        } else {
+          Future(None)
+        }
+      case Failure(t) =>
+        log.warn("Failed to generate new ticket", t)
+        Future(None)
     }
   }.recoverWith { case t: Throwable =>
     log.error("Error when creating new block", t)
@@ -167,7 +170,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
     BigInt(1, Hash(t.proofs.map(_.signature).reduce(_ ++ _)))
   } else 0
 
-  private[consensus] def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Ticket = {
+  private[consensus] def generate(keyPair: (PrivateKey, PublicKey), puz: Array[Byte]): Try[Ticket] = Try {
 
     val (privateKey, publicKey) = keyPair
 

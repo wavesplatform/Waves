@@ -41,6 +41,8 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
       case s: String if s.equalsIgnoreCase("qora") =>
         new QoraLikeConsensusModule
       case s: String if s.equalsIgnoreCase("perma") =>
+        val treeDir = new File(settings.treeDir)
+        treeDir.mkdirs()
         val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
         if (settings.isTrustedDealer) {
           val tree = if (Files.exists(Paths.get(settings.treeDir + "/tree0.mapDB"))) {
@@ -48,8 +50,6 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
             new MerkleTree(settings.treeDir, Constants.n, Constants.segmentSize, FastCryptographicHash)
           } else {
             log.info("Generating random data set")
-            val treeDir = new File(settings.treeDir)
-            treeDir.mkdirs()
             val datasetFile = settings.treeDir + "/data.file"
             new RandomAccessFile(datasetFile, "rw").setLength(Constants.n * Constants.segmentSize)
             log.info("Calculate tree")

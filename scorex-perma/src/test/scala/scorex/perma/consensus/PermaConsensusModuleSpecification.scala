@@ -54,7 +54,7 @@ with Matchers with ScorexLogging {
     forAll { (seed: Array[Byte], puz: Array[Byte], wrongBytes: Array[Byte]) =>
       whenever(seed.nonEmpty && puz.nonEmpty && wrongBytes.nonEmpty && !wrongBytes.sameElements(puz)) {
         val keyPair = EllipticCurveImpl.createKeyPair(seed)
-        val ticket = consensus.generate(keyPair, puz)
+        val ticket = consensus.generate(keyPair, puz).get
         val publicKey = keyPair._2
         consensus.validate(publicKey, puz, consensus.ticketScore(ticket) + 1, ticket, rootHash) shouldBe true
         consensus.validate(publicKey, puz, consensus.ticketScore(ticket), ticket, rootHash) shouldBe false

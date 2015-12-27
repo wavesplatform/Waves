@@ -17,7 +17,7 @@ class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDa
   private var commitNeeded = false
 
   private val db =
-    DBMaker.appendFileDB(new File(fileName + ".mapDB"))
+    DBMaker.appendFileDB(new File(fileName))
       .fileMmapEnableIfSupported()
       .closeOnJvmShutdown()
       .checksumEnable()
