@@ -3,9 +3,9 @@ package scorex.perma.consensus
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
-import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.ads.merkle.AuthDataBlock
+import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.crypto.singing.SigningFunctions.{PrivateKey, PublicKey}
 import scorex.perma.settings.Constants
@@ -86,8 +86,7 @@ class PermaConsensusModule(rootHash: Array[Byte])
   }
 
   def generateNextBlock[TT](account: PrivateKeyAccount)
-                           (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = Try {
-
+                           (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = Future {
     val parent = transactionModule.blockStorage.history.lastBlock
     val puz = generatePuz(parent)
 
@@ -99,24 +98,23 @@ class PermaConsensusModule(rootHash: Array[Byte])
         if (validate(keyPair._2, puz, target, ticket, rootHash)) {
           val timestamp = NTP.correctedTime()
           val consensusData = PermaConsensusBlockData(target, puz, ticket)
-          Future(Some(Block.buildAndSign(Version,
+          Some(Block.buildAndSign(Version,
             timestamp,
             parent.uniqueId,
             consensusData,
             transactionModule.packUnconfirmed(),
-            account)))
+            account))
         } else {
-          Future(None)
+          None
         }
       case Failure(t) =>
         log.warn("Failed to generate new ticket", t)
-        Future(None)
+        None
     }
   }.recoverWith { case t: Throwable =>
     log.error("Error when creating new block", t)
-    t.printStackTrace()
-    Try(Future(None))
-  }.getOrElse(Future(None))
+    Future(None)
+  }
 
   override def consensusBlockData(block: Block): PermaConsensusBlockData = block.consensusDataField.value match {
     case b: PermaConsensusBlockData => b
