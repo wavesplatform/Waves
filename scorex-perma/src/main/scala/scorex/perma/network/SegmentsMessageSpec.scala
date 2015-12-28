@@ -50,23 +50,23 @@ object GetSegmentsMessageSpec extends MessageSpec[Seq[DataSegmentIndex]] {
 
   override val messageName: String = "GetSegmentsMessage"
 
-  private val DataLength = 8
+  private val SegmentIndexLength = 8
 
   override def serializeData(indexes: Seq[DataSegmentIndex]): Array[Byte] = {
     val length = indexes.length
     val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), 4, 0)
 
     indexes.foldLeft(lengthBytes) { case (bs, index) =>
-      Bytes.concat(bs, Bytes.ensureCapacity(Longs.toByteArray(index), DataLength, 0))
+      Bytes.concat(bs, Bytes.ensureCapacity(Longs.toByteArray(index), SegmentIndexLength, 0))
     }
   }
 
   override def deserializeData(bytes: Array[MessageCode]): Try[Seq[DataSegmentIndex]] = Try {
     val length = Ints.fromByteArray(bytes.slice(0, 4))
-    require(bytes.length == 4 + length * DataLength)
+    require(bytes.length == 4 + length * SegmentIndexLength)
     (0 until length).map { i =>
-      val position = 4 + i * DataLength
-      Longs.fromByteArray(bytes.slice(position, position + DataLength))
+      val position = 4 + i * SegmentIndexLength
+      Longs.fromByteArray(bytes.slice(position, position + SegmentIndexLength))
     }
   }
 }
