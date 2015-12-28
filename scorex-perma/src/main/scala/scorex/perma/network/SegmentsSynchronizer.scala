@@ -9,8 +9,6 @@ import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.{SendToChosen, ViewSynchronizer}
 import scorex.perma.settings.Constants._
-import scorex.perma.settings.{Constants, PermaSettings}
-import scorex.perma.storage.AuthDataStorage
 import scorex.storage.Storage
 import scorex.utils.ScorexLogging
 import shapeless.Typeable._
