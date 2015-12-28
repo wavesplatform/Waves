@@ -114,7 +114,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         }
       case Failure(t) =>
         val segmentIds: Seq[DataSegmentIndex] = 1.to(Constants.l).map(i => calculateIndex(account.publicKey, i - 1))
-          .filterNot(authDataStorage.containsKey(_))
+          .filterNot(authDataStorage.containsKey)
         if (segmentIds.nonEmpty) {
           val blockMsg = Message(GetSegmentsMessageSpec, Right(segmentIds), None)
           if (networkControllerOpt.isDefined) {

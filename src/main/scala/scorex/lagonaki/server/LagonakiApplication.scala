@@ -17,7 +17,7 @@ import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRou
 import scorex.network._
 import scorex.perma.api.http.PermaConsensusApiRoute
 import scorex.perma.consensus.PermaConsensusModule
-import scorex.perma.network.SegmentsSynchronizer
+import scorex.perma.network.{PermacoinMessagesRepo, SegmentsSynchronizer}
 import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants._
 import scorex.perma.storage.AuthDataStorage
@@ -125,7 +125,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
     typeOf[AddressApiRoute]
   )
 
-  override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
+  override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs ++ PermacoinMessagesRepo.specs
 
   //checks
   require(transactionModule.balancesSupport)

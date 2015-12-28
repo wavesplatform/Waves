@@ -4,14 +4,13 @@ import java.io.File
 
 import org.mapdb.{DBMaker, HTreeMap, Serializer}
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.perma.settings.Constants.{DataSegmentIndex, DataSegment}
+import scorex.perma.settings.Constants.{DataSegment, DataSegmentIndex}
 import scorex.storage.Storage
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
 
 class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDataBlock[DataSegment]] with ScorexLogging {
-
 
   //TODO https://github.com/jankotek/mapdb/issues/634 workaround
   private var commitNeeded = false
@@ -43,12 +42,9 @@ class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDa
 
   override def close(): Unit = db.close()
 
+  override def containsKey(key: DataSegmentIndex): Boolean = map.containsKey(key)
 
-  override def containsKey(key: DataSegmentIndex): Boolean = {
-    map.containsKey(key)
-  }
-
-  override def get(key: DataSegmentIndex): Option[AuthDataBlock[DataSegment]] = {
+  override def get(key: DataSegmentIndex): Option[AuthDataBlock[DataSegment]] =
     Try {
       map.get(key)
     } match {
@@ -59,6 +55,4 @@ class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDa
         log.debug("Enable to load key for level 0: " + key)
         None
     }
-  }
-
 }
