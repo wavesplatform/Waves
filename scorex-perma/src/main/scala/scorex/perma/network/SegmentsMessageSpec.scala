@@ -9,6 +9,7 @@ import scorex.perma.settings.Constants.{DataSegment, DataSegmentIndex}
 
 import scala.util.Try
 
+
 object SegmentsMessageSpec extends MessageSpec[Map[DataSegmentIndex, AuthDataBlock[DataSegment]]] {
   override val messageCode: MessageCode = 51: Byte
 
@@ -69,4 +70,8 @@ object GetSegmentsMessageSpec extends MessageSpec[Seq[DataSegmentIndex]] {
       Longs.fromByteArray(bytes.slice(position, position + DataLength))
     }
   }
+}
+
+object PermacoinMessagesRepo {
+  val specs = Seq(GetSegmentsMessageSpec, SegmentsMessageSpec)
 }
