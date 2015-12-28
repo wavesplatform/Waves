@@ -4,7 +4,7 @@ import java.io.File
 
 import org.mapdb.{DBMaker, HTreeMap, Serializer}
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.perma.settings.Constants.{DataSegmentIndex, DataSegment}
+import scorex.perma.settings.Constants.{DataSegment, DataSegmentIndex}
 import scorex.storage.Storage
 import scorex.utils.ScorexLogging
 
@@ -44,9 +44,7 @@ class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDa
   override def close(): Unit = db.close()
 
 
-  override def containsKey(key: DataSegmentIndex): Boolean = {
-    map.containsKey(key)
-  }
+  override def containsKey(key: DataSegmentIndex): Boolean = map.containsKey(key)
 
   override def get(key: DataSegmentIndex): Option[AuthDataBlock[DataSegment]] = {
     Try {

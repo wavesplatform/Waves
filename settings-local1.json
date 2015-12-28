@@ -13,6 +13,7 @@
   "max-rollback": 100,
   "offline-generation": true,
   "perma": {
+    "authDataStorage": "authDataStorage1.mapDB",
     "isTrustedDealer": true
   }
 }
