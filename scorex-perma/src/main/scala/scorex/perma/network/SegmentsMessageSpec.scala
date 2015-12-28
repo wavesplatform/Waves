@@ -4,7 +4,6 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.network.message.Message.MessageCode
 import scorex.network.message.MessageSpec
-import scorex.perma.settings.Constants
 import scorex.perma.settings.Constants.{DataSegment, DataSegmentIndex}
 
 import scala.util.Try
@@ -53,11 +52,11 @@ object GetSegmentsMessageSpec extends MessageSpec[Seq[DataSegmentIndex]] {
 
   private val DataLength = 8
 
-  override def serializeData(idexes: Seq[DataSegmentIndex]): Array[Byte] = {
-    val length = idexes.length
+  override def serializeData(indexes: Seq[DataSegmentIndex]): Array[Byte] = {
+    val length = indexes.length
     val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), 4, 0)
 
-    idexes.foldLeft(lengthBytes) { case (bs, index) =>
+    indexes.foldLeft(lengthBytes) { case (bs, index) =>
       Bytes.concat(bs, Bytes.ensureCapacity(Longs.toByteArray(index), DataLength, 0))
     }
   }
