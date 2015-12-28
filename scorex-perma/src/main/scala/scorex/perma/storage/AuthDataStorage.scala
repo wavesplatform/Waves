@@ -44,8 +44,6 @@ class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDa
 
   override def containsKey(key: DataSegmentIndex): Boolean = map.containsKey(key)
 
-  override def containsKey(key: DataSegmentIndex): Boolean = map.containsKey(key)
-
   override def get(key: DataSegmentIndex): Option[AuthDataBlock[DataSegment]] =
     Try {
       map.get(key)
