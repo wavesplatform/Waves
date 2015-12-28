@@ -28,7 +28,7 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], stor
 
   override protected val networkControllerRef: ActorRef = application.networkController
 
-  override val messageSpecs: Seq[MessageSpec[_]] = Seq()
+  override val messageSpecs: Seq[MessageSpec[_]] = Seq(SegmentsMessageSpec, GetSegmentsMessageSpec)
 
   override def receive: Receive = {
     case DataFromPeer(msgId, indexes: Seq[DataSegmentIndex]@unchecked, remote)
