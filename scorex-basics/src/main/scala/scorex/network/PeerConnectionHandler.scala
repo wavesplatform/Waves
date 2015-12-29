@@ -50,7 +50,7 @@ case class PeerConnectionHandler(application: Application,
           networkControllerRef ! message
 
         case Failure(e) =>
-          log.info(s"Corrupted data from: " + remote + " : " + e.getMessage)
+          log.info(s"Corrupted data from: " + remote,  e)
           connection ! Close
         //context stop self
       }
