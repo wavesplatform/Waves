@@ -58,7 +58,7 @@ object AuthDataBlock {
     val merklePathSize = Ints.fromByteArray(bytes.slice(8, 12))
     val data = bytes.slice(12, 12 + dataSize)
     val merklePathStart = 12 + dataSize
-    val merklePath = (0 until merklePathSize).map { i =>
+    val merklePath = (0 until merklePathLength).map { i =>
       bytes.slice(merklePathStart + i * merklePathSize, merklePathStart + (i + 1) * merklePathSize)
     }
     AuthDataBlock(data, merklePath)
