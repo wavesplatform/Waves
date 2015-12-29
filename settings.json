@@ -15,5 +15,9 @@
   ],
   "max-rollback": 100,
   "blockGenerationDelay": 0,
-  "offline-generation": true
+  "offline-generation": true,
+  "perma": {
+    "treeDir": "/tmp/scorex/data/tree",
+    "authDataStorage": "permatree.db"
+  }
 }

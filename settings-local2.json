@@ -14,5 +14,9 @@
 		"123.123.123.123"
 	],
   	"max-rollback" : 100,
-  	"offline-generation" : false
+  	"offline-generation" : false,
+	"perma": {
+		"treeDir": "/tmp/scorex/data2/tree",
+		"authDataStorage": "authDataStorage2.mapDB"
+	}
 }
