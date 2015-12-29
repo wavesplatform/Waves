@@ -90,8 +90,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
   override def transactions(block: Block): StoredInBlock =
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
-  override def packUnconfirmed(): StoredInBlock =
-    UnconfirmedTransactionsDatabaseImpl.all().filter(isValid(_)).filter(!blockStorage.state.included(_))
+  override def packUnconfirmed(): StoredInBlock = UnconfirmedTransactionsDatabaseImpl.all().filter(isValid(_))
+    .filter(!blockStorage.state.included(_)).take(MaxTransactionsPerBlock)
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
@@ -170,5 +170,5 @@ object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
   val MaxTimeForUnconfirmed: Duration = 1.hour
-  val MaxTransactionsPerBlock = 100: Byte
+  val MaxTransactionsPerBlock: Int = 1000
 }
