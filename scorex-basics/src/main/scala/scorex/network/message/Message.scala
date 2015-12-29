@@ -76,7 +76,7 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
     val magic = new Array[Byte](MagicLength)
     bytes.get(magic)
 
-    assert(magic.sameElements(Message.MAGIC), "Wrong magic bytes")
+    assert(magic.sameElements(Message.MAGIC), "Wrong magic bytes" + magic.mkString)
 
     val msgCode = bytes.get
 
