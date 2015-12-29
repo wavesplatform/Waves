@@ -6,7 +6,7 @@ import scorex.block.BlockField
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.perma.settings.Constants
+import scorex.perma.settings.PermaConstants
 
 import scala.annotation.tailrec
 import scala.util.Try
@@ -28,7 +28,7 @@ case class PermaConsensusBlockField(override val value: PermaConsensusBlockData)
         val proofBytes =
           Bytes.ensureCapacity(p.signature, SignatureLength, 0) ++
             Bytes.ensureCapacity(Longs.toByteArray(p.segmentIndex), 8, 0) ++
-            Bytes.ensureCapacity(p.segment.data, Constants.segmentSize, 0) ++
+            Bytes.ensureCapacity(p.segment.data, PermaConstants.segmentSize, 0) ++
             Bytes.ensureCapacity(Ints.toByteArray(p.segment.merklePath.length), 4, 0) ++
             p.segment.merklePath.foldLeft(Array.empty: Array[Byte]) { (acc, d) =>
               acc ++ d
@@ -55,11 +55,11 @@ object PermaConsensusBlockField {
         val proofsStart = from
         val signatureStart = proofsStart + SignatureLength
         val dataStart = signatureStart + 8
-        val merklePathStart = dataStart + Constants.segmentSize
+        val merklePathStart = dataStart + PermaConstants.segmentSize
 
         val signature = bytes.slice(proofsStart, proofsStart + SignatureLength)
         val signatureIndex = Longs.fromByteArray(bytes.slice(signatureStart, signatureStart + 8))
-        val blockData = bytes.slice(dataStart, dataStart + Constants.segmentSize)
+        val blockData = bytes.slice(dataStart, dataStart + PermaConstants.segmentSize)
         val merklePathSize = Ints.fromByteArray(bytes.slice(merklePathStart, merklePathStart + 4))
         val merklePath = (0 until merklePathSize).map { i =>
           bytes.slice(merklePathStart + 4 + i * HashLength, merklePathStart + 4 + (i + 1) * HashLength)

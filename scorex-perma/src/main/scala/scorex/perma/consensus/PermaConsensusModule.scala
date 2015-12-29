@@ -13,8 +13,8 @@ import scorex.network.NetworkController.SendToNetwork
 import scorex.network.SendToRandom
 import scorex.network.message.Message
 import scorex.perma.network.GetSegmentsMessageSpec
-import scorex.perma.settings.Constants
-import scorex.perma.settings.Constants._
+import scorex.perma.settings.PermaConstants
+import scorex.perma.settings.PermaConstants._
 import scorex.storage.Storage
 import scorex.transaction.TransactionModule
 import scorex.utils.{NTP, ScorexLogging, randomBytes}
@@ -30,10 +30,10 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
                           (implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ConsensusModule[PermaConsensusBlockData] with ScorexLogging {
 
-  val InitialTarget = Constants.initialTarget
+  val InitialTarget = PermaConstants.initialTarget
   val initialTargetPow: BigInt = log2(InitialTarget)
-  val TargetRecalculation = Constants.targetRecalculation
-  val AvgDelay = Constants.averageDelay
+  val TargetRecalculation = PermaConstants.targetRecalculation
+  val AvgDelay = PermaConstants.averageDelay
   val Hash = FastCryptographicHash
   val SSize = Hash.DigestSize
   require(SSize == PermaConsensusBlockField.SLength)
@@ -113,7 +113,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
           None
         }
       case Failure(t) =>
-        val segmentIds: Seq[DataSegmentIndex] = 1.to(Constants.l).map(i => calculateIndex(account.publicKey, i - 1))
+        val segmentIds: Seq[DataSegmentIndex] = 1.to(PermaConstants.l).map(i => calculateIndex(account.publicKey, i - 1))
           .filterNot(authDataStorage.containsKey)
         if (segmentIds.nonEmpty) {
           val blockMsg = Message(GetSegmentsMessageSpec, Right(segmentIds), None)
@@ -157,17 +157,17 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
                                   t: Ticket,
                                   rootHash: Digest): Boolean = Try {
     val proofs = t.proofs
-    require(proofs.size == Constants.k)
+    require(proofs.size == PermaConstants.k)
     require(t.s.length == SSize)
 
     val sigs = NoSig +: proofs.map(_.signature)
     val ris = proofs.map(_.segmentIndex)
-    require(ris(0) == calculateIndex(publicKey, (BigInt(1, Hash(puz ++ publicKey ++ t.s)) % Constants.l).toInt))
+    require(ris(0) == calculateIndex(publicKey, (BigInt(1, Hash(puz ++ publicKey ++ t.s)) % PermaConstants.l).toInt))
 
-    val partialProofsCheck = 1.to(Constants.k).foldLeft(true) { case (partialResult, i) =>
+    val partialProofsCheck = 1.to(PermaConstants.k).foldLeft(true) { case (partialResult, i) =>
       val segment = proofs(i - 1).segment
       val rc = calculateIndex(publicKey,
-        BigInt(1, Hash(puz ++ publicKey ++ proofs(i - 1).signature)).mod(Constants.l).toInt)
+        BigInt(1, Hash(puz ++ publicKey ++ proofs(i - 1).signature)).mod(PermaConstants.l).toInt)
 
       segment.check(ris(i - 1), rootHash)() && {
         val hi = Hash(puz ++ publicKey ++ sigs(i - 1) ++ segment.data)
@@ -189,19 +189,19 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
     val s = randomBytes(SSize)
 
     val sig0 = NoSig
-    val r1 = calculateIndex(publicKey, (BigInt(1, Hash(puz ++ publicKey ++ s)) % Constants.l).toInt)
+    val r1 = calculateIndex(publicKey, (BigInt(1, Hash(puz ++ publicKey ++ s)) % PermaConstants.l).toInt)
 
-    val proofs: IndexedSeq[PartialProof] = 1.to(Constants.k).foldLeft(
+    val proofs: IndexedSeq[PartialProof] = 1.to(PermaConstants.k).foldLeft(
       (r1, sig0, Seq[PartialProof]())
     ) {
       case ((ri, sig_prev, seq), _) =>
         val segment = authDataStorage.get(ri).get
         val hi = Hash(puz ++ publicKey ++ sig_prev ++ segment.data)
         val sig = EllipticCurveImpl.sign(privateKey, hi)
-        val rNext = calculateIndex(publicKey, BigInt(1, Hash(puz ++ publicKey ++ sig)).mod(Constants.l).toInt)
+        val rNext = calculateIndex(publicKey, BigInt(1, Hash(puz ++ publicKey ++ sig)).mod(PermaConstants.l).toInt)
 
         (rNext, sig, seq :+ PartialProof(sig, ri, segment))
-    }._3.toIndexedSeq.ensuring(_.size == Constants.k)
+    }._3.toIndexedSeq.ensuring(_.size == PermaConstants.k)
 
     Ticket(publicKey, s, proofs)
   }
@@ -209,7 +209,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   //calculate index of i-th segment
   private[consensus] def calculateIndex(pubKey: PublicKey, i: Int): Long = {
     val h = Hash(pubKey ++ BigInt(i).toByteArray)
-    BigInt(1, h).mod(Constants.n).toLong
+    BigInt(1, h).mod(PermaConstants.n).toLong
   }
 
   private def calcTarget(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {

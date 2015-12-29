@@ -5,8 +5,8 @@ import java.io.File
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.perma.settings.Constants.DataSegment
-import scorex.perma.settings.{Constants, PermaSettings}
+import scorex.perma.settings.PermaConstants.DataSegment
+import scorex.perma.settings.{PermaConstants, PermaSettings}
 import scorex.perma.storage.AuthDataStorage
 import scorex.settings.Settings
 import scorex.storage.Storage
@@ -29,7 +29,7 @@ class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks
       val s = randomBytes(PermaConsensusBlockField.SLength)
       val signature = randomBytes(PermaConsensusBlockField.SignatureLength)
       val signature2 = randomBytes(PermaConsensusBlockField.SignatureLength)
-      val blockdata = randomBytes(Constants.segmentSize)
+      val blockdata = randomBytes(PermaConstants.segmentSize)
       val hash1 = randomBytes(PermaConsensusBlockField.HashLength)
       val hash2 = randomBytes(PermaConsensusBlockField.HashLength)
 

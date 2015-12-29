@@ -3,7 +3,7 @@ package scorex.perma.settings
 import com.typesafe.config.ConfigFactory
 import scorex.utils.ScorexLogging
 
-object Constants extends ScorexLogging {
+object PermaConstants extends ScorexLogging {
 
   private val permaConf = ConfigFactory.load("perma").getConfig("perma")
 

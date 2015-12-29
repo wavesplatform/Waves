@@ -3,7 +3,7 @@ package scorex.perma.network
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.perma.settings.Constants
+import scorex.perma.settings.PermaConstants
 import scorex.utils._
 
 class SegmentsMessageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
@@ -14,7 +14,7 @@ class SegmentsMessageSpecification extends PropSpec with PropertyChecks with Gen
 
   property("SegmentsMessageSpec: Encode to bytes round-trip") {
     forAll { (indexes: Seq[Long]) =>
-      val ab = AuthDataBlock(randomBytes(Constants.segmentSize), Seq(randomBytes(32),randomBytes(32),randomBytes(32)))
+      val ab = AuthDataBlock(randomBytes(PermaConstants.segmentSize), Seq(randomBytes(32),randomBytes(32),randomBytes(32)))
       val data = indexes.map(i => i -> ab).toMap
       val serialized = segmentsMessageSp.serializeData(data)
       val deserealized = segmentsMessageSp.deserializeData(serialized).get

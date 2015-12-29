@@ -4,7 +4,7 @@ import java.io.File
 
 import org.mapdb.{DBMaker, HTreeMap, Serializer}
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.perma.settings.Constants.{DataSegment, DataSegmentIndex}
+import scorex.perma.settings.PermaConstants.{DataSegment, DataSegmentIndex}
 import scorex.storage.Storage
 import scorex.utils.ScorexLogging
 

@@ -7,8 +7,8 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.ads.merkle.{AuthDataBlock, MerkleTree}
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.perma.settings.Constants.DataSegment
-import scorex.perma.settings.{Constants, PermaSettings}
+import scorex.perma.settings.PermaConstants.DataSegment
+import scorex.perma.settings.{PermaConstants, PermaSettings}
 import scorex.perma.storage.AuthDataStorage
 import scorex.settings.Settings
 import scorex.storage.Storage
@@ -24,13 +24,13 @@ with Matchers with ScorexLogging {
   val treeDir = new File(settings.treeDir)
   treeDir.mkdirs()
   val datasetFile = settings.treeDir + "/data.file"
-  new RandomAccessFile(datasetFile, "rw").setLength(Constants.n * Constants.segmentSize)
+  new RandomAccessFile(datasetFile, "rw").setLength(PermaConstants.n * PermaConstants.segmentSize)
   log.info("Calculate tree")
-  val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, Constants.segmentSize, FastCryptographicHash)
-  require(tree.nonEmptyBlocks == Constants.n, s"${tree.nonEmptyBlocks} == ${Constants.n}")
+  val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, PermaConstants.segmentSize, FastCryptographicHash)
+  require(tree.nonEmptyBlocks == PermaConstants.n, s"${tree.nonEmptyBlocks} == ${PermaConstants.n}")
 
   log.info("Test tree")
-  val index = Constants.n - 3
+  val index = PermaConstants.n - 3
   val leaf = tree.byIndex(index).get
   require(leaf.check(index, tree.rootHash)(FastCryptographicHash))
 
@@ -45,7 +45,7 @@ with Matchers with ScorexLogging {
     }
   }
 
-  addBlock(Constants.n - 1)
+  addBlock(PermaConstants.n - 1)
 
   val rootHash = tree.rootHash
   val consensus = new PermaConsensusModule(rootHash)
