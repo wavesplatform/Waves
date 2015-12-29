@@ -10,8 +10,5 @@ trait Storage[Key, Value] {
 
   def close(): Unit
 
-  def containsKey(key: Key): Boolean = {
-    get(key).isDefined
-  }
-
+  def containsKey(key: Key): Boolean = get(key).isDefined
 }

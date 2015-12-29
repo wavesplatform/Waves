@@ -9,8 +9,8 @@ import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.crypto.singing.SigningFunctions.{PrivateKey, PublicKey}
-import scorex.network.Broadcast
 import scorex.network.NetworkController.SendToNetwork
+import scorex.network.SendToRandom
 import scorex.network.message.Message
 import scorex.perma.network.GetSegmentsMessageSpec
 import scorex.perma.settings.Constants
@@ -43,8 +43,9 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
 
   implicit val consensusModule: ConsensusModule[PermaConsensusBlockData] = this
 
-  def miningReward(block: Block) = if (blockGenerator(block).publicKey sameElements GenesisCreator.publicKey) 0
-  else 1000000
+  private def miningReward(block: Block) =
+    if (blockGenerator(block).publicKey sameElements GenesisCreator.publicKey) 0
+    else 1000000
 
   private def blockGenerator(block: Block) = block.signerDataField.value.generator
 
@@ -85,8 +86,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   def generators(block: Block): Seq[Account] = Seq(blockGenerator(block))
 
   def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
-    val score = initialTargetPow -
-      log2(consensusBlockData(block).target)
+    val score = initialTargetPow - log2(consensusBlockData(block).target)
     if (score > 0) score else 1
   }
 
@@ -118,7 +118,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         if (segmentIds.nonEmpty) {
           val blockMsg = Message(GetSegmentsMessageSpec, Right(segmentIds), None)
           if (networkControllerOpt.isDefined) {
-            networkControllerOpt.get ! SendToNetwork(blockMsg, Broadcast)
+            networkControllerOpt.get ! SendToNetwork(blockMsg, SendToRandom)
           }
           log.warn(s"Failed to generate new ticket, ${segmentIds.length} segments required")
         } else log.warn(s"Failed to generate new ticket", t)
