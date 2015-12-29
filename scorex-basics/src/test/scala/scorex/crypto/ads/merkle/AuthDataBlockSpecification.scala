@@ -17,6 +17,7 @@ class AuthDataBlockSpecification extends PropSpec with PropertyChecks with Gener
       val bytes = AuthDataBlock.encode(b)
       val decoded = AuthDataBlock.decode(bytes).get
       decoded.data shouldBe b.data
+      decoded.merklePath.size shouldBe b.merklePath.size
       decoded.merklePath.head shouldBe b.merklePath.head
       decoded.merklePath(1) shouldBe b.merklePath(1)
     }
