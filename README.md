@@ -27,7 +27,7 @@ Features
 * Modular design
 * Scala language
 * Two 100% Proof-of-Stake consensus algos out of the box, Nxt-like and Qora-like. One algo could be replaced
-with an another with just one line of code edited (in Constants.scala)
+with an another with just one line of code edited (in PermaConstants.scala)
 * Simplest transactional model
 * Asynchronous network layer on top of TCP
 * JSON API

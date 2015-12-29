@@ -5,7 +5,6 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.crypto.hash.FastCryptographicHash
 import FastCryptographicHash._
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.network.ConnectedPeer
 
 import scala.util.{Success, Try}

@@ -18,8 +18,8 @@ import scorex.network._
 import scorex.perma.api.http.PermaConsensusApiRoute
 import scorex.perma.consensus.PermaConsensusModule
 import scorex.perma.network.{PermacoinMessagesRepo, SegmentsSynchronizer}
-import scorex.perma.settings.Constants
-import scorex.perma.settings.Constants._
+import scorex.perma.settings.PermaConstants
+import scorex.perma.settings.PermaConstants._
 import scorex.perma.storage.AuthDataStorage
 import scorex.storage.Storage
 import scorex.transaction._
@@ -48,19 +48,19 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
           log.info("TrustedDealer node")
           val tree = if (Files.exists(Paths.get(settings.treeDir + "/tree0.mapDB"))) {
             log.info("Get existing tree")
-            new MerkleTree(settings.treeDir, Constants.n, Constants.segmentSize, FastCryptographicHash)
+            new MerkleTree(settings.treeDir, PermaConstants.n, PermaConstants.segmentSize, FastCryptographicHash)
           } else {
             log.info("Generating random data set")
             val datasetFile = settings.treeDir + "/data.file"
-            new RandomAccessFile(datasetFile, "rw").setLength(Constants.n * Constants.segmentSize)
+            new RandomAccessFile(datasetFile, "rw").setLength(PermaConstants.n * PermaConstants.segmentSize)
             log.info("Calculate tree")
-            val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, Constants.segmentSize, FastCryptographicHash)
-            require(tree.nonEmptyBlocks == Constants.n, s"${tree.nonEmptyBlocks} == ${Constants.n}")
+            val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, PermaConstants.segmentSize, FastCryptographicHash)
+            require(tree.nonEmptyBlocks == PermaConstants.n, s"${tree.nonEmptyBlocks} == ${PermaConstants.n}")
             tree
           }
           require(settings.rootHash sameElements tree.rootHash, "Tree root hash differs from root hash in settings")
           log.info("Test tree")
-          val index = Constants.n - 3
+          val index = PermaConstants.n - 3
           val leaf = tree.byIndex(index).get
           require(leaf.check(index, tree.rootHash)(FastCryptographicHash))
 
@@ -72,7 +72,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
               addBlock(i - 1)
             }
           }
-          addBlock(Constants.n - 1)
+          addBlock(PermaConstants.n - 1)
         }
         val rootHash = settings.rootHash
 
