@@ -12,7 +12,8 @@ import scala.util.{Failure, Success}
 
 class BlockGenerator(application: Application) extends FSM[Status, Unit] {
 
-  val blockGenerationDelay = 0.second
+  val blockGenerationDelay = application.settings.blockGenerationDelay
+
   startWith(Syncing, Unit)
 
   when(Syncing) {
