@@ -12,13 +12,16 @@ import scala.util.{Failure, Success}
 
 class BlockGenerator(application: Application) extends FSM[Status, Unit] {
 
+  val blockGenerationDelay = 0.second
   startWith(Syncing, Unit)
 
   when(Syncing) {
-    case Event(StartGeneration, _) => goto(Generating)
+    case Event(StartGeneration, _) =>
+      tryToGenerateABlock()
+      goto(Generating)
   }
 
-  when(Generating, 1.second) {
+  when(Generating, 15.seconds) {
     case Event(StateTimeout, _) =>
       tryToGenerateABlock()
       stay()
@@ -42,7 +45,7 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
   def tryToGenerateABlock(): Unit = {
     implicit val transactionalModule = application.transactionModule
 
-    log.info("Trying to generate a new block")
+    if (blockGenerationDelay > 500.milliseconds) log.info("Trying to generate a new block")
     val accounts = application.wallet.privateKeyAccounts()
     application.consensusModule.generateNextBlocks(accounts)(application.transactionModule) onComplete {
       case Success(blocks: Seq[Block]) =>
@@ -50,6 +53,7 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
           val bestBlock = blocks.maxBy(application.consensusModule.blockScore)
           self ! bestBlock
         }
+        context.system.scheduler.scheduleOnce(blockGenerationDelay, self, StateTimeout)
       case Failure(ex) => log.error("Failed to generate new block: {}", ex)
       case m => log.error("Unexpected message: {}", m)
     }

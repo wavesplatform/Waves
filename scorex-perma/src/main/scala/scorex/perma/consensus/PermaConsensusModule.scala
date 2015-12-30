@@ -121,12 +121,9 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
             networkControllerOpt.get ! SendToNetwork(blockMsg, SendToRandom)
           }
           log.warn(s"Failed to generate new ticket, ${segmentIds.length} segments required")
-        } else log.warn(s"Failed to generate new ticket", t)
-        None
+          throw new NotEnoughSegments(segmentIds)
+        } else throw t
     }
-  }.recoverWith { case t: Throwable =>
-    log.error("Error when creating new block", t)
-    Future(None)
   }
 
   override def consensusBlockData(block: Block): PermaConsensusBlockData = block.consensusDataField.value match {
@@ -234,3 +231,5 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
 
   private def log2(i: BigInt): BigInt = BigDecimal(math.log(i.doubleValue()) / math.log(2)).toBigInt()
 }
+
+class NotEnoughSegments(ids: Seq[DataSegmentIndex]) extends Error

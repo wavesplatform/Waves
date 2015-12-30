@@ -7,6 +7,7 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
+import scorex.crypto.encode.Base58
 import scorex.transaction.BlockStorage._
 import scorex.transaction.{BlockTree, TransactionModule}
 import scorex.utils.ScorexLogging
@@ -156,7 +157,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
       case Success(v) =>
         Some(v)
       case Failure(e) =>
-        log.debug("Enable readBlock for key: " + key.mkString)
+        log.debug("Enable readBlock for key: " + Base58.encode(key))
         None
     }
   }

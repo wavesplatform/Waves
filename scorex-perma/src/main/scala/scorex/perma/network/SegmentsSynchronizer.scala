@@ -24,7 +24,7 @@ import shapeless.Typeable._
 class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], storage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ViewSynchronizer with ScorexLogging {
 
-  val MaxSegmentsInMessage = 10
+  private val MaxSegmentsInMessage = 16
 
   override protected val networkControllerRef: ActorRef = application.networkController
 
