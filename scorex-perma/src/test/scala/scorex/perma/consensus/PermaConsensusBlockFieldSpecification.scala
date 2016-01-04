@@ -12,7 +12,7 @@ import scorex.settings.Settings
 import scorex.storage.Storage
 import scorex.utils._
 
-class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
+class PermaConsensusBlockFieldSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
   implicit val settings = new Settings with PermaSettings {
     val filename = "settings-test.json"
