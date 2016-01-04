@@ -69,13 +69,14 @@ javaOptions ++= Seq(
   "-server"
 )
 
+testOptions in Test += Tests.Argument("-oD", "-u", "target/test-reports")
+
 //assembly settings
 assemblyJarName in assembly := "scorex.jar"
 
 test in assembly := {}
 
 mainClass in assembly := Some("scorex.lagonaki.server.Server")
-
 
 //publishing settings
 
