@@ -49,6 +49,7 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], stor
 
       if (segments.forall(s => s._2.check(s._1, rootHash)(FastCryptographicHash))) {
         segments.foreach(s => storage.set(s._1, s._2))
+        storage.commit()
       } else {
         log.warn(s"Incorrect segments from " + remote)
         //TODO blacklisting
