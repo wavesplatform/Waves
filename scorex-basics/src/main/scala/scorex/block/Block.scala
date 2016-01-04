@@ -111,9 +111,6 @@ object Block extends ScorexLogging {
                      (implicit consModule: ConsensusModule[CDT],
                       transModule: TransactionModule[TDT]): Try[Block] = Try {
 
-    require(consModule != null)
-    require(transModule != null)
-
     val version = bytes.head
 
     var position = 1

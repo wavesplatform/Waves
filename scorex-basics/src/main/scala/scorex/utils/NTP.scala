@@ -33,7 +33,7 @@ object NTP extends ScorexLogging {
 
       val info = client.getTime(InetAddress.getByName(NtpServer))
       info.computeDetails()
-      if (info.getOffset != null) offset = info.getOffset
+      if (Option(info.getOffset).isDefined) offset = info.getOffset
     } catch {
       case t: Throwable => log.warn("Problems with NTP: ", t)
     } finally {

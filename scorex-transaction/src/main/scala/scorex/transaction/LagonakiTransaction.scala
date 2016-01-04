@@ -37,14 +37,13 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
   def isSignatureValid(): Boolean
 
   //VALIDATE
-
   def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value
 
   def involvedAmount(account: Account): Long
 
   def balanceChanges(): Map[Account, Long]
 
-  override def equals(other: Any):Boolean = other match {
+  override def equals(other: Any): Boolean = other match {
     case tx: LagonakiTransaction => signature.sameElements(tx.signature)
     case _ => false
   }
