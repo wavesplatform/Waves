@@ -24,7 +24,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 /**
-  * Data and functions related to a consensus algo
+  * Data and functions related to a Permacoin consensus protocol
   */
 class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[ActorRef] = None)
                           (implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
@@ -35,8 +35,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   val TargetRecalculation = PermaConstants.targetRecalculation
   val AvgDelay = PermaConstants.averageDelay
   val Hash = FastCryptographicHash
-  val SSize = Hash.DigestSize
-  require(SSize == PermaConsensusBlockField.SLength)
+  val SSize = Hash.DigestSize.ensuring(_ == PermaConsensusBlockField.SLength)
 
   val GenesisCreator = new PublicKeyAccount(Array.fill(PermaConsensusBlockField.PublicKeyLength)(0: Byte))
   val Version: Byte = 1
@@ -61,9 +60,8 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         if (puzIsValid && targetIsValid && ticketIsValid)
           true
         else {
-          log.debug(
-            s"Non-valid block: puzIsValid=$puzIsValid, targetIsValid=$targetIsValid && ticketIsValid=$ticketIsValid"
-          )
+          log.debug(s"""Non-valid block: puzIsValid=$puzIsValid,
+                        targetIsValid=$targetIsValid && ticketIsValid=$ticketIsValid""")
           false
         }
 
@@ -72,17 +70,9 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
     }
   }
 
-  /**
-    * Fees could go to a single miner(forger) usually, but can go to many parties, e.g. see
-    * Meni Rosenfeld's Proof-of-Activity proposal http://eprint.iacr.org/2014/452.pdf
-    */
   def feesDistribution(block: Block): Map[Account, Long] =
     Map(blockGenerator(block) -> (miningReward(block) + block.transactions.map(_.fee).sum))
 
-  /**
-    * Get block producers(miners/forgers). Usually one miner produces a block, but in some proposals not
-    * (see e.g. Meni Rosenfeld's Proof-of-Activity paper http://eprint.iacr.org/2014/452.pdf)
-    */
   def generators(block: Block): Seq[Account] = Seq(blockGenerator(block))
 
   def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
