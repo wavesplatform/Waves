@@ -12,9 +12,6 @@ import scala.util.{Failure, Success, Try}
 
 class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDataBlock[DataSegment]] with ScorexLogging {
 
-  //TODO https://github.com/jankotek/mapdb/issues/634 workaround
-  private var commitNeeded = false
-
   private val db =
     DBMaker.appendFileDB(new File(fileName))
       .fileMmapEnableIfSupported()
@@ -35,10 +32,7 @@ class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDa
     }
   }
 
-  override def commit(): Unit = if (commitNeeded) {
-    db.commit()
-    commitNeeded = false
-  }
+  override def commit(): Unit = db.commit()
 
   override def close(): Unit = db.close()
 
