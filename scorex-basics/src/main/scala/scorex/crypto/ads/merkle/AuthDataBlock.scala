@@ -51,8 +51,6 @@ object AuthDataBlock {
   }
 
   def decode(bytes: Array[Byte]): Try[AuthDataBlock[Array[Byte]]] = Try {
-    val length = Ints.fromByteArray(bytes.slice(0, 4))
-
     val dataSize = Ints.fromByteArray(bytes.slice(0, 4))
     val merklePathLength = Ints.fromByteArray(bytes.slice(4, 8))
     val merklePathSize = Ints.fromByteArray(bytes.slice(8, 12))
