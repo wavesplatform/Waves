@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.google.common.primitives.Ints
 import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.encode.Base58
@@ -43,10 +44,12 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
 
   def balanceChanges(): Map[Account, Long]
 
-  override def equals(other: Any) = other match {
+  override def equals(other: Any):Boolean = other match {
     case tx: LagonakiTransaction => signature.sameElements(tx.signature)
     case _ => false
   }
+
+  override def hashCode(): Int = Ints.fromByteArray(signature)
 
   protected def jsonBase() = {
     Json.obj("type" -> transactionType.id,
