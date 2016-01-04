@@ -12,7 +12,6 @@ import scala.util.Random
 
 class SegmentsMessageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
-
   val segmentsMessageSp = SegmentsMessageSpec
   val getSegmentsMessageSpec = GetSegmentsMessageSpec
   val (treeDirName: String, _, tempFile: String) = generateFile(PermaConstants.n.toInt)
@@ -47,12 +46,10 @@ class SegmentsMessageSpecification extends PropSpec with PropertyChecks with Gen
     }
   }
 
-
   def generateFile(blocks: Int, subdir: String = "1"): (String, File, String) = {
     val treeDirName = "/tmp/scorex/test/" + subdir + "/"
     val treeDir = new File(treeDirName)
     val tempFile = treeDirName + "/data.file"
-
 
     val data = new Array[Byte](1024 * blocks)
     Random.nextBytes(data)
