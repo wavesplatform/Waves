@@ -63,12 +63,6 @@ Install SBT(Scala Build Tool):
 `apt-get update`
 `apt-get install sbt`
 
-Run test
----
-
-Run `sbt test` to execute all available tests.
-Read more about testing with sbt at [http://www.scala-sbt.org/0.13/docs/Testing.html](http://www.scala-sbt.org/0.13/docs/Testing.html)
-
 Run
 ---
 
@@ -113,7 +107,7 @@ Tests
 ---
 
 Run `sbt test` to run tests.
-
+Read more about testing with sbt at [http://www.scala-sbt.org/0.13/docs/Testing.html](http://www.scala-sbt.org/0.13/docs/Testing.html)
 
 API
 ---
