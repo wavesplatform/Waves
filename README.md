@@ -102,6 +102,13 @@ Some examples of CLI commands:
  * GET blocks/first
  * POST payment {"amount":400, "fee":1, "sender":"2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPNKr","recipient":"Y2BXLjiAhPUMSo8iBbDEhv81VwKnytTXsH"}
 
+
+Tests
+---
+
+Run `sbt test` to run tests.
+
+
 API
 ---
 
