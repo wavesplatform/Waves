@@ -19,18 +19,16 @@ class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDa
       .checksumEnable()
       .make()
 
-  private val map: HTreeMap[DataSegmentIndex, AuthDataBlock[DataSegment]] = db.hashMapCreate("segments")
-    .keySerializer(Serializer.LONG)
-    .makeOrGet()
+  private val map: HTreeMap[DataSegmentIndex, AuthDataBlock[DataSegment]] =
+    db.hashMapCreate("segments")
+      .keySerializer(Serializer.LONG)
+      .makeOrGet()
 
-  override def set(key: DataSegmentIndex, value: AuthDataBlock[DataSegment]): Unit = {
-    Try {
-      map.put(key, value)
-    }.recoverWith { case t: Throwable =>
+  override def set(key: DataSegmentIndex, value: AuthDataBlock[DataSegment]): Unit =
+    Try(map.put(key, value)).recoverWith { case t: Throwable =>
       log.warn("Failed to set key:" + key, t)
       Failure(t)
     }
-  }
 
   override def commit(): Unit = db.commit()
 
@@ -39,9 +37,7 @@ class AuthDataStorage(fileName: String) extends Storage[DataSegmentIndex, AuthDa
   override def containsKey(key: DataSegmentIndex): Boolean = map.containsKey(key)
 
   override def get(key: DataSegmentIndex): Option[AuthDataBlock[DataSegment]] =
-    Try {
-      map.get(key)
-    } match {
+    Try(map.get(key)) match {
       case Success(v) =>
         Option(v)
 
