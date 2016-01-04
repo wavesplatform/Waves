@@ -130,7 +130,6 @@ object Block extends ScorexLogging {
     val consBlockField = consModule.parseBlockData(cBytes).get
     position += cBytesLength
 
-
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val tBytes = bytes.slice(position, position + tBytesLength)
