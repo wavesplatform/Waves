@@ -59,7 +59,8 @@ trait Block extends ScorexLogging {
       transactionDataField.json ++
       signerDataField.json ++
       Json.obj(
-        "fee" -> fee
+        "fee" -> fee,
+        "blocksize" -> bytes.length
       )
 
   lazy val bytes = {
