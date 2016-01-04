@@ -215,9 +215,7 @@ class HistorySynchronizer(application: Application)
         val blockMsg = Message(BlockMessageSpec, Right(block), None)
         networkControllerRef ! SendToNetwork(blockMsg, Broadcast)
       }
-    } else {
-      log.warning(s"Non-valid block: ${block.json} local: $local")
-    }
+    } else log.warning(s"Non-valid block: ${block.json} local: $local")
   }
 }
 
