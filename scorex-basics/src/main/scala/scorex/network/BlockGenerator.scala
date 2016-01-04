@@ -35,7 +35,6 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
   }
 
   whenUnhandled {
-
     case Event(GetStatus, _) =>
       sender() ! stateName.name
       stay()
@@ -80,5 +79,4 @@ object BlockGenerator {
   case object StartGeneration
 
   case object StopGeneration
-
 }
