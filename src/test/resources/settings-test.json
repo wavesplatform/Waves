@@ -11,6 +11,10 @@
     "127.0.0.1",
     "123.123.123.123"
   ],
+  "perma": {
+    "treeDir": "/tmp/scorex/test/data/tree",
+    "authDataStorage": "authDataStorage.mapDB"
+  },
   "max-rollback": 100,
   "history": "blockchain",
   "offline-generation": true
