@@ -27,15 +27,15 @@ class HistorySynchronizer(application: Application)
 
   override val messageSpecs = Seq(ScoreMessageSpec, GetSignaturesSpec, SignaturesSpec, BlockMessageSpec, GetBlockSpec)
 
-  lazy val scoreSyncer = new ScoreNetworkObject(self)
+  private lazy val scoreSyncer = new ScoreNetworkObject(self)
 
-  lazy val history = application.history
+  private lazy val history = application.history
 
-  override lazy val networkControllerRef = application.networkController
+  protected override lazy val networkControllerRef = application.networkController
 
-  lazy val blockGenerator = application.blockGenerator
+  private lazy val blockGenerator = application.blockGenerator
 
-  override def preStart: Unit = {
+  override def preStart(): Unit = {
     super.preStart()
     context.system.scheduler.schedule(1.second, 1.seconds) {
       val msg = Message(ScoreMessageSpec, Right(history.score()), None)
