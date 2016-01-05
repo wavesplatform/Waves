@@ -1,4 +1,4 @@
-Scorex - Lagonaki Release
+Scorex - Lagonaki Release [![Build Status](http://scorextech.gq:8080/buildStatus/icon?job=Scorex-lagonaki)](http://scorextech.gq:8080/job/Scorex-lagonaki)
 =========================
 
 **The modular blockchain framework**
