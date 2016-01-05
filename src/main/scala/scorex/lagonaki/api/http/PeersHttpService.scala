@@ -39,7 +39,7 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
           }
         } {
           case Success(value) => complete(value)
-          case Failure(ex) => failWith(ex)s
+          case Failure(ex) => failWith(ex)
         }
       }
     }
