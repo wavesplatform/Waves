@@ -70,7 +70,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
   private val balances = database.hashMap[Account, Long]("balances")
 
-  private val includedTx: HTreeMap[Array[Byte], Array[Byte]] = database.hashMapCreate("segments")
+  private val includedTx: HTreeMap[Array[Byte], Array[Byte]] = database.hashMapCreate("includedTx")
     .keySerializer(Serializer.BYTE_ARRAY)
     .valueSerializer(Serializer.BYTE_ARRAY)
     .makeOrGet()
@@ -88,7 +88,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
   override def processBlock(block: Block, reversal: Boolean): Try[State] = Try {
     val trans = block.transactionModule.transactions(block)
     trans foreach { tx =>
-      if (!reversal && includedTx.containsKey(tx.signature)) throw new Error("Trying to add transaction twice")
+      if (!reversal && includedTx.containsKey(tx.signature)) throw new Exception("Already included tx")
       else if (!reversal) includedTx.put(tx.signature, block.uniqueId)
       else includedTx.remove(tx.signature, block.uniqueId)
     }
