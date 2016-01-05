@@ -35,7 +35,7 @@ class HistorySynchronizer(application: Application)
 
   private lazy val blockGenerator = application.blockGenerator
 
-  override def preStart(): Unit = {
+  override def preStart: Unit = {
     super.preStart()
     context.system.scheduler.schedule(1.second, 1.seconds) {
       val msg = Message(ScoreMessageSpec, Right(history.score()), None)
@@ -89,8 +89,8 @@ class HistorySynchronizer(application: Application)
   when(GettingBlock) {
     case Event(CheckBlock(blockId), witnesses) =>
       if (blocksToReceive.front.sameElements(blockId)) {
-        val ss = SendToRandomFromChosen(witnesses)
-        val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
+        val sendTo = SendToRandomFromChosen(witnesses)
+        val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), sendTo)
         networkControllerRef ! stn
       }
       stay()
@@ -117,7 +117,10 @@ class HistorySynchronizer(application: Application)
           context.system.scheduler.scheduleOnce(5.seconds)(self ! CheckBlock(blockId))
           stay()
         }
-      } else stay()
+      } else {
+        self ! CheckBlock(blockId)
+        stay()
+      }
   }
 
   //accept only new block from local or remote
@@ -202,10 +205,9 @@ class HistorySynchronizer(application: Application)
 
   initialize()
 
-
   private def processNewBlock(block: Block, local: Boolean) = {
     if (block.isValid) {
-      log.info(s"New block: ${block.json} local: $local")
+      log.info(s"New block(local: $local): ${block.json}")
       transactionalModule.blockStorage.appendBlock(block)
 
       block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
@@ -231,7 +233,5 @@ object HistorySynchronizer {
 
   case object Synced extends Status
 
-
   case class CheckBlock(id: BlockId)
-
 }
