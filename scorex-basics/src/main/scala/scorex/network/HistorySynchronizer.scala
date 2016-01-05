@@ -234,4 +234,5 @@ object HistorySynchronizer {
   case object Synced extends Status
 
   case class CheckBlock(id: BlockId)
+
 }

@@ -193,7 +193,6 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
 
 }
 
-
 object QoraLikeConsensusModule {
   val GeneratorSignatureLength = 64
 }
