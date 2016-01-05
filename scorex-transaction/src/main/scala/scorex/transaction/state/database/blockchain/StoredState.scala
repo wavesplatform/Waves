@@ -5,6 +5,7 @@ import java.io.{DataInput, DataOutput, File}
 import org.mapdb._
 import scorex.account.Account
 import scorex.block.Block
+import scorex.block.Block.BlockId
 import scorex.transaction.state.LagonakiState
 import scorex.transaction.{LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
@@ -141,7 +142,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
   //initialization
   setStateHeight(0)
 
-  override def included(tx: Transaction): Boolean = includedTx.containsKey(tx.signature)
+  override def included(tx: Transaction): Option[BlockId] = Option(includedTx.get(tx.signature))
 
   //for debugging purposes only
   override def toString: String = {

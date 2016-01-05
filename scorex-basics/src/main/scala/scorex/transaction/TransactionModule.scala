@@ -8,7 +8,9 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   def isValid(block: Block): Boolean
 
-  def isValid(block: Transaction): Boolean
+  def isValid(transaction: Transaction, block: Option[Block]): Boolean
+
+  def isValid(transaction: Transaction): Boolean = isValid(transaction, None)
 
   def transactions(block: Block): Seq[Transaction]
 

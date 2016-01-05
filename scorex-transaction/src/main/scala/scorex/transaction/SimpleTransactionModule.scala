@@ -92,7 +92,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
   override def packUnconfirmed(): StoredInBlock = UnconfirmedTransactionsDatabaseImpl.all().filter(isValid)
-    .filter(!blockStorage.state.included(_)).take(MaxTransactionsPerBlock)
+    .filter(blockStorage.state.included(_).isEmpty).take(MaxTransactionsPerBlock)
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
@@ -153,17 +153,35 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     TransactionsBlockField(txs)
   }
 
-  override def isValid(block: Block): Boolean = transactions(block).forall(isValid)
+  override def isValid(block: Block): Boolean = transactions(block).forall(t => isValid(t, Some(block)))
 
-  def isValid(transaction: Transaction): Boolean = transaction match {
+  def isValid(transaction: Transaction, blockOpt: Option[Block]): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.isSignatureValid() && tx.validate()(this) == ValidationResult.ValidateOke && !blockStorage.state.included(tx)
+      val notIncluded: Boolean = blockOpt match {
+        case Some(block) => Try {
+          blockStorage.state.included(tx) match {
+            case None => true
+            case Some(blockId) =>
+              val parent = blockStorage.history.parent(block, settings.MaxRollback).get
+              val headers = blockStorage.history.lookForward(parent.uniqueId, application.settings.MaxBlocksChunks)
+              headers.exists { id =>
+                val block = blockStorage.history.blockById(id).get
+                transactions(block).map(_.signature).exists(_ sameElements tx.signature)
+              }
+          }
+        }.getOrElse(false)
+        case None =>
+          blockStorage.state.included(tx).isEmpty
+      }
+
+      tx.isSignatureValid() && tx.validate()(this) == ValidationResult.ValidateOke && notIncluded
     case gtx: GenesisTransaction =>
-      blockStorage.history.height() == 0 && !blockStorage.state.included(gtx)
+      blockStorage.history.height() == 0
     case otx: Any =>
       log.error(s"Wrong kind of tx: $otx")
       false
   }
+
 }
 
 object SimpleTransactionModule {
