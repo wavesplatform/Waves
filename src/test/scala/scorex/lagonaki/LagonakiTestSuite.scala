@@ -21,7 +21,7 @@ class LagonakiTestSuite extends Suites(
 
 ) with BeforeAndAfterAll {
 
-  override def beforeAll() = {}
+  override protected def beforeAll() = {}
 
-  override def afterAll() = {}
+  override protected def afterAll() = {}
 }

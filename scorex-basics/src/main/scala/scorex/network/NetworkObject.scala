@@ -17,11 +17,11 @@ trait NetworkObject[V] {
 
   private var _consideredValue: Option[ConsideredValue[V]] = None
 
-  def consideredValue = _consideredValue
+  def consideredValue: Option[ConsideredValue[V]] = _consideredValue
 
   def betterThan(newValue: Option[V], oldValue: Option[V]): Boolean
 
-  def networkUpdate(remote: ConnectedPeer, value: V) = {
+  def networkUpdate(remote: ConnectedPeer, value: V): Unit = {
     candidates += remote -> value
     val ct = consider(candidates)
     candidates = ct._3

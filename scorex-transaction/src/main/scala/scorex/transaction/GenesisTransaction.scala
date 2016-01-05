@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import scorex.account.Account
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.crypto.encode.Base58
@@ -17,12 +17,12 @@ case class GenesisTransaction(override val recipient: Account,
   import scorex.transaction.GenesisTransaction._
   import scorex.transaction.LagonakiTransaction._
 
-  override def json() =
+  override def json(): JsObject =
     jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toString)
 
   override lazy val creator: Option[Account] = None
 
-  override def bytes() = {
+  override def bytes(): Array[Byte] = {
     val typeBytes = Array(TransactionType.GenesisTransaction.id.toByte)
 
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
@@ -39,7 +39,7 @@ case class GenesisTransaction(override val recipient: Account,
 
   override lazy val dataLength = TypeLength + BASE_LENGTH
 
-  def isSignatureValid() = {
+  override def isSignatureValid(): Boolean = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GenesisTransaction.id), TypeLength, 0)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
@@ -49,7 +49,7 @@ case class GenesisTransaction(override val recipient: Account,
     Bytes.concat(h, h).sameElements(signature)
   }
 
-  override def validate()(implicit transactionModule: SimpleTransactionModule) =
+  override def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value =
     if (amount < 0) {
       ValidationResult.NegativeAmount
     } else if (!Account.isValidAddress(recipient.address)) {
@@ -69,7 +69,7 @@ object GenesisTransaction {
   private val RECIPIENT_LENGTH = Account.AddressLength
   private val BASE_LENGTH = TimestampLength + RECIPIENT_LENGTH + AmountLength
 
-  def generateSignature(recipient: Account, amount: BigDecimal, timestamp: Long) = {
+  def generateSignature(recipient: Account, amount: BigDecimal, timestamp: Long): Array[Byte] = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GenesisTransaction.id), TypeLength, 0)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
     val amountBytes = amount.bigDecimal.unscaledValue().toByteArray

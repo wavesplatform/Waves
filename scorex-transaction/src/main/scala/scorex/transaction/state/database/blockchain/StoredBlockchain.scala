@@ -160,7 +160,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
       }
     }
 
-  override def toString = ((1 to height()) map { case h =>
+  override def toString: String = ((1 to height()) map { case h =>
     val bl = blockAt(h).get
     s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
   }).mkString("\n")

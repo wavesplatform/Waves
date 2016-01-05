@@ -144,7 +144,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
   override def included(tx: Transaction): Boolean = includedTx.containsKey(tx.signature)
 
   //for debugging purposes only
-  override def toString = {
+  override def toString: String = {
     import scala.collection.JavaConversions._
     balances.mkString("\n")
   }

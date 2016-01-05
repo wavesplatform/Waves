@@ -3,7 +3,7 @@ package scorex.transaction
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -24,13 +24,13 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
   override lazy val creator = Some(sender)
 
-  override def json() = jsonBase() ++ Json.obj(
+  override def json(): JsObject = jsonBase() ++ Json.obj(
     "sender" -> sender.address,
     "recipient" -> recipient.address,
     "amount" -> amount
   )
 
-  override def bytes() = {
+  override def bytes(): Array[Byte] = {
     val typeBytes = Array(TypeId.toByte)
 
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
@@ -44,12 +44,12 @@ case class PaymentTransaction(sender: PublicKeyAccount,
       feeBytes, signature)
   }
 
-  override def isSignatureValid() = {
+  override def isSignatureValid(): Boolean = {
     val data = signatureData(sender, recipient, amount, fee, timestamp)
     EllipticCurveImpl.verify(signature, data, sender.publicKey)
   }
 
-  override def validate()(implicit transactionModule: SimpleTransactionModule) =
+  override def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value =
     if (!Account.isValidAddress(recipient.address)) {
       ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (transactionModule.blockStorage.state.balance(sender.address) < amount + fee) {

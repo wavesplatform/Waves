@@ -10,6 +10,7 @@ import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.network.{ConnectedPeer, NetworkController}
 import spray.http.MediaTypes._
+import spray.routing.Route
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
@@ -28,7 +29,7 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
-  def peers = path("") {
+  def peers: Route = path("") {
     get {
       respondWithMediaType(`application/json`) {
         onComplete {

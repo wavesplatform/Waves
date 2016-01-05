@@ -33,14 +33,13 @@ class PeerManager(settings: Settings) extends ScorexLogging {
   }
 
   def addPeer(peer: InetSocketAddress): Unit =
-    if (!settings.knownPeers.contains(peer))
-      PeerDatabaseImpl.addKnownPeer(peer)
+    if (!settings.knownPeers.contains(peer)) PeerDatabaseImpl.addKnownPeer(peer)
 
 
-  def blacklistPeer(peer: InetSocketAddress) = {
+  def blacklistPeer(peer: InetSocketAddress): Unit = {
     PeerDatabaseImpl.removeConnectedPeer(peer)
     PeerDatabaseImpl.blacklistPeer(peer)
   }
 
-  def isBlacklisted(address: InetSocketAddress) = PeerDatabaseImpl.isBlacklisted(address)
+  def isBlacklisted(address: InetSocketAddress): Boolean = PeerDatabaseImpl.isBlacklisted(address)
 }

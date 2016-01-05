@@ -13,6 +13,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.state.LagonakiState
 import scorex.wallet.Wallet
 import spray.http.MediaTypes._
+import spray.routing.Route
 
 import scala.util.{Failure, Success, Try}
 
@@ -31,7 +32,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
   ))
-  def deleteAddress = {
+  def deleteAddress: Route = {
     path(Segment) { case address =>
       jsonRoute({
         val jsRes = walletNotExists(wallet).getOrElse {
@@ -57,7 +58,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"Base58-encoded\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
   ))
-  def sign = {
+  def sign: Route = {
     path("sign" / Segment) { case address =>
       signPath(address, encode = true)
     }
@@ -72,7 +73,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"plain text\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
   ))
-  def signText = {
+  def signText: Route = {
     path("signText" / Segment) { case address =>
       signPath(address, encode = false)
     }
@@ -91,7 +92,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
       defaultValue = "{\n\t\"message\":\"Base58-encoded message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
     )
   ))
-  def verify = {
+  def verify: Route = {
     path("verify" / Segment) { case address =>
       verifyPath(address, decode = true)
     }
@@ -110,7 +111,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
       defaultValue = "{\n\t\"message\":\"Plain message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
     )
   ))
-  def verifyText = {
+  def verifyText: Route = {
     path("verifyText" / Segment) { case address =>
       verifyPath(address, decode = false)
     }
@@ -122,7 +123,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
   ))
-  def generatingBalance = {
+  def generatingBalance: Route = {
     path("generatingbalance" / Segment) { case address =>
       jsonRoute {
         val jsRes = if (!Account.isValidAddress(address)) {
@@ -143,7 +144,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
   ))
-  def balance = {
+  def balance: Route = {
     path("balance" / Segment) { case address =>
       jsonRoute {
         val jsRes = balanceJson(address, 1)
@@ -158,7 +159,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path"),
     new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "Int", paramType = "path")
   ))
-  def confirmationBalance = {
+  def confirmationBalance: Route = {
     path("balance" / Segment / IntNumber) { case (address, confirmations) =>
       //todo: confirmations parameter doesn't work atm
       jsonRoute {
@@ -172,7 +173,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
   ))
-  def seed = {
+  def seed: Route = {
     path("seed" / Segment) { case address =>
       jsonRoute {
         //CHECK IF WALLET EXISTS
@@ -192,7 +193,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
   ))
-  def validate = {
+  def validate: Route = {
     path("validate" / Segment) { case address =>
       jsonRoute {
         val jsRes = Json.obj("address" -> address, "valid" -> Account.isValidAddress(address))
@@ -203,7 +204,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
 
   @Path("/")
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
-  def root = {
+  def root: Route = {
     path("") {
       jsonRoute {
         val addresses = wallet.privateKeyAccounts().map(_.address)
@@ -214,7 +215,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
 
   @Path("/")
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
-  def create = {
+  def create: Route = {
     path("") {
       jsonRoute({
         val jsRes =

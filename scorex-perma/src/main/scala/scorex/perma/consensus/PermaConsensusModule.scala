@@ -134,7 +134,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   override def formBlockData(data: PermaConsensusBlockData): BlockField[PermaConsensusBlockData] =
     PermaConsensusBlockField(data)
 
-  def generatePuz(block: Block) = Hash(block.bytes)
+  def generatePuz(block: Block): Digest = Hash(block.bytes)
 
   private val NoSig = Array[Byte]()
 

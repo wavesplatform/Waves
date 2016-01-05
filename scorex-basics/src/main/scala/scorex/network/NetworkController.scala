@@ -33,7 +33,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.Port))
 
 
-  override def receive = {
+  override def receive: Receive = {
     case b@Bound(localAddress) =>
       log.info("Successfully bound to the port " + settings.Port)
       context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)

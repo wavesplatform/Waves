@@ -80,23 +80,23 @@ class Wallet(walletFileOpt: Option[File],
 
   def exportAccountSeed(address: String): Option[Array[Byte]] = privateKeyAccount(address).map(_.seed)
 
-  def privateKeyAccount(address: String) = accountsCache.get(address)
+  def privateKeyAccount(address: String): Option[PrivateKeyAccount] = accountsCache.get(address)
 
   def exportSeed(): Array[Byte] = seed
 
-  def close() = if (!database.isClosed) {
+  def close(): Unit = if (!database.isClosed) {
     database.commit()
     database.close()
     accountsCache.clear()
   }
 
-  def exists() = walletFileOpt.map(_.exists()).getOrElse(true)
+  def exists(): Boolean = walletFileOpt.map(_.exists()).getOrElse(true)
 
-  def accounts() = accountsCache.values.toSeq
+  def accounts(): Seq[PrivateKeyAccount] = accountsCache.values.toSeq
 
   def nonce(): Int = database.atomicInteger(NonceFieldName).intValue()
 
-  def setNonce(nonce: Int) = database.atomicInteger(NonceFieldName).set(nonce)
+  def setNonce(nonce: Int): Unit = database.atomicInteger(NonceFieldName).set(nonce)
 
   def getAndIncrementNonce(): Int = database.atomicInteger(NonceFieldName).getAndIncrement()
 }

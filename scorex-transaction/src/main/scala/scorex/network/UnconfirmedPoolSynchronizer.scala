@@ -16,7 +16,7 @@ class UnconfirmedPoolSynchronizer(application: Application) extends ViewSynchron
 
   val transactionModule = application.transactionModule
 
-  override def receive = {
+  override def receive: Receive = {
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
       (tx, transactionModule.isValid(tx)) match {

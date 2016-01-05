@@ -9,9 +9,9 @@ class Account(val address: String) extends Serializable {
 
   lazy val bytes = Base58.decode(address).get
 
-  override def toString = address
+  override def toString: String = address
 
-  override def equals(b: Any) = b match {
+  override def equals(b: Any): Boolean = b match {
     case a: Account => a.address == address
     case _ => false
   }

@@ -35,7 +35,7 @@ class HistorySynchronizer(application: Application)
 
   lazy val blockGenerator = application.blockGenerator
 
-  override def preStart = {
+  override def preStart: Unit = {
     super.preStart()
     context.system.scheduler.schedule(1.second, 1.seconds) {
       val msg = Message(ScoreMessageSpec, Right(history.score()), None)
@@ -203,7 +203,7 @@ class HistorySynchronizer(application: Application)
   initialize()
 
 
-  def processNewBlock(block: Block, local: Boolean) = {
+  private def processNewBlock(block: Block, local: Boolean) = {
     if (block.isValid) {
       log.info(s"New block: ${block.json} local: $local")
       transactionalModule.blockStorage.appendBlock(block)

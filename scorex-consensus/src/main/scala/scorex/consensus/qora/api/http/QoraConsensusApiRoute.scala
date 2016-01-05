@@ -27,7 +27,7 @@ case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, block
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "blockId", value = "Block id", required = true, dataType = "String", paramType = "path")
   ))
-  def generating = {
+  def generating: Route = {
     path("generatingbalance" / Segment) { case encodedSignature =>
       jsonRoute {
         withBlock(blockStorage.history, encodedSignature) { block =>
@@ -41,7 +41,7 @@ case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, block
 
   @Path("/generatingbalance")
   @ApiOperation(value = "Next generating balance", notes = "Generating balance of a next block", httpMethod = "GET")
-  def nextGenerating = {
+  def nextGenerating: Route = {
     path("generatingbalance") {
       jsonRoute {
         val generatingBalance = consensusModule.getNextBlockGeneratingBalance(blockStorage.history)
@@ -55,7 +55,7 @@ case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, block
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "balance", value = "Generating balance", required = true, dataType = "Long", paramType = "path")
   ))
-  def timeForBalance = {
+  def timeForBalance: Route = {
     path("time" / Segment) { case generatingBalance =>
       jsonRoute {
         val jsRes = Try {
@@ -69,7 +69,7 @@ case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, block
 
   @Path("/time")
   @ApiOperation(value = "Time", notes = "Estimated time before next block", httpMethod = "GET")
-  def time = {
+  def time: Route = {
     path("time") {
       jsonRoute {
         val block = blockStorage.history.lastBlock
@@ -82,7 +82,7 @@ case class QoraConsensusApiRoute(consensusModule: QoraLikeConsensusModule, block
 
   @Path("/algo")
   @ApiOperation(value = "Consensus algo", notes = "Shows which consensus algo being using", httpMethod = "GET")
-  def algo = {
+  def algo: Route = {
     path("algo") {
       jsonRoute {
         Json.obj("consensus-algo" -> "qora").toString()

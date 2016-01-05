@@ -9,7 +9,7 @@ trait PeerDatabase {
 
   def allConnectedPeers(peer: InetSocketAddress): Seq[InetSocketAddress]
 
-  def addKnownPeer(peer: InetSocketAddress)
+  def addKnownPeer(peer: InetSocketAddress): Unit
 
   def knownPeers(): Seq[InetSocketAddress]
 

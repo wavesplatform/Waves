@@ -26,7 +26,7 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
     override def deserializeData(bytes: Array[Byte]): Try[Unit] =
       Try(require(bytes.isEmpty, "Non-empty data for GetPeers"))
 
-    override def serializeData(data: Unit) = Array()
+    override def serializeData(data: Unit): Array[Byte] = Array()
   }
 
   object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
@@ -56,7 +56,7 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
       }
     }
 
-    override def serializeData(peers: Seq[InetSocketAddress]) = {
+    override def serializeData(peers: Seq[InetSocketAddress]): Array[Byte] = {
       val length = peers.size
       val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DataLength, 0)
 

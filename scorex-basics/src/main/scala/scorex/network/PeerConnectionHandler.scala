@@ -32,7 +32,7 @@ case class PeerConnectionHandler(application: Application,
 
   val selfPeer = new ConnectedPeer(remote, self)
 
-  override def receive = {
+  override def receive: Receive = {
 
     case msg: message.Message[_] =>
       connection ! Write(ByteString(msg.bytes))
@@ -50,7 +50,7 @@ case class PeerConnectionHandler(application: Application,
           networkControllerRef ! message
 
         case Failure(e) =>
-          log.info(s"Corrupted data from: " + remote,  e)
+          log.info(s"Corrupted data from: " + remote, e)
           connection ! Close
         //context stop self
       }
@@ -74,6 +74,9 @@ case class PeerConnectionHandler(application: Application,
 }
 
 object PeerConnectionHandler {
+
   case object CloseConnection
+
   case object Blacklist
+
 }

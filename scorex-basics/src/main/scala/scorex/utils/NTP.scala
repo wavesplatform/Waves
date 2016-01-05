@@ -11,7 +11,7 @@ object NTP extends ScorexLogging {
   private var lastUpdate = 0L
   private var offset = 0L
 
-  def correctedTime() = {
+  def correctedTime(): Long = {
     //CHECK IF OFFSET NEEDS TO BE UPDATED
     if (System.currentTimeMillis() > lastUpdate + TimeTillUpdate) {
       updateOffSet()

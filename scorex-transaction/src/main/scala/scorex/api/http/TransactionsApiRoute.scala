@@ -7,6 +7,7 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.transaction.state.LagonakiState
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
+import spray.routing.Route
 
 
 @Api(value = "/transactions", description = "Information about transactions")
@@ -25,7 +26,7 @@ case class TransactionsApiRoute(state: LagonakiState)(implicit val context: Acto
     new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "String", paramType = "path"),
     new ApiImplicitParam(name = "limit", value = "Specified number of records to be returned", required = true, dataType = "Long", paramType = "path")
   ))
-  def adressLimit = {
+  def adressLimit: Route = {
     path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
       jsonRoute {
         val txJsons = state.accountTransactions(address)
@@ -41,7 +42,7 @@ case class TransactionsApiRoute(state: LagonakiState)(implicit val context: Acto
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "String", paramType = "path")
   ))
-  def address = {
+  def address: Route = {
     path("address" / Segment) { case address =>
       jsonRoute {
         val txJsons = state.accountTransactions(address).map(_.json())
@@ -52,7 +53,7 @@ case class TransactionsApiRoute(state: LagonakiState)(implicit val context: Acto
 
   @Path("/unconfirmed")
   @ApiOperation(value = "Unconfirmed", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
-  def unconfirmed = {
+  def unconfirmed: Route = {
     path("unconfirmed") {
       jsonRoute {
         Json.arr(UnconfirmedTransactionsDatabaseImpl.all().map(_.json())).toString()

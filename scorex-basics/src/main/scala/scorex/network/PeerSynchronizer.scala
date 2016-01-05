@@ -21,7 +21,7 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
 
   private val peerManager = application.peerManager
 
-  override def preStart = {
+  override def preStart: Unit = {
     super.preStart()
 
     val ntwMsg = Message(GetPeersSpec, Right(), None)
@@ -34,7 +34,7 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
     .map(_.getAddress)
     .toSeq
 
-  override def receive = {
+  override def receive: Receive = {
     case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)
       if msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
 

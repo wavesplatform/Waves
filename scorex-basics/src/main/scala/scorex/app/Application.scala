@@ -75,7 +75,7 @@ trait Application extends ScorexLogging {
     })
   }
 
-  def stopAll() = synchronized {
+  def stopAll(): Unit = synchronized {
     log.info("Stopping message processor")
     networkController ! NetworkController.ShutdownNetwork
 
