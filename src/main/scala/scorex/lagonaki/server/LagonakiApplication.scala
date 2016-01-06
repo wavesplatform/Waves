@@ -46,7 +46,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
         val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
         if (settings.isTrustedDealer) {
           log.info("TrustedDealer node")
-          val tree = if (Files.exists(Paths.get(settings.treeDir + "/tree0.mapDB"))) {
+          val tree = if (Files.exists(Paths.get(settings.treeDir + MerkleTree.TreeFileName + "0.mapDB"))) {
             log.info("Get existing tree")
             new MerkleTree(settings.treeDir, PermaConstants.n, PermaConstants.segmentSize, FastCryptographicHash)
           } else {
