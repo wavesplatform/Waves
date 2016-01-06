@@ -12,7 +12,7 @@ import scala.annotation.tailrec
 
 class MerkleTree[H <: CryptographicHash](treeFolder: String,
                                          val nonEmptyBlocks: Position,
-                                         blockSize: Int = 1024,
+                                         blockSize: Int,
                                          hash: H = FastCryptographicHash
                                         ) extends ScorexLogging {
 
@@ -88,7 +88,7 @@ object MerkleTree {
 
   def fromFile[H <: CryptographicHash](fileName: String,
                                        treeFolder: String,
-                                       blockSize: Int = 1024,
+                                       blockSize: Int,
                                        hash: H = FastCryptographicHash
                                       ): MerkleTree[H] = {
     val byteBuffer = new Array[Byte](blockSize)

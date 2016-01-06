@@ -15,7 +15,7 @@ class SegmentsMessageSpecification extends PropSpec with PropertyChecks with Gen
   val segmentsMessageSp = SegmentsMessageSpec
   val getSegmentsMessageSpec = GetSegmentsMessageSpec
   val (treeDirName: String, _, tempFile: String) = generateFile(PermaConstants.n.toInt)
-  val tree = MerkleTree.fromFile(tempFile, treeDirName)
+  val tree = MerkleTree.fromFile(tempFile, treeDirName, PermaConstants.segmentSize)
 
   property("SegmentsMessageSpec: Encode to bytes round-trip") {
     forAll { (in: Seq[Long]) =>
