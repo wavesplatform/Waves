@@ -12,6 +12,7 @@ import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
 import scorex.crypto.ads.merkle.{AuthDataBlock, MerkleTree}
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRoute}
 import scorex.network._
@@ -53,15 +54,24 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
             val datasetFile = settings.treeDir + "/data.file"
             if (!Files.exists(Paths.get(datasetFile))) {
               log.info("Generating random data set")
-              new RandomAccessFile(datasetFile, "rw").setLength(PermaConstants.n * PermaConstants.segmentSize)
+              val f = new RandomAccessFile(datasetFile, "rw")
+              val padding: Array[Byte] = Array.fill(PermaConstants.segmentSize - 8)(0: Byte)
+              f.setLength(PermaConstants.n * PermaConstants.segmentSize)
+
+              (0L until PermaConstants.n) foreach { i =>
+                f.writeLong(i)
+                f.write(padding)
+              }
             }
             log.info("Calculate tree")
             val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, PermaConstants.segmentSize, FastCryptographicHash)
             require(tree.nonEmptyBlocks == PermaConstants.n, s"${tree.nonEmptyBlocks} == ${PermaConstants.n}")
             tree
           }
-          require(settings.rootHash sameElements tree.rootHash, "Tree root hash differs from root hash in settings")
           log.info("Test tree")
+          require(settings.rootHash sameElements tree.rootHash, "Tree root hash differs from root hash in settings")
+          require(tree.byIndex(PermaConstants.n - 1).isDefined)
+          require(tree.byIndex(PermaConstants.n).isEmpty)
           val index = PermaConstants.n - 3
           val leaf = tree.byIndex(index).get
           require(leaf.check(index, tree.rootHash)(FastCryptographicHash))
