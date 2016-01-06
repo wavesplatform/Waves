@@ -19,6 +19,7 @@ import scorex.storage.Storage
 import scorex.transaction.TransactionModule
 import scorex.utils.{NTP, ScorexLogging, randomBytes}
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
@@ -60,7 +61,8 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         if (puzIsValid && targetIsValid && ticketIsValid)
           true
         else {
-          log.debug(s"""Non-valid block: puzIsValid=$puzIsValid,
+          log.debug(
+            s"""Non-valid block: puzIsValid=$puzIsValid,
                         targetIsValid=$targetIsValid && ticketIsValid=$ticketIsValid""")
           false
         }
@@ -199,24 +201,24 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
     BigInt(1, h).mod(PermaConstants.n).toLong
   }
 
+  private val targetBuf = TrieMap[Int, BigInt]()
+
   private def calcTarget(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val trans = transactionModule.blockStorage.history
     val currentTarget = consensusBlockData(block).target
-    Try {
-      val height = trans.heightOf(block).get
-      if (height % TargetRecalculation == 0 && height > TargetRecalculation) {
+    val height = trans.heightOf(block).get
+    if (height % TargetRecalculation == 0 && height > TargetRecalculation) {
+      def calc = {
         val lastAvgDuration: BigInt = trans.averageDelay(block, TargetRecalculation).get
         val newTarget = currentTarget * lastAvgDuration / 1000 / AvgDelay
+        targetBuf.put(height, newTarget)
         log.debug(s"Height: $height, target:$newTarget vs $currentTarget, lastAvgDuration:$lastAvgDuration")
         newTarget
-      } else {
-        currentTarget
       }
-    }.recoverWith { case t: Throwable =>
-      log.error(s"Error when calculating target: ${t.getMessage}")
-      t.printStackTrace()
-      Success(currentTarget)
-    }.getOrElse(currentTarget)
+      targetBuf.getOrElseUpdate(height, calc)
+    } else {
+      currentTarget
+    }
   }
 
   private def log2(i: BigInt): BigInt = BigDecimal(math.log(i.doubleValue()) / math.log(2)).toBigInt()
