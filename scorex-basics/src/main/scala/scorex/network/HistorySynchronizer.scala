@@ -191,16 +191,10 @@ class HistorySynchronizer(application: Application)
   }
 
   onTransition {
-    case _ -> Syncing =>
-      scoreSyncer.consideredValue.foreach { cv =>
-        self ! cv
-      }
-
-    case _ -> Synced =>
-      blockGenerator ! BlockGenerator.StartGeneration
-
-    case Synced -> _ =>
-      blockGenerator ! BlockGenerator.StopGeneration
+    case from -> to =>
+      if (from == Synced) blockGenerator ! BlockGenerator.StopGeneration
+      if (to == Synced) blockGenerator ! BlockGenerator.StartGeneration
+      if (to == Syncing) scoreSyncer.consideredValue.foreach(cv => self ! cv)
   }
 
   initialize()
