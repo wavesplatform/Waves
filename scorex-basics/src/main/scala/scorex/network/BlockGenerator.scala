@@ -17,9 +17,7 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
   startWith(Syncing, Unit)
 
   when(Syncing) {
-    case Event(StartGeneration, _) =>
-      tryToGenerateABlock()
-      goto(Generating)
+    case Event(StartGeneration, _) => goto(Generating)
   }
 
   when(Generating, 15.seconds) {
@@ -58,6 +56,11 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
       case m => log.error("Unexpected message: {}", m)
     }
   }
+
+  onTransition {
+    case Syncing -> Generating => context.system.scheduler.scheduleOnce(blockGenerationDelay, self, StateTimeout)
+  }
+
 }
 
 object BlockGenerator {
@@ -79,4 +82,5 @@ object BlockGenerator {
   case object StartGeneration
 
   case object StopGeneration
+
 }
