@@ -50,7 +50,7 @@ class HistorySynchronizer(application: Application)
     case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
       val localScore = history.score()
       if (networkScore > localScore) {
-        log.info("networkScore > localScore")
+        log.info(s"networkScore=$networkScore > localScore=$localScore")
         val lastIds = history.lastBlocks(100).map(_.uniqueId)
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
@@ -209,8 +209,11 @@ class HistorySynchronizer(application: Application)
         val blockMsg = Message(BlockMessageSpec, Right(block), None)
         networkControllerRef ! SendToNetwork(blockMsg, Broadcast)
       } else {
+        val oldHeight = history.height()
+        val oldScore = history.score()
         transactionalModule.blockStorage.appendBlock(block)
         block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
+        log.info(s"(height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})")
       }
     } else log.warning(s"Invalid new block(local: $local): ${block.json}")
   }
