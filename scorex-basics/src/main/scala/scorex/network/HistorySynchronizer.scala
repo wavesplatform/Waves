@@ -118,7 +118,7 @@ class HistorySynchronizer(application: Application)
           stay()
         }
       } else {
-        self ! CheckBlock(blockId)
+        self ! CheckBlock(blocksToReceive.front)
         stay()
       }
   }
