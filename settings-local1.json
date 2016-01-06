@@ -16,5 +16,6 @@
     "treeDir": "/tmp/scorex/data1/tree",
     "authDataStorage": "authDataStorage1.mapDB",
     "isTrustedDealer": true
-  }
+  },
+  "blockGenerationDelay": 5000
 }
