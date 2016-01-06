@@ -192,6 +192,7 @@ class HistorySynchronizer(application: Application)
 
   onTransition {
     case from -> to =>
+      log.info(s"transition from $from to $to")
       if (from == Synced) blockGenerator ! BlockGenerator.StopGeneration
       if (to == Synced) blockGenerator ! BlockGenerator.StartGeneration
       if (to == Syncing) scoreSyncer.consideredValue.foreach(cv => self ! cv)
