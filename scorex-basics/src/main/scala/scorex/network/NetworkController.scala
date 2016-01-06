@@ -56,8 +56,10 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
         }
       }
 
-    case c@Connected(remote, local) =>
-      log.info(s"Connected to $remote")
+    //if check as Connected is being sent on Bind also
+    case c@Connected(remote, local) if remote.getAddress.toString != local.getAddress.toString =>
+
+      log.info(s"Connected to $remote, local is: $local")
       connectingPeers -= remote
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
