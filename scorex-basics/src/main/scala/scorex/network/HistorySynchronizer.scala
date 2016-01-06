@@ -212,7 +212,7 @@ class HistorySynchronizer(application: Application)
         transactionalModule.blockStorage.appendBlock(block)
         block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
       }
-    } else log.warning(s"Non-valid block: ${block.json} local: $local")
+    } else log.warning(s"Invalid new block(local: $local): ${block.json}")
   }
 }
 

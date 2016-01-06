@@ -28,5 +28,5 @@ case class SendToChosen(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy
 
 case class SendToRandomFromChosen(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy {
   override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] =
-    Seq(chosenPeers(Random.nextInt(peers.length)))
+    Seq(chosenPeers(Random.nextInt(chosenPeers.length)))
 }
