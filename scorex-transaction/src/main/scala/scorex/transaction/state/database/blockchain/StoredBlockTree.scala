@@ -119,33 +119,38 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
       }
     }
 
+    /**
+      *
+      * @return true when best block added, false when block score is less then current score
+      */
     override def writeBlock(block: Block): Try[Boolean] = Try {
-      if (exists(block)) throw new Error("Block is already in storage")
-      val parent = readBlock(block.referenceField.value)
-      lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
-      parent match {
-        case Some(p) =>
-          if (height() - p._3 > MaxRollback) {
-            throw new Error(s"Trying to add block with too old parent")
-          } else {
-            val s = p._2 + blockScore
-            map.put(block.uniqueId, (block.bytes, s, p._3 + 1))
-            db.commit()
-            if (s > score()) {
+      if (!exists(block)) {
+        val parent = readBlock(block.referenceField.value)
+        lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
+        parent match {
+          case Some(p) =>
+            if (height() - p._3 > MaxRollback) {
+              throw new Error(s"Trying to add block with too old parent")
+            } else {
+              val s = p._2 + blockScore
+              map.put(block.uniqueId, (block.bytes, s, p._3 + 1))
+              db.commit()
+              if (s > score()) {
+                setBestBlockId(block.uniqueId)
+                true
+              } else false
+            }
+          case None => map.isEmpty match {
+            case true =>
               setBestBlockId(block.uniqueId)
+              map.put(block.uniqueId, (block.bytes, blockScore, 1))
+              db.commit()
               true
-            } else false
+            case false =>
+              throw new Error(s"Parent ${block.referenceField.value.mkString} block is not in tree")
           }
-        case None => map.isEmpty match {
-          case true =>
-            setBestBlockId(block.uniqueId)
-            map.put(block.uniqueId, (block.bytes, blockScore, 1))
-            db.commit()
-            true
-          case false =>
-            throw new Error(s"Parent ${block.referenceField.value.mkString} block is not in tree")
         }
-      }
+      } else false
     }
 
     override def exists(blockId: BlockId): Boolean = map.containsKey(blockId)

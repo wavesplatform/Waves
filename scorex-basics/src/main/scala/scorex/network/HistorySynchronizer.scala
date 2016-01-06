@@ -203,14 +203,14 @@ class HistorySynchronizer(application: Application)
   private def processNewBlock(block: Block, local: Boolean) = {
     if (block.isValid) {
       log.info(s"New block(local: $local): ${block.json}")
-      transactionalModule.blockStorage.appendBlock(block)
-
-      block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
 
       //broadcast block only if it is generated locally
       if (local) {
         val blockMsg = Message(BlockMessageSpec, Right(block), None)
         networkControllerRef ! SendToNetwork(blockMsg, Broadcast)
+      } else {
+        transactionalModule.blockStorage.appendBlock(block)
+        block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
       }
     } else log.warning(s"Non-valid block: ${block.json} local: $local")
   }
