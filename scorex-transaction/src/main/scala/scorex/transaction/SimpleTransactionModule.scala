@@ -162,7 +162,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
           blockStorage.state.included(tx) match {
             case None => true
             case Some(blockId) =>
-              val parent = blockStorage.history.parent(block, settings.MaxRollback).get
+              val parent = blockStorage.history.parent(block).get
               val headers = blockStorage.history.lookForward(parent.uniqueId, application.settings.MaxBlocksChunks)
               headers.exists { id =>
                 val block = blockStorage.history.blockById(id).get
