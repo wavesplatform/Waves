@@ -50,9 +50,11 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
             log.info("Get existing tree")
             new MerkleTree(settings.treeDir, PermaConstants.n, PermaConstants.segmentSize, FastCryptographicHash)
           } else {
-            log.info("Generating random data set")
             val datasetFile = settings.treeDir + "/data.file"
-            new RandomAccessFile(datasetFile, "rw").setLength(PermaConstants.n * PermaConstants.segmentSize)
+            if (!Files.exists(Paths.get(datasetFile))) {
+              log.info("Generating random data set")
+              new RandomAccessFile(datasetFile, "rw").setLength(PermaConstants.n * PermaConstants.segmentSize)
+            }
             log.info("Calculate tree")
             val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, PermaConstants.segmentSize, FastCryptographicHash)
             require(tree.nonEmptyBlocks == PermaConstants.n, s"${tree.nonEmptyBlocks} == ${PermaConstants.n}")
