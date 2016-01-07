@@ -14,7 +14,7 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
 
   val dirName = "/tmp/scorex/test/"
   val dir = new File(dirName)
-  dir.mkdir()
+  dir.mkdirs()
   for (file <- dir.listFiles) file.delete
 
   testTree(new StoredBlockTree(Some(dirName)), "File")
