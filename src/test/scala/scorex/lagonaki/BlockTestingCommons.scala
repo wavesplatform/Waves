@@ -5,7 +5,6 @@ import scorex.block.Block
 import scorex.block.Block._
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
-import scorex.utils.randomBytes
 
 import scala.util.Random
 

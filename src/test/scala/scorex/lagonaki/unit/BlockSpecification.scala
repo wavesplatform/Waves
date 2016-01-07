@@ -6,13 +6,37 @@ import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
 import scorex.consensus.qora.{QoraLikeConsensusBlockData, QoraLikeConsensusModule}
 import scorex.lagonaki.TestingCommons
+import scorex.lagonaki.TestingCommons._
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.util.Random
 
 class BlockSpecification extends FunSuite with Matchers with TestingCommons {
 
-  ignore("block generation then validation") {
+  test("Block generation then validation") {
+    implicit val consensusModule = application.consensusModule
+    implicit val transactionModule = application.transactionModule
+    if (transactionModule.blockStorage.history.isEmpty) {
+      transactionModule.blockStorage.appendBlock(Block.genesis())
+    }
+
+
+    val wallet = application.wallet
+    if (wallet.privateKeyAccounts().isEmpty) {
+      wallet.generateNewAccounts(3)
+    }
+    val accounts = wallet.privateKeyAccounts()
+    def genValidBlock(): Block = {
+      Await.result(consensusModule.generateNextBlocks(accounts)(transactionModule), 10.seconds).headOption match {
+        case Some(block: Block) => block
+        case None => genValidBlock()
+      }
+    }
+
+    val block = genValidBlock()
+    block.isValid shouldBe true
   }
 
   import TestingCommons._
