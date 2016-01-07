@@ -1,13 +1,13 @@
 package scorex.lagonaki.unit
 
 import org.scalatest.{FunSuite, Matchers}
-import scorex.account.PrivateKeyAccount
+import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
 import scorex.consensus.qora.{QoraLikeConsensusBlockData, QoraLikeConsensusModule}
 import scorex.lagonaki.TestingCommons
 import scorex.lagonaki.TestingCommons._
-import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
+import scorex.transaction._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -16,13 +16,12 @@ import scala.util.Random
 class BlockSpecification extends FunSuite with Matchers with TestingCommons {
 
   test("Block generation then validation") {
+    // Prepare tests
     implicit val consensusModule = application.consensusModule
     implicit val transactionModule = application.transactionModule
     if (transactionModule.blockStorage.history.isEmpty) {
       transactionModule.blockStorage.appendBlock(Block.genesis())
     }
-
-
     val wallet = application.wallet
     if (wallet.privateKeyAccounts().isEmpty) {
       wallet.generateNewAccounts(3)
@@ -34,9 +33,37 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
         case None => genValidBlock()
       }
     }
+    val genesisAccs = application.blockStorage.history.genesis.transactions.flatMap(_ match {
+      case gtx: GenesisTransaction => Some(gtx.recipient)
+      case _ => None
+    })
+    def genTransaction(senderAcc:PrivateKeyAccount, recipientAcc:Account, amt: Long, fee: Long = 1): Transaction = {
+      transactionModule.createPayment(senderAcc, recipientAcc, amt, fee)
+    }
+    def genValidTransaction: Transaction = {
+      val senderAcc = accounts(Random.nextInt(accounts.size))
+      val senderBalance = transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
+      val fee = Random.nextInt(5).toLong + 1
+      if(senderBalance <= fee ) {
+        genValidTransaction
+      } else {
+        val amt = Math.abs(Random.nextLong() % (senderBalance - fee))
+        genTransaction(senderAcc, accounts(Random.nextInt(accounts.size)), amt, fee)
+      }
+    }
 
+    // Start tests
+    // Gen block without transactions
     val block = genValidBlock()
     block.isValid shouldBe true
+    transactionModule.transactions(block).size shouldBe 0
+    // Gen block with transactions
+    (1 to 100) foreach(i =>  genValidTransaction )
+    val block2 = genValidBlock()
+    block2.isValid shouldBe true
+    transactionModule.transactions(block2).size shouldBe 100
+
+
   }
 
   import TestingCommons._
@@ -106,7 +133,4 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     assert(parsedBlock.signerDataField.value.generator.publicKey.sameElements(gen.publicKey))
   }
 
-  ignore("Base58 serialization/restoring") {
-
-  }
 }
