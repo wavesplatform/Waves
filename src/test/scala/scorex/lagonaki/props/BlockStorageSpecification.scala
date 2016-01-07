@@ -60,7 +60,6 @@ with BlockTestingCommons {
     storage.appendBlock(firstBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs firstBlock.uniqueId
     storage.state.accountTransactions(sender).length shouldBe 1
-    storage.state.accountTransactions(sender).head.fee shouldBe bt
     storage.state.included(firstBlockTransaction).get shouldBe firstBlock.uniqueId
 
     //Add block with the same score to branch point
@@ -68,7 +67,6 @@ with BlockTestingCommons {
     storage.appendBlock(branchedBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs firstBlock.uniqueId
     storage.state.accountTransactions(sender).length shouldBe 1
-    storage.state.accountTransactions(sender).head.fee shouldBe bt
     storage.state.included(firstBlockTransaction).get shouldBe firstBlock.uniqueId
 
     //Add block with the better score to branch point
@@ -76,7 +74,6 @@ with BlockTestingCommons {
     storage.appendBlock(bestBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs bestBlock.uniqueId
     storage.state.accountTransactions(sender).length shouldBe 1
-    storage.state.accountTransactions(sender).head.fee shouldBe biggerBt
     storage.state.included(firstBlockTransaction) shouldBe None
   }
 }
