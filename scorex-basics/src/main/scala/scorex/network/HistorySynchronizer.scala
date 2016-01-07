@@ -186,13 +186,13 @@ class HistorySynchronizer(application: Application)
       stay()
 
     case nonsense: Any =>
-      log.warning(s"HistorySynchronizer: got something strange in the state ($stateName) :: $nonsense")
+      log.warning(s"Got something strange in the state ($stateName) :: $nonsense")
       stay()
   }
 
   onTransition {
     case from -> to =>
-      log.info(s"transition from $from to $to")
+      log.info(s"Transition from $from to $to")
       if (from == Synced) blockGenerator ! BlockGenerator.StopGeneration
       if (to == Synced) blockGenerator ! BlockGenerator.StartGeneration
       if (to == Syncing) scoreSyncer.consideredValue.foreach(cv => self ! cv)
