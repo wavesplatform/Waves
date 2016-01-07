@@ -8,6 +8,7 @@ import scorex.consensus.qora.{QoraLikeConsensusBlockData, QoraLikeConsensusModul
 import scorex.lagonaki.TestingCommons
 import scorex.lagonaki.TestingCommons._
 import scorex.transaction._
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -37,14 +38,14 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
       case gtx: GenesisTransaction => Some(gtx.recipient)
       case _ => None
     })
-    def genTransaction(senderAcc:PrivateKeyAccount, recipientAcc:Account, amt: Long, fee: Long = 1): Transaction = {
+    def genTransaction(senderAcc: PrivateKeyAccount, recipientAcc: Account, amt: Long, fee: Long = 1): Transaction = {
       transactionModule.createPayment(senderAcc, recipientAcc, amt, fee)
     }
     def genValidTransaction: Transaction = {
       val senderAcc = accounts(Random.nextInt(accounts.size))
       val senderBalance = transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
       val fee = Random.nextInt(5).toLong + 1
-      if(senderBalance <= fee ) {
+      if (senderBalance <= fee) {
         genValidTransaction
       } else {
         val amt = Math.abs(Random.nextLong() % (senderBalance - fee))
@@ -53,17 +54,35 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     }
 
     // Start tests
-    // Gen block without transactions
-    val block = genValidBlock()
-    block.isValid shouldBe true
-    transactionModule.transactions(block).size shouldBe 0
     // Gen block with transactions
-    (1 to 100) foreach(i =>  genValidTransaction )
+    val TSize = SimpleTransactionModule.MaxTransactionsPerBlock
+    val transactions = (1 to TSize) map (i => genValidTransaction)
     val block2 = genValidBlock()
     block2.isValid shouldBe true
-    transactionModule.transactions(block2).size shouldBe 100
+    transactionModule.transactions(block2).size shouldBe TSize
+    transactions.foreach(tx => transactionModule.blockStorage.state.included(tx) shouldBe None)
+    transactionModule.blockStorage.appendBlock(block2)
+    transactions.foreach(tx => transactionModule.blockStorage.state.included(tx).get shouldBe block2.uniqueId)
 
+    // Don't include same transactions twice
+    transactions.foreach(tx => transactionModule.onNewOffchainTransaction(tx))
+    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe TSize
+    val b3tx = genValidTransaction
+    val block3 = genValidBlock()
+    block3.isValid shouldBe true
+    transactionModule.transactions(block3).head.signature shouldBe b3tx.signature
 
+    // Branched block with the same transaction
+    transactionModule.onNewOffchainTransaction(b3tx)
+    val block4 = genValidBlock()
+    block4.isValid shouldBe true
+    transactionModule.transactions(block4).head.signature shouldBe b3tx.signature
+
+    // branched block is still valid after apply of another one
+    transactionModule.blockStorage.appendBlock(block3)
+    transactionModule.blockStorage.state.included(b3tx).get shouldBe block3.uniqueId
+    block3.isValid shouldBe true
+    block4.isValid shouldBe true
   }
 
   import TestingCommons._
