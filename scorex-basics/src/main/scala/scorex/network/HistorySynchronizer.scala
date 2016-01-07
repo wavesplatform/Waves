@@ -125,11 +125,6 @@ class HistorySynchronizer(application: Application)
 
   //accept only new block from local or remote
   when(Synced) {
-    case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
-      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
-      processNewBlock(block, local = false)
-      stay()
-
     case Event(block: Block, _) =>
       processNewBlock(block, local = true)
       stay()
@@ -142,6 +137,11 @@ class HistorySynchronizer(application: Application)
 
   //common logic for all the states
   whenUnhandled {
+    case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
+      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
+      processNewBlock(block, local = false)
+      stay()
+
     //init signal(boxed Unit) matching
     case Event(Unit, _) if stateName == initialState =>
       stay()
