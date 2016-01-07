@@ -19,7 +19,7 @@ class PermaConsensusBlockFieldSpecification extends PropSpec with PropertyChecks
   }
   new File(settings.treeDir).mkdirs()
   implicit lazy val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
-  val consensus = new PermaConsensusModule(randomBytes(32))
+  val consensus = new PermaConsensusModule(randomBytes())
 
   property("Encode to bytes round-trip") {
     forAll { (diff: Long, segmentIndex: Long) =>
