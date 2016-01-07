@@ -49,13 +49,13 @@ with BlockTestingCommons {
 
   property("Update to branch with better score") {
     val branchPoint = storage.history.lastBlock
-    val senderSeed = randomBytes(32)
+    val senderSeed = randomBytes()
     val sender = new PrivateKeyAccount(senderSeed)
     val bt = 20
     val biggerBt = 19
 
     //Add block to best chain
-    val firstBlock = genBlock(bt, randomBytes(32), senderSeed, Some(branchPoint.uniqueId))
+    val firstBlock = genBlock(bt, randomBytes(), senderSeed, Some(branchPoint.uniqueId))
     val firstBlockTransaction = firstBlock.transactions.head
     storage.appendBlock(firstBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs firstBlock.uniqueId
@@ -64,7 +64,7 @@ with BlockTestingCommons {
     storage.state.included(firstBlockTransaction).get shouldBe firstBlock.uniqueId
 
     //Add block with the same score to branch point
-    val branchedBlock = genBlock(bt, randomBytes(32), senderSeed, Some(branchPoint.uniqueId))
+    val branchedBlock = genBlock(bt, randomBytes(), senderSeed, Some(branchPoint.uniqueId))
     storage.appendBlock(branchedBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs firstBlock.uniqueId
     storage.state.accountTransactions(sender).length shouldBe 1
@@ -72,7 +72,7 @@ with BlockTestingCommons {
     storage.state.included(firstBlockTransaction).get shouldBe firstBlock.uniqueId
 
     //Add block with the better score to branch point
-    val bestBlock = genBlock(biggerBt, randomBytes(32), senderSeed, Some(branchPoint.uniqueId))
+    val bestBlock = genBlock(biggerBt, randomBytes(), senderSeed, Some(branchPoint.uniqueId))
     storage.appendBlock(bestBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs bestBlock.uniqueId
     storage.state.accountTransactions(sender).length shouldBe 1

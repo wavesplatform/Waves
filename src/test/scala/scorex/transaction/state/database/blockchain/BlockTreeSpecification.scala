@@ -59,22 +59,22 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
       val branchPoint = blockTree.lastBlock
 
       //Add block to best chain
-      val block = genBlock(20, randomBytes(32), randomBytes(32), Some(branchPoint.uniqueId))
+      val block = genBlock(20, randomBytes(), randomBytes(), Some(branchPoint.uniqueId))
       blockTree.appendBlock(block).isSuccess shouldBe true
       blockTree.lastBlock.uniqueId should contain theSameElementsAs block.uniqueId
 
       //Add block with the same score to branch point
-      val branchedBlock = genBlock(20, randomBytes(32), randomBytes(32), Some(branchPoint.uniqueId))
+      val branchedBlock = genBlock(20, randomBytes(), randomBytes(), Some(branchPoint.uniqueId))
       blockTree.appendBlock(branchedBlock).isSuccess shouldBe true
       blockTree.lastBlock.uniqueId should contain theSameElementsAs block.uniqueId
 
       //Add block with the better score to branch point
-      val bestBlock = genBlock(19, randomBytes(32), randomBytes(32), Some(branchPoint.uniqueId))
+      val bestBlock = genBlock(19, randomBytes(), randomBytes(), Some(branchPoint.uniqueId))
       blockTree.appendBlock(bestBlock).isSuccess shouldBe true
       blockTree.lastBlock.uniqueId should contain theSameElementsAs bestBlock.uniqueId
 
       //Add block to subtree with smaller score to make it best subtree
-      val longerTreeBlock = genBlock(19, randomBytes(32), randomBytes(32), Some(branchedBlock.uniqueId))
+      val longerTreeBlock = genBlock(19, randomBytes(), randomBytes(), Some(branchedBlock.uniqueId))
       blockTree.appendBlock(longerTreeBlock).isSuccess shouldBe true
       blockTree.lastBlock.uniqueId should contain theSameElementsAs longerTreeBlock.uniqueId
     }
@@ -82,7 +82,7 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
     property(s"$prefix: Wrong block") {
       val prevS = blockTree.score()
       val prevB = blockTree.lastBlock
-      val wrongBlock = genBlock(19, randomBytes(32), randomBytes(32), Some(randomBytes(51)))
+      val wrongBlock = genBlock(19, randomBytes(), randomBytes(), Some(randomBytes(51)))
 
       //Block with no parent in blockTree
       blockTree.appendBlock(wrongBlock).isSuccess shouldBe false
