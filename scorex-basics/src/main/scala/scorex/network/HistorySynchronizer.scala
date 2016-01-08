@@ -86,7 +86,11 @@ class HistorySynchronizer(application: Application)
       goto(GettingBlock)
   }
 
-  when(GettingBlock) {
+  when(GettingBlock, 15.seconds) {
+    case Event(StateTimeout, _) =>
+      blocksToReceive.clear()
+      goto(Syncing)
+
     case Event(CheckBlock(blockId), witnesses) =>
       if (blocksToReceive.front.sameElements(blockId)) {
         val sendTo = SendToRandomFromChosen(witnesses)
@@ -104,19 +108,26 @@ class HistorySynchronizer(application: Application)
       log.info("Got block: " + blockId)
 
       if (blocksToReceive.front.sameElements(blockId)) {
-        processNewBlock(block, local = false)
-        blocksToReceive.dequeue()
+        if(processNewBlock(block, local = false)) {
+          blocksToReceive.dequeue()
 
-        if (blocksToReceive.isEmpty) {
-          goto(Syncing) using Seq()
+          if (blocksToReceive.isEmpty) {
+            goto(Syncing) using Seq()
+          } else {
+            val blockId = blocksToReceive.front
+            val ss = SendToRandomFromChosen(Seq(remote))
+            val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
+            networkControllerRef ! stn
+            context.system.scheduler.scheduleOnce(5.seconds)(self ! CheckBlock(blockId))
+          }
         } else {
-          val blockId = blocksToReceive.front
-          val ss = SendToRandomFromChosen(Seq(remote))
-          val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
-          networkControllerRef ! stn
-          context.system.scheduler.scheduleOnce(5.seconds)(self ! CheckBlock(blockId))
-          stay()
+          if(!history.contains(block.referenceField.value)) {
+            blocksToReceive.clear()
+            blocksToReceive.enqueue(block.referenceField.value)
+            self ! CheckBlock(block.referenceField.value)
+          }
         }
+        stay()
       } else {
         self ! CheckBlock(blocksToReceive.front)
         stay()
@@ -200,7 +211,7 @@ class HistorySynchronizer(application: Application)
 
   initialize()
 
-  private def processNewBlock(block: Block, local: Boolean) = {
+  private def processNewBlock(block: Block, local: Boolean): Boolean = {
     if (block.isValid) {
       log.info(s"New block(local: $local): ${block.json}")
 
@@ -215,7 +226,11 @@ class HistorySynchronizer(application: Application)
         block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
         log.info(s"(height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})")
       }
-    } else log.warning(s"Invalid new block(local: $local): ${block.json}")
+      true
+    } else {
+      log.warning(s"Invalid new block(local: $local): ${block.json}")
+      false
+    }
   }
 }
 

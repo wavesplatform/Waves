@@ -11,7 +11,7 @@ trait TransactionSettings {
     res
   }
 
-  private val DefaultHistory = "blockchain"
+  private val DefaultHistory = "blocktree"
   lazy val history = (settingsJSON \ "history").asOpt[String].getOrElse(DefaultHistory)
 
   private val DefaultMaxRollback = 100
