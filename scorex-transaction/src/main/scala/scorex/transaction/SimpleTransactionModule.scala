@@ -173,8 +173,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
         case None =>
           blockStorage.state.included(tx).isEmpty
       }
-
-      tx.isSignatureValid() && tx.validate()(this) == ValidationResult.ValidateOke && notIncluded
+      val v = tx.isSignatureValid() && tx.validate()(this) == ValidationResult.ValidateOke && notIncluded
+      if (!v) {
+        log.warn(s"Invalid transaction: ${tx.isSignatureValid()} && ${tx.validate()(this)} == ${ValidationResult.ValidateOke} && ${notIncluded}")
+      }
+      v
     case gtx: GenesisTransaction =>
       blockStorage.history.height() == 0
     case otx: Any =>
