@@ -207,9 +207,9 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
     val trans = transactionModule.blockStorage.history
     val currentTarget = consensusBlockData(block).target
     val height = trans.heightOf(block).get
-    if (height % TargetRecalculation == 0) {
+    if (height % TargetRecalculation == 0 && height > TargetRecalculation) {
       def calc = {
-        val lastAvgDuration: BigInt = trans.averageDelay(block, TargetRecalculation - 1).get
+        val lastAvgDuration: BigInt = trans.averageDelay(block, TargetRecalculation).get
         val newTarget = currentTarget * lastAvgDuration / 1000 / AvgDelay
         targetBuf.put(height, newTarget)
         log.debug(s"Height: $height, target:$newTarget vs $currentTarget, lastAvgDuration:$lastAvgDuration")
