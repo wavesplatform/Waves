@@ -17,8 +17,8 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
   dir.mkdirs()
   for (file <- dir.listFiles) file.delete
 
-  testTree(new StoredBlockTree(Some(dirName)), "File")
-  testTree(new StoredBlockTree(None), "Memory")
+  testTree(new StoredBlockTree(Some(dirName), 100), "File")
+  testTree(new StoredBlockTree(None, 100), "Memory")
 
   def testTree(blockTree: StoredBlockTree, prefix: String): Unit = {
 
