@@ -9,6 +9,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockField}
+import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.transaction.LagonakiTransaction.ValidationResult
@@ -190,7 +191,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
           s" ${ValidationResult.ValidateOke} && $notIncluded")
         v
       case None =>
-        log.warn("Validating transaction without state for it's block in history")
+        log.warn(s"Validating transaction without state for it's block " +
+          Try(Base58.encode(blockOpt.get.referenceField.value)) + " in history")
         false
     }
     case gtx: GenesisTransaction =>

@@ -6,6 +6,7 @@ import org.mapdb._
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.crypto.encode.Base58
 import scorex.transaction.state.LagonakiState
 import scorex.transaction.{LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
@@ -109,7 +110,8 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
     val newHeight = (if (!reversal) stateHeight() + 1 else stateHeight() - 1).ensuring(_ > 0)
     setStateHeight(newHeight)
     database.commit()
-    if (!reversal) StoredState.history.put(block.uniqueId, database.snapshot())
+
+    if (!reversal) StoredState.history.put(Base58.encode(block.uniqueId), database.snapshot())
     this
   }
 
@@ -139,8 +141,8 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
 object StoredState {
 
-  val history = TrieMap[BlockId, DB]()
+  val history = TrieMap[String, DB]()
 
-  def apply(id: BlockId): Option[StoredState] = history.get(id).map(new StoredState(_))
+  def apply(id: BlockId): Option[StoredState] = history.get(Base58.encode(id)).map(new StoredState(_))
 
 }
