@@ -5,6 +5,7 @@ resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositori
 libraryDependencies ++=
     Dependencies.serizalization ++
     Dependencies.akka ++
+    Dependencies.p2p ++
     Dependencies.db ++
     Dependencies.spray ++
     Dependencies.testKit ++
