@@ -8,6 +8,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.TransactionType
+import scorex.transaction.state.LagonakiState
 
 case class PaymentTransaction(sender: PublicKeyAccount,
                               override val recipient: Account,
@@ -49,10 +50,10 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     EllipticCurveImpl.verify(signature, data, sender.publicKey)
   }
 
-  override def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value =
+  override def validate(state:LagonakiState): ValidationResult.Value =
     if (!Account.isValidAddress(recipient.address)) {
       ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (transactionModule.blockStorage.state.balance(sender.address) < amount + fee) {
+    } else if (state.balance(sender.address) < amount + fee) {
       ValidationResult.NoBalance //CHECK IF SENDER HAS ENOUGH MONEY
     } else if (amount <= 0) {
       ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE

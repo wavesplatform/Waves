@@ -5,6 +5,7 @@ import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.{ValidationResult, _}
+import scorex.transaction.state.LagonakiState
 
 import scala.util.Try
 
@@ -37,7 +38,10 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
   def isSignatureValid(): Boolean
 
   //VALIDATE
-  def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value
+  def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value =
+    validate(transactionModule.blockStorage.state)
+
+  def validate(state: LagonakiState): ValidationResult.Value
 
   def involvedAmount(account: Account): Long
 
