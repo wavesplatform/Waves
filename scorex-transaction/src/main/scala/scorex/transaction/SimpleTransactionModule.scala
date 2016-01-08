@@ -162,10 +162,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
   def isValid(transaction: Transaction, blockOpt: Option[Block]): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      val notIncluded: Boolean = blockStorage.state(blockOpt.map(_.uniqueId)).included(tx).isEmpty
-      val v = tx.isSignatureValid() && tx.validate()(this) == ValidationResult.ValidateOke && notIncluded
+      val txState = blockStorage.state(blockOpt.map(_.uniqueId))
+      val notIncluded: Boolean = txState.included(tx).isEmpty
+      val v = tx.isSignatureValid() && tx.validate(txState) == ValidationResult.ValidateOke && notIncluded
       if (!v) {
-        log.warn(s"Invalid transaction: ${tx.isSignatureValid()} && ${tx.validate()(this)} == ${ValidationResult.ValidateOke} && ${notIncluded}")
+        log.warn(s"Invalid transaction: ${tx.isSignatureValid()} && ${tx.validate(txState)} == ${ValidationResult.ValidateOke} && ${notIncluded}")
       }
       v
     case gtx: GenesisTransaction =>
