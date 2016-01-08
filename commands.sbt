@@ -6,6 +6,7 @@ val recompile = taskKey[File]("Recompile project")
 val start = taskKey[Unit]("Connect to the network")
 val startLocal1 = taskKey[Unit]("Run local peer with settings-local1.json")
 val startLocal2 = taskKey[Unit]("Run local peer with settings-local2.json")
+val startLocal3 = taskKey[Unit]("Run local peer with settings-local3.json")
 val startLocal = taskKey[Unit]("Run both peers")
 
 recompile := {
@@ -24,6 +25,10 @@ startLocal1 := {
 
 startLocal2 := {
   runPeer(JarPath, "settings-local2.json")
+}
+
+startLocal3 := {
+  runPeer(JarPath, "settings-local3.json")
 }
 
 startLocal := {
