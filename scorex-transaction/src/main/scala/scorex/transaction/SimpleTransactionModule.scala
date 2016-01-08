@@ -1,6 +1,9 @@
 package scorex.transaction
 
+import java.io.File
+
 import com.google.common.primitives.{Bytes, Ints}
+import org.mapdb.DBMaker
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
@@ -61,11 +64,29 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
 
-    override def state(id: Option[BlockId]) = s
+    override def state(idOpt: Option[BlockId]): Option[StoredState] = idOpt match {
+      case None => Some(currentState)
+      case Some(b) => StoredState(b)
+    }
 
-    override def state = state(None)
+    override def state: StoredState = currentState
 
-    private val s = new StoredState(settings.dataDirOpt)
+    private val currentState = settings.dataDirOpt match {
+      case Some(dataFolder) =>
+        log.debug("DB loaded from {}", dataFolder)
+        val db = DBMaker.fileDB(new File(dataFolder + s"/state"))
+          .closeOnJvmShutdown()
+          .cacheSize(2048)
+          .checksumEnable()
+          .snapshotEnable()
+          .fileMmapEnable()
+          .make()
+        db.rollback() //clear uncommitted data from possibly invalid last run
+        new StoredState(db)
+
+      case None => new StoredState(DBMaker.memoryDB().snapshotEnable().make())
+    }
+
   }
 
   /**
@@ -161,19 +182,23 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
   override def isValid(block: Block): Boolean = transactions(block).forall(t => isValid(t, Some(block)))
 
   def isValid(transaction: Transaction, blockOpt: Option[Block]): Boolean = transaction match {
-    case tx: PaymentTransaction =>
-      val txState = blockStorage.state(blockOpt.map(_.uniqueId))
-      val notIncluded: Boolean = txState.included(tx).isEmpty
-      val v = tx.isSignatureValid() && tx.validate(txState) == ValidationResult.ValidateOke && notIncluded
-      if (!v) {
-        log.warn(s"Invalid transaction: ${tx.isSignatureValid()} && ${tx.validate(txState)} == ${ValidationResult.ValidateOke} && ${notIncluded}")
-      }
-      v
+    case tx: PaymentTransaction => blockStorage.state(blockOpt.map(_.referenceField.value)) match {
+      case Some(txState) =>
+        val notIncluded: Boolean = txState.included(tx).isEmpty
+        val v = tx.isSignatureValid() && tx.validate(txState) == ValidationResult.ValidateOke && notIncluded
+        if (!v) log.warn(s"Invalid transaction: ${tx.isSignatureValid()} && ${tx.validate(txState)} ==" +
+          s" ${ValidationResult.ValidateOke} && $notIncluded")
+        v
+      case None =>
+        log.warn("Validating transaction without state for it's block in history")
+        false
+    }
     case gtx: GenesisTransaction =>
       blockStorage.history.height() == 0
     case otx: Any =>
       log.error(s"Wrong kind of tx: $otx")
       false
+
   }
 
 }

@@ -1,6 +1,6 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.{DataInput, DataOutput, File}
+import java.io.{DataInput, DataOutput}
 
 import org.mapdb._
 import scorex.account.Account
@@ -10,6 +10,7 @@ import scorex.transaction.state.LagonakiState
 import scorex.transaction.{LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
 
+import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
 
@@ -18,7 +19,7 @@ import scala.util.Try
   * If no datafolder provided, blockchain lives in RAM (intended for tests only)
   */
 
-class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with ScorexLogging {
+class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
   private object AccSerializer extends Serializer[Account] {
     override def serialize(dataOutput: DataOutput, a: Account): Unit =
@@ -51,22 +52,6 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
     }
   }
 
-
-  private val database: DB = dataFolderOpt match {
-    case Some(dataFolder) =>
-      log.debug("DB loaded from {}", dataFolder)
-      val db = DBMaker.fileDB(new File(dataFolder + s"/state"))
-        .closeOnJvmShutdown()
-        .cacheSize(2048)
-        .checksumEnable()
-        .fileMmapEnable()
-        .make()
-      db.rollback() //clear uncommitted data from possibly invalid last run
-      db
-
-    case None => DBMaker.memoryDB().make()
-  }
-
   private val StateHeight = "height"
 
   private val balances = database.hashMap[Account, Long]("balances")
@@ -83,6 +68,9 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
     null)
 
   def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
+
+  //initialization
+  if (Option(stateHeight()).isEmpty) setStateHeight(0)
 
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
@@ -121,6 +109,7 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
     val newHeight = (if (!reversal) stateHeight() + 1 else stateHeight() - 1).ensuring(_ > 0)
     setStateHeight(newHeight)
     database.commit()
+    if (!reversal) StoredState.history.put(block.uniqueId, database.snapshot())
     this
   }
 
@@ -139,9 +128,6 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
   override def watchAccountTransactions(account: Account): Unit = accountTransactions.put(account, Array())
 
 
-  //initialization
-  setStateHeight(0)
-
   override def included(tx: Transaction): Option[BlockId] = Option(includedTx.get(tx.signature))
 
   //for debugging purposes only
@@ -149,4 +135,12 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
     import scala.collection.JavaConversions._
     balances.mkString("\n")
   }
+}
+
+object StoredState {
+
+  val history = TrieMap[BlockId, DB]()
+
+  def apply(id: BlockId): Option[StoredState] = history.get(id).map(new StoredState(_))
+
 }
