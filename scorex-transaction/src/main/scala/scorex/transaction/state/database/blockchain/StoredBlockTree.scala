@@ -18,7 +18,7 @@ import scala.util.{Failure, Success, Try}
 /**
   * If no datafolder provided, blocktree lives in RAM (useful for tests)
   */
-class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
+class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
                      (implicit consensusModule: ConsensusModule[_],
                       transactionModule: TransactionModule[_])
   extends BlockTree with ScorexLogging {
