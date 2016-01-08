@@ -6,6 +6,7 @@ import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.{ValidationResult, _}
 import scorex.transaction.state.LagonakiState
+import scorex.transaction.state.database.blockchain.StoredState
 
 import scala.util.Try
 
@@ -41,7 +42,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
   def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value =
     validate(transactionModule.blockStorage.state)
 
-  def validate(state: LagonakiState): ValidationResult.Value
+  def validate(state: BalanceSheet): ValidationResult.Value
 
   def involvedAmount(account: Account): Long
 

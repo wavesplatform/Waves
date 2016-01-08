@@ -50,7 +50,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     EllipticCurveImpl.verify(signature, data, sender.publicKey)
   }
 
-  override def validate(state:LagonakiState): ValidationResult.Value =
+  override def validate(state: BalanceSheet): ValidationResult.Value =
     if (!Account.isValidAddress(recipient.address)) {
       ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (state.balance(sender.address) < amount + fee) {

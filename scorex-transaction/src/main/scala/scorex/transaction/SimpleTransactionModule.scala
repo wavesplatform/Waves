@@ -4,6 +4,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
+import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockField}
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
@@ -59,7 +60,12 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
         log.error(s"Unknown history storage: $s. Use StoredBlockchain...")
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
-    override val state = new StoredState(settings.dataDirOpt)
+
+    override def state(id: Option[BlockId]) = s
+
+    override def state = state(None)
+
+    private val s = new StoredState(settings.dataDirOpt)
   }
 
   /**
@@ -156,22 +162,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
   def isValid(transaction: Transaction, blockOpt: Option[Block]): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      val notIncluded: Boolean = blockOpt match {
-        case Some(block) => Try {
-          blockStorage.state.included(tx) match {
-            case None => true
-            case Some(blockId) =>
-              val parent = blockStorage.history.parent(block).get
-              val headers = blockStorage.history.lookForward(parent.uniqueId, application.settings.MaxBlocksChunks)
-              headers.exists { id =>
-                val block = blockStorage.history.blockById(id).get
-                transactions(block).map(_.signature).exists(_ sameElements tx.signature)
-              }
-          }
-        }.getOrElse(false)
-        case None =>
-          blockStorage.state.included(tx).isEmpty
-      }
+      val notIncluded: Boolean = blockStorage.state(blockOpt.map(_.uniqueId)).included(tx).isEmpty
       val v = tx.isSignatureValid() && tx.validate()(this) == ValidationResult.ValidateOke && notIncluded
       if (!v) {
         log.warn(s"Invalid transaction: ${tx.isSignatureValid()} && ${tx.validate()(this)} == ${ValidationResult.ValidateOke} && ${notIncluded}")

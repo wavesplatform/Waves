@@ -55,7 +55,6 @@ trait Application extends ScorexLogging {
   val blockStorage: BlockStorage
 
   lazy val history: History = blockStorage.history
-  lazy val state: State = blockStorage.state
 
   lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistorySynchronizer")
 
