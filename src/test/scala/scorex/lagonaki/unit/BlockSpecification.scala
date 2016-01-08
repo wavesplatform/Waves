@@ -84,7 +84,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     // branched block is still valid after apply of another one
     transactionModule.blockStorage.appendBlock(block3)
     transactionModule.blockStorage.state.included(b3tx).get shouldBe block3.uniqueId
-//    block3.isValid shouldBe true // TODO block in blockchain should be valid
+    block3.isValid shouldBe true
     block4.isValid shouldBe true
   }
 

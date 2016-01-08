@@ -81,19 +81,21 @@ trait Block extends ScorexLogging {
   lazy val bytesWithoutSignature = bytes.dropRight(EllipticCurveImpl.SignatureLength)
 
   def isValid: Boolean = {
-    val v = consensusModule.isValid(this) &&
-      transactionModule.isValid(this) &&
-      transactionModule.blockStorage.history.contains(referenceField.value) &&
-      EllipticCurveImpl.verify(signerDataField.value.signature,
-        bytesWithoutSignature,
-        signerDataField.value.generator.publicKey)
-    if (!v) log.debug(
-      s"Block checks: ${consensusModule.isValid(this)} && ${transactionModule.isValid(this)} && " +
-        s"${transactionModule.blockStorage.history.contains(referenceField.value)} && " +
-        EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
+    if (!transactionModule.blockStorage.history.contains(this)) {
+      val v = consensusModule.isValid(this) &&
+        transactionModule.isValid(this) &&
+        transactionModule.blockStorage.history.contains(referenceField.value) &&
+        EllipticCurveImpl.verify(signerDataField.value.signature,
+          bytesWithoutSignature,
           signerDataField.value.generator.publicKey)
-    )
-    v
+      if (!v) log.debug(
+        s"Block checks: ${consensusModule.isValid(this)} && ${transactionModule.isValid(this)} && " +
+          s"${transactionModule.blockStorage.history.contains(referenceField.value)} && " +
+          EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
+            signerDataField.value.generator.publicKey)
+      )
+      v
+    } else true
   }
 
   override def equals(obj: scala.Any): Boolean = {
