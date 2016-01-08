@@ -83,6 +83,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
           .fileMmapEnable()
           .make()
         db.rollback() //clear uncommitted data from possibly invalid last run
+        if (!history.isEmpty) StoredState.history.put(Base58.encode(history.lastBlock.uniqueId), db.snapshot())
         new StoredState(db)
 
       case None => new StoredState(DBMaker.memoryDB().snapshotEnable().make())
