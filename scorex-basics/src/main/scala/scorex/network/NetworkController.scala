@@ -1,6 +1,6 @@
 package scorex.network
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 
 import akka.actor._
 import akka.io.Tcp._
@@ -9,10 +9,11 @@ import scorex.app.Application
 import scorex.network.message.{Message, MessageSpec}
 import scorex.utils.ScorexLogging
 
+import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 
 //must be singleton
@@ -29,6 +30,33 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   private val connectingPeers = mutable.Buffer[InetSocketAddress]()
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
+
+  {
+    settings.declaredAddress.map { myAddress =>
+      Try {
+        val uri = new URI("http://" + myAddress)
+        val myHost = uri.getHost
+        val myAddrs = InetAddress.getAllByName(myHost)
+
+        NetworkInterface.getNetworkInterfaces.exists { intf =>
+            intf.getInterfaceAddresses.exists { intfAddr =>
+              val extAddr = intfAddr.getAddress
+              myAddrs.contains(extAddr)
+            }
+          } match {
+            case true => true
+            case false =>
+              if (settings.upnpEnabled) {
+                val extAddr = application.upnp.externalAddress
+                myAddrs.contains(extAddr)
+              } else false
+          }
+      }.recover{case t:Throwable =>
+          log.error("Declared address validation failed: ", t)
+          false
+      }.getOrElse(false)
+    }
+  }
 
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port))
 
@@ -59,13 +87,13 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     //if check as Connected is being sent on Bind also
     case c@Connected(remote, local) =>
 
-        log.info(s"Connected to $remote, local is: $local")
-        connectingPeers -= remote
-        val connection = sender()
-        val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
-        connection ! Register(handler)
-        connectedPeers += remote -> new ConnectedPeer(remote, handler)
-        peerManager.peerConnected(remote)
+      log.info(s"Connected to $remote, local is: $local")
+      connectingPeers -= remote
+      val connection = sender()
+      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
+      connection ! Register(handler)
+      connectedPeers += remote -> new ConnectedPeer(remote, handler)
+      peerManager.peerConnected(remote)
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)

@@ -39,9 +39,8 @@ trait Application extends ScorexLogging {
 
   lazy val basicMessagesSpecsRepo = new BasicMessagesRepo()
 
-  private lazy val upnp = new UPnP(settings)
-
   //p2p
+  lazy val upnp = new UPnP(settings)
   if (settings.upnpEnabled) upnp.addPort(settings.port)
 
   lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
@@ -63,6 +62,9 @@ trait Application extends ScorexLogging {
   lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistorySynchronizer")
 
   def run() {
+    log.debug(s"SvailableProcessors = ${Runtime.getRuntime.availableProcessors}")
+    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
+
     checkGenesis()
 
     IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
