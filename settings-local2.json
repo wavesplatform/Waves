@@ -4,6 +4,7 @@
 		"upnp": true,
 		"upnpGatewayTimeout": 7000,
 		"upnpDiscoverTimeout": 3000,
+		"port": 9084,
 		"knownPeers": [
 			"5.9.86.168"
 		],

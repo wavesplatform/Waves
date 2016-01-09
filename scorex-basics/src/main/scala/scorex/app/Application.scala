@@ -5,11 +5,11 @@ import akka.io.IO
 import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
+import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
-import scorex.network.{BlockGenerator, HistorySynchronizer, NetworkController, PeerSynchronizer}
 import scorex.settings.Settings
-import scorex.transaction.{BlockStorage, History, State, TransactionModule}
+import scorex.transaction.{BlockStorage, History, TransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import spray.can.Http
@@ -39,7 +39,11 @@ trait Application extends ScorexLogging {
 
   lazy val basicMessagesSpecsRepo = new BasicMessagesRepo()
 
+  private lazy val upnp = new UPnP(settings)
+
   //p2p
+  if (settings.upnpEnabled) upnp.addPort(settings.port)
+
   lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
 
   lazy val peerManager = new PeerManager(settings)
@@ -75,7 +79,8 @@ trait Application extends ScorexLogging {
   }
 
   def stopAll(): Unit = synchronized {
-    log.info("Stopping message processor")
+    log.info("Stopping network services")
+    if (settings.upnpEnabled) upnp.deletePort(settings.port)
     networkController ! NetworkController.ShutdownNetwork
 
     log.info("Stopping actors (incl. block generator)")

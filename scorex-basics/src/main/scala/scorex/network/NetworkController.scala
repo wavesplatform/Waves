@@ -30,16 +30,16 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
-  IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.Port))
+  IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port))
 
 
   override def receive: Receive = {
     case b@Bound(localAddress) =>
-      log.info("Successfully bound to the port " + settings.Port)
+      log.info("Successfully bound to the port " + settings.port)
       context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)
 
     case CommandFailed(_: Bind) =>
-      log.error("Network port " + settings.Port + " already in use!")
+      log.error("Network port " + settings.port + " already in use!")
       context stop self
       application.stopAll()
 

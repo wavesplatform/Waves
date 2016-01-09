@@ -15,8 +15,6 @@ import scala.util.Try
 
 trait Settings extends ScorexLogging {
 
-  lazy val Port = 9084
-
   val filename: String
 
   lazy val settingsJSON: JsObject = Try {
@@ -45,7 +43,7 @@ trait Settings extends ScorexLogging {
   lazy val knownPeers = Try {
     (p2pSettings \ "knownPeers").as[List[String]].flatMap { addr =>
       val inetAddress = InetAddress.getByName(addr)
-      if (inetAddress == InetAddress.getLocalHost) None else Some(new InetSocketAddress(inetAddress, Port))
+      if (inetAddress == InetAddress.getLocalHost) None else Some(new InetSocketAddress(inetAddress, port))
     }
   }.getOrElse(Seq[InetSocketAddress]())
   lazy val bindAddress = (p2pSettings \ "bindAddress").asOpt[String].getOrElse(DefaultBindAddress)
@@ -55,7 +53,8 @@ trait Settings extends ScorexLogging {
   lazy val upnpEnabled = (p2pSettings \ "upnp").asOpt[Boolean].getOrElse(true)
   lazy val upnpGatewayTimeout = (p2pSettings \ "upnpGatewayTimeout").asOpt[Int]
   lazy val upnpDiscoverTimeout = (p2pSettings \ "upnpDiscoverTimeout").asOpt[Int]
-
+  lazy val port = (p2pSettings \ "port").asOpt[Int].getOrElse(9084)
+  lazy val declaredAddress = (p2pSettings \ "myAddress").asOpt[String]
 
   lazy val rpcPort = (settingsJSON \ "rpcPort").asOpt[Int].getOrElse(DefaultRpcPort)
   lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcAllowed").asOpt[List[String]].getOrElse(DefaultRpcAllowed.split(""))
