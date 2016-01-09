@@ -1,21 +1,26 @@
 {
-  "bindAddress": "127.0.0.1",
-  "knownpeers": [
-    "5.9.86.168"
-  ],
-  "walletdir": "/tmp/scorex/wallet",
-  "walletpassword": "cookies",
-  "walletseed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
-  "datadir": "/tmp/scorex/data",
-  "minconnections": 10,
-  "rpcport": 9085,
-  "rpcallowed": [
+  "p2p":{
+    "bindAddress": "127.0.0.1",
+    "upnp": true,
+    "upnpGatewayTimeout": 7000,
+    "upnpDiscoverTimeout": 3000,
+    "knownPeers": [
+      "5.9.86.168"
+    ],
+    "maxConnections": 10
+  },
+  "walletDir": "/tmp/scorex/wallet",
+  "walletPassword": "cookies",
+  "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
+  "dataDir": "/tmp/scorex/data",
+  "rpcPort": 9085,
+  "rpcAllowed": [
     "127.0.0.1",
     "123.123.123.123"
   ],
-  "max-rollback": 100,
+  "maxRollback": 100,
   "blockGenerationDelay": 0,
-  "offline-generation": true,
+  "offlineGeneration": true,
   "perma": {
     "treeDir": "/tmp/scorex/data/tree",
     "authDataStorage": "permatree.db"
