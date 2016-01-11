@@ -90,7 +90,7 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
       blockTree.lastBlock.uniqueId should contain theSameElementsAs prevB.uniqueId
 
       //Apply same block twice
-      blockTree.appendBlock(prevB).isSuccess shouldBe false
+      blockTree.appendBlock(prevB).isSuccess shouldBe true
       blockTree.score() shouldBe prevS
       blockTree.lastBlock.uniqueId should contain theSameElementsAs prevB.uniqueId
     }
