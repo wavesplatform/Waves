@@ -32,6 +32,8 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
 
     def readBlock(id: BlockId): Option[StoredBlock]
 
+    def readBlock(block: Block): Option[StoredBlock] = readBlock(block.uniqueId)
+
     def filter(f: Block => Boolean): Seq[StoredBlock] = {
       @tailrec
       def iterate(b: StoredBlock, f: Block => Boolean, acc: Seq[StoredBlock] = Seq.empty): Seq[StoredBlock] = {
@@ -124,7 +126,8 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
       * @return true when best block added, false when block score is less then current score
       */
     override def writeBlock(block: Block): Try[Boolean] = Try {
-      require(!exists(block))
+      if (exists(block)) log.warn(s"Trying to add block ${Base58.encode(block.uniqueId)} that is already in tree "
+        + s" at height ${readBlock(block).map(_._3)}")
       val parent = readBlock(block.referenceField.value)
       lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
       parent match {

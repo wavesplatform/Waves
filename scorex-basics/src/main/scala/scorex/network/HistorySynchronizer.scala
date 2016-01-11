@@ -228,6 +228,7 @@ class HistorySynchronizer(application: Application)
             block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
             log.info(s"(height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})")
           case Failure(e) =>
+            e.printStackTrace
             log.warning(s"failed to append block: $e")
         }
         appending.isSuccess
