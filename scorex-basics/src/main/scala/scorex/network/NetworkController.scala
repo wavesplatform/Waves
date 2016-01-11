@@ -54,8 +54,8 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     }.recover { case t: Throwable =>
       log.error("Declared address validation failed: ", t)
       false
-    }.getOrElse(true)
-  }.ensuring(_ == true, "Declared address isn't valid")
+    }.getOrElse(false)
+  }.getOrElse(true).ensuring(_ == true, "Declared address isn't valid")
 
   log.info(s"Declared address: ${settings.declaredAddress}")
 

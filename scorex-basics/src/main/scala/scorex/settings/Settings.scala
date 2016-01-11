@@ -1,6 +1,6 @@
 package scorex.settings
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
@@ -38,14 +38,17 @@ trait Settings extends ScorexLogging {
     f.exists()
   }
 
+  //p2p
+  lazy val DefaultPort = 9084
   lazy val p2pSettings = settingsJSON \ "p2p"
 
   lazy val localOnly = (p2pSettings \ "localOnly").asOpt[Boolean].getOrElse(false)
 
   lazy val knownPeers = Try {
-    (p2pSettings \ "knownPeers").as[List[String]].flatMap { addr =>
-      val inetAddress = InetAddress.getByName(addr)
-      if (inetAddress == InetAddress.getLocalHost) None else Some(new InetSocketAddress(inetAddress, port))
+    (p2pSettings \ "knownPeers").as[List[String]].map { addr =>
+      val addrParts = addr.split(":")
+      val port = if(addrParts.size == 2) addrParts(1).toInt else DefaultPort
+      new InetSocketAddress(addrParts(0), port)
     }
   }.getOrElse(Seq[InetSocketAddress]())
   lazy val bindAddress = (p2pSettings \ "bindAddress").asOpt[String].getOrElse(DefaultBindAddress)
@@ -55,7 +58,7 @@ trait Settings extends ScorexLogging {
   lazy val upnpEnabled = (p2pSettings \ "upnp").asOpt[Boolean].getOrElse(true)
   lazy val upnpGatewayTimeout = (p2pSettings \ "upnpGatewayTimeout").asOpt[Int]
   lazy val upnpDiscoverTimeout = (p2pSettings \ "upnpDiscoverTimeout").asOpt[Int]
-  lazy val port = (p2pSettings \ "port").asOpt[Int].getOrElse(9084)
+  lazy val port = (p2pSettings \ "port").asOpt[Int].getOrElse(DefaultPort)
   lazy val declaredAddress = (p2pSettings \ "myAddress").asOpt[String]
 
   //p2p settings assertions
