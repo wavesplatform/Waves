@@ -80,6 +80,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
     private def setBestBlockId(newId: BlockId) = {
       bestBlockId = newId
       bestBlockStorage.put(0, newId)
+      db.commit()
     }
 
     override def lookForward(parentSignature: BlockId, howMany: Height): Seq[BlockId] = Try {
