@@ -13,7 +13,7 @@ import shapeless.Typeable._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 //todo: write tests
 class HistorySynchronizer(application: Application)
@@ -108,7 +108,7 @@ class HistorySynchronizer(application: Application)
       log.info("Got block: " + blockId)
 
       if (blocksToReceive.front.sameElements(blockId)) {
-        if(processNewBlock(block, local = false)) {
+        if (processNewBlock(block, local = false)) {
           blocksToReceive.dequeue()
 
           if (blocksToReceive.isEmpty) {
@@ -120,12 +120,11 @@ class HistorySynchronizer(application: Application)
             networkControllerRef ! stn
             context.system.scheduler.scheduleOnce(5.seconds)(self ! CheckBlock(blockId))
           }
-        } else {
-          if(!history.contains(block.referenceField.value)) {
-            blocksToReceive.clear()
-            blocksToReceive.enqueue(block.referenceField.value)
-            self ! CheckBlock(block.referenceField.value)
-          }
+        } else if (!history.contains(block.referenceField.value)) {
+          log.warning("No parent block in history")
+          blocksToReceive.clear()
+          blocksToReceive.enqueue(block.referenceField.value)
+          self ! CheckBlock(block.referenceField.value)
         }
         stay()
       } else {
@@ -219,14 +218,20 @@ class HistorySynchronizer(application: Application)
       if (local) {
         val blockMsg = Message(BlockMessageSpec, Right(block), None)
         networkControllerRef ! SendToNetwork(blockMsg, Broadcast)
+        true
       } else {
         val oldHeight = history.height()
         val oldScore = history.score()
-        transactionalModule.blockStorage.appendBlock(block)
-        block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-        log.info(s"(height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})")
+        val appending = transactionalModule.blockStorage.appendBlock(block)
+        appending match {
+          case Success(_) =>
+            block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
+            log.info(s"(height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})")
+          case Failure(e) =>
+            log.warning(s"failed to append block: $e")
+        }
+        appending.isSuccess
       }
-      true
     } else {
       log.warning(s"Invalid new block(local: $local): ${block.json}")
       false
