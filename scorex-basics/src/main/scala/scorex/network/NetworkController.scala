@@ -31,7 +31,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
-
   //check own declared address for validity
   settings.declaredAddress.map { myAddress =>
     Try {
@@ -57,6 +56,8 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       false
     }.getOrElse(true)
   }.ensuring(_ == true, "Declared address isn't valid")
+
+  log.info(s"Declared address: ${settings.declaredAddress}")
 
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port))
 
