@@ -40,6 +40,8 @@ trait Settings extends ScorexLogging {
 
   lazy val p2pSettings = settingsJSON \ "p2p"
 
+  lazy val localOnly = (p2pSettings \ "localOnly").asOpt[Boolean].getOrElse(false)
+
   lazy val knownPeers = Try {
     (p2pSettings \ "knownPeers").as[List[String]].flatMap { addr =>
       val inetAddress = InetAddress.getByName(addr)
@@ -55,6 +57,10 @@ trait Settings extends ScorexLogging {
   lazy val upnpDiscoverTimeout = (p2pSettings \ "upnpDiscoverTimeout").asOpt[Int]
   lazy val port = (p2pSettings \ "port").asOpt[Int].getOrElse(9084)
   lazy val declaredAddress = (p2pSettings \ "myAddress").asOpt[String]
+
+  //p2p settings assertions
+  assert(!(localOnly && upnpEnabled), "Both localOnly and upnp enabled")
+  //todo: localOnly & declaredAddress
 
   lazy val rpcPort = (settingsJSON \ "rpcPort").asOpt[Int].getOrElse(DefaultRpcPort)
   lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcAllowed").asOpt[List[String]].getOrElse(DefaultRpcAllowed.split(""))
