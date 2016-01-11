@@ -105,29 +105,27 @@ class HistorySynchronizer(application: Application)
       val blockId = block.uniqueId
       log.info("Got block: " + blockId)
 
-      if (blocksToReceive.nonEmpty && blocksToReceive.front.sameElements(blockId)) {
-        if (processNewBlock(block, local = false)) {
-          blocksToReceive.dequeue()
+      if (processNewBlock(block, local = false)) {
+        if (blocksToReceive.nonEmpty && blocksToReceive.front.sameElements(blockId)) blocksToReceive.dequeue()
 
-          if (blocksToReceive.isEmpty) {
-            goto(Syncing) using Seq()
-          } else {
-            val blockId = blocksToReceive.front
-            val ss = SendToRandomFromChosen(Seq(remote))
-            val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
-            networkControllerRef ! stn
-            context.system.scheduler.scheduleOnce(5.seconds)(self ! CheckBlock(blockId))
-          }
-        } else if (!history.contains(block.referenceField.value)) {
-          log.warning("No parent block in history")
-          blocksToReceive.clear()
-          blocksToReceive.enqueue(block.referenceField.value)
-          self ! CheckBlock(block.referenceField.value)
+        if (blocksToReceive.nonEmpty) {
+          val blockId = blocksToReceive.front
+          val ss = SendToRandomFromChosen(Seq(remote))
+          val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
+          networkControllerRef ! stn
+          context.system.scheduler.scheduleOnce(5.seconds)(self ! CheckBlock(blockId))
         }
-      } else if (blocksToReceive.nonEmpty) {
-        self ! CheckBlock(blocksToReceive.front)
+      } else if (!history.contains(block.referenceField.value)) {
+        log.warning("No parent block in history")
+        blocksToReceive.clear()
+        blocksToReceive.enqueue(block.referenceField.value)
       }
-      stay()
+      if (blocksToReceive.isEmpty) {
+        self ! CheckBlock(blocksToReceive.front)
+        stay()
+      } else {
+        goto(Syncing) using Seq()
+      }
   }
 
   //accept only new block from local or remote
