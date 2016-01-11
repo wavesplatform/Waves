@@ -1,6 +1,7 @@
 package scorex.lagonaki.server
 
 import scorex.transaction.GenesisTransaction
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
@@ -17,6 +18,7 @@ object Server extends App with ScorexLogging {
 
     log.debug("LagonakiApplication has been started")
     application.run()
+    require(StoredState(application.blockStorage.history.lastBlock.uniqueId).isDefined)
     if (application.settings.offlineGeneration) {
       testingScript(application)
     } else {
