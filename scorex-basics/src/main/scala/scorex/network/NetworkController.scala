@@ -31,32 +31,32 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
-  {
-    settings.declaredAddress.map { myAddress =>
-      Try {
-        val uri = new URI("http://" + myAddress)
-        val myHost = uri.getHost
-        val myAddrs = InetAddress.getAllByName(myHost)
 
-        NetworkInterface.getNetworkInterfaces.exists { intf =>
-            intf.getInterfaceAddresses.exists { intfAddr =>
-              val extAddr = intfAddr.getAddress
-              myAddrs.contains(extAddr)
-            }
-          } match {
-            case true => true
-            case false =>
-              if (settings.upnpEnabled) {
-                val extAddr = application.upnp.externalAddress
-                myAddrs.contains(extAddr)
-              } else false
-          }
-      }.recover{case t:Throwable =>
-          log.error("Declared address validation failed: ", t)
-          false
-      }.getOrElse(false)
-    }
-  }
+  //check own declared address for validity
+  settings.declaredAddress.map { myAddress =>
+    Try {
+      val uri = new URI("http://" + myAddress)
+      val myHost = uri.getHost
+      val myAddrs = InetAddress.getAllByName(myHost)
+
+      NetworkInterface.getNetworkInterfaces.exists { intf =>
+        intf.getInterfaceAddresses.exists { intfAddr =>
+          val extAddr = intfAddr.getAddress
+          myAddrs.contains(extAddr)
+        }
+      } match {
+        case true => true
+        case false =>
+          if (settings.upnpEnabled) {
+            val extAddr = application.upnp.externalAddress
+            myAddrs.contains(extAddr)
+          } else false
+      }
+    }.recover { case t: Throwable =>
+      log.error("Declared address validation failed: ", t)
+      false
+    }.getOrElse(true)
+  }.ensuring(_ == true, "Declared address isn't valid")
 
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port))
 
