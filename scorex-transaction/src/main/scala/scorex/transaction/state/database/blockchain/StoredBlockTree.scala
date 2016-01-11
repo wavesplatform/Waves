@@ -139,7 +139,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
             val s = p._2 + blockScore
             map.put(block.uniqueId, (block.bytes, s, p._3 + 1))
             db.commit()
-            if (s > score()) {
+            if (s >= score()) {
               setBestBlockId(block.uniqueId)
               true
             } else false
