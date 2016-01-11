@@ -92,7 +92,7 @@ class HistorySynchronizer(application: Application)
       goto(Syncing)
 
     case Event(CheckBlock(blockId), witnesses) =>
-      if (blocksToReceive.front.sameElements(blockId)) {
+      if (blocksToReceive.nonEmpty && blocksToReceive.front.sameElements(blockId)) {
         val sendTo = SendToRandomFromChosen(witnesses)
         val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), sendTo)
         networkControllerRef ! stn
@@ -102,12 +102,10 @@ class HistorySynchronizer(application: Application)
     case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
 
-      require(blocksToReceive.nonEmpty)
-
       val blockId = block.uniqueId
       log.info("Got block: " + blockId)
 
-      if (blocksToReceive.front.sameElements(blockId)) {
+      if (blocksToReceive.nonEmpty && blocksToReceive.front.sameElements(blockId)) {
         if (processNewBlock(block, local = false)) {
           blocksToReceive.dequeue()
 
@@ -126,11 +124,10 @@ class HistorySynchronizer(application: Application)
           blocksToReceive.enqueue(block.referenceField.value)
           self ! CheckBlock(block.referenceField.value)
         }
-        stay()
-      } else {
+      } else if (blocksToReceive.nonEmpty) {
         self ! CheckBlock(blocksToReceive.front)
-        stay()
       }
+      stay()
   }
 
   //accept only new block from local or remote
