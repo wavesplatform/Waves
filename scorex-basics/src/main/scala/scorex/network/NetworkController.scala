@@ -32,35 +32,44 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
   //check own declared address for validity
-  settings.declaredAddress.map { myAddress =>
-    Try {
-      val uri = new URI("http://" + myAddress)
-      val myHost = uri.getHost
-      val myAddrs = InetAddress.getAllByName(myHost)
+  if(!settings.localOnly) {
+    settings.declaredAddress.map { myAddress =>
+      Try {
+        val uri = new URI("http://" + myAddress)
+        val myHost = uri.getHost
+        val myAddrs = InetAddress.getAllByName(myHost)
 
-      NetworkInterface.getNetworkInterfaces.exists { intf =>
-        intf.getInterfaceAddresses.exists { intfAddr =>
-          val extAddr = intfAddr.getAddress
-          myAddrs.contains(extAddr)
-        }
-      } match {
-        case true => true
-        case false =>
-          if (settings.upnpEnabled) {
-            val extAddr = application.upnp.externalAddress
+        NetworkInterface.getNetworkInterfaces.exists { intf =>
+          intf.getInterfaceAddresses.exists { intfAddr =>
+            val extAddr = intfAddr.getAddress
             myAddrs.contains(extAddr)
-          } else false
-      }
-    }.recover { case t: Throwable =>
-      log.error("Declared address validation failed: ", t)
-      false
-    }.getOrElse(false)
-  }.getOrElse(true).ensuring(_ == true, "Declared address isn't valid")
+          }
+        } match {
+          case true => true
+          case false =>
+            if (settings.upnpEnabled) {
+              val extAddr = application.upnp.externalAddress
+              myAddrs.contains(extAddr)
+            } else false
+        }
+      }.recover { case t: Throwable =>
+        log.error("Declared address validation failed: ", t)
+        false
+      }.getOrElse(false)
+    }.getOrElse(true).ensuring(_ == true, "Declared address isn't valid")
+  }
+
+  lazy val ownAddress = settings.declaredAddress.map(InetAddress.getByName).orElse {
+    if (settings.upnpEnabled) application.upnp.externalAddress else None
+  }
+
+  ownAddress.foreach { declaredAddress =>
+    peerManager.addPeer(new InetSocketAddress(declaredAddress, settings.port))
+  }
 
   log.info(s"Declared address: ${settings.declaredAddress}")
 
   IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port))
-
 
   override def receive: Receive = {
     case b@Bound(localAddress) =>
@@ -76,7 +85,9 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       if (connectedPeers.size < settings.maxConnections) {
         peerManager.randomPeer() match {
           case Some(peer) =>
-            if (!connectedPeers.contains(peer) && !connectingPeers.contains(peer)) {
+            if (!connectedPeers.contains(peer) &&
+              !connectingPeers.contains(peer) &&
+              !ownAddress.contains(peer.getAddress)) {
               connectingPeers += peer
               val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
               IO(Tcp) ! Connect(peer, timeout = connTimeout)
@@ -87,20 +98,23 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
     //if check as Connected is being sent on Bind also
     case c@Connected(remote, local) =>
-      if(connectingPeers.contains(remote)) {
+      val connection = sender()
+      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
+      connection ! Register(handler)
+      connectedPeers += remote -> new ConnectedPeer(remote, handler)
+
+      if (connectingPeers.contains(remote)) {
         log.info(s"Connected to $remote, local is: $local")
         connectingPeers -= remote
-        val connection = sender()
-        val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
-        connection ! Register(handler)
-        connectedPeers += remote -> new ConnectedPeer(remote, handler)
-        peerManager.peerConnected(remote)
+        peerManager.onPeerConnected(remote)
+      } else {
+        log.info(s"Got incoming connection from $remote")
       }
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
       connectingPeers -= c.remoteAddress
-      peerManager.peerDisconnected(c.remoteAddress)
+      peerManager.onPeerDisconnected(c.remoteAddress)
 
     case CommandFailed(cmd: Tcp.Command) =>
       log.info("Failed to execute command : " + cmd)
@@ -113,7 +127,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
     case PeerDisconnected(remote) =>
       connectedPeers -= remote
-      peerManager.peerDisconnected(remote)
+      peerManager.onPeerDisconnected(remote)
 
     case RegisterMessagesHandler(specs, handler) =>
       messageHandlers += specs.map(_.messageCode) -> handler
@@ -140,7 +154,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     case SendToNetwork(message, sendingStrategy) =>
       sendingStrategy.choose(connectedPeers.values.toSeq).foreach(_.handlerRef ! message)
 
-    case GetPeers => sender() ! connectedPeers.values.toSeq
+    case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
 
     case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
   }
@@ -159,7 +173,7 @@ object NetworkController {
 
   case object ShutdownNetwork
 
-  case object GetPeers
+  case object GetConnectedPeers
 
   case class PeerDisconnected(address: InetSocketAddress)
 

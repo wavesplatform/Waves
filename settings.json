@@ -1,12 +1,12 @@
 {
   "p2p":{
-    "bindAddress": "127.0.0.1",
+    "bindAddress": "0.0.0.0",
     "upnp": true,
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
     "port": 9084,
     "knownPeers": [
-      "5.9.86.168"
+      "23.94.190.226"
     ],
     "maxConnections": 10
   },

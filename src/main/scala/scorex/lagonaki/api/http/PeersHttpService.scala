@@ -33,7 +33,7 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
     get {
       respondWithMediaType(`application/json`) {
         onComplete {
-          (application.networkController ? NetworkController.GetPeers).map { peers =>
+          (application.networkController ? NetworkController.GetConnectedPeers).map { peers =>
             Json.obj("peers" -> Json.arr(peers.asInstanceOf[Seq[ConnectedPeer]]
               .map(_.address.toString))).toString()
           }
