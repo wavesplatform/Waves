@@ -96,9 +96,11 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
     }
 
     property(s"$prefix: Look forward") {
-      assert(blockTree.height() > 1)
-      val newBlocks = blockTree.lookForward(genesis.uniqueId, 10)
-      assert(newBlocks.nonEmpty)
+      blockTree.height() should be > 1
+      forAll(Gen.choose(1, 100)) { (limit: Int) =>
+        val newBlocks = blockTree.lookForward(genesis.uniqueId, limit)
+        newBlocks.size shouldBe Math.min(limit, blockTree.height() - 1)
+      }
     }
   }
 }
