@@ -69,21 +69,24 @@ class HistorySynchronizer(application: Application)
       if msgId == SignaturesSpec.messageCode &&
         blockIds.cast[Seq[Block.BlockId]].isDefined &&
         witnesses.contains(remote) => //todo: ban if non-expected sender
+      val newBLockIds = blockIds.filter(!history.contains(_))
+      log.info(s"Got SignaturesMessage with ${blockIds.length} sigs, ${newBLockIds.size} are new")
 
-      log.info(s"Got SignaturesMessage with ${blockIds.length} sigs")
       val common = blockIds.head
       assert(application.history.contains(common)) //todo: what if not?
       Try(application.blockStorage.removeAfter(common)) //todo we don't need this call for blockTree
 
       blocksToReceive.clear()
 
-      blockIds.tail.foreach { blockId =>
-        blocksToReceive += blockId
-      }
+      if (newBLockIds.nonEmpty) {
+        newBLockIds.foreach { blockId =>
+          blocksToReceive += blockId
+        }
 
-      val firstReq = blockIds.tail.head
-      networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(firstReq), None), SendToChosen(Seq(remote)))
-      goto(GettingBlock)
+        networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blocksToReceive.front), None),
+          SendToChosen(Seq(remote)))
+        goto(GettingBlock)
+      } else goto(Syncing)
   }
 
   when(GettingBlock, 15.seconds) {
@@ -142,11 +145,6 @@ class HistorySynchronizer(application: Application)
 
   //common logic for all the states
   whenUnhandled {
-    case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
-      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
-      processNewBlock(block, local = false)
-      stay()
-
     //init signal(boxed Unit) matching
     case Event(Unit, _) if stateName == initialState =>
       stay()
