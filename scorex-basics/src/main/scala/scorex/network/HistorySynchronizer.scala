@@ -120,7 +120,7 @@ class HistorySynchronizer(application: Application)
         blocksToReceive.clear()
         blocksToReceive.enqueue(block.referenceField.value)
       }
-      if (blocksToReceive.isEmpty) {
+      if (blocksToReceive.nonEmpty) {
         self ! CheckBlock(blocksToReceive.front)
         stay()
       } else {
