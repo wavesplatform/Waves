@@ -87,18 +87,19 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
     //if check as Connected is being sent on Bind also
     case c@Connected(remote, local) =>
-
-      log.info(s"Connected to $remote, local is: $local")
-      connectingPeers -= remote
-      val connection = sender()
-      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
-      connection ! Register(handler)
-      connectedPeers += remote -> new ConnectedPeer(remote, handler)
-      peerManager.peerConnected(remote)
+      if(connectingPeers.contains(remote)) {
+        log.info(s"Connected to $remote, local is: $local")
+        connectingPeers -= remote
+        val connection = sender()
+        val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
+        connection ! Register(handler)
+        connectedPeers += remote -> new ConnectedPeer(remote, handler)
+        peerManager.peerConnected(remote)
+      }
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
-      connectedPeers -= c.remoteAddress
+      connectingPeers -= c.remoteAddress
       peerManager.peerDisconnected(c.remoteAddress)
 
     case CommandFailed(cmd: Tcp.Command) =>
@@ -113,7 +114,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     case PeerDisconnected(remote) =>
       connectedPeers -= remote
       peerManager.peerDisconnected(remote)
-
 
     case RegisterMessagesHandler(specs, handler) =>
       messageHandlers += specs.map(_.messageCode) -> handler
