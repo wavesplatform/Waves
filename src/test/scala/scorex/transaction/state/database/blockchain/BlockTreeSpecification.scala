@@ -63,8 +63,8 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
       blockTree.appendBlock(block).isSuccess shouldBe true
       blockTree.lastBlock.uniqueId should contain theSameElementsAs block.uniqueId
 
-      //Add block with the same score to branch point
-      val branchedBlock = genBlock(20, randomBytes(), randomBytes(), Some(branchPoint.uniqueId))
+      //Add block with lower score to branch point
+      val branchedBlock = genBlock(21, randomBytes(), randomBytes(), Some(branchPoint.uniqueId))
       blockTree.appendBlock(branchedBlock).isSuccess shouldBe true
       blockTree.lastBlock.uniqueId should contain theSameElementsAs block.uniqueId
 
