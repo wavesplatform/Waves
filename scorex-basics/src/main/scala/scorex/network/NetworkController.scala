@@ -131,7 +131,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
     case c@Connected(remote, local) =>
       val connection = sender()
-      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
+      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote, nodeNonce))
       connection ! Register(handler)
       val newPeer = new ConnectedPeer(remote, handler)
       connectedPeers += remote -> newPeer
