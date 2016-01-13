@@ -27,7 +27,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   private lazy val peerManager = application.peerManager
 
   private val connectedPeers = mutable.Map[InetSocketAddress, ConnectedPeer]()
-  private val connectingPeers = mutable.Buffer[InetSocketAddress]()
+  private var connectingPeer: Option[InetSocketAddress] = None
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
@@ -120,16 +120,12 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   def peerLogic: Receive = {
     case CheckPeers =>
-      if (connectedPeers.size < settings.maxConnections) {
-        peerManager.randomPeer() match {
-          case Some(peer) =>
-            if (!connectedPeers.contains(peer) &&
-              !connectingPeers.contains(peer) &&
-              !externalAddress.contains(peer.getAddress)) {
-              connectingPeers += peer
-              IO(Tcp) ! Connect(peer, localAddress = None, timeout = connTimeout)
-            }
-          case None =>
+      if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
+        peerManager.randomPeer().foreach { peer =>
+          if (!connectedPeers.contains(peer)) {
+            connectingPeer = Some(peer)
+            IO(Tcp) ! Connect(peer, localAddress = None, timeout = connTimeout)
+          }
         }
       }
 
@@ -148,9 +144,9 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
         System.currentTimeMillis() / 1000
       )
 
-      if (connectingPeers.contains(remote)) {
+      if (connectingPeer.contains(remote)) {
         log.info(s"Connected to $remote, local is: $local")
-        connectingPeers -= remote
+        connectingPeer = None
         peerManager.onPeerConnected(remote)
       } else {
         log.info(s"Got incoming connection from $remote")
@@ -158,7 +154,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
-      connectingPeers -= c.remoteAddress
+      connectingPeer = None
       peerManager.onPeerDisconnected(c.remoteAddress)
 
     case PeerDisconnected(remote) =>
