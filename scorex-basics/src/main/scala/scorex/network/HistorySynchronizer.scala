@@ -141,6 +141,11 @@ class HistorySynchronizer(application: Application)
       val localScore = history.score()
       if (networkScore > localScore) goto(Syncing) using witnesses
       else stay() using Seq()
+
+    case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
+      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
+      processNewBlock(block, local = false)
+      stay()
   }
 
   //common logic for all the states
