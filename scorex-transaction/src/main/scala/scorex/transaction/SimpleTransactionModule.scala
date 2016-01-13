@@ -210,5 +210,5 @@ object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
   val MaxTimeForUnconfirmed = 1.hour
-  val MaxTransactionsPerBlock = 1000
+  val MaxTransactionsPerBlock = 100
 }
