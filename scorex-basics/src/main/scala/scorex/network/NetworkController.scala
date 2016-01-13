@@ -133,7 +133,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
         }
       }
 
-    //if check as Connected is being sent on Bind also
     case c@Connected(remote, local) =>
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
@@ -165,12 +164,10 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     case PeerDisconnected(remote) =>
       connectedPeers -= remote
       peerManager.onPeerDisconnected(remote)
-
-    case CommandFailed(cmd: Tcp.Command) =>
-      log.info("Failed to execute command : " + cmd)
   }
 
-  override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse {
+  //calls from API / application
+  def interfaceCalls: Receive = {
     case ShutdownNetwork =>
       log.info("Going to shutdown all connections & unbind port")
       connectedPeers.values.foreach(_.handlerRef ! PeerConnectionHandler.CloseConnection)
@@ -178,6 +175,11 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       context stop self
 
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
+  }
+
+  override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse interfaceCalls orElse {
+    case CommandFailed(cmd: Tcp.Command) =>
+      log.info("Failed to execute command : " + cmd)
 
     case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
   }
