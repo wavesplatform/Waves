@@ -44,7 +44,7 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
 
     case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
 
-      //todo: externalize the number, check on receiving
+      //todo: externalize the number, check on receiving, random shuffling
       val peers = peerManager.knownPeers().take(3)
       val msg = Message(PeersSpec, Right(peers), None)
       networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))

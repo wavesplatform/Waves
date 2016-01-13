@@ -26,12 +26,20 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   private lazy val settings = application.settings
   private lazy val peerManager = application.peerManager
 
-  private val connectedPeers = mutable.Map[InetSocketAddress, ConnectedPeer]()
+  private val connectedPeers = mutable.Map[ConnectedPeer, Option[Handshake]]()
   private var connectingPeer: Option[InetSocketAddress] = None
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
-  lazy val nodeNonce = (Random.nextInt() + 1000) * Random.nextInt() + Random.nextInt()
+  lazy val nodeNonce:Long = (Random.nextInt() + 1000) * Random.nextInt() + Random.nextInt()
+
+  val handshakeTemplate = Handshake(application.applicationName,
+    application.appVersion,
+    ownAddress.toString,
+    settings.port,
+    nodeNonce,
+    0
+  )
 
   //check own declared address for validity
   if (!settings.localOnly) {
@@ -115,14 +123,14 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       }
 
     case SendToNetwork(message, sendingStrategy) =>
-      sendingStrategy.choose(connectedPeers.values.toSeq).foreach(_.handlerRef ! message)
+      sendingStrategy.choose(connectedPeers.keys.toSeq).foreach(_.handlerRef ! message)
   }
 
   def peerLogic: Receive = {
     case CheckPeers =>
       if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
         peerManager.randomPeer().foreach { peer =>
-          if (!connectedPeers.contains(peer)) {
+          if (!connectedPeers.map(_._1.address).contains(peer)) {
             connectingPeer = Some(peer)
             IO(Tcp) ! Connect(peer, localAddress = None, timeout = connTimeout)
           }
@@ -134,15 +142,9 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote, nodeNonce))
       connection ! Register(handler)
       val newPeer = new ConnectedPeer(remote, handler)
-      connectedPeers += remote -> newPeer
+      connectedPeers += newPeer -> None
 
-      newPeer.handlerRef ! Handshake(application.applicationName,
-        application.appVersion,
-        ownAddress.toString,
-        settings.port,
-        nodeNonce,
-        System.currentTimeMillis() / 1000
-      )
+      newPeer.handlerRef ! handshakeTemplate.copy(time = System.currentTimeMillis() / 1000)
 
       if (connectingPeer.contains(remote)) {
         log.info(s"Connected to $remote, local is: $local")
@@ -158,19 +160,24 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       peerManager.onPeerDisconnected(c.remoteAddress)
 
     case PeerDisconnected(remote) =>
-      connectedPeers -= remote
+      connectedPeers.retain{case (p,_) => p.address != remote}
       peerManager.onPeerDisconnected(remote)
+
+    case PeerHandshake(address, handshake) =>
+      connectedPeers.find(_._1.address == address).foreach{case (cp, _) =>
+        connectedPeers.update(cp, Some(handshake))
+      }
   }
 
   //calls from API / application
   def interfaceCalls: Receive = {
     case ShutdownNetwork =>
       log.info("Going to shutdown all connections & unbind port")
-      connectedPeers.values.foreach(_.handlerRef ! PeerConnectionHandler.CloseConnection)
+      connectedPeers.keys.foreach(_.handlerRef ! PeerConnectionHandler.CloseConnection)
       self ! Unbind
       context stop self
 
-    case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
+    case GetConnectedPeers => sender() ! (connectedPeers.values.flatten.toSeq:Seq[Handshake])
   }
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse interfaceCalls orElse {
@@ -197,5 +204,7 @@ object NetworkController {
   case object GetConnectedPeers
 
   case class PeerDisconnected(address: InetSocketAddress)
+
+  case class PeerHandshake(address: InetSocketAddress, handshake: Handshake)
 
 }

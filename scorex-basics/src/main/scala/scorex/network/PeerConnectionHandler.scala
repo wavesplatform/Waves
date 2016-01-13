@@ -6,6 +6,7 @@ import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
 import akka.util.ByteString
 import scorex.app.Application
+import scorex.network.NetworkController.PeerHandshake
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success}
@@ -20,7 +21,7 @@ class ConnectedPeer(val address: InetSocketAddress, val handlerRef: ActorRef) {
   override def toString: String = super.toString
 }
 
-
+//todo: timeout on Ack waiting
 case class PeerConnectionHandler(application: Application,
                                  connection: ActorRef,
                                  remote: InetSocketAddress,
@@ -67,6 +68,7 @@ case class PeerConnectionHandler(application: Application,
         case Success(handshake) =>
           if (handshake.fromNonce != ownNonce) {
             connection ! Write(HandShakeAck.bytesAsByteString)
+            networkControllerRef ! PeerHandshake(remote, handshake)
             context become newCycle
           } else {
             connection ! Close
@@ -114,5 +116,4 @@ object PeerConnectionHandler {
   case object CloseConnection
 
   case object Blacklist
-
 }
