@@ -79,7 +79,8 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   //address to send to ther peers
   lazy val ownAddress = externalAddress.getOrElse(localAddress.getAddress)
 
-  override def receive: Receive = {
+
+  private def bindingLogic: Receive = {
     case b@Bound(localAddr) =>
       log.info("Successfully bound to the port " + settings.port)
       context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)
@@ -88,7 +89,36 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       log.error("Network port " + settings.port + " already in use!")
       context stop self
       application.stopAll()
+  }
 
+  def businessLogic: Receive = {
+    case RegisterMessagesHandler(specs, handler) =>
+      messageHandlers += specs.map(_.messageCode) -> handler
+
+    //a message coming in from another peer
+    case Message(spec, Left(msgBytes), Some(remote)) =>
+      val msgId = spec.messageCode
+
+      spec.deserializeData(msgBytes) match {
+        case Success(content) =>
+          messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
+            case Some(handler) =>
+              handler ! DataFromPeer(msgId, content, remote)
+
+            case None =>
+              log.error("No handlers found for message: " + msgId)
+            //todo: ???
+          }
+        case Failure(e) =>
+          log.error("Failed to deserialize data: " + e.getMessage)
+        //todo: ban peer
+      }
+
+    case SendToNetwork(message, sendingStrategy) =>
+      sendingStrategy.choose(connectedPeers.values.toSeq).foreach(_.handlerRef ! message)
+  }
+
+  def peerLogic: Receive = {
     case CheckPeers =>
       if (connectedPeers.size < settings.maxConnections) {
         peerManager.randomPeer() match {
@@ -132,43 +162,20 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       connectingPeers -= c.remoteAddress
       peerManager.onPeerDisconnected(c.remoteAddress)
 
+    case PeerDisconnected(remote) =>
+      connectedPeers -= remote
+      peerManager.onPeerDisconnected(remote)
+
     case CommandFailed(cmd: Tcp.Command) =>
       log.info("Failed to execute command : " + cmd)
+  }
 
+  override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse {
     case ShutdownNetwork =>
       log.info("Going to shutdown all connections & unbind port")
       connectedPeers.values.foreach(_.handlerRef ! PeerConnectionHandler.CloseConnection)
       self ! Unbind
       context stop self
-
-    case PeerDisconnected(remote) =>
-      connectedPeers -= remote
-      peerManager.onPeerDisconnected(remote)
-
-    case RegisterMessagesHandler(specs, handler) =>
-      messageHandlers += specs.map(_.messageCode) -> handler
-
-    //a message coming in from another peer
-    case Message(spec, Left(msgBytes), Some(remote)) =>
-      val msgId = spec.messageCode
-
-      spec.deserializeData(msgBytes) match {
-        case Success(content) =>
-          messageHandlers.find(_._1.contains(msgId)).map(_._2) match {
-            case Some(handler) =>
-              handler ! DataFromPeer(msgId, content, remote)
-
-            case None =>
-              log.error("No handlers found for message: " + msgId)
-            //todo: ???
-          }
-        case Failure(e) =>
-          log.error("Failed to deserialize data: " + e.getMessage)
-        //todo: ban peer
-      }
-
-    case SendToNetwork(message, sendingStrategy) =>
-      sendingStrategy.choose(connectedPeers.values.toSeq).foreach(_.handlerRef ! message)
 
     case GetConnectedPeers => sender() ! connectedPeers.values.toSeq
 
