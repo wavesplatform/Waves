@@ -35,6 +35,8 @@ class HistorySynchronizer(application: Application)
 
   private lazy val blockGenerator = application.blockGenerator
 
+  private val GettingExtensionTimeout = 15.seconds
+
   override def preStart: Unit = {
     super.preStart()
     context.system.scheduler.schedule(1.second, 1.seconds) {
@@ -54,13 +56,14 @@ class HistorySynchronizer(application: Application)
         val lastIds = history.lastBlocks(100).map(_.uniqueId)
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
+        context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! StateTimeout)
         goto(GettingExtension) using witnesses
       } else goto(Synced) using Seq()
   }
 
   private val blocksToReceive = mutable.Queue[BlockId]()
 
-  when(GettingExtension, 15.seconds) {
+  when(GettingExtension, GettingExtensionTimeout) {
     case Event(StateTimeout, _) =>
       goto(Syncing)
 
