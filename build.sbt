@@ -65,6 +65,8 @@ libraryDependencies ++=
   Dependencies.testKit ++
   Dependencies.logging
 
+scalacOptions ++= Seq("-feature", "-deprecation")
+
 javaOptions ++= Seq(
   "-server"
 )
