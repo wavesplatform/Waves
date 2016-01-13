@@ -2,6 +2,7 @@ package scorex.app
 
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
+import com.google.common.primitives.Ints
 import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
@@ -16,10 +17,32 @@ import spray.can.Http
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.runtime.universe.Type
+import scala.util.Try
 
+
+case class ApplicationVersion(firstDigit: Int, secondDigit: Int, thirdDigit: Int){
+  lazy val bytes:Array[Byte] = Ints.toByteArray(firstDigit) ++ Ints.toByteArray(secondDigit) ++ Ints.toByteArray(thirdDigit)
+}
+
+object ApplicationVersion{
+  val SerializedVersionLength = 4*3
+
+  def parse(bytes:Array[Byte]):Try[ApplicationVersion] = Try{
+    require(bytes.length == SerializedVersionLength, "Wrong bytes for application version")
+    ApplicationVersion(
+      Ints.fromByteArray(bytes.slice(0,4)),
+      Ints.fromByteArray(bytes.slice(4,8)),
+      Ints.fromByteArray(bytes.slice(8,12))
+    )
+  }
+}
 
 trait Application extends ScorexLogging {
+  val ApplicationNameLimit = 50
+
   val applicationName: String
+
+  val appVersion: ApplicationVersion
 
   //settings
   implicit val settings: Settings
@@ -62,7 +85,7 @@ trait Application extends ScorexLogging {
   lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistorySynchronizer")
 
   def run() {
-    log.debug(s"Available processors:  ${Runtime.getRuntime.availableProcessors}")
+    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
 
     checkGenesis()

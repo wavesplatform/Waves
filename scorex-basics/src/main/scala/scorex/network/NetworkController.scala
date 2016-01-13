@@ -13,7 +13,7 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Random, Success, Try}
 
 
 //must be singleton
@@ -31,8 +31,10 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
+  lazy val nodeNonce = (Random.nextInt() + 1000) * Random.nextInt() + Random.nextInt()
+
   //check own declared address for validity
-  if(!settings.localOnly) {
+  if (!settings.localOnly) {
     settings.declaredAddress.map { myAddress =>
       Try {
         val uri = new URI("http://" + myAddress)
@@ -59,20 +61,26 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     }.getOrElse(true).ensuring(_ == true, "Declared address isn't valid")
   }
 
-  lazy val ownAddress = settings.declaredAddress.map(InetAddress.getByName).orElse {
+  lazy val externalAddress = settings.declaredAddress.map(InetAddress.getByName).orElse {
     if (settings.upnpEnabled) application.upnp.externalAddress else None
   }
 
-  ownAddress.foreach { declaredAddress =>
+  externalAddress.foreach { declaredAddress =>
     peerManager.addPeer(new InetSocketAddress(declaredAddress, settings.port))
   }
 
   log.info(s"Declared address: ${settings.declaredAddress}")
 
-  IO(Tcp) ! Bind(self, new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port))
+  lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
+  lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
+
+  IO(Tcp) ! Bind(self, localAddress)
+
+  //address to send to ther peers
+  lazy val ownAddress = externalAddress.getOrElse(localAddress.getAddress)
 
   override def receive: Receive = {
-    case b@Bound(localAddress) =>
+    case b@Bound(localAddr) =>
       log.info("Successfully bound to the port " + settings.port)
       context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)
 
@@ -87,10 +95,9 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
           case Some(peer) =>
             if (!connectedPeers.contains(peer) &&
               !connectingPeers.contains(peer) &&
-              !ownAddress.contains(peer.getAddress)) {
+              !externalAddress.contains(peer.getAddress)) {
               connectingPeers += peer
-              val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
-              IO(Tcp) ! Connect(peer, timeout = connTimeout)
+              IO(Tcp) ! Connect(peer, localAddress = None, timeout = connTimeout)
             }
           case None =>
         }
@@ -101,7 +108,16 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
       connection ! Register(handler)
-      connectedPeers += remote -> new ConnectedPeer(remote, handler)
+      val newPeer = new ConnectedPeer(remote, handler)
+      connectedPeers += remote -> newPeer
+
+      newPeer.handlerRef ! Handshake(application.applicationName,
+        application.appVersion,
+        ownAddress.toString,
+        settings.port,
+        nodeNonce,
+        System.currentTimeMillis() / 1000
+      )
 
       if (connectingPeers.contains(remote)) {
         log.info(s"Connected to $remote, local is: $local")

@@ -6,7 +6,7 @@ import java.nio.file.{Files, Paths}
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
 import scorex.api.http._
-import scorex.app.Application
+import scorex.app.{Application, ApplicationVersion}
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.consensus.qora.QoraLikeConsensusModule
@@ -31,6 +31,12 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
   override val applicationName = "lagonaki"
 
   private val appConf = ConfigFactory.load().getConfig("app")
+
+  override val appVersion = {
+    val raw = appConf.getString("version")
+    val parts = raw.split("\\.")
+    ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
+  }
 
   override implicit lazy val settings = new LagonakiSettings(settingsFilename)
 

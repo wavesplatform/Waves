@@ -20,6 +20,7 @@ class ConnectedPeer(val address: InetSocketAddress, val handlerRef: ActorRef) {
   override def toString: String = super.toString
 }
 
+
 case class PeerConnectionHandler(application: Application,
                                  connection: ActorRef,
                                  remote: InetSocketAddress) extends Actor with ScorexLogging {
@@ -32,7 +33,20 @@ case class PeerConnectionHandler(application: Application,
 
   val selfPeer = new ConnectedPeer(remote, self)
 
-  override def receive: Receive = {
+  def beforeHandshake: Receive = {
+    case h: Handshake =>
+      connection ! Write(ByteString(h.bytes))
+
+    case Received(data) =>
+      Handshake.parse(data.toArray) match {
+        case Success(handshake) =>
+          context become afterHandshake
+        case Failure(t) =>
+          log.info(s"Error during parsing a handshake: $t")
+      }
+  }
+
+  def afterHandshake: Receive = {
 
     case msg: message.Message[_] =>
       connection ! Write(ByteString(msg.bytes))
@@ -71,6 +85,8 @@ case class PeerConnectionHandler(application: Application,
 
     case nonsense: Any => log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
   }
+
+  override def receive: Receive = beforeHandshake
 }
 
 object PeerConnectionHandler {
