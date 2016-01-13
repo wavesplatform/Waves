@@ -1,5 +1,6 @@
 package scorex.network
 
+import akka.util.ByteString
 import com.google.common.primitives.{Ints, Longs}
 import scorex.app.ApplicationVersion
 import scorex.utils.ScorexLogging
@@ -59,4 +60,11 @@ object Handshake extends ScorexLogging {
     log.info("Error during handshake parsing:", t)
     Failure(t)
   }
+}
+
+
+object HandShakeAck {
+  val bytes: Array[Byte] = Array(0: Byte, 44: Byte, 11: Byte, 33: Byte)
+  val bytesAsByteString = ByteString(bytes)
+  val messageSize = bytes.length
 }

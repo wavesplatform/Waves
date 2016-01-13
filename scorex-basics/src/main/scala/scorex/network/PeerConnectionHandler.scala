@@ -33,21 +33,30 @@ case class PeerConnectionHandler(application: Application,
 
   val selfPeer = new ConnectedPeer(remote, self)
 
-  def beforeHandshake: Receive = {
+  private def processOwnHandshake(newCycle: Receive): Receive = {
     case h: Handshake =>
       connection ! Write(ByteString(h.bytes))
+      context become newCycle
+  }
 
-    case Received(data) =>
+  private def processHandshakeAck(newCycle: Receive): Receive = {
+    case Received(data) if data.length == HandShakeAck.messageSize =>
+      if(data == HandShakeAck.bytes.toSeq) context become newCycle else connection ! Close
+  }
+
+  private def processHandshake(newCycle: Receive): Receive = {
+    case Received(data) if data.length > HandShakeAck.messageSize =>
       Handshake.parse(data.toArray) match {
         case Success(handshake) =>
-          context become afterHandshake
+          connection ! Write(HandShakeAck.bytesAsByteString)
+          context become newCycle
         case Failure(t) =>
           log.info(s"Error during parsing a handshake: $t")
+          connection ! Close
       }
   }
 
-  def afterHandshake: Receive = {
-
+  def workingCycle: Receive = {
     case msg: message.Message[_] =>
       connection ! Write(ByteString(msg.bytes))
 
@@ -86,7 +95,10 @@ case class PeerConnectionHandler(application: Application,
     case nonsense: Any => log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
   }
 
-  override def receive: Receive = beforeHandshake
+  override def receive: Receive =
+    processOwnHandshake(processHandshakeAck(processHandshake(workingCycle)) orElse
+      processHandshake(processHandshakeAck(workingCycle))) orElse
+      processHandshake(processOwnHandshake(processHandshakeAck(workingCycle)))
 }
 
 object PeerConnectionHandler {
@@ -94,5 +106,4 @@ object PeerConnectionHandler {
   case object CloseConnection
 
   case object Blacklist
-
 }
