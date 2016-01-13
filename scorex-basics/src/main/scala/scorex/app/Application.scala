@@ -62,7 +62,7 @@ trait Application extends ScorexLogging {
   lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistorySynchronizer")
 
   def run() {
-    log.debug(s"SvailableProcessors = ${Runtime.getRuntime.availableProcessors}")
+    log.debug(s"Available processors:  ${Runtime.getRuntime.availableProcessors}")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
 
     checkGenesis()
