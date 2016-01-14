@@ -119,6 +119,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
   override def transactions(block: Block): StoredInBlock =
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
+  //TODO check double spending
   override def packUnconfirmed(): StoredInBlock = UnconfirmedTransactionsDatabaseImpl.all().filter(isValid)
     .filter(blockStorage.state.included(_).isEmpty).take(MaxTransactionsPerBlock)
 
