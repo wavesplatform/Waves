@@ -1,7 +1,7 @@
 package scorex.lagonaki.server
 
-import scorex.transaction.GenesisTransaction
 import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.{BalanceSheet, GenesisTransaction, Transaction}
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
@@ -60,17 +60,24 @@ object Server extends App with ScorexLogging {
         None
     })
 
-    (1 to Int.MaxValue).foreach { _ =>
-      Thread.sleep(1000)
+    def genPayment(): Option[Transaction] = {
       val pkAccs = wallet.privateKeyAccounts().ensuring(_.nonEmpty)
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
+      val senderBalance = application.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
       val recipientAcc = genesisAccs(Random.nextInt(genesisAccs.size))
-
-      val amt = Random.nextInt(100000).toLong
       val fee = Random.nextInt(5).toLong
+      if (senderBalance - fee > 0) {
+        val amt = Math.abs(Random.nextLong() % (senderBalance - fee))
+        Some(application.transactionModule.createPayment(senderAcc, recipientAcc, amt, fee))
+      } else None
+    }
 
-      val tx = application.transactionModule.createPayment(senderAcc, recipientAcc, amt, fee)
-      log.info(s"Payment created: $tx")
+    log.info("Generate 200 transactions")
+    (1 to 200) foreach (_ => genPayment())
+
+    (1 to Int.MaxValue).foreach { _ =>
+      Thread.sleep(Random.nextInt(2000))
+      log.info(s"Payment created: ${genPayment()}")
     }
   }
 }
