@@ -7,7 +7,6 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
-import scorex.storage.{MapDBStorage, Storage}
 import scorex.transaction.state.LagonakiState
 import scorex.transaction.{LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
@@ -130,8 +129,29 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
   override def watchAccountTransactions(account: Account): Unit = accountTransactions.put(account, Array())
 
-
   override def included(tx: Transaction): Option[BlockId] = Option(includedTx.get(tx.signature))
+
+  def isValid(txs: Seq[Transaction]): Boolean = validate(txs).size == txs.size
+
+  //return seq of valid transactions
+  def validate(txs: Seq[Transaction]): Seq[Transaction] = {
+    val tmpBalances = TrieMap[Account, Long]()
+
+    txs.foldLeft(Seq.empty: Seq[Transaction]) { case (acc, atx) =>
+      atx match {
+        case tx: LagonakiTransaction =>
+          val changes = tx.balanceChanges().foldLeft(Map.empty: Map[Account, Long]) { case (iChanges, (acc, delta)) =>
+            //update balances sheet
+            val currentChange = iChanges.getOrElse(acc, 0L)
+            val newChange = currentChange + delta
+            iChanges.updated(acc, newChange)
+          }
+          if (changes.forall(a => balances.get(a._1) >= a._2)) tx +: acc
+          else acc
+        case _ => acc
+      }
+    }
+  }
 
   //for debugging purposes only
   override def toString: String = {

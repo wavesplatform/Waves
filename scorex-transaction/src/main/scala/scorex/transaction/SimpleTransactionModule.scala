@@ -119,9 +119,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
   override def transactions(block: Block): StoredInBlock =
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
-  //TODO check double spending
-  override def packUnconfirmed(): StoredInBlock = UnconfirmedTransactionsDatabaseImpl.all().filter(isValid)
-    .filter(blockStorage.state.included(_).isEmpty).take(MaxTransactionsPerBlock)
+  override def packUnconfirmed(): StoredInBlock = blockStorage.state.validate(UnconfirmedTransactionsDatabaseImpl.all()
+    .filter(isValid).filter(blockStorage.state.included(_).isEmpty).take(MaxTransactionsPerBlock))
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
@@ -182,27 +181,27 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     TransactionsBlockField(txs)
   }
 
-  override def isValid(block: Block): Boolean = transactions(block).forall(t => isValid(t, Some(block)))
+  override def isValid(block: Block): Boolean = blockStorage.state(Some(block.referenceField.value)) match {
+    case Some(blockState) =>
+      isValid(transactions(block), blockState)
+    case None =>
+      log.warn(s"No block state ${Base58.encode(block.referenceField.value)} in history")
+      false
+  }
 
-  def isValid(transaction: Transaction, blockOpt: Option[Block]): Boolean = transaction match {
-    case tx: PaymentTransaction => blockStorage.state(blockOpt.map(_.referenceField.value)) match {
-      case Some(txState) =>
-        val notIncluded: Boolean = txState.included(tx).isEmpty
-        val v = tx.isSignatureValid() && tx.validate(txState) == ValidationResult.ValidateOke && notIncluded
-        if (!v) log.warn(s"Invalid transaction: ${tx.isSignatureValid()} && ${tx.validate(txState)} ==" +
-          s" ${ValidationResult.ValidateOke} && $notIncluded")
-        v
-      case None =>
-        log.warn(s"Validating transaction without state for it's block " +
-          Try(Base58.encode(blockOpt.get.referenceField.value)) + " in history")
-        false
-    }
+  override def isValid(transaction: Transaction): Boolean = isValid(transaction, blockStorage.state)
+
+  private def isValid(transactions: Seq[Transaction], state: StoredState): Boolean =
+    transactions.forall(isValid) && state.isValid(transactions)
+  
+  private def isValid(transaction: Transaction, txState: StoredState): Boolean = transaction match {
+    case tx: PaymentTransaction =>
+      tx.isSignatureValid() && tx.validate(txState) == ValidationResult.ValidateOke && txState.included(tx).isEmpty
     case gtx: GenesisTransaction =>
       blockStorage.history.height() == 0
     case otx: Any =>
       log.error(s"Wrong kind of tx: $otx")
       false
-
   }
 
 }
