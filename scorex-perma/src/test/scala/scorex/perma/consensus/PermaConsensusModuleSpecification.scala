@@ -18,8 +18,9 @@ class PermaConsensusModuleSpecification extends PropSpec with PropertyChecks wit
 with Matchers with ScorexLogging {
 
   implicit val settings = new Settings with PermaSettings {
-    val filename = "settings-test.json"
+    override lazy val filename = "settings-test.json"
   }
+
   log.info("Generating random data set")
   val treeDir = new File(settings.treeDir)
   treeDir.mkdirs()
