@@ -14,9 +14,10 @@ import scorex.utils._
 
 class PermaConsensusBlockFieldSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
-  implicit val settings = new Settings with PermaSettings {
-    val filename = "settings-test.json"
+  implicit object settings extends Settings with PermaSettings {
+    override lazy val filename = "settings-test.json"
   }
+
   new File(settings.treeDir).mkdirs()
   implicit lazy val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
   val consensus = new PermaConsensusModule(randomBytes())
