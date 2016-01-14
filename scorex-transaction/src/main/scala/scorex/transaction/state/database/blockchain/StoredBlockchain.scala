@@ -83,6 +83,8 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   //if there are some uncommited changes from last run, discard'em
   if (signaturesIndex.size() > 0) database.rollback()
 
+  log.info(s"Initialized blockchain in $dataFolderOpt with ${height()} blocks")
+
   override private[transaction] def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
     Try {
       val parent = block.referenceField
