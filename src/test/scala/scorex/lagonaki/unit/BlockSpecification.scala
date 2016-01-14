@@ -1,7 +1,7 @@
 package scorex.lagonaki.unit
 
 import org.scalatest.{FunSuite, Matchers}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
 import scorex.consensus.qora.{QoraLikeConsensusBlockData, QoraLikeConsensusModule}
@@ -32,7 +32,9 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     def genValidBlock(): Block = {
       Await.result(consensusModule.generateNextBlocks(accounts)(transactionModule), 10.seconds).headOption match {
         case Some(block: Block) => block
-        case None => genValidBlock()
+        case None =>
+          Thread.sleep(500)
+          genValidBlock()
       }
     }
     val genesisAccs = application.blockStorage.history.genesis.transactions.flatMap(_ match {
@@ -44,10 +46,6 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     }
     def genValidTransaction(randomAmnt: Boolean = true): Transaction = {
       val senderAcc = accounts(Random.nextInt(accounts.size))
-      def recepient(): Account = {
-        val acc = accounts(Random.nextInt(accounts.size))
-        if (acc.address != senderAcc.address) acc else recepient()
-      }
       val senderBalance = transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
       val fee = Random.nextInt(5).toLong + 1
       if (senderBalance <= fee) {
@@ -55,18 +53,20 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
       } else {
         val amt = if (randomAmnt) Math.abs(Random.nextLong() % (senderBalance - fee))
         else senderBalance - fee
-        val tx = genTransaction(senderAcc, recepient(), amt, fee)
-        if (tx.validate()(transactionModule) == ValidationResult.ValidateOke) tx else genValidTransaction(randomAmnt)
+        val tx = genTransaction(senderAcc, accounts(Random.nextInt(accounts.size)), amt, fee)
+        if (tx.validate()(transactionModule) == ValidationResult.ValidateOke) {
+          tx
+        } else genValidTransaction(randomAmnt)
       }
     }
 
     // Start tests
     // Gen block with transactions
-    val TSize = SimpleTransactionModule.MaxTransactionsPerBlock + 1
+    val TSize = SimpleTransactionModule.MaxTransactionsPerBlock * 4
     val transactions = (1 to TSize) map (i => genValidTransaction())
     val block2 = genValidBlock()
     block2.isValid shouldBe true
-    transactionModule.transactions(block2).size shouldBe SimpleTransactionModule.MaxTransactionsPerBlock
+    assert(transactionModule.transactions(block2).size <= SimpleTransactionModule.MaxTransactionsPerBlock)
     transactions.foreach(tx => transactionModule.blockStorage.state.included(tx) shouldBe None)
     transactionModule.blockStorage.appendBlock(block2)
     val blokc2txs = transactionModule.transactions(block2)
@@ -77,7 +77,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     // Don't include same transactions twice
     blokc2txs.foreach(tx => transactionModule.onNewOffchainTransaction(tx))
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe blokc2txs.size
-    val b3tx = genValidTransaction(false)
+    val b3tx = genValidTransaction(randomAmnt = false)
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe blokc2txs.size + 1
     val block3 = genValidBlock()
     block3.isValid shouldBe true
@@ -101,12 +101,16 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     //Double spending
     UnconfirmedTransactionsDatabaseImpl.all().foreach(tx => UnconfirmedTransactionsDatabaseImpl.remove(tx))
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
-    (1 to 2) foreach (_ => accounts.foreach(i => genValidTransaction(false)))
+    accounts.foreach { a =>
+      val recepient = new PublicKeyAccount(Array.empty)
+      val senderBalance = transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(a)
+
+      val txs = (1 to 2) map (i => genTransaction(a, recepient, senderBalance / 2, 1))
+    }
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe accounts.size * 2
     val block5 = genValidBlock()
     block5.isValid shouldBe true
-    val block5tx = transactionModule.transactions(block5)
-    block5tx.size shouldBe accounts.size
+    accounts foreach(a => assert(transactionModule.blockStorage.state.balance(a.address) > 0))
   }
 
   import TestingCommons._

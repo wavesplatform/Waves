@@ -138,7 +138,7 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
   def validate(txs: Seq[Transaction]): Seq[Transaction] = {
     val tmpBalances = TrieMap[Account, Long]()
 
-    txs.foldLeft(Seq.empty: Seq[Transaction]) { case (acc, atx) =>
+    val r = txs.foldLeft(Seq.empty: Seq[Transaction]) { case (acc, atx) =>
       atx match {
         case tx: LagonakiTransaction =>
           val changes = tx.balanceChanges().foldLeft(Map.empty: Map[Account, Long]) { case (iChanges, (acc, delta)) =>
@@ -147,11 +147,18 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
             val newChange = currentChange + delta
             iChanges.updated(acc, newChange)
           }
-          if (changes.forall(a => balances.get(a._1) + a._2 >= 0)) tx +: acc
+          val check = changes.forall { a =>
+            val balance = tmpBalances.getOrElseUpdate(a._1, balances.get(a._1))
+            val newBalance = balance + a._2
+            if (newBalance >= 0) tmpBalances.put(a._1, newBalance)
+            newBalance >= 0
+          }
+          if (check) tx +: acc
           else acc
         case _ => acc
       }
     }
+    if (r.size == txs.size) r else validate(r)
   }
 
   //for debugging purposes only
