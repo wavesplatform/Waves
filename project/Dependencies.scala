@@ -18,6 +18,10 @@ object Dependencies {
     "com.typesafe.akka" %% "akka-actor" % "2.4.+"
   )
 
+  lazy val p2p = Seq(
+    "org.bitlet" % "weupnp" % "0.1.+"
+  )
+
   lazy val db = Seq(
     "org.mapdb" % "mapdb" % "2.+"
   )

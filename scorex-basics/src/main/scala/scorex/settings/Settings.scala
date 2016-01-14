@@ -1,6 +1,6 @@
 package scorex.settings
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
@@ -14,8 +14,6 @@ import scala.util.Try
   */
 
 trait Settings extends ScorexLogging {
-
-  lazy val Port = 9084
 
   val filename: String
 
@@ -40,29 +38,44 @@ trait Settings extends ScorexLogging {
     f.exists()
   }
 
+  //p2p
+  lazy val DefaultPort = 9084
+  lazy val p2pSettings = settingsJSON \ "p2p"
+
+  lazy val localOnly = (p2pSettings \ "localOnly").asOpt[Boolean].getOrElse(false)
+
   lazy val knownPeers = Try {
-    (settingsJSON \ "knownpeers").as[List[String]].flatMap { addr =>
-      val inetAddress = InetAddress.getByName(addr)
-      if (inetAddress == InetAddress.getLocalHost) None else Some(new InetSocketAddress(inetAddress, Port))
+    (p2pSettings \ "knownPeers").as[List[String]].map { addr =>
+      val addrParts = addr.split(":")
+      val port = if(addrParts.size == 2) addrParts(1).toInt else DefaultPort
+      new InetSocketAddress(addrParts(0), port)
     }
   }.getOrElse(Seq[InetSocketAddress]())
+  lazy val bindAddress = (p2pSettings \ "bindAddress").asOpt[String].getOrElse(DefaultBindAddress)
+  lazy val maxConnections = (p2pSettings \ "maxConnections").asOpt[Int].getOrElse(DefaultMaxConnections)
+  lazy val connectionTimeout = (p2pSettings \ "connectionTimeout").asOpt[Int].getOrElse(DefaultConnectionTimeout)
+  lazy val pingInterval = (p2pSettings \ "pingInterval").asOpt[Int].getOrElse(DefaultPingInterval)
+  lazy val upnpEnabled = (p2pSettings \ "upnp").asOpt[Boolean].getOrElse(true)
+  lazy val upnpGatewayTimeout = (p2pSettings \ "upnpGatewayTimeout").asOpt[Int]
+  lazy val upnpDiscoverTimeout = (p2pSettings \ "upnpDiscoverTimeout").asOpt[Int]
+  lazy val port = (p2pSettings \ "port").asOpt[Int].getOrElse(DefaultPort)
+  lazy val declaredAddress = (p2pSettings \ "myAddress").asOpt[String]
 
-  lazy val maxConnections = (settingsJSON \ "maxconnections").asOpt[Int].getOrElse(DefaultMaxConnections)
-  lazy val connectionTimeout = (settingsJSON \ "connectiontimeout").asOpt[Int].getOrElse(DefaultConnectionTimeout)
-  lazy val rpcPort = (settingsJSON \ "rpcport").asOpt[Int].getOrElse(DefaultRpcPort)
-  lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcallowed").asOpt[List[String]].getOrElse(DefaultRpcAllowed.split(""))
-  lazy val pingInterval = (settingsJSON \ "pinginterval").asOpt[Int].getOrElse(DefaultPingInterval)
-  lazy val offlineGeneration = (settingsJSON \ "offline-generation").asOpt[Boolean].getOrElse(false)
-  lazy val bindAddress = (settingsJSON \ "bindAddress").asOpt[String].getOrElse(DefaultBindAddress)
+  //p2p settings assertions
+  assert(!(localOnly && upnpEnabled), "Both localOnly and upnp enabled")
+  //todo: localOnly & declaredAddress
+
+  lazy val rpcPort = (settingsJSON \ "rpcPort").asOpt[Int].getOrElse(DefaultRpcPort)
+  lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcAllowed").asOpt[List[String]].getOrElse(DefaultRpcAllowed.split(""))
+
+  lazy val offlineGeneration = (settingsJSON \ "offlineGeneration").asOpt[Boolean].getOrElse(false)
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)
 
-  lazy val walletDirOpt = (settingsJSON \ "walletdir").asOpt[String]
+  lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
-
-  lazy val walletPassword = (settingsJSON \ "walletpassword").as[String]
-
-  lazy val walletSeed = Base58.decode((settingsJSON \ "walletseed").as[String])
+  lazy val walletPassword = (settingsJSON \ "walletPassword").as[String]
+  lazy val walletSeed = Base58.decode((settingsJSON \ "walletSeed").as[String])
 
   //NETWORK
   private val DefaultMaxConnections = 20
@@ -77,5 +90,4 @@ trait Settings extends ScorexLogging {
   private val DefaultRpcAllowed = "127.0.0.1"
 
   private val DefaultBlockGenerationDelay: FiniteDuration = 1.second
-
 }

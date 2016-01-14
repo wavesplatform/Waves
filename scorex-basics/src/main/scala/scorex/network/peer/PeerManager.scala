@@ -20,10 +20,10 @@ class PeerManager(settings: Settings) extends ScorexLogging {
     } else knownPeers
   }
 
-  def peerConnected(peer: InetSocketAddress): Unit =
+  def onPeerConnected(peer: InetSocketAddress): Unit =
     PeerDatabaseImpl.addConnectedPeer(peer)
 
-  def peerDisconnected(peer: InetSocketAddress): Unit =
+  def onPeerDisconnected(peer: InetSocketAddress): Unit =
     PeerDatabaseImpl.removeConnectedPeer(peer)
 
   def randomPeer(): Option[InetSocketAddress] = {

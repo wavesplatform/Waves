@@ -2,24 +2,47 @@ package scorex.app
 
 import akka.actor.{ActorSystem, Props}
 import akka.io.IO
+import com.google.common.primitives.Ints
 import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
+import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
-import scorex.network.{BlockGenerator, HistorySynchronizer, NetworkController, PeerSynchronizer}
 import scorex.settings.Settings
-import scorex.transaction.{BlockStorage, History, State, TransactionModule}
+import scorex.transaction.{BlockStorage, History, TransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import spray.can.Http
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.runtime.universe.Type
+import scala.util.Try
 
+
+case class ApplicationVersion(firstDigit: Int, secondDigit: Int, thirdDigit: Int){
+  lazy val bytes:Array[Byte] = Ints.toByteArray(firstDigit) ++ Ints.toByteArray(secondDigit) ++ Ints.toByteArray(thirdDigit)
+}
+
+object ApplicationVersion{
+  val SerializedVersionLength = 4*3
+
+  def parse(bytes:Array[Byte]):Try[ApplicationVersion] = Try{
+    require(bytes.length == SerializedVersionLength, "Wrong bytes for application version")
+    ApplicationVersion(
+      Ints.fromByteArray(bytes.slice(0,4)),
+      Ints.fromByteArray(bytes.slice(4,8)),
+      Ints.fromByteArray(bytes.slice(8,12))
+    )
+  }
+}
 
 trait Application extends ScorexLogging {
+  val ApplicationNameLimit = 50
+
   val applicationName: String
+
+  val appVersion: ApplicationVersion
 
   //settings
   implicit val settings: Settings
@@ -40,6 +63,9 @@ trait Application extends ScorexLogging {
   lazy val basicMessagesSpecsRepo = new BasicMessagesRepo()
 
   //p2p
+  lazy val upnp = new UPnP(settings)
+  if (settings.upnpEnabled) upnp.addPort(settings.port)
+
   lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
 
   lazy val peerManager = new PeerManager(settings)
@@ -59,6 +85,9 @@ trait Application extends ScorexLogging {
   lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistorySynchronizer")
 
   def run() {
+    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
+    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
+
     checkGenesis()
 
     IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
@@ -75,7 +104,8 @@ trait Application extends ScorexLogging {
   }
 
   def stopAll(): Unit = synchronized {
-    log.info("Stopping message processor")
+    log.info("Stopping network services")
+    if (settings.upnpEnabled) upnp.deletePort(settings.port)
     networkController ! NetworkController.ShutdownNetwork
 
     log.info("Stopping actors (incl. block generator)")

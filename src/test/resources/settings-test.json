@@ -1,11 +1,15 @@
 {
-  "bindAddress": "127.0.0.1",
-  "knownpeers": [
-    "127.0.0.1"
-  ],
+  "p2p": {
+    "localOnly": true,
+    "bindAddress": "127.0.0.1",
+    "upnp": false,
+    "knownPeers": ["127.0.0.1"],
+    "maxConnections": 10
+  },
+
   "walletpassword": "cookies",
   "walletseed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
-  "minconnections": 10,
+
   "rpcport": 9085,
   "rpcallowed": [
     "127.0.0.1",
