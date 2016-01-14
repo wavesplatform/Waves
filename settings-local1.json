@@ -7,7 +7,7 @@
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
     "port": 9084,
-    "knownPeers": [],
+    "knownPeers": ["127.0.0.2:9088"],
     "maxConnections": 10
   },
   "walletDir": "/tmp/scorex/wallet1",

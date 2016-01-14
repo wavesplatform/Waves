@@ -12,13 +12,11 @@ import scorex.utils.ScorexLogging
 import scala.util.{Failure, Success}
 
 
-class ConnectedPeer(val address: InetSocketAddress, val handlerRef: ActorRef) {
+case class ConnectedPeer(address: InetSocketAddress, handlerRef: ActorRef) {
 
   import shapeless.Typeable._
 
   override def equals(obj: scala.Any): Boolean = obj.cast[ConnectedPeer].exists(_.address == this.address)
-
-  override def toString: String = super.toString
 }
 
 //todo: timeout on Ack waiting
