@@ -7,6 +7,7 @@ import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
 import scorex.consensus.qora.{QoraLikeConsensusBlockData, QoraLikeConsensusModule}
 import scorex.lagonaki.TestingCommons
 import scorex.lagonaki.TestingCommons._
+import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 
@@ -38,11 +39,15 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
       case gtx: GenesisTransaction => Some(gtx.recipient)
       case _ => None
     })
-    def genTransaction(senderAcc: PrivateKeyAccount, recipientAcc: Account, amt: Long, fee: Long = 1): Transaction = {
+    def genTransaction(senderAcc: PrivateKeyAccount, recipientAcc: Account, amt: Long, fee: Long = 1): LagonakiTransaction = {
       transactionModule.createPayment(senderAcc, recipientAcc, amt, fee)
     }
     def genValidTransaction(randomAmnt: Boolean = true): Transaction = {
       val senderAcc = accounts(Random.nextInt(accounts.size))
+      def recepient(): Account = {
+        val acc = accounts(Random.nextInt(accounts.size))
+        if (acc.address != senderAcc.address) acc else recepient()
+      }
       val senderBalance = transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
       val fee = Random.nextInt(5).toLong + 1
       if (senderBalance <= fee) {
@@ -50,7 +55,8 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
       } else {
         val amt = if (randomAmnt) Math.abs(Random.nextLong() % (senderBalance - fee))
         else senderBalance - fee
-        genTransaction(senderAcc, accounts(Random.nextInt(accounts.size)), amt, fee)
+        val tx = genTransaction(senderAcc, recepient(), amt, fee)
+        if (tx.validate()(transactionModule) == ValidationResult.ValidateOke) tx else genValidTransaction(randomAmnt)
       }
     }
 
@@ -72,6 +78,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     blokc2txs.foreach(tx => transactionModule.onNewOffchainTransaction(tx))
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe blokc2txs.size
     val b3tx = genValidTransaction(false)
+    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe blokc2txs.size + 1
     val block3 = genValidBlock()
     block3.isValid shouldBe true
     val blokc3txs = transactionModule.transactions(block3)
@@ -90,6 +97,16 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     block3.isValid shouldBe true
     //TODO fix and uncomment
     //    block4.isValid shouldBe true
+
+    //Double spending
+    UnconfirmedTransactionsDatabaseImpl.all().foreach(tx => UnconfirmedTransactionsDatabaseImpl.remove(tx))
+    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
+    (1 to 2) foreach (_ => accounts.foreach(i => genValidTransaction(false)))
+    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe accounts.size * 2
+    val block5 = genValidBlock()
+    block5.isValid shouldBe true
+    val block5tx = transactionModule.transactions(block5)
+    block5tx.size shouldBe accounts.size
   }
 
   import TestingCommons._

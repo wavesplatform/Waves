@@ -104,7 +104,7 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
     balanceChanges.foreach { case (acc, delta) =>
       val balance = Option(balances.get(acc)).getOrElse(0L)
       val newBalance = if (!reversal) balance + delta else balance - delta
-      if (newBalance < 0) log.error(s"Account $acc balance $newBalance is negative")
+      if (newBalance < 0) log.error(s"Account $acc balance $newBalance isnegative")
       balances.put(acc, newBalance)
     }
 
@@ -147,7 +147,7 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
             val newChange = currentChange + delta
             iChanges.updated(acc, newChange)
           }
-          if (changes.forall(a => balances.get(a._1) >= a._2)) tx +: acc
+          if (changes.forall(a => balances.get(a._1) + a._2 >= 0)) tx +: acc
           else acc
         case _ => acc
       }
