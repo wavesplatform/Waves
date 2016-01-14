@@ -7,11 +7,11 @@
     "maxConnections": 10
   },
 
-  "walletpassword": "cookies",
-  "walletseed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
+  "walletPassword": "cookies",
+  "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
 
-  "rpcport": 9085,
-  "rpcallowed": [
+  "rpcPort": 9085,
+  "rpcAllowed": [
     "127.0.0.1",
     "123.123.123.123"
   ],
@@ -19,7 +19,7 @@
     "treeDir": "/tmp/scorex/perma/test/data/tree",
     "authDataStorage": "authDataStorage.mapDB"
   },
-  "max-rollback": 100,
+  "maxRollback": 100,
   "history": "blockchain",
-  "offline-generation": true
+  "offlineGeneration": true
 }
