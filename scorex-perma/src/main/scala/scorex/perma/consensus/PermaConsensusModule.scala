@@ -61,9 +61,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         if (puzIsValid && targetIsValid && ticketIsValid)
           true
         else {
-          log.debug(
-            s"""Non-valid block: puzIsValid=$puzIsValid,
-                        targetIsValid=$targetIsValid && ticketIsValid=$ticketIsValid""")
+          log.warn(s"Invalid block: puz=$puzIsValid,target=$targetIsValid && ticket=$ticketIsValid")
           false
         }
 
