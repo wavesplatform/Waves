@@ -31,7 +31,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
-  lazy val nodeNonce:Long = (Random.nextInt() + 1000) * Random.nextInt() + Random.nextInt()
+  lazy val nodeNonce: Long = (Random.nextInt() + 1000) * Random.nextInt() + Random.nextInt()
 
   val handshakeTemplate = Handshake(application.applicationName,
     application.appVersion,
@@ -160,13 +160,24 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       peerManager.onPeerDisconnected(c.remoteAddress)
 
     case PeerDisconnected(remote) =>
-      connectedPeers.retain{case (p,_) => p.address != remote}
+      connectedPeers.retain { case (p, _) => p.address != remote }
       peerManager.onPeerDisconnected(remote)
 
     case PeerHandshake(address, handshake) =>
-      connectedPeers.find(_._1.address == address).foreach{case (cp, _) =>
-        connectedPeers.update(cp, Some(handshake))
+      val toUpdate = connectedPeers.filter { case (cp, h) =>
+        cp.address == address || h.map(_.fromNonce == handshake.fromNonce).getOrElse(true)
       }
+
+      val newCp = toUpdate.find(_._1.address.getAddress.toString == handshake.fromAddress)
+        .getOrElse(toUpdate.head)._1
+
+      toUpdate.keys.foreach(connectedPeers.remove)
+
+      //drop connection to self if occured
+      if (handshake.fromNonce == nodeNonce)
+        newCp.handlerRef ! PeerConnectionHandler.CloseConnection
+      else
+        connectedPeers += newCp -> Some(handshake)
   }
 
   //calls from API / application
@@ -177,7 +188,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       self ! Unbind
       context stop self
 
-    case GetConnectedPeers => sender() ! (connectedPeers.values.flatten.toSeq:Seq[Handshake])
+    case GetConnectedPeers => sender() ! (connectedPeers.values.flatten.toSeq: Seq[Handshake])
   }
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse interfaceCalls orElse {
