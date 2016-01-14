@@ -173,7 +173,11 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
       toUpdate.keys.foreach(connectedPeers.remove)
 
-      connectedPeers += newCp -> Some(handshake)
+      //drop connection to self if occured
+      if (handshake.fromNonce == nodeNonce)
+        newCp.handlerRef ! PeerConnectionHandler.CloseConnection
+      else
+        connectedPeers += newCp -> Some(handshake)
   }
 
   //calls from API / application
