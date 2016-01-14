@@ -63,17 +63,20 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     transactionModule.transactions(block2).size shouldBe SimpleTransactionModule.MaxTransactionsPerBlock
     transactions.foreach(tx => transactionModule.blockStorage.state.included(tx) shouldBe None)
     transactionModule.blockStorage.appendBlock(block2)
-    transactionModule.transactions(block2).foreach(tx => transactionModule.blockStorage.state.included(tx).get shouldBe block2.uniqueId)
+    val blokc2txs = transactionModule.transactions(block2)
+    blokc2txs.foreach(tx => transactionModule.blockStorage.state.included(tx).get shouldBe block2.uniqueId)
     UnconfirmedTransactionsDatabaseImpl.all().foreach(tx => UnconfirmedTransactionsDatabaseImpl.remove(tx))
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
 
     // Don't include same transactions twice
-    transactions.foreach(tx => transactionModule.onNewOffchainTransaction(tx))
-    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe TSize
+    blokc2txs.foreach(tx => transactionModule.onNewOffchainTransaction(tx))
+    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe blokc2txs.size
     val b3tx = genValidTransaction(false)
     val block3 = genValidBlock()
     block3.isValid shouldBe true
-    transactionModule.transactions(block3).head.signature shouldBe b3tx.signature
+    val blokc3txs = transactionModule.transactions(block3)
+    blokc3txs.size shouldBe 1
+    blokc3txs.head.signature shouldBe b3tx.signature
 
     // Branched block with the same transaction with full balance
     transactionModule.onNewOffchainTransaction(b3tx)
@@ -86,7 +89,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     transactionModule.blockStorage.state.included(b3tx).get shouldBe block3.uniqueId
     block3.isValid shouldBe true
     //TODO fix and uncomment
-//    block4.isValid shouldBe true
+    //    block4.isValid shouldBe true
   }
 
   import TestingCommons._

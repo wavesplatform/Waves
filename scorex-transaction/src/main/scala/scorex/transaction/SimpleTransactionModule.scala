@@ -193,7 +193,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
   private def isValid(transactions: Seq[Transaction], state: StoredState): Boolean =
     transactions.forall(isValid) && state.isValid(transactions)
-  
+
   private def isValid(transaction: Transaction, txState: StoredState): Boolean = transaction match {
     case tx: PaymentTransaction =>
       tx.isSignatureValid() && tx.validate(txState) == ValidationResult.ValidateOke && txState.included(tx).isEmpty
