@@ -16,7 +16,7 @@
     "123.123.123.123"
   ],
   "perma": {
-    "treeDir": "/tmp/scorex/perma/test/data/tree",
+    "treeDir": "/tmp/scorex-test/perma/data/tree",
     "authDataStorage": "authDataStorage.mapDB"
   },
   "maxRollback": 100,
