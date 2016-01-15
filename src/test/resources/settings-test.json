@@ -11,6 +11,7 @@
   "walletPassword": "cookies",
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
 
+  "dataDir": "/tmp/scorex-test/data",
   "rpcPort": 9085,
   "rpcAllowed": [
     "127.0.0.1",

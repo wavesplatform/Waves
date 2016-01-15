@@ -6,16 +6,22 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.block.Block
-import scorex.lagonaki.BlockTestingCommons
+import scorex.lagonaki.{TestingCommons, BlockTestingCommons}
 import scorex.utils._
+
+import scala.util.Try
 
 class BlockTreeSpecification extends PropSpec with PropertyChecks
 with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
 
-  val dirName = "/tmp/scorex/test/"
+  import TestingCommons._
+
+  val dirName = application.settings.dataDirOpt.get
   val dir = new File(dirName)
   dir.mkdirs()
-  for (file <- dir.listFiles) file.delete
+  Try {
+    for (file <- dir.listFiles) file.delete
+  }
 
   testTree(new StoredBlockTree(Some(dirName), 100), "File")
   testTree(new StoredBlockTree(None, 100), "Memory")
