@@ -65,7 +65,7 @@ object Server extends App with ScorexLogging {
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val senderBalance = application.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
       val recipientAcc = genesisAccs(Random.nextInt(genesisAccs.size))
-      val fee = Random.nextInt(5).toLong
+      val fee = Random.nextInt(5).toLong + 1
       if (senderBalance - fee > 0) {
         val amt = Math.abs(Random.nextLong() % (senderBalance - fee))
         Some(application.transactionModule.createPayment(senderAcc, recipientAcc, amt, fee))
