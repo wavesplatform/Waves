@@ -41,8 +41,10 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
       case gtx: GenesisTransaction => Some(gtx.recipient)
       case _ => None
     })
-    def genTransaction(senderAcc: PrivateKeyAccount, recipientAcc: Account, amt: Long, fee: Long = 1): LagonakiTransaction = {
-      transactionModule.createPayment(senderAcc, recipientAcc, amt, fee)
+    def genTransaction(sender: PrivateKeyAccount, recipient: Account, amt: Long, fee: Long = 1): LagonakiTransaction = {
+      val tx = transactionModule.createPayment(sender, recipient, amt, fee)
+      if(tx.validate()(transactionModule) == ValidationResult.ValidateOke) tx
+      else genTransaction(sender, recipient, amt, fee)
     }
     def genValidTransaction(randomAmnt: Boolean = true): Transaction = {
       val senderAcc = accounts(Random.nextInt(accounts.size))
