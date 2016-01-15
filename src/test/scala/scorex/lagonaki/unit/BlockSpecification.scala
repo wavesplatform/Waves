@@ -31,7 +31,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     val accounts = wallet.privateKeyAccounts()
     def genValidBlock(): Block = {
       Await.result(consensusModule.generateNextBlocks(accounts)(transactionModule), 10.seconds).headOption match {
-        case Some(block: Block) => block
+        case Some(block: Block) if block.isValid => block
         case None =>
           Thread.sleep(500)
           genValidBlock()
@@ -110,7 +110,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe accounts.size * 2
     val block5 = genValidBlock()
     block5.isValid shouldBe true
-    accounts foreach(a => assert(transactionModule.blockStorage.state.balance(a.address) > 0))
+    accounts foreach (a => assert(transactionModule.blockStorage.state.balance(a.address) > 0))
   }
 
   import TestingCommons._
