@@ -47,7 +47,7 @@ class SegmentsMessageSpecification extends PropSpec with PropertyChecks with Gen
   }
 
   def generateFile(blocks: Int, subdir: String = "1"): (String, File, String) = {
-    val treeDirName = "/tmp/scorex/test/" + subdir + "/"
+    val treeDirName = "/tmp/scorex-test/test/" + subdir + "/"
     val treeDir = new File(treeDirName)
     val tempFile = treeDirName + "/data.file"
 

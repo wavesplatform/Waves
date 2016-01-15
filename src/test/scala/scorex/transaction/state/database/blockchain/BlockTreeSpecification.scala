@@ -1,7 +1,5 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.File
-
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
@@ -12,12 +10,7 @@ import scorex.utils._
 class BlockTreeSpecification extends PropSpec with PropertyChecks
 with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
 
-  val dirName = "/tmp/scorex/test/"
-  val dir = new File(dirName)
-  dir.mkdirs()
-  for (file <- dir.listFiles) file.delete
 
-  testTree(new StoredBlockTree(Some(dirName), 100), "File")
   testTree(new StoredBlockTree(None, 100), "Memory")
 
   def testTree(blockTree: StoredBlockTree, prefix: String): Unit = {

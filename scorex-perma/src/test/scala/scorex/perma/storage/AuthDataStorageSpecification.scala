@@ -10,7 +10,7 @@ import scorex.crypto.ads.merkle.AuthDataBlock
 
 class AuthDataStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
-  val treeDirName = "/tmp/scorex/test/AuthDataStorageSpecification/"
+  val treeDirName = "/tmp/scorex-test/test/AuthDataStorageSpecification/"
   val treeDir = new File(treeDirName)
   treeDir.mkdirs()
 

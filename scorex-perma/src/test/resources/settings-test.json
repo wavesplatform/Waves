@@ -1,6 +1,10 @@
 {
+  "p2p": {
+    "port": 9090
+  },
+  "rpcPort": 9095,
   "perma": {
-    "treeDir": "/tmp/scorex/test/data/tree",
+    "treeDir": "/tmp/scorex-test/data/tree",
     "authDataStorage": "authDataStorage.mapDB"
   }
 }
