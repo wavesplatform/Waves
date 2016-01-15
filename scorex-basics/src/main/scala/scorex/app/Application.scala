@@ -70,8 +70,8 @@ trait Application extends ScorexLogging {
 
   lazy val peerManager = new PeerManager(settings)
 
-  lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this))
-  lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGenerator], this))
+  lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this), "networkController")
+  lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGenerator], this), "blockGenerator")
 
   //wallet
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
