@@ -12,7 +12,10 @@ import scala.util.Try
 trait BlockStorage extends ScorexLogging {
 
   val history: History
-  val state: State
+
+  def state(id: Option[BlockId]): Option[State]
+
+  def state: State
 
   def appendBlock(block: Block): Try[Unit] = synchronized {
     history.appendBlock(block).map { blocks =>

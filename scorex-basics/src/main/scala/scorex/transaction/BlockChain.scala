@@ -2,13 +2,14 @@ package scorex.transaction
 
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.transaction.History.BlockchainScore
 import scorex.utils.ScorexLogging
 
 trait BlockChain extends History with ScorexLogging {
 
   def blockAt(height: Int): Option[Block]
 
-  def genesisBlock = blockAt(1)
+  def genesisBlock: Option[Block] = blockAt(1)
 
   override def parent(block: Block, back: Int = 1): Option[Block] = {
     require(back > 0)
@@ -28,7 +29,7 @@ trait BlockChain extends History with ScorexLogging {
 
   def children(block: Block): Seq[Block]
 
-  def score() =
+  def score(): BlockchainScore =
     (1 to height()).foldLeft(0: BigInt) { case (sc, h) =>
       sc + blockAt(h).map { bl: Block =>
         bl.consensusModule.blockScore(bl)(bl.transactionModule)

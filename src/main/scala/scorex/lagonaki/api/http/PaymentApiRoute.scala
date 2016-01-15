@@ -8,6 +8,7 @@ import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.state.wallet.Payment
 import spray.http.MediaTypes._
+import spray.routing.Route
 
 import scala.util.Try
 
@@ -34,7 +35,7 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
-  def payment = path("payment") {
+  def payment: Route = path("payment") {
     post {
       respondWithMediaType(`application/json`) {
         entity(as[String]) { body => complete {
@@ -44,7 +45,7 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
                 case err: JsError =>
                   err
                 case JsSuccess(payment: Payment, _) =>
-                  val txOpt = application.createPayment(payment)
+                  val txOpt = application.transactionModule.createPayment(payment, wallet)
                   txOpt match {
                     case Some(tx) =>
                       tx.validate() match {

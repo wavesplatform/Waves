@@ -1,14 +1,14 @@
 package scorex.transaction.state.database
 
-import scorex.transaction.LagonakiTransaction
+import scorex.transaction.Transaction
 
 
 trait UnconfirmedTransactionsDatabase {
-  def putIfNew(tx: LagonakiTransaction): Boolean
+  def putIfNew(tx: Transaction): Boolean
 
-  def all(): Seq[LagonakiTransaction]
+  def all(): Seq[Transaction]
 
-  def getBySignature(signature: Array[Byte]): Option[LagonakiTransaction]
+  def getBySignature(signature: Array[Byte]): Option[Transaction]
 
-  def remove(tx: LagonakiTransaction)
+  def remove(tx: Transaction)
 }

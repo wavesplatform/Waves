@@ -6,15 +6,16 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
-import scorex.crypto.SigningFunctions._
-import scorex.crypto.{EllipticCurveImpl, SigningFunctions}
+import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.singing.SigningFunctions
+import scorex.crypto.singing.SigningFunctions.Signature
 import scorex.network.message.Message._
-import scorex.transaction.{TransactionModule, History}
+import scorex.transaction.{History, TransactionModule}
 
 import scala.util.Try
 
 
-class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
+class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_],
                           consensusModule: ConsensusModule[_]) {
 
   object GetPeersSpec extends MessageSpec[Unit] {
@@ -25,7 +26,7 @@ class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
     override def deserializeData(bytes: Array[Byte]): Try[Unit] =
       Try(require(bytes.isEmpty, "Non-empty data for GetPeers"))
 
-    override def serializeData(data: Unit) = Array()
+    override def serializeData(data: Unit): Array[Byte] = Array()
   }
 
   object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
@@ -46,7 +47,7 @@ class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
       if (bytes.length != DataLength + (length * (AddressLength + PortLength)))
         throw new Exception("Data does not match length")
 
-      (0 to length - 1).map { i =>
+      (0 until length).map { i =>
         val position = lengthBytes.length + (i * (AddressLength + PortLength))
         val addressBytes = util.Arrays.copyOfRange(bytes, position, position + AddressLength)
         val address = InetAddress.getByAddress(addressBytes)
@@ -55,7 +56,7 @@ class BasicMessagesRepo()(implicit val transactionalModule:TransactionModule[_],
       }
     }
 
-    override def serializeData(peers: Seq[InetSocketAddress]) = {
+    override def serializeData(peers: Seq[InetSocketAddress]): Array[Byte] = {
       val length = peers.size
       val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DataLength, 0)
 

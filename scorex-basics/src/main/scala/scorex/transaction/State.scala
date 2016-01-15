@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import scorex.block.Block
+import scorex.block.Block.BlockId
 import scorex.transaction.BlockStorage.{Direction, Forward, Reversed}
 
 import scala.util.Try
@@ -25,5 +26,5 @@ trait State {
     * @param tx - a transaction to check
     * @return whether transaction is already included into a state or not
     */
-  def included(tx: Transaction): Boolean
+  def included(tx: Transaction): Option[BlockId]
 }

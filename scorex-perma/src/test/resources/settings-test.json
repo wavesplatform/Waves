@@ -1,5 +1,6 @@
 {
   "perma": {
-    "treeDir": "/tmp/scorex/perma/test/"
+    "treeDir": "/tmp/scorex/test/data/tree",
+    "authDataStorage": "authDataStorage.mapDB"
   }
 }

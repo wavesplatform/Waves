@@ -5,21 +5,22 @@ import java.io.File
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.perma.settings.Constants.DataSegment
-import scorex.perma.settings.{Constants, PermaSettings}
+import scorex.perma.settings.PermaConstants.DataSegment
+import scorex.perma.settings.{PermaConstants, PermaSettings}
 import scorex.perma.storage.AuthDataStorage
 import scorex.settings.Settings
 import scorex.storage.Storage
 import scorex.utils._
 
-class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
+class PermaConsensusBlockFieldSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
-  implicit val settings = new Settings with PermaSettings {
-    val filename = "settings-test.json"
+  implicit object settings extends Settings with PermaSettings {
+    override lazy val filename = "settings-test.json"
   }
+
   new File(settings.treeDir).mkdirs()
   implicit lazy val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
-  val consensus = new PermaConsensusModule(randomBytes(32))
+  val consensus = new PermaConsensusModule(randomBytes())
 
   property("Encode to bytes round-trip") {
     forAll { (diff: Long, segmentIndex: Long) =>
@@ -29,12 +30,12 @@ class PermaConsensusBlockFiendSpecification extends PropSpec with PropertyChecks
       val s = randomBytes(PermaConsensusBlockField.SLength)
       val signature = randomBytes(PermaConsensusBlockField.SignatureLength)
       val signature2 = randomBytes(PermaConsensusBlockField.SignatureLength)
-      val blockdata = randomBytes(Constants.segmentSize)
+      val blockdata = randomBytes(PermaConstants.segmentSize)
       val hash1 = randomBytes(PermaConsensusBlockField.HashLength)
       val hash2 = randomBytes(PermaConsensusBlockField.HashLength)
 
       val authDataBlock: AuthDataBlock[DataSegment] = AuthDataBlock(blockdata, Seq(hash1, hash2))
-      val initialBlock = PermaConsensusBlockField(PermaLikeConsensusBlockData(
+      val initialBlock = PermaConsensusBlockField(PermaConsensusBlockData(
         math.abs(diff),
         puz,
         Ticket(pubkey, s, IndexedSeq(

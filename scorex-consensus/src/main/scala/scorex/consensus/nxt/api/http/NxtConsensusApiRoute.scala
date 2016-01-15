@@ -7,8 +7,8 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.consensus.nxt.NxtLikeConsensusModule
-import scorex.crypto.Base58
-import scorex.transaction.{BlockStorage, BlockChain, History}
+import scorex.crypto.encode.Base58
+import scorex.transaction.BlockStorage
 import spray.routing.Route
 
 
@@ -27,7 +27,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockStorage
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "String", paramType = "path")
   ))
-  def generationSignatureId = {
+  def generationSignatureId: Route = {
     path("generationsignature" / Segment) { case encodedSignature =>
       jsonRoute {
         withBlock(blockStorage.history, encodedSignature) { block =>
@@ -42,7 +42,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockStorage
 
   @Path("/generationsignature")
   @ApiOperation(value = "Generation signature last", notes = "Generation signature of a last block", httpMethod = "GET")
-  def generationSignature = {
+  def generationSignature: Route = {
     path("generationsignature") {
       jsonRoute {
         val lastBlock = blockStorage.history.lastBlock
@@ -57,7 +57,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockStorage
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "String", paramType = "path")
   ))
-  def baseTargetId = {
+  def baseTargetId: Route = {
     path("basetarget" / Segment) { case encodedSignature =>
       jsonRoute {
         withBlock(blockStorage.history, encodedSignature) { block =>
@@ -71,7 +71,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockStorage
 
   @Path("/basetarget")
   @ApiOperation(value = "Base target last", notes = "Base target of a last block", httpMethod = "GET")
-  def basetarget = {
+  def basetarget: Route = {
     path("basetarget") {
       jsonRoute {
         val lastBlock = blockStorage.history.lastBlock
@@ -83,7 +83,7 @@ class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockStorage
 
   @Path("/algo")
   @ApiOperation(value = "Consensus algo", notes = "Shows which consensus algo being using", httpMethod = "GET")
-  def algo = {
+  def algo: Route = {
     path("algo") {
       jsonRoute {
         Json.obj("consensus-algo" -> "nxt").toString()

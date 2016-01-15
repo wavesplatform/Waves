@@ -1,15 +1,17 @@
 package scorex.lagonaki.api.http
 
+import javax.ws.rs.Path
+
 import akka.actor.ActorRefFactory
 import akka.pattern.ask
 import com.wordnik.swagger.annotations._
-import javax.ws.rs.Path
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.lagonaki.server.settings.Constants
 import scorex.network.BlockGenerator
 import spray.http.MediaTypes._
+import spray.routing.Route
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -29,7 +31,7 @@ case class ScorexApiRoute(application: LagonakiApplication)(implicit val context
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json Scorex version")
   ))
-  def version = {
+  def version: Route = {
     path("version") {
       jsonRoute {
         Json.obj("version" -> Constants.AgentName).toString()
@@ -39,7 +41,7 @@ case class ScorexApiRoute(application: LagonakiApplication)(implicit val context
 
   @Path("/stop")
   @ApiOperation(value = "Stop", notes = "Stop the app", httpMethod = "POST")
-  def scorex = path("stop") {
+  def scorex: Route = path("stop") {
     jsonRoute({
       Future(application.stopAll())
       Json.obj("stopped" -> true).toString()
@@ -48,7 +50,7 @@ case class ScorexApiRoute(application: LagonakiApplication)(implicit val context
 
   @Path("/status")
   @ApiOperation(value = "Status", notes = "Get status of the running core(Offline/Syncing/Generating)", httpMethod = "GET")
-  def status = path("status") {
+  def status: Route = path("status") {
     get {
       respondWithMediaType(`application/json`) {
         onComplete {

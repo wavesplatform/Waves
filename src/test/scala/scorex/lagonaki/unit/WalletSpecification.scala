@@ -1,7 +1,7 @@
 package scorex.lagonaki.unit
 
 import org.scalatest.FunSuite
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 import scorex.wallet.Wallet
 
 import scala.util.Random
@@ -30,7 +30,7 @@ class WalletSpecification extends FunSuite {
     assert(w.privateKeyAccounts().isEmpty)
   }
 
-  test("reopening"){
+  test("reopening") {
 
     //todo read folder from settings
     val walletFile = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")

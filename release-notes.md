@@ -1,3 +1,24 @@
+**1.2.0**
+---------
+
+* Web interface to core API has been added. Please set "rpcport" value in settings.json then visit
+   http://localhost:{rpcport}/ after server bootstrapping.
+
+* Permacoin implementation has been added. Permacoin is blockchain consensus protocol based on
+non-interactive Proof-of-Retrievability of a static dataset by A. Miller, E. Shi, J. Katz, B. Parno et at.
+ For details please see the paper http://cs.umd.edu/~amiller/permacoin.pdf . Protocol settings could be changed
+ in perma.conf.
+
+* For Permacoin module, new API calls are /consensus/target, /consensus/target/{blockId},
+ /consensus/puz, /consensus/puz/{blockId} .
+
+* P2P layer is totally rewritten. From now a new module can implement messages and messages handling
+logic separately. Then module p2p logic is to be wired into application's logic.
+
+* Experimental: a node could store a blocktree explicitly. Storage type could be changed via "history"
+setting(set "blockchain" / "blocktree"). Different nodes can have different storage types.
+
+
 **1.1.2**
 ---------
 

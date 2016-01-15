@@ -3,7 +3,8 @@ package scorex.network.message
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
-import scorex.crypto.Sha256._
+import scorex.crypto.hash.FastCryptographicHash
+import FastCryptographicHash._
 import scorex.network.ConnectedPeer
 
 import scala.util.{Success, Try}
@@ -17,7 +18,7 @@ trait MessageSpec[Content] {
 
   def serializeData(data: Content): Array[Byte]
 
-  override def toString = s"MessageSpec($messageCode: $messageName)"
+  override def toString: String = s"MessageSpec($messageCode: $messageName)"
 }
 
 
@@ -74,7 +75,7 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
     val magic = new Array[Byte](MagicLength)
     bytes.get(magic)
 
-    assert(magic.sameElements(Message.MAGIC), "Wrong magic bytes")
+    assert(magic.sameElements(Message.MAGIC), "Wrong magic bytes" + magic.mkString)
 
     val msgCode = bytes.get
 

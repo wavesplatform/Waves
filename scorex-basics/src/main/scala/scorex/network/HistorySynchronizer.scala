@@ -5,15 +5,15 @@ import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
-import scorex.network.message.Message
 import scorex.network.NetworkObject.ConsideredValue
+import scorex.network.message.Message
 import scorex.transaction.History
 import shapeless.Typeable._
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 //todo: write tests
 class HistorySynchronizer(application: Application)
@@ -27,15 +27,17 @@ class HistorySynchronizer(application: Application)
 
   override val messageSpecs = Seq(ScoreMessageSpec, GetSignaturesSpec, SignaturesSpec, BlockMessageSpec, GetBlockSpec)
 
-  lazy val scoreSyncer = new ScoreNetworkObject(self)
+  private lazy val scoreSyncer = new ScoreNetworkObject(self)
 
-  lazy val history = application.history
+  private lazy val history = application.history
 
-  override lazy val networkControllerRef = application.networkController
+  protected override lazy val networkControllerRef = application.networkController
 
-  lazy val blockGenerator = application.blockGenerator
+  private lazy val blockGenerator = application.blockGenerator
 
-  override def preStart = {
+  private val GettingExtensionTimeout = 15.seconds
+
+  override def preStart: Unit = {
     super.preStart()
     context.system.scheduler.schedule(1.second, 1.seconds) {
       val msg = Message(ScoreMessageSpec, Right(history.score()), None)
@@ -50,17 +52,18 @@ class HistorySynchronizer(application: Application)
     case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
       val localScore = history.score()
       if (networkScore > localScore) {
-        log.info("networkScore > localScore")
+        log.info(s"networkScore=$networkScore > localScore=$localScore")
         val lastIds = history.lastBlocks(100).map(_.uniqueId)
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
+        context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! StateTimeout)
         goto(GettingExtension) using witnesses
       } else goto(Synced) using Seq()
   }
 
   private val blocksToReceive = mutable.Queue[BlockId]()
 
-  when(GettingExtension, 15.seconds) {
+  when(GettingExtension, GettingExtensionTimeout) {
     case Event(StateTimeout, _) =>
       goto(Syncing)
 
@@ -69,28 +72,35 @@ class HistorySynchronizer(application: Application)
       if msgId == SignaturesSpec.messageCode &&
         blockIds.cast[Seq[Block.BlockId]].isDefined &&
         witnesses.contains(remote) => //todo: ban if non-expected sender
+      val newBLockIds = blockIds.filter(!history.contains(_))
+      log.info(s"Got SignaturesMessage with ${blockIds.length} sigs, ${newBLockIds.size} are new")
 
-      log.info(s"Got SignaturesMessage with ${blockIds.length} sigs")
       val common = blockIds.head
       assert(application.history.contains(common)) //todo: what if not?
-      Try{application.blockStorage.removeAfter(common)} //todo we don't need this call for blockTree
+      Try(application.blockStorage.removeAfter(common)) //todo we don't need this call for blockTree
 
       blocksToReceive.clear()
 
-      blockIds.tail.foreach { blockId =>
-        blocksToReceive += blockId
-      }
+      if (newBLockIds.nonEmpty) {
+        newBLockIds.foreach { blockId =>
+          blocksToReceive += blockId
+        }
 
-      val firstReq = blockIds.tail.head
-      networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(firstReq), None), SendToChosen(Seq(remote)))
-      goto(GettingBlock)
+        networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blocksToReceive.front), None),
+          SendToChosen(Seq(remote)))
+        goto(GettingBlock)
+      } else goto(Syncing)
   }
 
-  when(GettingBlock) {
+  when(GettingBlock, 15.seconds) {
+    case Event(StateTimeout, _) =>
+      blocksToReceive.clear()
+      goto(Syncing)
+
     case Event(CheckBlock(blockId), witnesses) =>
-      if (blocksToReceive.front.sameElements(blockId)) {
-        val ss = SendToRandomFromChosen(witnesses)
-        val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
+      if (blocksToReceive.nonEmpty && blocksToReceive.front.sameElements(blockId)) {
+        val sendTo = SendToRandomFromChosen(witnesses)
+        val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), sendTo)
         networkControllerRef ! stn
       }
       stay()
@@ -98,35 +108,34 @@ class HistorySynchronizer(application: Application)
     case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
 
-      require(blocksToReceive.nonEmpty)
-
       val blockId = block.uniqueId
       log.info("Got block: " + blockId)
 
-      if (blocksToReceive.front.sameElements(blockId)) {
-        processNewBlock(block, local = false)
-        blocksToReceive.dequeue()
+      if (processNewBlock(block, local = false)) {
+        if (blocksToReceive.nonEmpty && blocksToReceive.front.sameElements(blockId)) blocksToReceive.dequeue()
 
-        if (blocksToReceive.isEmpty) {
-          goto(Syncing) using Seq()
-        } else {
+        if (blocksToReceive.nonEmpty) {
           val blockId = blocksToReceive.front
           val ss = SendToRandomFromChosen(Seq(remote))
           val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
           networkControllerRef ! stn
           context.system.scheduler.scheduleOnce(5.seconds)(self ! CheckBlock(blockId))
-          stay()
         }
-      } else stay()
+      } else if (!history.contains(block.referenceField.value)) {
+        log.warning("No parent block in history")
+        blocksToReceive.clear()
+        blocksToReceive.enqueue(block.referenceField.value)
+      }
+      if (blocksToReceive.nonEmpty) {
+        self ! CheckBlock(blocksToReceive.front)
+        stay()
+      } else {
+        goto(Syncing) using Seq()
+      }
   }
 
   //accept only new block from local or remote
   when(Synced) {
-    case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
-      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
-      processNewBlock(block, local = false)
-      stay()
-
     case Event(block: Block, _) =>
       processNewBlock(block, local = true)
       stay()
@@ -135,6 +144,11 @@ class HistorySynchronizer(application: Application)
       val localScore = history.score()
       if (networkScore > localScore) goto(Syncing) using witnesses
       else stay() using Seq()
+
+    case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
+      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
+      processNewBlock(block, local = false)
+      stay()
   }
 
   //common logic for all the states
@@ -183,40 +197,46 @@ class HistorySynchronizer(application: Application)
       stay()
 
     case nonsense: Any =>
-      log.warning(s"HistorySynchronizer: got something strange in the state ($stateName) :: $nonsense")
+      log.warning(s"Got something strange in the state ($stateName) :: $nonsense")
       stay()
   }
 
   onTransition {
-    case _ -> Syncing =>
-      scoreSyncer.consideredValue.foreach { cv =>
-        self ! cv
-      }
-
-    case _ -> Synced =>
-      blockGenerator ! BlockGenerator.StartGeneration
-
-    case Synced -> _ =>
-      blockGenerator ! BlockGenerator.StopGeneration
+    case from -> to =>
+      log.info(s"Transition from $from to $to")
+      if (from == Synced) blockGenerator ! BlockGenerator.StopGeneration
+      if (to == Synced) blockGenerator ! BlockGenerator.StartGeneration
+      if (to == Syncing) scoreSyncer.consideredValue.foreach(cv => self ! cv)
   }
 
   initialize()
 
-
-  def processNewBlock(block: Block, local: Boolean) = {
+  private def processNewBlock(block: Block, local: Boolean): Boolean = {
     if (block.isValid) {
-      log.info(s"New block: ${block.json} local: $local")
-      transactionalModule.blockStorage.appendBlock(block)
-
-      block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
+      log.info(s"New block(local: $local): ${block.json}")
 
       //broadcast block only if it is generated locally
-      if (!local) {
+      if (local) {
         val blockMsg = Message(BlockMessageSpec, Right(block), None)
         networkControllerRef ! SendToNetwork(blockMsg, Broadcast)
+        true
+      } else {
+        val oldHeight = history.height()
+        val oldScore = history.score()
+        val appending = transactionalModule.blockStorage.appendBlock(block)
+        appending match {
+          case Success(_) =>
+            block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
+            log.info(s"(height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})")
+          case Failure(e) =>
+            e.printStackTrace
+            log.warning(s"failed to append block: $e")
+        }
+        appending.isSuccess
       }
     } else {
-      log.warning(s"Non-valid block: ${block.json} local: $local")
+      log.warning(s"Invalid new block(local: $local): ${block.json}")
+      false
     }
   }
 }
@@ -232,7 +252,6 @@ object HistorySynchronizer {
   case object GettingBlock extends Status
 
   case object Synced extends Status
-
 
   case class CheckBlock(id: BlockId)
 

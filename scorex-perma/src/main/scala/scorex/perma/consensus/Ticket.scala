@@ -2,7 +2,7 @@ package scorex.perma.consensus
 
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Reads, Writes}
-import scorex.crypto.SigningFunctions._
+import scorex.crypto.singing.SigningFunctions.PublicKey
 import scorex.utils.JsonSerialization
 
 case class Ticket(publicKey: PublicKey,

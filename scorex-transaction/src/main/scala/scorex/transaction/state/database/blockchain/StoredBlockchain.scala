@@ -16,7 +16,6 @@ import scala.util.{Failure, Success, Try}
 /**
   * If no datafolder provided, blockchain lives in RAM (useful for tests)
   */
-
 class StoredBlockchain(dataFolderOpt: Option[String])
                       (implicit consensusModule: ConsensusModule[_],
                        transactionModule: TransactionModule[_])
@@ -83,6 +82,8 @@ class StoredBlockchain(dataFolderOpt: Option[String])
 
   //if there are some uncommited changes from last run, discard'em
   if (signaturesIndex.size() > 0) database.rollback()
+
+  log.info(s"Initialized blockchain in $dataFolderOpt with ${height()} blocks")
 
   override private[transaction] def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
     Try {
@@ -161,7 +162,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
       }
     }
 
-  override def toString = ((1 to height()) map { case h =>
+  override def toString: String = ((1 to height()) map { case h =>
     val bl = blockAt(h).get
     s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
   }).mkString("\n")

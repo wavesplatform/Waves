@@ -2,6 +2,7 @@ package scorex.lagonaki.integration
 
 import play.api.libs.json.Json
 import scorex.api.http.BlocksApiRoute
+import scorex.block.Block
 import scorex.lagonaki.TestingCommons
 
 
@@ -10,6 +11,10 @@ class BlocksRoutingSpecification extends RouteTest {
   import TestingCommons._
 
   application.checkGenesis()
+  implicit val consensusModule = application.consensusModule
+  implicit val transactionModule = application.transactionModule
+  lazy val genesis = Block.genesis()
+  lazy val signature = (genesis.json \ "signature").as[String]
 
   val blocksRoute = BlocksApiRoute(application.blockStorage.history, application.wallet).route
 
@@ -19,7 +24,21 @@ class BlocksRoutingSpecification extends RouteTest {
       (js \ "fee").as[Int] shouldBe 0
       (js \ "version").as[Int] should be >= 1
       (js \ "transactions").toOption should not be None
-      //TODO check concrete block?
+      js.toString() shouldBe genesis.json.toString()
+    }
+  }
+
+  it should "return block for correct signature" in {
+    Get(s"/blocks/signature/$signature") ~> blocksRoute ~> check {
+      val js = Json.parse(responseAs[String])
+      js.toString() shouldBe genesis.json.toString()
+    }
+  }
+
+  it should "return block height for correct signature" in {
+    Get(s"/blocks/height/$signature") ~> blocksRoute ~> check {
+      val js = Json.parse(responseAs[String])
+      (js \ "height").as[Int] shouldBe 1
     }
   }
 
@@ -31,6 +50,7 @@ class BlocksRoutingSpecification extends RouteTest {
       (js \ "transactions").toOption should not be None
     }
   }
+
   it should "return error for wrong signature" in {
     Get("/blocks/signature/wrongSignature") ~> blocksRoute ~> check {
       val js = Json.parse(responseAs[String])
@@ -38,12 +58,12 @@ class BlocksRoutingSpecification extends RouteTest {
     }
   }
 
-  //TODO check correct signature
   it should "return block at 1" in {
     Get("/blocks/at/1") ~> blocksRoute ~> check {
       val js = Json.parse(responseAs[String])
       (js \ "fee").as[Int] should be >= 0
       (js \ "version").as[Int] should be >= 1
+      js.toString() shouldBe genesis.json.toString()
     }
   }
 
@@ -54,7 +74,14 @@ class BlocksRoutingSpecification extends RouteTest {
     }
   }
 
-  //TODO test route /blocks/height/$encodedSignature
+  it should "return return error when there are no children" in {
+    Get(s"/blocks/child/$signature") ~> blocksRoute ~> check {
+      val js = Json.parse(responseAs[String])
+      (js \ "status").as[String] shouldBe "error"
+    }
+  }
+
   //TODO test route /blocks/child/$encodedSignature
   //TODO test route /blocks/address/$address
+  //TODO test blocks other then genesis
 }

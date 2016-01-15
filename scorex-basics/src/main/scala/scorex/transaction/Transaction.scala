@@ -4,8 +4,8 @@ import play.api.libs.json.JsObject
 
 
 /**
- * A transaction is an atomic state modifier
- */
+  * A transaction is an atomic state modifier
+  */
 
 trait Transaction {
   val fee: Long
@@ -14,12 +14,12 @@ trait Transaction {
   val signature: Array[Byte]
 
   /**
-   * A transaction could be serialized into JSON
-   */
+    * A transaction could be serialized into JSON
+    */
   def json(): JsObject
 
   /**
-   * A transaction could be serialized into binary form
-   */
+    * A transaction could be serialized into binary form
+    */
   def bytes(): Array[Byte]
 }

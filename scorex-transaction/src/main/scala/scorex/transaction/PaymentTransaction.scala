@@ -3,10 +3,12 @@ package scorex.transaction
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.crypto.{EllipticCurveImpl, Base58}
+import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.TransactionType
+import scorex.transaction.state.LagonakiState
 
 case class PaymentTransaction(sender: PublicKeyAccount,
                               override val recipient: Account,
@@ -16,20 +18,20 @@ case class PaymentTransaction(sender: PublicKeyAccount,
                               override val signature: Array[Byte])
   extends LagonakiTransaction(TransactionType.PaymentTransaction, recipient, amount, fee, timestamp, signature) {
 
-  import scorex.transaction.PaymentTransaction._
   import scorex.transaction.LagonakiTransaction._
+  import scorex.transaction.PaymentTransaction._
 
   override lazy val dataLength = TypeLength + BaseLength
 
   override lazy val creator = Some(sender)
 
-  override def json() = jsonBase() ++ Json.obj(
+  override def json(): JsObject = jsonBase() ++ Json.obj(
     "sender" -> sender.address,
     "recipient" -> recipient.address,
     "amount" -> amount
   )
 
-  override def bytes() = {
+  override def bytes(): Array[Byte] = {
     val typeBytes = Array(TypeId.toByte)
 
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
@@ -43,15 +45,15 @@ case class PaymentTransaction(sender: PublicKeyAccount,
       feeBytes, signature)
   }
 
-  override def isSignatureValid() = {
+  override def isSignatureValid(): Boolean = {
     val data = signatureData(sender, recipient, amount, fee, timestamp)
     EllipticCurveImpl.verify(signature, data, sender.publicKey)
   }
 
-  override def validate()(implicit transactionModule: SimpleTransactionModule) =
+  override def validate(state: BalanceSheet): ValidationResult.Value =
     if (!Account.isValidAddress(recipient.address)) {
       ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (transactionModule.blockStorage.state.balance(sender.address) < amount + fee) {
+    } else if (state.balance(sender.address) < amount + fee) {
       ValidationResult.NoBalance //CHECK IF SENDER HAS ENOUGH MONEY
     } else if (amount <= 0) {
       ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
@@ -60,13 +62,13 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     } else ValidationResult.ValidateOke
 
 
-  override def involvedAmount(account: Account):Long = {
+  override def involvedAmount(account: Account): Long = {
     val address = account.address
 
     if (address.equals(sender.address) && address.equals(recipient.address)) {
       -fee
     } else if (address.equals(sender.address)) {
-      -amount-fee
+      -amount - fee
     } else if (address.equals(recipient.address)) {
       amount
     } else 0

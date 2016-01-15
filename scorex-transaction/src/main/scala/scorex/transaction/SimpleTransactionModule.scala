@@ -1,15 +1,24 @@
 package scorex.transaction
 
+import java.io.File
+
 import com.google.common.primitives.{Bytes, Ints}
+import org.mapdb.DBMaker
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.Account
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.app.Application
+import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockField}
-import scorex.consensus.ConsensusModule
+import scorex.crypto.encode.Base58
+import scorex.network.message.Message
+import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
-import scorex.utils.ScorexLogging
+import scorex.transaction.state.wallet.Payment
+import scorex.utils.{NTP, ScorexLogging}
+import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -32,11 +41,14 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
   }
 }
 
-class SimpleTransactionModule(implicit val settings: TransactionSettings,
-                              consensusModule: ConsensusModule[_])
+
+class SimpleTransactionModule(implicit val settings: TransactionSettings, application: Application)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
 
   import SimpleTransactionModule._
+
+  val consensusModule = application.consensusModule
+  val networkController = application.networkController
 
   val TransactionSizeLength = 4
 
@@ -52,7 +64,31 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
         log.error(s"Unknown history storage: $s. Use StoredBlockchain...")
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
-    override val state = new StoredState(settings.dataDirOpt)
+
+    override def state(idOpt: Option[BlockId]): Option[StoredState] = idOpt match {
+      case None => Some(currentState)
+      case Some(b) => StoredState(b)
+    }
+
+    override def state: StoredState = currentState
+
+    private val currentState = settings.dataDirOpt match {
+      case Some(dataFolder) =>
+        log.debug("DB loaded from {}", dataFolder)
+        val db = DBMaker.fileDB(new File(dataFolder + s"/state"))
+          .closeOnJvmShutdown()
+          .cacheSize(2048)
+          .checksumEnable()
+          .snapshotEnable()
+          .fileMmapEnable()
+          .make()
+        db.rollback() //clear uncommitted data from possibly invalid last run
+        if (!history.isEmpty) StoredState.history.put(Base58.encode(history.lastBlock.uniqueId), db.snapshot())
+        new StoredState(db)
+
+      case None => new StoredState(DBMaker.memoryDB().snapshotEnable().make())
+    }
+
   }
 
   /**
@@ -64,8 +100,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     bytes.isEmpty match {
       case true => TransactionsBlockField(Seq())
       case false =>
+        val txData = bytes.tail
         val txCount = bytes.head // so 255 txs max
-      val txData = bytes.tail
         formBlockData((1 to txCount).foldLeft((0: Int, Seq[LagonakiTransaction]())) { case ((pos, txs), _) =>
           val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
           val transactionLength = Ints.fromByteArray(transactionLengthBytes)
@@ -77,14 +113,14 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     }
   }
 
-  override def formBlockData(transactions: StoredInBlock): TransactionsBlockField =
-    TransactionsBlockField(transactions)
+  override def formBlockData(transactions: StoredInBlock): TransactionsBlockField = TransactionsBlockField(transactions)
 
+  //TODO asInstanceOf
   override def transactions(block: Block): StoredInBlock =
-    block.transactionDataField.asInstanceOf[TransactionsBlockField].value //todo: asInstanceOf
+    block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
-  override def packUnconfirmed(): StoredInBlock =
-    UnconfirmedTransactionsDatabaseImpl.all().filter(isValid(_)).filter(!blockStorage.state.included(_))
+  override def packUnconfirmed(): StoredInBlock = blockStorage.state.validate(UnconfirmedTransactionsDatabaseImpl.all()
+    .filter(isValid).filter(blockStorage.state.included(_).isEmpty).take(MaxTransactionsPerBlock))
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
@@ -99,46 +135,80 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings,
     }
   }
 
+  override def onNewOffchainTransaction(transaction: Transaction): Unit =
+    if (UnconfirmedTransactionsDatabaseImpl.putIfNew(transaction)) {
+      val spec = TransactionalMessagesRepo.TransactionMessageSpec
+      val ntwMsg = Message(spec, Right(transaction), None)
+      networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
+    }
+
+  def createPayment(payment: Payment, wallet: Wallet): Option[PaymentTransaction] = {
+    wallet.privateKeyAccount(payment.sender).map { sender =>
+      createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
+    }
+  }
+
+  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
+    val time = NTP.correctedTime()
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
+    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
+    if (payment.validate()(this) == ValidationResult.ValidateOke) {
+      onNewOffchainTransaction(payment)
+    }
+    payment
+  }
+
   override def genesisData: BlockField[StoredInBlock] = {
     val ipoMembers = List(
-      "QTwpq6La1CzXrwbFbcxncb4kv5g2UNFiY2",
-      "QSwv4GoR3UjwXKSZN5eoAhHqPcEWTKzomD",
-      "QhcAVCVWbWVV1zR3YGFXpbqPdC3f9U9Vk8",
-      "QQBe83C4re58s7RPTJADw2uqD8jBubebof",
-      "QPsvHmzarLsHDRzjqpGRuLKJMh5WWf6KSp",
-      "QN7q77Szn3dXaWXFJigGN7KdyegFEGNj8J",
-      "QgN6AT5yrnB12U42QptidCWQkhUEsQaTTp",
-      "QNpF56FwQ6xuVynpMndcUEeam3JmPt7tj4",
-      "Qa9cNprVTsYPeuxzVjad5p1CvzAezYffdd",
-      "QZkTyUfZFLjPiKzQuJNZo4kV959YZkoYe3"
+      //peer 1 accounts
+      "jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS",
+      "aptcN9CfZouX7apreDB6WG2cJVbkos881",
+      "kVVAu6F21Ax2Ugddms4p5uXz4kdZfAp8g",
+      //peer 2 accounts
+      "mobNC7SHZRUXDi4GrZP9T2F4iLC1ZidmX",
+      "ffUTdmFDesA7NLqLaVfUNgQRD2Xn4tNBp",
+      "UR2WjoDCW32XAvYuPbyQW3guxMei5HKf1"
     )
 
     val timestamp = 0L
+    val totalBalance = 60000000000L
 
     val txs = ipoMembers.map { addr =>
       val recipient = new Account(addr)
-      GenesisTransaction(recipient, 1000000000L, timestamp)
+      GenesisTransaction(recipient, totalBalance / ipoMembers.length, timestamp)
     }
 
     TransactionsBlockField(txs)
   }
 
-  override def isValid(block: Block): Boolean = transactions(block).forall(isValid(_, blockStorage.history.heightOf(block).getOrElse(0) == 1))
+  override def isValid(block: Block): Boolean = blockStorage.state(Some(block.referenceField.value)) match {
+    case Some(blockState) =>
+      isValid(transactions(block), blockState)
+    case None =>
+      log.warn(s"No block state ${Base58.encode(block.referenceField.value)} in history")
+      false
+  }
 
-  def isValid(transaction: Transaction, isGenesisBlock: Boolean = false): Boolean = transaction match {
-    case ptx: PaymentTransaction =>
-      ptx.isSignatureValid() && ptx.validate()(this) == ValidationResult.ValidateOke
+  override def isValid(transaction: Transaction): Boolean = isValid(transaction, blockStorage.state)
+
+  private def isValid(transactions: Seq[Transaction], state: StoredState): Boolean =
+    transactions.forall(isValid) && state.isValid(transactions)
+
+  private def isValid(transaction: Transaction, txState: StoredState): Boolean = transaction match {
+    case tx: PaymentTransaction =>
+      tx.isSignatureValid() && tx.validate(txState) == ValidationResult.ValidateOke && txState.included(tx).isEmpty
     case gtx: GenesisTransaction =>
-      isGenesisBlock
+      blockStorage.history.height() == 0
     case otx: Any =>
       log.error(s"Wrong kind of tx: $otx")
       false
   }
+
 }
 
 object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
-  val MaxTimeForUnconfirmed: Duration = 1.hour
-  val MaxTransactionsPerBlock = 100: Byte
+  val MaxTimeForUnconfirmed = 1.hour
+  val MaxTransactionsPerBlock = 100
 }

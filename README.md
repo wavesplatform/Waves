@@ -27,7 +27,7 @@ Features
 * Modular design
 * Scala language
 * Two 100% Proof-of-Stake consensus algos out of the box, Nxt-like and Qora-like. One algo could be replaced
-with an another with just one line of code edited (in Constants.scala)
+with an another with just one line of code edited (in PermaConstants.scala)
 * Simplest transactional model
 * Asynchronous network layer on top of TCP
 * JSON API
@@ -101,6 +101,13 @@ Some examples of CLI commands:
 
  * GET blocks/first
  * POST payment {"amount":400, "fee":1, "sender":"2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPNKr","recipient":"Y2BXLjiAhPUMSo8iBbDEhv81VwKnytTXsH"}
+
+
+Tests
+---
+
+Run `sbt test` to run tests.
+Read more about testing with sbt at [http://www.scala-sbt.org/0.13/docs/Testing.html](http://www.scala-sbt.org/0.13/docs/Testing.html)
 
 API
 ---

@@ -7,6 +7,7 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
+import scorex.crypto.encode.Base58
 import scorex.transaction.BlockStorage._
 import scorex.transaction.{BlockTree, TransactionModule}
 import scorex.utils.ScorexLogging
@@ -17,7 +18,7 @@ import scala.util.{Failure, Success, Try}
 /**
   * If no datafolder provided, blocktree lives in RAM (useful for tests)
   */
-class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
+class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
                      (implicit consensusModule: ConsensusModule[_],
                       transactionModule: TransactionModule[_])
   extends BlockTree with ScorexLogging {
@@ -30,6 +31,8 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     def writeBlock(block: Block): Try[Boolean]
 
     def readBlock(id: BlockId): Option[StoredBlock]
+
+    def readBlock(block: Block): Option[StoredBlock] = readBlock(block.uniqueId)
 
     def filter(f: Block => Boolean): Seq[StoredBlock] = {
       @tailrec
@@ -77,6 +80,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     private def setBestBlockId(newId: BlockId) = {
       bestBlockId = newId
       bestBlockStorage.put(0, newId)
+      db.commit()
     }
 
     override def lookForward(parentSignature: BlockId, howMany: Height): Seq[BlockId] = Try {
@@ -118,8 +122,13 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
       }
     }
 
+    /**
+      *
+      * @return true when best block added, false when block score is less then current score
+      */
     override def writeBlock(block: Block): Try[Boolean] = Try {
-      if (exists(block)) throw new Error("Block is already in storage")
+      if (exists(block)) log.warn(s"Trying to add block ${Base58.encode(block.uniqueId)} that is already in tree "
+        + s" at height ${readBlock(block).map(_._3)}")
       val parent = readBlock(block.referenceField.value)
       lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
       parent match {
@@ -130,7 +139,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
             val s = p._2 + blockScore
             map.put(block.uniqueId, (block.bytes, s, p._3 + 1))
             db.commit()
-            if (s > score()) {
+            if (s >= score()) {
               setBestBlockId(block.uniqueId)
               true
             } else false
@@ -156,7 +165,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
       case Success(v) =>
         Some(v)
       case Failure(e) =>
-        log.debug("Enable readBlock for key: " + key.mkString)
+        log.debug("Enable readBlock for key: " + Base58.encode(key))
         None
     }
   }
@@ -255,5 +264,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int = 100)
     blockStorage.lookForward(parentSignature, howMany)
 
   override def contains(id: BlockId): Boolean = blockStorage.exists(id)
+
+  override lazy val genesis: Block = blockById(Block.genesis().uniqueId).get
 
 }

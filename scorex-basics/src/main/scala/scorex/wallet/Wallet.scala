@@ -5,7 +5,7 @@ import java.io.File
 import com.google.common.primitives.{Bytes, Ints}
 import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.Sha256._
+import scorex.crypto.hash.SecureCryptographicHash
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
@@ -16,7 +16,7 @@ class Wallet(walletFileOpt: Option[File],
              password: String,
              seed: Array[Byte]) extends ScorexLogging {
 
-  private val NONCE = "nonce"
+  private val NonceFieldName = "nonce"
 
   private val database = walletFileOpt match {
     case Some(walletFile) =>
@@ -67,10 +67,9 @@ class Wallet(walletFileOpt: Option[File],
     } else None
   }
 
-  def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] = {
-    val nonceBytes = Ints.toByteArray(nonce)
-    doubleHash(Bytes.concat(nonceBytes, seed, nonceBytes))
-  }
+  def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
+    SecureCryptographicHash(Bytes.concat(Ints.toByteArray(nonce), seed))
+
 
   def deleteAccount(account: PrivateKeyAccount): Boolean = synchronized {
     val res = accountsPersistence.remove(account.seed)
@@ -81,23 +80,23 @@ class Wallet(walletFileOpt: Option[File],
 
   def exportAccountSeed(address: String): Option[Array[Byte]] = privateKeyAccount(address).map(_.seed)
 
-  def privateKeyAccount(address: String) = accountsCache.get(address)
+  def privateKeyAccount(address: String): Option[PrivateKeyAccount] = accountsCache.get(address)
 
   def exportSeed(): Array[Byte] = seed
 
-  def close() = if (!database.isClosed) {
+  def close(): Unit = if (!database.isClosed) {
     database.commit()
     database.close()
     accountsCache.clear()
   }
 
-  def exists() = walletFileOpt.map(_.exists()).getOrElse(true)
+  def exists(): Boolean = walletFileOpt.map(_.exists()).getOrElse(true)
 
-  def accounts() = accountsCache.values.toSeq
+  def accounts(): Seq[PrivateKeyAccount] = accountsCache.values.toSeq
 
-  def nonce(): Int = database.atomicInteger(NONCE).intValue()
+  def nonce(): Int = database.atomicInteger(NonceFieldName).intValue()
 
-  def setNonce(nonce: Int) = database.atomicInteger(NONCE).set(nonce)
+  def setNonce(nonce: Int): Unit = database.atomicInteger(NonceFieldName).set(nonce)
 
-  def getAndIncrementNonce(): Int = database.atomicInteger(NONCE).getAndIncrement()
+  def getAndIncrementNonce(): Int = database.atomicInteger(NonceFieldName).getAndIncrement()
 }

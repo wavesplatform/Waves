@@ -1,15 +1,17 @@
 package scorex.account
 
-import scorex.crypto.{Base58, RIPEMD160}
+import scorex.crypto.hash.SecureCryptographicHash
+import SecureCryptographicHash._
+import scorex.crypto.encode.Base58
 
 
 class Account(val address: String) extends Serializable {
 
   lazy val bytes = Base58.decode(address).get
 
-  override def toString = address
+  override def toString: String = address
 
-  override def equals(b: Any) = b match {
+  override def equals(b: Any): Boolean = b match {
     case a: Account => a.address == address
     case _ => false
   }
@@ -20,22 +22,15 @@ class Account(val address: String) extends Serializable {
 
 object Account {
 
-  import scorex.crypto.Sha256._
-
-  val AddressLength = 25
-
-  val AddressVersion: Byte = 58
+  val AddressVersion: Byte = 1
   val ChecksumLength = 4
+  val HashLength = 20
+  val AddressLength = 1 + ChecksumLength + HashLength
 
-  def fromBytes(bytes: Array[Byte]): Account = new Account(Base58.encode(bytes))
-
-  //todo: props test for: isValidAddress(fromPubkey(any)) == true
   def fromPubkey(publicKey: Array[Byte]): String = {
-    val publicKeyHash = new RIPEMD160().digest(hash(publicKey))
+    val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: publicKeyHash //prepend ADDRESS_VERSION
-    val checkSum = doubleHash(withoutChecksum).take(ChecksumLength)
-
-    Base58.encode(withoutChecksum ++ checkSum)
+    Base58.encode(withoutChecksum ++ calcCheckSum(withoutChecksum))
   }
 
   def isValidAddress(address: String): Boolean =
@@ -45,10 +40,12 @@ object Account {
       else {
         val checkSum = addressBytes.takeRight(ChecksumLength)
 
-        val dh = doubleHash(addressBytes.dropRight(ChecksumLength))
-        val checkSumGenerated = dh.take(ChecksumLength)
+        val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
 
         checkSum.sameElements(checkSumGenerated)
       }
     }.getOrElse(false)
+
+  private def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = hash(withoutChecksum).take(ChecksumLength)
+
 }

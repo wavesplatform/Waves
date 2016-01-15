@@ -1,15 +1,16 @@
 package scorex.perma.settings
 
 import play.api.libs.json.JsObject
+import scorex.crypto.encode.Base58
 
 trait PermaSettings {
   val settingsJSON: JsObject
 
-  private val DefaultTreeDir = "/tmp/scorex/perma/"
-  private val DefaultAuthDataStorage = DefaultTreeDir + "authDataStorage.mapDB"
+  lazy val rootHash: Array[Byte] = Base58.decode("FQb7JGmZayjS9Y9qMpRtWZtW8BXrGRCbbuX2YNH5Q54t").get
 
-  lazy val treeDir = (settingsJSON \ "perma" \ "treeDir").asOpt[String].getOrElse(DefaultTreeDir)
-  lazy val authDataStorage =
-    (settingsJSON \ "perma" \ "authDataStorage").asOpt[String].getOrElse(DefaultAuthDataStorage)
+  lazy val isTrustedDealer = (settingsJSON \ "perma" \ "isTrustedDealer").asOpt[Boolean].getOrElse(false)
 
+  lazy val treeDir = (settingsJSON \ "perma" \ "treeDir").as[String]
+
+  lazy val authDataStorage = treeDir + (settingsJSON \ "perma" \ "authDataStorage").as[String]
 }

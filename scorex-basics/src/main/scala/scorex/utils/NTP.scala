@@ -11,7 +11,7 @@ object NTP extends ScorexLogging {
   private var lastUpdate = 0L
   private var offset = 0L
 
-  def correctedTime() = {
+  def correctedTime(): Long = {
     //CHECK IF OFFSET NEEDS TO BE UPDATED
     if (System.currentTimeMillis() > lastUpdate + TimeTillUpdate) {
       updateOffSet()
@@ -33,7 +33,7 @@ object NTP extends ScorexLogging {
 
       val info = client.getTime(InetAddress.getByName(NtpServer))
       info.computeDetails()
-      if (info.getOffset != null) offset = info.getOffset
+      if (Option(info.getOffset).isDefined) offset = info.getOffset
     } catch {
       case t: Throwable => log.warn("Problems with NTP: ", t)
     } finally {

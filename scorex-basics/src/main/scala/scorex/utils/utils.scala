@@ -3,7 +3,6 @@ package scorex
 import java.security.SecureRandom
 
 import scala.annotation.tailrec
-
 import scala.concurrent.duration._
 
 package object utils {
@@ -22,7 +21,7 @@ package object utils {
     }
   }
 
-  def randomBytes(howMany: Int) = {
+  def randomBytes(howMany: Int = 32):Array[Byte] = {
     val r = new Array[Byte](howMany)
     new SecureRandom().nextBytes(r) //overrides r
     r

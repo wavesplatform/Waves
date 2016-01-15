@@ -7,10 +7,11 @@ import spray.routing._
 
 trait ApiRoute extends HttpService {
   val context: ActorRefFactory
-  val route: spray.routing.Route
-  def actorRefFactory = context
+  val route: Route
 
-  def jsonRoute(fn: => ToResponseMarshallable, method:Directive0 = get) = method {
+  def actorRefFactory: ActorRefFactory = context
+
+  def jsonRoute(fn: => ToResponseMarshallable, method: Directive0 = get): Route = method {
     respondWithMediaType(`application/json`) {
       complete(
         fn

@@ -1,10 +1,12 @@
 package scorex.transaction
 
-import scorex.account.Account
-import scorex.crypto.Base58
-import scorex.transaction.LagonakiTransaction.{ValidationResult, _}
-
+import com.google.common.primitives.Ints
 import play.api.libs.json.Json
+import scorex.account.Account
+import scorex.crypto.encode.Base58
+import scorex.transaction.LagonakiTransaction.{ValidationResult, _}
+import scorex.transaction.state.LagonakiState
+import scorex.transaction.state.database.blockchain.StoredState
 
 import scala.util.Try
 
@@ -37,17 +39,21 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
   def isSignatureValid(): Boolean
 
   //VALIDATE
+  def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value =
+    validate(transactionModule.blockStorage.state)
 
-  def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value
+  def validate(state: BalanceSheet): ValidationResult.Value
 
   def involvedAmount(account: Account): Long
 
   def balanceChanges(): Map[Account, Long]
 
-  override def equals(other: Any) = other match {
+  override def equals(other: Any): Boolean = other match {
     case tx: LagonakiTransaction => signature.sameElements(tx.signature)
     case _ => false
   }
+
+  override def hashCode(): Int = Ints.fromByteArray(signature)
 
   protected def jsonBase() = {
     Json.obj("type" -> transactionType.id,

@@ -3,17 +3,17 @@ package scorex.crypto.ads.merkle
 import java.io.{FileOutputStream, RandomAccessFile}
 import java.nio.file.{Files, Paths}
 
-import scorex.crypto.CryptographicHash.Digest
 import scorex.crypto.ads.merkle.TreeStorage.Position
-import scorex.crypto.{CryptographicHash, Sha256}
+import scorex.crypto.hash.CryptographicHash.Digest
+import scorex.crypto.hash.{CryptographicHash, FastCryptographicHash}
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
 
 class MerkleTree[H <: CryptographicHash](treeFolder: String,
                                          val nonEmptyBlocks: Position,
-                                         blockSize: Int = 1024,
-                                         hash: H = Sha256
+                                         blockSize: Int,
+                                         hash: H = FastCryptographicHash
                                         ) extends ScorexLogging {
 
   import MerkleTree._
@@ -55,7 +55,7 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
     }
   }
 
-  private lazy val emptyHash = hash.hash("")
+  private lazy val emptyHash = hash("")
 
   def getHash(key: TreeStorage.Key): Option[Digest] = {
     storage.get(key) match {
@@ -64,9 +64,9 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
           val h1 = getHash((key._1 - 1, key._2 * 2))
           val h2 = getHash((key._1 - 1, key._2 * 2 + 1))
           val calculatedHash = (h1, h2) match {
-            case (Some(hash1), Some(hash2)) => hash.hash(hash1 ++ hash2)
-            case (Some(h), _) => hash.hash(h ++ emptyHash)
-            case (_, Some(h)) => hash.hash(emptyHash ++ h)
+            case (Some(hash1), Some(hash2)) => hash(hash1 ++ hash2)
+            case (Some(h), _) => hash(h ++ emptyHash)
+            case (_, Some(h)) => hash(emptyHash ++ h)
             case _ => emptyHash
           }
           storage.set(key, calculatedHash)
@@ -88,8 +88,8 @@ object MerkleTree {
 
   def fromFile[H <: CryptographicHash](fileName: String,
                                        treeFolder: String,
-                                       blockSize: Int = 1024,
-                                       hash: H = Sha256
+                                       blockSize: Int,
+                                       hash: H = FastCryptographicHash
                                       ): MerkleTree[H] = {
     val byteBuffer = new Array[Byte](blockSize)
 
@@ -123,7 +123,7 @@ object MerkleTree {
       val fos = new FileOutputStream(treeFolder + "/" + currentBlock)
       fos.write(block)
       fos.close()
-      storage.set((0, currentBlock), hash.hash(block))
+      storage.set((0, currentBlock), hash(block))
       if (currentBlock < nonEmptyBlocks - 1) {
         processBlocks(currentBlock + 1)
       }

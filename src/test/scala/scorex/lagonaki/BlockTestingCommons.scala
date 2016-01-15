@@ -10,23 +10,23 @@ import scala.util.Random
 
 trait BlockTestingCommons extends TestingCommons {
 
+  import TestingCommons._
+
   implicit val consensusModule = new NxtLikeConsensusModule()
-  implicit val transactionModule = new SimpleTransactionModule()
+  implicit val transactionModule = new SimpleTransactionModule()(application.settings, application)
 
   val genesis: Block = Block.genesis()
   val gen = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(Byte.MaxValue).toByte))
 
   protected var lastBlockId: BlockId = genesis.uniqueId
 
-  def genBlock(bt: Long, gs: Array[Byte], seed: Array[Byte], parentId: Option[BlockId] = None)
+  def genBlock(bt: Long, gs: Array[Byte], seed: Array[Byte], parentId: Option[BlockId] = None,
+               transactions: Seq[Transaction] = Seq.empty)
               (implicit consensusModule: NxtLikeConsensusModule, transactionModule: SimpleTransactionModule): Block = {
 
     val reference = parentId.getOrElse(lastBlockId)
 
-    val sender = new PrivateKeyAccount(seed)
-    val tx: Transaction = PaymentTransaction(sender, gen, 5, bt, System.currentTimeMillis() - 5000)
-
-    val tbd = Seq(tx)
+    val tbd = if (transactions.isEmpty) Seq(genTransaction(seed)) else transactions
     val cbd = new NxtLikeConsensusBlockData {
       override val generationSignature: Array[Byte] = gs
       override val baseTarget: Long = math.max(math.abs(bt), 1)
@@ -38,5 +38,10 @@ trait BlockTestingCommons extends TestingCommons {
     val block = Block.buildAndSign(version, timestamp, reference, cbd, tbd, gen)
     lastBlockId = block.uniqueId
     block
+  }
+
+  def genTransaction(seed: Array[Byte]): Transaction = {
+    val sender = new PrivateKeyAccount(seed)
+    PaymentTransaction(sender, gen, 1, 1, System.currentTimeMillis() - 5000)
   }
 }

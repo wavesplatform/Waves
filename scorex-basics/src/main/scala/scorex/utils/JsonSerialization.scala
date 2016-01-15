@@ -1,7 +1,7 @@
 package scorex.utils
 
 import play.api.libs.json._
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 
 import scala.util.{Failure, Success}
 
@@ -27,7 +27,6 @@ trait JsonSerialization {
     }
   }
 
-
   implicit val bigIntWrites = new Writes[BigInt] {
     def writes(bitInt: BigInt) = JsString(bitInt.toString)
   }
@@ -42,5 +41,4 @@ trait JsonSerialization {
         throw new RuntimeException(s"Bigint MUST be represented as string in json $m ${m.getClass} given")
     }
   }
-
 }

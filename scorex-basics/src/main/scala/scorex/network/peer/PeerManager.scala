@@ -20,27 +20,25 @@ class PeerManager(settings: Settings) extends ScorexLogging {
     } else knownPeers
   }
 
-  def peerConnected(peer: InetSocketAddress): Unit =
+  def onPeerConnected(peer: InetSocketAddress): Unit =
     PeerDatabaseImpl.addConnectedPeer(peer)
 
-  def peerDisconnected(peer: InetSocketAddress): Unit =
+  def onPeerDisconnected(peer: InetSocketAddress): Unit =
     PeerDatabaseImpl.removeConnectedPeer(peer)
 
   def randomPeer(): Option[InetSocketAddress] = {
     val peers = knownPeers()
-    if(peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
+    if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
     else None
   }
 
   def addPeer(peer: InetSocketAddress): Unit =
-    if (!settings.knownPeers.contains(peer))
-      PeerDatabaseImpl.addKnownPeer(peer)
+    if (!settings.knownPeers.contains(peer)) PeerDatabaseImpl.addKnownPeer(peer)
 
-
-  def blacklistPeer(peer: InetSocketAddress) = {
+  def blacklistPeer(peer: InetSocketAddress): Unit = {
     PeerDatabaseImpl.removeConnectedPeer(peer)
     PeerDatabaseImpl.blacklistPeer(peer)
   }
 
-  def isBlacklisted(address: InetSocketAddress) = PeerDatabaseImpl.isBlacklisted(address)
+  def isBlacklisted(address: InetSocketAddress): Boolean = PeerDatabaseImpl.isBlacklisted(address)
 }

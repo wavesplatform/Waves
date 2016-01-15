@@ -3,7 +3,7 @@ package scorex.crypto.ads.merkle
 import java.io.File
 
 import org.mapdb.{DBMaker, HTreeMap, Serializer}
-import scorex.crypto.CryptographicHash.Digest
+import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.storage.Storage
 import scorex.utils.ScorexLogging
 

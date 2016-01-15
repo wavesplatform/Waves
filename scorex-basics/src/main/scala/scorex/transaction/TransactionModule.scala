@@ -8,11 +8,15 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   def isValid(block: Block): Boolean
 
+  def isValid(transaction: Transaction): Boolean
+
   def transactions(block: Block): Seq[Transaction]
 
   def packUnconfirmed(): TransactionBlockData
 
   def clearFromUnconfirmed(data: TransactionBlockData): Unit
+
+  def onNewOffchainTransaction(transaction: Transaction): Unit
 
   lazy val balancesSupport: Boolean = blockStorage.state match {
     case _: State with BalanceSheet => true

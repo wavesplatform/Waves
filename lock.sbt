@@ -23,10 +23,10 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe" % "config" % "1.3.0",
   "com.typesafe.akka" % "akka-actor_2.11" % "2.4.1",
   "com.typesafe.akka" % "akka-testkit_2.11" % "2.3.9",
-  "com.typesafe.play" % "play-datacommons_2.11" % "2.4.5",
-  "com.typesafe.play" % "play-functional_2.11" % "2.4.5",
-  "com.typesafe.play" % "play-iteratees_2.11" % "2.4.5",
-  "com.typesafe.play" % "play-json_2.11" % "2.4.5",
+  "com.typesafe.play" % "play-datacommons_2.11" % "2.4.6",
+  "com.typesafe.play" % "play-functional_2.11" % "2.4.6",
+  "com.typesafe.play" % "play-iteratees_2.11" % "2.4.6",
+  "com.typesafe.play" % "play-json_2.11" % "2.4.6",
   "com.typesafe.scala-logging" % "scala-logging_2.11" % "3.1.0",
   "com.wordnik" % "swagger-annotations" % "1.3.12",
   "com.wordnik" % "swagger-core_2.11" % "1.3.12",
@@ -40,6 +40,8 @@ dependencyOverrides in ThisBuild ++= Set(
   "io.spray" % "spray-util_2.11" % "1.3.3",
   "javax.ws.rs" % "jsr311-api" % "1.1.1",
   "joda-time" % "joda-time" % "2.8.1",
+  "org.bitlet" % "weupnp" % "0.1.4",
+  "org.consensusresearch" % "scrypto_2.11" % "1.0.3",
   "org.joda" % "joda-convert" % "1.7",
   "org.json4s" % "json4s-ast_2.11" % "3.2.11",
   "org.json4s" % "json4s-core_2.11" % "3.2.11",
@@ -57,7 +59,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scalacheck" % "scalacheck_2.11" % "1.12.5",
   "org.scalactic" % "scalactic_2.11" % "2.3.0-SNAP2",
   "org.scalatest" % "scalatest_2.11" % "2.3.0-SNAP2",
-  "org.slf4j" % "slf4j-api" % "1.7.7",
+  "org.slf4j" % "slf4j-api" % "1.7.13",
   "org.whispersystems" % "curve25519-java" % "0.2.4"
 )
-// LIBRARY_DEPENDENCIES_HASH 2c4136cc7cf36dbf51d6526b95d4108981b4f155
+// LIBRARY_DEPENDENCIES_HASH 2cf9407c56e0bfe1b0eb6da27c2a2ed7bbcc6c01

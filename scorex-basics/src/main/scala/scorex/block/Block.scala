@@ -59,7 +59,8 @@ trait Block extends ScorexLogging {
       transactionDataField.json ++
       signerDataField.json ++
       Json.obj(
-        "fee" -> fee
+        "fee" -> fee,
+        "blocksize" -> bytes.length
       )
 
   lazy val bytes = {
@@ -80,19 +81,21 @@ trait Block extends ScorexLogging {
   lazy val bytesWithoutSignature = bytes.dropRight(EllipticCurveImpl.SignatureLength)
 
   def isValid: Boolean = {
-    val v = consensusModule.isValid(this) &&
-      transactionModule.isValid(this) &&
-      transactionModule.blockStorage.history.contains(referenceField.value) &&
-      EllipticCurveImpl.verify(signerDataField.value.signature,
-        bytesWithoutSignature,
-        signerDataField.value.generator.publicKey)
-    if (!v) log.debug(
-      s"Block checks: ${consensusModule.isValid(this)} && ${transactionModule.isValid(this)} && " +
-        s"${transactionModule.blockStorage.history.contains(referenceField.value)} && " +
-        EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
+    if (!transactionModule.blockStorage.history.contains(this)) {
+      val v = consensusModule.isValid(this) &&
+        transactionModule.isValid(this) &&
+        transactionModule.blockStorage.history.contains(referenceField.value) &&
+        EllipticCurveImpl.verify(signerDataField.value.signature,
+          bytesWithoutSignature,
           signerDataField.value.generator.publicKey)
-    )
-    v
+      if (!v) log.debug(
+        s"Block checks: ${consensusModule.isValid(this)} && ${transactionModule.isValid(this)} && " +
+          s"${transactionModule.blockStorage.history.contains(referenceField.value)} && " +
+          EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
+            signerDataField.value.generator.publicKey)
+      )
+      v
+    } else true
   }
 
   override def equals(obj: scala.Any): Boolean = {
@@ -111,9 +114,6 @@ object Block extends ScorexLogging {
                      (implicit consModule: ConsensusModule[CDT],
                       transModule: TransactionModule[TDT]): Try[Block] = Try {
 
-    require(consModule != null)
-    require(transModule != null)
-
     val version = bytes.head
 
     var position = 1
@@ -129,7 +129,6 @@ object Block extends ScorexLogging {
     val cBytes = bytes.slice(position, position + cBytesLength)
     val consBlockField = consModule.parseBlockData(cBytes).get
     position += cBytesLength
-
 
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
@@ -158,7 +157,6 @@ object Block extends ScorexLogging {
 
       override val consensusDataField: BlockField[ConsensusDataType] = consBlockField
 
-      //todo: more generic approach!
       override val uniqueId: BlockId = signature
 
       override val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
@@ -193,7 +191,7 @@ object Block extends ScorexLogging {
       override val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", SignerData(generator, signature))
       override val consensusDataField: BlockField[CDT] = consensusModule.formBlockData(consensusData)
 
-      override val uniqueId: BlockId = signature //todo:wrong
+      override val uniqueId: BlockId = signature
 
       override val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
     }
@@ -231,7 +229,7 @@ object Block extends ScorexLogging {
     override val timestampField: LongBlockField = LongBlockField("timestamp",
       new DateTime(System.currentTimeMillis()).toDateMidnight.getMillis)
 
-    override val signerDataField: SignerDataBlockField =
-      new SignerDataBlockField("signature", SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array.fill(EllipticCurveImpl.SignatureLength)(0)))
+    override val signerDataField: SignerDataBlockField = new SignerDataBlockField("signature",
+      SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array.fill(EllipticCurveImpl.SignatureLength)(0)))
   }
 }

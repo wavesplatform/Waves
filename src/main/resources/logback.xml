@@ -15,13 +15,13 @@
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <encoder>
-          <pattern>[%thread] >> [%-5level] %logger{36} >> %d{HH:mm:ss.SSS}  %msg%n</pattern>
+            <pattern>[%thread] >> [%-5level] %logger{36} >> %d{HH:mm:ss.SSS} %msg%n</pattern>
         </encoder>
     </appender>
 
-  <root>
-    <appender-ref ref="CONSOLE" />
-      <appender-ref ref="ERRFILE"/>
-  </root>
+    <root>
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ERRFILE"/>
+    </root>
 
 </configuration>

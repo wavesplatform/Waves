@@ -10,7 +10,7 @@ import scala.concurrent.Future
 
 trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[ConsensusBlockData] {
 
-  def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean
+  def isValid[TransactionalBlockData](block: Block)(implicit transactionModule: TransactionModule[TransactionalBlockData]): Boolean
 
   /**
     * Fees could go to a single miner(forger) usually, but can go to many parties, e.g. see
@@ -28,11 +28,11 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
 
   def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt
 
-  def generateNextBlock[TT](account: PrivateKeyAccount)
-                           (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]]
+  def generateNextBlock[TransactionalBlockData](account: PrivateKeyAccount)
+                           (implicit transactionModule: TransactionModule[TransactionalBlockData]): Future[Option[Block]]
 
-  def generateNextBlocks[T](accounts: Seq[PrivateKeyAccount])
-                           (implicit transactionModule: TransactionModule[T]): Future[Seq[Block]] = {
+  def generateNextBlocks[TransactionalBlockData](accounts: Seq[PrivateKeyAccount])
+                           (implicit transactionModule: TransactionModule[TransactionalBlockData]): Future[Seq[Block]] = {
     Future.sequence(accounts.map(acc => generateNextBlock(acc))).map(_.flatten)
   }
 

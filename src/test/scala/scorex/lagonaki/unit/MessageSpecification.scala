@@ -6,16 +6,17 @@ import org.scalatest.FunSuite
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.crypto.EllipticCurveImpl.SignatureLength
-import scorex.lagonaki.server.LagonakiSettings
+import scorex.lagonaki.TestingCommons
 import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler}
 import scorex.transaction.{History, SimpleTransactionModule}
-
 import shapeless.Typeable._
 
-class MessageSpecification extends FunSuite {
-  implicit lazy val settings = new LagonakiSettings("settings-test.json")
+class MessageSpecification extends FunSuite with TestingCommons {
+
+  import TestingCommons._
+
   implicit lazy val consensusModule = new NxtLikeConsensusModule
-  implicit lazy val transactionModule = new SimpleTransactionModule
+  implicit lazy val transactionModule = new SimpleTransactionModule()(application.settings, application)
 
   private lazy val repo = new BasicMessagesRepo()
   private lazy val handler = new MessageHandler(repo.specs)

@@ -3,7 +3,7 @@ package scorex.consensus.qora
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.block.BlockField
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 
 
 case class QoraConsensusBlockField(override val value: QoraLikeConsensusBlockData)
@@ -16,7 +16,7 @@ case class QoraConsensusBlockField(override val value: QoraLikeConsensusBlockDat
       value.generatorSignature
 
 
-  override def json: JsObject = Json.obj(name -> Json.obj (
+  override def json: JsObject = Json.obj(name -> Json.obj(
     "base-target" -> value.generatingBalance,
     "generation-signature" -> Base58.encode(value.generatorSignature)
   ))

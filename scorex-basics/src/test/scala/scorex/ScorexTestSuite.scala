@@ -1,12 +1,13 @@
 package scorex
 
 import org.scalatest.Suites
-import scorex.crypto.{SigningFunctionsSpecification, Sha256Specification, Base58Specification}
-import scorex.crypto.ads.merkle.{MerkleTreeStorageSpecification, MerkleSpecification}
+import scorex.account.AccountSpecification
+import scorex.crypto.SigningFunctionsSpecification
+import scorex.crypto.ads.merkle.{AuthDataBlockSpecification, MerkleSpecification, MerkleTreeStorageSpecification}
 
-class ScorexTestSuite extends Suites (
-  new Base58Specification,
-  new Sha256Specification,
+class ScorexTestSuite extends Suites(
+  new AccountSpecification,
+  new AuthDataBlockSpecification,
   new SigningFunctionsSpecification,
   new MerkleSpecification,
   new MerkleTreeStorageSpecification

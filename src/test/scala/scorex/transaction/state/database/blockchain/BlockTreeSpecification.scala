@@ -14,11 +14,11 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
 
   val dirName = "/tmp/scorex/test/"
   val dir = new File(dirName)
-  dir.mkdir()
+  dir.mkdirs()
   for (file <- dir.listFiles) file.delete
 
-  testTree(new StoredBlockTree(Some(dirName)), "File")
-  testTree(new StoredBlockTree(None), "Memory")
+  testTree(new StoredBlockTree(Some(dirName), 100), "File")
+  testTree(new StoredBlockTree(None, 100), "Memory")
 
   def testTree(blockTree: StoredBlockTree, prefix: String): Unit = {
 
@@ -32,6 +32,7 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
       blockTree.height() shouldBe 0
       blockTree.appendBlock(genesis).isSuccess shouldBe true
       blockTree.height() shouldBe 1
+      blockTree.blockById(genesis.uniqueId) should not be None
     }
 
     property(s"$prefix: Add linear blocks in chain") {
@@ -58,22 +59,22 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
       val branchPoint = blockTree.lastBlock
 
       //Add block to best chain
-      val block = genBlock(20, randomBytes(32), randomBytes(32), Some(branchPoint.uniqueId))
+      val block = genBlock(20, randomBytes(), randomBytes(), Some(branchPoint.uniqueId))
       blockTree.appendBlock(block).isSuccess shouldBe true
       blockTree.lastBlock.uniqueId should contain theSameElementsAs block.uniqueId
 
-      //Add block with the same score to branch point
-      val branchedBlock = genBlock(20, randomBytes(32), randomBytes(32), Some(branchPoint.uniqueId))
+      //Add block with lower score to branch point
+      val branchedBlock = genBlock(21, randomBytes(), randomBytes(), Some(branchPoint.uniqueId))
       blockTree.appendBlock(branchedBlock).isSuccess shouldBe true
       blockTree.lastBlock.uniqueId should contain theSameElementsAs block.uniqueId
 
       //Add block with the better score to branch point
-      val bestBlock = genBlock(19, randomBytes(32), randomBytes(32), Some(branchPoint.uniqueId))
+      val bestBlock = genBlock(19, randomBytes(), randomBytes(), Some(branchPoint.uniqueId))
       blockTree.appendBlock(bestBlock).isSuccess shouldBe true
       blockTree.lastBlock.uniqueId should contain theSameElementsAs bestBlock.uniqueId
 
       //Add block to subtree with smaller score to make it best subtree
-      val longerTreeBlock = genBlock(19, randomBytes(32), randomBytes(32), Some(branchedBlock.uniqueId))
+      val longerTreeBlock = genBlock(19, randomBytes(), randomBytes(), Some(branchedBlock.uniqueId))
       blockTree.appendBlock(longerTreeBlock).isSuccess shouldBe true
       blockTree.lastBlock.uniqueId should contain theSameElementsAs longerTreeBlock.uniqueId
     }
@@ -81,7 +82,7 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
     property(s"$prefix: Wrong block") {
       val prevS = blockTree.score()
       val prevB = blockTree.lastBlock
-      val wrongBlock = genBlock(19, randomBytes(32), randomBytes(32), Some(randomBytes(51)))
+      val wrongBlock = genBlock(19, randomBytes(), randomBytes(), Some(randomBytes(51)))
 
       //Block with no parent in blockTree
       blockTree.appendBlock(wrongBlock).isSuccess shouldBe false
@@ -89,15 +90,17 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
       blockTree.lastBlock.uniqueId should contain theSameElementsAs prevB.uniqueId
 
       //Apply same block twice
-      blockTree.appendBlock(prevB).isSuccess shouldBe false
+      blockTree.appendBlock(prevB).isSuccess shouldBe true
       blockTree.score() shouldBe prevS
       blockTree.lastBlock.uniqueId should contain theSameElementsAs prevB.uniqueId
     }
 
     property(s"$prefix: Look forward") {
-      assert(blockTree.height() > 1)
-      val newBlocks = blockTree.lookForward(genesis.uniqueId, 10)
-      assert(newBlocks.nonEmpty)
+      blockTree.height() should be > 1
+      forAll(Gen.choose(1, 100)) { (limit: Int) =>
+        val newBlocks = blockTree.lookForward(genesis.uniqueId, limit)
+        newBlocks.size shouldBe Math.min(limit, blockTree.height() - 1)
+      }
     }
   }
 }

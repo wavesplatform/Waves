@@ -5,7 +5,7 @@ import java.io.{File, FileOutputStream}
 import org.scalacheck.Gen
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.Sha256
+import scorex.crypto.hash.FastCryptographicHash
 
 import scala.util.Random
 
@@ -17,12 +17,12 @@ class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDri
     for (blocks <- List(7, 8, 9, 128)) {
       val smallInteger = Gen.choose(0, blocks - 1)
       val (treeDirName: String, _, tempFile: String) = generateFile(blocks)
-      val tree = MerkleTree.fromFile(tempFile, treeDirName)
+      val tree = MerkleTree.fromFile(tempFile, treeDirName, 1024)
       forAll(smallInteger) { (index: Int) =>
         val leafOption = tree.byIndex(index)
         leafOption should not be None
         val leaf = leafOption.get
-        val resp = leaf.check(index, tree.rootHash)(Sha256)
+        val resp = leaf.check(index, tree.rootHash)(FastCryptographicHash)
         resp shouldBe true
       }
       tree.storage.close()
@@ -34,12 +34,12 @@ class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDri
     for (blocks <- List(7, 8, 9, 128)) {
       val (treeDirName: String, _, tempFile: String) = generateFile(blocks, "2")
 
-      val fileTree = MerkleTree.fromFile(tempFile, treeDirName)
+      val fileTree = MerkleTree.fromFile(tempFile, treeDirName, 1024)
       val rootHash = fileTree.rootHash
 
       fileTree.storage.close()
 
-      val tree = new MerkleTree(treeDirName, fileTree.nonEmptyBlocks)
+      val tree = new MerkleTree(treeDirName, fileTree.nonEmptyBlocks, 1024)
       val newRootHash = tree.rootHash
       tree.storage.close()
       rootHash shouldBe newRootHash

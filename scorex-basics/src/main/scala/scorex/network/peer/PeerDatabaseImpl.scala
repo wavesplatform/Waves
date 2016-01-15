@@ -10,15 +10,15 @@ object PeerDatabaseImpl extends PeerDatabase {
   private val whitelist = mutable.Buffer[InetSocketAddress]()
   private val blacklist = mutable.Buffer[InetSocketAddress]()
 
-  override def addConnectedPeer(peer: InetSocketAddress) = connected.synchronized(
+  override def addConnectedPeer(peer: InetSocketAddress): Unit = connected.synchronized(
     connected += peer
   )
 
-  override def removeConnectedPeer(peer: InetSocketAddress) = connected.synchronized(
+  override def removeConnectedPeer(peer: InetSocketAddress): Unit = connected.synchronized(
     connected -= peer
   )
 
-  override def allConnectedPeers(peer: InetSocketAddress) = connected.synchronized(
+  override def allConnectedPeers(peer: InetSocketAddress): Seq[InetSocketAddress] = connected.synchronized(
     connected.toSeq
   )
 

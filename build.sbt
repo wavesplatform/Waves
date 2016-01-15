@@ -54,7 +54,7 @@ licenses := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/
 
 homepage := Some(url("https://github.com/ConsensusResearch/Scorex-Lagonaki"))
 
-resolvers ++= Seq("Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases/",
+resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/")
 
 libraryDependencies ++=
@@ -65,9 +65,13 @@ libraryDependencies ++=
   Dependencies.testKit ++
   Dependencies.logging
 
+scalacOptions ++= Seq("-feature", "-deprecation")
+
 javaOptions ++= Seq(
   "-server"
 )
+
+testOptions in Test += Tests.Argument("-oD", "-u", "target/test-reports")
 
 //assembly settings
 assemblyJarName in assembly := "scorex.jar"
@@ -75,7 +79,6 @@ assemblyJarName in assembly := "scorex.jar"
 test in assembly := {}
 
 mainClass in assembly := Some("scorex.lagonaki.server.Server")
-
 
 //publishing settings
 
@@ -113,9 +116,8 @@ dockerfile in docker := {
     // copy settings
     copy(settingsPath, "/app/settings.json")
     // persist data beyond the lifetime of a container session
-    // todo: probably would be better to define uniq scorex folder inside /tmp
-    run("mkdir", "-p", "/tmp")
-    volume("/tmp")
+    run("mkdir", "-p", "/tmp/scorex")
+    volume("/tmp/scorex")
     // run scorex as:
     // /usr/bin/java -jar scorex.jar
     workDir("/app")

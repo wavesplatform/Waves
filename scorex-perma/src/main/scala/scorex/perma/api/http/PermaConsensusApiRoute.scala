@@ -6,7 +6,7 @@ import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.crypto.Base58
+import scorex.crypto.encode.Base58
 import scorex.perma.consensus.PermaConsensusModule
 import scorex.transaction.BlockStorage
 import spray.routing.Route
@@ -26,7 +26,7 @@ class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockStorage
 
   @Path("/target")
   @ApiOperation(value = "Last target", notes = "Target of a last block", httpMethod = "GET")
-  def target = {
+  def target: Route = {
     path("target") {
       jsonRoute {
         Json.obj("target" -> consensusModule.consensusBlockData(blockchain.lastBlock).target.toString).toString
@@ -39,7 +39,7 @@ class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockStorage
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "String", paramType = "path")
   ))
-  def targetId = {
+  def targetId: Route = {
     path("target" / Segment) { case encodedSignature =>
       jsonRoute {
         withBlock(blockchain, encodedSignature) { block =>
@@ -53,7 +53,7 @@ class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockStorage
 
   @Path("/puz")
   @ApiOperation(value = "Current puzzle", notes = "Current puzzle", httpMethod = "GET")
-  def puz = {
+  def puz: Route = {
     path("puz") {
       jsonRoute {
         Json.obj("puz" -> Base58.encode(consensusModule.generatePuz(blockchain.lastBlock))).toString
@@ -66,7 +66,7 @@ class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockStorage
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "String", paramType = "path")
   ))
-  def puzId = {
+  def puzId: Route = {
     path("puz" / Segment) { case encodedSignature =>
       jsonRoute {
         withBlock(blockchain, encodedSignature) { block =>
@@ -81,7 +81,7 @@ class PermaConsensusApiRoute(consensusModule: PermaConsensusModule, blockStorage
 
   @Path("/algo")
   @ApiOperation(value = "Consensus algo", notes = "Shows which consensus algo being using", httpMethod = "GET")
-  def algo = {
+  def algo: Route = {
     path("algo") {
       jsonRoute {
         Json.obj("consensus-algo" -> "perma").toString()

@@ -87,15 +87,8 @@ trait History {
     (block.timestampField.value - parent(block, blockNum).get.timestampField.value) / blockNum
   }
 
-  lazy val genesis: Block = {
-    def deeper(b: Block): Block = parent(b) match {
-      case Some(parentBlock) => deeper(parentBlock)
-      case None => b
-    }
-    deeper(lastBlock)
-  }
+  val genesis: Block
 
-  //def removeAfter(signature: Block.BlockId)
 }
 
 object History {

@@ -2,9 +2,9 @@ package scorex.perma.consensus
 
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Reads, Writes}
-import scorex.crypto.SigningFunctions._
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.perma.settings.Constants._
+import scorex.crypto.singing.SigningFunctions.Signature
+import scorex.perma.settings.PermaConstants._
 import scorex.utils.JsonSerialization
 
 case class PartialProof(signature: Signature, segmentIndex: Long, segment: AuthDataBlock[DataSegment])

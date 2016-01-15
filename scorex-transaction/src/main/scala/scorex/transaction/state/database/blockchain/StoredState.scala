@@ -1,14 +1,17 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.{DataInput, DataOutput, File}
+import java.io.{DataInput, DataOutput}
 
 import org.mapdb._
 import scorex.account.Account
 import scorex.block.Block
+import scorex.block.Block.BlockId
+import scorex.crypto.encode.Base58
 import scorex.transaction.state.LagonakiState
 import scorex.transaction.{LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
 
+import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
 
@@ -17,7 +20,7 @@ import scala.util.Try
   * If no datafolder provided, blockchain lives in RAM (intended for tests only)
   */
 
-class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with ScorexLogging {
+class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
   private object AccSerializer extends Serializer[Account] {
     override def serialize(dataOutput: DataOutput, a: Account): Unit =
@@ -50,27 +53,11 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
     }
   }
 
-
-  private val database: DB = dataFolderOpt match {
-    case Some(dataFolder) =>
-      log.debug("DB loaded from {}", dataFolder)
-      val db = DBMaker.fileDB(new File(dataFolder + s"/state"))
-        .closeOnJvmShutdown()
-        .cacheSize(2048)
-        .checksumEnable()
-        .fileMmapEnable()
-        .make()
-      db.rollback() //clear uncommitted data from possibly invalid last run
-      db
-
-    case None => DBMaker.memoryDB().make()
-  }
-
   private val StateHeight = "height"
 
   private val balances = database.hashMap[Account, Long]("balances")
 
-  private val includedTx: HTreeMap[Array[Byte], Array[Byte]] = database.hashMapCreate("segments")
+  private val includedTx: HTreeMap[Array[Byte], Array[Byte]] = database.hashMapCreate("includedTx")
     .keySerializer(Serializer.BYTE_ARRAY)
     .valueSerializer(Serializer.BYTE_ARRAY)
     .makeOrGet()
@@ -83,12 +70,15 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
   def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
 
+  //initialization
+  if (Option(stateHeight()).isEmpty) setStateHeight(0)
+
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
   override def processBlock(block: Block, reversal: Boolean): Try[State] = Try {
     val trans = block.transactionModule.transactions(block)
     trans foreach { tx =>
-      if (!reversal && includedTx.containsKey(tx.signature)) throw new Error("Trying to add transaction twice")
+      if (!reversal && includedTx.containsKey(tx.signature)) throw new Exception("Already included tx")
       else if (!reversal) includedTx.put(tx.signature, block.uniqueId)
       else includedTx.remove(tx.signature, block.uniqueId)
     }
@@ -114,12 +104,15 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
     balanceChanges.foreach { case (acc, delta) =>
       val balance = Option(balances.get(acc)).getOrElse(0L)
       val newBalance = if (!reversal) balance + delta else balance - delta
+      if (newBalance < 0) log.error(s"Account $acc balance $newBalance is negative")
       balances.put(acc, newBalance)
     }
 
     val newHeight = (if (!reversal) stateHeight() + 1 else stateHeight() - 1).ensuring(_ > 0)
     setStateHeight(newHeight)
     database.commit()
+
+    if (!reversal) StoredState.history.put(Base58.encode(block.uniqueId), database.snapshot())
     this
   }
 
@@ -137,15 +130,48 @@ class StoredState(dataFolderOpt: Option[String]) extends LagonakiState with Scor
 
   override def watchAccountTransactions(account: Account): Unit = accountTransactions.put(account, Array())
 
+  override def included(tx: Transaction): Option[BlockId] = Option(includedTx.get(tx.signature))
 
-  //initialization
-  setStateHeight(0)
+  def isValid(txs: Seq[Transaction]): Boolean = validate(txs).size == txs.size
 
-  override def included(tx: Transaction): Boolean = includedTx.containsKey(tx.signature)
+  //return seq of valid transactions
+  def validate(txs: Seq[Transaction]): Seq[Transaction] = {
+    val tmpBalances = TrieMap[Account, Long]()
+
+    val r = txs.foldLeft(Seq.empty: Seq[Transaction]) { case (acc, atx) =>
+      atx match {
+        case tx: LagonakiTransaction =>
+          val changes = tx.balanceChanges().foldLeft(Map.empty: Map[Account, Long]) { case (iChanges, (acc, delta)) =>
+            //update balances sheet
+            val currentChange = iChanges.getOrElse(acc, 0L)
+            val newChange = currentChange + delta
+            iChanges.updated(acc, newChange)
+          }
+          val check = changes.forall { a =>
+            val balance = tmpBalances.getOrElseUpdate(a._1, balances.get(a._1))
+            val newBalance = balance + a._2
+            if (newBalance >= 0) tmpBalances.put(a._1, newBalance)
+            newBalance >= 0
+          }
+          if (check) tx +: acc
+          else acc
+        case _ => acc
+      }
+    }
+    if (r.size == txs.size) r else validate(r)
+  }
 
   //for debugging purposes only
-  override def toString = {
+  override def toString: String = {
     import scala.collection.JavaConversions._
     balances.mkString("\n")
   }
+}
+
+object StoredState {
+
+  val history = TrieMap[String, DB]()
+
+  def apply(id: BlockId): Option[StoredState] = history.get(Base58.encode(id)).map(new StoredState(_))
+
 }
