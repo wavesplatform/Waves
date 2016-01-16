@@ -39,13 +39,10 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
     override val messageName: String = "Peers message"
 
     override def deserializeData(bytes: Array[Byte]): Try[Seq[InetSocketAddress]] = Try {
-      //READ LENGTH
       val lengthBytes = util.Arrays.copyOfRange(bytes, 0, DataLength)
       val length = Ints.fromByteArray(lengthBytes)
 
-      //CHECK IF DATA MATCHES LENGTH
-      if (bytes.length != DataLength + (length * (AddressLength + PortLength)))
-        throw new Exception("Data does not match length")
+      assert (bytes.length == DataLength + (length * (AddressLength + PortLength)), "Data does not match length")
 
       (0 until length).map { i =>
         val position = lengthBytes.length + (i * (AddressLength + PortLength))
@@ -77,11 +74,8 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
       val lengthBytes = bytes.take(DataLength)
       val length = Ints.fromByteArray(lengthBytes)
 
-      //CHECK IF DATA MATCHES LENGTH
-      if (bytes.length != DataLength + (length * SignatureLength))
-        throw new Exception("Data does not match length")
+      assert(bytes.length == DataLength + (length * SignatureLength), "Data does not match length")
 
-      //CREATE HEADERS LIST
       (0 to length - 1).map { i =>
         val position = DataLength + (i * SignatureLength)
         bytes.slice(position, position + SignatureLength)
