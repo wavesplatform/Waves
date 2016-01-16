@@ -20,7 +20,7 @@ with Matchers {
       val recipient = new PrivateKeyAccount(recipientSeed)
 
       val tx = PaymentTransaction(sender, recipient, amount, fee, time)
-      tx.isSignatureValid should be(true)
+      tx.signatureValid should be(true)
     }
   }
 
@@ -35,10 +35,10 @@ with Matchers {
 
       val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
 
-      PaymentTransaction(sender, recipient, amount, fee + 1, time, sig).isSignatureValid should be(false)
-      PaymentTransaction(sender, recipient, amount, fee, time + 1, sig).isSignatureValid should be(false)
-      PaymentTransaction(sender, recipient, amount + 1, fee, time + 1, sig).isSignatureValid should be(false)
-      PaymentTransaction(recipient, sender, amount + 1, fee, time + 1, sig).isSignatureValid should be(false)
+      PaymentTransaction(sender, recipient, amount, fee + 1, time, sig).signatureValid should be(false)
+      PaymentTransaction(sender, recipient, amount, fee, time + 1, sig).signatureValid should be(false)
+      PaymentTransaction(sender, recipient, amount + 1, fee, time + 1, sig).signatureValid should be(false)
+      PaymentTransaction(recipient, sender, amount + 1, fee, time + 1, sig).signatureValid should be(false)
     }
   }
 
@@ -83,7 +83,7 @@ with Matchers {
       tx.timestamp shouldEqual txAfter.timestamp
       tx.amount shouldEqual txAfter.amount
       tx.fee shouldEqual txAfter.fee
-      txAfter.isSignatureValid shouldEqual true
+      txAfter.signatureValid shouldEqual true
     }
   }
 }

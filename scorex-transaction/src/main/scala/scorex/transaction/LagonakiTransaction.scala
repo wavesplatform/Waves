@@ -33,7 +33,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
   val creator: Option[Account]
 
 
-  def isSignatureValid: Boolean
+  val signatureValid: Boolean
 
   //VALIDATE
   def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value =
