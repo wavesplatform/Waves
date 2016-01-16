@@ -8,7 +8,6 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.TransactionType
-import scorex.transaction.state.LagonakiState
 
 case class PaymentTransaction(sender: PublicKeyAccount,
                               override val recipient: Account,
@@ -34,11 +33,9 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   override def bytes(): Array[Byte] = {
     val typeBytes = Array(TypeId.toByte)
 
-    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
-
-    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
-
-    val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FeeLength, 0)
+    val timestampBytes = Longs.toByteArray(timestamp)
+    val amountBytes = Longs.toByteArray(amount)
+    val feeBytes = Longs.toByteArray(fee)
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
       Base58.decode(recipient.address).get, amountBytes,
@@ -136,17 +133,10 @@ object PaymentTransaction {
 
   private def signatureData(sender: PublicKeyAccount, recipient: Account,
                             amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
-    //WRITE TYPE
-    val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.PaymentTransaction.id), TypeLength, 0)
-
-    //WRITE TIMESTAMP
-    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
-
-    //WRITE AMOUNT
-    val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
-
-    //WRITE FEE
-    val feeBytes = Bytes.ensureCapacity(Longs.toByteArray(fee), FeeLength, 0)
+    val typeBytes = Ints.toByteArray(TransactionType.PaymentTransaction.id)
+    val timestampBytes = Longs.toByteArray(timestamp)
+    val amountBytes = Longs.toByteArray(amount)
+    val feeBytes = Longs.toByteArray(fee)
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
       Base58.decode(recipient.address).get, amountBytes, feeBytes)
