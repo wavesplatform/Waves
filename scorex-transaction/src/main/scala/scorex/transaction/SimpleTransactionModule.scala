@@ -196,7 +196,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
   private def isValid(transaction: Transaction, txState: StoredState): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.isSignatureValid() && tx.validate(txState) == ValidationResult.ValidateOke && txState.included(tx).isEmpty
+      tx.isSignatureValid && tx.validate(txState) == ValidationResult.ValidateOke && txState.included(tx).isEmpty
     case gtx: GenesisTransaction =>
       blockStorage.history.height() == 0
     case otx: Any =>

@@ -39,7 +39,7 @@ case class GenesisTransaction(override val recipient: Account,
 
   override lazy val dataLength = TypeLength + BASE_LENGTH
 
-  override def isSignatureValid(): Boolean = {
+  override def isSignatureValid: Boolean = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GenesisTransaction.id), TypeLength, 0)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
@@ -87,17 +87,14 @@ object GenesisTransaction {
 
     var position = 0
 
-    //READ TIMESTAMP
     val timestampBytes = java.util.Arrays.copyOfRange(data, position, position + TimestampLength)
     val timestamp = Longs.fromByteArray(timestampBytes)
     position += TimestampLength
 
-    //READ RECIPIENT
     val recipientBytes = java.util.Arrays.copyOfRange(data, position, position + RECIPIENT_LENGTH)
     val recipient = new Account(Base58.encode(recipientBytes))
     position += RECIPIENT_LENGTH
 
-    //READ AMOUNT
     val amountBytes = java.util.Arrays.copyOfRange(data, position, position + AmountLength)
     val amount = Longs.fromByteArray(amountBytes)
 

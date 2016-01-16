@@ -45,7 +45,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
       feeBytes, signature)
   }
 
-  override def isSignatureValid(): Boolean = {
+  override def isSignatureValid: Boolean = {
     val data = signatureData(sender, recipient, amount, fee, timestamp)
     EllipticCurveImpl.verify(signature, data, sender.publicKey)
   }

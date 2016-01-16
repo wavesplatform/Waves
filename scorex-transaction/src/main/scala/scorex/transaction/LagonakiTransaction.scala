@@ -5,10 +5,8 @@ import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.{ValidationResult, _}
-import scorex.transaction.state.LagonakiState
-import scorex.transaction.state.database.blockchain.StoredState
-
 import scala.util.Try
+import scala.concurrent.duration._
 
 
 abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
@@ -18,8 +16,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
                                    override val timestamp: Long,
                                    override val signature: Array[Byte]) extends Transaction {
 
-  //24HOUR DEADLINE TO INCLUDE TRANSACTION IN BLOCK
-  lazy val deadline = timestamp + (1000 * 60 * 60 * 24)
+  lazy val deadline = timestamp + 24.hours.toMillis
 
   lazy val feePerByte = fee / dataLength.toDouble
   lazy val hasMinimumFee = fee >= MinimumFee
@@ -36,7 +33,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
   val creator: Option[Account]
 
 
-  def isSignatureValid(): Boolean
+  def isSignatureValid: Boolean
 
   //VALIDATE
   def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value =
