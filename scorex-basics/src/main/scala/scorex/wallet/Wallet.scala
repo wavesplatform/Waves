@@ -46,10 +46,8 @@ class Wallet(walletFileOpt: Option[File],
     (1 to howMany).flatMap(_ => generateNewAccount())
 
   def generateNewAccount(): Option[PrivateKeyAccount] = synchronized {
-    //READ NONCE
     val nonce = getAndIncrementNonce()
 
-    //GENERATE ACCOUNT SEED
     val accountSeed = generateAccountSeed(seed, nonce)
     val account = new PrivateKeyAccount(accountSeed)
 
