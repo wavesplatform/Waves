@@ -3,7 +3,7 @@ package scorex.block
 import scala.util.Try
 
 /**
-  * A generic interface having functions to convert data into a part of a block and vice versa.
+  * A generic interface with functionality to convert data into a part of a block and vice versa
   */
 
 trait BlockProcessingModule[BlockPartDataType] {

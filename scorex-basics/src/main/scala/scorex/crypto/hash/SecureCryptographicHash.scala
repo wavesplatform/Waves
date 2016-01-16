@@ -4,6 +4,10 @@ import scorex.crypto._
 import scorex.crypto.hash.CryptographicHash._
 
 
+/**
+  * The chain of two hash functions, Blake and Keccak
+  */
+
 object SecureCryptographicHash extends CryptographicHash {
 
   override val DigestSize: Int = 32
