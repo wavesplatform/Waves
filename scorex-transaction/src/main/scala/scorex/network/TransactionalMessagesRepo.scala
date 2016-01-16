@@ -8,7 +8,6 @@ import scala.util.Try
 
 object TransactionalMessagesRepo {
 
-
   object TransactionMessageSpec extends MessageSpec[Transaction] {
     override val messageCode: MessageCode = 25: Byte
 
