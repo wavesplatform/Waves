@@ -17,12 +17,12 @@ case class GenesisTransaction(override val recipient: Account,
   import scorex.transaction.GenesisTransaction._
   import scorex.transaction.LagonakiTransaction._
 
-  override def json(): JsObject =
-    jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toString)
-
   override lazy val creator: Option[Account] = None
 
-  override def bytes(): Array[Byte] = {
+  override lazy val json: JsObject =
+    jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toString)
+
+  override lazy val bytes: Array[Byte] = {
     val typeBytes = Array(TransactionType.GenesisTransaction.id.toByte)
 
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)

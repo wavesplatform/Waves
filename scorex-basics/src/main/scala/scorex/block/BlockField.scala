@@ -52,8 +52,8 @@ case class BlockIdField(override val name: String, override val value: Block.Blo
 case class TransactionBlockField(override val name: String, override val value: Transaction)
   extends BlockField[Transaction] {
 
-  override lazy val json: JsObject = value.json()
-  override lazy val bytes: Array[Byte] = value.bytes()
+  override lazy val json: JsObject = value.json
+  override lazy val bytes: Array[Byte] = value.bytes
 }
 
 case class SignerData(generator: PublicKeyAccount, signature: Array[Byte])

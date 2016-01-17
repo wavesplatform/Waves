@@ -36,7 +36,7 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
     override def serialize(dataOutput: DataOutput, txs: Array[LagonakiTransaction]): Unit = {
       DataIO.packInt(dataOutput, txs.length)
       txs.foreach { tx =>
-        val bytes = tx.bytes()
+        val bytes = tx.bytes
         DataIO.packInt(dataOutput, bytes.length)
         dataOutput.write(bytes)
       }

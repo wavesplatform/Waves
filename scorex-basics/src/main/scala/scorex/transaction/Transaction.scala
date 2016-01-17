@@ -16,10 +16,10 @@ trait Transaction {
   /**
     * A transaction could be serialized into JSON
     */
-  def json(): JsObject
+  def json: JsObject
 
   /**
     * A transaction could be serialized into binary form
     */
-  def bytes(): Array[Byte]
+  def bytes: Array[Byte]
 }

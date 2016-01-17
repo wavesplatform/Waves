@@ -50,7 +50,7 @@ case class PaymentApiRoute(application: LagonakiApplication)(implicit val contex
                     case Some(tx) =>
                       tx.validate() match {
                         case ValidationResult.ValidateOke =>
-                          tx.json()
+                          tx.json
 
                         case ValidationResult.InvalidAddress =>
                           InvalidAddress.json

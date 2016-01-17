@@ -31,7 +31,7 @@ case class TransactionsApiRoute(state: LagonakiState)(implicit val context: Acto
       jsonRoute {
         val txJsons = state.accountTransactions(address)
           .takeRight(limit)
-          .map(_.json())
+          .map(_.json)
         Json.arr(txJsons).toString()
       }
     }
@@ -45,7 +45,7 @@ case class TransactionsApiRoute(state: LagonakiState)(implicit val context: Acto
   def address: Route = {
     path("address" / Segment) { case address =>
       jsonRoute {
-        val txJsons = state.accountTransactions(address).map(_.json())
+        val txJsons = state.accountTransactions(address).map(_.json)
         Json.arr(txJsons).toString()
       }
     }
@@ -56,7 +56,7 @@ case class TransactionsApiRoute(state: LagonakiState)(implicit val context: Acto
   def unconfirmed: Route = {
     path("unconfirmed") {
       jsonRoute {
-        Json.arr(UnconfirmedTransactionsDatabaseImpl.all().map(_.json())).toString()
+        Json.arr(UnconfirmedTransactionsDatabaseImpl.all().map(_.json)).toString()
       }
     }
   }

@@ -24,13 +24,13 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
   override lazy val creator = Some(sender)
 
-  override def json(): JsObject = jsonBase() ++ Json.obj(
+  override lazy val json: JsObject = jsonBase() ++ Json.obj(
     "sender" -> sender.address,
     "recipient" -> recipient.address,
     "amount" -> amount
   )
 
-  override def bytes(): Array[Byte] = {
+  override lazy val bytes: Array[Byte] = {
     val typeBytes = Array(TypeId.toByte)
 
     val timestampBytes = Longs.toByteArray(timestamp)
