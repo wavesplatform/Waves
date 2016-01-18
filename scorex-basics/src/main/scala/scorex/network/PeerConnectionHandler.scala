@@ -4,7 +4,8 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorRef}
 import akka.io.Tcp._
-import akka.util.ByteString
+import akka.util.{ByteString, CompactByteString}
+import com.google.common.primitives.Ints
 import scorex.app.Application
 import scorex.network.NetworkController.PeerHandshake
 import scorex.utils.ScorexLogging
@@ -23,7 +24,7 @@ case class ConnectedPeer(address: InetSocketAddress, handlerRef: ActorRef) {
 case class PeerConnectionHandler(application: Application,
                                  connection: ActorRef,
                                  remote: InetSocketAddress,
-                                 ownNonce: Long) extends Actor with ScorexLogging {
+                                 ownNonce: Long) extends Actor with Buffering with ScorexLogging {
 
   import PeerConnectionHandler._
 
@@ -77,9 +78,10 @@ case class PeerConnectionHandler(application: Application,
       }
   }: Receive) orElse processErrors
 
-  def workingCycleLocalInterface:Receive = {
+  def workingCycleLocalInterface: Receive = {
     case msg: message.Message[_] =>
-      connection ! Write(ByteString(msg.bytes))
+      val bytes = msg.bytes
+      connection ! Write(ByteString(Ints.toByteArray(bytes.length) ++ bytes))
 
     case Blacklist =>
       log.info(s"Going to blacklist " + remote)
@@ -88,17 +90,27 @@ case class PeerConnectionHandler(application: Application,
     //  connection ! Close
   }
 
-  def workingCycleRemoteInterface:Receive = {
-    case Received(data) =>
-      application.messagesHandler.parse(data.toByteBuffer, Some(selfPeer)) match {
-        case Success(message) =>
-          log.info("received message " + message.spec + " from " + remote)
-          networkControllerRef ! message
+  private var chunksBuffer: ByteString = CompactByteString()
 
-        case Failure(e) =>
-          log.info(s"Corrupted data from: " + remote, e)
-          connection ! Close
-        //context stop self
+  def workingCycleRemoteInterface: Receive = {
+    case Received(data) =>
+
+      val t = getPacket(chunksBuffer ++ data)
+      chunksBuffer = t._2
+
+      t._1.find { packet =>
+        application.messagesHandler.parse(packet.toByteBuffer, Some(selfPeer)) match {
+          case Success(message) =>
+            log.info("received message " + message.spec + " from " + remote)
+            networkControllerRef ! message
+            false
+
+          case Failure(e) =>
+            log.info(s"Corrupted data from: " + remote, e)
+            connection ! Close
+          //context stop self
+            true
+        }
       }
 
     case nonsense: Any => log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
