@@ -1,6 +1,5 @@
 package scorex.network
 
-import akka.actor.FSM
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -8,6 +7,7 @@ import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.NetworkObject.ConsideredValue
 import scorex.network.message.Message
 import scorex.transaction.History
+import scorex.utils.ScorexLogging
 import shapeless.Typeable._
 
 import scala.collection.mutable
@@ -15,9 +15,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
+
 //todo: write tests
-class HistorySynchronizer(application: Application)
-  extends ViewSynchronizer with FSM[HistorySynchronizer.Status, Seq[ConnectedPeer]] {
+class HistorySynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   import HistorySynchronizer._
   import application.basicMessagesSpecsRepo._
@@ -25,7 +25,7 @@ class HistorySynchronizer(application: Application)
   private implicit val consensusModule = application.consensusModule
   private implicit val transactionalModule = application.transactionModule
 
-  override val messageSpecs = Seq(ScoreMessageSpec, GetSignaturesSpec, SignaturesSpec, BlockMessageSpec, GetBlockSpec)
+  override val messageSpecs = Seq(ScoreMessageSpec, SignaturesSpec, BlockMessageSpec)
 
   private lazy val scoreSyncer = new ScoreNetworkObject(self)
 
@@ -35,7 +35,8 @@ class HistorySynchronizer(application: Application)
 
   private lazy val blockGenerator = application.blockGenerator
 
-  private val GettingExtensionTimeout = 15.seconds
+  private val GettingExtensionTimeout = 40.seconds
+  private val GettingBlockTimeout = 10.seconds
 
   override def preStart: Unit = {
     super.preStart()
@@ -45,33 +46,32 @@ class HistorySynchronizer(application: Application)
     }
   }
 
-  val initialState = if (application.settings.offlineGeneration) Synced else Syncing
-  startWith(initialState, Seq())
+  override def receive = if (application.settings.offlineGeneration) synced else syncing
 
-  when(Syncing) {
-    case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
+  def syncing: Receive = ({
+    case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
       val localScore = history.score()
       if (networkScore > localScore) {
         log.info(s"networkScore=$networkScore > localScore=$localScore")
         val lastIds = history.lastBlocks(100).map(_.uniqueId)
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
-        context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! StateTimeout)
-        goto(GettingExtension) using witnesses
-      } else goto(Synced) using Seq()
-  }
+        context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
+        context become gettingExtension(witnesses)
+      } else gotoSynced()
+  }:Receive) orElse commonLogic
 
   private val blocksToReceive = mutable.Queue[BlockId]()
 
-  when(GettingExtension, GettingExtensionTimeout) {
-    case Event(StateTimeout, _) =>
-      goto(Syncing)
+  def gettingExtension(witnesses: Seq[ConnectedPeer]): Receive = ({
+    case GettingExtensionTimeout => gotoSyncing()
 
     //todo: aggregating function for block ids (like score has)
-    case Event(DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, remote), witnesses)
+    case DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, remote)
       if msgId == SignaturesSpec.messageCode &&
         blockIds.cast[Seq[Block.BlockId]].isDefined &&
         witnesses.contains(remote) => //todo: ban if non-expected sender
+
       val newBLockIds = blockIds.filter(!history.contains(_))
       log.info(s"Got SignaturesMessage with ${blockIds.length} sigs, ${newBLockIds.size} are new")
 
@@ -81,31 +81,34 @@ class HistorySynchronizer(application: Application)
 
       blocksToReceive.clear()
 
-      if (newBLockIds.nonEmpty) {
+      val newContext = if (newBLockIds.nonEmpty) {
         newBLockIds.foreach { blockId =>
           blocksToReceive += blockId
         }
 
         networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blocksToReceive.front), None),
           SendToChosen(Seq(remote)))
-        goto(GettingBlock)
-      } else goto(Syncing)
-  }
 
-  when(GettingBlock, 15.seconds) {
-    case Event(StateTimeout, _) =>
+        context.system.scheduler.scheduleOnce(GettingBlockTimeout)(self ! GettingBlockTimeout)
+        gettingBlock(witnesses)
+      } else syncing
+
+      context become newContext
+  }:Receive) orElse commonLogic
+
+  def gettingBlock(witnesses: Seq[ConnectedPeer]): Receive = ({
+    case GettingBlockTimeout => //15.seconds
       blocksToReceive.clear()
-      goto(Syncing)
+      gotoSyncing()
 
-    case Event(CheckBlock(blockId), witnesses) =>
+    case CheckBlock(blockId) =>
       if (blocksToReceive.nonEmpty && blocksToReceive.front.sameElements(blockId)) {
         val sendTo = SendToRandomFromChosen(witnesses)
         val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), sendTo)
         networkControllerRef ! stn
       }
-      stay()
 
-    case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
+    case DataFromPeer(msgId, block: Block@unchecked, remote)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
 
       val blockId = block.uniqueId
@@ -122,94 +125,58 @@ class HistorySynchronizer(application: Application)
           context.system.scheduler.scheduleOnce(5.seconds)(self ! CheckBlock(blockId))
         }
       } else if (!history.contains(block.referenceField.value)) {
-        log.warning("No parent block in history")
+        log.warn("No parent block in history")
         blocksToReceive.clear()
         blocksToReceive.enqueue(block.referenceField.value)
       }
+
       if (blocksToReceive.nonEmpty) {
         self ! CheckBlock(blocksToReceive.front)
-        stay()
       } else {
-        goto(Syncing) using Seq()
+        context become syncing
       }
-  }
+  }:Receive) orElse commonLogic
 
   //accept only new block from local or remote
-  when(Synced) {
-    case Event(block: Block, _) =>
+  def synced: Receive = ({
+    case block: Block =>
       processNewBlock(block, local = true)
-      stay()
 
-    case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
+    case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
       val localScore = history.score()
-      if (networkScore > localScore) goto(Syncing) using witnesses
-      else stay() using Seq()
+      if (networkScore > localScore) {
+        blockGenerator ! BlockGenerator.StopGeneration
+        context become gettingExtension(witnesses)
+      }
 
-    case Event(DataFromPeer(msgId, block: Block@unchecked, remote), _)
+    case DataFromPeer(msgId, block: Block@unchecked, remote)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
       processNewBlock(block, local = false)
-      stay()
-  }
+  }:Receive) orElse commonLogic
 
   //common logic for all the states
-  whenUnhandled {
-    //init signal(boxed Unit) matching
-    case Event(Unit, _) if stateName == initialState =>
-      stay()
-
+  def commonLogic: Receive = {
     //todo: check sender
-    case Event(DataFromPeer(msgId, content: History.BlockchainScore, remote), _)
+    case DataFromPeer(msgId, content: History.BlockchainScore, remote)
       if msgId == ScoreMessageSpec.messageCode =>
       scoreSyncer.networkUpdate(remote, content)
-      stay()
 
-    //todo: check sender
-    case Event(DataFromPeer(msgId, otherSigs: Seq[Block.BlockId]@unchecked, remote), _)
-      if msgId == GetSignaturesSpec.messageCode && otherSigs.cast[Seq[Block.BlockId]].isDefined =>
-
-      log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
-
-      otherSigs.exists { parent =>
-        val headers = application.history.lookForward(parent, application.settings.MaxBlocksChunks)
-
-        if (headers.nonEmpty) {
-          val msg = Message(SignaturesSpec, Right(Seq(parent) ++ headers), None)
-          val ss = SendToChosen(Seq(remote))
-          networkControllerRef ! SendToNetwork(msg, ss)
-          true
-        } else false
-      }
-      stay()
-
-
-    //todo: check sender?
-    case Event(DataFromPeer(msgId, sig: Block.BlockId@unchecked, remote), _)
-      if msgId == GetBlockSpec.messageCode =>
-
-      application.history.blockById(sig).foreach { b =>
-        val msg = Message(BlockMessageSpec, Right(b), None)
-        val ss = SendToChosen(Seq(remote))
-        networkControllerRef ! SendToNetwork(msg, ss)
-      }
-      stay()
-
-    case Event(ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses), _) =>
-      stay()
+    case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
 
     case nonsense: Any =>
-      log.warning(s"Got something strange in the state ($stateName) :: $nonsense")
-      stay()
+      log.warn(s"Got something strange in the state :: $nonsense")
   }
 
-  onTransition {
-    case from -> to =>
-      log.info(s"Transition from $from to $to")
-      if (from == Synced) blockGenerator ! BlockGenerator.StopGeneration
-      if (to == Synced) blockGenerator ! BlockGenerator.StartGeneration
-      if (to == Syncing) scoreSyncer.consideredValue.foreach(cv => self ! cv)
+
+  private def gotoSynced() = {
+    blockGenerator ! BlockGenerator.StartGeneration
+    context become synced
   }
 
-  initialize()
+  private def gotoSyncing() = {
+    scoreSyncer.consideredValue.foreach(cv => self ! cv)
+    context become syncing
+  }
 
   private def processNewBlock(block: Block, local: Boolean): Boolean = {
     if (block.isValid) {
@@ -226,13 +193,13 @@ class HistorySynchronizer(application: Application)
             block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
             log.info(s"(height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})")
           case Failure(e) =>
-            e.printStackTrace
-            log.warning(s"failed to append block: $e")
+            e.printStackTrace()
+            log.warn(s"failed to append block: $e")
         }
         appending.isSuccess
       } else true
     } else {
-      log.warning(s"Invalid new block(local: $local): ${block.json}")
+      log.warn(s"Invalid new block(local: $local): ${block.json}")
       false
     }
   }
@@ -251,5 +218,4 @@ object HistorySynchronizer {
   case object Synced extends Status
 
   case class CheckBlock(id: BlockId)
-
 }
