@@ -77,10 +77,18 @@ case class PeerConnectionHandler(application: Application,
       }
   }: Receive) orElse processErrors
 
-  def workingCycle: Receive = ({
+  def workingCycleLocalInterface:Receive = {
     case msg: message.Message[_] =>
       connection ! Write(ByteString(msg.bytes))
 
+    case Blacklist =>
+      log.info(s"Going to blacklist " + remote)
+    //todo: real blacklisting
+    //  PeerManager.blacklistPeer(remote)
+    //  connection ! Close
+  }
+
+  def workingCycleRemoteInterface:Receive = {
     case Received(data) =>
       application.messagesHandler.parse(data.toByteBuffer, Some(selfPeer)) match {
         case Success(message) =>
@@ -93,14 +101,10 @@ case class PeerConnectionHandler(application: Application,
         //context stop self
       }
 
-    case Blacklist =>
-      log.info(s"Going to blacklist " + remote)
-    //todo: real blacklisting
-    //  PeerManager.blacklistPeer(remote)
-    //  connection ! Close
-
     case nonsense: Any => log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
-  }: Receive) orElse processErrors
+  }
+
+  def workingCycle: Receive = workingCycleLocalInterface orElse workingCycleRemoteInterface orElse processErrors
 
   override def receive: Receive =
     processOwnHandshake(
