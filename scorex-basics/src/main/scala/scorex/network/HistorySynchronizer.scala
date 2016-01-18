@@ -215,15 +215,12 @@ class HistorySynchronizer(application: Application)
     if (block.isValid) {
       log.info(s"New block(local: $local): ${block.json}")
 
-      //broadcast block only if it is generated locally
-      if (local) {
-        val blockMsg = Message(BlockMessageSpec, Right(block), None)
-        networkControllerRef ! SendToNetwork(blockMsg, Broadcast)
-        true
-      } else {
+      if (local) networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), Broadcast)
+      if (!local || application.settings.offlineGeneration) {
         val oldHeight = history.height()
         val oldScore = history.score()
         val appending = transactionalModule.blockStorage.appendBlock(block)
+
         appending match {
           case Success(_) =>
             block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
@@ -233,7 +230,7 @@ class HistorySynchronizer(application: Application)
             log.warning(s"failed to append block: $e")
         }
         appending.isSuccess
-      }
+      } else true
     } else {
       log.warning(s"Invalid new block(local: $local): ${block.json}")
       false
