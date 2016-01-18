@@ -46,7 +46,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     }
   }
 
-  override def receive = if (application.settings.offlineGeneration) synced else syncing
+  override def receive = if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
 
   def syncing: Receive = ({
     case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
@@ -171,11 +171,13 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   private def gotoSynced() = {
     blockGenerator ! BlockGenerator.StartGeneration
     context become synced
+    synced
   }
 
   private def gotoSyncing() = {
     scoreSyncer.consideredValue.foreach(cv => self ! cv)
     context become syncing
+    syncing
   }
 
   private def processNewBlock(block: Block, local: Boolean): Boolean = {
