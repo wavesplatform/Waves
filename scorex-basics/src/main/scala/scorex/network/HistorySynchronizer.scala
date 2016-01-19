@@ -59,7 +59,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
         context become gettingExtension(witnesses)
       } else gotoSynced()
-  }:Receive) orElse commonLogic
+  }: Receive) orElse commonLogic
 
   private val blocksToReceive = mutable.Queue[BlockId]()
 
@@ -94,7 +94,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       } else syncing
 
       context become newContext
-  }:Receive) orElse commonLogic
+  }: Receive) orElse commonLogic
 
   def gettingBlock(witnesses: Seq[ConnectedPeer]): Receive = ({
     case GettingBlockTimeout => //15.seconds
@@ -135,7 +135,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       } else {
         context become syncing
       }
-  }:Receive) orElse commonLogic
+  }: Receive) orElse commonLogic
 
   //accept only new block from local or remote
   def synced: Receive = ({
@@ -152,7 +152,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     case DataFromPeer(msgId, block: Block@unchecked, remote)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
       processNewBlock(block, local = false)
-  }:Receive) orElse commonLogic
+  }: Receive) orElse commonLogic
 
   //common logic for all the states
   def commonLogic: Receive = {
@@ -163,8 +163,11 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
     case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
 
-    //the signals to initialize and timeouts
-    case Unit | f:FiniteDuration =>
+    //the signals to initialize
+    case Unit =>
+
+    //timeout signals
+    case f: FiniteDuration =>
 
     case nonsense: Any =>
       log.warn(s"Got something strange: $nonsense")
@@ -223,4 +226,5 @@ object HistorySynchronizer {
   case object Synced extends Status
 
   case class CheckBlock(id: BlockId)
+
 }
