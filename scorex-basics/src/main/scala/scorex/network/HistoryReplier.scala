@@ -43,5 +43,8 @@ class HistoryReplier(application: Application) extends ViewSynchronizer with Sco
         val ss = SendToChosen(Seq(remote))
         networkControllerRef ! SendToNetwork(msg, ss)
       }
+
+    //the signal to initialize
+    case Unit =>
   }
 }

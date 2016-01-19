@@ -163,6 +163,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
     case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
 
+    //the signals to initialize and timeouts
+    case Unit | f:FiniteDuration =>
+
     case nonsense: Any =>
       log.warn(s"Got something strange: $nonsense")
   }
