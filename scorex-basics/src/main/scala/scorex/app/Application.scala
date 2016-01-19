@@ -63,7 +63,7 @@ trait Application extends ScorexLogging {
   lazy val history: History = blockStorage.history
 
   lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistorySynchronizer")
-  lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistoryReplier")
+  lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
   def run() {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
