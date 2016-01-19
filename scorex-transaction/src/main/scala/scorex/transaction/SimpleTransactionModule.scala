@@ -183,7 +183,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
   override def isValid(block: Block): Boolean = blockStorage.state(Some(block.referenceField.value)) match {
     case Some(blockState) =>
-      isValid(transactions(block), blockState)
+      isValid(block.transactions, blockState)
     case None =>
       log.warn(s"No block state ${Base58.encode(block.referenceField.value)} in history")
       false

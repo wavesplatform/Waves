@@ -15,8 +15,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
 
-
-//must be singleton
+/**
+  * Control all network interaction
+  * must be singleton
+  */
 class NetworkController(application: Application) extends Actor with ScorexLogging {
 
   import NetworkController._

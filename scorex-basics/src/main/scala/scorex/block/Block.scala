@@ -42,7 +42,6 @@ trait Block extends ScorexLogging {
   val referenceField: BlockIdField
   val signerDataField: SignerDataBlockField
 
-
   // Some block characteristic which is uniq for a block
   // e.g. hash or signature. Used in referencing
   val uniqueId: Block.BlockId
