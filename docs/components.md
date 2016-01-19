@@ -54,7 +54,7 @@ Any real trace is much more complicated than this example :)
 Consensus Protocol
 ------------------
 
-By using network protocol a node can download one chain or another or even multiple chains(as different 
+By using network protocol a node can download one chain or another or even multiple chains (as different 
 peers can have different chains). Then the question is what is the canonical chain shared by majority, the 
  right kind of history an user can rely on. Consensus protocol aims to solve the problem.
  
