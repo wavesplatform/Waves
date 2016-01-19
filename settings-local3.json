@@ -5,8 +5,7 @@
 		"upnpGatewayTimeout": 7000,
 		"upnpDiscoverTimeout": 3000,
 		"knownPeers": [
-			"127.0.0.1",
-			"127.0.0.2"
+			"127.0.0.2:9088"
 		],
 		"maxConnections": 10
 	},
