@@ -12,6 +12,7 @@ import scala.util.{Failure, Success}
 
 class BlockGenerator(application: Application) extends FSM[Status, Unit] {
 
+  // BlockGenerator is trying to generate a new block every $blockGenerationDelay. Should be 0 for PoW consensus model.
   val blockGenerationDelay = application.settings.blockGenerationDelay
 
   startWith(Syncing, Unit)

@@ -63,6 +63,7 @@ trait Application extends ScorexLogging {
   lazy val history: History = blockStorage.history
 
   lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistorySynchronizer")
+  lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
   def run() {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
@@ -73,6 +74,7 @@ trait Application extends ScorexLogging {
     IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
 
     historySynchronizer ! Unit
+    historyReplier ! Unit
     actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
 
     //CLOSE ON UNEXPECTED SHUTDOWN

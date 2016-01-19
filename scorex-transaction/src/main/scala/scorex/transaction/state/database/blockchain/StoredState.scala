@@ -76,7 +76,7 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
   override def processBlock(block: Block, reversal: Boolean): Try[State] = Try {
-    val trans = block.transactionModule.transactions(block)
+    val trans = block.transactions
     trans foreach { tx =>
       if (!reversal && includedTx.containsKey(tx.signature)) throw new Exception("Already included tx")
       else if (!reversal) includedTx.put(tx.signature, block.uniqueId)

@@ -3,6 +3,7 @@ package scorex.network
 import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorRef}
+import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
@@ -107,11 +108,14 @@ case class PeerConnectionHandler(application: Application,
 
           case Failure(e) =>
             log.info(s"Corrupted data from: " + remote, e)
-            connection ! Close
-          //context stop self
+          //  connection ! Close
+          //  context stop self
             true
         }
       }
+
+    case CommandFailed(cmd: Tcp.Command) =>
+      log.info("Failed to execute command : " + cmd)
 
     case nonsense: Any => log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
   }

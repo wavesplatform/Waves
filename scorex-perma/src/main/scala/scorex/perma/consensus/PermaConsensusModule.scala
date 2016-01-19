@@ -134,6 +134,9 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   override def formBlockData(data: PermaConsensusBlockData): BlockField[PermaConsensusBlockData] =
     PermaConsensusBlockField(data)
 
+  /**
+    * Puzzle to a new generate block on top of $block
+    */
   def generatePuz(block: Block): Digest = Hash(block.bytes)
 
   private val NoSig = Array[Byte]()

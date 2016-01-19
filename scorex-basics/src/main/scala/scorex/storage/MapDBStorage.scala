@@ -7,6 +7,9 @@ import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
 
+/**
+  * Common key-value storage kept in file
+  */
 class MapDBStorage[Key, Value](fileName: String) extends Storage[Key, Value] with ScorexLogging {
 
   protected val db = DBMaker.appendFileDB(new File(fileName))

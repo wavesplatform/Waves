@@ -21,7 +21,7 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
   import TestingCommons._
   import application.basicMessagesSpecsRepo._
 
-  def this() = this(ActorSystem("MySpec"))
+  def this() = this(ActorSystem("PeerSynchronizerSpecification"))
 
   val probe = new TestProbe(system)
 
@@ -44,6 +44,7 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
       ps ! DataFromPeer(GetPeersSpec.messageCode, Right(), peer)
       probe.expectMsg(Message(PeersSpec, Right(newPeers), None))
     }
+
     "add more peers" in {
       val peersBefore = application.peerManager.knownPeers()
       peersBefore.length shouldBe 2

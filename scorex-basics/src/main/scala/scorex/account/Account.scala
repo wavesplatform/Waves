@@ -27,6 +27,9 @@ object Account {
   val HashLength = 20
   val AddressLength = 1 + ChecksumLength + HashLength
 
+  /**
+    * Create account from public key. Used in PublicKeyAccount/PrivateKeyAccount.
+    */
   def fromPubkey(publicKey: Array[Byte]): String = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: publicKeyHash //prepend ADDRESS_VERSION
