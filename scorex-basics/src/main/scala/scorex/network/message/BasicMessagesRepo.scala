@@ -55,11 +55,10 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
 
     override def serializeData(peers: Seq[InetSocketAddress]): Array[Byte] = {
       val length = peers.size
-      val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DataLength, 0)
+      val lengthBytes = Ints.toByteArray(length)
 
       peers.foldLeft(lengthBytes) { case (bs, peer) =>
-        Bytes.concat(bs,
-          peer.getAddress.getAddress, Bytes.ensureCapacity(Ints.toByteArray(peer.getPort), 4, 0))
+        Bytes.concat(bs, peer.getAddress.getAddress, Ints.toByteArray(peer.getPort))
       }
     }
   }
@@ -84,7 +83,7 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
 
     override def serializeData(signatures: Seq[Signature]): Array[Byte] = {
       val length = signatures.size
-      val lengthBytes = Bytes.ensureCapacity(Ints.toByteArray(length), DataLength, 0)
+      val lengthBytes = Ints.toByteArray(length)
 
       //WRITE SIGNATURES
       signatures.foldLeft(lengthBytes) { case (bs, header) => Bytes.concat(bs, header) }
@@ -113,7 +112,6 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
     }
   }
 
-  //todo: height removed, check the code using this message type
   object BlockMessageSpec extends MessageSpec[Block] {
     override val messageCode: MessageCode = 23: Byte
 
