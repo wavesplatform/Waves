@@ -7,7 +7,9 @@ import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.{LagonakiTransaction, Transaction}
 import scorex.utils.ScorexLogging
 
-
+/**
+  * Synchronizer pf transactions, that are not in blockchain yet
+  */
 class UnconfirmedPoolSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   override val messageSpecs = Seq(TransactionMessageSpec)

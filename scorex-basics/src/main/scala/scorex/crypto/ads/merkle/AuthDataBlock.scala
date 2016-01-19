@@ -16,6 +16,9 @@ import scala.util.Try
   */
 case class AuthDataBlock[Block](data: Block, merklePath: Seq[Digest]) {
 
+  /**
+    * Checks that this block is at position $index in tree with root hash = $rootHash
+    */
   def check[HashImpl <: CryptographicHash](index: Position, rootHash: Digest)
                                           (hashFunction: HashImpl = FastCryptographicHash): Boolean = {
 

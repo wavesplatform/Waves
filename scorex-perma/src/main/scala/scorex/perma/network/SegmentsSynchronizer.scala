@@ -18,9 +18,7 @@ import shapeless.Typeable._
   * Permacoin segments synchronization.
   * Some number of random peers are asked firstly.
   *
-  * @param application - application
   */
-
 class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], storage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ViewSynchronizer with ScorexLogging {
 

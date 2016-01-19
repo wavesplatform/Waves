@@ -26,6 +26,9 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
 
   storage.commit()
 
+  /**
+    * Return AuthDataBlock at position $index
+    */
   def byIndex(index: Position): Option[AuthDataBlock[Block]] = {
     if (index < nonEmptyBlocks && index >= 0) {
       @tailrec
@@ -57,7 +60,7 @@ class MerkleTree[H <: CryptographicHash](treeFolder: String,
 
   private lazy val emptyHash = hash("")
 
-  def getHash(key: TreeStorage.Key): Option[Digest] = {
+  private def getHash(key: TreeStorage.Key): Option[Digest] = {
     storage.get(key) match {
       case None =>
         if (key._1 > 0) {
@@ -86,6 +89,9 @@ object MerkleTree {
 
   val TreeFileName = "/hashTree"
 
+  /**
+    * Create Merkle tree from file with data
+    */
   def fromFile[H <: CryptographicHash](fileName: String,
                                        treeFolder: String,
                                        blockSize: Int,
@@ -137,9 +143,8 @@ object MerkleTree {
     new MerkleTree(treeFolder, nonEmptyBlocks, blockSize, hash)
   }
 
-  private def log2(x: Double): Double = math.log(x) / math.log(2)
-
-  def calculateRequiredLevel(numberOfDataBlocks: Position): Int = {
+  private[merkle] def calculateRequiredLevel(numberOfDataBlocks: Position): Int = {
+    def log2(x: Double): Double = math.log(x) / math.log(2)
     math.ceil(log2(numberOfDataBlocks)).toInt
   }
 }
