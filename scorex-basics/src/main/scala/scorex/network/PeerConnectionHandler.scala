@@ -3,6 +3,7 @@ package scorex.network
 import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorRef}
+import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.ByteString
 import scorex.app.Application
@@ -98,6 +99,9 @@ case class PeerConnectionHandler(application: Application,
     //todo: real blacklisting
     //  PeerManager.blacklistPeer(remote)
     //  connection ! Close
+
+    case CommandFailed(cmd: Tcp.Command) =>
+      log.info("Failed to execute command : " + cmd)
 
     case nonsense: Any => log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
   }: Receive) orElse processErrors
