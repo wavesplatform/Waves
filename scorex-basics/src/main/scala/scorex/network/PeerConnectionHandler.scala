@@ -90,7 +90,7 @@ case class PeerConnectionHandler(application: Application,
 
         case Failure(e) =>
           log.info(s"Corrupted data from: " + remote, e)
-          connection ! Close
+        //  connection ! Close
         //context stop self
       }
 
