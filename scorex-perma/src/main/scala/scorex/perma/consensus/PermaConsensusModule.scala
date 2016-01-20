@@ -137,7 +137,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   /**
     * Puzzle to a new generate block on top of $block
     */
-  def generatePuz(block: Block): Digest = Hash(block.bytes)
+  def generatePuz(block: Block): Digest = Hash(block.uniqueId)
 
   private val NoSig = Array[Byte]()
 
