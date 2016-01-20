@@ -39,9 +39,7 @@ trait NetworkObject[V] {
 }
 
 object NetworkObject {
-
   case class ConsideredValue[V](value: Option[V], witnesses: Seq[ConnectedPeer])
-
 }
 
 
