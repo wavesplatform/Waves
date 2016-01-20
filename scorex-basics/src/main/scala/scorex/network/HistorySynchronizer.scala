@@ -67,8 +67,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         val lastIds = history.lastBlocks(100).map(_.uniqueId)
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
-        context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
-        context become gettingExtension(witnesses)
+        gotoGettingExtension(witnesses)
       } else gotoSynced()
   }: Receive)
 
@@ -100,8 +99,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blocksToReceive.front), None),
           SendToChosen(Seq(remote)))
 
-        context.system.scheduler.scheduleOnce(GettingBlockTimeout)(self ! GettingBlockTimeout)
-        gettingBlock(witnesses)
+        gotoGettingBlock(witnesses)
       } else syncing
 
       context become newContext
@@ -158,7 +156,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       val localScore = history.score()
       if (networkScore > localScore) {
         blockGenerator ! BlockGenerator.StopGeneration
-        context become gettingExtension(witnesses)
+        gotoGettingExtension(witnesses)
       }
 
     case DataFromPeer(msgId, block: Block@unchecked, remote)
@@ -187,17 +185,30 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       log.warn(s"Got something strange: $nonsense")
   }
 
-
-  private def gotoSynced() = {
-    blockGenerator ! BlockGenerator.StartGeneration
-    context become synced
-    synced
-  }
-
   private def gotoSyncing() = {
+    log.debug("Transition to syncing")
     scoreSyncer.consideredValue.foreach(cv => self ! cv)
     context become syncing
     syncing
+  }
+
+  private def gotoGettingExtension(witnesses: Seq[ConnectedPeer]): Unit = {
+    log.debug("Transition to gettingExtension")
+    context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
+    context become gettingExtension(witnesses)
+  }
+
+  private def gotoGettingBlock(witnesses: Seq[ConnectedPeer]): Receive = {
+    log.debug("Transition to gettingBlock")
+    context.system.scheduler.scheduleOnce(GettingBlockTimeout)(self ! GettingBlockTimeout)
+    gettingBlock(witnesses)
+  }
+
+  private def gotoSynced() = {
+    log.debug("Transition to synced")
+    blockGenerator ! BlockGenerator.StartGeneration
+    context become synced
+    synced
   }
 
   private def processNewBlock(block: Block, local: Boolean): Boolean = {
