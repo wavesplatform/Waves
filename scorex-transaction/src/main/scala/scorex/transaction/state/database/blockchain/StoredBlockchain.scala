@@ -134,9 +134,6 @@ class StoredBlockchain(dataFolderOpt: Option[String])
     this
   }
 
-  override def heightOf(block: Block): Option[Int] =
-    signaturesIndex.descendingMap().find(_._2.sameElements(block.uniqueId)).map(_._1)
-
   override def blockAt(height: Int): Option[Block] = synchronized {
     blockStorage.readBlock(height)
   }
