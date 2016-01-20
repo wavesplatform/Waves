@@ -22,7 +22,7 @@ object Server extends App with ScorexLogging {
     if (application.settings.offlineGeneration) {
       testingScript(application)
     } else {
-      Thread.sleep(30.seconds.toMillis)
+      Thread.sleep(3.seconds.toMillis)
       testingScript(application)
     }
   } match {
