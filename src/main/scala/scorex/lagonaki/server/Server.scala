@@ -1,5 +1,6 @@
 package scorex.lagonaki.server
 
+import scorex.account.{Account, PublicKeyAccount}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{BalanceSheet, GenesisTransaction, Transaction}
 import scorex.utils.ScorexLogging
@@ -60,14 +61,14 @@ object Server extends App with ScorexLogging {
         None
     })
 
-    def genPayment(): Option[Transaction] = {
+    def genPayment(recipient: Option[Account] = None, amtOpt: Option[Long] = None): Option[Transaction] = {
       val pkAccs = wallet.privateKeyAccounts().ensuring(_.nonEmpty)
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val senderBalance = application.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
-      val recipientAcc = genesisAccs(Random.nextInt(genesisAccs.size))
+      val recipientAcc = recipient.getOrElse(genesisAccs(Random.nextInt(genesisAccs.size)))
       val fee = Random.nextInt(5).toLong + 1
       if (senderBalance - fee > 0) {
-        val amt = Math.abs(Random.nextLong() % (senderBalance - fee))
+        val amt = amtOpt.getOrElse(Math.abs(Random.nextLong() % (senderBalance - fee)))
         Some(application.transactionModule.createPayment(senderAcc, recipientAcc, amt, fee))
       } else None
     }
@@ -77,7 +78,10 @@ object Server extends App with ScorexLogging {
 
     (1 to Int.MaxValue).foreach { _ =>
       Thread.sleep(Random.nextInt(1.seconds.toMillis.toInt))
-      log.info(s"Payment created: ${genPayment()}")
+//      val payment = genPayment()
+//      if (payment.isDefined) log.info(s"Payment created: ${payment.get}")
+//      val paymentToNew = genPayment(Some(new PublicKeyAccount(Array.empty)), Some(1))
+//      if (paymentToNew.isDefined) log.info(s"Payment to empty account created: ${paymentToNew.get}")
     }
   }
 }

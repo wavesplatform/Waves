@@ -114,6 +114,9 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
     database.commit()
 
     if (!reversal) StoredState.history.put(Base58.encode(block.uniqueId), database.snapshot())
+    else if(!StoredState.history.contains(Base58.encode(block.referenceField.value))) {
+      StoredState.history.put(Base58.encode(block.referenceField.value), database.snapshot())
+    }
     this
   }
 
