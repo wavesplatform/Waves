@@ -4,7 +4,10 @@ import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
+import play.api.libs.json.Json
 import scorex.api.http._
+import scorex.block.Block.BlockId
+import scorex.crypto.encode.Base58
 import scorex.lagonaki.server.LagonakiApplication
 import spray.routing.Route
 
@@ -16,11 +19,11 @@ case class DebugApiRoute(application: LagonakiApplication)(implicit val context:
   lazy val wallet = application.wallet
 
   override lazy val route = pathPrefix("debug") {
-    state
+    state ~ stateAt
   }
 
   @Path("/state")
-  @ApiOperation(value = "State", notes = "get current state", httpMethod = "GET")
+  @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json state")
   ))
@@ -31,4 +34,22 @@ case class DebugApiRoute(application: LagonakiApplication)(implicit val context:
       }
     }
   }
+
+  @Path("/state/{blockId}")
+  @ApiOperation(value = "State at block", notes = "Get state at specified block", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "blockId", value = "Id of block", required = true, dataType = "String", paramType = "path")
+  ))
+  def stateAt: Route = {
+    path("state" / Segment) { case blockId =>
+      jsonRoute {
+        val id: BlockId = Base58.decode(blockId).getOrElse(Array.empty)
+        application.blockStorage.state(Some(id)) match {
+          case None => Json.obj("error" -> "wrong block id").toString
+          case Some(b) => b.toString
+        }
+      }
+    }
+  }
+
 }
