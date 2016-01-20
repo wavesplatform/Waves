@@ -36,6 +36,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
   private lazy val blockGenerator = application.blockGenerator
 
+  //todo: make configurable
   private val GettingExtensionTimeout = 40.seconds
   private val GettingBlockTimeout = 10.seconds
 
@@ -51,7 +52,14 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   override def receive: Receive =
     if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
 
-  def syncing: Receive = ({
+  def state(status: Status, logic: Receive): Receive =
+    logic orElse ({
+      case HistorySynchronizer.GetStatus =>
+        sender() ! status.name
+    }: Receive) orElse commonLogic
+
+
+  def syncing: Receive = state(HistorySynchronizer.Syncing, {
     case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
       val localScore = history.score()
       if (networkScore > localScore) {
@@ -62,11 +70,11 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
         context become gettingExtension(witnesses)
       } else gotoSynced()
-  }: Receive) orElse commonLogic
+  }: Receive)
 
   private val blocksToReceive = mutable.Queue[BlockId]()
 
-  def gettingExtension(witnesses: Seq[ConnectedPeer]): Receive = ({
+  def gettingExtension(witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingExtension, {
     case GettingExtensionTimeout => gotoSyncing()
 
     //todo: aggregating function for block ids (like score has)
@@ -97,9 +105,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       } else syncing
 
       context become newContext
-  }: Receive) orElse commonLogic
+  }: Receive)
 
-  def gettingBlock(witnesses: Seq[ConnectedPeer]): Receive = ({
+  def gettingBlock(witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingBlock, {
     case GettingBlockTimeout => //15.seconds
       blocksToReceive.clear()
       gotoSyncing()
@@ -139,10 +147,10 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       } else {
         context become syncing
       }
-  }: Receive) orElse commonLogic
+  }: Receive)
 
   //accept only new block from local or remote
-  def synced: Receive = ({
+  def synced: Receive = state(HistorySynchronizer.Synced, {
     case block: Block =>
       processNewBlock(block, local = true)
 
@@ -156,7 +164,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     case DataFromPeer(msgId, block: Block@unchecked, remote)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
       processNewBlock(block, local = false)
-  }: Receive) orElse commonLogic
+  }: Receive)
 
   //common logic for all the states
   def commonLogic: Receive = {
@@ -221,16 +229,28 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
 object HistorySynchronizer {
 
-  sealed trait Status
+  sealed trait Status {
+    val name: String
+  }
 
-  case object Syncing extends Status
+  case object Syncing extends Status {
+    override val name = "syncing"
+  }
 
-  case object GettingExtension extends Status
+  case object GettingExtension extends Status {
+    override val name = "getting extension"
+  }
 
-  case object GettingBlock extends Status
+  case object GettingBlock extends Status {
+    override val name = "getting block"
+  }
 
-  case object Synced extends Status
+  case object Synced extends Status {
+    override val name = "synced"
+  }
 
   case class CheckBlock(id: BlockId)
+
+  case object GetStatus
 
 }

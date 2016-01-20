@@ -7,7 +7,7 @@ import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.lagonaki.server.settings.Constants
-import scorex.network.BlockGenerator
+import scorex.network.{HistorySynchronizer, BlockGenerator}
 import spray.routing.Route
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -53,8 +53,14 @@ case class ScorexApiRoute(application: LagonakiApplication)(implicit val context
     get {
       respondWithMediaType(`application/json`) {
         onComplete {
-          (application.blockGenerator ? BlockGenerator.GetStatus).map { status =>
-            Json.obj("status" -> status.asInstanceOf[String]).toString()
+          def bgf = (application.blockGenerator ? BlockGenerator.GetStatus).map(_.toString)
+          def hsf = (application.historySynchronizer ? HistorySynchronizer.GetStatus).map(_.toString)
+
+          Future.sequence(Seq(bgf, hsf)).map { case statusesSeq=>
+            Json.obj(
+              "block generator status" -> statusesSeq.head,
+              "history synchronization status" -> statusesSeq.tail.head
+            ).toString()
           }
         } {
           case Success(value) => complete(value)
