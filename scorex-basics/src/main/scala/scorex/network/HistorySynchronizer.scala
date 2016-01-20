@@ -85,13 +85,13 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         val lastIds = history.lastBlocks(100).map(_.uniqueId)
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
-        gotoGettingExtension(witnesses)
+        gotoGettingExtension(networkScore, witnesses)
       } else gotoSynced()
   }: Receive)
 
   private val blocksToReceive = mutable.Queue[BlockId]()
 
-  def gettingExtension(witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingExtension, {
+  def gettingExtension(betterScore:BigInt,  witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingExtension, {
     case GettingExtensionTimeout => gotoSyncing()
 
     //todo: aggregating function for block ids (like score has)
@@ -109,7 +109,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
       blocksToReceive.clear()
 
-      val newContext = if (newBLockIds.nonEmpty) {
+      if (newBLockIds.nonEmpty) {
         newBLockIds.foreach { blockId =>
           blocksToReceive += blockId
         }
@@ -118,9 +118,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
           SendToChosen(Seq(remote)))
 
         gotoGettingBlock(witnesses)
-      } else syncing
-
-      context become newContext
+      } else gotoSyncing()
   }: Receive)
 
   def gettingBlock(witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingBlock, {
@@ -161,7 +159,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       if (blocksToReceive.nonEmpty) {
         self ! CheckBlock(blocksToReceive.front)
       } else {
-        context become syncing
+        gotoSyncing()
       }
   }: Receive)
 
@@ -174,7 +172,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       val localScore = history.score()
       if (networkScore > localScore) {
         blockGenerator ! BlockGenerator.StopGeneration
-        gotoGettingExtension(witnesses)
+        gotoGettingExtension(networkScore, witnesses)
       }
 
     case DataFromPeer(msgId, block: Block@unchecked, remote)
@@ -189,15 +187,16 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     syncing
   }
 
-  private def gotoGettingExtension(witnesses: Seq[ConnectedPeer]): Unit = {
+  private def gotoGettingExtension(betterScore:BigInt, witnesses: Seq[ConnectedPeer]): Unit = {
     log.debug("Transition to gettingExtension")
     context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
-    context become gettingExtension(witnesses)
+    context become gettingExtension(betterScore, witnesses)
   }
 
   private def gotoGettingBlock(witnesses: Seq[ConnectedPeer]): Receive = {
     log.debug("Transition to gettingBlock")
     context.system.scheduler.scheduleOnce(GettingBlockTimeout)(self ! GettingBlockTimeout)
+    context become gettingBlock(witnesses)
     gettingBlock(witnesses)
   }
 
