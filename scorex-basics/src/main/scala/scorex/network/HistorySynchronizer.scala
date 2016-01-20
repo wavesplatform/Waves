@@ -53,11 +53,29 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
 
   def state(status: Status, logic: Receive): Receive =
+    //combine specific logic with common for all the states
     logic orElse ({
       case HistorySynchronizer.GetStatus =>
         sender() ! status.name
-    }: Receive) orElse commonLogic
 
+      //todo: check sender
+      case DataFromPeer(msgId, content: History.BlockchainScore, remote)
+        if msgId == ScoreMessageSpec.messageCode =>
+
+        scoreSyncer.networkUpdate(remote, content)
+
+      case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
+        log.info("Got unhandled ConsideredValue(score)")
+
+      //the signals to initialize
+      case Unit =>
+
+      //timeout signals
+      case f: FiniteDuration =>
+
+      case nonsense: Any =>
+        log.warn(s"Got something strange: $nonsense")
+    }: Receive)
 
   def syncing: Receive = state(HistorySynchronizer.Syncing, {
     case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
@@ -163,27 +181,6 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
       processNewBlock(block, local = false)
   }: Receive)
-
-  //common logic for all the states
-  def commonLogic: Receive = {
-    //todo: check sender
-    case DataFromPeer(msgId, content: History.BlockchainScore, remote)
-      if msgId == ScoreMessageSpec.messageCode =>
-
-      scoreSyncer.networkUpdate(remote, content)
-
-    case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
-      log.info("Got unhandled ConsideredValue(score)")
-
-    //the signals to initialize
-    case Unit =>
-
-    //timeout signals
-    case f: FiniteDuration =>
-
-    case nonsense: Any =>
-      log.warn(s"Got something strange: $nonsense")
-  }
 
   private def gotoSyncing() = {
     log.debug("Transition to syncing")
