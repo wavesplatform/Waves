@@ -11,7 +11,6 @@ import scorex.transaction.History
 import scorex.utils.ScorexLogging
 import shapeless.Typeable._
 
-import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
@@ -53,7 +52,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
 
   def state(status: Status, logic: Receive): Receive =
-    //combine specific logic with common for all the states
+  //combine specific logic with common for all the states
     logic orElse ({
       case HistorySynchronizer.GetStatus =>
         sender() ! status.name
@@ -89,9 +88,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       } else gotoSynced()
   }: Receive)
 
-  private val blocksToReceive = mutable.Queue[BlockId]()
-
-  def gettingExtension(betterScore:BigInt,  witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingExtension, {
+  def gettingExtension(betterScore: BigInt, witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingExtension, {
     case GettingExtensionTimeout => gotoSyncing()
 
     //todo: aggregating function for block ids (like score has)
@@ -100,68 +97,48 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         blockIds.cast[Seq[Block.BlockId]].isDefined &&
         witnesses.contains(remote) => //todo: ban if non-expected sender
 
-      val newBLockIds = blockIds.filter(!history.contains(_))
-      log.info(s"Got SignaturesMessage with ${blockIds.length} sigs, ${newBLockIds.size} are new")
-
       val common = blockIds.head
       assert(application.history.contains(common)) //todo: what if not?
+
+      val toDownload = blockIds.tail
+      assert(!application.history.contains(toDownload.head)) //todo: what if not?
+
       Try(application.blockStorage.removeAfter(common)) //todo we don't need this call for blockTree
 
-      blocksToReceive.clear()
+      gotoGettingBlock(witnesses, toDownload.map(_ -> None))
 
-      if (newBLockIds.nonEmpty) {
-        newBLockIds.foreach { blockId =>
-          blocksToReceive += blockId
-        }
-
-        networkControllerRef ! NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blocksToReceive.front), None),
-          SendToChosen(Seq(remote)))
-
-        gotoGettingBlock(witnesses)
-      } else gotoSyncing()
+      blockIds.tail.foreach { blockId =>
+        val msg = Message(GetBlockSpec, Right(blockId), None)
+        val stn = SendToChosen(Seq(remote))
+        networkControllerRef ! NetworkController.SendToNetwork(msg, stn)
+      }
   }: Receive)
 
-  def gettingBlock(witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingBlock, {
-    case GettingBlockTimeout => //15.seconds
-      blocksToReceive.clear()
-      gotoSyncing()
-
-    case CheckBlock(blockId) =>
-      if (blocksToReceive.nonEmpty && blocksToReceive.front.sameElements(blockId)) {
-        val sendTo = SendToRandomFromChosen(witnesses)
-        val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), sendTo)
-        networkControllerRef ! stn
-      }
-
-    case DataFromPeer(msgId, block: Block@unchecked, remote)
-      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined
-        && blocksToReceive.front.sameElements(block.uniqueId) =>
-
-      val blockId = block.uniqueId
-      log.info("Got block: " + Base58.encode(blockId))
-
-      if (processNewBlock(block, local = false)) {
-        if (blocksToReceive.nonEmpty && blocksToReceive.front.sameElements(blockId)) blocksToReceive.dequeue()
-
-        if (blocksToReceive.nonEmpty) {
-          val blockId = blocksToReceive.front
-          val ss = SendToRandomFromChosen(Seq(remote))
-          val stn = NetworkController.SendToNetwork(Message(GetBlockSpec, Right(blockId), None), ss)
-          networkControllerRef ! stn
-          context.system.scheduler.scheduleOnce(5.seconds)(self ! CheckBlock(blockId))
-        }
-      } else if (!history.contains(block.referenceField.value)) {
-        log.warn("No parent block in history")
-        //blocksToReceive.clear()
-        //blocksToReceive.enqueue(block.referenceField.value)
-      }
-
-      if (blocksToReceive.nonEmpty) {
-        self ! CheckBlock(blocksToReceive.front)
-      } else {
+  def gettingBlock(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive =
+    state(HistorySynchronizer.GettingBlock, {
+      case GettingBlockTimeout => //15.seconds
         gotoSyncing()
-      }
-  }: Receive)
+
+      case DataFromPeer(msgId, block: Block@unchecked, remote)
+        if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
+
+        val blockId = block.uniqueId
+        log.info("Got block: " + Base58.encode(blockId))
+
+        blocks.indexWhere(_._1.sameElements(blockId)) match {
+          case i: Int if i == -1 => gotoGettingBlock(witnesses, blocks)
+          case idx: Int =>
+            val updBlocks = blocks.updated(idx, blockId -> Some(block))
+            if (idx == 0) {
+              val toProcess = updBlocks.takeWhile(_._2.isDefined).map(_._2.get)
+              toProcess.find(bp => !processNewBlock(bp, local = false)).foreach { case failedBlock =>
+                log.warn(s"Can't apply block: ${failedBlock.json}")
+                gotoSyncing()
+              }
+              gotoGettingBlock(witnesses, updBlocks.drop(toProcess.length))
+            } else gotoGettingBlock(witnesses, updBlocks)
+        }
+    }: Receive)
 
   //accept only new block from local or remote
   def synced: Receive = state(HistorySynchronizer.Synced, {
@@ -180,24 +157,24 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       processNewBlock(block, local = false)
   }: Receive)
 
-  private def gotoSyncing():Receive = {
+  private def gotoSyncing(): Receive = {
     log.debug("Transition to syncing")
     context become syncing
     scoreSyncer.consideredValue.foreach(cv => self ! cv)
     syncing
   }
 
-  private def gotoGettingExtension(betterScore:BigInt, witnesses: Seq[ConnectedPeer]): Unit = {
+  private def gotoGettingExtension(betterScore: BigInt, witnesses: Seq[ConnectedPeer]): Unit = {
     log.debug("Transition to gettingExtension")
     context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
     context become gettingExtension(betterScore, witnesses)
   }
 
-  private def gotoGettingBlock(witnesses: Seq[ConnectedPeer]): Receive = {
+  private def gotoGettingBlock(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive = {
     log.debug("Transition to gettingBlock")
     context.system.scheduler.scheduleOnce(GettingBlockTimeout)(self ! GettingBlockTimeout)
-    context become gettingBlock(witnesses)
-    gettingBlock(witnesses)
+    context become gettingBlock(witnesses, blocks)
+    gettingBlock(witnesses, blocks)
   }
 
   private def gotoSynced(): Receive = {

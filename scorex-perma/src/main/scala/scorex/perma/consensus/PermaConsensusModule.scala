@@ -54,10 +54,10 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
     val trans = transactionModule.blockStorage.history
     trans.parent(block) match {
       case Some(parent) =>
-        lazy val publicKey = blockGenerator(block).publicKey
-        lazy val puzIsValid = f.puz sameElements generatePuz(parent)
-        lazy val targetIsValid = f.target == calcTarget(parent)
-        lazy val ticketIsValid = validate(publicKey, f.puz, f.target, f.ticket, rootHash)
+        val publicKey = blockGenerator(block).publicKey
+        val puzIsValid = f.puz sameElements generatePuz(parent)
+        val targetIsValid = f.target == calcTarget(parent)
+        val ticketIsValid = validate(publicKey, f.puz, f.target, f.ticket, rootHash)
         if (puzIsValid && targetIsValid && ticketIsValid)
           true
         else {
@@ -137,7 +137,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   /**
     * Puzzle to a new generate block on top of $block
     */
-  def generatePuz(block: Block): Digest = Hash(block.bytes)
+  def generatePuz(block: Block): Digest = Hash(block.uniqueId)
 
   private val NoSig = Array[Byte]()
 
