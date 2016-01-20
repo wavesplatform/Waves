@@ -13,7 +13,7 @@ import scorex.consensus.qora.QoraLikeConsensusModule
 import scorex.consensus.qora.api.http.QoraConsensusApiRoute
 import scorex.crypto.ads.merkle.{AuthDataBlock, MerkleTree}
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.lagonaki.api.http.{PaymentApiRoute, PeersHttpService, ScorexApiRoute}
+import scorex.lagonaki.api.http.{DebugApiRoute, PaymentApiRoute, PeersHttpService, ScorexApiRoute}
 import scorex.network._
 import scorex.perma.api.http.PermaConsensusApiRoute
 import scorex.perma.consensus.PermaConsensusModule
@@ -123,7 +123,8 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
     ScorexApiRoute(this),
     SeedApiRoute(),
     PeersHttpService(this),
-    AddressApiRoute(wallet, blockStorage.state)
+    AddressApiRoute(wallet, blockStorage.state),
+    DebugApiRoute(this)
   )
 
   override lazy val apiTypes = Seq(
@@ -139,7 +140,8 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
     typeOf[ScorexApiRoute],
     typeOf[SeedApiRoute],
     typeOf[PeersHttpService],
-    typeOf[AddressApiRoute]
+    typeOf[AddressApiRoute],
+    typeOf[DebugApiRoute]
   )
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs ++ PermacoinMessagesRepo.specs

@@ -3,6 +3,7 @@ package scorex.transaction.state.database.blockchain
 import java.io.{DataInput, DataOutput}
 
 import org.mapdb._
+import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -161,11 +162,13 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
     if (r.size == txs.size) r else validate(r)
   }
 
-  //for debugging purposes only
-  override def toString: String = {
+  def toJson: JsObject = {
     import scala.collection.JavaConversions._
-    balances.mkString("\n")
+    JsObject(balances.keySet().map(a => a.address -> JsNumber(balances.get(a))).toMap)
   }
+
+  //for debugging purposes only
+  override def toString: String = toJson.toString()
 }
 
 object StoredState {
