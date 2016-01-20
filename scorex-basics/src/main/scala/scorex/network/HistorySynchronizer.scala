@@ -3,6 +3,7 @@ package scorex.network
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.crypto.encode.Base58
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.NetworkObject.ConsideredValue
 import scorex.network.message.Message
@@ -40,13 +41,15 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
   override def preStart: Unit = {
     super.preStart()
-    context.system.scheduler.schedule(1.second, 1.seconds) {
+    //todo: make configurable
+    context.system.scheduler.schedule(1.second, 2.seconds) {
       val msg = Message(ScoreMessageSpec, Right(history.score()), None)
       networkControllerRef ! NetworkController.SendToNetwork(msg, SendToRandom)
     }
   }
 
-  override def receive = if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
+  override def receive: Receive =
+    if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
 
   def syncing: Receive = ({
     case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
@@ -109,10 +112,11 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       }
 
     case DataFromPeer(msgId, block: Block@unchecked, remote)
-      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
+      if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined
+        && blocksToReceive.front.sameElements(block.uniqueId) =>
 
       val blockId = block.uniqueId
-      log.info("Got block: " + blockId)
+      log.info("Got block: " + Base58.encode(blockId))
 
       if (processNewBlock(block, local = false)) {
         if (blocksToReceive.nonEmpty && blocksToReceive.front.sameElements(blockId)) blocksToReceive.dequeue()
@@ -126,8 +130,8 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         }
       } else if (!history.contains(block.referenceField.value)) {
         log.warn("No parent block in history")
-        blocksToReceive.clear()
-        blocksToReceive.enqueue(block.referenceField.value)
+        //blocksToReceive.clear()
+        //blocksToReceive.enqueue(block.referenceField.value)
       }
 
       if (blocksToReceive.nonEmpty) {
@@ -159,9 +163,11 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     //todo: check sender
     case DataFromPeer(msgId, content: History.BlockchainScore, remote)
       if msgId == ScoreMessageSpec.messageCode =>
+
       scoreSyncer.networkUpdate(remote, content)
 
     case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
+      log.info("Got unhandled ConsideredValue(score)")
 
     //the signals to initialize
     case Unit =>
