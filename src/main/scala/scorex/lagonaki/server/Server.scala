@@ -1,6 +1,6 @@
 package scorex.lagonaki.server
 
-import scorex.account.{Account, PublicKeyAccount}
+import scorex.account.Account
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{BalanceSheet, GenesisTransaction, Transaction}
 import scorex.utils.ScorexLogging
