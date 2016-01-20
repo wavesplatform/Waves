@@ -105,7 +105,6 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
       Try(application.blockStorage.removeAfter(common)) //todo we don't need this call for blockTree
 
-
       gotoGettingBlock(witnesses, toDownload.map(_ -> None))
 
       blockIds.tail.foreach { blockId =>
@@ -127,13 +126,14 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         log.info("Got block: " + Base58.encode(blockId))
 
         blocks.indexWhere(_._1.sameElements(blockId)) match {
-          case i:Int if i == -1 => gotoGettingBlock(witnesses, blocks)
-          case idx:Int =>
+          case i: Int if i == -1 => gotoGettingBlock(witnesses, blocks)
+          case idx: Int =>
             val updBlocks = blocks.updated(idx, blockId -> Some(block))
-            if(idx==0){
+            if (idx == 0) {
               val toProcess = updBlocks.takeWhile(_._2.isDefined).map(_._2.get)
-              toProcess.foreach{case bp =>
-                processNewBlock(bp, local = false)
+              toProcess.find(bp => !processNewBlock(bp, local = false)).foreach { case failedBlock =>
+                log.warn(s"Can't apply block: ${failedBlock.json}")
+                gotoSyncing()
               }
               gotoGettingBlock(witnesses, updBlocks.drop(toProcess.length))
             } else gotoGettingBlock(witnesses, updBlocks)
