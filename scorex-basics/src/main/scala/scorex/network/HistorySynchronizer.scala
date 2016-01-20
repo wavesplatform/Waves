@@ -182,10 +182,10 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       processNewBlock(block, local = false)
   }: Receive)
 
-  private def gotoSyncing() = {
+  private def gotoSyncing():Receive = {
     log.debug("Transition to syncing")
-    scoreSyncer.consideredValue.foreach(cv => self ! cv)
     context become syncing
+    scoreSyncer.consideredValue.foreach(cv => self ! cv)
     syncing
   }
 
@@ -201,7 +201,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     gettingBlock(witnesses)
   }
 
-  private def gotoSynced() = {
+  private def gotoSynced(): Receive = {
     log.debug("Transition to synced")
     blockGenerator ! BlockGenerator.StartGeneration
     context become synced
