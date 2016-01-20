@@ -15,8 +15,14 @@ non-interactive Proof-of-Retrievability of a static dataset by A. Miller, E. Shi
 * P2P layer is totally rewritten. From now a new module can implement messages and messages handling
 logic separately. Then module p2p logic is to be wired into application's logic.
 
+* UPnP ports mapping
+
+* TCP packets assembling (Akka I/O missing)
+
 * Experimental: a node could store a blocktree explicitly. Storage type could be changed via "history"
 setting(set "blockchain" / "blocktree"). Different nodes can have different storage types.
+
+* New class of API calls, starting with debug/
 
 
 **1.1.2**
