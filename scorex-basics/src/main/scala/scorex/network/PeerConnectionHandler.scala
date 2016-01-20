@@ -11,7 +11,7 @@ import scorex.app.Application
 import scorex.network.NetworkController.PeerHandshake
 import scorex.utils.ScorexLogging
 
-import scala.util.{Failure, Success}
+import scala.util.{Try, Failure, Success}
 
 
 case class ConnectedPeer(address: InetSocketAddress, handlerRef: ActorRef) {
@@ -96,21 +96,23 @@ case class PeerConnectionHandler(application: Application,
   def workingCycleRemoteInterface: Receive = {
     case Received(data) =>
 
-      val t = getPacket(chunksBuffer ++ data)
-      chunksBuffer = t._2
+      Try {
+        val t = getPacket(chunksBuffer ++ data)
+        chunksBuffer = t._2
 
-      t._1.find { packet =>
-        application.messagesHandler.parse(packet.toByteBuffer, Some(selfPeer)) match {
-          case Success(message) =>
-            log.info("received message " + message.spec + " from " + remote)
-            networkControllerRef ! message
-            false
+        t._1.find { packet =>
+          application.messagesHandler.parse(packet.toByteBuffer, Some(selfPeer)) match {
+            case Success(message) =>
+              log.info("received message " + message.spec + " from " + remote)
+              networkControllerRef ! message
+              false
 
-          case Failure(e) =>
-            log.info(s"Corrupted data from: " + remote, e)
-          //  connection ! Close
-          //  context stop self
-            true
+            case Failure(e) =>
+              log.info(s"Corrupted data from: " + remote, e)
+              //  connection ! Close
+              //  context stop self
+              true
+          }
         }
       }
 
