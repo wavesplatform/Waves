@@ -11,7 +11,7 @@ import scorex.app.Application
 import scorex.network.NetworkController.PeerHandshake
 import scorex.utils.ScorexLogging
 
-import scala.util.{Try, Failure, Success}
+import scala.util.{Failure, Success}
 
 
 case class ConnectedPeer(address: InetSocketAddress, handlerRef: ActorRef) {
@@ -54,12 +54,18 @@ case class PeerConnectionHandler(application: Application,
   private def processOwnHandshake(newCycle: Receive): Receive = ({
     case h: Handshake =>
       connection ! Write(ByteString(h.bytes))
+      log.info(s"Handshake sent to $remote")
       context become newCycle
   }: Receive) orElse processErrors
 
   private def processHandshakeAck(newCycle: Receive): Receive = ({
     case Received(data) if data.length == HandShakeAck.messageSize =>
-      if (data == HandShakeAck.bytes.toSeq) context become newCycle else connection ! Close
+      if (data == HandShakeAck.bytes.toSeq) {
+        log.info(s"Got Handshake Ack from $remote")
+        context become newCycle
+      } else {
+        connection ! Close
+      }
   }: Receive) orElse processErrors
 
   private def processHandshake(newCycle: Receive): Receive = ({
@@ -69,6 +75,7 @@ case class PeerConnectionHandler(application: Application,
           if (handshake.fromNonce != ownNonce) {
             connection ! Write(HandShakeAck.bytesAsByteString)
             networkControllerRef ! PeerHandshake(remote, handshake)
+            log.info(s"Got a Handshake from $remote")
             context become newCycle
           } else {
             connection ! Close
@@ -96,23 +103,21 @@ case class PeerConnectionHandler(application: Application,
   def workingCycleRemoteInterface: Receive = {
     case Received(data) =>
 
-      Try {
-        val t = getPacket(chunksBuffer ++ data)
-        chunksBuffer = t._2
+      val t = getPacket(chunksBuffer ++ data)
+      chunksBuffer = t._2
 
-        t._1.find { packet =>
-          application.messagesHandler.parse(packet.toByteBuffer, Some(selfPeer)) match {
-            case Success(message) =>
-              log.info("received message " + message.spec + " from " + remote)
-              networkControllerRef ! message
-              false
+      t._1.find { packet =>
+        application.messagesHandler.parse(packet.toByteBuffer, Some(selfPeer)) match {
+          case Success(message) =>
+            log.info("received message " + message.spec + " from " + remote)
+            networkControllerRef ! message
+            false
 
-            case Failure(e) =>
-              log.info(s"Corrupted data from: " + remote, e)
-              //  connection ! Close
-              //  context stop self
-              true
-          }
+          case Failure(e) =>
+            log.info(s"Corrupted data from: " + remote, e)
+            //  connection ! Close
+            //  context stop self
+            true
         }
       }
 
