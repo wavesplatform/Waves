@@ -23,7 +23,7 @@ case class DebugApiRoute(application: LagonakiApplication)(implicit val context:
     blocks ~ state ~ stateAt
   }
 
-  @Path("/blocks")
+  @Path("/blocks/{howMany}")
   @ApiOperation(value = "Blocks", notes = "Get sizes and full hashes for last blocks", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(
