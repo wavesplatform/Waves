@@ -1,17 +1,17 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.{DataInput, DataOutput}
+import java.io.{DataInput, DataOutput, File}
 
 import org.mapdb._
 import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.crypto.encode.Base58
 import scorex.transaction.state.LagonakiState
 import scorex.transaction.{LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
 
+import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
@@ -54,20 +54,58 @@ class StoredState(val database: DB) extends LagonakiState with ScorexLogging {
     }
   }
 
+  //Names of collections in DB
   private val StateHeight = "height"
+  private val Balances = "balances"
+  private val IncludedTx = "includedTx"
+  private val WatchedTxs = "watchedTxs"
 
-  private val balances = database.hashMap[Account, Long]("balances")
+  private val balances = database.hashMap[Account, Long](Balances)
 
-  private val includedTx: HTreeMap[Array[Byte], Array[Byte]] = database.hashMapCreate("includedTx")
+  private val includedTx: HTreeMap[Array[Byte], Array[Byte]] = database.hashMapCreate(IncludedTx)
     .keySerializer(Serializer.BYTE_ARRAY)
     .valueSerializer(Serializer.BYTE_ARRAY)
     .makeOrGet()
 
   private val accountTransactions = database.hashMap(
-    "watchedTxs",
+    WatchedTxs,
     AccSerializer,
     TxArraySerializer,
     null)
+
+  //TODO refactor
+  override def copyTo(fileNameOpt: Option[String]): State = StoredState.synchronized {
+    val db: DB = fileNameOpt match {
+      case Some(fileName) =>
+        DBMaker.fileDB(new File(fileName))
+          .closeOnJvmShutdown()
+          .cacheSize(2048)
+          .checksumEnable()
+          .fileMmapEnable()
+          .make()
+      case None => DBMaker.memoryDB().snapshotEnable().make()
+    }
+    db.atomicInteger(StateHeight).set(stateHeight())
+    val balancesCopy = db.hashMap[Account, Long](Balances)
+
+    val includedTxCopy: HTreeMap[Array[Byte], Array[Byte]] = db.hashMapCreate(IncludedTx)
+      .keySerializer(Serializer.BYTE_ARRAY)
+      .valueSerializer(Serializer.BYTE_ARRAY)
+      .makeOrGet()
+
+    val accountTransactionsCopy = db.hashMap(
+      WatchedTxs,
+      AccSerializer,
+      TxArraySerializer,
+      null)
+
+    balances.keySet().foreach(key => balancesCopy.put(key, balances(key)))
+    includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
+    accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
+    db.commit()
+    db.close()
+    StoredState(fileNameOpt).get
+  }
 
   def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
 
@@ -166,4 +204,35 @@ class StoredState(val database: DB) extends LagonakiState with ScorexLogging {
 
   //for debugging purposes only
   override def toString: String = toJson.toString()
+}
+
+object StoredState {
+
+
+  private val cache = TrieMap[String, StoredState]()
+
+  def apply(fileNameOpt: Option[String]): Option[StoredState] = this.synchronized {
+    fileNameOpt match {
+      case Some(fileName) =>
+        cache.get(fileName) match {
+          case Some(state) => Some(state)
+          case _ =>
+            val f = new File(fileName)
+            if (f.exists()) {
+              val db = DBMaker.fileDB(new File(fileName))
+                .closeOnJvmShutdown()
+                .cacheSize(2048)
+                .checksumEnable()
+                .fileMmapEnable()
+                .make()
+              val s = new StoredState(db)
+              cache.put(fileName, s)
+              Some(s)
+            } else None
+
+        }
+
+      case None => ???
+    }
+  }
 }

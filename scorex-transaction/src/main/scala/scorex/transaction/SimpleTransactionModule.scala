@@ -1,7 +1,5 @@
 package scorex.transaction
 
-import java.io.File
-
 import com.google.common.primitives.{Bytes, Ints}
 import org.mapdb.DBMaker
 import play.api.libs.json.{JsObject, Json}
@@ -65,25 +63,17 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
 
-    override def state(id: BlockId): Option[StoredState] = super.state(id).map(_.asInstanceOf[StoredState])
+    private def getFileName(id: BlockId) = settings.dataDirOpt.map(d => d + "/state-" + Base58.encode(id))
 
-    override def state: StoredState = super.state.asInstanceOf[StoredState]
+    override def saveState(id: BlockId, state: State): StoredState =
+      state.copyTo(getFileName(id)).asInstanceOf[StoredState]
 
-    override val genesisState = settings.dataDirOpt match {
-      case Some(dataFolder) =>
-        log.debug("DB loaded from {}", dataFolder)
-        val db = DBMaker.fileDB(new File(dataFolder + s"/state"))
-          .closeOnJvmShutdown()
-          .cacheSize(2048)
-          .checksumEnable()
-          .snapshotEnable()
-          .fileMmapEnable()
-          .make()
-        db.rollback() //clear uncommitted data from possibly invalid last run
-        new StoredState(db)
+    override def state(id: BlockId): Option[StoredState] = StoredState(getFileName(id))
 
-      case None => new StoredState(DBMaker.memoryDB().snapshotEnable().make())
-    }
+    override def state: StoredState = if (history.height() > 0) state(history.lastBlock.uniqueId).get
+    else emptyState
+
+    override val emptyState = new StoredState(DBMaker.memoryDB().snapshotEnable().make())
 
   }
 

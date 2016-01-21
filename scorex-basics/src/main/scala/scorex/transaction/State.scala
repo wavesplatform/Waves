@@ -22,4 +22,7 @@ trait State {
     * @return whether transaction is already included into a state or not
     */
   def included(tx: Transaction): Option[BlockId]
+
+  def copyTo(fileNameOpt: Option[String]): State
+
 }
