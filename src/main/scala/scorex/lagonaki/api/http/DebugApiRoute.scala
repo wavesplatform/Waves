@@ -8,6 +8,7 @@ import play.api.libs.json.Json
 import scorex.api.http._
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.lagonaki.server.LagonakiApplication
 import spray.routing.Route
 
@@ -19,7 +20,28 @@ case class DebugApiRoute(application: LagonakiApplication)(implicit val context:
   lazy val wallet = application.wallet
 
   override lazy val route = pathPrefix("debug") {
-    state ~ stateAt
+    blocks ~ state ~ stateAt
+  }
+
+  @Path("/blocks")
+  @ApiOperation(value = "Blocks", notes = "Get sizes and full hashes for last blocks", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "howMany",
+      value = "How many last blocks to take",
+      required = true,
+      dataType = "String",
+      paramType = "path")
+  ))
+  def blocks: Route = {
+    path("blocks" / IntNumber) { case howMany =>
+      jsonRoute {
+        Json.arr(application.blockStorage.history.lastBlocks(howMany).map { block =>
+          val bytes = block.bytes
+          Json.obj(bytes.length.toString -> Base58.encode(FastCryptographicHash(bytes)))
+        }).toString()
+      }
+    }
   }
 
   @Path("/state")
