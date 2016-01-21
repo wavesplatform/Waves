@@ -156,15 +156,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
         log.info(s"Got incoming connection from $remote")
       }
 
-    case CommandFailed(c: Connect) =>
-      log.info("Failed to connect to : " + c.remoteAddress)
-      connectingPeer = None
-      peerManager.onPeerDisconnected(c.remoteAddress)
-
-    case PeerDisconnected(remote) =>
-      connectedPeers.retain { case (p, _) => p.address != remote }
-      peerManager.onPeerDisconnected(remote)
-
     case PeerHandshake(address, handshake) =>
       val toUpdate = connectedPeers.filter { case (cp, h) =>
         cp.address == address || h.map(_.fromNonce == handshake.fromNonce).getOrElse(true)
@@ -180,6 +171,15 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
         newCp.handlerRef ! PeerConnectionHandler.CloseConnection
       else
         connectedPeers += newCp -> Some(handshake)
+
+    case CommandFailed(c: Connect) =>
+      log.info("Failed to connect to : " + c.remoteAddress)
+      connectingPeer = None
+      peerManager.onPeerDisconnected(c.remoteAddress)
+
+    case PeerDisconnected(remote) =>
+      connectedPeers.retain { case (p, _) => p.address != remote }
+      peerManager.onPeerDisconnected(remote)
   }
 
   //calls from API / application
