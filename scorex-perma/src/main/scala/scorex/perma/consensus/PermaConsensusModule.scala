@@ -31,6 +31,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
                           (implicit val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ConsensusModule[PermaConsensusBlockData] with ScorexLogging {
 
+  val BlockReward = 1000000
   val InitialTarget = PermaConstants.initialTarget
   val initialTargetPow: BigInt = log2(InitialTarget)
   val TargetRecalculation = PermaConstants.targetRecalculation
@@ -44,30 +45,25 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   implicit val consensusModule: ConsensusModule[PermaConsensusBlockData] = this
 
   private def miningReward(block: Block) =
-    if (blockGenerator(block).publicKey sameElements GenesisCreator.publicKey) 0
-    else 1000000
+    if (blockGenerator(block).publicKey sameElements GenesisCreator.publicKey) 0 else BlockReward
 
   private def blockGenerator(block: Block) = block.signerDataField.value.generator
 
   def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = {
     val f = consensusBlockData(block)
-    val trans = transactionModule.blockStorage.history
-    trans.parent(block) match {
-      case Some(parent) =>
-        val publicKey = blockGenerator(block).publicKey
-        val puzIsValid = f.puz sameElements generatePuz(parent)
-        val targetIsValid = f.target == calcTarget(parent)
-        val ticketIsValid = validate(publicKey, f.puz, f.target, f.ticket, rootHash)
-        if (puzIsValid && targetIsValid && ticketIsValid)
-          true
-        else {
-          log.warn(s"Invalid block: puz=$puzIsValid,target=$targetIsValid && ticket=$ticketIsValid")
-          false
-        }
-
-      case None =>
+    val tm = transactionModule.blockStorage.history
+    tm.parent(block).map { parent =>
+      val publicKey = blockGenerator(block).publicKey
+      val puzIsValid = f.puz sameElements generatePuz(parent)
+      val targetIsValid = f.target == calcTarget(parent)
+      val ticketIsValid = validate(publicKey, f.puz, f.target, f.ticket, rootHash)
+      if (puzIsValid && targetIsValid && ticketIsValid)
         true
-    }
+      else {
+        log.warn(s"Invalid block: puz=$puzIsValid,target=$targetIsValid && ticket=$ticketIsValid")
+        false
+      }
+    }.getOrElse(false)
   }
 
   def feesDistribution(block: Block): Map[Account, Long] =
