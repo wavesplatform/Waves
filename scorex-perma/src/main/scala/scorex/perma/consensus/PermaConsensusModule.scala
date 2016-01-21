@@ -52,7 +52,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = {
     val f = consensusBlockData(block)
     val tm = transactionModule.blockStorage.history
-    tm.parent(block).map { parent =>
+    tm.parent(block).exists { parent =>
       val publicKey = blockGenerator(block).publicKey
       val puzIsValid = f.puz sameElements generatePuz(parent)
       val targetIsValid = f.target == calcTarget(parent)
@@ -60,10 +60,10 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
       if (puzIsValid && targetIsValid && ticketIsValid)
         true
       else {
-        log.warn(s"Invalid block: puz=$puzIsValid,target=$targetIsValid && ticket=$ticketIsValid")
+        log.warn(s"Invalid block: puz=$puzIsValid, target=$targetIsValid && ticket=$ticketIsValid")
         false
       }
-    }.getOrElse(false)
+    }
   }
 
   def feesDistribution(block: Block): Map[Account, Long] =
