@@ -11,6 +11,7 @@ import shapeless.Typeable._
 import scala.collection.JavaConversions._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.util.Random
 
 class PeerSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
 
@@ -43,8 +44,8 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
 
     case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
 
-      //todo: externalize the number, check on receiving, random shuffling
-      val peers = peerManager.knownPeers().take(3)
+      //todo: externalize the number, check on receiving
+      val peers = Random.shuffle(peerManager.knownPeers()).take(3)
       val msg = Message(PeersSpec, Right(peers), None)
       networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
 
