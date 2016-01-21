@@ -177,11 +177,11 @@ class StoredState(val database: DB) extends LagonakiState with ScorexLogging {
     val r = txs.foldLeft(Seq.empty: Seq[Transaction]) { case (acc, atx) =>
       atx match {
         case tx: LagonakiTransaction =>
-          val changes = tx.balanceChanges().foldLeft(Map.empty: Map[Account, Long]) { case (iChanges, (acc, delta)) =>
+          val changes = tx.balanceChanges().foldLeft(Map.empty: Map[Account, Long]) { case (iChanges, (txAcc, delta)) =>
             //update balances sheet
-            val currentChange = iChanges.getOrElse(acc, 0L)
+            val currentChange = iChanges.getOrElse(txAcc, 0L)
             val newChange = currentChange + delta
-            iChanges.updated(acc, newChange)
+            iChanges.updated(txAcc, newChange)
           }
           val check = changes.forall { a =>
             val balance = tmpBalances.getOrElseUpdate(a._1, balances.get(a._1))
