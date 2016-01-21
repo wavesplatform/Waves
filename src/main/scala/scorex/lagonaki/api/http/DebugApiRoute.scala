@@ -44,7 +44,7 @@ case class DebugApiRoute(application: LagonakiApplication)(implicit val context:
     path("state" / Segment) { case blockId =>
       jsonRoute {
         val id: BlockId = Base58.decode(blockId).getOrElse(Array.empty)
-        application.blockStorage.state(Some(id)) match {
+        application.blockStorage.state(id) match {
           case None => Json.obj("error" -> "wrong block id").toString
           case Some(b) => b.toString
         }

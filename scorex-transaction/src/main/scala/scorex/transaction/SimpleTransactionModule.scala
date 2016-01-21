@@ -65,10 +65,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
 
-    override def state(idOpt: Option[BlockId]): Option[StoredState] = idOpt match {
-      case None => Some(currentState)
-      case Some(b) => StoredState(b)
-    }
+    override def state(id: BlockId): Option[StoredState] = super.state(id).map(_.asInstanceOf[StoredState])
 
     override def state: StoredState = currentState
 
@@ -181,7 +178,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     TransactionsBlockField(txs)
   }
 
-  override def isValid(block: Block): Boolean = blockStorage.state(Some(block.referenceField.value)) match {
+  override def isValid(block: Block): Boolean = blockStorage.state(block.referenceField.value) match {
     case Some(blockState) =>
       isValid(block.transactions, blockState)
     case None =>

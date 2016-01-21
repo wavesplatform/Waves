@@ -13,15 +13,7 @@ trait State {
   /**
     * Apply block to current state or revert it, if reversal=true.
     */
-  private[transaction] def processBlock(block: Block, reversal: Boolean): Try[State]
-
-  private[transaction] def processBlock(block: Block, direction: Direction): Try[State] = direction match {
-    case Forward => processBlock(block, reversal = false)
-    case Reversed => processBlock(block, reversal = true)
-  }
-
-  private[transaction] def processBlock(block: Block): Try[State] = processBlock(block, reversal = false)
-
+  private[transaction] def processBlock(block: Block): Try[State]
 
   /**
     * Determine whether a transaction was already processed or not.

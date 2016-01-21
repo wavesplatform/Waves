@@ -21,7 +21,7 @@ import scala.util.Try
   * If no datafolder provided, blockchain lives in RAM (intended for tests only)
   */
 
-class StoredState(database: DB) extends LagonakiState with ScorexLogging {
+class StoredState(val database: DB) extends LagonakiState with ScorexLogging {
 
   private object AccSerializer extends Serializer[Account] {
     override def serialize(dataOutput: DataOutput, a: Account): Unit =
@@ -76,12 +76,11 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
-  override def processBlock(block: Block, reversal: Boolean): Try[State] = Try {
+  override def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactions
     trans foreach { tx =>
-      if (!reversal && includedTx.containsKey(tx.signature)) throw new Exception("Already included tx")
-      else if (!reversal) includedTx.put(tx.signature, block.uniqueId)
-      else includedTx.remove(tx.signature, block.uniqueId)
+      if (includedTx.containsKey(tx.signature)) throw new Exception("Already included tx")
+      else includedTx.put(tx.signature, block.uniqueId)
     }
     val balanceChanges = trans.foldLeft(block.consensusModule.feesDistribution(block)) { case (changes, atx) =>
       atx match {
@@ -89,8 +88,7 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
           tx.balanceChanges().foldLeft(changes) { case (iChanges, (acc, delta)) =>
             //check whether account is watched, add tx to its txs list if so
             val prevTxs = accountTransactions.getOrDefault(acc, Array())
-            if (!reversal) accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
-            else accountTransactions.put(acc, prevTxs.filter(t => !(t.signature sameElements tx.signature)))
+            accountTransactions.put(acc, prevTxs.filter(t => !(t.signature sameElements tx.signature)))
             //update balances sheet
             val currentChange = iChanges.getOrElse(acc, 0L)
             val newChange = currentChange + delta
@@ -104,19 +102,16 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
     balanceChanges.foreach { case (acc, delta) =>
       val balance = Option(balances.get(acc)).getOrElse(0L)
-      val newBalance = if (!reversal) balance + delta else balance - delta
+      val newBalance = balance + delta
       if (newBalance < 0) log.error(s"Account $acc balance $newBalance is negative")
       balances.put(acc, newBalance)
     }
 
-    val newHeight = (if (!reversal) stateHeight() + 1 else stateHeight() - 1).ensuring(_ > 0)
+    val newHeight = stateHeight() + 1
     setStateHeight(newHeight)
     database.commit()
 
-    if (!reversal) StoredState.history.put(Base58.encode(block.uniqueId), database.snapshot())
-    else if(!StoredState.history.contains(Base58.encode(block.referenceField.value))) {
-      StoredState.history.put(Base58.encode(block.referenceField.value), database.snapshot())
-    }
+    StoredState.history.put(Base58.encode(block.uniqueId), database.snapshot())
     this
   }
 
