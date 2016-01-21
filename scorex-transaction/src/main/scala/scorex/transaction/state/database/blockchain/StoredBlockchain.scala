@@ -93,7 +93,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
         blockStorage.writeBlock(h, block).flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
           case Success(_) =>
             database.commit()
-            Seq((block, Forward))
+            Seq(block)
           case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
         }
       } else blockById(parent.value) match {
@@ -113,7 +113,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
             blockStorage.writeBlock(h, block).flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
               case Success(_) =>
                 database.commit()
-                toRollback ++ Seq((block, Forward))
+                Seq(block)
               case Failure(t) =>
                 database.rollback()
                 throw new Error("Error while storing blockchain a change: " + t)

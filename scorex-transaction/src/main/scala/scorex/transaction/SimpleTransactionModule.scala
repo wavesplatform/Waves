@@ -67,9 +67,9 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
     override def state(id: BlockId): Option[StoredState] = super.state(id).map(_.asInstanceOf[StoredState])
 
-    override def state: StoredState = currentState
+    override def state: StoredState = super.state.asInstanceOf[StoredState]
 
-    private val currentState = settings.dataDirOpt match {
+    override val genesisState = settings.dataDirOpt match {
       case Some(dataFolder) =>
         log.debug("DB loaded from {}", dataFolder)
         val db = DBMaker.fileDB(new File(dataFolder + s"/state"))
@@ -80,7 +80,6 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
           .fileMmapEnable()
           .make()
         db.rollback() //clear uncommitted data from possibly invalid last run
-        if (!history.isEmpty) StoredState.history.put(Base58.encode(history.lastBlock.uniqueId), db.snapshot())
         new StoredState(db)
 
       case None => new StoredState(DBMaker.memoryDB().snapshotEnable().make())

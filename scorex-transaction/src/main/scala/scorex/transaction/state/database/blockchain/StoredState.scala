@@ -111,7 +111,6 @@ class StoredState(val database: DB) extends LagonakiState with ScorexLogging {
     setStateHeight(newHeight)
     database.commit()
 
-    StoredState.history.put(Base58.encode(block.uniqueId), database.snapshot())
     this
   }
 
@@ -167,12 +166,4 @@ class StoredState(val database: DB) extends LagonakiState with ScorexLogging {
 
   //for debugging purposes only
   override def toString: String = toJson.toString()
-}
-
-object StoredState {
-
-  val history = TrieMap[String, DB]()
-
-  def apply(id: BlockId): Option[StoredState] = history.get(Base58.encode(id)).map(new StoredState(_))
-
 }

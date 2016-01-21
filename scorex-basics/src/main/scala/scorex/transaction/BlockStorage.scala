@@ -21,13 +21,17 @@ trait BlockStorage extends ScorexLogging {
 
   def state(id: BlockId): Option[State] = stateHistory.get(Base58.encode(id))
 
-  def state: State
+  def state: State = if (history.height() > 0) stateHistory.get(Base58.encode(history.lastBlock.uniqueId)).get
+  else genesisState
+
+  val genesisState: State
 
   //Append block to current state
   def appendBlock(block: Block): Try[Unit] = synchronized {
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
-        state(b.referenceField.value).get.processBlock(b) match {
+        val currentState = if (history.heightOf(b).get != 1) state(b.referenceField.value).get else genesisState
+        currentState.processBlock(b) match {
           case Success(st) => saveState(b.uniqueId, st)
           case Failure(e) => log.error("Unable to process block", e)
         }
