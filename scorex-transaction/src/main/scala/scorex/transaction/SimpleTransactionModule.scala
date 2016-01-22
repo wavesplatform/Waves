@@ -84,7 +84,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     override def state: StoredState = if (history.height() > 0) state(history.lastBlock.uniqueId).get
     else emptyState
 
-    override val emptyState = StoredState(None)
+    override val emptyState = StoredState(getFileName(Array.empty))
 
   }
 
