@@ -1,7 +1,8 @@
 package scorex.transaction
 
+import java.io.File
+
 import com.google.common.primitives.{Bytes, Ints}
-import org.mapdb.DBMaker
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
@@ -18,6 +19,7 @@ import scorex.transaction.state.wallet.Payment
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -63,17 +65,26 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
 
-    private def getFileName(id: BlockId) = settings.dataDirOpt.map(d => d + "/state-" + Base58.encode(id))
+    private def getFileName(id: BlockId): Option[String] = settings.dataDirOpt.map(d => d + "/state-" + Base58.encode(id))
 
-    override def saveState(id: BlockId, state: State): StoredState =
-      state.copyTo(getFileName(id)).asInstanceOf[StoredState]
+    override def copyState(id: BlockId, state: State): StoredState = {
+      val copy = state.copyTo(getFileName(id)).asInstanceOf[StoredState]
+      cache.put(Base58.encode(id), copy)
+      copy
+    }
 
-    override def state(id: BlockId): Option[StoredState] = StoredState(getFileName(id))
+    override def state(id: BlockId): Option[StoredState] = cache.get(Base58.encode(id)) match {
+      case None if getFileName(id).exists(f => new File(f).exists()) =>
+        Some(cache.getOrElseUpdate(Base58.encode(id), StoredState(getFileName(id))))
+      case ot => ot
+    }
+
+    private val cache = TrieMap[String, StoredState]()
 
     override def state: StoredState = if (history.height() > 0) state(history.lastBlock.uniqueId).get
     else emptyState
 
-    override val emptyState = new StoredState(DBMaker.memoryDB().snapshotEnable().make())
+    override val emptyState = StoredState(None)
 
   }
 

@@ -14,7 +14,7 @@ trait BlockStorage extends ScorexLogging {
 
   val history: History
 
-  def saveState(id: BlockId, state: State): State
+  def copyState(id: BlockId, state: State): State
 
   def state(id: BlockId): Option[State]
 
@@ -27,7 +27,7 @@ trait BlockStorage extends ScorexLogging {
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
         val currentState = if (history.heightOf(b).get != 1) state(b.referenceField.value).get else emptyState
-        saveState(b.uniqueId, currentState).processBlock(b)
+        copyState(b.uniqueId, currentState).processBlock(b)
       }
     }
   }

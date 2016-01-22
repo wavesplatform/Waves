@@ -18,10 +18,11 @@ import scala.util.Try
 
 /** Store current balances only, and balances changes within effective balance depth.
   * Store transactions for selected accounts only.
-  * If no datafolder provided, blockchain lives in RAM (intended for tests only)
+  * If no filename provided, blockchain lives in RAM (intended for tests only).
+  *
+  * Use apply method of StoredState object to create new instance
   */
-
-class StoredState(val database: DB) extends LagonakiState with ScorexLogging {
+class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
   private object AccSerializer extends Serializer[Account] {
     override def serialize(dataOutput: DataOutput, a: Account): Unit =
@@ -74,17 +75,8 @@ class StoredState(val database: DB) extends LagonakiState with ScorexLogging {
     null)
 
   //TODO refactor
-  override def copyTo(fileNameOpt: Option[String]): State = StoredState.synchronized {
-    val db: DB = fileNameOpt match {
-      case Some(fileName) =>
-        DBMaker.fileDB(new File(fileName))
-          .closeOnJvmShutdown()
-          .cacheSize(2048)
-          .checksumEnable()
-          .fileMmapEnable()
-          .make()
-      case None => DBMaker.memoryDB().snapshotEnable().make()
-    }
+  override def copyTo(fileNameOpt: Option[String]): State = synchronized {
+    val db: DB = StoredState.makeDb(fileNameOpt)
     db.atomicInteger(StateHeight).set(stateHeight())
     val balancesCopy = db.hashMap[Account, Long](Balances)
 
@@ -103,8 +95,7 @@ class StoredState(val database: DB) extends LagonakiState with ScorexLogging {
     includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
     accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
     db.commit()
-    db.close()
-    StoredState(fileNameOpt).get
+    new StoredState(db)
   }
 
   def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
@@ -208,31 +199,18 @@ class StoredState(val database: DB) extends LagonakiState with ScorexLogging {
 
 object StoredState {
 
+  def apply(fileNameOpt: Option[String]): StoredState = this.synchronized {
+    new StoredState(makeDb(fileNameOpt))
+  }
 
-  private val cache = TrieMap[String, StoredState]()
-
-  def apply(fileNameOpt: Option[String]): Option[StoredState] = this.synchronized {
-    fileNameOpt match {
-      case Some(fileName) =>
-        cache.get(fileName) match {
-          case Some(state) => Some(state)
-          case _ =>
-            val f = new File(fileName)
-            if (f.exists()) {
-              val db = DBMaker.fileDB(new File(fileName))
-                .closeOnJvmShutdown()
-                .cacheSize(2048)
-                .checksumEnable()
-                .fileMmapEnable()
-                .make()
-              val s = new StoredState(db)
-              cache.put(fileName, s)
-              Some(s)
-            } else None
-
-        }
-
-      case None => ???
-    }
+  private[blockchain] def makeDb(DBFileNameOpt: Option[String]) = DBFileNameOpt match {
+    case Some(fileName) =>
+      DBMaker.fileDB(new File(fileName))
+        .closeOnJvmShutdown()
+        .cacheSize(2048)
+        .checksumEnable()
+        .fileMmapEnable()
+        .make()
+    case None => DBMaker.memoryDB().snapshotEnable().make()
   }
 }
