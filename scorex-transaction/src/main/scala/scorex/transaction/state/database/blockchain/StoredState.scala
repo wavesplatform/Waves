@@ -1,6 +1,7 @@
 package scorex.transaction.state.database.blockchain
 
 import java.io.{DataInput, DataOutput, File}
+import java.nio.file.Files
 
 import org.mapdb._
 import play.api.libs.json.{JsNumber, JsObject}
@@ -11,7 +12,6 @@ import scorex.transaction.state.LagonakiState
 import scorex.transaction.{LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
 
-import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
@@ -22,7 +22,7 @@ import scala.util.Try
   *
   * Use apply method of StoredState object to create new instance
   */
-class StoredState(database: DB) extends LagonakiState with ScorexLogging {
+class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiState with ScorexLogging {
 
   private object AccSerializer extends Serializer[Account] {
     override def serialize(dataOutput: DataOutput, a: Account): Unit =
@@ -74,28 +74,14 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
     TxArraySerializer,
     null)
 
-  //TODO refactor
   override def copyTo(fileNameOpt: Option[String]): State = StoredState.synchronized {
-    val db: DB = StoredState.makeDb(fileNameOpt)
-    db.atomicInteger(StateHeight).set(stateHeight())
-    val balancesCopy = db.hashMap[Account, Long](Balances)
-
-    val includedTxCopy: HTreeMap[Array[Byte], Array[Byte]] = db.hashMapCreate(IncludedTx)
-      .keySerializer(Serializer.BYTE_ARRAY)
-      .valueSerializer(Serializer.BYTE_ARRAY)
-      .makeOrGet()
-
-    val accountTransactionsCopy = db.hashMap(
-      WatchedTxs,
-      AccSerializer,
-      TxArraySerializer,
-      null)
-
-    balances.keySet().foreach(key => balancesCopy.put(key, balances(key)))
-    includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
-    accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
-    db.commit()
-    new StoredState(db)
+    (fileNameOpt, dbFileName) match {
+      case (Some(newFileName), Some(oldFileName)) =>
+        Files.copy(new File(oldFileName).toPath, new File(oldFileName).toPath)
+        new StoredState(StoredState.makeDb(fileNameOpt), fileNameOpt)
+      case _ =>
+        new StoredState(database.snapshot(), None)
+    }
   }
 
   def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
@@ -200,7 +186,7 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 object StoredState {
 
   def apply(fileNameOpt: Option[String]): StoredState = this.synchronized {
-    new StoredState(makeDb(fileNameOpt))
+    new StoredState(makeDb(fileNameOpt), fileNameOpt)
   }
 
   private[blockchain] def makeDb(DBFileNameOpt: Option[String]) = DBFileNameOpt match {
