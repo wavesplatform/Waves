@@ -12,6 +12,7 @@ import scorex.transaction.state.LagonakiState
 import scorex.transaction.{LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
 
+import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
@@ -80,7 +81,26 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
         Files.copy(new File(oldFileName).toPath, new File(oldFileName).toPath)
         new StoredState(StoredState.makeDb(fileNameOpt), fileNameOpt)
       case _ =>
-        new StoredState(database.snapshot(), None)
+        val db: DB = StoredState.makeDb(None)
+        db.atomicInteger(StateHeight).set(stateHeight())
+        val balancesCopy = db.hashMap[Account, Long](Balances)
+
+        val includedTxCopy: HTreeMap[Array[Byte], Array[Byte]] = db.hashMapCreate(IncludedTx)
+          .keySerializer(Serializer.BYTE_ARRAY)
+          .valueSerializer(Serializer.BYTE_ARRAY)
+          .makeOrGet()
+
+        val accountTransactionsCopy = db.hashMap(
+          WatchedTxs,
+          AccSerializer,
+          TxArraySerializer,
+          null)
+
+        balances.keySet().foreach(key => balancesCopy.put(key, balances(key)))
+        includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
+        accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
+        db.commit()
+        new StoredState(db, None)
     }
   }
 
