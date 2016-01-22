@@ -75,7 +75,7 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
     null)
 
   //TODO refactor
-  override def copyTo(fileNameOpt: Option[String]): State = synchronized {
+  override def copyTo(fileNameOpt: Option[String]): State = StoredState.synchronized {
     val db: DB = StoredState.makeDb(fileNameOpt)
     db.atomicInteger(StateHeight).set(stateHeight())
     val balancesCopy = db.hashMap[Account, Long](Balances)
