@@ -117,7 +117,7 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
           tx.balanceChanges().foldLeft(changes) { case (iChanges, (acc, delta)) =>
             //check whether account is watched, add tx to its txs list if so
             val prevTxs = accountTransactions.getOrDefault(acc, Array())
-            accountTransactions.put(acc, prevTxs.filter(t => !(t.signature sameElements tx.signature)))
+            accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
             //update balances sheet
             val currentChange = iChanges.getOrElse(acc, 0L)
             val newChange = currentChange + delta
