@@ -16,7 +16,7 @@ import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
 import scorex.transaction.state.wallet.Payment
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils._
 import scorex.wallet.Wallet
 
 import scala.collection.concurrent.TrieMap
@@ -75,7 +75,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
     override def state(id: BlockId): Option[StoredState] = cache.get(Base58.encode(id)) match {
       case None if getFileName(id).exists(f => new File(f).exists()) =>
-        Some(cache.getOrElseUpdate(Base58.encode(id), StoredState(getFileName(id))))
+        untilTimeout(5.seconds)(Some(cache.getOrElseUpdate(Base58.encode(id), StoredState(getFileName(id)))))
       case ot => ot
     }
 

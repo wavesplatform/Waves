@@ -205,9 +205,8 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
 
 object StoredState {
 
-  def apply(fileNameOpt: Option[String]): StoredState = this.synchronized {
-    new StoredState(makeDb(fileNameOpt), fileNameOpt)
-  }
+  def apply(fileNameOpt: Option[String]): StoredState = new StoredState(makeDb(fileNameOpt), fileNameOpt)
+
 
   private[blockchain] def makeDb(DBFileNameOpt: Option[String]) = DBFileNameOpt match {
     case Some(fileName) =>
