@@ -1,44 +1,130 @@
 package scorex.network.peer
 
 import java.net.InetSocketAddress
-
-import scorex.settings.Settings
+import scala.collection.mutable
+import scala.util.Random
+import akka.actor.Actor
+import scorex.app.Application
 import scorex.utils.ScorexLogging
 
-import scala.util.Random
+import scorex.network._
+import scala.collection.JavaConversions._
 
-class PeerManager(settings: Settings) extends ScorexLogging {
+
+class PeerManager(application: Application) extends Actor with ScorexLogging {
+
+  import PeerManager._
+
   private val DatabasePeersAmount = 1000
 
-  def knownPeers(): Seq[InetSocketAddress] = {
-    val knownPeers = PeerDatabaseImpl.knownPeers()
-    log.info("Peers retrieved from database : " + knownPeers)
-    if (knownPeers.size < DatabasePeersAmount) {
-      val allPeers = settings.knownPeers ++ knownPeers
+  private val connectedPeers = mutable.Map[ConnectedPeer, Option[Handshake]]()
+  private var connectingPeer: Option[InetSocketAddress] = None
+
+  private lazy val settings = application.settings
+  private lazy val networkController = application.networkController
+
+  private def knownPeers(): Seq[InetSocketAddress] = {
+    val dbPeers = PeerDatabaseImpl.knownPeers()
+    log.info("Peers retrieved from database : " + dbPeers)
+    if (dbPeers.size < DatabasePeersAmount) {
+      val allPeers = settings.knownPeers ++ dbPeers
       log.info("Peers retrieved including settings : " + allPeers)
       allPeers
-    } else knownPeers
+    } else dbPeers
   }
 
-  def onPeerConnected(peer: InetSocketAddress): Unit =
-    PeerDatabaseImpl.addConnectedPeer(peer)
-
-  def onPeerDisconnected(peer: InetSocketAddress): Unit =
-    PeerDatabaseImpl.removeConnectedPeer(peer)
-
-  def randomPeer(): Option[InetSocketAddress] = {
+  private def randomPeer(): Option[InetSocketAddress] = {
     val peers = knownPeers()
     if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
     else None
   }
 
-  def addPeer(peer: InetSocketAddress): Unit =
-    if (!settings.knownPeers.contains(peer)) PeerDatabaseImpl.addKnownPeer(peer)
 
+  override def receive: Receive = {
+    case AddPeer(address) =>
+      if (!settings.knownPeers.contains(address)) PeerDatabaseImpl.addKnownPeer(address)
+
+    case KnownPeers => sender() ! knownPeers
+
+    case RandomPeer => sender() ! randomPeer()
+
+    case RandomPeers(howMany:Int) => sender() ! Random.shuffle(knownPeers()).take(3)
+
+    case CheckPeers =>
+      if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
+        randomPeer().foreach { address =>
+          if (!connectedPeers.map(_._1.address).contains(address)) {
+            connectingPeer = Some(address)
+            networkController ! NetworkController.ConnectTo(address)
+          }
+        }
+      }
+
+    case Connected(newPeer@ConnectedPeer(remote, _)) =>
+      connectedPeers += newPeer -> None
+      if (connectingPeer.contains(remote)) {
+        log.info(s"Connected to $remote")
+        connectingPeer = None
+      } else {
+        log.info(s"Got incoming connection from $remote")
+      }
+
+    case Handshaked(address, handshake) =>
+      val toUpdate = connectedPeers.filter { case (cp, h) =>
+        cp.address == address || h.map(_.fromNonce == handshake.fromNonce).getOrElse(true)
+      }
+
+      val newCp = toUpdate.find(_._1.address.getAddress.toString == handshake.fromAddress)
+        .getOrElse(toUpdate.head)._1
+
+      toUpdate.keys.foreach(connectedPeers.remove)
+
+      //drop connection to self if occured
+      if (handshake.fromNonce == application.nodeNonce)
+        newCp.handlerRef ! PeerConnectionHandler.CloseConnection
+      else
+        connectedPeers += newCp -> Some(handshake)
+
+    case PeerDisconnected(remote) =>
+      connectedPeers.retain { case (p, _) => p.address != remote }
+
+    case FilterPeers(sendingStrategy: SendingStrategy) =>
+      sender() ! sendingStrategy.choose(connectedPeers.keys.toSeq)
+
+    case GetConnectedPeers =>
+      sender() ! (connectedPeers.values.flatten.toSeq: Seq[Handshake])
+  }
+
+  /*
   def blacklistPeer(peer: InetSocketAddress): Unit = {
     PeerDatabaseImpl.removeConnectedPeer(peer)
     PeerDatabaseImpl.blacklistPeer(peer)
   }
 
-  def isBlacklisted(address: InetSocketAddress): Boolean = PeerDatabaseImpl.isBlacklisted(address)
+  def isBlacklisted(address: InetSocketAddress): Boolean = PeerDatabaseImpl.isBlacklisted(address)*/
+}
+
+object PeerManager {
+
+  case class AddPeer(address: InetSocketAddress)
+
+  case object KnownPeers
+
+  case object RandomPeer
+
+  case class RandomPeers(hawMany:Int)
+
+  case object CheckPeers
+
+  case class Connected(newPeer: ConnectedPeer)
+
+  case class Handshaked(address: InetSocketAddress, handshake: Handshake)
+
+  case class Disconnected(remote: InetSocketAddress)
+
+  case class PeerDisconnected(address: InetSocketAddress)
+
+  case class FilterPeers(sendingStrategy: SendingStrategy)
+
+  case object GetConnectedPeers
 }
