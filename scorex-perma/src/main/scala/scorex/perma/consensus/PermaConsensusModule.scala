@@ -198,7 +198,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
     BigInt(1, h).mod(PermaConstants.n).toLong
   }
 
-  private val targetBuf = TrieMap[Int, BigInt]()
+  private val targetBuf = TrieMap[Array[Byte], BigInt]()
 
   private def calcTarget(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val trans = transactionModule.blockStorage.history
@@ -208,11 +208,10 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
       def calc = {
         val lastAvgDuration: BigInt = trans.averageDelay(block, TargetRecalculation).get
         val newTarget = currentTarget * lastAvgDuration / 1000 / AvgDelay
-        targetBuf.put(height, newTarget)
         log.debug(s"Height: $height, target:$newTarget vs $currentTarget, lastAvgDuration:$lastAvgDuration")
         newTarget
       }
-      targetBuf.getOrElseUpdate(height, calc)
+      targetBuf.getOrElseUpdate(block.uniqueId, calc)
     } else {
       currentTarget
     }
