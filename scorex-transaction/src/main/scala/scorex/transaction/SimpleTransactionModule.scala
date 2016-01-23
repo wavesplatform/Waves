@@ -73,16 +73,19 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
       copy
     }
 
+    private val StateCopyTimeout = 10.seconds
+
     override def state(id: BlockId): Option[StoredState] = cache.get(Base58.encode(id)) match {
       case None if getFileName(id).exists(f => new File(f).exists()) =>
-        untilTimeout(5.seconds)(Some(cache.getOrElseUpdate(Base58.encode(id), StoredState(getFileName(id)))))
+        untilTimeout(StateCopyTimeout)(Some(cache.getOrElseUpdate(Base58.encode(id), StoredState(getFileName(id)))))
       case ot => ot
     }
 
     private val cache = TrieMap[String, StoredState]()
 
-    override def state: StoredState = if (history.height() > 0) state(history.lastBlock.uniqueId).get
-    else emptyState
+    override def state: StoredState = if (history.height() > 0) {
+      untilTimeout(StateCopyTimeout)(state(history.lastBlock.uniqueId).get)
+    } else emptyState
 
     override val emptyState = StoredState(getFileName(Array.empty))
 
