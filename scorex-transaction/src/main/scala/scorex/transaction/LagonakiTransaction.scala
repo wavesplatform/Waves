@@ -37,7 +37,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
 
   //VALIDATE
   def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value =
-    validate(transactionModule.blockStorage.state)
+    validate(transactionModule.blockStorage.state.asInstanceOf[BalanceSheet])
 
   def validate(state: BalanceSheet): ValidationResult.Value
 

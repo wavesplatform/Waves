@@ -25,4 +25,7 @@ trait State {
 
   def copyTo(fileNameOpt: Option[String]): State
 
+  def isValid(txs: Seq[Transaction]): Boolean = validate(txs).size == txs.size
+
+  def validate(txs: Seq[Transaction]): Seq[Transaction]
 }

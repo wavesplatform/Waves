@@ -8,8 +8,7 @@ import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.transaction.state.LagonakiState
-import scorex.transaction.{LagonakiTransaction, State, Transaction}
+import scorex.transaction.{LagonakiState, LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
@@ -164,8 +163,6 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
   override def watchAccountTransactions(account: Account): Unit = accountTransactions.put(account, Array())
 
   override def included(tx: Transaction): Option[BlockId] = Option(includedTx.get(tx.signature))
-
-  def isValid(txs: Seq[Transaction]): Boolean = validate(txs).size == txs.size
 
   //return seq of valid transactions
   def validate(txs: Seq[Transaction]): Seq[Transaction] = {

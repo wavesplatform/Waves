@@ -55,39 +55,60 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
   private val instance = this
 
   override val blockStorage = new BlockStorage {
+    override val MaxRollback: Int = settings.MaxRollback
+
     override val history: History = settings.history match {
       case s: String if s.equalsIgnoreCase("blockchain") =>
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
       case s: String if s.equalsIgnoreCase("blocktree") =>
-        new StoredBlockTree(settings.dataDirOpt, settings.MaxRollback)(consensusModule, instance)
+        new StoredBlockTree(settings.dataDirOpt, MaxRollback)(consensusModule, instance)
       case s =>
         log.error(s"Unknown history storage: $s. Use StoredBlockchain...")
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
 
-    private def getFileName(id: BlockId): Option[String] = settings.dataDirOpt.map(d => d + "/state-" + Base58.encode(id))
 
-    override def copyState(id: BlockId, state: State): StoredState = {
-      val copy = state.copyTo(getFileName(id)).asInstanceOf[StoredState]
-      cache.put(Base58.encode(id), copy)
-      copy
+    override val stateHistory: StateHistory = new StateHistory {
+      private val stateDir: Option[String] = settings.dataDirOpt
+
+      val cache = TrieMap[String, StoredState]()
+
+      private val StateCopyTimeout = 10.seconds
+
+      private def getFileName(id: BlockId): Option[String] = stateDir.map(f => f + "/state-" + key(id))
+
+      private def key(id: BlockId): String = Base58.encode(id)
+
+      override def keySet: Set[BlockId] = stateDir match {
+        case Some(folder) =>
+          val f = new File(folder).listFiles().map(_.getName).toSet.filter(_.startsWith("state-")).map(_.substring(6))
+          f.flatMap(s => Base58.decode(s).toOption)
+        case None => cache.keySet.flatMap(s => Base58.decode(s).toOption).toSet
+      }
+
+      override def copyState(id: BlockId, state: LagonakiState): StoredState = {
+        val copy = state.copyTo(getFileName(id)).asInstanceOf[StoredState]
+        cache.put(key(id), copy)
+        copy
+      }
+
+      override def removeState(id: BlockId): Unit = {
+        cache.remove(key(id))
+        getFileName(id).map(new File(_).delete())
+      }
+
+      override def state(id: BlockId): Option[StoredState] = cache.get(Base58.encode(id)) match {
+        case None if getFileName(id).exists(f => new File(f).exists()) =>
+          untilTimeout(StateCopyTimeout)(Some(cache.getOrElseUpdate(key(id), StoredState(getFileName(id)))))
+        case ot => ot
+      }
+
+      override def state: StoredState = if (history.height() > 0) {
+        untilTimeout(StateCopyTimeout)(state(history.lastBlock.uniqueId).get)
+      } else emptyState
+
+      override val emptyState = StoredState(getFileName(Array.empty))
     }
-
-    private val StateCopyTimeout = 10.seconds
-
-    override def state(id: BlockId): Option[StoredState] = cache.get(Base58.encode(id)) match {
-      case None if getFileName(id).exists(f => new File(f).exists()) =>
-        untilTimeout(StateCopyTimeout)(Some(cache.getOrElseUpdate(Base58.encode(id), StoredState(getFileName(id)))))
-      case ot => ot
-    }
-
-    private val cache = TrieMap[String, StoredState]()
-
-    override def state: StoredState = if (history.height() > 0) {
-      untilTimeout(StateCopyTimeout)(state(history.lastBlock.uniqueId).get)
-    } else emptyState
-
-    override val emptyState = StoredState(getFileName(Array.empty))
 
   }
 
@@ -189,9 +210,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
       false
   }
 
-  override def isValid(transaction: Transaction): Boolean = isValid(transaction, blockStorage.state)
+  //TODO asInstanceOf
+  override def isValid(transaction: Transaction): Boolean =
+    isValid(transaction, blockStorage.state.asInstanceOf[StoredState])
 
-  private def isValid(transactions: Seq[Transaction], state: StoredState): Boolean =
+  private def isValid(transactions: Seq[Transaction], state: State): Boolean =
     transactions.forall(isValid) && state.isValid(transactions)
 
   private def isValid(transaction: Transaction, txState: StoredState): Boolean = transaction match {

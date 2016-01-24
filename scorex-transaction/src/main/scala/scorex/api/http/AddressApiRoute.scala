@@ -10,7 +10,7 @@ import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.state.LagonakiState
+import scorex.transaction.LagonakiState
 import scorex.wallet.Wallet
 import spray.http.MediaTypes._
 import spray.routing.Route

@@ -5,7 +5,7 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.transaction.state.LagonakiState
+import scorex.transaction.LagonakiState
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import spray.routing.Route
 
