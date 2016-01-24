@@ -1,7 +1,7 @@
 package scorex.transaction.state.database.blockchain
 
 import akka.actor.Actor
-import scorex.block.Block.BlockId
+import scorex.crypto.encode.Base58
 import scorex.transaction.BlockStorage
 import scorex.utils.ScorexLogging
 
@@ -18,10 +18,10 @@ class HistoryScavenger(blockStorage: BlockStorage) extends Actor with ScorexLogg
 
   override def receive: Receive = {
     case Unit =>
-      log.info("Remove old states")
-      val lastBlocks: Set[BlockId] = blockStorage.history.lastBlocks(blockStorage.MaxRollback).map(_.uniqueId).toSet
-      val storedStates: Set[BlockId] = blockStorage.stateHistory.keySet
+      val lastBlocks = blockStorage.history.lastBlocks(blockStorage.MaxRollback).map(b => Base58.encode(b.uniqueId)).toSet
+      val storedStates = blockStorage.stateHistory.keySet.map(Base58.encode)
       val diff = storedStates.diff(lastBlocks)
-      diff.foreach(id => blockStorage.stateHistory.removeState(id))
+      log.info("Remove old states: " + diff)
+      diff.flatMap(en => Base58.decode(en).toOption).foreach(id => blockStorage.stateHistory.removeState(id))
   }
 }
