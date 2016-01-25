@@ -11,7 +11,6 @@ import akka.util.Timeout
 import scorex.app.Application
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager
-import scorex.network.peer.PeerManager.Disconnected
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
@@ -135,6 +134,9 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   }
 
   def peerLogic: Receive = {
+    case ConnectTo(remote) =>
+      IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout)
+
     case c@Connected(remote, local) =>
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote, nodeNonce))
@@ -145,7 +147,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
-      peerManager ! Disconnected(c.remoteAddress)
+      peerManager ! PeerManager.Disconnected(c.remoteAddress)
   }
 
   //calls from API / application

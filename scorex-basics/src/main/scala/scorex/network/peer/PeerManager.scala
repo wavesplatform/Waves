@@ -85,8 +85,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       else
         connectedPeers += newCp -> Some(handshake)
 
-    case PeerDisconnected(remote) =>
+    case Disconnected(remote) =>
       connectedPeers.retain { case (p, _) => p.address != remote }
+      if (connectingPeer.contains(remote)) {
+        connectingPeer = None
+      }
 
     case FilterPeers(sendingStrategy: SendingStrategy) =>
       sender() ! sendingStrategy.choose(connectedPeers.keys.toSeq)
@@ -121,8 +124,6 @@ object PeerManager {
   case class Handshaked(address: InetSocketAddress, handshake: Handshake)
 
   case class Disconnected(remote: InetSocketAddress)
-
-  case class PeerDisconnected(address: InetSocketAddress)
 
   case class FilterPeers(sendingStrategy: SendingStrategy)
 

@@ -46,7 +46,7 @@ case class PeerConnectionHandler(application: Application,
       connection ! Close
 
     case cc: ConnectionClosed =>
-      peerManager ! PeerManager.PeerDisconnected(remote)
+      peerManager ! PeerManager.Disconnected(remote)
       log.info("Connection closed to : " + remote + ": " + cc.getErrorCause)
 
     case CloseConnection =>
