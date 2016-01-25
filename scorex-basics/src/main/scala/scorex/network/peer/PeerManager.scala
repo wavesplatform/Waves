@@ -1,14 +1,15 @@
 package scorex.network.peer
 
 import java.net.InetSocketAddress
-import scala.collection.mutable
-import scala.util.Random
+
 import akka.actor.Actor
 import scorex.app.Application
+import scorex.network._
 import scorex.utils.ScorexLogging
 
-import scorex.network._
 import scala.collection.JavaConversions._
+import scala.collection.mutable
+import scala.util.Random
 
 
 class PeerManager(application: Application) extends Actor with ScorexLogging {
@@ -39,8 +40,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     else None
   }
 
-
-  override def receive: Receive = {
+  private def peerLists: Receive = {
     case AddPeer(address) =>
       if (!settings.knownPeers.contains(address)) PeerDatabaseImpl.addKnownPeer(address)
 
@@ -48,18 +48,18 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case RandomPeer => sender() ! randomPeer()
 
-    case RandomPeers(howMany:Int) => sender() ! Random.shuffle(knownPeers()).take(3)
+    case RandomPeers(howMany: Int) => sender() ! Random.shuffle(knownPeers()).take(3)
 
-    case CheckPeers =>
-      if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
-        randomPeer().foreach { address =>
-          if (!connectedPeers.map(_._1.address).contains(address)) {
-            connectingPeer = Some(address)
-            networkController ! NetworkController.ConnectTo(address)
-          }
-        }
-      }
+    case FilterPeers(sendingStrategy: SendingStrategy) =>
+      sender() ! sendingStrategy.choose(connectedPeers.keys.toSeq)
+  }
 
+  private def apiInterface: Receive = {
+    case GetConnectedPeers =>
+      sender() ! (connectedPeers.values.flatten.toSeq: Seq[Handshake])
+  }
+
+  private def peerCycle: Receive = {
     case Connected(newPeer@ConnectedPeer(remote, _)) =>
       connectedPeers += newPeer -> None
       if (connectingPeer.contains(remote)) {
@@ -79,7 +79,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
       toUpdate.keys.foreach(connectedPeers.remove)
 
-      //drop connection to self if occured
+      //drop connection to self if occurred
       if (handshake.fromNonce == application.nodeNonce)
         newCp.handlerRef ! PeerConnectionHandler.CloseConnection
       else
@@ -90,13 +90,19 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       if (connectingPeer.contains(remote)) {
         connectingPeer = None
       }
-
-    case FilterPeers(sendingStrategy: SendingStrategy) =>
-      sender() ! sendingStrategy.choose(connectedPeers.keys.toSeq)
-
-    case GetConnectedPeers =>
-      sender() ! (connectedPeers.values.flatten.toSeq: Seq[Handshake])
   }
+
+  override def receive: Receive = ({
+    case CheckPeers =>
+      if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
+        randomPeer().foreach { address =>
+          if (!connectedPeers.map(_._1.address).contains(address)) {
+            connectingPeer = Some(address)
+            networkController ! NetworkController.ConnectTo(address)
+          }
+        }
+      }
+  }: Receive) orElse peerLists orElse apiInterface orElse peerCycle
 
   /*
   def blacklistPeer(peer: InetSocketAddress): Unit = {
@@ -115,7 +121,7 @@ object PeerManager {
 
   case object RandomPeer
 
-  case class RandomPeers(hawMany:Int)
+  case class RandomPeers(hawMany: Int)
 
   case object CheckPeers
 
