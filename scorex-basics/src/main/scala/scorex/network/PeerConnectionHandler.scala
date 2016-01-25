@@ -52,6 +52,12 @@ case class PeerConnectionHandler(application: Application,
     case CloseConnection =>
       log.info(s"Enforced to abort communication with: " + remote)
       connection ! Close
+
+    case CommandFailed(cmd: Tcp.Command) =>
+      log.info("Failed to execute command : " + cmd)
+
+    case nonsense: Any =>
+      log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
   }
 
   private def processOwnHandshake(newCycle: Receive): Receive = ({
@@ -123,11 +129,6 @@ case class PeerConnectionHandler(application: Application,
             true
         }
       }
-
-    case CommandFailed(cmd: Tcp.Command) =>
-      log.info("Failed to execute command : " + cmd)
-
-    case nonsense: Any => log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
   }
 
   def workingCycle: Receive = workingCycleLocalInterface orElse workingCycleRemoteInterface orElse processErrors
