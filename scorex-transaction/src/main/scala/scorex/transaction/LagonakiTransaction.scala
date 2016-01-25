@@ -43,7 +43,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
 
   def involvedAmount(account: Account): Long
 
-  def balanceChanges(): Map[Account, Long]
+  def balanceChanges(): Seq[(Account, Long)]
 
   override def equals(other: Any): Boolean = other match {
     case tx: LagonakiTransaction => signature.sameElements(tx.signature)
