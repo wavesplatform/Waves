@@ -73,9 +73,11 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     }.getOrElse(true).ensuring(_ == true, "Declared address isn't valid")
   }
 
-  lazy val externalAddress = settings.declaredAddress.map(InetAddress.getByName).orElse {
-    if (settings.upnpEnabled) application.upnp.externalAddress else None
-  }
+  lazy val externalAddress = settings.declaredAddress
+    .flatMap(s => Try(InetAddress.getByName(s)).toOption)
+    .orElse {
+      if (settings.upnpEnabled) application.upnp.externalAddress else None
+    }
 
   externalAddress.foreach { declaredAddress =>
     peerManager ! PeerManager.AddPeer(new InetSocketAddress(declaredAddress, settings.port))
