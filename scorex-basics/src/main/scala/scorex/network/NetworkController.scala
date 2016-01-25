@@ -7,7 +7,6 @@ import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
-
 import scorex.app.Application
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager
@@ -165,7 +164,8 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     case CommandFailed(cmd: Tcp.Command) =>
       log.info("Failed to execute command : " + cmd)
 
-    case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
+    case nonsense: Any =>
+      log.warn(s"NetworkController: got something strange $nonsense")
   }
 }
 
@@ -180,5 +180,6 @@ object NetworkController {
 
   case object ShutdownNetwork
 
-  case class ConnectTo(address:InetSocketAddress)
+  case class ConnectTo(address: InetSocketAddress)
+
 }
