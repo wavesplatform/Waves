@@ -5,15 +5,19 @@ import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
+import akka.pattern.ask
+import akka.util.Timeout
+
 import scorex.app.Application
 import scorex.network.message.{Message, MessageSpec}
+import scorex.network.peer.PeerManager
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.{Failure, Success, Try}
 
 /**
   * Control all network interaction
@@ -25,15 +29,14 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   private implicit val system = context.system
 
+  private implicit val timeout = Timeout(5.seconds)
+
   private lazy val settings = application.settings
   private lazy val peerManager = application.peerManager
 
-  private val connectedPeers = mutable.Map[ConnectedPeer, Option[Handshake]]()
-  private var connectingPeer: Option[InetSocketAddress] = None
-
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
-  lazy val nodeNonce: Long = (Random.nextInt() + 1000) * Random.nextInt() + Random.nextInt()
+  private lazy val nodeNonce = application.nodeNonce
 
   val handshakeTemplate = Handshake(application.applicationName,
     application.appVersion,
@@ -76,7 +79,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   }
 
   externalAddress.foreach { declaredAddress =>
-    peerManager.addPeer(new InetSocketAddress(declaredAddress, settings.port))
+    peerManager ! PeerManager.AddPeer(new InetSocketAddress(declaredAddress, settings.port))
   }
 
   log.info(s"Declared address: ${settings.declaredAddress}")
@@ -93,7 +96,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   private def bindingLogic: Receive = {
     case b@Bound(localAddr) =>
       log.info("Successfully bound to the port " + settings.port)
-      context.system.scheduler.schedule(200.millis, 3.seconds)(self ! CheckPeers)
+      context.system.scheduler.schedule(200.millis, 3.seconds)(peerManager ! PeerManager.CheckPeers)
 
     case CommandFailed(_: Bind) =>
       log.error("Network port " + settings.port + " already in use!")
@@ -125,72 +128,37 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       }
 
     case SendToNetwork(message, sendingStrategy) =>
-      sendingStrategy.choose(connectedPeers.keys.toSeq).foreach(_.handlerRef ! message)
+      (peerManager ? PeerManager.FilterPeers(sendingStrategy))
+        .map(_.asInstanceOf[Seq[ConnectedPeer]])
+        .foreach(_.foreach(_.handlerRef ! message))
   }
 
   def peerLogic: Receive = {
-    case CheckPeers =>
-      if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
-        peerManager.randomPeer().foreach { peer =>
-          if (!connectedPeers.map(_._1.address).contains(peer)) {
-            connectingPeer = Some(peer)
-            IO(Tcp) ! Connect(peer, localAddress = None, timeout = connTimeout)
-          }
-        }
-      }
+    case ConnectTo(remote) =>
+      IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout)
 
     case c@Connected(remote, local) =>
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote, nodeNonce))
       connection ! Register(handler)
       val newPeer = new ConnectedPeer(remote, handler)
-      connectedPeers += newPeer -> None
-
       newPeer.handlerRef ! handshakeTemplate.copy(time = System.currentTimeMillis() / 1000)
-
-      if (connectingPeer.contains(remote)) {
-        log.info(s"Connected to $remote, local is: $local")
-        connectingPeer = None
-        peerManager.onPeerConnected(remote)
-      } else {
-        log.info(s"Got incoming connection from $remote")
-      }
-
-    case PeerHandshake(address, handshake) =>
-      val toUpdate = connectedPeers.filter { case (cp, h) =>
-        cp.address == address || h.map(_.fromNonce == handshake.fromNonce).getOrElse(true)
-      }
-
-      val newCp = toUpdate.find(_._1.address.getAddress.toString == handshake.fromAddress)
-        .getOrElse(toUpdate.head)._1
-
-      toUpdate.keys.foreach(connectedPeers.remove)
-
-      //drop connection to self if occured
-      if (handshake.fromNonce == nodeNonce)
-        newCp.handlerRef ! PeerConnectionHandler.CloseConnection
-      else
-        connectedPeers += newCp -> Some(handshake)
+      peerManager ! PeerManager.Connected(newPeer)
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
-      connectingPeer = None
-      peerManager.onPeerDisconnected(c.remoteAddress)
-
-    case PeerDisconnected(remote) =>
-      connectedPeers.retain { case (p, _) => p.address != remote }
-      peerManager.onPeerDisconnected(remote)
+      peerManager ! PeerManager.Disconnected(c.remoteAddress)
   }
 
   //calls from API / application
   def interfaceCalls: Receive = {
     case ShutdownNetwork =>
       log.info("Going to shutdown all connections & unbind port")
-      connectedPeers.keys.foreach(_.handlerRef ! PeerConnectionHandler.CloseConnection)
+      (peerManager ? PeerManager.FilterPeers(Broadcast))
+        .map(_.asInstanceOf[Seq[ConnectedPeer]])
+        .foreach(_.foreach(_.handlerRef ! PeerConnectionHandler.CloseConnection))
       self ! Unbind
       context stop self
-
-    case GetConnectedPeers => sender() ! (connectedPeers.values.flatten.toSeq: Seq[Handshake])
   }
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse interfaceCalls orElse {
@@ -210,14 +178,7 @@ object NetworkController {
 
   case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
 
-  private case object CheckPeers
-
   case object ShutdownNetwork
 
-  case object GetConnectedPeers
-
-  case class PeerDisconnected(address: InetSocketAddress)
-
-  case class PeerHandshake(address: InetSocketAddress, handshake: Handshake)
-
+  case class ConnectTo(address:InetSocketAddress)
 }

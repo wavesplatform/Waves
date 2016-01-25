@@ -2,20 +2,26 @@ package scorex.network
 
 import java.net.{InetSocketAddress, NetworkInterface}
 
+import akka.pattern.ask
+import akka.util.Timeout
 import scorex.app.Application
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.Message
+import scorex.network.peer.PeerManager
+import scorex.network.peer.PeerManager.RandomPeers
 import scorex.utils.ScorexLogging
 import shapeless.Typeable._
 
 import scala.collection.JavaConversions._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Random
+
 
 class PeerSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   import application.basicMessagesSpecsRepo._
+
+  private implicit val timeout = Timeout(5.seconds)
 
   override val messageSpecs = Seq(GetPeersSpec, PeersSpec)
   override val networkControllerRef = application.networkController
@@ -39,15 +45,19 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
       if msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
 
       peers.foreach { isa =>
-        if (!own.exists(_.sameElements(isa.getAddress.getAddress))) peerManager.addPeer(isa)
+        if (!own.exists(_.sameElements(isa.getAddress.getAddress)))
+          peerManager ! PeerManager.AddPeer(isa)
       }
 
     case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
 
       //todo: externalize the number, check on receiving
-      val peers = Random.shuffle(peerManager.knownPeers()).take(3)
-      val msg = Message(PeersSpec, Right(peers), None)
-      networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
+      (peerManager ? RandomPeers(3))
+        .mapTo[Seq[InetSocketAddress]]
+        .foreach { peers =>
+          val msg = Message(PeersSpec, Right(peers), None)
+          networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
+        }
 
     case nonsense: Any => log.warn(s"PeerSynchronizer: got something strange $nonsense")
   }

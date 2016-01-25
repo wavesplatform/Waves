@@ -8,7 +8,8 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.json.{JsString, Json}
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.lagonaki.server.LagonakiApplication
-import scorex.network.{Handshake, NetworkController}
+import scorex.network.Handshake
+import scorex.network.peer.PeerManager
 import spray.http.MediaTypes._
 import spray.routing.Route
 
@@ -33,13 +34,15 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
     get {
       respondWithMediaType(`application/json`) {
         onComplete {
-          (application.networkController ? NetworkController.GetConnectedPeers).map { handshakes =>
-            val peerData = Json.arr(handshakes.asInstanceOf[Seq[Handshake]].map { handshake =>
-              val s = handshake.fromAddress.toString + ":" + handshake.fromPort + "::" + handshake.fromNonce
-              JsString(s)
-            })
-            Json.obj("peers" -> peerData).toString()
-          }
+          (application.peerManager ? PeerManager.GetConnectedPeers)
+            .mapTo[Seq[Handshake]]
+            .map { handshakes =>
+              val peerData = Json.arr(handshakes.map { handshake =>
+                val s = handshake.fromAddress.toString + ":" + handshake.fromPort + "::" + handshake.fromNonce
+                JsString(s)
+              })
+              Json.obj("peers" -> peerData).toString()
+            }
         } {
           case Success(value) => complete(value)
           case Failure(ex) => failWith(ex)
