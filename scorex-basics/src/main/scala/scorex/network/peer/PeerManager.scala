@@ -42,9 +42,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def peerLists: Receive = {
     case AddPeer(address) =>
-      if (!settings.knownPeers.contains(address)) PeerDatabaseImpl.addKnownPeer(address)
+      if (!knownPeers().contains(address)) PeerDatabaseImpl.addKnownPeer(address)
 
-    case KnownPeers => sender() ! knownPeers
+    case KnownPeers => sender() ! knownPeers()
 
     case RandomPeer => sender() ! randomPeer()
 
