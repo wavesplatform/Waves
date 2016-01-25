@@ -16,6 +16,7 @@ import spray.can.Http
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.runtime.universe.Type
+import scala.util.Random
 
 trait Application extends ScorexLogging {
   val ApplicationNameLimit = 50
@@ -43,12 +44,14 @@ trait Application extends ScorexLogging {
   lazy val basicMessagesSpecsRepo = new BasicMessagesRepo()
 
   //p2p
+  lazy val nodeNonce: Long = (Random.nextInt() + 1000) * Random.nextInt() + Random.nextInt()
+
   lazy val upnp = new UPnP(settings)
   if (settings.upnpEnabled) upnp.addPort(settings.port)
 
   lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
 
-  lazy val peerManager = new PeerManager(settings)
+  lazy val peerManager = actorSystem.actorOf(Props(classOf[PeerManager], this))
 
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this), "networkController")
   lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGenerator], this), "blockGenerator")

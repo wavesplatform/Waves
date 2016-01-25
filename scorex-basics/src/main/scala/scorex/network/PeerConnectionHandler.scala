@@ -8,7 +8,8 @@ import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
 import scorex.app.Application
-import scorex.network.NetworkController.PeerHandshake
+import scorex.network.peer.PeerManager
+import scorex.network.peer.PeerManager.Handshaked
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success}
@@ -33,6 +34,8 @@ case class PeerConnectionHandler(application: Application,
 
   private lazy val networkControllerRef: ActorRef = application.networkController
 
+  private lazy val peerManager: ActorRef = application.peerManager
+
   val selfPeer = new ConnectedPeer(remote, self)
 
   private def processErrors: Receive = {
@@ -43,7 +46,7 @@ case class PeerConnectionHandler(application: Application,
       connection ! Close
 
     case cc: ConnectionClosed =>
-      networkControllerRef ! NetworkController.PeerDisconnected(remote)
+      peerManager ! PeerManager.Disconnected(remote)
       log.info("Connection closed to : " + remote + ": " + cc.getErrorCause)
 
     case CloseConnection =>
@@ -74,7 +77,7 @@ case class PeerConnectionHandler(application: Application,
         case Success(handshake) =>
           if (handshake.fromNonce != ownNonce) {
             connection ! Write(HandShakeAck.bytesAsByteString)
-            networkControllerRef ! PeerHandshake(remote, handshake)
+            peerManager ! Handshaked(remote, handshake)
             log.info(s"Got a Handshake from $remote")
             context become newCycle
           } else {
