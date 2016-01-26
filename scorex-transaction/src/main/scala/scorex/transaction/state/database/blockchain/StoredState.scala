@@ -1,7 +1,6 @@
 package scorex.transaction.state.database.blockchain
 
 import java.io.{DataInput, DataOutput, File}
-import java.nio.file.Files
 
 import org.mapdb._
 import play.api.libs.json.{JsNumber, JsObject}
@@ -75,32 +74,26 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     null)
 
   override def copyTo(fileNameOpt: Option[String]): State = StoredState.synchronized {
-    (fileNameOpt, dbFileName) match {
-      case (Some(newFileName), Some(oldFileName)) =>
-        Files.copy(new File(oldFileName).toPath, new File(oldFileName).toPath)
-        new StoredState(StoredState.makeDb(fileNameOpt), fileNameOpt)
-      case _ =>
-        val db: DB = StoredState.makeDb(None)
-        db.atomicInteger(StateHeight).set(stateHeight())
-        val balancesCopy = db.hashMap[Account, Long](Balances)
+    val db: DB = StoredState.makeDb(fileNameOpt)
+    db.atomicInteger(StateHeight).set(stateHeight())
+    val balancesCopy = db.hashMap[Account, Long](Balances)
 
-        val includedTxCopy: HTreeMap[Array[Byte], Array[Byte]] = db.hashMapCreate(IncludedTx)
-          .keySerializer(Serializer.BYTE_ARRAY)
-          .valueSerializer(Serializer.BYTE_ARRAY)
-          .makeOrGet()
+    val includedTxCopy: HTreeMap[Array[Byte], Array[Byte]] = db.hashMapCreate(IncludedTx)
+      .keySerializer(Serializer.BYTE_ARRAY)
+      .valueSerializer(Serializer.BYTE_ARRAY)
+      .makeOrGet()
 
-        val accountTransactionsCopy = db.hashMap(
-          WatchedTxs,
-          AccSerializer,
-          TxArraySerializer,
-          null)
+    val accountTransactionsCopy = db.hashMap(
+      WatchedTxs,
+      AccSerializer,
+      TxArraySerializer,
+      null)
 
-        balances.keySet().foreach(key => balancesCopy.put(key, balances(key)))
-        includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
-        accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
-        db.commit()
-        new StoredState(db, None)
-    }
+    balances.keySet().foreach(key => balancesCopy.put(key, balances(key)))
+    includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
+    accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
+    db.commit()
+    new StoredState(db, None)
   }
 
   def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
