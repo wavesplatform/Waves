@@ -155,6 +155,8 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     balance
   }
 
+  def totalBalance(): Long = balances.keySet().toList.map(i => balances.get(i)).sum
+
   override def accountTransactions(account: Account): Array[LagonakiTransaction] =
     Option(accountTransactions.get(account)).getOrElse(Array())
 
