@@ -136,7 +136,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     case c@Connected(remote, local) =>
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote, nodeNonce))
-      connection ! Register(handler)
+      connection ! Register(handler, keepOpenOnPeerClosed = false, useResumeWriting = true)
       val newPeer = new ConnectedPeer(remote, handler)
       newPeer.handlerRef ! handshakeTemplate.copy(time = System.currentTimeMillis() / 1000)
       peerManager ! PeerManager.Connected(newPeer)
