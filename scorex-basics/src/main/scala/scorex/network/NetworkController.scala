@@ -39,8 +39,8 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   val handshakeTemplate = Handshake(application.applicationName,
     application.appVersion,
-    ownAddress.toString,
-    settings.port,
+    ownSocketAddress.getAddress.toString,
+    ownSocketAddress.getPort,
     nodeNonce,
     0
   )
@@ -73,22 +73,21 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     }.getOrElse(true).ensuring(_ == true, "Declared address isn't valid")
   }
 
-  lazy val externalAddress = settings.declaredAddress
+  lazy val externalSocketAddress = settings.declaredAddress
     .flatMap(s => Try(InetAddress.getByName(s)).toOption)
     .orElse {
       if (settings.upnpEnabled) application.upnp.externalAddress else None
-    }
+    }.map(ia => new InetSocketAddress(ia, application.settings.port))
 
   //an address to send to peers
-  lazy val ownAddress = externalAddress.getOrElse(localAddress.getAddress)
+  lazy val ownSocketAddress = externalSocketAddress.getOrElse(localAddress)
 
-  log.info(s"Declared address: $ownAddress")
+  log.info(s"Declared address: $ownSocketAddress")
 
   lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
   lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
 
   IO(Tcp) ! Bind(self, localAddress)
-
 
   private def bindingLogic: Receive = {
     case b@Bound(localAddr) =>
