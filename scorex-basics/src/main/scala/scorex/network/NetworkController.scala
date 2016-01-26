@@ -92,7 +92,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   private def bindingLogic: Receive = {
     case b@Bound(localAddr) =>
       log.info("Successfully bound to the port " + settings.port)
-      context.system.scheduler.schedule(200.millis, 3.seconds)(peerManager ! PeerManager.CheckPeers)
+      context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! PeerManager.CheckPeers)
 
     case CommandFailed(_: Bind) =>
       log.error("Network port " + settings.port + " already in use!")

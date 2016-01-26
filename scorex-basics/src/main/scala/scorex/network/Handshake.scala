@@ -61,10 +61,3 @@ object Handshake extends ScorexLogging {
     Failure(t)
   }
 }
-
-
-object HandShakeAck {
-  val bytes: Array[Byte] = Array(0: Byte, 44: Byte, 11: Byte, 33: Byte)
-  val bytesAsByteString = ByteString(bytes)
-  val messageSize = bytes.length
-}

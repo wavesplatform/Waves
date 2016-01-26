@@ -22,6 +22,10 @@ case class ConnectedPeer(address: InetSocketAddress, handlerRef: ActorRef) {
   override def equals(obj: scala.Any): Boolean = obj.cast[ConnectedPeer].exists(_.address == this.address)
 }
 
+
+case object Ack extends Event
+
+
 //todo: timeout on Ack waiting
 case class PeerConnectionHandler(application: Application,
                                  connection: ActorRef,
@@ -30,13 +34,14 @@ case class PeerConnectionHandler(application: Application,
 
   import PeerConnectionHandler._
 
-  context watch connection
-
   private lazy val networkControllerRef: ActorRef = application.networkController
 
   private lazy val peerManager: ActorRef = application.peerManager
 
   val selfPeer = new ConnectedPeer(remote, self)
+
+
+  context watch connection
 
   override def preStart: Unit = connection ! ResumeReading
 
@@ -62,34 +67,27 @@ case class PeerConnectionHandler(application: Application,
       connection ! ResumeReading
   }
 
-  private def processOwnHandshake(newCycle: Receive): Receive = ({
+  private var handshakeGot = false
+  private var handshakeSent = false
+
+  private object HandshakeCheck
+
+  private def handshake: Receive = ({
     case h: Handshake =>
       connection ! Write(ByteString(h.bytes))
       log.info(s"Handshake sent to $remote")
-      context become newCycle
-  }: Receive) orElse processErrors(CommunicationState.SendingHandshake.toString)
+      handshakeSent = true
+      self ! HandshakeCheck
 
-  private def processHandshakeAck(newCycle: Receive): Receive = ({
-    case Received(data) if data.length == HandShakeAck.messageSize =>
-      if (data == HandShakeAck.bytes.toSeq) {
-        log.info(s"Got Handshake Ack from $remote")
-        connection ! ResumeReading
-        context become newCycle
-      } else {
-        connection ! Close
-      }
-  }: Receive) orElse processErrors(CommunicationState.AwaitingHandshakeAck.toString)
-
-  private def processHandshake(newCycle: Receive): Receive = ({
-    case Received(data) if data.length > HandShakeAck.messageSize =>
+    case Received(data) =>
       Handshake.parse(data.toArray) match {
         case Success(handshake) =>
           if (handshake.fromNonce != ownNonce) {
-            connection ! Write(HandShakeAck.bytesAsByteString)
             peerManager ! Handshaked(remote, handshake)
             log.info(s"Got a Handshake from $remote")
             connection ! ResumeReading
-            context become newCycle
+            handshakeGot = true
+            self ! HandshakeCheck
           } else {
             connection ! Close
           }
@@ -97,7 +95,14 @@ case class PeerConnectionHandler(application: Application,
           log.info(s"Error during parsing a handshake: $t")
           connection ! Close
       }
+
+    case HandshakeCheck =>
+      if (handshakeGot && handshakeSent) {
+        connection ! ResumeReading
+        context become workingCycle
+      }
   }: Receive) orElse processErrors(CommunicationState.AwaitingHandshake.toString)
+
 
   def workingCycleLocalInterface: Receive = {
     case msg: message.Message[_] =>
@@ -133,22 +138,20 @@ case class PeerConnectionHandler(application: Application,
             true
         }
       }
-      connection ! ResumeReading
+      connection ! Write(data, Ack)
   }
 
   def workingCycle: Receive =
     workingCycleLocalInterface orElse
       workingCycleRemoteInterface orElse
       processErrors(CommunicationState.WorkingCycle.toString) orElse ({
+      case Ack =>
+        connection ! ResumeReading
       case nonsense: Any =>
         log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
     }: Receive)
 
-  override def receive: Receive =
-    processOwnHandshake(
-      processHandshakeAck(processHandshake(workingCycle))
-        orElse processHandshake(processHandshakeAck(workingCycle))
-    ) orElse processHandshake(processOwnHandshake(processHandshakeAck(workingCycle)))
+  override def receive: Receive = handshake
 }
 
 object PeerConnectionHandler {
