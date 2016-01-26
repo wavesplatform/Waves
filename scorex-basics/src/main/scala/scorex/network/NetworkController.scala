@@ -7,7 +7,6 @@ import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
-
 import scorex.app.Application
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager
@@ -74,9 +73,11 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     }.getOrElse(true).ensuring(_ == true, "Declared address isn't valid")
   }
 
-  lazy val externalAddress = settings.declaredAddress.map(InetAddress.getByName).orElse {
-    if (settings.upnpEnabled) application.upnp.externalAddress else None
-  }
+  lazy val externalAddress = settings.declaredAddress
+    .flatMap(s => Try(InetAddress.getByName(s)).toOption)
+    .orElse {
+      if (settings.upnpEnabled) application.upnp.externalAddress else None
+    }
 
   externalAddress.foreach { declaredAddress =>
     peerManager ! PeerManager.AddPeer(new InetSocketAddress(declaredAddress, settings.port))
@@ -165,7 +166,8 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     case CommandFailed(cmd: Tcp.Command) =>
       log.info("Failed to execute command : " + cmd)
 
-    case nonsense: Any => log.warn(s"NetworkController: got something strange $nonsense")
+    case nonsense: Any =>
+      log.warn(s"NetworkController: got something strange $nonsense")
   }
 }
 
@@ -180,5 +182,6 @@ object NetworkController {
 
   case object ShutdownNetwork
 
-  case class ConnectTo(address:InetSocketAddress)
+  case class ConnectTo(address: InetSocketAddress)
+
 }
