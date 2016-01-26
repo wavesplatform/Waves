@@ -43,7 +43,7 @@ case class PeerConnectionHandler(application: Application,
       log.info(s"Write failed : $w " + remote + s" in state $stateName")
       //todo: blacklisting
       //peerManager.blacklistPeer(remote)
-      connection ! Close
+      //connection ! Close
 
     case cc: ConnectionClosed =>
       peerManager ! PeerManager.Disconnected(remote)
