@@ -14,12 +14,11 @@
   "rpcPort": 9085,
   "rpcAllowed": [],
   "maxRollback": 100,
-  "blockGenerationDelay": 0,
   "offlineGeneration": true,
   "perma": {
     "isTrustedDealer": true,
     "treeDir": "/opt/scorex/data/tree",
     "authDataStorage": "permatree.db"
   },
-  "blockGenerationDelay": 5000
+  "blockGenerationDelay": 60000
 }
