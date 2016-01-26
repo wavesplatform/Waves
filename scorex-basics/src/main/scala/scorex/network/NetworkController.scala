@@ -79,19 +79,15 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       if (settings.upnpEnabled) application.upnp.externalAddress else None
     }
 
-  externalAddress.foreach { declaredAddress =>
-    peerManager ! PeerManager.AddPeer(new InetSocketAddress(declaredAddress, settings.port))
-  }
+  //an address to send to peers
+  lazy val ownAddress = externalAddress.getOrElse(localAddress.getAddress)
 
-  log.info(s"Declared address: ${settings.declaredAddress}")
+  log.info(s"Declared address: $ownAddress")
 
   lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
   lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
 
   IO(Tcp) ! Bind(self, localAddress)
-
-  //address to send to ther peers
-  lazy val ownAddress = externalAddress.getOrElse(localAddress.getAddress)
 
 
   private def bindingLogic: Receive = {

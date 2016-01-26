@@ -38,26 +38,23 @@ case class PeerConnectionHandler(application: Application,
 
   val selfPeer = new ConnectedPeer(remote, self)
 
-  private def processErrors: Receive = {
+  private def processErrors(stateName: String): Receive = {
     case CommandFailed(w: Write) =>
-      log.info(s"Write failed : $w " + remote)
+      log.info(s"Write failed : $w " + remote + s" in state $stateName")
       //todo: blacklisting
       //peerManager.blacklistPeer(remote)
       connection ! Close
 
     case cc: ConnectionClosed =>
       peerManager ! PeerManager.Disconnected(remote)
-      log.info("Connection closed to : " + remote + ": " + cc.getErrorCause)
+      log.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
 
     case CloseConnection =>
-      log.info(s"Enforced to abort communication with: " + remote)
+      log.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
       connection ! Close
 
     case CommandFailed(cmd: Tcp.Command) =>
-      log.info("Failed to execute command : " + cmd)
-
-    case nonsense: Any =>
-      log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
+      log.info("Failed to execute command : " + cmd + s" in state $stateName")
   }
 
   private def processOwnHandshake(newCycle: Receive): Receive = ({
@@ -65,7 +62,7 @@ case class PeerConnectionHandler(application: Application,
       connection ! Write(ByteString(h.bytes))
       log.info(s"Handshake sent to $remote")
       context become newCycle
-  }: Receive) orElse processErrors
+  }: Receive) orElse processErrors(CommunicationState.SendingHandshake.toString)
 
   private def processHandshakeAck(newCycle: Receive): Receive = ({
     case Received(data) if data.length == HandShakeAck.messageSize =>
@@ -75,7 +72,7 @@ case class PeerConnectionHandler(application: Application,
       } else {
         connection ! Close
       }
-  }: Receive) orElse processErrors
+  }: Receive) orElse processErrors(CommunicationState.AwaitingHandshakeAck.toString)
 
   private def processHandshake(newCycle: Receive): Receive = ({
     case Received(data) if data.length > HandShakeAck.messageSize =>
@@ -93,7 +90,7 @@ case class PeerConnectionHandler(application: Application,
           log.info(s"Error during parsing a handshake: $t")
           connection ! Close
       }
-  }: Receive) orElse processErrors
+  }: Receive) orElse processErrors(CommunicationState.AwaitingHandshake.toString)
 
   def workingCycleLocalInterface: Receive = {
     case msg: message.Message[_] =>
@@ -131,7 +128,13 @@ case class PeerConnectionHandler(application: Application,
       }
   }
 
-  def workingCycle: Receive = workingCycleLocalInterface orElse workingCycleRemoteInterface orElse processErrors
+  def workingCycle: Receive =
+    workingCycleLocalInterface orElse
+      workingCycleRemoteInterface orElse
+      processErrors(CommunicationState.WorkingCycle.toString) orElse ({
+      case nonsense: Any =>
+        log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
+    }: Receive)
 
   override def receive: Receive =
     processOwnHandshake(
@@ -142,7 +145,17 @@ case class PeerConnectionHandler(application: Application,
 
 object PeerConnectionHandler {
 
+  private object CommunicationState extends Enumeration {
+    type CommunicationState = Value
+
+    val SendingHandshake = Value(1, "SendingHandshake")
+    val AwaitingHandshake = Value(2, "AwaitingHandshake")
+    val AwaitingHandshakeAck = Value(3, "AwaitingHandshakeAck")
+    val WorkingCycle = Value(4, "WorkingCycle")
+  }
+
   case object CloseConnection
 
   case object Blacklist
+
 }

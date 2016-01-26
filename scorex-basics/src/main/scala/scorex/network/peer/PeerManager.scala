@@ -80,10 +80,12 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       toUpdate.keys.foreach(connectedPeers.remove)
 
       //drop connection to self if occurred
-      if (handshake.fromNonce == application.nodeNonce)
+      if (handshake.fromNonce == application.nodeNonce) {
         newCp.handlerRef ! PeerConnectionHandler.CloseConnection
-      else
+      } else {
+        self ! PeerManager.AddPeer(newCp.address)
         connectedPeers += newCp -> Some(handshake)
+      }
 
     case Disconnected(remote) =>
       connectedPeers.retain { case (p, _) => p.address != remote }
@@ -134,4 +136,5 @@ object PeerManager {
   case class FilterPeers(sendingStrategy: SendingStrategy)
 
   case object GetConnectedPeers
+
 }
