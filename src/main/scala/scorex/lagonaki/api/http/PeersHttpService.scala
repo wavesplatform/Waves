@@ -1,5 +1,6 @@
 package scorex.lagonaki.api.http
 
+import java.net.InetSocketAddress
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
@@ -22,15 +23,40 @@ case class PeersHttpService(application: LagonakiApplication)(implicit val conte
 
   override lazy val route =
     pathPrefix("peers") {
-      peers // TODO implement and fix ~ score
+      allPeers ~ connectedPeers // TODO implement and fix ~ score
     }
 
-  @Path("/")
+  @Path("/all")
   @ApiOperation(value = "Peer list", notes = "Peer list", httpMethod = "GET")
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
-  def peers: Route = path("") {
+  def allPeers: Route = path("all") {
+    get {
+      respondWithMediaType(`application/json`) {
+        onComplete {
+          (application.peerManager ? PeerManager.GetAllPeers)
+            .mapTo[Seq[InetSocketAddress]]
+            .map { addresses =>
+              val peerData = Json.arr(addresses.map { address =>
+                JsString(address.toString)
+              })
+              Json.obj("peers" -> peerData).toString()
+            }
+        } {
+          case Success(value) => complete(value)
+          case Failure(ex) => failWith(ex)
+        }
+      }
+    }
+  }
+
+  @Path("/connected")
+  @ApiOperation(value = "Connected peers list", notes = "Connected peers list", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with connected peers or error")
+  ))
+  def connectedPeers: Route = path("connected") {
     get {
       respondWithMediaType(`application/json`) {
         onComplete {

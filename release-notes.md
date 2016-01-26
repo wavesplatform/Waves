@@ -18,6 +18,8 @@ logic separately. Then module p2p logic is to be wired into application's logic.
 * Experimental: a node could store a blocktree explicitly. Storage type could be changed via "history"
 setting(set "blockchain" / "blocktree"). Different nodes can have different storage types.
 
+* peers/ API call has been renamed into peers/connected, peers/all has been added
+
 
 **1.1.2**
 ---------

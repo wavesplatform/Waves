@@ -57,6 +57,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private def apiInterface: Receive = {
     case GetConnectedPeers =>
       sender() ! (connectedPeers.values.flatten.toSeq: Seq[Handshake])
+
+    case GetAllPeers =>
+      sender() ! knownPeers()
   }
 
   private def peerCycle: Receive = {
@@ -134,6 +137,8 @@ object PeerManager {
   case class Disconnected(remote: InetSocketAddress)
 
   case class FilterPeers(sendingStrategy: SendingStrategy)
+
+  case object GetAllPeers
 
   case object GetConnectedPeers
 
