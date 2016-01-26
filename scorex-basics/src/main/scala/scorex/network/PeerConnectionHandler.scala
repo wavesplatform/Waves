@@ -38,12 +38,16 @@ case class PeerConnectionHandler(application: Application,
 
   val selfPeer = new ConnectedPeer(remote, self)
 
+  override def preStart: Unit = connection ! ResumeReading
+
   private def processErrors(stateName: String): Receive = {
     case CommandFailed(w: Write) =>
-      log.info(s"Write failed : $w " + remote + s" in state $stateName")
+      log.warn(s"Write failed :$w " + remote + s" in state $stateName")
       //todo: blacklisting
       //peerManager.blacklistPeer(remote)
-      connection ! Close
+      //connection ! Close
+
+      connection ! ResumeReading
 
     case cc: ConnectionClosed =>
       peerManager ! PeerManager.Disconnected(remote)
@@ -55,6 +59,7 @@ case class PeerConnectionHandler(application: Application,
 
     case CommandFailed(cmd: Tcp.Command) =>
       log.info("Failed to execute command : " + cmd + s" in state $stateName")
+      connection ! ResumeReading
   }
 
   private def processOwnHandshake(newCycle: Receive): Receive = ({
@@ -68,6 +73,7 @@ case class PeerConnectionHandler(application: Application,
     case Received(data) if data.length == HandShakeAck.messageSize =>
       if (data == HandShakeAck.bytes.toSeq) {
         log.info(s"Got Handshake Ack from $remote")
+        connection ! ResumeReading
         context become newCycle
       } else {
         connection ! Close
@@ -82,6 +88,7 @@ case class PeerConnectionHandler(application: Application,
             connection ! Write(HandShakeAck.bytesAsByteString)
             peerManager ! Handshaked(remote, handshake)
             log.info(s"Got a Handshake from $remote")
+            connection ! ResumeReading
             context become newCycle
           } else {
             connection ! Close
@@ -126,6 +133,7 @@ case class PeerConnectionHandler(application: Application,
             true
         }
       }
+      connection ! ResumeReading
   }
 
   def workingCycle: Receive =
