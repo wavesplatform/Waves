@@ -138,15 +138,13 @@ case class PeerConnectionHandler(application: Application,
             true
         }
       }
-      connection ! Write(data, Ack)
+      connection ! ResumeReading
   }
 
   def workingCycle: Receive =
     workingCycleLocalInterface orElse
       workingCycleRemoteInterface orElse
       processErrors(CommunicationState.WorkingCycle.toString) orElse ({
-      case Ack =>
-        connection ! ResumeReading
       case nonsense: Any =>
         log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
     }: Receive)
