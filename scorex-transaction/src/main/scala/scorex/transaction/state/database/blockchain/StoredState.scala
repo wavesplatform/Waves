@@ -93,6 +93,7 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
     accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
     db.commit()
+    log.debug("Total balance is:" + totalBalance)
     new StoredState(db, None)
   }
 
