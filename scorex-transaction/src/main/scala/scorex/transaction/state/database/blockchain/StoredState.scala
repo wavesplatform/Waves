@@ -137,6 +137,7 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     val newHeight = stateHeight() + 1
     setStateHeight(newHeight)
     database.commit()
+    log.debug(s"Total balance at height $newHeight is $totalBalance")
 
     this
   }
@@ -148,7 +149,7 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     balance
   }
 
-  def totalBalance(): Long = balances.keySet().toList.map(i => balances.get(i)).sum
+  def totalBalance: Long = balances.keySet().toList.map(i => balances.get(i)).sum
 
   override def accountTransactions(account: Account): Array[LagonakiTransaction] =
     Option(accountTransactions.get(account)).getOrElse(Array())
@@ -191,6 +192,11 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     JsObject(balances.keySet().map(a => a.address -> JsNumber(balances.get(a))).toMap)
   }
 
+  //Self check
+  def isValid(initialBalance: Long): Boolean = {
+    totalBalance >= initialBalance
+  }
+
   //for debugging purposes only
   override def toString: String = toJson.toString()
 }
@@ -198,7 +204,6 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
 object StoredState {
 
   def apply(fileNameOpt: Option[String]): StoredState = new StoredState(makeDb(fileNameOpt), fileNameOpt)
-
 
   private[blockchain] def makeDb(DBFileNameOpt: Option[String]) = DBFileNameOpt match {
     case Some(fileName) =>

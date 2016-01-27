@@ -184,7 +184,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     synced
   }
 
-  private def processNewBlock(block: Block, local: Boolean): Boolean = {
+  private def processNewBlock(block: Block, local: Boolean): Boolean = Try {
     if (block.isValid) {
       log.info(s"New block(local: $local): ${block.json}")
 
@@ -207,7 +207,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       log.warn(s"Invalid new block(local: $local): ${block.json}")
       false
     }
-  }
+  }.getOrElse(false)
 }
 
 object HistorySynchronizer {
