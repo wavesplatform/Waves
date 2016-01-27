@@ -100,13 +100,12 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
       override def state(id: BlockId): Option[StoredState] = state(id, MaxRollback)
 
-      def state(id: BlockId, limit: Int): Option[StoredState] = cache.get(Base58.encode(id)) match {
+      def state(id: BlockId, limit: Int): Option[StoredState] = cache.get(key(id)) match {
         case None =>
           val st: Option[StoredState] = if (!getFileName(id).exists(f => new File(f).exists())) None
-          else {
-            Try(untilTimeout(StateCopyTimeout)(cache.getOrElseUpdate(key(id), StoredState(getFileName(id))))).toOption
-          }
-          if (limit > 0 && (st.isEmpty || !st.get.isValid(InitialBalance))) {
+          else Some(untilTimeout(StateCopyTimeout)(StoredState(getFileName(id))))
+
+          val recoveredState = if (limit > 0 && (st.isEmpty || !st.get.isValid(InitialBalance))) {
             //State is wrong, recover from the previous one
             log.warn(s"State for block ${Base58.encode(id)} is not valid, recover from parent")
             removeState(id)
@@ -115,6 +114,9 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
             newState.map(s => s.processBlock(history.blockById(id).get))
             newState
           } else st
+          recoveredState.map(s => cache.put(key(id), s))
+
+          recoveredState
 
         case ot => ot
       }
