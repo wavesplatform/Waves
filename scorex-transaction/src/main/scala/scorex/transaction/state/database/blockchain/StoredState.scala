@@ -100,7 +100,6 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
 
   //initialization
   if (Option(stateHeight()).isEmpty) setStateHeight(0)
-  if (stateHeight() > 0) require(totalBalance >= 60000000000L)
 
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
@@ -138,7 +137,7 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     val newHeight = stateHeight() + 1
     setStateHeight(newHeight)
     database.commit()
-    log.debug(s"Total balance at heigth $newHeight is $totalBalance")
+    log.debug(s"Total balance at height $newHeight is $totalBalance")
 
     this
   }
