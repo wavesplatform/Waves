@@ -51,6 +51,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
   val networkController = application.networkController
 
   val TransactionSizeLength = 4
+  val InitialBalance = 60000000000L
 
   private val instance = this
 
@@ -97,15 +98,13 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
         getFileName(id).map(new File(_).delete())
       }
 
-      private def stateIsValid(st: StoredState): Boolean = st.totalBalance < 60000000000L
-
       override def state(id: BlockId): Option[StoredState] = cache.get(Base58.encode(id)) match {
         case None =>
           val st:Option[StoredState] = if(!getFileName(id).exists(f => new File(f).exists())) None
           else {
             Try(untilTimeout(StateCopyTimeout)(cache.getOrElseUpdate(key(id), StoredState(getFileName(id))))).toOption
           }
-          if (st.isEmpty || stateIsValid(st.get)) {
+          if (st.isEmpty || !st.get.isValid(InitialBalance)) {
             //State is wrong, recover from the previous one
             log.warn(s"State for block ${Base58.encode(id)} is not valid, recover from parent")
             removeState(id)
@@ -207,7 +206,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     )
 
     val timestamp = 0L
-    val totalBalance = 60000000000L
+    val totalBalance = InitialBalance
 
     val txs = ipoMembers.map { addr =>
       val recipient = new Account(addr)

@@ -192,6 +192,11 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     JsObject(balances.keySet().map(a => a.address -> JsNumber(balances.get(a))).toMap)
   }
 
+  //Self check
+  def isValid(initialBalance: Long): Boolean = {
+    totalBalance >= initialBalance
+  }
+
   //for debugging purposes only
   override def toString: String = toJson.toString()
 }
