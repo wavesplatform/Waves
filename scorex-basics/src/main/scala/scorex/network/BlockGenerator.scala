@@ -26,10 +26,6 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
       tryToGenerateABlock()
       stay()
 
-    case Event(newBlock: Block, _) =>
-      application.historySynchronizer ! newBlock
-      stay()
-
     case Event(StopGeneration, _) => goto(Syncing)
   }
 
@@ -50,7 +46,7 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
       case Success(blocks: Seq[Block]) =>
         if (blocks.nonEmpty) {
           val bestBlock = blocks.maxBy(application.consensusModule.blockScore)
-          self ! bestBlock
+          application.historySynchronizer ! bestBlock
         }
         context.system.scheduler.scheduleOnce(blockGenerationDelay, self, StateTimeout)
       case Failure(ex) => log.error("Failed to generate new block", ex)
