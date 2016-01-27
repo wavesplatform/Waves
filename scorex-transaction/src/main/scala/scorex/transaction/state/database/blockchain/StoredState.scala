@@ -100,6 +100,7 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
 
   //initialization
   if (Option(stateHeight()).isEmpty) setStateHeight(0)
+  if (stateHeight() > 0) require(totalBalance >= 60000000000L)
 
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
@@ -199,7 +200,6 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
 object StoredState {
 
   def apply(fileNameOpt: Option[String]): StoredState = new StoredState(makeDb(fileNameOpt), fileNameOpt)
-
 
   private[blockchain] def makeDb(DBFileNameOpt: Option[String]) = DBFileNameOpt match {
     case Some(fileName) =>
