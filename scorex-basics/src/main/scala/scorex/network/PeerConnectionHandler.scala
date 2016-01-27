@@ -2,7 +2,7 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{SupervisorStrategy, Actor, ActorRef}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
@@ -44,6 +44,9 @@ case class PeerConnectionHandler(application: Application,
   context watch connection
 
   override def preStart: Unit = connection ! ResumeReading
+
+  // there is not recovery for broken connections
+  override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   private def processErrors(stateName: String): Receive = {
     case CommandFailed(w: Write) =>
@@ -157,14 +160,11 @@ object PeerConnectionHandler {
   private object CommunicationState extends Enumeration {
     type CommunicationState = Value
 
-    val SendingHandshake = Value(1, "SendingHandshake")
-    val AwaitingHandshake = Value(2, "AwaitingHandshake")
-    val AwaitingHandshakeAck = Value(3, "AwaitingHandshakeAck")
-    val WorkingCycle = Value(4, "WorkingCycle")
+    val AwaitingHandshake = Value("AwaitingHandshake")
+    val WorkingCycle = Value("WorkingCycle")
   }
 
   case object CloseConnection
 
   case object Blacklist
-
 }
