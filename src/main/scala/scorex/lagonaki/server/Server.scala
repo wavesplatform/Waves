@@ -1,7 +1,6 @@
 package scorex.lagonaki.server
 
 import scorex.account.Account
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{BalanceSheet, GenesisTransaction, Transaction}
 import scorex.utils.ScorexLogging
 
@@ -19,7 +18,7 @@ object Server extends App with ScorexLogging {
 
     log.debug("LagonakiApplication has been started")
     application.run()
-    require(StoredState(application.blockStorage.history.lastBlock.uniqueId).isDefined)
+    require(application.blockStorage.state(application.blockStorage.history.lastBlock.uniqueId).isDefined)
     if (application.settings.offlineGeneration) {
       testingScript(application)
     } else {
@@ -74,11 +73,11 @@ object Server extends App with ScorexLogging {
     }
 
     log.info("Generate 200 transactions")
-    (1 to 200) foreach (_ => genPayment())
+//    (1 to 200) foreach (_ => genPayment())
 
     (1 to Int.MaxValue).foreach { _ =>
       Thread.sleep(Random.nextInt(5.seconds.toMillis.toInt))
-      log.info(s"Payment created: ${genPayment()}")
+//      log.info(s"Payment created: ${genPayment()}")
     }
   }
 }

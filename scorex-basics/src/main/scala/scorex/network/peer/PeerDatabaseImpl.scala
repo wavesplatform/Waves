@@ -6,21 +6,8 @@ import scala.collection.mutable
 
 //todo: persistence of known & blacklisted peers
 object PeerDatabaseImpl extends PeerDatabase {
-  private val connected = mutable.Buffer[InetSocketAddress]()
   private val whitelist = mutable.Buffer[InetSocketAddress]()
   private val blacklist = mutable.Buffer[InetSocketAddress]()
-
-  override def addConnectedPeer(peer: InetSocketAddress): Unit = connected.synchronized(
-    connected += peer
-  )
-
-  override def removeConnectedPeer(peer: InetSocketAddress): Unit = connected.synchronized(
-    connected -= peer
-  )
-
-  override def allConnectedPeers(peer: InetSocketAddress): Seq[InetSocketAddress] = connected.synchronized(
-    connected.toSeq
-  )
 
   override def addKnownPeer(peer: InetSocketAddress): Unit = whitelist.synchronized {
     whitelist += peer
@@ -35,4 +22,6 @@ object PeerDatabaseImpl extends PeerDatabase {
     blacklist.synchronized(blacklist.contains(address))
 
   override def knownPeers(): Seq[InetSocketAddress] = whitelist.synchronized(whitelist.toSeq)
+
+  override def blacklistedPeers(): Seq[InetSocketAddress] = blacklist.synchronized(blacklist.toSeq)
 }

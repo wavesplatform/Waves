@@ -1,27 +1,27 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.{DataInput, DataOutput}
+import java.io.{DataInput, DataOutput, File}
 
 import org.mapdb._
 import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.crypto.encode.Base58
-import scorex.transaction.state.LagonakiState
-import scorex.transaction.{LagonakiTransaction, State, Transaction}
+import scorex.transaction.{LagonakiState, LagonakiTransaction, State, Transaction}
 import scorex.utils.ScorexLogging
 
+import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
 
 /** Store current balances only, and balances changes within effective balance depth.
   * Store transactions for selected accounts only.
-  * If no datafolder provided, blockchain lives in RAM (intended for tests only)
+  * If no filename provided, blockchain lives in RAM (intended for tests only).
+  *
+  * Use apply method of StoredState object to create new instance
   */
-
-class StoredState(database: DB) extends LagonakiState with ScorexLogging {
+class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiState with ScorexLogging {
 
   private object AccSerializer extends Serializer[Account] {
     override def serialize(dataOutput: DataOutput, a: Account): Unit =
@@ -54,20 +54,47 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
     }
   }
 
+  //Names of collections in DB
   private val StateHeight = "height"
+  private val Balances = "balances"
+  private val IncludedTx = "includedTx"
+  private val WatchedTxs = "watchedTxs"
 
-  private val balances = database.hashMap[Account, Long]("balances")
+  private val balances = database.hashMap[Account, Long](Balances)
 
-  private val includedTx: HTreeMap[Array[Byte], Array[Byte]] = database.hashMapCreate("includedTx")
+  private val includedTx: HTreeMap[Array[Byte], Array[Byte]] = database.hashMapCreate(IncludedTx)
     .keySerializer(Serializer.BYTE_ARRAY)
     .valueSerializer(Serializer.BYTE_ARRAY)
     .makeOrGet()
 
   private val accountTransactions = database.hashMap(
-    "watchedTxs",
+    WatchedTxs,
     AccSerializer,
     TxArraySerializer,
     null)
+
+  override def copyTo(fileNameOpt: Option[String]): State = StoredState.synchronized {
+    val db: DB = StoredState.makeDb(fileNameOpt)
+    db.atomicInteger(StateHeight).set(stateHeight())
+    val balancesCopy = db.hashMap[Account, Long](Balances)
+
+    val includedTxCopy: HTreeMap[Array[Byte], Array[Byte]] = db.hashMapCreate(IncludedTx)
+      .keySerializer(Serializer.BYTE_ARRAY)
+      .valueSerializer(Serializer.BYTE_ARRAY)
+      .makeOrGet()
+
+    val accountTransactionsCopy = db.hashMap(
+      WatchedTxs,
+      AccSerializer,
+      TxArraySerializer,
+      null)
+
+    balances.keySet().foreach(key => balancesCopy.put(key, balances(key)))
+    includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
+    accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
+    db.commit()
+    new StoredState(db, None)
+  }
 
   def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
 
@@ -76,12 +103,11 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
-  override def processBlock(block: Block, reversal: Boolean): Try[State] = Try {
+  override def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactions
     trans foreach { tx =>
-      if (!reversal && includedTx.containsKey(tx.signature)) throw new Exception("Already included tx")
-      else if (!reversal) includedTx.put(tx.signature, block.uniqueId)
-      else includedTx.remove(tx.signature, block.uniqueId)
+      if (includedTx.containsKey(tx.signature)) throw new Exception("Already included tx")
+      else includedTx.put(tx.signature, block.uniqueId)
     }
     val balanceChanges = trans.foldLeft(block.consensusModule.feesDistribution(block)) { case (changes, atx) =>
       atx match {
@@ -89,8 +115,7 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
           tx.balanceChanges().foldLeft(changes) { case (iChanges, (acc, delta)) =>
             //check whether account is watched, add tx to its txs list if so
             val prevTxs = accountTransactions.getOrDefault(acc, Array())
-            if (!reversal) accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
-            else accountTransactions.put(acc, prevTxs.filter(t => !(t.signature sameElements tx.signature)))
+            accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
             //update balances sheet
             val currentChange = iChanges.getOrElse(acc, 0L)
             val newChange = currentChange + delta
@@ -104,19 +129,15 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
     balanceChanges.foreach { case (acc, delta) =>
       val balance = Option(balances.get(acc)).getOrElse(0L)
-      val newBalance = if (!reversal) balance + delta else balance - delta
+      val newBalance = balance + delta
       if (newBalance < 0) log.error(s"Account $acc balance $newBalance is negative")
       balances.put(acc, newBalance)
     }
 
-    val newHeight = (if (!reversal) stateHeight() + 1 else stateHeight() - 1).ensuring(_ > 0)
+    val newHeight = stateHeight() + 1
     setStateHeight(newHeight)
     database.commit()
 
-    if (!reversal) StoredState.history.put(Base58.encode(block.uniqueId), database.snapshot())
-    else if(!StoredState.history.contains(Base58.encode(block.referenceField.value))) {
-      StoredState.history.put(Base58.encode(block.referenceField.value), database.snapshot())
-    }
     this
   }
 
@@ -127,6 +148,8 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
     balance
   }
 
+  def totalBalance(): Long = balances.keySet().toList.map(i => balances.get(i)).sum
+
   override def accountTransactions(account: Account): Array[LagonakiTransaction] =
     Option(accountTransactions.get(account)).getOrElse(Array())
 
@@ -136,8 +159,6 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
   override def included(tx: Transaction): Option[BlockId] = Option(includedTx.get(tx.signature))
 
-  def isValid(txs: Seq[Transaction]): Boolean = validate(txs).size == txs.size
-
   //return seq of valid transactions
   def validate(txs: Seq[Transaction]): Seq[Transaction] = {
     val tmpBalances = TrieMap[Account, Long]()
@@ -145,11 +166,11 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
     val r = txs.foldLeft(Seq.empty: Seq[Transaction]) { case (acc, atx) =>
       atx match {
         case tx: LagonakiTransaction =>
-          val changes = tx.balanceChanges().foldLeft(Map.empty: Map[Account, Long]) { case (iChanges, (acc, delta)) =>
+          val changes = tx.balanceChanges().foldLeft(Map.empty: Map[Account, Long]) { case (iChanges, (txAcc, delta)) =>
             //update balances sheet
-            val currentChange = iChanges.getOrElse(acc, 0L)
+            val currentChange = iChanges.getOrElse(txAcc, 0L)
             val newChange = currentChange + delta
-            iChanges.updated(acc, newChange)
+            iChanges.updated(txAcc, newChange)
           }
           val check = changes.forall { a =>
             val balance = tmpBalances.getOrElseUpdate(a._1, balances.get(a._1))
@@ -176,8 +197,17 @@ class StoredState(database: DB) extends LagonakiState with ScorexLogging {
 
 object StoredState {
 
-  val history = TrieMap[String, DB]()
+  def apply(fileNameOpt: Option[String]): StoredState = new StoredState(makeDb(fileNameOpt), fileNameOpt)
 
-  def apply(id: BlockId): Option[StoredState] = history.get(Base58.encode(id)).map(new StoredState(_))
 
+  private[blockchain] def makeDb(DBFileNameOpt: Option[String]) = DBFileNameOpt match {
+    case Some(fileName) =>
+      DBMaker.fileDB(new File(fileName))
+        .closeOnJvmShutdown()
+        .cacheSize(2048)
+        .checksumEnable()
+        .fileMmapEnable()
+        .make()
+    case None => DBMaker.memoryDB().snapshotEnable().make()
+  }
 }

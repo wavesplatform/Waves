@@ -11,16 +11,37 @@ import scala.util.Try
   */
 trait BlockStorage extends ScorexLogging {
 
+  val MaxRollback: Int
+
   val history: History
 
-  def state(id: Option[BlockId]): Option[State]
+  val stateHistory: StateHistory
 
-  def state: State
+  trait StateHistory {
+    def keySet: Set[BlockId]
 
+    def removeState(id: BlockId): Unit
+
+    def copyState(id: BlockId, state: LagonakiState): LagonakiState
+
+    def state(id: BlockId): Option[LagonakiState]
+
+    def state: LagonakiState
+
+    val emptyState: LagonakiState
+  }
+
+  def state(id: BlockId): Option[LagonakiState] = stateHistory.state(id)
+
+  def state: LagonakiState = stateHistory.state
+
+
+  //Append block to current state
   def appendBlock(block: Block): Try[Unit] = synchronized {
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
-        state.processBlock(b._1, b._2)
+        val cState = if (history.heightOf(b).get != 1) state(b.referenceField.value).get else stateHistory.emptyState
+        stateHistory.copyState(b.uniqueId, cState).processBlock(b)
       }
     }
   }
@@ -29,10 +50,7 @@ trait BlockStorage extends ScorexLogging {
   def removeAfter(signature: BlockId): Unit = synchronized {
     history match {
       case h: BlockChain =>
-        while (!h.lastBlock.uniqueId.sameElements(signature)) {
-          state.processBlock(history.lastBlock, reversal = true)
-          h.discardBlock()
-        }
+        while (!h.lastBlock.uniqueId.sameElements(signature)) h.discardBlock()
       case _ =>
         throw new RuntimeException("Not available for other option than linear blockchain")
     }
@@ -52,5 +70,5 @@ object BlockStorage {
   /*
  * Block and direction to process it
  */
-  type BlocksToProcess = Seq[(Block, Direction)]
+  type BlocksToProcess = Seq[Block]
 }

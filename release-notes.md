@@ -24,6 +24,8 @@ setting(set "blockchain" / "blocktree"). Different nodes can have different stor
 
 * New class of API calls, starting with debug/
 
+* peers/ API call has been renamed into peers/connected, peers/all has been added
+
 
 **1.1.2**
 ---------

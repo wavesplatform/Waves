@@ -37,13 +37,13 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
 
   //VALIDATE
   def validate()(implicit transactionModule: SimpleTransactionModule): ValidationResult.Value =
-    validate(transactionModule.blockStorage.state)
+    validate(transactionModule.blockStorage.state.asInstanceOf[BalanceSheet])
 
   def validate(state: BalanceSheet): ValidationResult.Value
 
   def involvedAmount(account: Account): Long
 
-  def balanceChanges(): Map[Account, Long]
+  def balanceChanges(): Seq[(Account, Long)]
 
   override def equals(other: Any): Boolean = other match {
     case tx: LagonakiTransaction => signature.sameElements(tx.signature)

@@ -189,21 +189,20 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       log.info(s"New block(local: $local): ${block.json}")
 
       if (local) networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), Broadcast)
-      if (!local || application.settings.offlineGeneration) {
-        val oldHeight = history.height()
-        val oldScore = history.score()
-        val appending = transactionalModule.blockStorage.appendBlock(block)
 
-        appending match {
-          case Success(_) =>
-            block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-            log.info(s"(height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})")
-          case Failure(e) =>
-            e.printStackTrace()
-            log.warn(s"failed to append block: $e")
-        }
-        appending.isSuccess
-      } else true
+      val oldHeight = history.height()
+      val oldScore = history.score()
+      val appending = transactionalModule.blockStorage.appendBlock(block)
+
+      appending match {
+        case Success(_) =>
+          block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
+          log.info(s"(height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})")
+        case Failure(e) =>
+          e.printStackTrace()
+          log.warn(s"failed to append block: $e")
+      }
+      appending.isSuccess
     } else {
       log.warn(s"Invalid new block(local: $local): ${block.json}")
       false

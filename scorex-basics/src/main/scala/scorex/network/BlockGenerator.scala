@@ -53,15 +53,14 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
           self ! bestBlock
         }
         context.system.scheduler.scheduleOnce(blockGenerationDelay, self, StateTimeout)
-      case Failure(ex) => log.error("Failed to generate new block: {}", ex)
-      case m => log.error("Unexpected message: {}", m)
+      case Failure(ex) => log.error("Failed to generate new block", ex)
+      case m => log.error(s"Unexpected message: m")
     }
   }
 
   onTransition {
     case Syncing -> Generating => context.system.scheduler.scheduleOnce(blockGenerationDelay, self, StateTimeout)
   }
-
 }
 
 object BlockGenerator {
@@ -83,5 +82,4 @@ object BlockGenerator {
   case object StartGeneration
 
   case object StopGeneration
-
 }

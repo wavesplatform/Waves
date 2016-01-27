@@ -3,7 +3,6 @@ package scorex.transaction
 import java.io.File
 
 import com.google.common.primitives.{Bytes, Ints}
-import org.mapdb.DBMaker
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
@@ -17,9 +16,10 @@ import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
 import scorex.transaction.state.wallet.Payment
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils._
 import scorex.wallet.Wallet
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -55,38 +55,59 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
   private val instance = this
 
   override val blockStorage = new BlockStorage {
+    override val MaxRollback: Int = settings.MaxRollback
+
     override val history: History = settings.history match {
       case s: String if s.equalsIgnoreCase("blockchain") =>
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
       case s: String if s.equalsIgnoreCase("blocktree") =>
-        new StoredBlockTree(settings.dataDirOpt, settings.MaxRollback)(consensusModule, instance)
+        new StoredBlockTree(settings.dataDirOpt, MaxRollback)(consensusModule, instance)
       case s =>
         log.error(s"Unknown history storage: $s. Use StoredBlockchain...")
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
 
-    override def state(idOpt: Option[BlockId]): Option[StoredState] = idOpt match {
-      case None => Some(currentState)
-      case Some(b) => StoredState(b)
-    }
 
-    override def state: StoredState = currentState
+    override val stateHistory: StateHistory = new StateHistory {
+      private val stateDir: Option[String] = settings.dataDirOpt
 
-    private val currentState = settings.dataDirOpt match {
-      case Some(dataFolder) =>
-        log.debug("DB loaded from {}", dataFolder)
-        val db = DBMaker.fileDB(new File(dataFolder + s"/state"))
-          .closeOnJvmShutdown()
-          .cacheSize(2048)
-          .checksumEnable()
-          .snapshotEnable()
-          .fileMmapEnable()
-          .make()
-        db.rollback() //clear uncommitted data from possibly invalid last run
-        if (!history.isEmpty) StoredState.history.put(Base58.encode(history.lastBlock.uniqueId), db.snapshot())
-        new StoredState(db)
+      val cache = TrieMap[String, StoredState]()
 
-      case None => new StoredState(DBMaker.memoryDB().snapshotEnable().make())
+      private val StateCopyTimeout = 10.seconds
+
+      private def getFileName(id: BlockId): Option[String] = stateDir.map(f => f + "/state-" + key(id))
+
+      private def key(id: BlockId): String = Base58.encode(id)
+
+      override def keySet: Set[BlockId] = stateDir match {
+        case Some(folder) =>
+          val f = new File(folder).listFiles().map(_.getName).toSet.filter(_.startsWith("state-")).map(_.substring(6))
+          f.flatMap(s => Base58.decode(s).toOption)
+        case None => cache.keySet.flatMap(s => Base58.decode(s).toOption).toSet
+      }
+
+      override def copyState(id: BlockId, state: LagonakiState): StoredState = {
+        val copy = state.copyTo(getFileName(id)).asInstanceOf[StoredState]
+        cache.put(key(id), copy)
+        copy
+      }
+
+      override def removeState(id: BlockId): Unit = {
+        cache.remove(key(id))
+        getFileName(id).map(new File(_).delete())
+      }
+
+      override def state(id: BlockId): Option[StoredState] = cache.get(Base58.encode(id)) match {
+        case None if getFileName(id).exists(f => new File(f).exists()) =>
+          untilTimeout(StateCopyTimeout)(Some(cache.getOrElseUpdate(key(id), StoredState(getFileName(id)))))
+        case ot => ot
+      }
+
+      override def state: StoredState = if (history.height() > 0) {
+        untilTimeout(StateCopyTimeout)(state(history.lastBlock.uniqueId).get)
+      } else emptyState
+
+      override val emptyState = StoredState(getFileName(Array.empty))
     }
 
   }
@@ -181,7 +202,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     TransactionsBlockField(txs)
   }
 
-  override def isValid(block: Block): Boolean = blockStorage.state(Some(block.referenceField.value)) match {
+  override def isValid(block: Block): Boolean = blockStorage.state(block.referenceField.value) match {
     case Some(blockState) =>
       isValid(block.transactions, blockState)
     case None =>
@@ -189,14 +210,18 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
       false
   }
 
-  override def isValid(transaction: Transaction): Boolean = isValid(transaction, blockStorage.state)
+  //TODO asInstanceOf
+  override def isValid(transaction: Transaction): Boolean =
+    isValid(transaction, blockStorage.state.asInstanceOf[StoredState])
 
-  private def isValid(transactions: Seq[Transaction], state: StoredState): Boolean =
+  private def isValid(transactions: Seq[Transaction], state: State): Boolean =
     transactions.forall(isValid) && state.isValid(transactions)
 
   private def isValid(transaction: Transaction, txState: StoredState): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.signatureValid && tx.validate(txState) == ValidationResult.ValidateOke && txState.included(tx).isEmpty
+      val r = tx.signatureValid && tx.validate(txState) == ValidationResult.ValidateOke && txState.included(tx).isEmpty
+      if (!r) log.debug(s"Invalid $tx: ${tx.signatureValid}&&${tx.validate(txState)}&&${txState.included(tx).isEmpty}")
+      r
     case gtx: GenesisTransaction =>
       blockStorage.history.height() == 0
     case otx: Any =>

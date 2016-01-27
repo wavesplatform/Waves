@@ -186,7 +186,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
     val h = height()
     if ((h == 0) || (lastBlock.uniqueId sameElements block.referenceField.value)) {
       blockStorage.changeBestChain(Seq((block, Forward)))
-      blockStorage.writeBlock(block).map(x => Seq((block, Forward)))
+      blockStorage.writeBlock(block).map(x => Seq(block))
     } else blockById(parent.value) match {
       case Some(commonBlock) =>
         val oldLast = lastBlock
@@ -198,7 +198,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
                 val toProcess = block +: lastBlocks(block, heightOf(block).get - heightOf(node).get - 1)
                 val stateChanges = toReverse.map((_, Reversed)) ++ toProcess.map((_, Forward))
                 blockStorage.changeBestChain(stateChanges)
-                stateChanges
+                toProcess
               case None => ??? //Should never rich this point if we don't keep older then MaxRollback side chains
             }
           case false => Seq.empty
