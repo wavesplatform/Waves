@@ -77,7 +77,7 @@ object Server extends App with ScorexLogging {
 
     (1 to Int.MaxValue).foreach { _ =>
       Thread.sleep(Random.nextInt(5.seconds.toMillis.toInt))
-//      log.info(s"Payment created: ${genPayment()}")
+      log.info(s"Payment created: ${genPayment()}")
     }
   }
 }
