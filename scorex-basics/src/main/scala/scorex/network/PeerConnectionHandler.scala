@@ -157,14 +157,11 @@ object PeerConnectionHandler {
   private object CommunicationState extends Enumeration {
     type CommunicationState = Value
 
-    val SendingHandshake = Value(1, "SendingHandshake")
-    val AwaitingHandshake = Value(2, "AwaitingHandshake")
-    val AwaitingHandshakeAck = Value(3, "AwaitingHandshakeAck")
-    val WorkingCycle = Value(4, "WorkingCycle")
+    val AwaitingHandshake = Value("AwaitingHandshake")
+    val WorkingCycle = Value("WorkingCycle")
   }
 
   case object CloseConnection
 
   case object Blacklist
-
 }
