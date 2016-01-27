@@ -93,7 +93,6 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
     accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
     db.commit()
-    log.debug("Total balance is:" + totalBalance)
     new StoredState(db, None)
   }
 
@@ -138,6 +137,7 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     val newHeight = stateHeight() + 1
     setStateHeight(newHeight)
     database.commit()
+    log.debug(s"Total balance at heigth $newHeight is $totalBalance")
 
     this
   }
@@ -149,7 +149,7 @@ class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiStat
     balance
   }
 
-  def totalBalance(): Long = balances.keySet().toList.map(i => balances.get(i)).sum
+  def totalBalance: Long = balances.keySet().toList.map(i => balances.get(i)).sum
 
   override def accountTransactions(account: Account): Array[LagonakiTransaction] =
     Option(accountTransactions.get(account)).getOrElse(Array())
