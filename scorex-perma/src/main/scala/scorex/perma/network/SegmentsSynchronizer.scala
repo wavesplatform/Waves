@@ -22,7 +22,7 @@ import shapeless.Typeable._
 class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], storage: Storage[Long, AuthDataBlock[DataSegment]])
   extends ViewSynchronizer with ScorexLogging {
 
-  private val MaxSegmentsInMessage = 64
+  private val MaxSegmentsInMessage = 16
 
   override protected val networkControllerRef: ActorRef = application.networkController
 
@@ -31,15 +31,20 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], stor
   override def receive: Receive = {
     case DataFromPeer(msgId, indexes: Seq[DataSegmentIndex]@unchecked, remote)
       if msgId == GetSegmentsMessageSpec.messageCode && indexes.cast[Seq[DataSegmentIndex]].isDefined =>
+
       log.info("GetSegmentsMessage")
 
       val segments: Map[DataSegmentIndex, AuthDataBlock[DataSegment]] =
-        indexes.flatMap(i => storage.get(i).map(s => i -> s)).toMap
+        indexes.take(MaxSegmentsInMessage).flatMap(i => storage.get(i).map(s => i -> s)).toMap
 
+      val msg = Message(SegmentsMessageSpec, Right(segments), None)
+      networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
+
+      /*
       segments.grouped(MaxSegmentsInMessage).foreach { s =>
         val msg = Message(SegmentsMessageSpec, Right(s), None)
         networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
-      }
+      } */
 
     case DataFromPeer(msgId, segments: Map[DataSegmentIndex, AuthDataBlock[DataSegment]]@unchecked, remote)
       if msgId == SegmentsMessageSpec.messageCode && segments.cast[Map[DataSegmentIndex, AuthDataBlock[DataSegment]]].isDefined =>
