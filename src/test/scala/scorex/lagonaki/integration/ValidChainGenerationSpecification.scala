@@ -8,6 +8,7 @@ import scala.concurrent.duration._
 
 class ValidChainGenerationSpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
+/*
 
   val applications = List(new LagonakiApplication("settings-local1.json"),
     new LagonakiApplication("settings-local2.json"))
@@ -30,8 +31,7 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Befo
     untilTimeout(5.minutes, 10.seconds) {
       applications.foreach(_.blockStorage.history.height() should be > height + 5)
     }
-
-
   }
+*/
 
 }
