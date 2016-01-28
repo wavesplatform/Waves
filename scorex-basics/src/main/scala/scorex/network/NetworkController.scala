@@ -37,14 +37,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   private lazy val nodeNonce = application.nodeNonce
 
-  val handshakeTemplate = Handshake(application.applicationName,
-    application.appVersion,
-    ownSocketAddress.getAddress.toString,
-    ownSocketAddress.getPort,
-    nodeNonce,
-    0
-  )
-
   //check own declared address for validity
   if (!settings.localOnly) {
     settings.declaredAddress.map { myAddress =>
@@ -73,6 +65,8 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     }.getOrElse(true).ensuring(_ == true, "Declared address isn't valid")
   }
 
+  lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
+
   lazy val externalSocketAddress = settings.declaredAddress
     .flatMap(s => Try(InetAddress.getByName(s)).toOption)
     .orElse {
@@ -84,9 +78,18 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   log.info(s"Declared address: $ownSocketAddress")
 
-  lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
+  private lazy val handshakeTemplate = Handshake(application.applicationName,
+    application.appVersion,
+    ownSocketAddress.getAddress.toString,
+    ownSocketAddress.getPort,
+    nodeNonce,
+    0
+  )
+
+
   lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
 
+  //bind to listen incoming connections
   IO(Tcp) ! Bind(self, localAddress)
 
   private def bindingLogic: Receive = {
