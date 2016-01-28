@@ -116,7 +116,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
             case None =>
               log.error("No handlers found for message: " + msgId)
-            //todo: ???
+            //todo: ban a peer
           }
         case Failure(e) =>
           log.error("Failed to deserialize data: " + e.getMessage)
