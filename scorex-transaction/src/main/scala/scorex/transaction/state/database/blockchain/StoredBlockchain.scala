@@ -1,16 +1,15 @@
 package scorex.transaction.state.database.blockchain
 
-import better.files._
-import org.mapdb.DBMaker
+import org.mapdb.{DB, DBMaker}
 import scorex.account.Account
 import scorex.block.Block
+import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
 import scorex.transaction.BlockStorage._
 import scorex.transaction.{BlockChain, TransactionModule}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
-import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -21,67 +20,49 @@ class StoredBlockchain(dataFolderOpt: Option[String])
                        transactionModule: TransactionModule[_])
   extends BlockChain with ScorexLogging {
 
-  trait BlockchainPersistence {
-    def writeBlock(height: Int, block: Block): Try[Unit]
+  case class BlockchainPersistence(database: DB) {
+    val blocks = database.treeMap[Int, Array[Byte]]("blocks")
+    val signatures = database.treeMap[Int, BlockId]("signatures")
 
-    def readBlock(height: Int): Option[Block]
+    //if there are some uncommited changes from last run, discard'em
+    if (signatures.size() > 0) database.rollback()
 
-    def deleteBlock(height: Int): Unit
-  }
-
-  case class FileBlockchainPersistence(dataFolder: String) extends BlockchainPersistence {
-    private def blockFile(height: Int) = File(dataFolder + s"/block-$height")
-
-    override def writeBlock(height: Int, block: Block): Try[Unit] = Try {
-      val blockBytes = block.bytes
-      blockFile(height)
-        .clear()
-        .write(blockBytes)
-        .ensuring(_.size == blockBytes.length)
+    def writeBlock(height: Int, block: Block): Try[Unit] = Try {
+      blocks.put(height, block.bytes)
+      signatures.put(height, block.uniqueId)
+      database.commit()
     }
 
-    override def readBlock(height: Int): Option[Block] = {
-      Try(blockFile(height).byteArray)
-        .flatMap(bs => Block.parse(bs))
-        .recoverWith { case t =>
-          log.error(s"Error while reading a block for height $height", t)
-          Failure(t)
-        }.toOption
+    def readBlock(height: Int): Option[Block] =
+      Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parse(b).toOption)
+
+    def deleteBlock(height: Int): Unit = {
+      blocks.remove(height)
+      signatures.remove(height)
+      database.commit()
     }
 
-    override def deleteBlock(height: Int): Unit =
-      Try(blockFile(height).delete()).recover { case t =>
-        log.error(s"Can't delete blockfile: ${blockFile(height).name}", t)
-      }
+    def contains(id: BlockId): Boolean = signatures.exists(_._2.sameElements(id))
+
+    def height(): Int = signatures.size()
+
+    def heightOf(id: BlockId): Option[Int] = signatures.find(_._2.sameElements(id)).map(_._1)
+
   }
 
-  object MemoryBlockchainPersistence$ extends BlockchainPersistence {
-    private val memStorage = TrieMap[Int, Block]()
-
-    override def writeBlock(height: Int, block: Block): Try[Unit] =
-      Success(memStorage.put(height, block))
-
-    override def readBlock(height: Int): Option[Block] = memStorage.get(height)
-
-    override def deleteBlock(height: Int): Unit = memStorage.remove(height)
-  }
-
-  private val (blockStorage, database) = dataFolderOpt match {
-    case Some(dataFolder) =>
-      (FileBlockchainPersistence(dataFolder),
-        DBMaker.appendFileDB(new java.io.File(dataFolder + s"/signatures"))
+  private val blockStorage: BlockchainPersistence = {
+    val db = dataFolderOpt match {
+      case Some(dataFolder) =>
+        DBMaker.appendFileDB(new java.io.File(dataFolder + s"/blocks"))
           .fileMmapEnableIfSupported()
           .closeOnJvmShutdown()
           .checksumEnable()
-          .make())
-    case None =>
-      (MemoryBlockchainPersistence$, DBMaker.memoryDB().make())
+          .make()
+      case None => DBMaker.memoryDB().make()
+    }
+    new BlockchainPersistence(db)
   }
 
-  private val signaturesIndex = database.treeMap[Int, Array[Byte]]("signatures")
-
-  //if there are some uncommited changes from last run, discard'em
-  if (signaturesIndex.size() > 0) database.rollback()
 
   log.info(s"Initialized blockchain in $dataFolderOpt with ${height()} blocks")
 
@@ -90,10 +71,8 @@ class StoredBlockchain(dataFolderOpt: Option[String])
       val parent = block.referenceField
       if ((height() == 0) || (lastBlock.uniqueId sameElements parent.value)) {
         val h = height() + 1
-        blockStorage.writeBlock(h, block).flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
-          case Success(_) =>
-            database.commit()
-            Seq(block)
+        blockStorage.writeBlock(h, block) match {
+          case Success(_) => Seq(block)
           case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
         }
       } else blockById(parent.value) match {
@@ -106,17 +85,12 @@ class StoredBlockchain(dataFolderOpt: Option[String])
             val toRollback = blocksFromBranchPoint map { b =>
               val h = heightOf(b).get
               blockStorage.deleteBlock(h)
-              signaturesIndex.remove(h)
               (b, Reversed)
             }
             val h = height() + 1
-            blockStorage.writeBlock(h, block).flatMap(_ => Try(signaturesIndex.put(h, block.uniqueId))) match {
-              case Success(_) =>
-                database.commit()
-                Seq(block)
-              case Failure(t) =>
-                database.rollback()
-                throw new Error("Error while storing blockchain a change: " + t)
+            blockStorage.writeBlock(h, block) match {
+              case Success(_) => Seq(block)
+              case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
             }
           } else Seq.empty
         case None => throw new Error(s"Appending block ${block.json} which parent is not in blockchain")
@@ -129,8 +103,6 @@ class StoredBlockchain(dataFolderOpt: Option[String])
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
     blockStorage.deleteBlock(h)
-    signaturesIndex.remove(h)
-    database.commit()
     this
   }
 
@@ -138,19 +110,15 @@ class StoredBlockchain(dataFolderOpt: Option[String])
     blockStorage.readBlock(height)
   }
 
-  override def contains(signature: Array[Byte]): Boolean =
-    signaturesIndex.exists(_._2.sameElements(signature))
+  override def contains(signature: Array[Byte]): Boolean = blockStorage.contains(signature)
 
-  override def height(): Int = signaturesIndex.size
+  override def height(): Int = blockStorage.height()
 
-  override def heightOf(blockSignature: Array[Byte]): Option[Int] =
-    signaturesIndex.find(_._2.sameElements(blockSignature)).map(_._1)
+  override def heightOf(blockSignature: Array[Byte]): Option[Int] = blockStorage.heightOf(blockSignature)
 
-  override def blockById(blockId: Block.BlockId): Option[Block] =
-    heightOf(blockId).flatMap(blockAt)
+  override def blockById(blockId: BlockId): Option[Block] = heightOf(blockId).flatMap(blockAt)
 
-  override def children(block: Block): Seq[Block] =
-    heightOf(block).flatMap(h => blockAt(h + 1)).toSeq
+  override def children(block: Block): Seq[Block] = heightOf(block).flatMap(h => blockAt(h + 1)).toSeq
 
   override def generatedBy(account: Account): Seq[Block] =
     (1 to height()).toStream.flatMap { h =>

@@ -21,7 +21,7 @@ import scala.util.Try
   *
   * Use apply method of StoredState object to create new instance
   */
-class StoredState(database: DB, dbFileName: Option[String]) extends LagonakiState with ScorexLogging {
+class StoredState(val database: DB, dbFileName: Option[String]) extends LagonakiState with ScorexLogging {
 
   private object AccSerializer extends Serializer[Account] {
     override def serialize(dataOutput: DataOutput, a: Account): Unit =
