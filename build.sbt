@@ -25,3 +25,4 @@ linuxPackageMappings in Debian := linuxPackageMappings.value
 name in Debian := "PermaScorex"
 version in Debian := "0.1.0"
 genChanges in Debian := new File("changelog.md")
+name in Debian := "PermaScorex"
