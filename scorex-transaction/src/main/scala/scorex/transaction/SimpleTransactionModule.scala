@@ -94,7 +94,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
       }
 
       override def removeState(id: BlockId): Unit = {
-        cache.remove(key(id))
+        cache.remove(key(id)).foreach(_.database.close())
         getFileName(id).map(new File(_).delete())
       }
 
