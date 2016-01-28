@@ -40,12 +40,6 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], stor
       val msg = Message(SegmentsMessageSpec, Right(segments), None)
       networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
 
-      /*
-      segments.grouped(MaxSegmentsInMessage).foreach { s =>
-        val msg = Message(SegmentsMessageSpec, Right(s), None)
-        networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
-      } */
-
     case DataFromPeer(msgId, segments: Map[DataSegmentIndex, AuthDataBlock[DataSegment]]@unchecked, remote)
       if msgId == SegmentsMessageSpec.messageCode && segments.cast[Map[DataSegmentIndex, AuthDataBlock[DataSegment]]].isDefined =>
       log.info(s"SegmentsMessage with ${segments.size} segments")
