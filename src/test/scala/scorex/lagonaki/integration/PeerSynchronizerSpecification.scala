@@ -42,7 +42,7 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
 
   "PeerSynchronizer actor" must {
     "response with known peers" in {
-      ps ! DataFromPeer(GetPeersSpec.messageCode, Right(), peer)
+      ps ! DataFromPeer(GetPeersSpec.messageCode, Right, peer)
       val peers = (application.peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
         .futureValue
@@ -58,7 +58,7 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
         .mapTo[Seq[InetSocketAddress]]
         .futureValue
       newPeers.length shouldBe 2
-      ps ! DataFromPeer(GetPeersSpec.messageCode, Right(), peer)
+      ps ! DataFromPeer(GetPeersSpec.messageCode, Right, peer)
       probe.expectMsg(Message(PeersSpec, Right(newPeers), None))
     }
 
@@ -71,7 +71,7 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
       val newPeer = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 3)
       val peers: Seq[InetSocketAddress] = Seq(newPeer)
       ps ! DataFromPeer(PeersSpec.messageCode, peers, peer)
-      ps ! DataFromPeer(GetPeersSpec.messageCode, Right(), peer)
+      ps ! DataFromPeer(GetPeersSpec.messageCode, Right, peer)
       probe.expectMsg(Message(PeersSpec, Right(peersBefore ++ Seq(newPeer)), None))
     }
   }
