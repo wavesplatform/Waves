@@ -41,7 +41,6 @@ lazy val perma = subModule("perma")
   )
 
 lazy val root = Project(id = "scorex", base = file("."))
-  .aggregate(basics, transaction, consensus, perma)
   .dependsOn(basics, transaction, consensus, perma)
   .settings(commonSettings: _*)
   .settings(
@@ -136,11 +135,15 @@ imageNames in docker := Seq(
 
 pomIncludeRepository := { _ => false }
 
-pomExtra :=
-    <scm>
-      <url>git@github.com:ConsensusResearch/Scorex-Lagonaki.git</url>
-      <connection>scm:git:git@github.com:ConsensusResearch/Scorex-Lagonaki.git</connection>
-    </scm>
+licenses in ThisBuild := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
+
+homepage in ThisBuild := Some(url("https://github.com/ConsensusResearch/Scorex-Lagonaki"))
+
+pomExtra in ThisBuild :=
+  <scm>
+    <url>git@github.com:ConsensusResearch/Scorex-Lagonaki.git</url>
+    <connection>scm:git:git@github.com:ConsensusResearch/Scorex-Lagonaki.git</connection>
+  </scm>
     <developers>
       <developer>
         <id>kushti</id>
