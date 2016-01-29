@@ -59,17 +59,7 @@ trait Application extends ScorexLogging {
 
   //wallet
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
-  val wSeed = settings.walletSeed.getOrElse {
-    println("Please type your wallet seed")
-    def readSeed(): Array[Byte] = Base58.decode(scala.io.StdIn.readLine()) match {
-      case Success(seed) => seed
-      case _ =>
-        println("Wallet seed should be correct Base58 encoded string.")
-        readSeed()
-    }
-    readSeed()
-  }
-  implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, wSeed)
+  implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed)
 
   //interface to append log and state
   val blockStorage: BlockStorage

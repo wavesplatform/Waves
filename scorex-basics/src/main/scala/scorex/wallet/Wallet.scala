@@ -5,16 +5,16 @@ import java.io.File
 import com.google.common.primitives.{Bytes, Ints}
 import org.mapdb.{DBMaker, Serializer}
 import scorex.account.PrivateKeyAccount
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
+import scala.util.Success
 
 //todo: add accs txs?
-class Wallet(walletFileOpt: Option[File],
-             password: String,
-             seed: Array[Byte]) extends ScorexLogging {
+class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Array[Byte]]) extends ScorexLogging {
 
   private val NonceFieldName = "nonce"
 
@@ -32,6 +32,18 @@ class Wallet(walletFileOpt: Option[File],
     case None =>
       DBMaker.memoryDB().encryptionEnable(password).make
   }
+  if (Option(database.atomicVar("seed").get()).isEmpty) {
+    val seed = seedOpt.getOrElse {
+      println("Please type your wallet seed")
+      def readSeed(): Array[Byte] = Base58.decode(scala.io.StdIn.readLine()).getOrElse {
+        println("Wallet seed should be correct Base58 encoded string.")
+        readSeed()
+      }
+      readSeed()
+    }
+    database.atomicVar("seed").set(seed)
+  }
+  val seed: Array[Byte] = database.atomicVar("seed").get()
 
   private val accountsPersistence = database.hashSet("privkeys", Serializer.BYTE_ARRAY)
 
@@ -48,7 +60,7 @@ class Wallet(walletFileOpt: Option[File],
   def generateNewAccount(): Option[PrivateKeyAccount] = synchronized {
     val nonce = getAndIncrementNonce()
 
-    val accountSeed = generateAccountSeed(seed, nonce)
+    val accountSeed = generateAccountSeed(exportSeed, nonce)
     val account = new PrivateKeyAccount(accountSeed)
 
     val address = account.address
