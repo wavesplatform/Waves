@@ -5,6 +5,7 @@ import akka.io.IO
 import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
+import scorex.crypto.encode.Base58
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
@@ -16,7 +17,7 @@ import spray.can.Http
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.runtime.universe.Type
-import scala.util.Random
+import scala.util.{Success, Random}
 
 trait Application extends ScorexLogging {
   val ApplicationNameLimit = 50
@@ -58,7 +59,7 @@ trait Application extends ScorexLogging {
 
   //wallet
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
-  implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed.get)
+  implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed)
 
   //interface to append log and state
   val blockStorage: BlockStorage

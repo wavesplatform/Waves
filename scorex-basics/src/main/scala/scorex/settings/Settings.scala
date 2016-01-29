@@ -7,7 +7,7 @@ import scorex.crypto.encode.Base58
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Success, Try}
 
 /**
   * Settings
@@ -74,8 +74,11 @@ trait Settings extends ScorexLogging {
 
   lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
-  lazy val walletPassword = (settingsJSON \ "walletPassword").as[String]
-  lazy val walletSeed = Base58.decode((settingsJSON \ "walletSeed").as[String])
+  lazy val walletPassword = (settingsJSON \ "walletPassword").asOpt[String].getOrElse{
+    println("Please type your wallet password")
+    scala.io.StdIn.readLine()
+  }
+  lazy val walletSeed = (settingsJSON \ "walletSeed").asOpt[String].flatMap(s => Base58.decode(s).toOption)
 
   //NETWORK
   private val DefaultMaxConnections = 20

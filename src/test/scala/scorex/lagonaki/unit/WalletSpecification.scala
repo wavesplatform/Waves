@@ -12,7 +12,7 @@ class WalletSpecification extends FunSuite {
 
   test("wallet - acc deletion") {
 
-    val w = new Wallet(None, "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
+    val w = new Wallet(None, "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption)
 
     w.generateNewAccounts(walletSize)
 
@@ -35,12 +35,12 @@ class WalletSpecification extends FunSuite {
     //todo read folder from settings
     val walletFile = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")
 
-    val w = new Wallet(Some(walletFile), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
+    val w = new Wallet(Some(walletFile), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption)
     w.generateNewAccounts(10)
     w.close()
     assert(w.exists())
 
-    val w2 = new Wallet(Some(walletFile), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get)
+    val w2 = new Wallet(Some(walletFile), "cookies", None)
     assert(w2.privateKeyAccounts().head.address != null)
   }
 }
