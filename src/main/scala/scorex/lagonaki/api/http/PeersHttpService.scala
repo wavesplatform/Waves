@@ -8,7 +8,7 @@ import akka.pattern.ask
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.{JsString, Json}
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.lagonaki.server.LagonakiApplication
+import scorex.app.Application
 import scorex.network.Handshake
 import scorex.network.peer.PeerManager
 import spray.http.MediaTypes._
@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
 @Api(value = "/peers", description = "Get info about peers", position = 2)
-case class PeersHttpService(application: LagonakiApplication)(implicit val context: ActorRefFactory)
+case class PeersHttpService(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
   override lazy val route =

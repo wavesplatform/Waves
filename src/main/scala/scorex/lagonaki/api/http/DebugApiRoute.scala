@@ -6,14 +6,14 @@ import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http._
+import scorex.app.Application
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.lagonaki.server.LagonakiApplication
 import spray.routing.Route
 
 @Api(value = "/debug", description = "Debug methods", position = 1)
-case class DebugApiRoute(application: LagonakiApplication)(implicit val context: ActorRefFactory)
+case class DebugApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   implicit lazy val transactionModule = application.transactionModule

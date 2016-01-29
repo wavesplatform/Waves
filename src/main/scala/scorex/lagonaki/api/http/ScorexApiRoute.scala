@@ -1,23 +1,24 @@
 package scorex.lagonaki.api.http
 
 import javax.ws.rs.Path
+
 import akka.actor.ActorRefFactory
 import akka.pattern.ask
+import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.lagonaki.server.LagonakiApplication
+import scorex.app.Application
 import scorex.lagonaki.server.settings.Constants
-import scorex.network.{HistorySynchronizer, BlockGenerator}
+import scorex.network.{BlockGenerator, HistorySynchronizer}
+import spray.http.MediaTypes._
 import spray.routing.Route
+
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-import spray.http.MediaTypes._
-import com.wordnik.swagger.annotations._
-import scala.concurrent.ExecutionContext.Implicits.global
-
 @Api(value = "scorex", description = "General commands & information", position = 0)
-case class ScorexApiRoute(application: LagonakiApplication)(implicit val context: ActorRefFactory)
+case class ScorexApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
   override lazy val route =
@@ -56,7 +57,7 @@ case class ScorexApiRoute(application: LagonakiApplication)(implicit val context
           def bgf = (application.blockGenerator ? BlockGenerator.GetStatus).map(_.toString)
           def hsf = (application.historySynchronizer ? HistorySynchronizer.GetStatus).map(_.toString)
 
-          Future.sequence(Seq(bgf, hsf)).map { case statusesSeq=>
+          Future.sequence(Seq(bgf, hsf)).map { case statusesSeq =>
             Json.obj(
               "block generator status" -> statusesSeq.head,
               "history synchronization status" -> statusesSeq.tail.head
