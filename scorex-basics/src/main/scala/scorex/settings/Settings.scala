@@ -75,7 +75,7 @@ trait Settings extends ScorexLogging {
   lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
   lazy val walletPassword = (settingsJSON \ "walletPassword").as[String]
-  lazy val walletSeed = Base58.decode((settingsJSON \ "walletSeed").as[String])
+  lazy val walletSeed = (settingsJSON \ "walletSeed").asOpt[String].flatMap(s => Base58.decode(s).toOption)
 
   //NETWORK
   private val DefaultMaxConnections = 20
