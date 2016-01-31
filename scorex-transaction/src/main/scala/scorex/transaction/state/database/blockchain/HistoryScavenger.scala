@@ -18,7 +18,7 @@ class HistoryScavenger(blockStorage: BlockStorage) extends Actor with ScorexLogg
 
   override def receive: Receive = {
     case Unit =>
-      val lastBlocks = blockStorage.history.lastBlocks(blockStorage.MaxRollback).map(b => Base58.encode(b.uniqueId)).toSet
+      val lastBlocks = blockStorage.history.lastBlocks(blockStorage.MaxRollback).map(b => b.encodedId).toSet
       val storedStates = blockStorage.stateHistory.keySet.map(Base58.encode)
       val diff = storedStates.diff(lastBlocks)
       log.info("Remove old states: " + diff)

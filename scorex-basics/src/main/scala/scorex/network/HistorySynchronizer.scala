@@ -3,7 +3,6 @@ package scorex.network
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.crypto.encode.Base58
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.NetworkObject.ConsideredValue
 import scorex.network.message.Message
@@ -123,7 +122,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
 
         val blockId = block.uniqueId
-        log.info("Got block: " + Base58.encode(blockId))
+        log.info("Got block: " + block.encodedId)
 
         blocks.indexWhere(_._1.sameElements(blockId)) match {
           case i: Int if i == -1 => gotoGettingBlock(witnesses, blocks)

@@ -6,7 +6,6 @@ import scorex.block.{Block, BlockField}
 import scorex.consensus.ConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.crypto.singing.SigningFunctions.{PrivateKey, PublicKey}
@@ -212,7 +211,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         log.debug(s"Height: $height, target:$newTarget vs $currentTarget, lastAvgDuration:$lastAvgDuration")
         newTarget
       }
-      targetBuf.getOrElseUpdate(Base58.encode(block.uniqueId), calc)
+      targetBuf.getOrElseUpdate(block.encodedId, calc)
     } else {
       currentTarget
     }

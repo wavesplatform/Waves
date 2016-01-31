@@ -6,6 +6,7 @@ import play.api.libs.json.Json
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.consensus.ConsensusModule
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionModule
 import scorex.utils.ScorexLogging
 
@@ -45,6 +46,8 @@ trait Block extends ScorexLogging {
   // Some block characteristic which is uniq for a block
   // e.g. hash or signature. Used in referencing
   val uniqueId: Block.BlockId
+
+  lazy val encodedId: String = Base58.encode(uniqueId)
 
   lazy val transactions = transactionModule.transactions(this)
 

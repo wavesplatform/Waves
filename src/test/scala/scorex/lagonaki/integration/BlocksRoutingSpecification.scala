@@ -76,7 +76,7 @@ class BlocksRoutingSpecification extends RouteTest {
   }
 
   it should "return return error when there are no children" in {
-    val sig = Base58.encode(transactionModule.blockStorage.history.lastBlock.uniqueId)
+    val sig = transactionModule.blockStorage.history.lastBlock.encodedId
     Get(s"/blocks/child/$sig") ~> blocksRoute ~> check {
       val js = Json.parse(responseAs[String])
       (js \ "status").as[String] shouldBe "error"

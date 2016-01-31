@@ -127,7 +127,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
       * @return true when best block added, false when block score is less then current score
       */
     override def writeBlock(block: Block): Try[Boolean] = Try {
-      if (exists(block)) log.warn(s"Trying to add block ${Base58.encode(block.uniqueId)} that is already in tree "
+      if (exists(block)) log.warn(s"Trying to add block ${block.encodedId} that is already in tree "
         + s" at height ${readBlock(block).map(_._3)}")
       val parent = readBlock(block.referenceField.value)
       lazy val blockScore = consensusModule.blockScore(block).ensuring(_ > 0)
