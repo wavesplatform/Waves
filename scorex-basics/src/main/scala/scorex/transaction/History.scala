@@ -3,6 +3,7 @@ package scorex.transaction
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.crypto.encode.Base58
 import scorex.transaction.BlockStorage.BlocksToProcess
 
 import scala.util.Try
@@ -44,6 +45,8 @@ trait History {
   def contains(id: BlockId): Boolean = blockById(id).isDefined
 
   def blockById(blockId: Block.BlockId): Option[Block]
+
+  def blockById(blockId: String): Option[Block] = Base58.decode(blockId).toOption.flatMap(blockById)
 
   /**
     * Height of a block if it's in the blocktree

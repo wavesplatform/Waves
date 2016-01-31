@@ -18,7 +18,7 @@ object Server extends App with ScorexLogging {
 
     log.debug("LagonakiApplication has been started")
     application.run()
-    require(application.blockStorage.state(application.blockStorage.history.lastBlock.uniqueId).isDefined)
+    require(application.blockStorage.state(application.blockStorage.history.lastBlock.encodedId).isDefined)
     if (application.settings.offlineGeneration) {
       testingScript(application)
     } else {

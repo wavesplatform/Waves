@@ -6,7 +6,6 @@ import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
-import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockField}
 import scorex.crypto.encode.Base58
 import scorex.network.message.Message
@@ -76,45 +75,43 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
       private val StateCopyTimeout = 10.seconds
 
-      private def getFileName(id: BlockId): Option[String] = stateDir.map(f => f + "/state-" + key(id))
+      private def getFileName(encodedId: String): Option[String] = stateDir.map(f => f + "/state-" + encodedId)
 
-      private def key(id: BlockId): String = Base58.encode(id)
-
-      override def keySet: Set[BlockId] = stateDir match {
+      override def keySet: Set[String] = stateDir match {
         case Some(folder) =>
-          val f = new File(folder).listFiles().map(_.getName).toSet.filter(_.startsWith("state-")).map(_.substring(6))
-          f.flatMap(s => Base58.decode(s).toOption)
-        case None => cache.keySet.flatMap(s => Base58.decode(s).toOption).toSet
+          new File(folder).listFiles().map(_.getName).toSet.filter(_.startsWith("state-")).map(_.substring(6))
+        case None => cache.keySet.toSet
       }
 
-      override def copyState(id: BlockId, state: LagonakiState): StoredState = {
-        val copy = state.copyTo(getFileName(id)).asInstanceOf[StoredState]
-        cache.put(key(id), copy)
+      override def copyState(encodedId: String, state: LagonakiState): StoredState = {
+        val copy = state.copyTo(getFileName(encodedId)).asInstanceOf[StoredState]
+        cache.put(encodedId, copy)
         copy
       }
 
-      override def removeState(id: BlockId): Unit = {
-        cache.remove(key(id)).foreach(_.database.close())
-        getFileName(id).map(new File(_).delete())
+      override def removeState(encodedId: String): Unit = {
+        cache.remove(encodedId).foreach(_.database.close())
+        getFileName(encodedId).map(new File(_).delete())
       }
 
-      override def state(id: BlockId): Option[StoredState] = state(id, MaxRollback)
+      override def state(encodedId: String): Option[StoredState] = state(encodedId, MaxRollback)
 
-      def state(id: BlockId, limit: Int): Option[StoredState] = cache.get(key(id)) match {
+      def state(encodedId: String, limit: Int): Option[StoredState] = cache.get(encodedId) match {
         case None =>
-          val st: Option[StoredState] = if (!getFileName(id).exists(f => new File(f).exists())) None
-          else Some(untilTimeout(StateCopyTimeout)(StoredState(getFileName(id))))
+          val st: Option[StoredState] = if (!getFileName(encodedId).exists(f => new File(f).exists())) None
+          else Some(untilTimeout(StateCopyTimeout)(StoredState(getFileName(encodedId))))
 
           val recoveredState = if (limit > 0 && (st.isEmpty || !st.get.isValid(InitialBalance))) {
             //State is wrong, recover from the previous one
-            log.warn(s"State for block ${Base58.encode(id)} is not valid, recover from parent")
-            removeState(id)
-            val parenState = history.blockById(id).map(_.referenceField.value).flatMap(id => state(id, limit - 1))
-            val newState: Option[StoredState] = parenState.map(s => copyState(id, s))
-            newState.map(s => s.processBlock(history.blockById(id).get))
+            log.warn(s"State for block $encodedId} is not valid, recover from parent")
+            removeState(encodedId)
+            val parenState = history.blockById(encodedId).map(_.referenceField.value)
+              .flatMap(id => state(Base58.encode(id), limit - 1))
+            val newState: Option[StoredState] = parenState.map(s => copyState(encodedId, s))
+            newState.map(s => s.processBlock(history.blockById(encodedId).get))
             newState
           } else st
-          recoveredState.map(s => cache.put(key(id), s))
+          recoveredState.map(s => cache.put(encodedId, s))
 
           recoveredState
 
@@ -122,12 +119,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
       }
 
       override def state: StoredState = if (history.height() > 0) {
-        untilTimeout(StateCopyTimeout)(state(history.lastBlock.uniqueId).get)
+        untilTimeout(StateCopyTimeout)(state(history.lastBlock.encodedId).get)
       } else emptyState
 
-      override val emptyState = StoredState(getFileName(Array.empty))
+      override val emptyState = StoredState(getFileName(""))
     }
-
   }
 
   /**

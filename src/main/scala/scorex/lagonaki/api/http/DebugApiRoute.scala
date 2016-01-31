@@ -65,8 +65,7 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
   def stateAt: Route = {
     path("state" / Segment) { case blockId =>
       jsonRoute {
-        val id: BlockId = Base58.decode(blockId).getOrElse(Array.empty)
-        application.blockStorage.state(id) match {
+        application.blockStorage.state(blockId) match {
           case None => Json.obj("error" -> "wrong block id").toString
           case Some(b) => b.toString
         }
