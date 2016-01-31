@@ -3,6 +3,7 @@ package scorex.lagonaki.integration
 import play.api.libs.json.Json
 import scorex.api.http.BlocksApiRoute
 import scorex.block.Block
+import scorex.crypto.encode.Base58
 import scorex.lagonaki.TestingCommons
 
 
@@ -75,7 +76,8 @@ class BlocksRoutingSpecification extends RouteTest {
   }
 
   it should "return return error when there are no children" in {
-    Get(s"/blocks/child/$signature") ~> blocksRoute ~> check {
+    val sig = Base58.encode(transactionModule.blockStorage.history.lastBlock.uniqueId)
+    Get(s"/blocks/child/$sig") ~> blocksRoute ~> check {
       val js = Json.parse(responseAs[String])
       (js \ "status").as[String] shouldBe "error"
     }
