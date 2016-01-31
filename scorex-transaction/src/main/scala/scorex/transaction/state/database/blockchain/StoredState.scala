@@ -127,12 +127,13 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
       }
     }
 
-    balanceChanges.foreach { case (acc, delta) =>
+    val newBalances: Map[Account, Long] = balanceChanges.map { case (acc, delta) =>
       val balance = Option(balances.get(acc)).getOrElse(0L)
-      val newBalance = balance + delta
-      if (newBalance < 0) log.error(s"Account $acc balance $newBalance is negative")
-      balances.put(acc, newBalance)
+      require(balance + delta > 0, s"Account $acc balance is negative: $balance + $delta")
+      (acc, balance + delta)
     }
+
+    newBalances.foreach(a => balances.put(a._1, a._2))
 
     val newHeight = stateHeight() + 1
     setStateHeight(newHeight)
