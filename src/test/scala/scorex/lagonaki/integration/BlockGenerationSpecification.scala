@@ -43,26 +43,18 @@ class BlockGenerationSpecification extends FunSuite with Matchers with TestingCo
     case _ => None
   })
 
-  def genTransaction(sender: PrivateKeyAccount, recipient: Account, amt: Long, fee: Long = 1): LagonakiTransaction = {
-    val tx = transactionModule.createPayment(sender, recipient, amt, fee)
-    if (tx.validate()(transactionModule) == ValidationResult.ValidateOke) tx
-    else genTransaction(sender, recipient, amt, fee)
-  }
-
   def genValidTransaction(randomAmnt: Boolean = true): Transaction = {
     val senderAcc = accounts(Random.nextInt(accounts.size))
     val senderBalance = transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
     val fee = Random.nextInt(5).toLong + 1
     if (senderBalance <= fee) {
-      println(s"$senderBalance <= $fee")
       genValidTransaction(randomAmnt)
     } else {
       val amt = if (randomAmnt) Math.abs(Random.nextLong() % (senderBalance - fee))
       else senderBalance - fee
-      val tx = genTransaction(senderAcc, accounts(Random.nextInt(accounts.size)), amt, fee)
-      if (tx.validate()(transactionModule) == ValidationResult.ValidateOke) {
-        tx
-      } else genValidTransaction(randomAmnt)
+      val tx = transactionModule.createPayment(senderAcc, accounts(Random.nextInt(accounts.size)), amt, fee)
+      if (tx.validate()(transactionModule) == ValidationResult.ValidateOke) tx
+      else genValidTransaction(randomAmnt)
     }
   }
 
@@ -116,7 +108,7 @@ class BlockGenerationSpecification extends FunSuite with Matchers with TestingCo
       val recepient = new PublicKeyAccount(Array.empty)
       val senderBalance = transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(a)
 
-      val txs = (1 to 2) map (i => genTransaction(a, recepient, senderBalance / 2, 1))
+      if (senderBalance > 1) (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
     }
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe accounts.size * 2
     val block5 = genValidBlock()
