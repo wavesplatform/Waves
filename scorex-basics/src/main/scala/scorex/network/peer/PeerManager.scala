@@ -108,14 +108,6 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         }
       }
   }: Receive) orElse peerLists orElse apiInterface orElse peerCycle
-
-  /*
-  def blacklistPeer(peer: InetSocketAddress): Unit = {
-    PeerDatabaseImpl.removeConnectedPeer(peer)
-    PeerDatabaseImpl.blacklistPeer(peer)
-  }
-
-  def isBlacklisted(address: InetSocketAddress): Boolean = PeerDatabaseImpl.isBlacklisted(address)*/
 }
 
 object PeerManager {

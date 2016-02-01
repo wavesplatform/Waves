@@ -7,7 +7,7 @@ trait PeerDatabase {
 
   def knownPeers(): Seq[InetSocketAddress]
 
-  def blacklistPeer(peer: InetSocketAddress)
+  def blacklistPeer(peer: InetSocketAddress): Unit
 
   def blacklistedPeers(): Seq[InetSocketAddress]
 
