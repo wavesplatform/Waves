@@ -74,10 +74,10 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case Handshaked(address, handshake) =>
       val toUpdate = connectedPeers.filter { case (cp, h) =>
-        cp.address == address || h.map(_.fromNonce == handshake.fromNonce).getOrElse(true)
+        cp.socketAddress == address || h.map(_.fromNonce == handshake.fromNonce).getOrElse(true)
       }
 
-      val newCp = toUpdate.find(_._1.address.getAddress.toString == handshake.fromAddress)
+      val newCp = toUpdate.find(_._1.socketAddress.getAddress.toString == handshake.fromAddress)
         .getOrElse(toUpdate.head)._1
 
       toUpdate.keys.foreach(connectedPeers.remove)
@@ -86,12 +86,12 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       if (handshake.fromNonce == application.nodeNonce) {
         newCp.handlerRef ! PeerConnectionHandler.CloseConnection
       } else {
-        self ! PeerManager.AddPeer(newCp.address)
+        self ! PeerManager.AddPeer(newCp.socketAddress)
         connectedPeers += newCp -> Some(handshake)
       }
 
     case Disconnected(remote) =>
-      connectedPeers.retain { case (p, _) => p.address != remote }
+      connectedPeers.retain { case (p, _) => p.socketAddress != remote }
       if (connectingPeer.contains(remote)) {
         connectingPeer = None
       }
@@ -101,7 +101,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     case CheckPeers =>
       if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
         randomPeer().foreach { address =>
-          if (!connectedPeers.map(_._1.address).contains(address)) {
+          if (!connectedPeers.map(_._1.socketAddress).contains(address)) {
             connectingPeer = Some(address)
             networkController ! NetworkController.ConnectTo(address)
           }

@@ -15,11 +15,12 @@ import scorex.utils.ScorexLogging
 import scala.util.{Failure, Success}
 
 
-case class ConnectedPeer(address: InetSocketAddress, handlerRef: ActorRef) {
+case class ConnectedPeer(socketAddress: InetSocketAddress, handlerRef: ActorRef) {
 
   import shapeless.Typeable._
 
-  override def equals(obj: scala.Any): Boolean = obj.cast[ConnectedPeer].exists(_.address == this.address)
+  override def equals(obj: scala.Any): Boolean =
+    obj.cast[ConnectedPeer].exists(_.socketAddress == this.socketAddress)
 }
 
 
@@ -38,8 +39,7 @@ case class PeerConnectionHandler(application: Application,
 
   private lazy val peerManager: ActorRef = application.peerManager
 
-  val selfPeer = new ConnectedPeer(remote, self)
-
+  private val selfPeer = new ConnectedPeer(remote, self)
 
   context watch connection
 
