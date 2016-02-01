@@ -97,19 +97,20 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         witnesses.contains(remote) => //todo: ban if non-expected sender
 
       val common = blockIds.head
-      assert(application.history.contains(common)) //todo: what if not?
 
       val toDownload = blockIds.tail
-      assert(!application.history.contains(toDownload.head)) //todo: what if not?
-
-      Try(application.blockStorage.removeAfter(common)) //todo we don't need this call for blockTree
-
-      gotoGettingBlock(witnesses, toDownload.map(_ -> None))
-
-      blockIds.tail.foreach { blockId =>
-        val msg = Message(GetBlockSpec, Right(blockId), None)
-        val stn = SendToChosen(Seq(remote))
-        networkControllerRef ! NetworkController.SendToNetwork(msg, stn)
+      if (application.history.contains(common) && !application.history.contains(toDownload.head)) {
+        Try(application.blockStorage.removeAfter(common)) //todo we don't need this call for blockTree
+        gotoGettingBlock(witnesses, toDownload.map(_ -> None))
+        blockIds.tail.foreach { blockId =>
+          val msg = Message(GetBlockSpec, Right(blockId), None)
+          val stn = SendToChosen(Seq(remote))
+          networkControllerRef ! NetworkController.SendToNetwork(msg, stn)
+        }
+      } else {
+        log.warn(s"Strange blockIds: ${application.history.contains(common)} &&" +
+          s"${!application.history.contains(toDownload.head)}")
+        gotoSyncing()
       }
   }: Receive)
 
