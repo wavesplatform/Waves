@@ -41,7 +41,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   }
 
   private def peerLists: Receive = {
-    case AddPeer(address) =>
+    case AddKnownPeer(address) =>
       if (!knownPeers().contains(address)) PeerDatabaseImpl.addKnownPeer(address)
 
     case KnownPeers => sender() ! knownPeers()
@@ -86,7 +86,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       if (handshake.fromNonce == application.nodeNonce) {
         newCp.handlerRef ! PeerConnectionHandler.CloseConnection
       } else {
-        self ! PeerManager.AddPeer(newCp.socketAddress)
+        self ! PeerManager.AddKnownPeer(newCp.socketAddress)
         connectedPeers += newCp -> Some(handshake)
       }
 
@@ -112,7 +112,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
 object PeerManager {
 
-  case class AddPeer(address: InetSocketAddress)
+  case class AddKnownPeer(address: InetSocketAddress)
 
   case object KnownPeers
 

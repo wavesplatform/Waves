@@ -46,7 +46,7 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
 
       peers.foreach { isa =>
         if (!own.exists(_.sameElements(isa.getAddress.getAddress)))
-          peerManager ! PeerManager.AddPeer(isa)
+          peerManager ! PeerManager.AddKnownPeer(isa)
       }
 
     case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
