@@ -129,7 +129,7 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
 
     val newBalances: Map[Account, Long] = balanceChanges.map { case (acc, delta) =>
       val balance = Option(balances.get(acc)).getOrElse(0L)
-      require(balance + delta > 0, s"Account $acc balance is negative: $balance + $delta")
+      require(balance + delta >= 0, s"Account $acc balance is negative: $balance + $delta")
       (acc, balance + delta)
     }
 
