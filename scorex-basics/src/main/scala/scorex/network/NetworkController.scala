@@ -74,14 +74,13 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     }.map(ia => new InetSocketAddress(ia, application.settings.port))
 
   //an address to send to peers
-  lazy val ownSocketAddress = externalSocketAddress.getOrElse(localAddress)
+  lazy val ownSocketAddress = externalSocketAddress
 
   log.info(s"Declared address: $ownSocketAddress")
 
   private lazy val handshakeTemplate = Handshake(application.applicationName,
     application.appVersion,
-    ownSocketAddress.getAddress.toString,
-    ownSocketAddress.getPort,
+    ownSocketAddress,
     nodeNonce,
     0
   )
