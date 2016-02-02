@@ -1,12 +1,15 @@
 package scorex.lagonaki.integration
 
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.server.LagonakiApplication
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{ScorexLogging, untilTimeout}
 
 import scala.concurrent.duration._
 
-class ValidChainGenerationSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging {
+class ValidChainGenerationSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
+with TransactionTestingCommons {
 
 
   val applications = List(new LagonakiApplication("settings-local1.json"),
@@ -36,6 +39,15 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Befo
     untilTimeout(5.minutes, 10.seconds) {
       applications.head.blockStorage.history.contains(last) shouldBe true
     }
+  }
+
+  test("Include valid transaction in new block") {
+    val tx = genValidTransaction()
+    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 1
+    untilTimeout(5.minutes, 10.seconds) {
+      applications.foreach(_.blockStorage.state.included(tx) shouldBe true)
+    }
+
   }
 
 }
