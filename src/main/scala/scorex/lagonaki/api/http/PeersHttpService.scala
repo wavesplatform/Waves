@@ -64,7 +64,7 @@ case class PeersHttpService(application: Application)(implicit val context: Acto
             .mapTo[Seq[Handshake]]
             .map { handshakes =>
               val peerData = Json.arr(handshakes.map { handshake =>
-                val s = handshake.nodeName + "::" + handshake.fromAddress.toString + "::" + handshake.fromNonce
+                val s = handshake.nodeName + "::" + handshake.declaredAddress.toString + "::" + handshake.nodeNonce
                 JsString(s)
               })
               Json.obj("peers" -> peerData).toString()

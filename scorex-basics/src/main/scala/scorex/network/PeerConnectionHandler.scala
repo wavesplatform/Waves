@@ -30,8 +30,7 @@ case object Ack extends Event
 //todo: timeout on Ack waiting
 case class PeerConnectionHandler(application: Application,
                                  connection: ActorRef,
-                                 remote: InetSocketAddress,
-                                 ownNonce: Long) extends Actor with Buffering with ScorexLogging {
+                                 remote: InetSocketAddress) extends Actor with Buffering with ScorexLogging {
 
   import PeerConnectionHandler._
 
@@ -85,7 +84,7 @@ case class PeerConnectionHandler(application: Application,
     case Received(data) =>
       Handshake.parse(data.toArray) match {
         case Success(handshake) =>
-          if (handshake.fromNonce != ownNonce) {
+          if (handshake.nodeNonce != application.settings.nodeNonce) {
             peerManager ! Handshaked(remote, handshake)
             log.info(s"Got a Handshake from $remote")
             connection ! ResumeReading

@@ -43,25 +43,20 @@ with Matchers {
        nonce: Long,
        time: Long) =>
 
-        val h1 = Handshake(appName, av, nodeName, None, nonce, time)
-
+        val h1 = Handshake(appName, av, nodeName, nonce, None, time)
         val hr1 = Handshake.parse(h1.bytes).get
-
         hr1.applicationName should be(h1.applicationName)
         hr1.applicationVersion should be(h1.applicationVersion)
-        hr1.fromAddress should be(h1.fromAddress)
-        hr1.fromNonce should be(h1.fromNonce)
+        hr1.declaredAddress should be(h1.declaredAddress)
+        hr1.nodeNonce should be(h1.nodeNonce)
         hr1.time should be(h1.time)
 
-
-        val h2 = Handshake(appName, av, nodeName, Some(isa), nonce, time)
-
+        val h2 = Handshake(appName, av, nodeName, nonce, Some(isa), time)
         val hr2 = Handshake.parse(h2.bytes).get
-
         hr2.applicationName should be(h2.applicationName)
         hr2.applicationVersion should be(h2.applicationVersion)
-        hr2.fromAddress should be(h2.fromAddress)
-        hr2.fromNonce should be(h2.fromNonce)
+        hr2.declaredAddress should be(h2.declaredAddress)
+        hr2.nodeNonce should be(h2.nodeNonce)
         hr2.time should be(h2.time)
     }
   }

@@ -76,19 +76,19 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case Handshaked(address, handshake) =>
       val toUpdate = connectedPeers.filter { case (cp, h) =>
-        cp.socketAddress == address || h.map(_.fromNonce == handshake.fromNonce).getOrElse(true)
+        cp.socketAddress == address || h.map(_.nodeNonce == handshake.nodeNonce).getOrElse(true)
       }
 
-      val newCp = toUpdate.find(_._1.socketAddress.getAddress.toString == handshake.fromAddress)
+      val newCp = toUpdate.find(_._1.socketAddress.getAddress.toString == handshake.declaredAddress)
         .getOrElse(toUpdate.head)._1
 
       toUpdate.keys.foreach(connectedPeers.remove)
 
       //drop connection to self if occurred
-      if (handshake.fromNonce == application.settings.nodeNonce) {
+      if (handshake.nodeNonce == application.settings.nodeNonce) {
         newCp.handlerRef ! PeerConnectionHandler.CloseConnection
       } else {
-        handshake.fromAddress.foreach(address => self ! PeerManager.AddKnownPeer(address))
+        handshake.declaredAddress.foreach(address => self ! PeerManager.AddKnownPeer(address))
         connectedPeers += newCp -> Some(handshake)
       }
 

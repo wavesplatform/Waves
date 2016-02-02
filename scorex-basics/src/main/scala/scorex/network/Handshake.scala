@@ -11,26 +11,26 @@ import scala.util.{Failure, Try}
 
 case class Handshake(applicationName: String,
                      applicationVersion: ApplicationVersion,
-                     nodeName:String,
-                     fromAddress: Option[InetSocketAddress],
-                     fromNonce: Long,
+                     nodeName: String,
+                     nodeNonce: Long,
+                     declaredAddress: Option[InetSocketAddress],
                      time: Long
                     ) {
 
   lazy val bytes: Array[Byte] = {
     val anb = applicationName.getBytes
 
-    val fab = fromAddress.map { isa =>
+    val fab = declaredAddress.map { isa =>
       isa.getAddress.getAddress ++ Ints.toByteArray(isa.getPort)
     }.getOrElse(Array[Byte]())
 
-    val nnb = nodeName.getBytes
+    val nodeNameBytes = nodeName.getBytes
 
     Array(anb.size.toByte) ++ anb ++
       applicationVersion.bytes ++
-      Array(nnb.size.toByte) ++ nnb ++
+      Array(nodeNameBytes.size.toByte) ++ nodeNameBytes ++
+      Longs.toByteArray(nodeNonce) ++
       Ints.toByteArray(fab.length) ++ fab ++
-      Longs.toByteArray(fromNonce) ++
       Longs.toByteArray(time)
   }
 }
@@ -53,10 +53,13 @@ object Handshake extends ScorexLogging {
     val nodeName = new String(bytes.slice(position, position + nodeNameSize))
     position += nodeNameSize
 
+    val nonce = Longs.fromByteArray(bytes.slice(position, position + 8))
+    position += 8
+
     val fas = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
 
-    val isaOpt = if(fas>0){
+    val isaOpt = if (fas > 0) {
       val fa = bytes.slice(position, position + fas - 4)
       position += fas - 4
 
@@ -66,12 +69,9 @@ object Handshake extends ScorexLogging {
       Some(new InetSocketAddress(InetAddress.getByAddress(fa), port))
     } else None
 
-    val nonce = Longs.fromByteArray(bytes.slice(position, position + 8))
-    position += 8
-
     val time = Longs.fromByteArray(bytes.slice(position, position + 8))
 
-    Handshake(an, av, nodeName, isaOpt, nonce, time)
+    Handshake(an, av, nodeName, nonce, isaOpt, time)
   }.recoverWith { case t: Throwable =>
     log.info("Error during handshake parsing:", t)
     Failure(t)
