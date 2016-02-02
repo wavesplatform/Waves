@@ -13,7 +13,9 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Befo
     new LagonakiApplication("settings-local2.json"))
 
   override protected def beforeAll(): Unit = {
-    applications.foreach(_.run())
+    applications.head.run()
+    Thread.sleep(5000)
+    applications(1).run()
     applications.foreach(_.wallet.generateNewAccounts(10))
     applications.foreach(_.wallet.privateKeyAccounts().nonEmpty shouldBe true)
     applications.foreach(_.blockStorage.history.height() should be > 0)
@@ -25,10 +27,14 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Befo
   }
 
 
-  test("generate 5 blocks") {
+  test("generate 3 blocks") {
     val height = applications.head.blockStorage.history.height()
     untilTimeout(5.minutes, 10.seconds) {
-      applications.foreach(_.blockStorage.history.height() should be > height + 5)
+      applications.foreach(_.blockStorage.history.height() should be >= height + 3)
+    }
+    val last = applications.head.blockStorage.history.lastBlock
+    untilTimeout(5.minutes, 10.seconds) {
+      applications.head.blockStorage.history.contains(last) shouldBe true
     }
   }
 
