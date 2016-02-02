@@ -30,7 +30,7 @@ with TransactionTestingCommons {
   }
 
 
-  test("generate 3 blocks") {
+  test("generate 3 blocks and syncronize") {
     val height = applications.head.blockStorage.history.height()
     untilTimeout(5.minutes, 10.seconds) {
       applications.foreach(_.blockStorage.history.height() should be >= height + 3)
@@ -43,11 +43,12 @@ with TransactionTestingCommons {
 
   test("Include valid transaction in new block") {
     val tx = genValidTransaction()
+    val height = applications.map(_.blockStorage.history.height()).max
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 1
-    untilTimeout(5.minutes, 10.seconds) {
-      applications.foreach(_.blockStorage.state.included(tx) shouldBe true)
+    untilTimeout(5.minutes, 1.second) {
+      applications.foreach(_.blockStorage.history.height() should be >= height + 1)
     }
-
+    applications.foreach(_.blockStorage.state.included(tx).isDefined shouldBe true)
   }
 
 }
