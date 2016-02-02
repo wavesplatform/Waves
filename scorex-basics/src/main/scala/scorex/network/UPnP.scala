@@ -44,7 +44,6 @@ class UPnP(settings:Settings) extends ScorexLogging {
   }
 
   def addPort(port: Int): Try[Unit] = Try {
-    //todo: precise app name + version instead of "Scorex"
     if (gateway.get.addPortMapping(port, port, localAddress.get.getHostAddress, "TCP", "Scorex")) {
       log.debug("Mapped port [" + externalAddress.get.getHostAddress + "]:" + port)
     } else {

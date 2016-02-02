@@ -25,7 +25,7 @@ case class WalletApiRoute(wallet: Wallet)(implicit val context: ActorRefFactory)
   def seed: Route = {
     path("seed") {
       jsonRoute {
-        lazy val seedJs = Json.obj("seed" -> Base58.encode(wallet.exportSeed()))
+        lazy val seedJs = Json.obj("seed" -> Base58.encode(wallet.seed))
         walletNotExists(wallet).getOrElse(seedJs).toString
       }
 

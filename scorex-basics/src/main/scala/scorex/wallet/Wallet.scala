@@ -11,7 +11,6 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
-import scala.util.Success
 
 //todo: add accs txs?
 class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Array[Byte]]) extends ScorexLogging {
@@ -60,7 +59,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
   def generateNewAccount(): Option[PrivateKeyAccount] = synchronized {
     val nonce = getAndIncrementNonce()
 
-    val accountSeed = generateAccountSeed(exportSeed, nonce)
+    val accountSeed = generateAccountSeed(seed, nonce)
     val account = new PrivateKeyAccount(accountSeed)
 
     val address = account.address
@@ -91,8 +90,6 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
   def exportAccountSeed(address: String): Option[Array[Byte]] = privateKeyAccount(address).map(_.seed)
 
   def privateKeyAccount(address: String): Option[PrivateKeyAccount] = accountsCache.get(address)
-
-  def exportSeed(): Array[Byte] = seed
 
   def close(): Unit = if (!database.isClosed) {
     database.commit()
