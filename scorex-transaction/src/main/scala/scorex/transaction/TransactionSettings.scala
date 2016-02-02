@@ -1,5 +1,7 @@
 package scorex.transaction
 
+import java.io.File
+
 import play.api.libs.json.JsObject
 
 trait TransactionSettings {
@@ -7,7 +9,8 @@ trait TransactionSettings {
 
   lazy val dataDirOpt = {
     val res = (settingsJSON \ "dataDir").asOpt[String]
-    res.foreach(folder => new java.io.File(folder).mkdirs())
+    res.foreach(folder => new File(folder).mkdirs())
+    require(res.isEmpty || new File(res.get).exists())
     res
   }
 
