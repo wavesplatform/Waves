@@ -53,7 +53,9 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   private val blockStorage: BlockchainPersistence = {
     val db = dataFolderOpt match {
       case Some(dataFolder) =>
-        DBMaker.appendFileDB(new java.io.File(dataFolder + s"/blocks"))
+        val f = new java.io.File(dataFolder + s"/blocks")
+        f.mkdirs()
+        DBMaker.appendFileDB(f)
           .fileMmapEnableIfSupported()
           .closeOnJvmShutdown()
           .checksumEnable()
