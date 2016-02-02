@@ -7,7 +7,7 @@ import scorex.crypto.encode.Base58
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
-import scala.util.{Success, Try}
+import scala.util.{Random, Try}
 
 /**
   * Settings
@@ -40,14 +40,19 @@ trait Settings extends ScorexLogging {
 
   //p2p
   lazy val DefaultPort = 9084
+
   lazy val p2pSettings = settingsJSON \ "p2p"
+
+  lazy val nodeNonce: Long = (Random.nextInt(1000) + 1000) * Random.nextInt(1000) + Random.nextInt(1000)
+  lazy val nodeName = (p2pSettings \ "nodeName").asOpt[String]
+    .getOrElse(Random.nextPrintableChar().toString + nodeNonce)
 
   lazy val localOnly = (p2pSettings \ "localOnly").asOpt[Boolean].getOrElse(false)
 
   lazy val knownPeers = Try {
     (p2pSettings \ "knownPeers").as[List[String]].map { addr =>
       val addrParts = addr.split(":")
-      val port = if(addrParts.size == 2) addrParts(1).toInt else DefaultPort
+      val port = if (addrParts.size == 2) addrParts(1).toInt else DefaultPort
       new InetSocketAddress(addrParts(0), port)
     }
   }.getOrElse(Seq[InetSocketAddress]())
@@ -74,7 +79,7 @@ trait Settings extends ScorexLogging {
 
   lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
-  lazy val walletPassword = (settingsJSON \ "walletPassword").asOpt[String].getOrElse{
+  lazy val walletPassword = (settingsJSON \ "walletPassword").asOpt[String].getOrElse {
     println("Please type your wallet password")
     scala.io.StdIn.readLine()
   }

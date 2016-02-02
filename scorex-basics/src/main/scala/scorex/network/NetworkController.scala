@@ -35,7 +35,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
-  private lazy val nodeNonce = application.nodeNonce
+  private lazy val nodeNonce = application.settings.nodeNonce
 
   //check own declared address for validity
   if (!settings.localOnly) {
@@ -80,6 +80,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   private lazy val handshakeTemplate = Handshake(application.applicationName,
     application.appVersion,
+    settings.nodeName,
     ownSocketAddress,
     nodeNonce,
     0

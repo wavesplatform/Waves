@@ -83,10 +83,10 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       toUpdate.keys.foreach(connectedPeers.remove)
 
       //drop connection to self if occurred
-      if (handshake.fromNonce == application.nodeNonce) {
+      if (handshake.fromNonce == application.settings.nodeNonce) {
         newCp.handlerRef ! PeerConnectionHandler.CloseConnection
       } else {
-        self ! PeerManager.AddKnownPeer(newCp.socketAddress)
+        handshake.fromAddress.foreach(address => self ! PeerManager.AddKnownPeer(address))
         connectedPeers += newCp -> Some(handshake)
       }
 
