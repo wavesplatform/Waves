@@ -9,7 +9,8 @@ trait TransactionSettings {
 
   lazy val dataDirOpt = {
     val res = (settingsJSON \ "dataDir").asOpt[String]
-    res.foreach(folder => require(new File(folder).mkdirs()))
+    res.foreach(folder => new File(folder).mkdirs())
+    require(res.isEmpty || new File(res.get).exists())
     res
   }
 
