@@ -46,9 +46,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case KnownPeers => sender() ! knownPeers()
 
-    case RandomPeer => sender() ! randomPeer()
+    case RandomPeer =>
+      sender() ! randomPeer()
 
-    case RandomPeers(howMany: Int) => sender() ! Random.shuffle(knownPeers()).take(3)
+    case RandomPeers(howMany: Int) =>
+      sender() ! Random.shuffle(knownPeers()).take(3)
 
     case FilterPeers(sendingStrategy: SendingStrategy) =>
       sender() ! sendingStrategy.choose(connectedPeers.keys.toSeq)

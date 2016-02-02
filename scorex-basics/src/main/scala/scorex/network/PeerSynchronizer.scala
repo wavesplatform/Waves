@@ -1,6 +1,6 @@
 package scorex.network
 
-import java.net.{InetSocketAddress, NetworkInterface}
+import java.net.InetSocketAddress
 
 import akka.pattern.ask
 import akka.util.Timeout
@@ -12,7 +12,6 @@ import scorex.network.peer.PeerManager.RandomPeers
 import scorex.utils.ScorexLogging
 import shapeless.Typeable._
 
-import scala.collection.JavaConversions._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
@@ -35,19 +34,11 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
     context.system.scheduler.schedule(2.seconds, 10.seconds)(networkControllerRef ! stn)
   }
 
-  private val own: Seq[Array[Byte]] = NetworkInterface.getNetworkInterfaces
-    .flatMap(_.getInetAddresses)
-    .map(_.getAddress)
-    .toSeq
-
   override def receive: Receive = {
     case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)
       if msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
 
-      peers.foreach { isa =>
-        if (!own.exists(_.sameElements(isa.getAddress.getAddress)))
-          peerManager ! PeerManager.AddKnownPeer(isa)
-      }
+      peers.foreach(isa => peerManager ! PeerManager.AddKnownPeer(isa))
 
     case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
 
