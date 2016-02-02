@@ -1,5 +1,6 @@
 {
   "p2p": {
+    "nodeName": "Node1",
     "localOnly": true,
     "myAddress": "127.0.0.1",
     "bindAddress": "127.0.0.1",

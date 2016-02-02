@@ -11,6 +11,7 @@ import scala.util.{Failure, Try}
 
 case class Handshake(applicationName: String,
                      applicationVersion: ApplicationVersion,
+                     nodeName:String,
                      fromAddress: Option[InetSocketAddress],
                      fromNonce: Long,
                      time: Long
@@ -23,8 +24,11 @@ case class Handshake(applicationName: String,
       isa.getAddress.getAddress ++ Ints.toByteArray(isa.getPort)
     }.getOrElse(Array[Byte]())
 
+    val nnb = nodeName.getBytes
+
     Array(anb.size.toByte) ++ anb ++
       applicationVersion.bytes ++
+      Array(nnb.size.toByte) ++ nnb ++
       Ints.toByteArray(fab.length) ++ fab ++
       Longs.toByteArray(fromNonce) ++
       Longs.toByteArray(time)
@@ -42,6 +46,12 @@ object Handshake extends ScorexLogging {
 
     val av = ApplicationVersion.parse(bytes.slice(position, position + ApplicationVersion.SerializedVersionLength)).get
     position += ApplicationVersion.SerializedVersionLength
+
+    val nodeNameSize = bytes.slice(position, position + 1).head
+    position += 1
+
+    val nodeName = new String(bytes.slice(position, position + nodeNameSize))
+    position += nodeNameSize
 
     val fas = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
@@ -61,7 +71,7 @@ object Handshake extends ScorexLogging {
 
     val time = Longs.fromByteArray(bytes.slice(position, position + 8))
 
-    Handshake(an, av, isaOpt, nonce, time)
+    Handshake(an, av, nodeName, isaOpt, nonce, time)
   }.recoverWith { case t: Throwable =>
     log.info("Error during handshake parsing:", t)
     Failure(t)

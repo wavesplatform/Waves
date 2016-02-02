@@ -35,14 +35,15 @@ with Matchers {
     for (n <- Gen.choose(Integer.MIN_VALUE + 1, Integer.MAX_VALUE)) yield n
 
   property("handshake should remain the same after serialization/deserialization") {
-    forAll(Gen.alphaStr, appVersionGen, isGen, Gen.posNum[Long], Gen.posNum[Long]) {
+    forAll(Gen.alphaStr, appVersionGen, Gen.alphaStr, isGen, Gen.posNum[Long], Gen.posNum[Long]) {
       (appName: String,
        av: ApplicationVersion,
+       nodeName: String,
        isa: InetSocketAddress,
        nonce: Long,
        time: Long) =>
 
-        val h1 = Handshake(appName, av, None, nonce, time)
+        val h1 = Handshake(appName, av, nodeName, None, nonce, time)
 
         val hr1 = Handshake.parse(h1.bytes).get
 
@@ -53,7 +54,7 @@ with Matchers {
         hr1.time should be(h1.time)
 
 
-        val h2 = Handshake(appName, av, Some(isa), nonce, time)
+        val h2 = Handshake(appName, av, nodeName, Some(isa), nonce, time)
 
         val hr2 = Handshake.parse(h2.bytes).get
 

@@ -5,7 +5,6 @@ import akka.io.IO
 import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
-import scorex.crypto.encode.Base58
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
@@ -45,8 +44,6 @@ trait Application extends ScorexLogging {
   lazy val basicMessagesSpecsRepo = new BasicMessagesRepo()
 
   //p2p
-  lazy val nodeNonce: Long = (Random.nextInt() + 1000) * Random.nextInt() + Random.nextInt()
-
   lazy val upnp = new UPnP(settings)
   if (settings.upnpEnabled) upnp.addPort(settings.port)
 
