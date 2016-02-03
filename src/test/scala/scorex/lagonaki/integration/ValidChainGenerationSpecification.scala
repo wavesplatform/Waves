@@ -70,13 +70,20 @@ with TransactionTestingCommons {
   test("Seed API route") {
     val length = Random.nextInt(4096)
     Base58.decode((getRequest("/seed/") \ "seed").as[String]).isSuccess shouldBe true
-    Base58.decode((getRequest(s"/seed/$length") \ "seed").as[String]).get.size shouldBe length
+    Base58.decode((getRequest(s"/seed/$length") \ "seed").as[String]).get.length shouldBe length
   }
 
   test("Wallet API route") {
     applications.foreach{ a =>
       (getRequest("/wallet/", peer(a))  \ "exists").as[Boolean] shouldBe true
       (getRequest("/wallet/seed", peer(a))  \ "seed").as[String] shouldBe Base58.encode(a.settings.walletSeed.get)
+    }
+  }
+
+  test("Peers API route") {
+    applications.foreach { a =>
+      (getRequest("/peers/connected", peer(a)) \ "peers").as[List[List[String]]].size shouldBe 1
+      (getRequest("/peers/all", peer(a)) \ "peers").as[List[List[String]]].size should be >= 1
     }
   }
 
