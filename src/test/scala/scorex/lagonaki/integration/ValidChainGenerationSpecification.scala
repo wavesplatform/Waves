@@ -52,4 +52,8 @@ with TransactionTestingCommons {
     applications.foreach(_.blockStorage.state.included(tx).isDefined shouldBe true)
   }
 
+  test("Scorex API calls") {
+
+  }
+
 }

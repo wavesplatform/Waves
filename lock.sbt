@@ -19,9 +19,10 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.github.pathikrit" % "better-files_2.11" % "2.13.0",
   "com.google.code.findbugs" % "jsr305" % "2.0.1",
   "com.google.guava" % "guava" % "15.0",
+  "com.ning" % "async-http-client" % "1.9.11",
   "com.thoughtworks.paranamer" % "paranamer" % "2.6",
   "com.typesafe" % "config" % "1.3.0",
-  "com.typesafe.akka" % "akka-actor_2.11" % "2.4.1",
+  "com.typesafe.akka" % "akka-actor_2.11" % "2.4.2-RC2",
   "com.typesafe.akka" % "akka-testkit_2.11" % "2.3.9",
   "com.typesafe.play" % "play-datacommons_2.11" % "2.4.6",
   "com.typesafe.play" % "play-functional_2.11" % "2.4.6",
@@ -31,6 +32,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.wordnik" % "swagger-annotations" % "1.3.12",
   "com.wordnik" % "swagger-core_2.11" % "1.3.12",
   "commons-net" % "commons-net" % "3.4",
+  "io.netty" % "netty" % "3.10.0.Final",
   "io.spray" % "spray-can_2.11" % "1.3.3",
   "io.spray" % "spray-http_2.11" % "1.3.3",
   "io.spray" % "spray-httpx_2.11" % "1.3.3",
@@ -40,6 +42,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "io.spray" % "spray-util_2.11" % "1.3.3",
   "javax.ws.rs" % "jsr311-api" % "1.1.1",
   "joda-time" % "joda-time" % "2.8.1",
+  "net.databinder.dispatch" % "dispatch-core_2.11" % "0.11.3",
   "org.bitlet" % "weupnp" % "0.1.4",
   "org.consensusresearch" % "scrypto_2.11" % "1.0.3",
   "org.joda" % "joda-convert" % "1.7",
@@ -52,6 +55,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.mapdb" % "mapdb" % "2.0-beta12",
   "org.parboiled" % "parboiled-core" % "1.1.7",
   "org.parboiled" % "parboiled-scala_2.11" % "1.1.7",
+  "org.scala-lang.modules" % "scala-java8-compat_2.11" % "0.7.0",
   "org.scala-lang.modules" % "scala-parser-combinators_2.11" % "1.0.1",
   "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.3",
   "org.scala-sbt" % "test-interface" % "1.0",
@@ -62,4 +66,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.slf4j" % "slf4j-api" % "1.7.13",
   "org.whispersystems" % "curve25519-java" % "0.2.4"
 )
-// LIBRARY_DEPENDENCIES_HASH 2cf9407c56e0bfe1b0eb6da27c2a2ed7bbcc6c01
+// LIBRARY_DEPENDENCIES_HASH 2fa9f7b1c79f987c540fe9b9c69c5d93511ec365
