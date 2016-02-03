@@ -110,6 +110,9 @@ class StoredBlockchain(dataFolderOpt: Option[String])
     blockStorage.readBlock(height)
   }
 
+  override def lastBlockIds(howMany: Int): Seq[BlockId] =
+    (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(blockStorage.signatures.get(i))).reverse
+
   override def contains(signature: Array[Byte]): Boolean = blockStorage.contains(signature)
 
   override def height(): Int = blockStorage.height()

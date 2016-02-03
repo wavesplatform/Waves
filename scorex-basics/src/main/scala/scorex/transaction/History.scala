@@ -78,6 +78,8 @@ trait History {
 
   def lastBlocks(howMany: Int): Seq[Block]
 
+  def lastBlockIds(howMany: Int): Seq[BlockId] = lastBlocks(howMany).map(b => b.uniqueId)
+
   /**
     * Return $howMany blocks starting from $parentSignature
     */
