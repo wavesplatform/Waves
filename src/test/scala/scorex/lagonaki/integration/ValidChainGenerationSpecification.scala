@@ -21,7 +21,7 @@ with TransactionTestingCommons {
   val applications = List(new LagonakiApplication("settings-local1.json"),
     new LagonakiApplication("settings-local2.json"))
 
-  def peer(a: LagonakiApplication): String = a.settings.bindAddress + ":" + a.settings.rpcPort
+  def peer(a: LagonakiApplication): String = "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
 
   override protected def beforeAll(): Unit = {
     applications.head.run()
