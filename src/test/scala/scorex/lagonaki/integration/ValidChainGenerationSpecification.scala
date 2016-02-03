@@ -21,6 +21,8 @@ with TransactionTestingCommons {
   val applications = List(new LagonakiApplication("settings-local1.json"),
     new LagonakiApplication("settings-local2.json"))
 
+  def peer(a: LagonakiApplication): String = a.settings.bindAddress + ":" + a.settings.rpcPort
+
   override protected def beforeAll(): Unit = {
     applications.head.run()
     Thread.sleep(5000)
@@ -58,21 +60,28 @@ with TransactionTestingCommons {
   }
 
   test("Scorex API route") {
-    val json: JsObject = httpReq("/scorex/status")
+    val json: JsObject = getRequest("/scorex/status")
     (json \ "block generator status").as[String] shouldBe "generating"
     (json \ "history synchronization status").as[String] shouldBe "synced"
 
-    (httpReq("/scorex/version") \ "version").as[String] should (startWith("Scorex") and include("v."))
+    (getRequest("/scorex/version") \ "version").as[String] should (startWith("Scorex") and include("v."))
   }
 
   test("Seed API route") {
     val length = Random.nextInt(4096)
-    Base58.decode((httpReq("/seed/") \ "seed").as[String]).isSuccess shouldBe true
-    Base58.decode((httpReq(s"/seed/$length") \ "seed").as[String]).get.size shouldBe length
+    Base58.decode((getRequest("/seed/") \ "seed").as[String]).isSuccess shouldBe true
+    Base58.decode((getRequest(s"/seed/$length") \ "seed").as[String]).get.size shouldBe length
   }
 
-  def httpReq(us: String): JsObject = {
-    val request = Http(url("http://127.0.0.1:9085" + us).GET)
+  test("Wallet API route") {
+    applications.foreach{ a =>
+      (getRequest("/wallet/", peer(a))  \ "exists").as[Boolean] shouldBe true
+      (getRequest("/wallet/seed", peer(a))  \ "seed").as[String] shouldBe Base58.encode(a.settings.walletSeed.get)
+    }
+  }
+
+  def getRequest(us: String, peer: String = "http://127.0.0.1:9085"): JsObject = {
+    val request = Http(url(peer + us).GET)
     val response = Await.result(request, 10 seconds)
     response
     Json.parse(response.getResponseBody).as[JsObject]
