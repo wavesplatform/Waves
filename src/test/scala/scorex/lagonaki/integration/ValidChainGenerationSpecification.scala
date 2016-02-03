@@ -1,11 +1,15 @@
 package scorex.lagonaki.integration
 
+import dispatch._
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import play.api.libs.json.{JsObject, Json}
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{ScorexLogging, untilTimeout}
 
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class ValidChainGenerationSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
@@ -36,7 +40,6 @@ with TransactionTestingCommons {
     }
   }
 
-
   test("generate 3 blocks and synchronize") {
     waitGenerationOfBlocks(3)
     val last = applications.head.blockStorage.history.lastBlock
@@ -48,12 +51,22 @@ with TransactionTestingCommons {
   test("Include valid transaction in new block") {
     val tx = genValidTransaction()
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 1
-    waitGenerationOfBlocks(1)
+    waitGenerationOfBlocks(2)
     applications.foreach(_.blockStorage.state.included(tx).isDefined shouldBe true)
   }
 
   test("Scorex API calls") {
+    val json: JsObject = httpReq("/scorex/status")
+    (json \ "block generator status").as[String] shouldBe "generating"
+    (json \ "history synchronization status").as[String] shouldBe "synced"
 
+    (httpReq("/scorex/version") \ "version").as[String] should (startWith("Scorex") and include("v."))
   }
 
+  def httpReq(us: String): JsObject = {
+    val request = Http(url("http://127.0.0.1:9085" + us).GET)
+    val response = Await.result(request, 10 seconds)
+    response
+    Json.parse(response.getResponseBody).as[JsObject]
+  }
 }
