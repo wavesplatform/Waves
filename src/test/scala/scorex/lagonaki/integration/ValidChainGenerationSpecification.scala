@@ -3,6 +3,7 @@ package scorex.lagonaki.integration
 import dispatch._
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import play.api.libs.json.{JsObject, Json}
+import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
@@ -11,6 +12,7 @@ import scorex.utils.{ScorexLogging, untilTimeout}
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.util.Random
 
 class ValidChainGenerationSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
 with TransactionTestingCommons {
@@ -55,12 +57,18 @@ with TransactionTestingCommons {
     applications.foreach(_.blockStorage.state.included(tx).isDefined shouldBe true)
   }
 
-  test("Scorex API calls") {
+  test("Scorex API route") {
     val json: JsObject = httpReq("/scorex/status")
     (json \ "block generator status").as[String] shouldBe "generating"
     (json \ "history synchronization status").as[String] shouldBe "synced"
 
     (httpReq("/scorex/version") \ "version").as[String] should (startWith("Scorex") and include("v."))
+  }
+
+  test("Seed API route") {
+    val length = Random.nextInt(4096)
+    Base58.decode((httpReq("/seed/") \ "seed").as[String]).isSuccess shouldBe true
+    Base58.decode((httpReq(s"/seed/$length") \ "seed").as[String]).get.size shouldBe length
   }
 
   def httpReq(us: String): JsObject = {
