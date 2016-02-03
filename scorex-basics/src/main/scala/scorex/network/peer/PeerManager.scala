@@ -24,8 +24,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private lazy val settings = application.settings
   private lazy val networkController = application.networkController
 
-  private def knownPeers(): Seq[InetSocketAddress] = {
-    val dbPeers = PeerDatabaseImpl.knownPeers()
+  //todo: change all usage scenarios to avoid unclear forSelf argument value choice
+  private def knownPeers(forSelf: Boolean): Seq[InetSocketAddress] = {
+    val dbPeers = PeerDatabaseImpl.knownPeers(forSelf)
     log.info("Peers retrieved from database : " + dbPeers)
     if (dbPeers.size < DatabasePeersAmount) {
       val allPeers = settings.knownPeers ++ dbPeers
@@ -35,22 +36,29 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   }
 
   private def randomPeer(): Option[InetSocketAddress] = {
-    val peers = knownPeers()
+    val peers = knownPeers(true)
     if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
     else None
   }
 
+  //todo: combine AddKnownPeer & UpdatePeer?
   private def peerLists: Receive = {
     case AddKnownPeer(address) =>
-      if (!knownPeers().contains(address)) PeerDatabaseImpl.addKnownPeer(address)
+      val peerInfo = PeerInfo(System.currentTimeMillis())
+      PeerDatabaseImpl.addOrUpdateKnownPeer(address, peerInfo)
 
-    case KnownPeers => sender() ! knownPeers()
+    case UpdatePeer(address, isSelf) =>
+      val peerInfo = PeerInfo(System.currentTimeMillis(), isSelf)
+      PeerDatabaseImpl.addOrUpdateKnownPeer(address, peerInfo)
+
+    case KnownPeers =>
+      sender() ! knownPeers(false)
 
     case RandomPeer =>
       sender() ! randomPeer()
 
     case RandomPeers(howMany: Int) =>
-      sender() ! Random.shuffle(knownPeers()).take(3)
+      sender() ! Random.shuffle(knownPeers(false)).take(3)
 
     case FilterPeers(sendingStrategy: SendingStrategy) =>
       sender() ! sendingStrategy.choose(connectedPeers.keys.toSeq)
@@ -61,7 +69,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       sender() ! (connectedPeers.values.flatten.toSeq: Seq[Handshake])
 
     case GetAllPeers =>
-      sender() ! knownPeers()
+      sender() ! knownPeers(true)
   }
 
   private def peerCycle: Receive = {
@@ -92,6 +100,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         //drop connection to self if occurred
         if (handshake.nodeNonce == application.settings.nodeNonce) {
           newCp.handlerRef ! PeerConnectionHandler.CloseConnection
+          self ! UpdatePeer(handshake.declaredAddress.getOrElse(address), self = true)
         } else {
           handshake.declaredAddress.foreach(address => self ! PeerManager.AddKnownPeer(address))
           connectedPeers += newCp -> Some(handshake)
@@ -121,6 +130,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 object PeerManager {
 
   case class AddKnownPeer(address: InetSocketAddress)
+
+  case class UpdatePeer(address: InetSocketAddress, self: Boolean)
 
   case object KnownPeers
 

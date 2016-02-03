@@ -132,6 +132,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
 
   def peerLogic: Receive = {
     case ConnectTo(remote) =>
+      log.info(s"Connectiong to: $remote")
       IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout, pullMode = true)
 
     case c@Connected(remote, local) =>

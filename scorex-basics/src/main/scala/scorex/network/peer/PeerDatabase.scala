@@ -2,10 +2,12 @@ package scorex.network.peer
 
 import java.net.InetSocketAddress
 
-trait PeerDatabase {
-  def addKnownPeer(peer: InetSocketAddress): Unit
+case class PeerInfo(lastSeen: Long, self: Boolean = false)
 
-  def knownPeers(): Seq[InetSocketAddress]
+trait PeerDatabase {
+  def addOrUpdateKnownPeer(peer: InetSocketAddress, peerInfo: PeerInfo): Unit
+
+  def knownPeers(forSelf: Boolean): Seq[InetSocketAddress]
 
   def blacklistPeer(peer: InetSocketAddress): Unit
 

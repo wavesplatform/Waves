@@ -2,7 +2,7 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{SupervisorStrategy, Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, SupervisorStrategy}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
@@ -84,17 +84,14 @@ case class PeerConnectionHandler(application: Application,
     case Received(data) =>
       Handshake.parse(data.toArray) match {
         case Success(handshake) =>
-          if (handshake.nodeNonce != application.settings.nodeNonce) {
-            peerManager ! Handshaked(remote, handshake)
-            log.info(s"Got a Handshake from $remote")
-            connection ! ResumeReading
-            handshakeGot = true
-            self ! HandshakeCheck
-          } else {
-            connection ! Close
-          }
+          peerManager ! Handshaked(remote, handshake)
+          log.info(s"Got a Handshake from $remote")
+          connection ! ResumeReading
+          handshakeGot = true
+          self ! HandshakeCheck
         case Failure(t) =>
           log.info(s"Error during parsing a handshake: $t")
+          //todo: blacklist?
           connection ! Close
       }
 
@@ -166,4 +163,5 @@ object PeerConnectionHandler {
   case object CloseConnection
 
   case object Blacklist
+
 }
