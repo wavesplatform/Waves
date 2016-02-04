@@ -37,9 +37,9 @@ class APISpecification extends FunSuite with Matchers with BeforeAndAfterAll wit
 
   test("Peers API route") {
     val connected = getRequest("/peers/connected")
-    (connected \\ "declaredAddress").toList.size shouldBe 1
-    (connected \\ "peerName").toList.size shouldBe 1
-    (connected \\ "peerNonce").toList.size shouldBe 1
+    (connected \\ "declaredAddress").toList.size should be >= 1
+    (connected \\ "peerName").toList.size should be >= 1
+    (connected \\ "peerNonce").toList.size should be >= 1
 
     val all = getRequest("/peers/all")
     (all \\ "address").toList.size should be >= 1
