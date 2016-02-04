@@ -15,7 +15,7 @@ with TransactionTestingCommons {
   val peers = applications.tail
 
   def waitGenerationOfBlocks(howMany: Int): Unit = {
-    val height = peers.head.blockStorage.history.height()
+    val height = peers.map(_.blockStorage.history.height()).max
     untilTimeout(5.minutes, 10.seconds) {
       peers.foreach(_.blockStorage.history.height() should be >= height + howMany)
     }
