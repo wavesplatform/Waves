@@ -89,8 +89,7 @@ with TransactionTestingCommons {
 
   def getRequest(us: String, peer: String = "http://127.0.0.1:9085"): JsObject = {
     val request = Http(url(peer + us).GET)
-    val response = Await.result(request, 10 seconds)
-    response
+    val response = Await.result(request, 10.seconds)
     Json.parse(response.getResponseBody).as[JsObject]
   }
 }
