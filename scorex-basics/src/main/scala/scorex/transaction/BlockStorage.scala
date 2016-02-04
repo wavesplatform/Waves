@@ -40,7 +40,7 @@ trait BlockStorage extends ScorexLogging {
 
 
   //Append block to current state
-  def appendBlock(block: Block): Try[Unit] = synchronized {
+  def appendBlock(block: Block): Try[Unit] = BlockStorage.synchronized {
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
         val cState = if (history.heightOf(b).get != 1) state(b.referenceField.value).get else stateHistory.emptyState
