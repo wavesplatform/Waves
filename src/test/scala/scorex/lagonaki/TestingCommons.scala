@@ -13,6 +13,15 @@ trait TestingCommons {
 }
 
 object TestingCommons {
-  val SettingsFilename = "settings-test.json"
-  val application = new LagonakiApplication(SettingsFilename)
+  val applications = List(
+    new LagonakiApplication("settings-test.json"),
+    new LagonakiApplication("settings-local1.json"),
+    new LagonakiApplication("settings-local2.json")
+  )
+
+  val application = applications.head
+
+  def peerUrl(a: LagonakiApplication = application): String =
+    "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
+
 }

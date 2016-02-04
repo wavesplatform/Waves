@@ -5,8 +5,6 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
-import scorex.lagonaki.server.LagonakiApplication
-import scorex.utils._
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,24 +14,6 @@ import scala.util.Random
 class APISpecification extends FunSuite with Matchers with BeforeAndAfterAll with TransactionTestingCommons {
 
   import scorex.lagonaki.TestingCommons._
-
-  def peerUrl(a: LagonakiApplication = application): String =
-    "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
-
-  override protected def beforeAll(): Unit = {
-    application.run()
-    if (application.wallet.privateKeyAccounts().isEmpty) application.wallet.generateNewAccounts(3)
-    application.wallet.privateKeyAccounts().nonEmpty shouldBe true
-    application.blockStorage.history.height() should be > 0
-    untilTimeout(20.seconds, 1.second) {
-      val json: JsObject = getRequest("/scorex/status")
-      (json \ "block generator status").asOpt[String].isDefined shouldBe true
-    }
-  }
-
-  override protected def afterAll(): Unit = {
-    application.stopAll()
-  }
 
   test("Scorex API route") {
     val json: JsObject = getRequest("/scorex/status")
