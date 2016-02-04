@@ -30,7 +30,7 @@ object Account {
   /**
     * Create account from public key. Used in PublicKeyAccount/PrivateKeyAccount.
     */
-  def fromPubkey(publicKey: Array[Byte]): String = {
+  def fromPublicKey(publicKey: Array[Byte]): String = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: publicKeyHash //prepend ADDRESS_VERSION
     Base58.encode(withoutChecksum ++ calcCheckSum(withoutChecksum))
