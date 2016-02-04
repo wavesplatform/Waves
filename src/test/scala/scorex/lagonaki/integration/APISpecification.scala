@@ -2,7 +2,7 @@ package scorex.lagonaki.integration
 
 import dispatch._
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsValue, JsObject, Json}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.utils._
@@ -16,9 +16,10 @@ class APISpecification extends FunSuite with Matchers with BeforeAndAfterAll wit
 
   import scorex.lagonaki.TestingCommons._
 
+
   test("Scorex API route") {
     untilTimeout(30.seconds) {
-      val json: JsObject = getRequest("/scorex/status")
+      val json = getRequest("/scorex/status")
       (json \ "block generator status").as[String] shouldBe "generating"
       (json \ "history synchronization status").as[String] shouldBe "synced"
     }
@@ -36,14 +37,22 @@ class APISpecification extends FunSuite with Matchers with BeforeAndAfterAll wit
     (getRequest("/wallet/seed") \ "seed").as[String] shouldBe Base58.encode(application.settings.walletSeed.get)
   }
 
+
   test("Peers API route") {
-    (getRequest("/peers/connected") \ "peers").as[List[List[String]]].size shouldBe 1
-    (getRequest("/peers/all") \ "peers").as[List[List[String]]].size should be >= 1
+    val connected = getRequest("/peers/connected")
+    (connected \\ "declaredAddress").toList.size shouldBe 1
+    (connected \\ "peerName").toList.size shouldBe 1
+    (connected \\ "peerNonce").toList.size shouldBe 1
+
+    val all = getRequest("/peers/all")
+    (all \\ "address").toList.size should be >= 1
+    (all \\ "nodeName").toList.size should be >= 1
+    (all \\ "nodeNonce").toList.size should be >= 1
   }
 
-  def getRequest(us: String, peer: String = peerUrl(application)): JsObject = {
+  def getRequest(us: String, peer: String = peerUrl(application)): JsValue = {
     val request = Http(url(peer + us).GET)
     val response = Await.result(request, 10.seconds)
-    Json.parse(response.getResponseBody).as[JsObject]
+    Json.parse(response.getResponseBody)
   }
 }
