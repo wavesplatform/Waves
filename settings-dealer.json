@@ -11,7 +11,7 @@
   "walletPassword": "cookies",
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
   "dataDir": "/opt/scorex/data",
-  "rpcPort": 9085,
+  "rpcPort": 9081,
   "rpcAllowed": [],
   "maxRollback": 100,
   "offlineGeneration": true,
