@@ -20,19 +20,19 @@ with TransactionTestingCommons {
     }
   }
 
+  test("Include valid transaction in new block") {
+    val tx = genValidTransaction()
+    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 1
+    waitGenerationOfBlocks(2)
+    applications.foreach(_.blockStorage.state.included(tx).isDefined shouldBe true)
+  }
+
   test("generate 3 blocks and synchronize") {
     waitGenerationOfBlocks(3)
     val last = applications.head.blockStorage.history.lastBlock
     untilTimeout(5.minutes, 10.seconds) {
       applications.head.blockStorage.history.contains(last) shouldBe true
     }
-  }
-
-  test("Include valid transaction in new block") {
-    val tx = genValidTransaction()
-    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 1
-    waitGenerationOfBlocks(2)
-    applications.foreach(_.blockStorage.state.included(tx).isDefined shouldBe true)
   }
 
 }

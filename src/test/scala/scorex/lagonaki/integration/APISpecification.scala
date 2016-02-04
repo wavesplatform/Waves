@@ -5,6 +5,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
+import scorex.utils._
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,10 +17,11 @@ class APISpecification extends FunSuite with Matchers with BeforeAndAfterAll wit
   import scorex.lagonaki.TestingCommons._
 
   test("Scorex API route") {
-    val json: JsObject = getRequest("/scorex/status")
-    (json \ "block generator status").as[String] shouldBe "generating"
-    (json \ "history synchronization status").as[String] shouldBe "synced"
-
+    untilTimeout(30.seconds) {
+      val json: JsObject = getRequest("/scorex/status")
+      (json \ "block generator status").as[String] shouldBe "generating"
+      (json \ "history synchronization status").as[String] shouldBe "synced"
+    }
     (getRequest("/scorex/version") \ "version").as[String] should (startWith("Scorex") and include("v."))
   }
 
