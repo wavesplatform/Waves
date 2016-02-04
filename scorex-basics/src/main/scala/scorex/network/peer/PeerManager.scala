@@ -24,9 +24,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private lazy val settings = application.settings
   private lazy val networkController = application.networkController
 
-  //todo: change all usage scenarios to avoid unclear forSelf argument value choice
-  private def knownPeers(forSelf: Boolean): Seq[InetSocketAddress] = {
-    val dbPeers = PeerDatabaseImpl.knownPeers(forSelf)
+  private lazy val peerDatabase = new PeerDatabaseImpl(application)
+
+  //todo: change all usage scenarios to avoid unclear excludeSelf argument value choice
+  private def knownPeers(excludeSelf: Boolean): Seq[InetSocketAddress] = {
+    val dbPeers = peerDatabase.knownPeers(excludeSelf)
     log.info("Peers retrieved from database : " + dbPeers)
     if (dbPeers.size < DatabasePeersAmount) {
       val allPeers = settings.knownPeers ++ dbPeers
@@ -45,11 +47,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private def peerLists: Receive = {
     case AddKnownPeer(address) =>
       val peerInfo = PeerInfo(System.currentTimeMillis())
-      PeerDatabaseImpl.addOrUpdateKnownPeer(address, peerInfo)
+      peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
 
-    case UpdatePeer(address, isSelf) =>
-      val peerInfo = PeerInfo(System.currentTimeMillis(), isSelf)
-      PeerDatabaseImpl.addOrUpdateKnownPeer(address, peerInfo)
+    case UpdatePeer(address, peerNonce, peerName) =>
+      val peerInfo = PeerInfo(System.currentTimeMillis(), peerNonce, peerName)
+      peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
 
     case KnownPeers =>
       sender() ! knownPeers(false)
@@ -100,7 +102,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         //drop connection to self if occurred
         if (handshake.nodeNonce == application.settings.nodeNonce) {
           newCp.handlerRef ! PeerConnectionHandler.CloseConnection
-          self ! UpdatePeer(handshake.declaredAddress.getOrElse(address), self = true)
+          val peerNonce = Some(handshake.nodeNonce)
+          val peerName = Some(handshake.nodeName)
+          self ! UpdatePeer(handshake.declaredAddress.getOrElse(address), peerNonce, peerName)
         } else {
           handshake.declaredAddress.foreach(address => self ! PeerManager.AddKnownPeer(address))
           connectedPeers += newCp -> Some(handshake)
@@ -131,7 +135,7 @@ object PeerManager {
 
   case class AddKnownPeer(address: InetSocketAddress)
 
-  case class UpdatePeer(address: InetSocketAddress, self: Boolean)
+  case class UpdatePeer(address: InetSocketAddress, peerNonce: Option[Long], peerName: Option[String])
 
   case object KnownPeers
 
