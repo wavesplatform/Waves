@@ -1,7 +1,7 @@
 package scorex.lagonaki
 
 import org.scalatest.{BeforeAndAfterAll, Suites}
-import scorex.lagonaki.integration.{BlockGeneratorSpecification, BlocksRoutingSpecification, ValidChainGenerationSpecification}
+import scorex.lagonaki.integration.{APISpecification, BlockGeneratorSpecification, BlocksRoutingSpecification, ValidChainGenerationSpecification}
 import scorex.lagonaki.props.BlockStorageSpecification
 import scorex.lagonaki.unit._
 import scorex.transaction.state.database.blockchain.BlockTreeSpecification
@@ -18,6 +18,7 @@ class LagonakiTestSuite extends Suites(
 
   //integration tests - slow!
   , new ValidChainGenerationSpecification
+  , new APISpecification
 
 ) with BeforeAndAfterAll {
 
