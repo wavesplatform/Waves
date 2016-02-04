@@ -23,10 +23,6 @@ class BlockGeneratorSpecification(_system: ActorSystem)
   val bg = application.blockGenerator
 
   "BlockGenerator actor" must {
-    "be syncing on start" in {
-      bg ! GetStatus
-      expectMsg(Syncing.name)
-    }
 
     "generate after downloading state" in {
       bg ! StartGeneration
@@ -36,6 +32,7 @@ class BlockGeneratorSpecification(_system: ActorSystem)
         expectMsg(Generating.name)
       }
     }
+
     "StopGeneration command change state to syncing from generating" in {
       bg ! StartGeneration
       untilTimeout(5.seconds) {
@@ -46,6 +43,7 @@ class BlockGeneratorSpecification(_system: ActorSystem)
       bg ! GetStatus
       expectMsg(Syncing.name)
     }
+
     "StopGeneration command don't change state from syncing" in {
       bg ! StartGeneration
       bg ! StopGeneration
