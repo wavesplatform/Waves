@@ -8,7 +8,7 @@ case class PeerInfo(lastSeen: Long, nonce: Option[Long] = None, nodeName: Option
 trait PeerDatabase {
   def addOrUpdateKnownPeer(peer: InetSocketAddress, peerInfo: PeerInfo): Unit
 
-  def knownPeers(forSelf: Boolean): Seq[InetSocketAddress]
+  def knownPeers(forSelf: Boolean): Map[InetSocketAddress, PeerInfo]
 
   def blacklistPeer(peer: InetSocketAddress): Unit
 

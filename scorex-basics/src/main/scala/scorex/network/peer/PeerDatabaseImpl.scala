@@ -30,11 +30,11 @@ class PeerDatabaseImpl(application: Application) extends PeerDatabase {
   override def isBlacklisted(address: InetSocketAddress): Boolean =
     blacklist.synchronized(blacklist.contains(address))
 
-  override def knownPeers(excludeSelf: Boolean): Seq[InetSocketAddress] =
+  override def knownPeers(excludeSelf: Boolean): Map[InetSocketAddress, PeerInfo] =
     (excludeSelf match {
       case true => whitelist.filter(_._2.nonce.getOrElse(-1) != ownNonce)
       case false => whitelist
-    }).keys.toSeq
+    }).toMap
 
   override def blacklistedPeers(): Seq[InetSocketAddress] =
     blacklist.keys.toSeq

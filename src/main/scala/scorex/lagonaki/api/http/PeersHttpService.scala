@@ -6,11 +6,11 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import akka.pattern.ask
 import com.wordnik.swagger.annotations._
-import play.api.libs.json.{JsString, Json}
+import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.Application
 import scorex.network.Handshake
-import scorex.network.peer.PeerManager
+import scorex.network.peer.{PeerInfo, PeerManager}
 import spray.http.MediaTypes._
 import spray.routing.Route
 
@@ -36,15 +36,18 @@ case class PeersHttpService(application: Application)(implicit val context: Acto
       respondWithMediaType(`application/json`) {
         onComplete {
           (application.peerManager ? PeerManager.GetAllPeers)
-            .mapTo[Seq[InetSocketAddress]]
-            .map { addresses =>
-              val peerData = Json.arr(addresses.map { address =>
-                JsString(address.toString)
+            .mapTo[Map[InetSocketAddress, PeerInfo]]
+            .map { peers =>
+              Json.arr(peers.map { case (address, peerInfo) =>
+                Json.obj(
+                  "address" -> address.toString,
+                  "nodeName" -> (peerInfo.nodeName.getOrElse("N/A"):String),
+                  "nodeNonce" -> (peerInfo.nonce.map(_.toString).getOrElse("N/A"):String)
+                )
               })
-              Json.obj("peers" -> peerData).toString()
             }
         } {
-          case Success(value) => complete(value)
+          case Success(value) => complete(value.toString())
           case Failure(ex) => failWith(ex)
         }
       }
