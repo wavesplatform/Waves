@@ -98,8 +98,8 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
       val common = blockIds.head
 
-      val toDownload = blockIds.tail
-      if (application.history.contains(common) && !application.history.contains(toDownload.head)) {
+      val toDownload = blockIds.tail.filter(b => !application.history.contains(b))
+      if (application.history.contains(common) && toDownload.nonEmpty) {
         Try(application.blockStorage.removeAfter(common)) //todo we don't need this call for blockTree
         gotoGettingBlock(witnesses, toDownload.map(_ -> None))
         blockIds.tail.foreach { blockId =>
@@ -108,8 +108,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
           networkControllerRef ! NetworkController.SendToNetwork(msg, stn)
         }
       } else {
-        log.warn(s"Strange blockIds: ${application.history.contains(common)} &&" +
-          s"${!application.history.contains(toDownload.head)}")
+        log.warn(s"Strange blockIds: ${application.history.contains(common)}")
         gotoSyncing()
       }
   }: Receive)
