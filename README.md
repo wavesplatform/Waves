@@ -1,4 +1,4 @@
-Scorex - Lagonaki Release [![Build Status](http://23.94.190.226:8080/buildStatus/icon?job=scorex/master)](http://23.94.190.226:8080/job/scorex/master)
+Scorex - Lagonaki Release [![Build Status](http://23.94.190.226:8080/buildStatus/icon?job=scorex/master)](http://23.94.190.226:8080/job/scorex/branch/master)
 =========================
 
 **The modular blockchain framework**
