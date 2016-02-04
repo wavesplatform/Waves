@@ -13,6 +13,7 @@ with TransactionTestingCommons {
   import TestingCommons._
 
   val peers = applications.tail
+  val app = peers.head
 
   def waitGenerationOfBlocks(howMany: Int): Unit = {
     val height = peers.map(_.blockStorage.history.height()).max
@@ -29,6 +30,8 @@ with TransactionTestingCommons {
   }
 
   test("generate 3 blocks and synchronize") {
+    val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(app.blockStorage.state.generationBalance(_)).sum
+    genBal should be >= (peers.head.transactionModule.InitialBalance / 2)
     waitGenerationOfBlocks(3)
     val last = peers.head.blockStorage.history.lastBlock
     untilTimeout(5.minutes, 10.seconds) {
