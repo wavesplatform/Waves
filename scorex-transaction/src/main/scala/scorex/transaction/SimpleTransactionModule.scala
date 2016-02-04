@@ -99,7 +99,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
       def state(encodedId: String, limit: Int): Option[StoredState] = cache.get(encodedId) match {
         case None =>
           val st: Option[StoredState] = if (!getFileName(encodedId).exists(f => new File(f).exists())) None
-          else Some(untilTimeout(StateCopyTimeout)(StoredState(getFileName(encodedId))))
+          else Some(untilTimeout(StateCopyTimeout)(cache.get(encodedId).getOrElse(StoredState(getFileName(encodedId)))))
 
           val recoveredState = if (limit > 0 && (st.isEmpty || !st.get.isValid(InitialBalance))) {
             //State is wrong, recover from the previous one
