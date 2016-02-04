@@ -83,10 +83,14 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
         case None => cache.keySet.toSet
       }
 
-      override def copyState(encodedId: String, state: LagonakiState): StoredState = {
-        val copy = state.copyTo(getFileName(encodedId)).asInstanceOf[StoredState]
-        cache.put(encodedId, copy)
-        copy
+      override def copyState(encodedId: String, state: LagonakiState): StoredState = cache.get(encodedId) match {
+        case None =>
+          val copy = state.copyTo(getFileName(encodedId)).asInstanceOf[StoredState]
+          cache.put(encodedId, copy)
+          copy
+        case Some(s) =>
+          log.warn(s"Trying to copy state $encodedId we already have in cache")
+          s
       }
 
       override def removeState(encodedId: String): Unit = {
