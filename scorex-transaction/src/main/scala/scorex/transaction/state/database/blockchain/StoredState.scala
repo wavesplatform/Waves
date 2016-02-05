@@ -8,10 +8,11 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.transaction.{LagonakiState, LagonakiTransaction, State, Transaction}
-import scorex.utils.ScorexLogging
+import scorex.utils.{ScorexLogging, untilTimeout}
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
+import scala.concurrent.duration._
 import scala.util.Try
 
 
@@ -194,15 +195,15 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
   }
 
   //Self check
-  def isValid(initialBalance: Long): Boolean = {
-    totalBalance >= initialBalance
-  }
+  def isValid(initialBalance: Long): Boolean = Try {
+    untilTimeout(5.seconds)(assert(totalBalance < initialBalance && stateHeight() >= 0))
+  }.isSuccess
 
   //for debugging purposes only
   override def toString: String = toJson.toString()
 
   override def finalize(): Unit = {
-    if(!database.isClosed) database.close()
+    if (!database.isClosed) database.close()
     super.finalize()
   }
 }
