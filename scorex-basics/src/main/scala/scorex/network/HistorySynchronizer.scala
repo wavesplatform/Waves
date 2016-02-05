@@ -108,7 +108,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
           networkControllerRef ! NetworkController.SendToNetwork(msg, stn)
         }
       } else {
-        log.warn(s"Strange blockIds: ${application.history.contains(common)}")
+        log.warn(s"Strange blockIds: $blockIds(${application.history.contains(common)})")
         gotoSyncing()
       }
   }: Receive)
