@@ -93,7 +93,7 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
     includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
     accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
     db.commit()
-    new StoredState(db, None)
+    new StoredState(db, fileNameOpt)
   }
 
   def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
