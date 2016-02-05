@@ -3,6 +3,7 @@ package scorex.network
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.crypto.encode.Base58
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.NetworkObject.ConsideredValue
 import scorex.network.message.Message
@@ -195,7 +196,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         case Success(_) =>
           block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
           log.info(
-            s"""After appending block(local: $local):
+            s"""After appending block(local: $local, parent: ${Base58.encode(block.referenceField.value)}):
             (height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})""")
           true
         case Failure(e) =>
