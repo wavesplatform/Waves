@@ -20,5 +20,5 @@
     "treeDir": "/opt/scorex/data/tree",
     "authDataStorage": "permatree.db"
   },
-  "blockGenerationDelay": 60000
+  "blockGenerationDelay": 15000
 }
