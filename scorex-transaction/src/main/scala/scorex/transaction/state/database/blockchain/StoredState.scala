@@ -200,6 +200,11 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
 
   //for debugging purposes only
   override def toString: String = toJson.toString()
+
+  override def finalize(): Unit = {
+    if(!database.isClosed) database.close()
+    super.finalize()
+  }
 }
 
 object StoredState {
