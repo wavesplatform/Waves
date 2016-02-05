@@ -191,17 +191,18 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
       val oldHeight = history.height()
       val oldScore = history.score()
-      val appending = transactionalModule.blockStorage.appendBlock(block)
-
-      appending match {
+      transactionalModule.blockStorage.appendBlock(block) match {
         case Success(_) =>
           block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-          log.info(s"(height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})")
+          log.info(
+            s"""After appending block(local: $local):
+            (height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})""")
+          true
         case Failure(e) =>
           e.printStackTrace()
           log.warn(s"failed to append block: $e")
+          false
       }
-      appending.isSuccess
     } else {
       log.warn(s"Invalid new block(local: $local): ${block.json}")
       false
