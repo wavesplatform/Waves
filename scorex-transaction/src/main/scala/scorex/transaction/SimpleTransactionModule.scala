@@ -20,7 +20,7 @@ import scorex.wallet.Wallet
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Success, Try}
 
 case class TransactionsBlockField(override val value: Seq[Transaction])
   extends BlockField[Seq[Transaction]] {
@@ -103,7 +103,12 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
       def state(encodedId: String, limit: Int): Option[StoredState] = cache.get(encodedId) match {
         case None =>
           val st: Option[StoredState] = if (!getFileName(encodedId).exists(f => new File(f).exists())) None
-          else Some(untilTimeout(StateCopyTimeout)(cache.get(encodedId).getOrElse(StoredState(getFileName(encodedId)))))
+          else Try(untilTimeout(StateCopyTimeout)(cache.get(encodedId).get)) match {
+            case Success(cachedState) => Some(cachedState)
+            case _ =>
+              log.info(s"Recover state for block $encodedId from file")
+              Some(StoredState(getFileName(encodedId)))
+          }
 
           val recoveredState = if (limit > 0 && (st.isEmpty || !st.get.isValid(InitialBalance))) {
             //State is wrong, recover from the previous one
