@@ -6,6 +6,10 @@ import scorex.transaction.History._
 
 case object UpdateNetworkView
 
+//todo: make dedicated Score Observer actor, to provide possibility to ask for a peer score from API
+//todo: and also to break a connection if no score message from remote for some time
+
+
 //not thread-safe!!!
 trait NetworkObject[V] {
 
