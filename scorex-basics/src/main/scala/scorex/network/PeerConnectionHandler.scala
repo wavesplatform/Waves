@@ -59,6 +59,7 @@ case class PeerConnectionHandler(application: Application,
     case cc: ConnectionClosed =>
       peerManager ! PeerManager.Disconnected(remote)
       log.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
+      context stop self
 
     case CloseConnection =>
       log.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
