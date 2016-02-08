@@ -8,7 +8,7 @@ import akka.util.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{Matchers, WordSpecLike}
 import scorex.lagonaki.TestingCommons
-import scorex.network.NetworkObject.ConsideredValue
+import scorex.network.ScoreObserver.ConsideredValue
 import scorex.network.{BlockGenerator, ConnectedPeer}
 import java.net.{InetAddress, InetSocketAddress}
 

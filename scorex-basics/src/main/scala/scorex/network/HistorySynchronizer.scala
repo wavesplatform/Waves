@@ -1,11 +1,12 @@
 package scorex.network
 
+import akka.actor.Props
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
-import scorex.network.NetworkObject.ConsideredValue
+import scorex.network.ScoreObserver.{ConsideredValue, PutScore}
 import scorex.network.message.Message
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
@@ -27,7 +28,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
   override val messageSpecs = Seq(ScoreMessageSpec, SignaturesSpec, BlockMessageSpec)
 
-  private lazy val scoreSyncer = new ScoreNetworkObject(self)
+  private lazy val scoreObserver = context.actorOf(Props(classOf[ScoreObserver], self))
 
   private lazy val history = application.history
 
@@ -58,13 +59,13 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         sender() ! status.name
 
       //todo: check sender
-      case DataFromPeer(msgId, content: History.BlockchainScore, connectedPeer)
+      case DataFromPeer(msgId, score: History.BlockchainScore, connectedPeer)
         if msgId == ScoreMessageSpec.messageCode =>
 
-        scoreSyncer.networkUpdate(connectedPeer, content)
+        scoreObserver ! PutScore(connectedPeer, score)
 
       case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
-        log.info("Got unhandled ConsideredValue(score)")
+        log.info(s"Got unhandled ConsideredValue($networkScore)")
 
       //the signal to initialize
       case Unit =>
@@ -161,7 +162,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   private def gotoSyncing(): Receive = {
     log.debug("Transition to syncing")
     context become syncing
-    scoreSyncer.consideredValue.foreach(cv => self ! cv)
+    scoreObserver ! ScoreObserver.GetScore
     syncing
   }
 
