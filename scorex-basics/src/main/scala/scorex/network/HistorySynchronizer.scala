@@ -58,15 +58,15 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         sender() ! status.name
 
       //todo: check sender
-      case DataFromPeer(msgId, content: History.BlockchainScore, remote)
+      case DataFromPeer(msgId, content: History.BlockchainScore, connectedPeer)
         if msgId == ScoreMessageSpec.messageCode =>
 
-        scoreSyncer.networkUpdate(remote, content)
+        scoreSyncer.networkUpdate(connectedPeer, content)
 
       case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
         log.info("Got unhandled ConsideredValue(score)")
 
-      //the signals to initialize
+      //the signal to initialize
       case Unit =>
 
       //timeout signals
@@ -92,10 +92,10 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     case GettingExtensionTimeout => gotoSyncing()
 
     //todo: aggregating function for block ids (like score has)
-    case DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, remote)
+    case DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, connectedPeer)
       if msgId == SignaturesSpec.messageCode &&
         blockIds.cast[Seq[Block.BlockId]].isDefined &&
-        witnesses.contains(remote) => //todo: ban if non-expected sender
+        witnesses.contains(connectedPeer) => //todo: ban if non-expected sender
 
       val common = blockIds.head
 
@@ -105,7 +105,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         gotoGettingBlock(witnesses, toDownload.map(_ -> None))
         blockIds.tail.foreach { blockId =>
           val msg = Message(GetBlockSpec, Right(blockId), None)
-          val stn = SendToChosen(Seq(remote))
+          val stn = SendToChosen(Seq(connectedPeer))
           networkControllerRef ! NetworkController.SendToNetwork(msg, stn)
         }
       } else {
@@ -119,7 +119,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       case GettingBlockTimeout => //15.seconds
         gotoSyncing()
 
-      case DataFromPeer(msgId, block: Block@unchecked, remote)
+      case DataFromPeer(msgId, block: Block@unchecked, connectedPeer)
         if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
 
         val blockId = block.uniqueId
@@ -152,7 +152,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         gotoGettingExtension(networkScore, witnesses)
       }
 
-    case DataFromPeer(msgId, block: Block@unchecked, remote)
+    case DataFromPeer(msgId, block: Block@unchecked, _)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
       processNewBlock(block, local = false)
   }: Receive)
