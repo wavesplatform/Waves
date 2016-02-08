@@ -16,7 +16,6 @@ import spray.can.Http
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.runtime.universe.Type
-import scala.util.{Success, Random}
 
 trait Application extends ScorexLogging {
   val ApplicationNameLimit = 50
