@@ -91,10 +91,10 @@ trait Block extends ScorexLogging {
       lazy val consensus = consensusModule.isValid(this)
       lazy val transaction = transactionModule.isValid(this)
 
-      if (!history) log.debug("Block checks: no parent block in history")
-      else if (!signature) log.debug("Block checks: signature is not valid")
-      else if (!consensus) log.debug("Block checks: consensus data is not valid")
-      else if (!transaction) log.debug("Block checks: transaction data is not valid")
+      if (!history) log.debug(s"Invalid block $encodedId: no parent block in history")
+      else if (!signature) log.debug(s"Invalid block $encodedId: signature is not valid")
+      else if (!consensus) log.debug(s"Invalid block $encodedId: consensus data is not valid")
+      else if (!transaction) log.debug(s"Invalid block $encodedId: transaction data is not valid")
 
       history && signature && consensus && transaction
     }
