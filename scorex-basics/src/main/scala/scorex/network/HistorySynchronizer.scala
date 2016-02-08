@@ -98,6 +98,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         witnesses.contains(remote) => //todo: ban if non-expected sender
 
       val common = blockIds.head
+      log.debug(s"Got blockIds: ${blockIds.map(id => Base58.encode(id))}")
 
       val toDownload = blockIds.tail.filter(b => !application.history.contains(b))
       if (application.history.contains(common) && toDownload.nonEmpty) {
