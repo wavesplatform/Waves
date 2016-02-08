@@ -83,21 +83,21 @@ trait Block extends ScorexLogging {
   lazy val bytesWithoutSignature = bytes.dropRight(EllipticCurveImpl.SignatureLength)
 
   def isValid: Boolean = {
-    if (!transactionModule.blockStorage.history.contains(this)) {
-      val v = consensusModule.isValid(this) &&
-        transactionModule.isValid(this) &&
-        transactionModule.blockStorage.history.contains(referenceField.value) &&
-        EllipticCurveImpl.verify(signerDataField.value.signature,
-          bytesWithoutSignature,
-          signerDataField.value.generator.publicKey)
-      if (!v) log.debug(
-        s"Block checks: ${consensusModule.isValid(this)} && ${transactionModule.isValid(this)} && " +
-          s"${transactionModule.blockStorage.history.contains(referenceField.value)} && " +
-          EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
-            signerDataField.value.generator.publicKey)
-      )
-      v
-    } else true
+    if (transactionModule.blockStorage.history.contains(this)) true //applyed blocks are valid
+    else {
+      lazy val history = transactionModule.blockStorage.history.contains(referenceField.value)
+      lazy val signature = EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
+        signerDataField.value.generator.publicKey)
+      lazy val consensus = consensusModule.isValid(this)
+      lazy val transaction = transactionModule.isValid(this)
+
+      if (!history) log.debug("Block checks: no parent block in history")
+      else if (!signature) log.debug("Block checks: signature is not valid")
+      else if (!consensus) log.debug("Block checks: consensus data is not valid")
+      else if (!transaction) log.debug("Block checks: transaction data is not valid")
+
+      history && signature && consensus && transaction
+    }
   }
 
   override def equals(obj: scala.Any): Boolean = {
