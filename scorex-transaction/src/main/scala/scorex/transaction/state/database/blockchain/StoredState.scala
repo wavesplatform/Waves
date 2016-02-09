@@ -57,6 +57,7 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
 
   //Names of collections in DB
   private val StateHeight = "height"
+  private val BlockProcessed = "blockProcessed"
   private val Balances = "balances"
   private val IncludedTx = "includedTx"
   private val WatchedTxs = "watchedTxs"
@@ -93,6 +94,7 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
     balances.keySet().foreach(key => balancesCopy.put(key, balances(key)))
     includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
     accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
+    db.atomicBoolean(BlockProcessed).set(true)
     db.commit()
     new StoredState(db, fileNameOpt)
   }
@@ -100,7 +102,11 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
   def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
 
   //initialization
-  if (Option(stateHeight()).isEmpty) setStateHeight(0)
+  if (Option(stateHeight()).isEmpty) {
+    setStateHeight(0)
+    database.atomicBoolean(BlockProcessed).set(true)
+  }
+
 
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
@@ -196,7 +202,9 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
 
   //Self check
   def isValid(initialBalance: Long): Boolean = Try {
-    untilTimeout(5.seconds)(assert(totalBalance >= initialBalance && stateHeight() >= 0))
+    untilTimeout(5.seconds) {
+      assert(totalBalance >= initialBalance && stateHeight() >= 0 && database.atomicBoolean(BlockProcessed).get)
+    }
   }.isSuccess
 
   //for debugging purposes only

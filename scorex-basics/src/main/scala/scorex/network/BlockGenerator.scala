@@ -14,9 +14,10 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
 
   // BlockGenerator is trying to generate a new block every $blockGenerationDelay. Should be 0 for PoW consensus model.
   private val blockGenerationDelay = application.settings.blockGenerationDelay
+  private val FailedGenerationDelay = 10.seconds
 
-  private def scheduleAGuess(): Unit =
-    context.system.scheduler.scheduleOnce(blockGenerationDelay, self, GuessABlock)
+  private def scheduleAGuess(delay: Option[FiniteDuration] = None): Unit =
+    context.system.scheduler.scheduleOnce(delay.getOrElse(blockGenerationDelay), self, GuessABlock)
 
   startWith(Syncing, Unit)
 
@@ -55,7 +56,9 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
           application.historySynchronizer ! bestBlock
         }
         scheduleAGuess()
-      case Failure(ex) => log.error("Failed to generate new block", ex)
+      case Failure(ex) =>
+        log.error("Failed to generate new block", ex)
+        scheduleAGuess(Some(FailedGenerationDelay))
       case m => log.error(s"Unexpected message: m")
     }
   }

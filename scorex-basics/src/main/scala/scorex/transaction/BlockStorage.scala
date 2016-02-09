@@ -23,7 +23,7 @@ trait BlockStorage extends ScorexLogging {
 
     def removeState(encodedId: String): Unit
 
-    def copyState(encodedId: String, state: LagonakiState): LagonakiState
+    def copyState(encodedId: String, state: LagonakiState, toProcess: Block): LagonakiState
 
     def state(encodedId: String): Option[LagonakiState]
 
@@ -44,7 +44,7 @@ trait BlockStorage extends ScorexLogging {
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
         val cState = if (history.heightOf(b).get != 1) state(b.referenceField.value).get else stateHistory.emptyState
-        stateHistory.copyState(b.encodedId, cState).processBlock(b)
+        stateHistory.copyState(b.encodedId, cState, b)
       }
     }
   }
