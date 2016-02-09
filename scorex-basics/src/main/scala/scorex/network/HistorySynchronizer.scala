@@ -136,8 +136,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
                 log.warn(s"Can't apply block: ${failedBlock.json}")
                 gotoSyncing()
               }
-              val nextBlocks = updBlocks.drop(toProcess.length)
-              if (nextBlocks.nonEmpty) gotoGettingBlock(witnesses, nextBlocks) else gotoSynced()
+              gotoGettingBlock(witnesses, updBlocks.drop(toProcess.length))
             } else gotoGettingBlock(witnesses, updBlocks)
         }
     }: Receive)
