@@ -13,8 +13,9 @@ import scorex.utils.ScorexLogging
 import shapeless.Typeable._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
+
+import scala.concurrent.duration._
 
 
 //todo: write tests
@@ -145,11 +146,10 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       processNewBlock(block, local = true)
 
     case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
-      val localScore = history.score()
-      if (networkScore > localScore) {
-        blockGenerator ! BlockGenerator.StopGeneration
-        gotoGettingExtension(networkScore, witnesses)
-      }
+      if (networkScore > history.score()) gotoGettingExtension(networkScore, witnesses)
+
+    case ConsideredValue(None, _) =>
+      gotoSyncing()
 
     case DataFromPeer(msgId, block: Block@unchecked, _)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
@@ -159,12 +159,14 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   private def gotoSyncing(): Receive = {
     log.debug("Transition to syncing")
     context become syncing
+    blockGenerator ! BlockGenerator.StopGeneration
     scoreObserver ! ScoreObserver.GetScore
     syncing
   }
 
   private def gotoGettingExtension(betterScore: BigInt, witnesses: Seq[ConnectedPeer]): Unit = {
     log.debug("Transition to gettingExtension")
+    blockGenerator ! BlockGenerator.StopGeneration
     context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
     context become gettingExtension(betterScore, witnesses)
   }
