@@ -6,7 +6,7 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
-import scorex.network.ScoreObserver.{ConsideredValue, PutScore}
+import scorex.network.ScoreObserver.{ConsideredValue, UpdateScore}
 import scorex.network.message.Message
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
@@ -63,7 +63,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       case DataFromPeer(msgId, score: History.BlockchainScore, connectedPeer)
         if msgId == ScoreMessageSpec.messageCode =>
 
-        scoreObserver ! PutScore(connectedPeer, score)
+        scoreObserver ! UpdateScore(Some(connectedPeer -> score))
 
       case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
         log.info(s"Got unhandled ConsideredValue($networkScore)")

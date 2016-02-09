@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef}
 import scorex.transaction.History._
 
 import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 //todo: break a connection if no score message from remote for some time?
 
@@ -29,15 +30,20 @@ class ScoreObserver(historySynchronizer: ActorRef) extends Actor {
     candidates.filter(_.seen > threshold)
   }
 
+  override def preStart: Unit = {
+    context.system.scheduler.schedule(5.seconds, 5.seconds)(self ! UpdateScore(None))
+  }
 
   override def receive: Receive = {
-    case PutScore(connectedPeer: ConnectedPeer, value: BlockchainScore) =>
+    case UpdateScore(scoreToAddOpt) =>
       val oldScore = candidates.headOption.map(_.score)
       candidates = clearOld(candidates)
 
-      candidates = candidates.filter(_.peer != connectedPeer)
+      scoreToAddOpt.foreach { case (connectedPeer, value) =>
+        candidates = candidates.filter(_.peer != connectedPeer)
+        candidates = candidates :+ Candidate(connectedPeer, value, System.currentTimeMillis())
+      }
 
-      candidates = candidates :+ Candidate(connectedPeer, value, System.currentTimeMillis())
       val ct = consider(candidates)
       candidates = ct._2
 
@@ -55,7 +61,7 @@ class ScoreObserver(historySynchronizer: ActorRef) extends Actor {
 }
 
 object ScoreObserver {
-  case class PutScore(connectedPeer: ConnectedPeer, value: BlockchainScore)
+  case class UpdateScore(scoreToAdd: Option[(ConnectedPeer, BlockchainScore)])
 
   case object GetScore
 
