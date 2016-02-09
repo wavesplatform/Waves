@@ -70,9 +70,6 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       //the signal to initialize
       case Unit =>
 
-      //timeout signals
-      case f: FiniteDuration =>
-
       case nonsense: Any =>
         log.warn(s"Got something strange: $nonsense")
     }: Receive)
