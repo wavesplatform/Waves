@@ -13,7 +13,10 @@ import scala.util.{Failure, Success}
 class BlockGenerator(application: Application) extends FSM[Status, Unit] {
 
   // BlockGenerator is trying to generate a new block every $blockGenerationDelay. Should be 0 for PoW consensus model.
-  val blockGenerationDelay = application.settings.blockGenerationDelay
+  private val blockGenerationDelay = application.settings.blockGenerationDelay
+
+  private def scheduleAGuess(): Unit =
+    context.system.scheduler.scheduleOnce(blockGenerationDelay, self, GuessABlock)
 
   startWith(Syncing, Unit)
 
@@ -21,16 +24,19 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
     case Event(StartGeneration, _) => goto(Generating)
   }
 
-  when(Generating, 15.seconds) {
-    case Event(StateTimeout, _) =>
+  when(Generating) {
+    case Event(GuessABlock, _) =>
       tryToGenerateABlock()
       stay()
 
-    case Event(StopGeneration, _) => goto(Syncing)
+    case Event(StopGeneration, _) =>
+      log.info("BlockGenerator: switching to syncing")
+      goto(Syncing)
   }
 
   whenUnhandled {
     case Event(GetStatus, _) =>
+      log.info("BlockGenerator: returning a status: " + stateName.name)
       sender() ! stateName.name
       stay()
   }
@@ -48,14 +54,14 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
           val bestBlock = blocks.maxBy(application.consensusModule.blockScore)
           application.historySynchronizer ! bestBlock
         }
-        context.system.scheduler.scheduleOnce(blockGenerationDelay, self, StateTimeout)
+        scheduleAGuess()
       case Failure(ex) => log.error("Failed to generate new block", ex)
       case m => log.error(s"Unexpected message: m")
     }
   }
 
   onTransition {
-    case Syncing -> Generating => context.system.scheduler.scheduleOnce(blockGenerationDelay, self, StateTimeout)
+    case Syncing -> Generating => scheduleAGuess()
   }
 }
 
@@ -78,4 +84,7 @@ object BlockGenerator {
   case object StartGeneration
 
   case object StopGeneration
+
+  case object GuessABlock
+
 }
