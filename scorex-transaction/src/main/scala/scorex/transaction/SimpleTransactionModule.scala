@@ -83,10 +83,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
         case None => cache.keySet.toSet
       }
 
-      override def copyState(encodedId: String, state: LagonakiState): StoredState = synchronized {
+      override def copyState(encodedId: String, state: LagonakiState, toProcess: Block): StoredState = synchronized {
         cache.get(encodedId) match {
           case None =>
             val copy = state.copyTo(getFileName(encodedId)).asInstanceOf[StoredState]
+            copy.processBlock(toProcess)
             cache.put(encodedId, copy)
             copy
           case Some(s) =>
@@ -118,9 +119,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
             removeState(encodedId)
             val parenState = history.blockById(encodedId).map(_.referenceField.value)
               .flatMap(id => state(Base58.encode(id), limit - 1))
-            val newState: Option[StoredState] = parenState.map(s => copyState(encodedId, s))
-            newState.map(s => s.processBlock(history.blockById(encodedId).get))
-            newState
+            parenState.map(s => copyState(encodedId, s, history.blockById(encodedId).get)))
           } else st
           recoveredState.map(s => cache.put(encodedId, s))
 
