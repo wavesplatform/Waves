@@ -32,8 +32,8 @@ class ScoreObserver(historySynchronizer: ActorRef) extends Actor {
 
   override def receive: Receive = {
     case PutScore(connectedPeer: ConnectedPeer, value: BlockchainScore) =>
+      val oldScore = candidates.headOption.map(_.score)
       candidates = clearOld(candidates)
-      val curScore = candidates.headOption.map(_.score)
 
       candidates = candidates.filter(_.peer != connectedPeer)
 
@@ -41,11 +41,11 @@ class ScoreObserver(historySynchronizer: ActorRef) extends Actor {
       val ct = consider(candidates)
       candidates = ct._2
 
-      val cValue = ct._1.map(_.score)
+      val newScore = ct._1.map(_.score)
       val witnesses = candidates.map(_.peer)
 
-      if (cValue.getOrElse(BigInt(0)) > curScore.getOrElse(BigInt(0))) {
-        historySynchronizer ! ConsideredValue(cValue, witnesses)
+      if (newScore.getOrElse(BigInt(0)) != oldScore.getOrElse(BigInt(0))) {
+        historySynchronizer ! ConsideredValue(newScore, witnesses)
       }
 
     case GetScore =>
