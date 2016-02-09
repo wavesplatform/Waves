@@ -203,8 +203,7 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
   //Self check
   def isValid(initialBalance: Long): Boolean = Try {
     untilTimeout(5.seconds) {
-      assert(totalBalance >= initialBalance && stateHeight() >= 0 && database.atomicBoolean(BlockProcessed).get
-      )
+      assert(totalBalance >= initialBalance && stateHeight() >= 0 && database.atomicBoolean(BlockProcessed).get)
     }
   }.isSuccess
 
