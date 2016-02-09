@@ -37,7 +37,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   private lazy val blockGenerator = application.blockGenerator
 
   //todo: make configurable
-  private val GettingExtensionTimeout = 40.seconds
+  private val GettingExtensionTimeout = 10.seconds
   private val GettingBlockTimeout = 10.seconds
 
   override def preStart: Unit = {
@@ -115,7 +115,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
   def gettingBlock(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive =
     state(HistorySynchronizer.GettingBlock, {
-      case GettingBlockTimeout => //15.seconds
+      case GettingBlockTimeout =>
         gotoSyncing()
 
       case DataFromPeer(msgId, block: Block@unchecked, connectedPeer)
