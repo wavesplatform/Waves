@@ -119,7 +119,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
             removeState(encodedId)
             val parenState = history.blockById(encodedId).map(_.referenceField.value)
               .flatMap(id => state(Base58.encode(id), limit - 1))
-            parenState.map(s => copyState(encodedId, s, history.blockById(encodedId).get)))
+            parenState.map(s => copyState(encodedId, s, history.blockById(encodedId).get))
           } else st
           recoveredState.map(s => cache.put(encodedId, s))
 
