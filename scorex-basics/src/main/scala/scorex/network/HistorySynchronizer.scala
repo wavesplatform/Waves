@@ -67,7 +67,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
 
       case ConsideredValue(None, _) =>
-        gotoSyncing()
+        if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
 
       //the signal to initialize
       case Unit =>
