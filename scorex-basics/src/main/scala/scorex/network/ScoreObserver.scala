@@ -27,11 +27,13 @@ class ScoreObserver(historySynchronizer: ActorRef) extends Actor with ScorexLogg
     }
 
   private def clearOld(candidates: Seq[Candidate]): Seq[Candidate] = {
+    //todo: make configurable?
     val threshold = System.currentTimeMillis() - 1.minute.toMillis
     candidates.filter(_.seen > threshold)
   }
 
   override def preStart: Unit = {
+    //todo: make configurable?
     context.system.scheduler.schedule(5.seconds, 5.seconds)(self ! UpdateScore(None))
   }
 
