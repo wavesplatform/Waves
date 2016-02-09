@@ -13,9 +13,8 @@ import scorex.utils.ScorexLogging
 import shapeless.Typeable._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success, Try}
-
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 
 //todo: write tests
@@ -66,7 +65,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         scoreObserver ! UpdateScore(Some(connectedPeer -> score))
 
       case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
-        log.info(s"Got unhandled ConsideredValue($networkScore)")
+
+      case ConsideredValue(None, _) =>
+        gotoSyncing()
 
       //the signal to initialize
       case Unit =>
@@ -147,9 +148,6 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
     case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
       if (networkScore > history.score()) gotoGettingExtension(networkScore, witnesses)
-
-    case ConsideredValue(None, _) =>
-      gotoSyncing()
 
     case DataFromPeer(msgId, block: Block@unchecked, _)
       if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
