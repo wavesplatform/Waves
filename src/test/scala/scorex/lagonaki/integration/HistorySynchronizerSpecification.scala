@@ -51,9 +51,11 @@ class HistorySynchronizerSpecification(_system: ActorSystem)
     }
 
     "stop block generation on better network score" in {
-      Thread.sleep(2.seconds.toMillis)
+      Thread.sleep(1.second.toMillis)
 
-      hs ! ConsideredValue(Some(BigInt(Int.MaxValue)), peers)
+      hs ! ConsideredValue(Some(BigInt(Long.MaxValue)), peers)
+
+      Thread.sleep(1.second.toMillis)
 
       val fStatus = (application.blockGenerator ? BlockGenerator.GetStatus).map(_.toString)
       whenReady(fStatus) { status =>
