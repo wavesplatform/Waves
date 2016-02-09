@@ -158,7 +158,6 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     log.debug("Transition to syncing")
     context become syncing
     blockGenerator ! BlockGenerator.StopGeneration
-    scoreObserver ! ScoreObserver.GetScore
     syncing
   }
 
