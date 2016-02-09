@@ -2,13 +2,14 @@ package scorex.network
 
 import akka.actor.{Actor, ActorRef}
 import scorex.transaction.History._
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 //todo: break a connection if no score message from remote for some time?
 
-class ScoreObserver(historySynchronizer: ActorRef) extends Actor {
+class ScoreObserver(historySynchronizer: ActorRef) extends Actor with ScorexLogging {
 
   import ScoreObserver._
 

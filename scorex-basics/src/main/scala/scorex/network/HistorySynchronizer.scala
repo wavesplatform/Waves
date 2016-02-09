@@ -6,7 +6,7 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
-import scorex.network.ScoreObserver.{ConsideredValue, UpdateScore}
+import scorex.network.ScoreObserver.{GetScore, ConsideredValue, UpdateScore}
 import scorex.network.message.Message
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
@@ -67,7 +67,10 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
 
       case ConsideredValue(None, _) =>
+        log.info("Got no score from outer world")
         if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
+
+      case _: FiniteDuration =>
 
       //the signal to initialize
       case Unit =>
@@ -103,7 +106,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       val toDownload = blockIds.tail.filter(b => !application.history.contains(b))
       if (application.history.contains(common) && toDownload.nonEmpty) {
         Try(application.blockStorage.removeAfter(common)) //todo we don't need this call for blockTree
-        gotoGettingBlock(witnesses, toDownload.map(_ -> None))
+        gotoGettingBlocks(witnesses, toDownload.map(_ -> None))
         blockIds.tail.foreach { blockId =>
           val msg = Message(GetBlockSpec, Right(blockId), None)
           val stn = SendToChosen(Seq(connectedPeer))
@@ -115,7 +118,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       }
   }: Receive)
 
-  def gettingBlock(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive =
+  def gettingBlocks(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive =
     state(HistorySynchronizer.GettingBlock, {
       case GettingBlockTimeout =>
         gotoSyncing()
@@ -127,7 +130,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         log.info("Got block: " + block.encodedId)
 
         blocks.indexWhere(_._1.sameElements(blockId)) match {
-          case i: Int if i == -1 => gotoGettingBlock(witnesses, blocks)
+          case i: Int if i == -1 => gotoGettingBlocks(witnesses, blocks)
           case idx: Int =>
             val updBlocks = blocks.updated(idx, blockId -> Some(block))
             if (idx == 0) {
@@ -136,8 +139,8 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
                 log.warn(s"Can't apply block: ${failedBlock.json}")
                 gotoSyncing()
               }
-              gotoGettingBlock(witnesses, updBlocks.drop(toProcess.length))
-            } else gotoGettingBlock(witnesses, updBlocks)
+              gotoGettingBlocks(witnesses, updBlocks.drop(toProcess.length))
+            } else gotoGettingBlocks(witnesses, updBlocks)
         }
     }: Receive)
 
@@ -157,6 +160,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   private def gotoSyncing(): Receive = {
     log.debug("Transition to syncing")
     context become syncing
+    scoreObserver ! GetScore
     blockGenerator ! BlockGenerator.StopGeneration
     syncing
   }
@@ -168,11 +172,11 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     context become gettingExtension(betterScore, witnesses)
   }
 
-  private def gotoGettingBlock(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive = {
-    log.debug("Transition to gettingBlock")
+  private def gotoGettingBlocks(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive = {
+    log.debug("Transition to gettingBlocks")
     context.system.scheduler.scheduleOnce(GettingBlockTimeout)(self ! GettingBlockTimeout)
-    context become gettingBlock(witnesses, blocks)
-    gettingBlock(witnesses, blocks)
+    context become gettingBlocks(witnesses, blocks)
+    gettingBlocks(witnesses, blocks)
   }
 
   private def gotoSynced(): Receive = {
