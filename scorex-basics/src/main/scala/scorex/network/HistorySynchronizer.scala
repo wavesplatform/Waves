@@ -203,7 +203,8 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
           false
       }
     } else {
-      log.warn(s"Invalid new block(local: $local): ${block.json}")
+      log.warn(s"Invalid new block(local: $local): ${block.json}\n"
+        + s"   state: ${transactionalModule.blockStorage.state(block.referenceField.value)}")
       false
     }
   }.getOrElse(false)

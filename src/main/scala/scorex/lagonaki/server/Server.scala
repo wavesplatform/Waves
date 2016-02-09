@@ -73,11 +73,11 @@ object Server extends App with ScorexLogging {
     }
 
     log.info("Generate 200 transactions")
-//    (1 to 200) foreach (_ => genPayment())
+    (1 to 200) foreach (_ => genPayment())
 
     (1 to Int.MaxValue).foreach { _ =>
       Thread.sleep(Random.nextInt(5.seconds.toMillis.toInt))
-//      log.info(s"Payment created: ${genPayment()}")
+      log.info(s"Payment created: ${genPayment()}")
     }
   }
 }

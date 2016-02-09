@@ -152,5 +152,5 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
   require(transactionModule.accountWatchingSupport)
 
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], this))
-  actorSystem.actorOf(Props(classOf[HistoryScavenger], blockStorage))
+  if (!settings.isTrustedDealer) actorSystem.actorOf(Props(classOf[HistoryScavenger], blockStorage))
 }

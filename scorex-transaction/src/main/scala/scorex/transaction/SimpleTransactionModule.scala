@@ -166,7 +166,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
   override def packUnconfirmed(): StoredInBlock = blockStorage.state.validate(UnconfirmedTransactionsDatabaseImpl.all()
-    .filter(isValid).filter(blockStorage.state.included(_).isEmpty).take(MaxTransactionsPerBlock))
+    .filter(isValid).take(MaxTransactionsPerBlock).filter(blockStorage.state.included(_).isEmpty))
+    .ensuring(isValid(_, blockStorage.state.asInstanceOf[StoredState]))
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
@@ -245,7 +246,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
   private def isValid(transaction: Transaction, txState: StoredState): Boolean = transaction match {
     case tx: PaymentTransaction =>
       val r = tx.signatureValid && tx.validate(txState) == ValidationResult.ValidateOke && txState.included(tx).isEmpty
-      if (!r) log.debug(s"Invalid $tx: ${tx.signatureValid}&&${tx.validate(txState)}&&${txState.included(tx).isEmpty}")
+      if (!r) log.debug(s"Invalid $tx: ${tx.signatureValid}&&${tx.validate(txState)}&&" +
+        txState.included(tx).map(Base58.encode))
       r
     case gtx: GenesisTransaction =>
       blockStorage.history.height() == 0
