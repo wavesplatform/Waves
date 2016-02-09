@@ -105,7 +105,7 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
   if (Option(stateHeight()).isEmpty) {
     setStateHeight(0)
     database.atomicBoolean(BlockProcessed).set(true)
-  } else database.atomicBoolean(BlockProcessed).set(false)
+  }
 
 
   def stateHeight(): Int = database.atomicInteger(StateHeight).get()
