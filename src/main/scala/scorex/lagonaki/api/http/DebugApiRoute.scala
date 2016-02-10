@@ -10,6 +10,7 @@ import scorex.app.Application
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
+import scorex.transaction.state.database.blockchain.StoredState
 import spray.routing.Route
 
 @Api(value = "/debug", description = "Debug methods", position = 1)
@@ -20,7 +21,7 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
   lazy val wallet = application.wallet
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ stateAt
+    blocks ~ state ~ stateAt ~ info
   }
 
   @Path("/blocks/{howMany}")
@@ -53,6 +54,23 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
     path("state") {
       jsonRoute {
         application.blockStorage.state.toString
+      }
+    }
+  }
+
+  @Path("/info")
+  @ApiOperation(value = "State", notes = "All info you need to debug", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def info: Route = {
+    path("info") {
+      jsonRoute {
+        val state = application.blockStorage.state.asInstanceOf[StoredState]
+        Json.obj(
+          "stateHeight" -> state.stateHeight(),
+          "stateHash" -> state.hashCode()
+        ).toString
       }
     }
   }

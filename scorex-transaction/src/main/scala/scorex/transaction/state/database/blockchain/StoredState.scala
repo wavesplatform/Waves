@@ -7,6 +7,7 @@ import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.{LagonakiState, LagonakiTransaction, State, Transaction}
 import scorex.utils.{ScorexLogging, untilTimeout}
 
@@ -145,7 +146,7 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
     val newHeight = stateHeight() + 1
     setStateHeight(newHeight)
     database.commit()
-    log.debug(s"Total balance at height $newHeight is $totalBalance")
+    log.debug(s"Total balance at height $newHeight is $totalBalance, hash: $hashCode")
 
     this
   }
@@ -197,7 +198,8 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
 
   def toJson: JsObject = {
     import scala.collection.JavaConversions._
-    JsObject(balances.keySet().map(a => a.address -> JsNumber(balances.get(a))).toMap)
+    val out = balances.keySet().map(a => a.address -> balances.get(a)).filter(b => b._2 != 0).toList.sortBy(_._1)
+    JsObject(out.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
 
   //Self check
@@ -213,6 +215,10 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
   override def finalize(): Unit = {
     if (!database.isClosed) database.close()
     super.finalize()
+  }
+
+  override def hashCode: Int = {
+    (BigInt(FastCryptographicHash(toString.getBytes())) % Int.MaxValue).toInt
   }
 }
 
