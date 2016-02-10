@@ -13,7 +13,7 @@ import scorex.utils.ScorexLogging
 import scala.util.{Failure, Try}
 
 /**
-  * A block is a an atomic piece of data network participates are agreed on.
+  * A block is an atomic piece of data network participates are agreed on.
   *
   * A block has:
   * - transactions data: a sequence of transactions, where a transaction is an atomic state update.
