@@ -77,7 +77,7 @@ trait Application extends ScorexLogging {
     historyReplier ! Unit
     actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
 
-    //CLOSE ON UNEXPECTED SHUTDOWN
+    //on unexpected shutdown
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run() {
         stopAll()
