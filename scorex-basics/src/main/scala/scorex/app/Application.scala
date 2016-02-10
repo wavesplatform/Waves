@@ -92,11 +92,9 @@ trait Application extends ScorexLogging {
 
     log.info("Stopping actors (incl. block generator)")
     actorSystem.terminate().onComplete { _ =>
-      //CLOSE WALLET
       log.info("Closing wallet")
       wallet.close()
 
-      //FORCE CLOSE
       log.info("Exiting from the app...")
       System.exit(0)
     }
