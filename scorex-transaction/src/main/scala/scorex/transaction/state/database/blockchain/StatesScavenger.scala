@@ -7,7 +7,7 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-
+import scala.util.Try
 
 /**
   * Delete old states / blocks we don't need any more
@@ -18,9 +18,12 @@ class StatesScavenger(blockStorage: BlockStorage) extends Actor with ScorexLoggi
 
   override def receive: Receive = {
     case Unit =>
-      val lastBlocks = blockStorage.history.lastBlockIds(blockStorage.MaxRollback).map(Base58.encode).toSet
-      val storedStates = blockStorage.stateHistory.keySet
-      val diff = storedStates.diff(lastBlocks)
+      val h = blockStorage.history
+      val diff = blockStorage.stateHistory.keySet.filter { id =>
+        Try {
+          h.height() - h.heightOf(Base58.decode(id).get).get > blockStorage.MaxRollback
+        }.getOrElse(false)
+      }
       log.info("Remove old states: " + diff)
       diff.foreach(id => blockStorage.stateHistory.removeState(id))
   }
