@@ -96,7 +96,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
         }
       }
 
-      override def removeState(encodedId: String): Unit = {
+      override def removeState(encodedId: String): Unit = synchronized {
         cache.remove(encodedId).foreach(_.database.close())
         getFileName(encodedId).map(new File(_).delete())
       }
