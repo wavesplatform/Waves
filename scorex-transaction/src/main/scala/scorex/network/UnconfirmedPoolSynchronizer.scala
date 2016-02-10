@@ -8,7 +8,7 @@ import scorex.transaction.{LagonakiTransaction, Transaction}
 import scorex.utils.ScorexLogging
 
 /**
-  * Synchronizer pf transactions, that are not in blockchain yet
+  * Synchronizing transactions that are not in blockchain yet
   */
 class UnconfirmedPoolSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
 
