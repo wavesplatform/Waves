@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 /**
   * Delete old states / blocks we don't need any more
   */
-class HistoryScavenger(blockStorage: BlockStorage) extends Actor with ScorexLogging {
+class StatesScavenger(blockStorage: BlockStorage) extends Actor with ScorexLogging {
 
   context.system.scheduler.schedule(1.minute, 5.minutes, self, Unit)
 
