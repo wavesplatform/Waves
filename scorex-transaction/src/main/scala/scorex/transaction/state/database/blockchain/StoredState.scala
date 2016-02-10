@@ -198,7 +198,8 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
 
   def toJson: JsObject = {
     import scala.collection.JavaConversions._
-    JsObject(balances.keySet().map(a => a.address -> JsNumber(balances.get(a))).toMap)
+    val out = balances.keySet().map(a => a.address -> balances.get(a)).filter(b => b._2 != 0).toList.sortBy(_._1)
+    JsObject(out.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
 
   //Self check
