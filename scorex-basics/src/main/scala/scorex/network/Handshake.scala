@@ -72,8 +72,5 @@ object Handshake extends ScorexLogging {
     val time = Longs.fromByteArray(bytes.slice(position, position + 8))
 
     Handshake(an, av, nodeName, nonce, isaOpt, time)
-  }.recoverWith { case t: Throwable =>
-    log.info("Error during handshake parsing:", t)
-    Failure(t)
   }
 }
