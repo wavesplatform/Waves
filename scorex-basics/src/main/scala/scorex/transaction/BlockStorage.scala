@@ -2,7 +2,6 @@ package scorex.transaction
 
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.crypto.encode.Base58
 import scorex.utils.ScorexLogging
 
 import scala.util.Try
@@ -16,35 +15,13 @@ trait BlockStorage extends ScorexLogging {
 
   val history: History
 
-  val stateHistory: StateHistory
-
-  trait StateHistory {
-    def keySet: Set[String]
-
-    def removeState(encodedId: String): Unit
-
-    def copyState(encodedId: String, state: LagonakiState, toProcess: Block): LagonakiState
-
-    def state(encodedId: String): Option[LagonakiState]
-
-    def state: LagonakiState
-
-    val emptyState: LagonakiState
-  }
-
-  def state(id: String): Option[LagonakiState] = stateHistory.state(id)
-
-  def state(id: BlockId): Option[LagonakiState] = stateHistory.state(Base58.encode(id))
-
-  def state: LagonakiState = stateHistory.state
-
+  def state: LagonakiState
 
   //Append block to current state
   def appendBlock(block: Block): Try[Unit] = BlockStorage.synchronized {
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
-        val cState = if (history.heightOf(b).get != 1) state(b.referenceField.value).get else stateHistory.emptyState
-        stateHistory.copyState(b.encodedId, cState, b)
+        state.processBlock(b)
       }
     }
   }

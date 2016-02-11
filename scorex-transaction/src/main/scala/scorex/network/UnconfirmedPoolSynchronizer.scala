@@ -21,7 +21,7 @@ class UnconfirmedPoolSynchronizer(application: Application) extends ViewSynchron
   override def receive: Receive = {
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
-      (tx, transactionModule.isValid(tx)) match {
+      (tx, transactionModule.blockStorage.state.isValid(tx)) match {
         case (ltx: LagonakiTransaction, true) => UnconfirmedTransactionsDatabaseImpl.putIfNew(ltx)
         case (atx, false) => log.error(s"Transaction $atx is not valid")
         case m => log.error(s"Got unexpected transaction: $m")

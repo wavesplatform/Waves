@@ -1,19 +1,19 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.{DataInput, DataOutput, File}
+import java.io.File
 
 import org.mapdb._
-import play.api.libs.json.{JsNumber, JsObject}
+import play.api.libs.json.JsObject
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.{LagonakiState, LagonakiTransaction, State, Transaction}
-import scorex.utils.{ScorexLogging, untilTimeout}
+import scorex.crypto.encode.Base58
+import scorex.transaction.LagonakiTransaction.ValidationResult
+import scorex.transaction._
+import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.duration._
 import scala.util.Try
 
 
@@ -23,154 +23,157 @@ import scala.util.Try
   *
   * Use apply method of StoredState object to create new instance
   */
-class StoredState(val database: DB, dbFileName: Option[String]) extends LagonakiState with ScorexLogging {
+class StoredState(fileNameOpt: Option[String]) extends LagonakiState with ScorexLogging {
+  /*
+    private object AccSerializer extends Serializer[Account] {
+      override def serialize(dataOutput: DataOutput, a: Account): Unit =
+        Serializer.STRING.serialize(dataOutput, a.address)
 
-  private object AccSerializer extends Serializer[Account] {
-    override def serialize(dataOutput: DataOutput, a: Account): Unit =
-      Serializer.STRING.serialize(dataOutput, a.address)
-
-    override def deserialize(dataInput: DataInput, i: Int): Account = {
-      val address = Serializer.STRING.deserialize(dataInput, i)
-      new Account(address)
-    }
-  }
-
-  private object TxArraySerializer extends Serializer[Array[LagonakiTransaction]] {
-    override def serialize(dataOutput: DataOutput, txs: Array[LagonakiTransaction]): Unit = {
-      DataIO.packInt(dataOutput, txs.length)
-      txs.foreach { tx =>
-        val bytes = tx.bytes
-        DataIO.packInt(dataOutput, bytes.length)
-        dataOutput.write(bytes)
+      override def deserialize(dataInput: DataInput, i: Int): Account = {
+        val address = Serializer.STRING.deserialize(dataInput, i)
+        new Account(address)
       }
     }
 
-    override def deserialize(dataInput: DataInput, i: Int): Array[LagonakiTransaction] = {
-      val txsCount = DataIO.unpackInt(dataInput)
-      (1 to txsCount).toArray.map { _ =>
-        val txSize = DataIO.unpackInt(dataInput)
-        val b = new Array[Byte](txSize)
-        dataInput.readFully(b)
-        LagonakiTransaction.parse(b).get //todo: .get w/out catching
+    private object TxArraySerializer extends Serializer[Array[LagonakiTransaction]] {
+      override def serialize(dataOutput: DataOutput, txs: Array[LagonakiTransaction]): Unit = {
+        DataIO.packInt(dataOutput, txs.length)
+        txs.foreach { tx =>
+          val bytes = tx.bytes
+          DataIO.packInt(dataOutput, bytes.length)
+          dataOutput.write(bytes)
+        }
       }
-    }
+
+      override def deserialize(dataInput: DataInput, i: Int): Array[LagonakiTransaction] = {
+        val txsCount = DataIO.unpackInt(dataInput)
+        (1 to txsCount).toArray.map { _ =>
+          val txSize = DataIO.unpackInt(dataInput)
+          val b = new Array[Byte](txSize)
+          dataInput.readFully(b)
+          LagonakiTransaction.parse(b).get //todo: .get w/out catching
+        }
+      }
+    }*/
+
+  type Adress = String
+
+  case class AccState(balance: Long)
+
+  type Reason = Seq[StateChangeReason]
+
+  case class Row(state: AccState, reason: Reason, lastRowHeight: Int)
+
+  val HeightKey = "height"
+  val DataKey = "dataset"
+  val LastStates = "lastStates"
+
+  private val db = fileNameOpt match {
+    case Some(fileName) =>
+      DBMaker.fileDB(new File(fileName))
+        .closeOnJvmShutdown()
+        .cacheSize(2048)
+        .checksumEnable()
+        .fileMmapEnable()
+        .make()
+    case None => DBMaker.memoryDB().snapshotEnable().make()
   }
 
-  //Names of collections in DB
-  private val StateHeight = "height"
-  private val BlockProcessed = "blockProcessed"
-  private val Balances = "balances"
-  private val IncludedTx = "includedTx"
-  private val WatchedTxs = "watchedTxs"
+  private def accountChanges(key: Adress): HTreeMap[Int, Row] = db.hashMapCreate(key.toString).makeOrGet()
 
-  private val balances = database.hashMap[Account, Long](Balances)
+  val lastStates = db.hashMap[Adress, Int](LastStates)
 
-  private val includedTx: HTreeMap[Array[Byte], Array[Byte]] = database.hashMapCreate(IncludedTx)
-    .keySerializer(Serializer.BYTE_ARRAY)
-    .valueSerializer(Serializer.BYTE_ARRAY)
-    .makeOrGet()
+  if (Option(db.atomicInteger(HeightKey).get()).isEmpty) db.atomicInteger(HeightKey).set(0)
 
-  private val accountTransactions = database.hashMap(
-    WatchedTxs,
-    AccSerializer,
-    TxArraySerializer,
-    null)
+  def stateHeight: Int = db.atomicInteger(HeightKey).get()
 
-  override def copyTo(fileNameOpt: Option[String]): State = StoredState.synchronized {
-    val db: DB = StoredState.makeDb(fileNameOpt)
-    db.atomicInteger(StateHeight).set(stateHeight())
-    val balancesCopy = db.hashMap[Account, Long](Balances)
+  private def setStateHeight(height: Int): Unit = db.atomicInteger(HeightKey).set(height)
 
-    val includedTxCopy: HTreeMap[Array[Byte], Array[Byte]] = db.hashMapCreate(IncludedTx)
-      .keySerializer(Serializer.BYTE_ARRAY)
-      .valueSerializer(Serializer.BYTE_ARRAY)
-      .makeOrGet()
-
-    val accountTransactionsCopy = db.hashMap(
-      WatchedTxs,
-      AccSerializer,
-      TxArraySerializer,
-      null)
-
-    balances.keySet().foreach(key => balancesCopy.put(key, balances(key)))
-    includedTx.keySet().foreach(key => includedTxCopy.put(key, includedTx(key)))
-    accountTransactions.keySet().foreach(key => accountTransactionsCopy.put(key, accountTransactions(key)))
-    db.atomicBoolean(BlockProcessed).set(true)
+  private def applyChanges(ch: Map[Adress, (AccState, Reason)]): Unit = synchronized {
+    val h = stateHeight
+    ch.foreach { ch =>
+      val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1)).getOrElse(0))
+      accountChanges(ch._1).put(h, change)
+      lastStates.put(ch._1, h)
+    }
+    setStateHeight(h + 1)
     db.commit()
-    new StoredState(db, fileNameOpt)
   }
 
-  def setStateHeight(height: Int): Unit = database.atomicInteger(StateHeight).set(height)
-
-  //initialization
-  if (Option(stateHeight()).isEmpty) {
-    setStateHeight(0)
-    database.atomicBoolean(BlockProcessed).set(true)
+  def rollbackTo(rollbackTo: Int): Unit = synchronized {
+    def deleteNewer(key: Adress): Unit = {
+      val currentHeight = lastStates.get(key)
+      if (currentHeight > rollbackTo) {
+        val dataMap = accountChanges(key)
+        val prevHeight = dataMap.remove(currentHeight).lastRowHeight
+        lastStates.put(key, prevHeight)
+        deleteNewer(key)
+      }
+    }
+    lastStates.keySet().foreach { key =>
+      deleteNewer(key)
+    }
+    setStateHeight(rollbackTo)
+    db.commit()
   }
-
-
-  def stateHeight(): Int = database.atomicInteger(StateHeight).get()
 
   override def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactions
-    trans foreach { tx =>
-      if (includedTx.containsKey(tx.signature)) throw new Exception("Already included tx")
-      else includedTx.put(tx.signature, block.uniqueId)
-    }
-    val balanceChanges = trans.foldLeft(block.consensusModule.feesDistribution(block)) { case (changes, atx) =>
+    //TODO require transaction is not included to state
+    val fees: Map[Account, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
+      .map(m => m._1 ->(AccState(balance(m._1.address) + m._2), Seq(FeesStateChange)))
+
+    val newBalances: Map[Account, (AccState, Reason)] = trans.foldLeft(fees) { case (changes, atx) =>
       atx match {
         case tx: LagonakiTransaction =>
           tx.balanceChanges().foldLeft(changes) { case (iChanges, (acc, delta)) =>
-            //check whether account is watched, add tx to its txs list if so
-            val prevTxs = accountTransactions.getOrDefault(acc, Array())
-            accountTransactions.put(acc, Array.concat(Array(tx), prevTxs))
             //update balances sheet
-            val currentChange = iChanges.getOrElse(acc, 0L)
-            val newChange = currentChange + delta
-            iChanges.updated(acc, newChange)
+            val add = acc.address
+            val t: Map[Account, (AccState, Reason)] = iChanges
+            val currentChange: (AccState, Reason) = iChanges.getOrElse(acc, (AccState(balance(add)), Seq.empty))
+            require(currentChange._1.balance + delta >= 0, "Account balancve should not be negative")
+            iChanges.updated(acc, (AccState(currentChange._1.balance + delta), tx +: currentChange._2))
           }
 
         case m =>
-          throw new Error("Wrong transaction type in pattern-matching" + m)
+          throw new Error("Wrong" +
+            "transaction type in pattern-matching" + m)
       }
     }
 
-    val newBalances: Map[Account, Long] = balanceChanges.map { case (acc, delta) =>
-      val balance = Option(balances.get(acc)).getOrElse(0L)
-      require(balance + delta >= 0, s"Account $acc balance is negative: $balance + $delta")
-      (acc, balance + delta)
-    }
-
-    newBalances.foreach(a => balances.put(a._1, a._2))
-
-    val newHeight = stateHeight() + 1
-    setStateHeight(newHeight)
-    database.commit()
-    log.debug(s"Total balance at height $newHeight is $totalBalance, hash: $hashCode")
+    applyChanges(newBalances.map(a => a._1.address -> a._2))
 
     this
   }
 
-  //todo: confirmations
-  override def balance(address: String, confirmations: Int): Long = {
-    val acc = new Account(address)
-    val balance = Option(balances.get(acc)).getOrElse(0L)
-    balance
+  override def balance(address: String, confirmations: Int): Long = balance(address, stateHeight - confirmations)
+
+  override def balance(address: String, atHeight: Option[Int] = None): Long = Option(lastStates.get(address)) match {
+    case None => 0L
+    case Some(h) =>
+      val requiredHeight = atHeight.getOrElse(stateHeight)
+      require(requiredHeight > 0)
+      def loop(hh: Int): Long = {
+        val row = accountChanges(address).get()
+        if (row.lastRowHeight < requiredHeight) row.state.balance
+        else loop(row.lastRowHeight)
+      }
+      loop(h)
   }
 
-  def totalBalance: Long = balances.keySet().toList.map(i => balances.get(i)).sum
+  //  def totalBalance: Long = balances.keySet().toList.map(i => balances.get(i)).sum
 
-  override def accountTransactions(account: Account): Array[LagonakiTransaction] =
-    Option(accountTransactions.get(account)).getOrElse(Array())
+  override def accountTransactions(account: Account): Array[LagonakiTransaction] = ???
 
-  override def stopWatchingAccountTransactions(account: Account): Unit = accountTransactions.remove(account)
+  override def stopWatchingAccountTransactions(account: Account): Unit = ???
 
-  override def watchAccountTransactions(account: Account): Unit = accountTransactions.put(account, Array())
+  override def watchAccountTransactions(account: Account): Unit = ???
 
-  override def included(tx: Transaction): Option[BlockId] = Option(includedTx.get(tx.signature))
+  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[BlockId] = ???
 
   //return seq of valid transactions
-  def validate(txs: Seq[Transaction]): Seq[Transaction] = {
+  override def validate(txs: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
+    val height = heightOpt.getOrElse(stateHeight)
     val tmpBalances = TrieMap[Account, Long]()
 
     val r = txs.foldLeft(Seq.empty: Seq[Transaction]) { case (acc, atx) =>
@@ -183,8 +186,8 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
             iChanges.updated(txAcc, newChange)
           }
           val check = changes.forall { a =>
-            val balance = tmpBalances.getOrElseUpdate(a._1, balances.get(a._1))
-            val newBalance = balance + a._2
+            val b = tmpBalances.getOrElseUpdate(a._1, balance(a._1.address))
+            val newBalance = b + a._2
             if (newBalance >= 0) tmpBalances.put(a._1, newBalance)
             newBalance >= 0
           }
@@ -193,47 +196,29 @@ class StoredState(val database: DB, dbFileName: Option[String]) extends Lagonaki
         case _ => acc
       }
     }
-    if (r.size == txs.size) r else validate(r)
+    if (r.size == txs.size) r else validate(r, Some(height))
   }
 
-  def toJson: JsObject = {
-    import scala.collection.JavaConversions._
-    val out = balances.keySet().map(a => a.address -> balances.get(a)).filter(b => b._2 != 0).toList.sortBy(_._1)
-    JsObject(out.map(a => a._1 -> JsNumber(a._2)).toMap)
+  private def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
+    case tx: PaymentTransaction =>
+      val r = tx.signatureValid && tx.validate(this) == ValidationResult.ValidateOke &&
+        this.included(tx, Some(height)).isEmpty
+      if (!r) log.debug(s"Invalid $tx: ${tx.signatureValid}&&${tx.validate(this)}&&" +
+        this.included(tx, Some(stateHeight)).map(Base58.encode))
+      r
+    case gtx: GenesisTransaction =>
+      height == 0
+    case otx: Any =>
+      log.error(s"Wrong kind of tx: $otx")
+      false
   }
 
-  //Self check
-  def isValid(initialBalance: Long): Boolean = Try {
-    untilTimeout(5.seconds) {
-      assert(totalBalance >= initialBalance && stateHeight() >= 0 && database.atomicBoolean(BlockProcessed).get)
-    }
-  }.isSuccess
+  def toJson: JsObject = ???
 
   //for debugging purposes only
   override def toString: String = toJson.toString()
 
-  override def finalize(): Unit = {
-    if (!database.isClosed) database.close()
-    super.finalize()
-  }
-
-  override def hashCode: Int = {
-    (BigInt(FastCryptographicHash(toString.getBytes())) % Int.MaxValue).toInt
-  }
-}
-
-object StoredState {
-
-  def apply(fileNameOpt: Option[String]): StoredState = new StoredState(makeDb(fileNameOpt), fileNameOpt)
-
-  private[blockchain] def makeDb(DBFileNameOpt: Option[String]) = DBFileNameOpt match {
-    case Some(fileName) =>
-      DBMaker.fileDB(new File(fileName))
-        .closeOnJvmShutdown()
-        .cacheSize(2048)
-        .checksumEnable()
-        .fileMmapEnable()
-        .make()
-    case None => DBMaker.memoryDB().snapshotEnable().make()
-  }
+  //  override def hashCode: Int = {
+  //    (BigInt(FastCryptographicHash(toString.getBytes())) % Int.MaxValue).toInt
+  //  }
 }

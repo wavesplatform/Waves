@@ -7,7 +7,7 @@ import play.api.libs.json.JsObject
   * A transaction is an atomic state modifier
   */
 
-trait Transaction {
+trait Transaction extends StateChangeReason {
   val fee: Long
 
   val timestamp: Long

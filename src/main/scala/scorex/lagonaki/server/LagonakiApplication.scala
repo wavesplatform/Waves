@@ -23,7 +23,6 @@ import scorex.perma.settings.PermaConstants._
 import scorex.perma.storage.AuthDataStorage
 import scorex.storage.Storage
 import scorex.transaction._
-import scorex.transaction.state.database.blockchain.StatesScavenger
 
 import scala.reflect.runtime.universe._
 
@@ -152,5 +151,4 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
   require(transactionModule.accountWatchingSupport)
 
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], this))
-  actorSystem.actorOf(Props(classOf[StatesScavenger], blockStorage))
 }

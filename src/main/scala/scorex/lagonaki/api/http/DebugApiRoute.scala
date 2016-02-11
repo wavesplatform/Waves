@@ -7,7 +7,6 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http._
 import scorex.app.Application
-import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.state.database.blockchain.StoredState
@@ -21,7 +20,7 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
   lazy val wallet = application.wallet
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ stateAt ~ info
+    blocks ~ state ~ info
   }
 
   @Path("/blocks/{howMany}")
@@ -68,27 +67,29 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
       jsonRoute {
         val state = application.blockStorage.state.asInstanceOf[StoredState]
         Json.obj(
-          "stateHeight" -> state.stateHeight(),
+          "stateHeight" -> state.stateHeight,
           "stateHash" -> state.hashCode()
         ).toString
       }
     }
   }
 
-  @Path("/state/{blockId}")
-  @ApiOperation(value = "State at block", notes = "Get state at specified block", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "blockId", value = "Id of block", required = true, dataType = "String", paramType = "path")
-  ))
-  def stateAt: Route = {
-    path("state" / Segment) { case blockId =>
-      jsonRoute {
-        application.blockStorage.state(blockId) match {
-          case None => Json.obj("error" -> "wrong block id").toString
-          case Some(b) => b.toString
+  /*
+    @Path("/state/{blockId}")
+    @ApiOperation(value = "State at block", notes = "Get state at specified block", httpMethod = "GET")
+    @ApiImplicitParams(Array(
+      new ApiImplicitParam(name = "blockId", value = "Id of block", required = true, dataType = "String", paramType = "path")
+    ))
+    def stateAt: Route = {
+      path("state" / Segment) { case blockId =>
+        jsonRoute {
+          application.blockStorage.history.heightOf(blockId) match {
+            case None => Json.obj("error" -> "wrong block id").toString
+            case Some(b) => b.toString
+          }
         }
       }
     }
-  }
+  */
 
 }
