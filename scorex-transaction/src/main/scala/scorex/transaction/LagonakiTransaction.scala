@@ -10,7 +10,7 @@ import scala.concurrent.duration._
 
 
 abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
-                                   val recipient: Account,
+                                   override val recipient: Account,
                                    val amount: Long,
                                    override val fee: Long,
                                    override val timestamp: Long,

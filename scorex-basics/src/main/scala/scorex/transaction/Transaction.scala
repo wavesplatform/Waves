@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import play.api.libs.json.JsObject
+import scorex.account.Account
 
 
 /**
@@ -12,6 +13,7 @@ trait Transaction extends StateChangeReason {
 
   val timestamp: Long
   val signature: Array[Byte]
+  val recipient: Account
 
   /**
     * A transaction could be serialized into JSON

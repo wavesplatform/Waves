@@ -169,14 +169,14 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   override def watchAccountTransactions(account: Account): Unit = ???
 
-  def included(tx: LagonakiTransaction, heightOpt: Option[Int] = None): Option[Int] = {
+  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = {
     Option(lastStates.get(tx.recipient.address)).flatMap { lastChangeHeight =>
       def loop(hh: Int): Option[Int] = {
         val row = accountChanges(tx.recipient.address).get()
         if (heightOpt.isDefined && heightOpt.get < hh) loop(row.lastRowHeight)
         else if (row.lastRowHeight > 0) {
-          val inCurrentChange = row.reason.filter(_.isInstanceOf[LagonakiTransaction])
-            .exists(scr => scr.asInstanceOf[LagonakiTransaction].signature sameElements tx.signature)
+          val inCurrentChange = row.reason.filter(_.isInstanceOf[Transaction])
+            .exists(scr => scr.asInstanceOf[Transaction].signature sameElements tx.signature)
           if (inCurrentChange) Some(hh)
           else loop(row.lastRowHeight)
         } else None
