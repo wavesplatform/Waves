@@ -6,7 +6,6 @@ import org.mapdb._
 import play.api.libs.json.JsObject
 import scorex.account.Account
 import scorex.block.Block
-import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
@@ -156,6 +155,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       def loop(hh: Int): Long = {
         val row = accountChanges(address).get()
         if (row.lastRowHeight < requiredHeight) row.state.balance
+        else if (row.lastRowHeight == 0) 0L
         else loop(row.lastRowHeight)
       }
       loop(h)
@@ -169,14 +169,28 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   override def watchAccountTransactions(account: Account): Unit = ???
 
-  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[BlockId] = ???
+  def included(tx: LagonakiTransaction, heightOpt: Option[Int] = None): Option[Int] = {
+    Option(lastStates.get(tx.recipient.address)).flatMap { lastChangeHeight =>
+      def loop(hh: Int): Option[Int] = {
+        val row = accountChanges(tx.recipient.address).get()
+        if (heightOpt.isDefined && heightOpt.get < hh) loop(row.lastRowHeight)
+        else if (row.lastRowHeight > 0) {
+          val inCurrentChange = row.reason.filter(_.isInstanceOf[LagonakiTransaction])
+            .exists(scr => scr.asInstanceOf[LagonakiTransaction].signature sameElements tx.signature)
+          if (inCurrentChange) Some(hh)
+          else loop(row.lastRowHeight)
+        } else None
+      }
+      loop(lastChangeHeight)
+    }
+  }
 
   //return seq of valid transactions
   override def validate(txs: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)
     val tmpBalances = TrieMap[Account, Long]()
 
-    val r = txs.foldLeft(Seq.empty: Seq[Transaction]) { case (acc, atx) =>
+    val r = txs.filter(t => isValid(t, height)).foldLeft(Seq.empty: Seq[Transaction]) { case (acc, atx) =>
       atx match {
         case tx: LagonakiTransaction =>
           val changes = tx.balanceChanges().foldLeft(Map.empty: Map[Account, Long]) { case (iChanges, (txAcc, delta)) =>
@@ -204,7 +218,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       val r = tx.signatureValid && tx.validate(this) == ValidationResult.ValidateOke &&
         this.included(tx, Some(height)).isEmpty
       if (!r) log.debug(s"Invalid $tx: ${tx.signatureValid}&&${tx.validate(this)}&&" +
-        this.included(tx, Some(stateHeight)).map(Base58.encode))
+        this.included(tx, Some(stateHeight)))
       r
     case gtx: GenesisTransaction =>
       height == 0
