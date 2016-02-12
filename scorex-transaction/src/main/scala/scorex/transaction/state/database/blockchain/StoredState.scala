@@ -145,7 +145,8 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     this
   }
 
-  override def balance(address: String, confirmations: Int): Long = balance(address, stateHeight - confirmations)
+  override def balanceWithConfirmations(address: String, confirmations: Int): Long =
+    balance(address, Some(stateHeight - confirmations))
 
   override def balance(address: String, atHeight: Option[Int] = None): Long = Option(lastStates.get(address)) match {
     case None => 0L
