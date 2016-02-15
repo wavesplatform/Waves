@@ -172,8 +172,8 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = {
     Option(lastStates.get(tx.recipient.address)).flatMap { lastChangeHeight =>
-      def loop(hh: Int): Option[Int] = {
-        val row = accountChanges(tx.recipient.address).get()
+      def loop(hh: Int): Option[Int] = if(hh > 0) {
+        val row = accountChanges(tx.recipient.address).get(hh)
         if (heightOpt.isDefined && heightOpt.get < hh) loop(row.lastRowHeight)
         else if (row.lastRowHeight > 0) {
           val inCurrentChange = row.reason.filter(_.isInstanceOf[Transaction])
@@ -181,7 +181,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
           if (inCurrentChange) Some(hh)
           else loop(row.lastRowHeight)
         } else None
-      }
+      } else None
       loop(lastChangeHeight)
     }
   }
