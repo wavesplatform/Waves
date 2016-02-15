@@ -141,6 +141,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     }
 
     applyChanges(newBalances.map(a => a._1.address -> a._2))
+    log.debug(s"New state height is $stateHeight, hash: $hash")
 
     this
   }
@@ -172,7 +173,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = {
     Option(lastStates.get(tx.recipient.address)).flatMap { lastChangeHeight =>
-      def loop(hh: Int): Option[Int] = if(hh > 0) {
+      def loop(hh: Int): Option[Int] = if (hh > 0) {
         val row = accountChanges(tx.recipient.address).get(hh)
         if (heightOpt.isDefined && heightOpt.get < hh) loop(row.lastRowHeight)
         else if (row.lastRowHeight > 0) {

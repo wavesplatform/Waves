@@ -4,7 +4,7 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.utils.ScorexLogging
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
   * Storage interface combining both history(blockchain/blocktree) and state
@@ -21,7 +21,12 @@ trait BlockStorage extends ScorexLogging {
   def appendBlock(block: Block): Try[Unit] = BlockStorage.synchronized {
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
-        state.processBlock(b)
+        state.processBlock(b) match{
+          case Failure(e) =>
+            log.error("Failed to apply block to state", e)
+            removeAfter(block.referenceField.value)
+          case Success(m) =>
+        }
       }
     }
   }
