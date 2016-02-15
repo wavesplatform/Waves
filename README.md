@@ -32,7 +32,7 @@ with an another with just one line of code edited (in PermaConstants.scala)
 * Asynchronous network layer on top of TCP
 * JSON API
 * Command line client for the JSON API
-* Curve25519 for signatures
+* Cryptographic primitives externalized into [separate scrypto framework](https://github.com/ScorexProject/scrypto)
 
 
 **This is the pretty buggy initial release version! Please report bugs found, and contribute with
