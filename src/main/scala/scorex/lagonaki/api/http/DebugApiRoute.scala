@@ -68,7 +68,7 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
         val state = application.blockStorage.state.asInstanceOf[StoredState]
         Json.obj(
           "stateHeight" -> state.stateHeight,
-          "stateHash" -> state.hashCode()
+          "stateHash" -> state.hash
         ).toString
       }
     }

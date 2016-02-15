@@ -3,10 +3,10 @@ package scorex.transaction.state.database.blockchain
 import java.io.File
 
 import org.mapdb._
-import play.api.libs.json.JsObject
+import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.Account
 import scorex.block.Block
-import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.utils.ScorexLogging
@@ -152,9 +152,9 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     case None => 0L
     case Some(h) =>
       val requiredHeight = atHeight.getOrElse(stateHeight)
-      require(requiredHeight > 0)
+      require(requiredHeight >= 0)
       def loop(hh: Int): Long = {
-        val row = accountChanges(address).get()
+        val row = accountChanges(address).get(hh)
         if (row.lastRowHeight < requiredHeight) row.state.balance
         else if (row.lastRowHeight == 0) 0L
         else loop(row.lastRowHeight)
@@ -228,12 +228,15 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       false
   }
 
-  def toJson: JsObject = ???
+  def toJson: JsObject = {
+    val ls = lastStates.keySet().map(add => add -> balance(add)).filter(b => b._2 != 0).toList.sortBy(_._1)
+    JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
+  }
 
   //for debugging purposes only
   override def toString: String = toJson.toString()
 
-  //  override def hashCode: Int = {
-  //    (BigInt(FastCryptographicHash(toString.getBytes())) % Int.MaxValue).toInt
-  //  }
+  def hash: Int = {
+    (BigInt(FastCryptographicHash(toString.getBytes())) % Int.MaxValue).toInt
+  }
 }
