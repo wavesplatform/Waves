@@ -4,8 +4,8 @@ import akka.actor.{Actor, ActorRef}
 import scorex.transaction.History._
 import scorex.utils.ScorexLogging
 
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 //todo: break a connection if no score message from remote for some time?
 
@@ -59,14 +59,19 @@ class ScoreObserver(historySynchronizer: ActorRef) extends Actor with ScorexLogg
 
     case GetScore =>
       candidates = clearOld(candidates)
-      sender() ! ConsideredValue(candidates.headOption.map(_.score), candidates.map(_.peer))
+      candidates.headOption.map(_.score) match {
+        case None => context.system.scheduler.scheduleOnce(1.second, sender(), ConsideredValue(None, Seq()))
+        case score => sender() ! ConsideredValue(score, candidates.map(_.peer))
+      }
   }
 }
 
 object ScoreObserver {
+
   case class UpdateScore(scoreToAdd: Option[(ConnectedPeer, BlockchainScore)])
 
   case object GetScore
 
   case class ConsideredValue(value: Option[BlockchainScore], witnesses: Seq[ConnectedPeer])
+
 }
