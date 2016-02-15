@@ -25,6 +25,9 @@ trait BlockStorage extends ScorexLogging {
           case Failure(e) =>
             log.error("Failed to apply block to state", e)
             removeAfter(block.referenceField.value)
+            //TODO ???
+            System.exit(1)
+
           case Success(m) =>
         }
       }

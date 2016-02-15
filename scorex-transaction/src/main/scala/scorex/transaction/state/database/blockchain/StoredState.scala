@@ -1,6 +1,6 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.File
+import java.io.{DataInput, DataOutput, File}
 
 import org.mapdb._
 import play.api.libs.json.{JsNumber, JsObject}
@@ -23,37 +23,32 @@ import scala.util.Try
   * Use apply method of StoredState object to create new instance
   */
 class StoredState(fileNameOpt: Option[String]) extends LagonakiState with ScorexLogging {
-  /*
-    private object AccSerializer extends Serializer[Account] {
-      override def serialize(dataOutput: DataOutput, a: Account): Unit =
-        Serializer.STRING.serialize(dataOutput, a.address)
 
-      override def deserialize(dataInput: DataInput, i: Int): Account = {
-        val address = Serializer.STRING.deserialize(dataInput, i)
-        new Account(address)
+  private object RowSerializer extends Serializer[Row] {
+    override def serialize(dataOutput: DataOutput, row: Row): Unit = {
+      DataIO.packInt(dataOutput, row.lastRowHeight)
+      DataIO.packLong(dataOutput, row.state.balance)
+      DataIO.packInt(dataOutput, row.reason.length)
+      row.reason.foreach { scr =>
+        DataIO.packInt(dataOutput, scr.bytes.length)
+        dataOutput.write(scr.bytes)
       }
     }
 
-    private object TxArraySerializer extends Serializer[Array[LagonakiTransaction]] {
-      override def serialize(dataOutput: DataOutput, txs: Array[LagonakiTransaction]): Unit = {
-        DataIO.packInt(dataOutput, txs.length)
-        txs.foreach { tx =>
-          val bytes = tx.bytes
-          DataIO.packInt(dataOutput, bytes.length)
-          dataOutput.write(bytes)
-        }
+    override def deserialize(dataInput: DataInput, i: Int): Row = {
+      val lastRowHeight = DataIO.unpackInt(dataInput)
+      val b = DataIO.unpackLong(dataInput)
+      val txCount = DataIO.unpackInt(dataInput)
+      val txs = (1 to txCount).toArray.map { _ =>
+        val txSize = DataIO.unpackInt(dataInput)
+        val b = new Array[Byte](txSize)
+        dataInput.readFully(b)
+        if (txSize > 0) LagonakiTransaction.parse(b).get //todo: .get w/out catching
+        else FeesStateChange
       }
-
-      override def deserialize(dataInput: DataInput, i: Int): Array[LagonakiTransaction] = {
-        val txsCount = DataIO.unpackInt(dataInput)
-        (1 to txsCount).toArray.map { _ =>
-          val txSize = DataIO.unpackInt(dataInput)
-          val b = new Array[Byte](txSize)
-          dataInput.readFully(b)
-          LagonakiTransaction.parse(b).get //todo: .get w/out catching
-        }
-      }
-    }*/
+      Row(AccState(b), txs, lastRowHeight)
+    }
+  }
 
   type Adress = String
 
@@ -78,7 +73,11 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     case None => DBMaker.memoryDB().snapshotEnable().make()
   }
 
-  private def accountChanges(key: Adress): HTreeMap[Int, Row] = db.hashMapCreate(key.toString).makeOrGet()
+  private def accountChanges(key: Adress): HTreeMap[Integer, Row] = db.hashMap(
+    key.toString,
+    Serializer.INTEGER,
+    RowSerializer,
+    null)
 
   val lastStates = db.hashMap[Adress, Int](LastStates)
 
@@ -118,6 +117,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   override def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactions
+    trans.foreach(t => if(included(t).isDefined) throw new Error(s"Transaction $t is already in state"))
     //TODO require transaction is not included to state
     val fees: Map[Account, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
       .map(m => m._1 ->(AccState(balance(m._1.address) + m._2), Seq(FeesStateChange)))
@@ -130,7 +130,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
             val add = acc.address
             val t: Map[Account, (AccState, Reason)] = iChanges
             val currentChange: (AccState, Reason) = iChanges.getOrElse(acc, (AccState(balance(add)), Seq.empty))
-            require(currentChange._1.balance + delta >= 0, "Account balancve should not be negative")
+            require(currentChange._1.balance + delta >= 0, "Account balance should not be negative")
             iChanges.updated(acc, (AccState(currentChange._1.balance + delta), tx +: currentChange._2))
           }
 

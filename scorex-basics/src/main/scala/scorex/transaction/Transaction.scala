@@ -20,8 +20,5 @@ trait Transaction extends StateChangeReason {
     */
   def json: JsObject
 
-  /**
-    * A transaction could be serialized into binary form
-    */
-  def bytes: Array[Byte]
+
 }
