@@ -76,7 +76,7 @@ Run one or two peers on the local machine:
    if needed. Access UI via localhost:9086
 * run "sbt startLocal3" to run second local peer binded to 127.0.0.3:9084 . Edit settings in settings-local2.json
    if needed. Access UI via localhost:9087
-* You can run both peers simultaneously by running "sbt startLocal"
+* You can run first & second peers simultaneously by running "sbt startLocal"
 
 
 You can also run "sbt start" script to connect to the network, but network is down now :)
