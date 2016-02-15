@@ -35,6 +35,7 @@ object Server extends App with ScorexLogging {
 
   def testingScript(application: LagonakiApplication): Unit = {
     log.info("Going to execute testing scenario")
+    log.info("Current state is:" + application.blockStorage.state)
     val wallet = application.wallet
 
     if (wallet.privateKeyAccounts().isEmpty) {
