@@ -5,7 +5,6 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
-import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.transaction.LagonakiTransaction.ValidationResult
@@ -160,9 +159,9 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
   }
 
   override def isValid(block: Block): Boolean =
-    blockStorage.history.heightOf(block).exists(h => blockStorage.state.isValid(block.transactions, Some(h)))
+    blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
 
-/*
+  /*
 
   //TODO asInstanceOf
   override def isValid(transaction: Transaction): Boolean =
