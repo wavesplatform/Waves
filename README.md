@@ -71,9 +71,11 @@ Run one or two peers on the local machine:
 
 * run "sbt recompile" to (re-)build .jar file
 * run "sbt startLocal1" to run first local peer binded to 127.0.0.1:9084 . Edit settings in settings-local1.json
-   if needed
-* run "sbt startLocal2" to run second local peer binded to 127.0.0.2:9084 . Edit settings in settings-local2.json
-   if needed
+   if needed. Access UI via localhost:9085
+* run "sbt startLocal2" to run second local peer binded to 127.0.0.2:9088 . Edit settings in settings-local2.json
+   if needed. Access UI via localhost:9086
+* run "sbt startLocal3" to run second local peer binded to 127.0.0.3:9084 . Edit settings in settings-local2.json
+   if needed. Access UI via localhost:9087
 * You can run both peers simultaneously by running "sbt startLocal"
 
 
@@ -121,8 +123,8 @@ Current Limitations
 todo: current glitches / limitations list
 
 
-Documentation
---------------
+Documentation and Resources
+---------------------------
 
 Articles:
 
@@ -142,6 +144,8 @@ Others:
 
 [API Description](docs/API.md)
 
+
+Please join our mail-list: [https://groups.io/g/scorex-dev](https://groups.io/g/scorex-dev) .
 
 
 Contributions
