@@ -87,13 +87,13 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   private def setStateHeight(height: Int): Unit = db.atomicInteger(HeightKey).set(height)
 
   private def applyChanges(ch: Map[Adress, (AccState, Reason)]): Unit = synchronized {
+    setStateHeight(stateHeight + 1)
     val h = stateHeight
     ch.foreach { ch =>
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1)).getOrElse(0))
       accountChanges(ch._1).put(h, change)
       lastStates.put(ch._1, h)
     }
-    setStateHeight(h + 1)
     db.commit()
   }
 
