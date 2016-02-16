@@ -124,7 +124,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
     applyChanges(newBalances.map(a => a._1.address -> a._2))
-    log.debug(s"New state height is $stateHeight, hash: $hash")
+    log.debug(s"New state height is $stateHeight, hash: $hash, totalBalance: $totalBalance")
 
     this
   }
@@ -166,7 +166,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       loop(h)
   }
 
-  //  def totalBalance: Long = balances.keySet().toList.map(i => balances.get(i)).sum
+  def totalBalance: Long = lastStates.keySet().map(add => balance(add)).sum
 
   override def accountTransactions(account: Account): Array[LagonakiTransaction] = ???
 
