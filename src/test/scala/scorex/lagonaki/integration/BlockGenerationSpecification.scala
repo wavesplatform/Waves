@@ -66,5 +66,25 @@ class BlockGenerationSpecification extends FunSuite with Matchers with Transacti
     accounts foreach (a => assert(transactionModule.blockStorage.state.balance(a.address) > 0))
   }
 
+  test("Rollback state") {
+    genValidTransaction()
+    val st1 = transactionModule.blockStorage.state.hash
+    val h = transactionModule.blockStorage.history.height()
+    val lastBlockId = transactionModule.blockStorage.history.lastBlock.uniqueId
+
+    val blockToRollback = genValidBlock()
+    transactionModule.blockStorage.appendBlock(blockToRollback)
+
+    transactionModule.blockStorage.history.height() shouldBe h + 1
+    blockToRollback.isValid shouldBe true
+    blockToRollback.transactions.nonEmpty shouldBe true
+    transactionModule.blockStorage.state.hash should not be st1
+
+    transactionModule.blockStorage.removeAfter(lastBlockId)
+
+    transactionModule.blockStorage.history.lastBlock.uniqueId shouldBe lastBlockId
+    transactionModule.blockStorage.state.hash shouldBe st1
+  }
+
 
 }
