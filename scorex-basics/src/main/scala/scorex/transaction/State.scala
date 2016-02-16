@@ -20,4 +20,6 @@ trait State {
   def isValid(txs: Seq[Transaction], height: Option[Int] = None): Boolean = validate(txs, height).size == txs.size
 
   def validate(txs: Seq[Transaction], height: Option[Int] = None): Seq[Transaction]
+
+  def rollbackTo(height: Int): Unit
 }

@@ -38,7 +38,9 @@ trait BlockStorage extends ScorexLogging {
   def removeAfter(signature: BlockId): Unit = synchronized {
     history match {
       case h: BlockChain =>
+        val height = h.heightOf(signature).get
         while (!h.lastBlock.uniqueId.sameElements(signature)) h.discardBlock()
+        state.rollbackTo(height)
       case _ =>
         throw new RuntimeException("Not available for other option than linear blockchain")
     }
