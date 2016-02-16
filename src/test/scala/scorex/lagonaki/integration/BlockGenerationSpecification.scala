@@ -24,12 +24,13 @@ class BlockGenerationSpecification extends FunSuite with Matchers with Transacti
     transactionModule.blockStorage.appendBlock(block2)
     blokc2txs = transactionModule.transactions(block2)
     blokc2txs.foreach(tx => state.included(tx) shouldBe history.heightOf(block2))
-    UnconfirmedTransactionsDatabaseImpl.all().foreach(tx => UnconfirmedTransactionsDatabaseImpl.remove(tx))
-    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
   }
 
   test("Don't include same transactions twice") {
-    blokc2txs.foreach(tx => transactionModule.onNewOffchainTransaction(tx))
+    blokc2txs.foreach(tx => state.included(tx).isDefined shouldBe true)
+    UnconfirmedTransactionsDatabaseImpl.all().foreach(tx => UnconfirmedTransactionsDatabaseImpl.remove(tx))
+    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
+    blokc2txs.foreach(tx => UnconfirmedTransactionsDatabaseImpl.putIfNew(tx))
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe blokc2txs.size
     val b3tx = genValidTransaction(randomAmnt = false)
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe blokc2txs.size + 1
@@ -46,7 +47,7 @@ class BlockGenerationSpecification extends FunSuite with Matchers with Transacti
 
     // branched block is still valid after apply of another one
     transactionModule.blockStorage.appendBlock(block3)
-    state.included(b3tx).get shouldBe history.heightOf(block3)
+    state.included(b3tx) shouldBe history.heightOf(block3)
     block3.isValid shouldBe true
     //TODO fix and uncomment
     //    block4.isValid shouldBe true

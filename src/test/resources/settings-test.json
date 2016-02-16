@@ -22,6 +22,5 @@
   },
   "maxRollback": 100,
   "history": "blockchain",
-  "offlineGeneration": true,
-  "blockGenerationDelay": 60000
+  "offlineGeneration": false
 }
