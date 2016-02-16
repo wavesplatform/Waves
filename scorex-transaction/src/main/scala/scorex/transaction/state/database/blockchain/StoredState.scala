@@ -12,8 +12,7 @@ import scorex.transaction._
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
-import scala.collection.concurrent.TrieMap
-import scala.util.Try
+import scala.util.{Random, Try}
 
 
 /** Store current balances only, and balances changes within effective balance depth.
@@ -117,11 +116,21 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   override def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactions
-    trans.foreach(t => if(included(t).isDefined) throw new Error(s"Transaction $t is already in state"))
-    //TODO require transaction is not included to state
+    trans.foreach(t => if (included(t).isDefined) throw new Error(s"Transaction $t is already in state"))
     val fees: Map[Account, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
       .map(m => m._1 ->(AccState(balance(m._1.address) + m._2), Seq(FeesStateChange)))
 
+    val newBalances: Map[Account, (AccState, Reason)] = calcNewBalances(trans, fees)
+    newBalances.foreach(nb => require(nb._2._1.balance >= 0))
+
+    applyChanges(newBalances.map(a => a._1.address -> a._2))
+    log.debug(s"New state height is $stateHeight, hash: $hash")
+
+    this
+  }
+
+  def calcNewBalances(trans: Seq[Transaction], fees: Map[Account, (AccState, Reason)]):
+  Map[Account, (AccState, Reason)] = {
     val newBalances: Map[Account, (AccState, Reason)] = trans.foldLeft(fees) { case (changes, atx) =>
       atx match {
         case tx: LagonakiTransaction =>
@@ -130,20 +139,14 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
             val add = acc.address
             val t: Map[Account, (AccState, Reason)] = iChanges
             val currentChange: (AccState, Reason) = iChanges.getOrElse(acc, (AccState(balance(add)), Seq.empty))
-            require(currentChange._1.balance + delta >= 0, "Account balance should not be negative")
             iChanges.updated(acc, (AccState(currentChange._1.balance + delta), tx +: currentChange._2))
           }
 
         case m =>
-          throw new Error("Wrong" +
-            "transaction type in pattern-matching" + m)
+          throw new Error("Wrong transaction type in pattern-matching" + m)
       }
     }
-
-    applyChanges(newBalances.map(a => a._1.address -> a._2))
-    log.debug(s"New state height is $stateHeight, hash: $hash")
-
-    this
+    newBalances
   }
 
   override def balanceWithConfirmations(address: String, confirmations: Int): Long =
@@ -190,29 +193,12 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   //return seq of valid transactions
   override def validate(txs: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)
-    val tmpBalances = TrieMap[Account, Long]()
-
-    val r = txs.filter(t => isValid(t, height)).foldLeft(Seq.empty: Seq[Transaction]) { case (acc, atx) =>
-      atx match {
-        case tx: LagonakiTransaction =>
-          val changes = tx.balanceChanges().foldLeft(Map.empty: Map[Account, Long]) { case (iChanges, (txAcc, delta)) =>
-            //update balances sheet
-            val currentChange = iChanges.getOrElse(txAcc, 0L)
-            val newChange = currentChange + delta
-            iChanges.updated(txAcc, newChange)
-          }
-          val check = changes.forall { a =>
-            val b = tmpBalances.getOrElseUpdate(a._1, balance(a._1.address))
-            val newBalance = b + a._2
-            if (newBalance >= 0) tmpBalances.put(a._1, newBalance)
-            newBalance >= 0
-          }
-          if (check) tx +: acc
-          else acc
-        case _ => acc
-      }
+    val nb = calcNewBalances(txs, Map.empty)
+    val negativeBalance: Option[(Account, (AccState, Reason))] = nb.find(b => b._2._1.balance < 0)
+    negativeBalance match {
+      case Some(b) => validate(Random.shuffle(txs).tail, Some(height))
+      case None => txs
     }
-    if (r.size == txs.size) r else validate(r, Some(height))
   }
 
   private def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
