@@ -9,6 +9,8 @@ import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 class BlockGenerationSpecification extends FunSuite with Matchers with TransactionTestingCommons {
 
   var blokc2txs: Seq[Transaction] = Seq.empty
+  val state = transactionModule.blockStorage.state
+  val history = transactionModule.blockStorage.history
 
   test("Gen block with transactions") {
     // Start tests
@@ -18,10 +20,10 @@ class BlockGenerationSpecification extends FunSuite with Matchers with Transacti
     val block2 = genValidBlock()
     block2.isValid shouldBe true
     assert(transactionModule.transactions(block2).size <= SimpleTransactionModule.MaxTransactionsPerBlock)
-    transactions.foreach(tx => transactionModule.blockStorage.state.included(tx) shouldBe None)
+    transactions.foreach(tx => state.included(tx) shouldBe None)
     transactionModule.blockStorage.appendBlock(block2)
     blokc2txs = transactionModule.transactions(block2)
-    blokc2txs.foreach(tx => transactionModule.blockStorage.state.included(tx).get shouldBe block2.uniqueId)
+    blokc2txs.foreach(tx => state.included(tx) shouldBe history.heightOf(block2))
     UnconfirmedTransactionsDatabaseImpl.all().foreach(tx => UnconfirmedTransactionsDatabaseImpl.remove(tx))
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
   }
@@ -44,7 +46,7 @@ class BlockGenerationSpecification extends FunSuite with Matchers with Transacti
 
     // branched block is still valid after apply of another one
     transactionModule.blockStorage.appendBlock(block3)
-    transactionModule.blockStorage.state.included(b3tx).get shouldBe block3.uniqueId
+    state.included(b3tx).get shouldBe history.heightOf(block3)
     block3.isValid shouldBe true
     //TODO fix and uncomment
     //    block4.isValid shouldBe true
@@ -56,34 +58,34 @@ class BlockGenerationSpecification extends FunSuite with Matchers with Transacti
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
     accounts.foreach { a =>
       val recepient = new PublicKeyAccount(Array.empty)
-      val senderBalance = transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(a)
+      val senderBalance = state.asInstanceOf[BalanceSheet].generationBalance(a)
 
       if (senderBalance > 1) (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
     }
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe accounts.size * 2
     val block5 = genValidBlock()
     block5.isValid shouldBe true
-    accounts foreach (a => assert(transactionModule.blockStorage.state.balance(a.address) > 0))
+    accounts foreach (a => assert(state.balance(a.address) > 0))
   }
 
   test("Rollback state") {
     genValidTransaction()
-    val st1 = transactionModule.blockStorage.state.hash
-    val h = transactionModule.blockStorage.history.height()
-    val lastBlockId = transactionModule.blockStorage.history.lastBlock.uniqueId
+    val st1 = state.hash
+    val h = history.height()
+    val lastBlockId = history.lastBlock.uniqueId
 
     val blockToRollback = genValidBlock()
     transactionModule.blockStorage.appendBlock(blockToRollback)
 
-    transactionModule.blockStorage.history.height() shouldBe h + 1
+    history.height() shouldBe h + 1
     blockToRollback.isValid shouldBe true
     blockToRollback.transactions.nonEmpty shouldBe true
-    transactionModule.blockStorage.state.hash should not be st1
+    state.hash should not be st1
 
     transactionModule.blockStorage.removeAfter(lastBlockId)
 
-    transactionModule.blockStorage.history.lastBlock.uniqueId shouldBe lastBlockId
-    transactionModule.blockStorage.state.hash shouldBe st1
+    history.lastBlock.uniqueId shouldBe lastBlockId
+    state.hash shouldBe st1
   }
 
 
