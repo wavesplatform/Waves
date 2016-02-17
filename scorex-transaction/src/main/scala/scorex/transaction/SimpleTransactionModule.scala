@@ -7,7 +7,6 @@ import scorex.app.Application
 import scorex.block.{Block, BlockField}
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
-import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
@@ -129,9 +128,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     val time = NTP.correctedTime()
     val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
     val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
-    if (payment.validate()(this) == ValidationResult.ValidateOke) {
-      onNewOffchainTransaction(payment)
-    }
+    if (blockStorage.state.isValid(payment)) onNewOffchainTransaction(payment)
     payment
   }
 
@@ -160,29 +157,6 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
   override def isValid(block: Block): Boolean =
     blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
-
-  /*
-
-  //TODO asInstanceOf
-  override def isValid(transaction: Transaction): Boolean =
-    isValid(transaction, blockStorage.state.asInstanceOf[StoredState])
-
-  private def isValid(transactions: Seq[Transaction], state: State): Boolean =
-    transactions.forall(isValid) && state.isValid(transactions)
-
-  private def isValid(transaction: Transaction, txState: StoredState): Boolean = transaction match {
-    case tx: PaymentTransaction =>
-      val r = tx.signatureValid && tx.validate(txState) == ValidationResult.ValidateOke && txState.included(tx).isEmpty
-      if (!r) log.debug(s"Invalid $tx: ${tx.signatureValid}&&${tx.validate(txState)}&&" +
-        txState.included(tx).map(Base58.encode))
-      r
-    case gtx: GenesisTransaction =>
-      blockStorage.history.height() == 0
-    case otx: Any =>
-      log.error(s"Wrong kind of tx: $otx")
-      false
-  }
-*/
 
 }
 

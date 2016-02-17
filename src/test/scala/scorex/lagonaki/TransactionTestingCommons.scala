@@ -47,7 +47,7 @@ trait TransactionTestingCommons {
       val amt = if (randomAmnt) Math.abs(Random.nextLong() % (senderBalance - fee))
       else senderBalance - fee
       val tx = transactionModule.createPayment(senderAcc, accounts(Random.nextInt(accounts.size)), amt, fee)
-      if (tx.validate()(transactionModule) == ValidationResult.ValidateOke) tx
+      if (transactionModule.blockStorage.state.isValid(tx)) tx
       else genValidTransaction(randomAmnt)
     }
   }

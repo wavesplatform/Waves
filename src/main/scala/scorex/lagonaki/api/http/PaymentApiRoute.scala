@@ -50,7 +50,7 @@ case class PaymentApiRoute(application: Application)(implicit val context: Actor
                   val txOpt = transactionModule.createPayment(payment, wallet)
                   txOpt match {
                     case Some(tx) =>
-                      tx.validate() match {
+                      tx.validate match {
                         case ValidationResult.ValidateOke =>
                           tx.json
 

@@ -47,11 +47,9 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     EllipticCurveImpl.verify(signature, data, sender.publicKey)
   }
 
-  override def validate(state: BalanceSheet): ValidationResult.Value =
+  override def validate: ValidationResult.Value =
     if (!Account.isValidAddress(recipient.address)) {
       ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (state.balance(sender.address) < amount + fee) {
-      ValidationResult.NoBalance //CHECK IF SENDER HAS ENOUGH MONEY
     } else if (amount <= 0) {
       ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
