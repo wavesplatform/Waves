@@ -19,7 +19,7 @@ class LagonakiTestSuite extends Suites(
 
   //integration tests - slow!
   , new ValidChainGenerationSpecification
-  , new BlockGenerationSpecification
+//  , new BlockGenerationSpecification
   , new APISpecification
 
 ) with BeforeAndAfterAll {
