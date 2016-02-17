@@ -159,7 +159,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
       def loop(hh: Int): Long = {
         val row = accountChanges(address).get(hh)
-        if(Option(row).isEmpty) log.error(s"accountChanges($address).get($hh) is null")
+        if (Option(row).isEmpty) log.error(s"accountChanges($address).get($hh) is null")
         if (row.lastRowHeight < requiredHeight) row.state.balance
         else if (row.lastRowHeight == 0) 0L
         else loop(row.lastRowHeight)
@@ -169,7 +169,25 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   def totalBalance: Long = lastStates.keySet().map(add => balance(add)).sum
 
-  override def accountTransactions(account: Account): Array[LagonakiTransaction] = ???
+  override def accountTransactions(account: Account): Array[LagonakiTransaction] = {
+    accountTransactions(account, stateHeight)
+  }
+
+  def accountTransactions(account: Account, height: Int): Array[LagonakiTransaction] = {
+    Option(lastStates.get(account.address)) match {
+      case Some(accHeight) =>
+        val m = accountChanges(account.address)
+        def loop(h: Int, acc: Array[LagonakiTransaction]): Array[LagonakiTransaction] = Option(m.get(h)) match {
+          case Some(heightChanges) =>
+            val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[LagonakiTransaction])
+              .map(_.asInstanceOf[LagonakiTransaction])
+            loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
+          case None => acc
+        }
+        loop(accHeight, Array.empty)
+      case None => Array.empty
+    }
+  }
 
   override def stopWatchingAccountTransactions(account: Account): Unit = ???
 
