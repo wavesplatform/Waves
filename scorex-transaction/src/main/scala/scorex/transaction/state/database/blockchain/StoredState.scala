@@ -211,8 +211,8 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   //return seq of valid transactions
   override def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
-    val txs = trans.filter(t => included(t).isEmpty && isValid(t))
     val height = heightOpt.getOrElse(stateHeight)
+    val txs = trans.filter(t => included(t).isEmpty && isValid(t, height))
     val nb = calcNewBalances(txs, Map.empty)
     val negativeBalance: Option[(Account, (AccState, Reason))] = nb.find(b => b._2._1.balance < 0)
     negativeBalance match {
