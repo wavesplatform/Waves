@@ -128,13 +128,13 @@ Documentation and Resources
 
 Articles:
 
-[The Architecture Of A Cryptocurrency](docs/components.md)
+[The Architecture Of A Cryptocurrency](docs/articles/components.md)
 
-[On the Way to a Modular Cryptocurrency, Part 1: Generic Block Structure](docs/modular1.md)
+[On the Way to a Modular Cryptocurrency, Part 1: Generic Block Structure](docs/articles/modular1.md)
 
-[On the Way to a Modular Cryptocurrency, Part 2: Stackable API](docs/modular2.md)
+[On the Way to a Modular Cryptocurrency, Part 2: Stackable API](docs/articles/modular2.md)
 
-[On Private Blockchains, Technically](docs/private-chains.md)
+[On Private Blockchains, Technically](docs/artices/private-chains.md)
 
 Readmes:
 

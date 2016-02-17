@@ -1,6 +1,6 @@
 # Documentation
 
-Please see <http://scorexproject.github.io/docs/> for API documentation
+Please see <http://scorexproject.github.io/docs/> for auto-generated API documentation
 
 # Access
 
