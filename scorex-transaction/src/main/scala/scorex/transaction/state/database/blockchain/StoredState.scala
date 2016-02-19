@@ -71,6 +71,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
         .make()
     case None => DBMaker.memoryDB().snapshotEnable().make()
   }
+  db.rollback()
 
   private def accountChanges(key: Adress): HTreeMap[Integer, Row] = db.hashMap(
     key.toString,
