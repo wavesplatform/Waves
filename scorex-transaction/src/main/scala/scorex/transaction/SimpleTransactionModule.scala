@@ -96,7 +96,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
   override def packUnconfirmed(): StoredInBlock =
-    blockStorage.state.validate(UnconfirmedTransactionsDatabaseImpl.all().take(MaxTransactionsPerBlock))
+    blockStorage.state.validate(UnconfirmedTransactionsDatabaseImpl.all()).sortBy(- _.fee).take(MaxTransactionsPerBlock)
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = {

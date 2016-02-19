@@ -219,7 +219,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     negativeBalance match {
       case Some(b) =>
         val accWorstTransaction = trans.filter(_.isInstanceOf[PaymentTransaction])
-          .map(_.asInstanceOf[PaymentTransaction]).filter(_.sender.address == b._1.address).maxBy(_.amount)
+          .map(_.asInstanceOf[PaymentTransaction]).filter(_.sender.address == b._1.address).minBy(_.fee)
         validate(txs.filterNot(_.signature sameElements accWorstTransaction.signature), Some(height))
       case None => txs
     }
