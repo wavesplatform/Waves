@@ -45,8 +45,12 @@ with TransactionTestingCommons {
     genBal should be >= (peers.head.transactionModule.InitialBalance / 2)
 
     val h = maxHeight()
-    val tx = genValidTransaction()
-    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 1
+    val tx = untilTimeout(1.minute){
+      val t = genValidTransaction()
+      app.transactionModule.packUnconfirmed().head.signature shouldBe t.signature
+      UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 1
+      t
+    }
 
     waitGenerationOfBlocks(3)
 
