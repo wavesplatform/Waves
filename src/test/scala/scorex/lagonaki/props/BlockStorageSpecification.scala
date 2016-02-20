@@ -29,7 +29,7 @@ with BlockTestingCommons {
       storage.appendBlock(block).isSuccess shouldBe true
       storage.history.height() shouldBe prevH + 1
       storage.state.accountTransactions(gen).length shouldBe prevTx + 1
-      storage.state.included(block.transactions.head).get shouldBe block.uniqueId
+      storage.state.included(block.transactions.head).get shouldBe storage.history.heightOf(block)
     }
   }
 
@@ -60,14 +60,14 @@ with BlockTestingCommons {
     storage.appendBlock(firstBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs firstBlock.uniqueId
     storage.state.accountTransactions(sender).length shouldBe 1
-    storage.state.included(firstBlockTransaction).get shouldBe firstBlock.uniqueId
+    storage.state.included(firstBlockTransaction).get shouldBe storage.history.heightOf(firstBlock)
 
     //Add block with the same score to branch point
     val branchedBlock = genBlock(bt, randomBytes(), senderSeed, Some(branchPoint.uniqueId))
     storage.appendBlock(branchedBlock).isSuccess shouldBe true
     storage.history.lastBlock.uniqueId should contain theSameElementsAs firstBlock.uniqueId
     storage.state.accountTransactions(sender).length shouldBe 1
-    storage.state.included(firstBlockTransaction).get shouldBe firstBlock.uniqueId
+    storage.state.included(firstBlockTransaction).get shouldBe storage.history.heightOf(firstBlock)
 
     //Add block with the better score to branch point
     val bestBlock = genBlock(biggerBt, randomBytes(), senderSeed, Some(branchPoint.uniqueId))

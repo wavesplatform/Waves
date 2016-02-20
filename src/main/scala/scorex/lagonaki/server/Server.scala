@@ -18,7 +18,6 @@ object Server extends App with ScorexLogging {
 
     log.debug("LagonakiApplication has been started")
     application.run()
-    require(application.blockStorage.state(application.blockStorage.history.lastBlock.encodedId).isDefined)
     if (application.settings.offlineGeneration) {
       testingScript(application)
     } else {
@@ -36,6 +35,7 @@ object Server extends App with ScorexLogging {
 
   def testingScript(application: LagonakiApplication): Unit = {
     log.info("Going to execute testing scenario")
+    log.info("Current state is:" + application.blockStorage.state)
     val wallet = application.wallet
 
     if (wallet.privateKeyAccounts().isEmpty) {

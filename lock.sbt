@@ -22,7 +22,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.ning" % "async-http-client" % "1.9.11",
   "com.thoughtworks.paranamer" % "paranamer" % "2.6",
   "com.typesafe" % "config" % "1.3.0",
-  "com.typesafe.akka" % "akka-actor_2.11" % "2.4.2-RC3",
+  "com.typesafe.akka" % "akka-actor_2.11" % "2.4.2",
   "com.typesafe.akka" % "akka-testkit_2.11" % "2.3.9",
   "com.typesafe.play" % "play-datacommons_2.11" % "2.4.6",
   "com.typesafe.play" % "play-functional_2.11" % "2.4.6",

@@ -8,8 +8,6 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   def isValid(block: Block): Boolean
 
-  def isValid(transaction: Transaction): Boolean
-
   def transactions(block: Block): Seq[Transaction]
 
   def packUnconfirmed(): TransactionBlockData

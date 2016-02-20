@@ -12,7 +12,7 @@ The module contains utility functions & basic common structure to be used by oth
 - Cryptographic hash functions. The only implementation in use at the moment is SHA-256
 - Signing/verification functions. Curve 25519 is the only current implementation 
 - RipeMD160 / Base58
-- Accounts. Basically an account is just a wrapper around valid address provided as string, could be 
+- Accounts. Basically an account is just a wrapper around valid address provided as string, could be
 accomplished with public key or public/private keypair. 
 - NTP client for time synchronization(but please note, there's no global time in a cryptocurrency p2p
 network!)
@@ -58,9 +58,3 @@ Consensus Module
 ----------------
 
 
-TODO:
------
-
-Other functions can be added to build offchain/onchain protocols e.g. other hash 
-functions(e.g. keccak256 / sha3), Merkle trees, one-way accumulators, commitments (e.g. Pedersen commitment), 
-ring signatures etc. 

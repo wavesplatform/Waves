@@ -2,10 +2,9 @@ package scorex.transaction
 
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.crypto.encode.Base58
 import scorex.utils.ScorexLogging
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
   * Storage interface combining both history(blockchain/blocktree) and state
@@ -16,35 +15,21 @@ trait BlockStorage extends ScorexLogging {
 
   val history: History
 
-  val stateHistory: StateHistory
-
-  trait StateHistory {
-    def keySet: Set[String]
-
-    def removeState(encodedId: String): Unit
-
-    def copyState(encodedId: String, state: LagonakiState, toProcess: Block): LagonakiState
-
-    def state(encodedId: String): Option[LagonakiState]
-
-    def state: LagonakiState
-
-    val emptyState: LagonakiState
-  }
-
-  def state(id: String): Option[LagonakiState] = stateHistory.state(id)
-
-  def state(id: BlockId): Option[LagonakiState] = stateHistory.state(Base58.encode(id))
-
-  def state: LagonakiState = stateHistory.state
-
+  def state: LagonakiState
 
   //Append block to current state
   def appendBlock(block: Block): Try[Unit] = BlockStorage.synchronized {
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
-        val cState = if (history.heightOf(b).get != 1) state(b.referenceField.value).get else stateHistory.emptyState
-        stateHistory.copyState(b.encodedId, cState, b)
+        state.processBlock(b) match{
+          case Failure(e) =>
+            log.error("Failed to apply block to state", e)
+            removeAfter(block.referenceField.value)
+            //TODO ???
+            System.exit(1)
+
+          case Success(m) =>
+        }
       }
     }
   }
@@ -53,7 +38,9 @@ trait BlockStorage extends ScorexLogging {
   def removeAfter(signature: BlockId): Unit = synchronized {
     history match {
       case h: BlockChain =>
+        val height = h.heightOf(signature).get
         while (!h.lastBlock.uniqueId.sameElements(signature)) h.discardBlock()
+        state.rollbackTo(height)
       case _ =>
         throw new RuntimeException("Not available for other option than linear blockchain")
     }
