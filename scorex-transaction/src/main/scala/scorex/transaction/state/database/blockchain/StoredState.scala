@@ -2,6 +2,7 @@ package scorex.transaction.state.database.blockchain
 
 import java.io.{DataInput, DataOutput, File}
 
+import com.google.common.primitives.Longs
 import org.mapdb._
 import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.Account
@@ -42,8 +43,8 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
         val txSize = DataIO.unpackInt(dataInput)
         val b = new Array[Byte](txSize)
         dataInput.readFully(b)
-        if (txSize > 0) LagonakiTransaction.parse(b).get //todo: .get w/out catching
-        else FeesStateChange
+        if (txSize == 8) FeesStateChange(Longs.fromByteArray(b))
+        else LagonakiTransaction.parse(b).get //todo: .get w/out catching
       }
       Row(AccState(b), txs, lastRowHeight)
     }
@@ -119,7 +120,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     val trans = block.transactions
     trans.foreach(t => if (included(t).isDefined) throw new Error(s"Transaction $t is already in state"))
     val fees: Map[Account, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
-      .map(m => m._1 ->(AccState(balance(m._1.address) + m._2), Seq(FeesStateChange)))
+      .map(m => m._1 ->(AccState(balance(m._1.address) + m._2), Seq(FeesStateChange(m._2))))
 
     val newBalances: Map[Account, (AccState, Reason)] = calcNewBalances(trans, fees)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))

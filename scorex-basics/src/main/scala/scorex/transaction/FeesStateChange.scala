@@ -1,5 +1,7 @@
 package scorex.transaction
 
-object FeesStateChange extends StateChangeReason {
-  override def bytes: Array[Byte] = Array.empty
+import com.google.common.primitives.Longs
+
+case class FeesStateChange(fee: Long) extends StateChangeReason {
+  override def bytes: Array[Byte] = Longs.toByteArray(fee)
 }
