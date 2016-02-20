@@ -235,13 +235,14 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       false
   }
 
-  def toJson: JsObject = {
-    val ls = lastStates.keySet().map(add => add -> balance(add)).filter(b => b._2 != 0).toList.sortBy(_._1)
+  //for debugging purposes only
+  def toJson(heightOpt: Option[Int] = None): JsObject = {
+    val ls = lastStates.keySet().map(add => add -> balance(add, heightOpt)).filter(b => b._2 != 0).toList.sortBy(_._1)
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
 
   //for debugging purposes only
-  override def toString: String = toJson.toString()
+  override def toString: String = toJson().toString()
 
   def hash: Int = {
     (BigInt(FastCryptographicHash(toString.getBytes())) % Int.MaxValue).toInt

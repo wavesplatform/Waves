@@ -20,7 +20,7 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
   lazy val wallet = application.wallet
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info
+    blocks ~ state ~ info ~ stateAt
   }
 
   @Path("/blocks/{howMany}")
@@ -74,22 +74,17 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
     }
   }
 
-  /*
-    @Path("/state/{blockId}")
-    @ApiOperation(value = "State at block", notes = "Get state at specified block", httpMethod = "GET")
-    @ApiImplicitParams(Array(
-      new ApiImplicitParam(name = "blockId", value = "Id of block", required = true, dataType = "String", paramType = "path")
-    ))
-    def stateAt: Route = {
-      path("state" / Segment) { case blockId =>
-        jsonRoute {
-          application.blockStorage.history.heightOf(blockId) match {
-            case None => Json.obj("error" -> "wrong block id").toString
-            case Some(b) => b.toString
-          }
-        }
+  @Path("/state/{height}")
+  @ApiOperation(value = "State at block", notes = "Get state at specified height", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "Int", paramType = "path")
+  ))
+  def stateAt: Route = {
+    path("state" / IntNumber) { case height =>
+      jsonRoute {
+        application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)).toString
       }
     }
-  */
+  }
 
 }
