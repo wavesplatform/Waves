@@ -131,7 +131,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     this
   }
 
-  def calcNewBalances(trans: Seq[Transaction], fees: Map[Account, (AccState, Reason)]):
+  private def calcNewBalances(trans: Seq[Transaction], fees: Map[Account, (AccState, Reason)]):
   Map[Account, (AccState, Reason)] = {
     val newBalances: Map[Account, (AccState, Reason)] = trans.foldLeft(fees) { case (changes, atx) =>
       atx match {
@@ -172,10 +172,6 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   def totalBalance: Long = lastStates.keySet().map(add => balance(add)).sum
 
   override def accountTransactions(account: Account): Array[LagonakiTransaction] = {
-    accountTransactions(account, stateHeight)
-  }
-
-  def accountTransactions(account: Account, height: Int): Array[LagonakiTransaction] = {
     Option(lastStates.get(account.address)) match {
       case Some(accHeight) =>
         val m = accountChanges(account.address)
@@ -190,10 +186,6 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       case None => Array.empty
     }
   }
-
-  override def stopWatchingAccountTransactions(account: Account): Unit = ???
-
-  override def watchAccountTransactions(account: Account): Unit = ???
 
   def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = {
     Option(lastStates.get(tx.recipient.address)).flatMap { lastChangeHeight =>
