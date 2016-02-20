@@ -49,7 +49,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     }
   }
 
-  type Adress = String
+  type Address = String
 
   case class AccState(balance: Long)
 
@@ -73,13 +73,13 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   }
   db.rollback()
 
-  private def accountChanges(key: Adress): HTreeMap[Integer, Row] = db.hashMap(
+  private def accountChanges(key: Address): HTreeMap[Integer, Row] = db.hashMap(
     key.toString,
     Serializer.INTEGER,
     RowSerializer,
     null)
 
-  val lastStates = db.hashMap[Adress, Int](LastStates)
+  val lastStates = db.hashMap[Address, Int](LastStates)
 
   if (Option(db.atomicInteger(HeightKey).get()).isEmpty) db.atomicInteger(HeightKey).set(0)
 
@@ -87,7 +87,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   private def setStateHeight(height: Int): Unit = db.atomicInteger(HeightKey).set(height)
 
-  private def applyChanges(ch: Map[Adress, (AccState, Reason)]): Unit = synchronized {
+  private def applyChanges(ch: Map[Address, (AccState, Reason)]): Unit = synchronized {
     setStateHeight(stateHeight + 1)
     val h = stateHeight
     ch.foreach { ch =>
@@ -99,7 +99,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   }
 
   def rollbackTo(rollbackTo: Int): Unit = synchronized {
-    def deleteNewer(key: Adress): Unit = {
+    def deleteNewer(key: Address): Unit = {
       val currentHeight = lastStates.get(key)
       if (currentHeight > rollbackTo) {
         val dataMap = accountChanges(key)
