@@ -1,16 +1,12 @@
 package scorex.transaction
 
-import java.io.File
-
 import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
-import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
-import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
@@ -18,9 +14,8 @@ import scorex.transaction.state.wallet.Payment
 import scorex.utils._
 import scorex.wallet.Wallet
 
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
-import scala.util.{Success, Try}
+import scala.util.Try
 
 case class TransactionsBlockField(override val value: Seq[Transaction])
   extends BlockField[Seq[Transaction]] {
@@ -55,6 +50,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
   private val instance = this
 
   override val blockStorage = new BlockStorage {
+
     override val MaxRollback: Int = settings.MaxRollback
 
     override val history: History = settings.history match {
@@ -67,73 +63,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
 
+    override val state = new StoredState(settings.dataDirOpt.map(_ + "/state.mapdb"))
 
-    override val stateHistory: StateHistory = new StateHistory {
-      private val stateDir: Option[String] = settings.dataDirOpt
-
-      val cache = TrieMap[String, StoredState]()
-
-      private val StateCopyTimeout = 10.seconds
-
-      private def getFileName(encodedId: String): Option[String] = stateDir.map(f => f + "/state-" + encodedId)
-
-      override def keySet: Set[String] = stateDir match {
-        case Some(folder) =>
-          new File(folder).listFiles().map(_.getName).toSet.filter(_.startsWith("state-")).map(_.substring(6))
-        case None => cache.keySet.toSet
-      }
-
-      override def copyState(encodedId: String, state: LagonakiState, toProcess: Block): StoredState = synchronized {
-        cache.get(encodedId) match {
-          case None =>
-            val copy = state.copyTo(getFileName(encodedId)).asInstanceOf[StoredState]
-            copy.processBlock(toProcess)
-            cache.put(encodedId, copy)
-            copy
-          case Some(s) =>
-            log.warn(s"Trying to copy state $encodedId we already have in cache")
-            s
-        }
-      }
-
-      override def removeState(encodedId: String): Unit = synchronized {
-        cache.remove(encodedId).foreach(_.database.close())
-        getFileName(encodedId).map(new File(_).delete())
-      }
-
-      override def state(encodedId: String): Option[StoredState] = state(encodedId, MaxRollback)
-
-      def state(encodedId: String, limit: Int): Option[StoredState] = cache.get(encodedId) match {
-        case None =>
-          val st: Option[StoredState] = if (!getFileName(encodedId).exists(f => new File(f).exists())) None
-          else Try(untilTimeout(StateCopyTimeout)(cache.get(encodedId).get)) match {
-            case Success(cachedState) => Some(cachedState)
-            case _ =>
-              log.info(s"Recover state for block $encodedId from file")
-              Some(StoredState(getFileName(encodedId)))
-          }
-
-          val recoveredState = if (limit > 0 && (st.isEmpty || !st.get.isValid(InitialBalance))) {
-            //State is wrong, recover from the previous one
-            log.warn(s"State for block $encodedId} is not valid, recover from parent")
-            removeState(encodedId)
-            val parenState = history.blockById(encodedId).map(_.referenceField.value)
-              .flatMap(id => state(Base58.encode(id), limit - 1))
-            parenState.map(s => copyState(encodedId, s, history.blockById(encodedId).get))
-          } else st
-          recoveredState.map(s => cache.put(encodedId, s))
-
-          recoveredState
-
-        case ot => ot
-      }
-
-      override def state: StoredState = if (history.height() > 0) {
-        untilTimeout(StateCopyTimeout)(state(history.lastBlock.encodedId).get)
-      } else emptyState
-
-      override val emptyState = StoredState(getFileName(""))
-    }
   }
 
   /**
@@ -164,9 +95,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
   override def transactions(block: Block): StoredInBlock =
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
-  override def packUnconfirmed(): StoredInBlock = blockStorage.state.validate(UnconfirmedTransactionsDatabaseImpl.all()
-    .filter(isValid).take(MaxTransactionsPerBlock).filter(blockStorage.state.included(_).isEmpty))
-    .ensuring(isValid(_, blockStorage.state.asInstanceOf[StoredState]))
+  override def packUnconfirmed(): StoredInBlock =
+    blockStorage.state.validate(UnconfirmedTransactionsDatabaseImpl.all()).sortBy(- _.fee).take(MaxTransactionsPerBlock)
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
@@ -198,9 +128,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     val time = NTP.correctedTime()
     val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
     val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
-    if (payment.validate()(this) == ValidationResult.ValidateOke) {
-      onNewOffchainTransaction(payment)
-    }
+    if (blockStorage.state.isValid(payment)) onNewOffchainTransaction(payment)
     payment
   }
 
@@ -227,33 +155,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     TransactionsBlockField(txs)
   }
 
-  override def isValid(block: Block): Boolean = blockStorage.state(block.referenceField.value) match {
-    case Some(blockState) =>
-      isValid(block.transactions, blockState)
-    case None =>
-      log.warn(s"No block state ${Base58.encode(block.referenceField.value)} in history")
-      false
-  }
-
-  //TODO asInstanceOf
-  override def isValid(transaction: Transaction): Boolean =
-    isValid(transaction, blockStorage.state.asInstanceOf[StoredState])
-
-  private def isValid(transactions: Seq[Transaction], state: State): Boolean =
-    transactions.forall(isValid) && state.isValid(transactions)
-
-  private def isValid(transaction: Transaction, txState: StoredState): Boolean = transaction match {
-    case tx: PaymentTransaction =>
-      val r = tx.signatureValid && tx.validate(txState) == ValidationResult.ValidateOke && txState.included(tx).isEmpty
-      if (!r) log.debug(s"Invalid $tx: ${tx.signatureValid}&&${tx.validate(txState)}&&" +
-        txState.included(tx).map(Base58.encode))
-      r
-    case gtx: GenesisTransaction =>
-      blockStorage.history.height() == 0
-    case otx: Any =>
-      log.error(s"Wrong kind of tx: $otx")
-      false
-  }
+  override def isValid(block: Block): Boolean =
+    blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
 
 }
 

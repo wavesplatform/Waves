@@ -49,7 +49,7 @@ case class GenesisTransaction(override val recipient: Account,
     Bytes.concat(h, h).sameElements(signature)
   }
 
-  override def validate(state: BalanceSheet): ValidationResult.Value =
+  override def validate: ValidationResult.Value =
     if (amount < 0) {
       ValidationResult.NegativeAmount
     } else if (!Account.isValidAddress(recipient.address)) {

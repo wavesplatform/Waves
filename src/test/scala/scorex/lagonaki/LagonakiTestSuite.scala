@@ -11,7 +11,7 @@ class LagonakiTestSuite extends Suites(
   //unit tests
   new MessageSpecification
   , new BlockSpecification
-  , new BlockStorageSpecification
+//  , new BlockStorageSpecification
   , new WalletSpecification
   , new BlockGeneratorSpecification
   , new BlocksRoutingSpecification
@@ -19,7 +19,6 @@ class LagonakiTestSuite extends Suites(
 
   //integration tests - slow!
   , new ValidChainGenerationSpecification
-//  , new BlockGenerationSpecification
   , new APISpecification
 
 ) with BeforeAndAfterAll {

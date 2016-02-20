@@ -15,17 +15,11 @@ trait State {
     */
   private[transaction] def processBlock(block: Block): Try[State]
 
-  /**
-    * Determine whether a transaction was already processed or not.
-    *
-    * @param tx - a transaction to check
-    * @return whether transaction is already included into a state or not
-    */
-  def included(tx: Transaction): Option[BlockId]
+  def isValid(tx: Transaction): Boolean = isValid(Seq(tx))
 
-  def copyTo(fileNameOpt: Option[String]): State
+  def isValid(txs: Seq[Transaction], height: Option[Int] = None): Boolean = validate(txs, height).size == txs.size
 
-  def isValid(txs: Seq[Transaction]): Boolean = validate(txs).size == txs.size
+  def validate(txs: Seq[Transaction], height: Option[Int] = None): Seq[Transaction]
 
-  def validate(txs: Seq[Transaction]): Seq[Transaction]
+  def rollbackTo(height: Int): Unit
 }

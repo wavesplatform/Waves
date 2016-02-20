@@ -27,5 +27,5 @@
     "authDataStorage": "authDataStorage1.mapDB",
     "isTrustedDealer": true
   },
-  "blockGenerationDelay": 5000
+  "blockGenerationDelay": 5001
 }

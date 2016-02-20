@@ -237,7 +237,7 @@ case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val co
       Json.obj(
         "address" -> address,
         "confirmations" -> confirmations,
-        "balance" -> state.balance(address, confirmations)
+        "balance" -> state.balanceWithConfirmations(address, confirmations)
       )
     }
 

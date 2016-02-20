@@ -7,7 +7,6 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http._
 import scorex.app.Application
-import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.state.database.blockchain.StoredState
@@ -21,7 +20,7 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
   lazy val wallet = application.wallet
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ stateAt ~ info
+    blocks ~ state ~ info ~ stateAt
   }
 
   @Path("/blocks/{howMany}")
@@ -68,25 +67,22 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
       jsonRoute {
         val state = application.blockStorage.state.asInstanceOf[StoredState]
         Json.obj(
-          "stateHeight" -> state.stateHeight(),
-          "stateHash" -> state.hashCode()
+          "stateHeight" -> state.stateHeight,
+          "stateHash" -> state.hash
         ).toString
       }
     }
   }
 
-  @Path("/state/{blockId}")
-  @ApiOperation(value = "State at block", notes = "Get state at specified block", httpMethod = "GET")
+  @Path("/state/{height}")
+  @ApiOperation(value = "State at block", notes = "Get state at specified height", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "blockId", value = "Id of block", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "Int", paramType = "path")
   ))
   def stateAt: Route = {
-    path("state" / Segment) { case blockId =>
+    path("state" / IntNumber) { case height =>
       jsonRoute {
-        application.blockStorage.state(blockId) match {
-          case None => Json.obj("error" -> "wrong block id").toString
-          case Some(b) => b.toString
-        }
+        application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)).toString
       }
     }
   }
