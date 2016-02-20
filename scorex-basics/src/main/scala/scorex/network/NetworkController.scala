@@ -102,9 +102,6 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   }
 
   def businessLogic: Receive = {
-    case RegisterMessagesHandler(specs, handler) =>
-      messageHandlers += specs.map(_.messageCode) -> handler
-
     //a message coming in from another peer
     case Message(spec, Left(msgBytes), Some(remote)) =>
       val msgId = spec.messageCode
@@ -160,6 +157,9 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   }
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse interfaceCalls orElse {
+    case RegisterMessagesHandler(specs, handler) =>
+      messageHandlers += specs.map(_.messageCode) -> handler
+
     case CommandFailed(cmd: Tcp.Command) =>
       log.info("Failed to execute command : " + cmd)
 
