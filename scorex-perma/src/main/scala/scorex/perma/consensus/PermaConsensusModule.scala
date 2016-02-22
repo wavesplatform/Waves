@@ -88,6 +88,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         val target = calcTarget(parent)
         if (validate(keyPair._2, puz, target, ticket, rootHash)) {
           val timestamp = NTP.correctedTime()
+          log.info("Valid ticket generated, build block")
           val consensusData = PermaConsensusBlockData(target, puz, ticket)
           Some(Block.buildAndSign(Version,
             timestamp,
