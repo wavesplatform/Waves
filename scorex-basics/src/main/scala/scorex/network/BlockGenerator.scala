@@ -16,8 +16,10 @@ class BlockGenerator(application: Application) extends FSM[Status, Unit] {
   private val blockGenerationDelay = application.settings.blockGenerationDelay
   private val FailedGenerationDelay = 10.seconds
 
-  private def scheduleAGuess(delay: Option[FiniteDuration] = None): Unit =
-    context.system.scheduler.scheduleOnce(delay.getOrElse(blockGenerationDelay), self, GuessABlock)
+  private def scheduleAGuess(delay: Option[FiniteDuration] = None): Unit = {
+    if (delay.getOrElse(blockGenerationDelay).toMillis == 0) self ! GuessABlock
+    else context.system.scheduler.scheduleOnce(delay.getOrElse(blockGenerationDelay), self, GuessABlock)
+  }
 
   startWith(Syncing, Unit)
 
