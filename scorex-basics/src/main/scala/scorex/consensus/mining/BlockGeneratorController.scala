@@ -56,7 +56,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       workers.foreach { w =>
         (w ? GetLastGenerationTime) onComplete {
           case Success(LastGenerationTime(t)) if System.currentTimeMillis() - t < FailedGenerationDelay.toMillis =>
-            log.info(s"Miner $w works fine")
+            log.info(s"Miner $w works fine, last try was ${System.currentTimeMillis() - t} millis ago")
           case Success(LastGenerationTime(t)) if System.currentTimeMillis() - t > FailedGenerationDelay.toMillis =>
             log.warn(s"Miner $w don't generate blocks")
             w ! GuessABlock
