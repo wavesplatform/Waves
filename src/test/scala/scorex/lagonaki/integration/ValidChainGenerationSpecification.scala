@@ -3,8 +3,8 @@ package scorex.lagonaki.integration
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.account.PublicKeyAccount
 import scorex.block.Block
+import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
-import scorex.network.BlockGenerator
 import scorex.transaction.{BalanceSheet, Transaction}
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{ScorexLogging, untilTimeout}
@@ -121,11 +121,11 @@ with TransactionTestingCommons {
     }
 
     untilTimeout(10.seconds) {
-      peers.foreach(_.blockGenerator ! BlockGenerator.StopGeneration)
+      peers.foreach(_.blockGenerator ! StopGeneration)
       peers.foreach(_.transactionModule.blockStorage.removeAfter(last.uniqueId))
       peers.foreach(_.history.lastBlock.encodedId shouldBe last.encodedId)
     }
-    peers.foreach(_.blockGenerator ! BlockGenerator.StartGeneration)
+    peers.foreach(_.blockGenerator ! StartGeneration)
 
     state.hash shouldBe st1
   }

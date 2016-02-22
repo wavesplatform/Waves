@@ -77,6 +77,8 @@ trait Settings extends ScorexLogging {
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)
 
+  lazy val mininigThreads: Int = (settingsJSON \ "mininigThreads").asOpt[Int].getOrElse(DefaultMiningThreads)
+
   lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
   lazy val walletPassword = (settingsJSON \ "walletPassword").asOpt[String].getOrElse {
@@ -98,4 +100,5 @@ trait Settings extends ScorexLogging {
   private val DefaultRpcAllowed = "127.0.0.1"
 
   private val DefaultBlockGenerationDelay: FiniteDuration = 1.second
+  private val DefaultMiningThreads: Int = 1
 }

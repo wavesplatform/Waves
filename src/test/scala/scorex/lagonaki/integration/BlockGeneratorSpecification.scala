@@ -3,6 +3,7 @@ package scorex.lagonaki.integration
 import akka.actor.ActorSystem
 import akka.testkit._
 import org.scalatest.{Matchers, WordSpecLike}
+import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.TestingCommons
 import scorex.utils.untilTimeout
 
@@ -16,7 +17,6 @@ class BlockGeneratorSpecification(_system: ActorSystem)
   with TestingCommons {
 
   import TestingCommons._
-  import scorex.network.BlockGenerator._
 
   def this() = this(ActorSystem("MySpec"))
 

@@ -4,6 +4,7 @@ import akka.actor.Props
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.consensus.mining.BlockGeneratorController._
 import scorex.crypto.encode.Base58
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.ScoreObserver.{GetScore, ConsideredValue, UpdateScore}
@@ -161,13 +162,13 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     log.debug("Transition to syncing")
     context become syncing
     scoreObserver ! GetScore
-    blockGenerator ! BlockGenerator.StopGeneration
+    blockGenerator ! StopGeneration
     syncing
   }
 
   private def gotoGettingExtension(betterScore: BigInt, witnesses: Seq[ConnectedPeer]): Unit = {
     log.debug("Transition to gettingExtension")
-    blockGenerator ! BlockGenerator.StopGeneration
+    blockGenerator ! StopGeneration
     context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
     context become gettingExtension(betterScore, witnesses)
   }
@@ -181,7 +182,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
   private def gotoSynced(): Receive = {
     log.debug("Transition to synced")
-    blockGenerator ! BlockGenerator.StartGeneration
+    blockGenerator ! StartGeneration
     context become synced
     synced
   }
