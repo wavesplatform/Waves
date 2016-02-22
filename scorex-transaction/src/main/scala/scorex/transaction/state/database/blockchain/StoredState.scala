@@ -12,6 +12,7 @@ import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
+import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.util.Try
 
@@ -204,16 +205,22 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   }
 
   //return seq of valid transactions
-  override def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
+  @tailrec
+  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)
     val txs = trans.filter(t => included(t).isEmpty && isValid(t, height))
     val nb = calcNewBalances(txs, Map.empty)
     val negativeBalance: Option[(Account, (AccState, Reason))] = nb.find(b => b._2._1.balance < 0)
     negativeBalance match {
       case Some(b) =>
-        val accWorstTransaction = trans.filter(_.isInstanceOf[PaymentTransaction])
-          .map(_.asInstanceOf[PaymentTransaction]).filter(_.sender.address == b._1.address).minBy(_.fee)
-        validate(txs.filterNot(_.signature sameElements accWorstTransaction.signature), Some(height))
+        val accTransactions = trans.filter(_.isInstanceOf[PaymentTransaction]).map(_.asInstanceOf[PaymentTransaction])
+          .filter(_.sender.address == b._1.address)
+        var sumBalance = 0L
+        val toRemove: Seq[Transaction] = accTransactions.sortBy(- _.fee).takeWhile { t =>
+          sumBalance = sumBalance - t.amount
+          sumBalance + b._2._1.balance > 0
+        }
+        validate(txs.intersect(toRemove), Some(height))
       case None => txs
     }
   }
