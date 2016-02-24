@@ -44,8 +44,14 @@ with TransactionTestingCommons {
     val acc = accounts.head
     val recepient = accounts.last
     val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc.address)
+    senderBalance should be > 0L
     val nonValid = transactionModule.createPayment(acc, recepient, senderBalance, 1)
     state.isValid(nonValid) shouldBe false
+
+    val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recepient, senderBalance / 2, 1))
+    doubleSpending.foreach(t => state.isValid(t) shouldBe true)
+    state.isValid(doubleSpending) shouldBe false
+    state.validate(doubleSpending).size shouldBe 1
   }
 
   test("generate 3 blocks with transaction and synchronize") {
