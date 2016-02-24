@@ -13,7 +13,8 @@ import org.scalatest.{Matchers, WordSpecLike}
 import scorex.lagonaki.TestingCommons
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.Message
-import scorex.network.peer.PeerManager.{AddKnownPeer, KnownPeers, RandomPeers}
+import scorex.network.peer.PeerManager
+import scorex.network.peer.PeerManager.{KnownPeers, RandomPeers}
 import scorex.network.{ConnectedPeer, PeerSynchronizer}
 
 //TODO move to basics
@@ -52,7 +53,7 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
       probe.expectMsg(msg)
 
       val newPeer = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 2)
-      application.peerManager ! AddKnownPeer(newPeer)
+      application.peerManager ! PeerManager.AddOrUpdatePeer(newPeer, None, None)
 
       val newPeers = (application.peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
