@@ -12,6 +12,7 @@ import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
+import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.util.Try
 
@@ -99,7 +100,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     db.commit()
   }
 
-  def rollbackTo(rollbackTo: Int): Unit = synchronized {
+  def rollbackTo(rollbackTo: Int): State = synchronized {
     def deleteNewer(key: Address): Unit = {
       val currentHeight = lastStates.get(key)
       if (currentHeight > rollbackTo) {
@@ -114,6 +115,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     }
     setStateHeight(rollbackTo)
     db.commit()
+    this
   }
 
   override def processBlock(block: Block): Try[State] = Try {
@@ -131,7 +133,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     this
   }
 
-  def calcNewBalances(trans: Seq[Transaction], fees: Map[Account, (AccState, Reason)]):
+  private def calcNewBalances(trans: Seq[Transaction], fees: Map[Account, (AccState, Reason)]):
   Map[Account, (AccState, Reason)] = {
     val newBalances: Map[Account, (AccState, Reason)] = trans.foldLeft(fees) { case (changes, atx) =>
       atx match {
@@ -172,10 +174,6 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   def totalBalance: Long = lastStates.keySet().map(add => balance(add)).sum
 
   override def accountTransactions(account: Account): Array[LagonakiTransaction] = {
-    accountTransactions(account, stateHeight)
-  }
-
-  def accountTransactions(account: Account, height: Int): Array[LagonakiTransaction] = {
     Option(lastStates.get(account.address)) match {
       case Some(accHeight) =>
         val m = accountChanges(account.address)
@@ -190,10 +188,6 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       case None => Array.empty
     }
   }
-
-  override def stopWatchingAccountTransactions(account: Account): Unit = ???
-
-  override def watchAccountTransactions(account: Account): Unit = ???
 
   def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = {
     Option(lastStates.get(tx.recipient.address)).flatMap { lastChangeHeight =>
@@ -212,16 +206,22 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   }
 
   //return seq of valid transactions
-  override def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
+  @tailrec
+  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)
     val txs = trans.filter(t => included(t).isEmpty && isValid(t, height))
     val nb = calcNewBalances(txs, Map.empty)
     val negativeBalance: Option[(Account, (AccState, Reason))] = nb.find(b => b._2._1.balance < 0)
     negativeBalance match {
       case Some(b) =>
-        val accWorstTransaction = trans.filter(_.isInstanceOf[PaymentTransaction])
-          .map(_.asInstanceOf[PaymentTransaction]).filter(_.sender.address == b._1.address).minBy(_.fee)
-        validate(txs.filterNot(_.signature sameElements accWorstTransaction.signature), Some(height))
+        val accTransactions = trans.filter(_.isInstanceOf[PaymentTransaction]).map(_.asInstanceOf[PaymentTransaction])
+          .filter(_.sender.address == b._1.address)
+        var sumBalance = 0L
+        val toRemove: Seq[Transaction] = accTransactions.sortBy(- _.fee).takeWhile { t =>
+          sumBalance = sumBalance - t.amount
+          sumBalance + b._2._1.balance > 0
+        }
+        validate(txs.intersect(toRemove), Some(height))
       case None => txs
     }
   }

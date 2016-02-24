@@ -8,8 +8,9 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.Application
+import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.server.settings.Constants
-import scorex.network.{BlockGenerator, HistorySynchronizer}
+import scorex.network.HistorySynchronizer
 import spray.http.MediaTypes._
 import spray.routing.Route
 
@@ -54,7 +55,7 @@ case class ScorexApiRoute(application: Application)(implicit val context: ActorR
     get {
       respondWithMediaType(`application/json`) {
         onComplete {
-          def bgf = (application.blockGenerator ? BlockGenerator.GetStatus).map(_.toString)
+          def bgf = (application.blockGenerator ? GetStatus).map(_.toString)
           def hsf = (application.historySynchronizer ? HistorySynchronizer.GetStatus).map(_.toString)
 
           Future.sequence(Seq(bgf, hsf)).map { case statusesSeq =>

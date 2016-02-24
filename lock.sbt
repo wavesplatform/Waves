@@ -52,7 +52,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.json4s" % "json4s-jackson_2.11" % "3.2.11",
   "org.json4s" % "json4s-native_2.11" % "3.2.11",
   "org.jvnet.mimepull" % "mimepull" % "1.9.5",
-  "org.mapdb" % "mapdb" % "2.0-beta12",
+  "org.mapdb" % "mapdb" % "2.0-beta13",
   "org.parboiled" % "parboiled-core" % "1.1.7",
   "org.parboiled" % "parboiled-scala_2.11" % "1.1.7",
   "org.scala-lang.modules" % "scala-java8-compat_2.11" % "0.7.0",
@@ -66,4 +66,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.slf4j" % "slf4j-api" % "1.7.16",
   "org.whispersystems" % "curve25519-java" % "0.2.4"
 )
-// LIBRARY_DEPENDENCIES_HASH a402d36f6f8303d8aa5de0fcd4c6421942ec14e5
+// LIBRARY_DEPENDENCIES_HASH cae1e2e1926977db6209841753c3f6edba9f5832

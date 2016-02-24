@@ -7,9 +7,10 @@ import akka.testkit.{TestProbe, ImplicitSender, TestKit}
 import akka.util.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{Matchers, WordSpecLike}
+import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.TestingCommons
 import scorex.network.ScoreObserver.ConsideredValue
-import scorex.network.{BlockGenerator, ConnectedPeer}
+import scorex.network.ConnectedPeer
 import java.net.{InetAddress, InetSocketAddress}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -44,9 +45,9 @@ class HistorySynchronizerSpecification(_system: ActorSystem)
 
   "HistorySynchronizer actor" must {
     "start in synced state with blocks generation" in {
-      val fStatus = (application.blockGenerator ? BlockGenerator.GetStatus).map(_.toString)
+      val fStatus = (application.blockGenerator ? GetStatus).map(_.toString)
       whenReady(fStatus) { status =>
-        status should equal(BlockGenerator.Generating.name)
+        status should equal(Generating.name)
       }
     }
 
@@ -57,9 +58,9 @@ class HistorySynchronizerSpecification(_system: ActorSystem)
 
       Thread.sleep(1.second.toMillis)
 
-      val fStatus = (application.blockGenerator ? BlockGenerator.GetStatus).map(_.toString)
+      val fStatus = (application.blockGenerator ? GetStatus).map(_.toString)
       whenReady(fStatus) { status =>
-        status should equal(BlockGenerator.Syncing.name)
+        status should equal(Syncing.name)
       }
     }
   }

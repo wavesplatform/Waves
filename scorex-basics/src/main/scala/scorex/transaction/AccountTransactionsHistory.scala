@@ -14,7 +14,4 @@ trait AccountTransactionsHistory {
 
   def accountTransactions(account: Account): Array[_ <: Transaction]
 
-  def watchAccountTransactions(account: Account)
-
-  def stopWatchingAccountTransactions(account: Account)
 }
