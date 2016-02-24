@@ -54,17 +54,10 @@ with TransactionTestingCommons {
     state.validate(doubleSpending).size shouldBe 1
   }
 
-  test("generate 3 blocks with transaction and synchronize") {
+  test("generate 3 blocks and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(app.blockStorage.state.generationBalance(_)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 2)
-
-    val h = maxHeight()
-    val tx = untilTimeout(1.minute) {
-      val t = genValidTransaction()
-      app.transactionModule.packUnconfirmed().head.signature shouldBe t.signature
-      UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 1
-      t
-    }
+    genValidTransaction()
 
     waitGenerationOfBlocks(3)
 
@@ -72,8 +65,6 @@ with TransactionTestingCommons {
     untilTimeout(5.minutes, 10.seconds) {
       peers.head.blockStorage.history.contains(last) shouldBe true
     }
-    peers.foreach(_.blockStorage.state.included(tx).isDefined shouldBe true)
-    peers.foreach(_.blockStorage.state.included(tx).get should be > h)
   }
 
   test("Don't include same transactions twice") {
@@ -108,13 +99,14 @@ with TransactionTestingCommons {
 
   test("Double spending") {
     cleanTransactionPool()
+    val recepient = new PublicKeyAccount(Array.empty)
     val trans = accounts.flatMap { a =>
-      val recepient = new PublicKeyAccount(Array.empty)
       val senderBalance = state.asInstanceOf[BalanceSheet].balance(a.address)
       (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
     }
     val valid = transactionModule.packUnconfirmed()
     valid.nonEmpty shouldBe true
+    state.validate(trans).nonEmpty shouldBe true
     valid.size should be < trans.size
 
     waitGenerationOfBlocks(2)
@@ -135,12 +127,16 @@ with TransactionTestingCommons {
       peers.foreach(_.blockStorage.history.height() should be > height)
       history.height() should be > height
       state.hash should not be st1
+      peers.foreach(_.transactionModule.blockStorage.history.contains(last))
     }
+    waitGenerationOfBlocks(0)
 
     untilTimeout(10.seconds) {
-      peers.foreach(_.blockGenerator ! StopGeneration)
-      peers.foreach(_.transactionModule.blockStorage.removeAfter(last.uniqueId))
-      peers.foreach(_.history.lastBlock.encodedId shouldBe last.encodedId)
+      peers.foreach { p =>
+        p.blockGenerator ! StopGeneration
+        p.transactionModule.blockStorage.removeAfter(last.uniqueId)
+        p.history.lastBlock.encodedId shouldBe last.encodedId
+      }
     }
     peers.foreach(_.blockGenerator ! StartGeneration)
 
