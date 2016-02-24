@@ -38,7 +38,7 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
     case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)
       if msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
 
-      peers.foreach(isa => peerManager ! PeerManager.AddKnownPeer(isa))
+      peers.foreach(isa => peerManager ! PeerManager.AddOrUpdatePeer(isa, None, None))
 
     case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
 

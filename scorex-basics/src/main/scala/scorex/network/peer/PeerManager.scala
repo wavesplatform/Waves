@@ -38,13 +38,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     else None
   }
 
-  //todo: combine AddKnownPeer & UpdatePeer?
   private def peerListOperations: Receive = {
-    case AddKnownPeer(address) =>
-      val peerInfo = PeerInfo(System.currentTimeMillis())
-      peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
-
-    case UpdatePeer(address, peerNonceOpt, peerNameOpt) =>
+    case AddOrUpdatePeer(address, peerNonceOpt, peerNameOpt) =>
       val peerInfo = PeerInfo(System.currentTimeMillis(), peerNonceOpt, peerNameOpt)
       peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
 
@@ -96,13 +91,13 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
         val peerNonce = Some(handshake.nodeNonce)
         val peerName = Some(handshake.nodeName)
-        self ! UpdatePeer(handshake.declaredAddress.getOrElse(address), peerNonce, peerName)
+        self ! AddOrUpdatePeer(handshake.declaredAddress.getOrElse(address), peerNonce, peerName)
 
         //drop connection to self if occurred
         if (handshake.nodeNonce == application.settings.nodeNonce) {
           newCp.handlerRef ! PeerConnectionHandler.CloseConnection
         } else {
-          handshake.declaredAddress.foreach(address => self ! PeerManager.AddKnownPeer(address))
+          handshake.declaredAddress.foreach(address => self ! PeerManager.AddOrUpdatePeer(address, None, None))
           connectedPeers += newCp -> Some(handshake)
         }
       }
@@ -129,9 +124,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
 object PeerManager {
 
-  case class AddKnownPeer(address: InetSocketAddress)
-
-  case class UpdatePeer(address: InetSocketAddress, peerNonce: Option[Long], peerName: Option[String])
+  case class AddOrUpdatePeer(address: InetSocketAddress, peerNonce: Option[Long], peerName: Option[String])
 
   case object KnownPeers
 
