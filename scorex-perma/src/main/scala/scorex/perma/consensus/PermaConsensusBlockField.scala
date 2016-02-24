@@ -3,8 +3,8 @@ package scorex.perma.consensus
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json._
 import scorex.block.BlockField
-import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.perma.settings.PermaConstants
 

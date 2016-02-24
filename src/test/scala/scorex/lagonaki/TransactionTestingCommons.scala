@@ -2,7 +2,6 @@ package scorex.lagonaki
 
 import scorex.block.Block
 import scorex.lagonaki.TestingCommons._
-import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.{BalanceSheet, GenesisTransaction, Transaction}
 
 import scala.concurrent.Await

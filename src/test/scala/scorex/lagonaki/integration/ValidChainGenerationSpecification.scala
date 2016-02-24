@@ -5,8 +5,8 @@ import scorex.account.PublicKeyAccount
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
-import scorex.transaction.{BalanceSheet, Transaction}
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.transaction.{BalanceSheet, Transaction}
 import scorex.utils.{ScorexLogging, untilTimeout}
 
 import scala.concurrent.duration._

@@ -7,7 +7,7 @@ import scorex.block.Block.BlockId
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.crypto.encode.Base58
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
-import scorex.network.ScoreObserver.{GetScore, ConsideredValue, UpdateScore}
+import scorex.network.ScoreObserver.{ConsideredValue, GetScore, UpdateScore}
 import scorex.network.message.Message
 import scorex.transaction.History
 import scorex.utils.ScorexLogging

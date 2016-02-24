@@ -6,7 +6,7 @@ import com.google.common.primitives.{Ints, Longs}
 import scorex.app.ApplicationVersion
 import scorex.utils.ScorexLogging
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 
 case class Handshake(applicationName: String,

@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import scorex.block.Block
+
 import scala.util.Try
 
 /**
