@@ -27,7 +27,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private lazy val peerDatabase = new PeerDatabaseImpl(application)
 
-  settings.knownPeers.foreach{address =>
+  settings.knownPeers.foreach { address =>
     val defaultPeerInfo = PeerInfo(System.currentTimeMillis(), None, None)
     peerDatabase.addOrUpdateKnownPeer(address, defaultPeerInfo)
   }
