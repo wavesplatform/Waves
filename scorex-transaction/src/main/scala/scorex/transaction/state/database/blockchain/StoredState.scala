@@ -100,7 +100,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     db.commit()
   }
 
-  def rollbackTo(rollbackTo: Int): Unit = synchronized {
+  def rollbackTo(rollbackTo: Int): State = synchronized {
     def deleteNewer(key: Address): Unit = {
       val currentHeight = lastStates.get(key)
       if (currentHeight > rollbackTo) {
@@ -115,6 +115,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     }
     setStateHeight(rollbackTo)
     db.commit()
+    this
   }
 
   override def processBlock(block: Block): Try[State] = Try {

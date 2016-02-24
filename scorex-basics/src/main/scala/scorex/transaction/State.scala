@@ -15,5 +15,5 @@ trait State {
 
   def validate(txs: Seq[Transaction], height: Option[Int] = None): Seq[Transaction]
 
-  def rollbackTo(height: Int): Unit
+  private[transaction] def rollbackTo(height: Int): State
 }
