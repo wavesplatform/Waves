@@ -13,7 +13,7 @@ import scala.util.Random
 
 /**
   * Must be singleton
-  * @param application
+  * @param application - Scorex-based application
   */
 class PeerManager(application: Application) extends Actor with ScorexLogging {
 
@@ -44,8 +44,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       val peerInfo = PeerInfo(System.currentTimeMillis())
       peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
 
-    case UpdatePeer(address, peerNonce, peerName) =>
-      val peerInfo = PeerInfo(System.currentTimeMillis(), peerNonce, peerName)
+    case UpdatePeer(address, peerNonceOpt, peerNameOpt) =>
+      val peerInfo = PeerInfo(System.currentTimeMillis(), peerNonceOpt, peerNameOpt)
       peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
 
     case KnownPeers =>
