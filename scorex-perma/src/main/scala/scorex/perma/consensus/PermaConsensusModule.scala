@@ -89,13 +89,17 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         if (validate(keyPair._2, puz, target, ticket, rootHash)) {
           val timestamp = NTP.correctedTime()
           log.info("Valid ticket generated, build block")
-          val consensusData = PermaConsensusBlockData(target, puz, ticket)
-          Some(Block.buildAndSign(Version,
+          val blockTry = Try(Block.buildAndSign(Version,
             timestamp,
             parent.uniqueId,
-            consensusData,
+            PermaConsensusBlockData(target, puz, ticket),
             transactionModule.packUnconfirmed(),
             account))
+          blockTry.recoverWith {
+            case e =>
+              log.error("Failed to build block:", e)
+              Failure(e)
+          }.toOption
         } else {
           None
         }
