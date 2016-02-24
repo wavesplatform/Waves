@@ -216,12 +216,13 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       case Some(b) =>
         val accTransactions = trans.filter(_.isInstanceOf[PaymentTransaction]).map(_.asInstanceOf[PaymentTransaction])
           .filter(_.sender.address == b._1.address)
-        var sumBalance = 0L
-        val toRemove: Seq[Transaction] = accTransactions.sortBy(- _.fee).takeWhile { t =>
-          sumBalance = sumBalance - t.amount
-          sumBalance + b._2._1.balance > 0
+        var sumBalance = b._2._1.balance
+        val toRemove: Seq[Transaction] = accTransactions.sortBy(- _.amount).takeWhile { t =>
+          val prevSum = sumBalance
+          sumBalance = sumBalance + t.amount + t.fee
+          prevSum < 0
         }
-        validate(txs.intersect(toRemove), Some(height))
+        validate(txs.filter(t => !toRemove.exists(tr => tr.signature sameElements t.signature)), Some(height))
       case None => txs
     }
   }

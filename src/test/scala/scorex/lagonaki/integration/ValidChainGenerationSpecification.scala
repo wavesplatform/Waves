@@ -40,12 +40,20 @@ with TransactionTestingCommons {
     else b.transactions
   }
 
+  test("state.validate()") {
+    val acc = accounts.head
+    val recepient = accounts.last
+    val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc.address)
+    val nonValid = transactionModule.createPayment(acc, recepient, senderBalance, 1)
+    state.isValid(nonValid) shouldBe false
+  }
+
   test("generate 3 blocks with transaction and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(app.blockStorage.state.generationBalance(_)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 2)
 
     val h = maxHeight()
-    val tx = untilTimeout(1.minute){
+    val tx = untilTimeout(1.minute) {
       val t = genValidTransaction()
       app.transactionModule.packUnconfirmed().head.signature shouldBe t.signature
       UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 1
@@ -94,14 +102,17 @@ with TransactionTestingCommons {
 
   test("Double spending") {
     cleanTransactionPool()
-    accounts.foreach { a =>
+    val trans = accounts.flatMap { a =>
       val recepient = new PublicKeyAccount(Array.empty)
       val senderBalance = state.asInstanceOf[BalanceSheet].balance(a.address)
       (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
     }
-    val trans = UnconfirmedTransactionsDatabaseImpl.all()
-    trans.nonEmpty shouldBe true
+    val valid = transactionModule.packUnconfirmed()
+    valid.nonEmpty shouldBe true
+    valid.size should be < trans.size
+
     waitGenerationOfBlocks(2)
+
     accounts.foreach(a => state.asInstanceOf[BalanceSheet].balance(a.address) should be >= 0L)
     trans.exists(tx => state.included(tx).isDefined) shouldBe true // Some of transactions should be included in state
     trans.forall(tx => state.included(tx).isDefined) shouldBe false // But some should not
