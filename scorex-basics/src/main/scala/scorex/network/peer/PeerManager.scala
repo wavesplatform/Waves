@@ -39,7 +39,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   }
 
   //todo: combine AddKnownPeer & UpdatePeer?
-  private def peerLists: Receive = {
+  private def peerListOperations: Receive = {
     case AddKnownPeer(address) =>
       val peerInfo = PeerInfo(System.currentTimeMillis())
       peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
@@ -124,7 +124,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
           }
         }
       }
-  }: Receive) orElse peerLists orElse apiInterface orElse peerCycle
+  }: Receive) orElse peerListOperations orElse apiInterface orElse peerCycle
 }
 
 object PeerManager {
