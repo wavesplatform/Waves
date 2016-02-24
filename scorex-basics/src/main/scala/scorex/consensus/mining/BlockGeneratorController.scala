@@ -32,7 +32,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       context.become(generating)
 
     case GetStatus =>
-      sender() ! Syncing
+      sender() ! Syncing.name
 
     case m => log.info(s"Unhandled $m in Syncing")
 
@@ -49,7 +49,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       workers = workers.filter(w => w != worker)
 
     case GetStatus =>
-      sender() ! Generating
+      sender() ! Generating.name
 
     case CheckWorkers =>
       log.info(s"Check ${workers.size} miner")
