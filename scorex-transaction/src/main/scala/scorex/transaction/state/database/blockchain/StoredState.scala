@@ -62,6 +62,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   val HeightKey = "height"
   val DataKey = "dataset"
   val LastStates = "lastStates"
+  val IncludedTx = "includedTx"
 
   private val db = fileNameOpt match {
     case Some(fileName) =>
@@ -83,6 +84,11 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   val lastStates = db.hashMap[Address, Int](LastStates)
 
+  val includedTx: HTreeMap[Array[Byte], Int] = db.hashMapCreate(IncludedTx)
+    .keySerializer(Serializer.BYTE_ARRAY)
+    .valueSerializer(Serializer.INTEGER)
+    .makeOrGet()
+
   if (Option(db.atomicInteger(HeightKey).get()).isEmpty) db.atomicInteger(HeightKey).set(0)
 
   def stateHeight: Int = db.atomicInteger(HeightKey).get()
@@ -96,6 +102,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1)).getOrElse(0))
       accountChanges(ch._1).put(h, change)
       lastStates.put(ch._1, h)
+      ch._2._2.foreach(t => includedTx.put(t.signature, h))
     }
     db.commit()
   }
@@ -189,21 +196,8 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     }
   }
 
-  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = {
-    Option(lastStates.get(tx.recipient.address)).flatMap { lastChangeHeight =>
-      def loop(hh: Int): Option[Int] = if (hh > 0) {
-        val row = accountChanges(tx.recipient.address).get(hh)
-        if (heightOpt.isDefined && heightOpt.get < hh) loop(row.lastRowHeight)
-        else if (row.lastRowHeight > 0) {
-          val inCurrentChange = row.reason.filter(_.isInstanceOf[Transaction])
-            .exists(scr => scr.asInstanceOf[Transaction].signature sameElements tx.signature)
-          if (inCurrentChange) Some(hh)
-          else loop(row.lastRowHeight)
-        } else None
-      } else None
-      loop(lastChangeHeight)
-    }
-  }
+  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] =
+    Option(includedTx.get(tx.signature)).filter(_ < heightOpt.getOrElse(Int.MaxValue))
 
   //return seq of valid transactions
   @tailrec

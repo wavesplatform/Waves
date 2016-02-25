@@ -35,11 +35,6 @@ with TransactionTestingCommons {
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
   }
 
-  def includedTransactions(b: Block): Seq[Transaction] = {
-    if (b.transactions.isEmpty) includedTransactions(history.parent(b).get)
-    else b.transactions
-  }
-
   test("generate 3 blocks and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(app.blockStorage.state.generationBalance(_)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 2)
@@ -56,7 +51,7 @@ with TransactionTestingCommons {
   test("Don't include same transactions twice") {
     val last = history.lastBlock
     val h = history.heightOf(last).get
-    val incl = includedTransactions(last)
+    val incl = includedTransactions(last, history)
     require(incl.nonEmpty)
     waitGenerationOfBlocks(0) // all peer should contain common block
     peers.foreach { p =>

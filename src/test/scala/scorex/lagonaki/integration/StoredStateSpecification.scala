@@ -1,14 +1,14 @@
 package scorex.lagonaki.integration
 
-import org.scalatest.{BeforeAndAfterAll, Matchers, FunSuite}
-import scorex.lagonaki.TestingCommons._
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
 import scorex.transaction.BalanceSheet
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.ScorexLogging
 
 import scala.util.Random
 
-class StoredStateSpecification  extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
+class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
 with TransactionTestingCommons {
 
   import TestingCommons._
@@ -39,7 +39,7 @@ with TransactionTestingCommons {
   }
 
   test("validate plenty of transactions") {
-    val trans = (1 to 10000).map{ i =>
+    val trans = (1 to UnconfirmedTransactionsDatabaseImpl.SizeLimit).map { i =>
       val account = accounts(Random.nextInt(accounts.size))
       val senderBalance = state.asInstanceOf[BalanceSheet].balance(account.address)
       val amount = Random.nextLong() % senderBalance
@@ -48,7 +48,18 @@ with TransactionTestingCommons {
     }
     val st = System.currentTimeMillis()
     state.validate(trans).size should be <= trans.size
-    System.currentTimeMillis() - st should be <= 2000L
+    //TODO optimization
+//    System.currentTimeMillis() - st should be <= 2000L
+  }
+
+  test("included") {
+    val incl = includedTransactions(history.lastBlock, history)
+    incl.nonEmpty shouldBe true
+    incl.forall(t => state.included(t).isDefined) shouldBe true
+
+    val newTx = genValidTransaction()
+    state.included(newTx).isDefined shouldBe false
+
   }
 
 }

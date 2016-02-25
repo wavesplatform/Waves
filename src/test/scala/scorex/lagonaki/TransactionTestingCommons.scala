@@ -2,7 +2,7 @@ package scorex.lagonaki
 
 import scorex.block.Block
 import scorex.lagonaki.TestingCommons._
-import scorex.transaction.{BalanceSheet, GenesisTransaction, Transaction}
+import scorex.transaction.{History, BalanceSheet, GenesisTransaction, Transaction}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -49,6 +49,11 @@ trait TransactionTestingCommons {
       if (transactionModule.blockStorage.state.isValid(tx)) tx
       else genValidTransaction(randomAmnt)
     }
+  }
+
+  def includedTransactions(b: Block, history: History): Seq[Transaction] = {
+    if (b.transactions.isEmpty) includedTransactions(history.parent(b).get, history)
+    else b.transactions
   }
 
 }
