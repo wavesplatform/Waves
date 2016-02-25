@@ -211,20 +211,21 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     val height = heightOpt.getOrElse(stateHeight)
     val txs = trans.filter(t => included(t).isEmpty && isValid(t, height))
     val nb = calcNewBalances(txs, Map.empty)
-    val negativeBalance: Option[(Account, (AccState, Reason))] = nb.find(b => b._2._1.balance < 0)
-    negativeBalance match {
-      case Some(b) =>
-        val accTransactions = trans.filter(_.isInstanceOf[PaymentTransaction]).map(_.asInstanceOf[PaymentTransaction])
-          .filter(_.sender.address == b._1.address)
-        var sumBalance = b._2._1.balance
-        val toRemove: Seq[Transaction] = accTransactions.sortBy(- _.amount).takeWhile { t =>
-          val prevSum = sumBalance
-          sumBalance = sumBalance + t.amount + t.fee
-          prevSum < 0
-        }
-        validate(txs.filter(t => !toRemove.exists(tr => tr.signature sameElements t.signature)), Some(height))
-      case None => txs
+    val negativeBalances: Map[Account, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
+    val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
+      val accTransactions = trans.filter(_.isInstanceOf[PaymentTransaction]).map(_.asInstanceOf[PaymentTransaction])
+        .filter(_.sender.address == b._1.address)
+      var sumBalance = b._2._1.balance
+      accTransactions.sortBy(-_.amount).takeWhile { t =>
+        val prevSum = sumBalance
+        sumBalance = sumBalance + t.amount + t.fee
+        prevSum < 0
+      }
     }
+    val validTransactions = txs.filter(t => !toRemove.exists(tr => tr.signature sameElements t.signature))
+    if (validTransactions.size == txs.size) txs
+    else if(validTransactions.nonEmpty) validate(validTransactions, heightOpt)
+    else validTransactions
   }
 
   private def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
