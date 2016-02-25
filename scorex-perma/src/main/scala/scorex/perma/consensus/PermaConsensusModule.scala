@@ -111,9 +111,9 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         val segmentIds: Seq[DataSegmentIndex] = 1.to(PermaConstants.l).map(i => calculateIndex(account.publicKey, i - 1))
           .filterNot(authDataStorage.containsKey)
         if (segmentIds.nonEmpty) {
-          val blockMsg = Message(GetSegmentsMessageSpec, Right(segmentIds), None)
+          val msg = Message(GetSegmentsMessageSpec, Right(segmentIds), None)
           if (networkControllerOpt.isDefined) {
-            networkControllerOpt.get ! SendToNetwork(blockMsg, SendToRandom)
+            networkControllerOpt.get ! SendToNetwork(msg, SendToRandom)
           }
           log.warn(s"Failed to generate new ticket, ${segmentIds.length} segments required")
           throw new NotEnoughSegments(segmentIds)
@@ -202,10 +202,8 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   }
 
   //calculate index of i-th segment
-  private[consensus] def calculateIndex(pubKey: PublicKey, i: Int): Long = {
-    val h = Hash(pubKey ++ BigInt(i).toByteArray)
-    BigInt(1, h).mod(PermaConstants.n).toLong
-  }
+  private[consensus] def calculateIndex(pubKey: PublicKey, i: Int): Long =
+    BigInt(1, Hash(pubKey ++ BigInt(i).toByteArray)).mod(PermaConstants.n).toLong
 
   private val targetBuf = TrieMap[String, BigInt]()
 
