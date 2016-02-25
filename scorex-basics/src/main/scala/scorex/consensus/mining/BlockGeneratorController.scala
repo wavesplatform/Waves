@@ -15,7 +15,7 @@ import scala.util.Success
 class BlockGeneratorController(application: Application) extends Actor with ScorexLogging {
 
   val threads = application.settings.mininigThreads
-  val FailedGenerationDelay = 10.seconds
+  val FailedGenerationDelay: FiniteDuration = Math.max(10, application.settings.blockGenerationDelay.toSeconds).seconds
   implicit val timeout = Timeout(FailedGenerationDelay)
 
   var workers: Seq[ActorRef] = Seq.empty
@@ -53,6 +53,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
     case CheckWorkers =>
       log.info(s"Check ${workers.size} miner")
+      val incTime =
       workers.foreach { w =>
         (w ? GetLastGenerationTime) onComplete {
           case Success(LastGenerationTime(t)) if System.currentTimeMillis() - t < FailedGenerationDelay.toMillis =>
