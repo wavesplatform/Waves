@@ -40,20 +40,6 @@ with TransactionTestingCommons {
     else b.transactions
   }
 
-  test("state.validate()") {
-    val acc = accounts.head
-    val recepient = accounts.last
-    val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc.address)
-    senderBalance should be > 0L
-    val nonValid = transactionModule.createPayment(acc, recepient, senderBalance, 1)
-    state.isValid(nonValid) shouldBe false
-
-    val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recepient, senderBalance / 2, 1))
-    doubleSpending.foreach(t => state.isValid(t) shouldBe true)
-    state.isValid(doubleSpending) shouldBe false
-    state.validate(doubleSpending).size shouldBe 1
-  }
-
   test("generate 3 blocks and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(app.blockStorage.state.generationBalance(_)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 2)
