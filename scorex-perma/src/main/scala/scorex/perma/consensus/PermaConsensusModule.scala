@@ -88,12 +88,16 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         val target = calcTarget(parent)
         if (validate(keyPair._2, puz, target, ticket, rootHash)) {
           val timestamp = NTP.correctedTime()
-          log.info("Valid ticket generated, build block")
+          log.info("Build Block: Valid ticket generated")
+          val consData = PermaConsensusBlockData(target, puz, ticket)
+          log.info("Build Block: packed consensus data")
+          val transData = transactionModule.packUnconfirmed()
+          log.info("Build Block: packed transaction data")
           val blockTry = Try(Block.buildAndSign(Version,
             timestamp,
             parent.uniqueId,
-            PermaConsensusBlockData(target, puz, ticket),
-            transactionModule.packUnconfirmed(),
+            consData,
+            transData,
             account))
           blockTry.recoverWith {
             case e =>
