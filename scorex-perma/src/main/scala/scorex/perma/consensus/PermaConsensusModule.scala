@@ -202,10 +202,8 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   }
 
   //calculate index of i-th segment
-  private[consensus] def calculateIndex(pubKey: PublicKey, i: Int): Long = {
-    val h = Hash(pubKey ++ BigInt(i).toByteArray)
-    BigInt(1, h).mod(PermaConstants.n).toLong
-  }
+  private[consensus] def calculateIndex(pubKey: PublicKey, i: Int): Long =
+    BigInt(1, Hash(pubKey ++ BigInt(i).toByteArray)).mod(PermaConstants.n).toLong
 
   private val targetBuf = TrieMap[String, BigInt]()
 
