@@ -112,7 +112,9 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       val currentHeight = lastStates.get(key)
       if (currentHeight > rollbackTo) {
         val dataMap = accountChanges(key)
-        val prevHeight = dataMap.remove(currentHeight).lastRowHeight
+        val changes = dataMap.remove(currentHeight)
+        changes.reason.foreach(t => includedTx.remove(t.signature))
+        val prevHeight = changes.lastRowHeight
         lastStates.put(key, prevHeight)
         deleteNewer(key)
       }
