@@ -35,7 +35,9 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       sender() ! Syncing.name
 
     case CheckWorkers =>
+      log.info(s"Check miners: $workers vs ${context.children}")
       workers.foreach(w => w ! Stop)
+      context.children.foreach(w => w ! Stop)
 
     case StopGeneration =>
 
@@ -56,7 +58,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       sender() ! Generating.name
 
     case CheckWorkers =>
-      log.info(s"Check ${workers.size} miner")
+      log.info(s"Check $workers")
       val incTime =
         workers.foreach { w =>
           (w ? GetLastGenerationTime) onComplete {
@@ -76,7 +78,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
   }
 
   def newWorkers(count: Int): Seq[ActorRef] = (1 to count).map { i =>
-    context.watch(context.actorOf(Props(classOf[Miner], application), s"Worker-$i"))
+    context.watch(context.actorOf(Props(classOf[Miner], application), s"Worker-${System.currentTimeMillis()}-$i"))
   }
 }
 

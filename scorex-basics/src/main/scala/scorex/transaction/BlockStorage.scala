@@ -19,16 +19,19 @@ trait BlockStorage extends ScorexLogging {
 
   //Append block to current state
   def appendBlock(block: Block): Try[Unit] = BlockStorage.synchronized {
+    val st = System.currentTimeMillis()
     history.appendBlock(block).map { blocks =>
+      val app = System.currentTimeMillis()
       blocks foreach { b =>
-        state.processBlock(b) match{
+        state.processBlock(b) match {
           case Failure(e) =>
             log.error("Failed to apply block to state", e)
             removeAfter(block.referenceField.value)
             //TODO ???
             System.exit(1)
-
           case Success(m) =>
+            val cur = System.currentTimeMillis()
+            log.info(s"Block ${block.encodedId} appended in ${app - st} ms, processed in ${cur - app} ms")
         }
       }
     }
