@@ -37,8 +37,9 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
     case CheckWorkers =>
       workers.foreach(w => w ! Stop)
 
-    case m => log.info(s"Unhandled $m in Syncing")
+    case StopGeneration =>
 
+    case m => log.warn(s"Unhandled $m in Syncing")
   }
 
   def generating: Receive = {
@@ -57,29 +58,26 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
     case CheckWorkers =>
       log.info(s"Check ${workers.size} miner")
       val incTime =
-      workers.foreach { w =>
-        (w ? GetLastGenerationTime) onComplete {
-          case Success(LastGenerationTime(t)) if System.currentTimeMillis() - t < FailedGenerationDelay.toMillis =>
-            log.info(s"Miner $w works fine, last try was ${System.currentTimeMillis() - t} millis ago")
-          case Success(LastGenerationTime(t)) if System.currentTimeMillis() - t > FailedGenerationDelay.toMillis =>
-            log.warn(s"Miner $w don't generate blocks")
-            w ! GuessABlock
-          case m =>
-            log.warn(s"Restart miner $w: $m")
-            w ! Stop
+        workers.foreach { w =>
+          (w ? GetLastGenerationTime) onComplete {
+            case Success(LastGenerationTime(t)) if System.currentTimeMillis() - t < FailedGenerationDelay.toMillis =>
+              log.info(s"Miner $w works fine, last try was ${System.currentTimeMillis() - t} millis ago")
+            case Success(LastGenerationTime(t)) if System.currentTimeMillis() - t > FailedGenerationDelay.toMillis =>
+              log.warn(s"Miner $w don't generate blocks")
+              w ! GuessABlock
+            case m =>
+              log.warn(s"Restart miner $w: $m")
+              w ! Stop
+          }
         }
-      }
       if (threads - workers.size > 0) workers = workers ++ newWorkers(threads - workers.size)
 
     case m => log.info(s"Unhandled $m in Generating")
-
   }
 
   def newWorkers(count: Int): Seq[ActorRef] = (1 to count).map { i =>
     context.watch(context.actorOf(Props(classOf[Miner], application), s"Worker-$i"))
   }
-
-
 }
 
 object BlockGeneratorController {
@@ -103,5 +101,4 @@ object BlockGeneratorController {
   case object StopGeneration
 
   case object CheckWorkers
-
 }
