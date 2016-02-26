@@ -37,9 +37,8 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
   private lazy val blockGenerator = application.blockGenerator
 
-  //todo: make configurable
-  private val GettingExtensionTimeout = 10.seconds
-  private val GettingBlockTimeout = 10.seconds
+  private val GettingExtensionTimeout = application.settings.gettingExtensionTimeout
+  private val GettingBlockTimeout = application.settings.gettingBlockTimeout
 
   override def preStart: Unit = {
     super.preStart()
