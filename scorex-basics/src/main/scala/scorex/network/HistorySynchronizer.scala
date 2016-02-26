@@ -75,7 +75,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
 
       case SelfCheck =>
-        if(System.currentTimeMillis() - lastUpdate > GettingBlockTimeout.toMillis ) gotoSyncing()
+        if (System.currentTimeMillis() - lastUpdate > GettingBlockTimeout.toMillis) gotoSyncing()
 
       //the signal to initialize
       case Unit =>
@@ -143,7 +143,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
                 log.warn(s"Can't apply block: ${failedBlock.json}")
                 gotoSyncing()
               }
-              if(updBlocks.size > toProcess.size) gotoGettingBlocks(witnesses, updBlocks.drop(toProcess.length))
+              if (updBlocks.size > toProcess.size) gotoGettingBlocks(witnesses, updBlocks.drop(toProcess.length))
               else gotoSyncing()
             } else gotoGettingBlocks(witnesses, updBlocks)
         }
@@ -190,7 +190,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   }
 
   private def processNewBlock(block: Block, local: Boolean): Boolean = Try {
+    val st = System.currentTimeMillis()
     if (block.isValid) {
+      val ch = System.currentTimeMillis()
       log.info(s"New block(local: $local): ${block.json}")
 
       if (local) networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), Broadcast)
@@ -200,8 +202,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       transactionalModule.blockStorage.appendBlock(block) match {
         case Success(_) =>
           block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
+          val f = System.currentTimeMillis()
           log.info(
-            s"""After appending block(local: $local, parent: ${Base58.encode(block.referenceField.value)}):
+            s"""Block ${block.encodedId} checked in ${ch - st} and appended in ${f - ch}.
             (height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})""")
           true
         case Failure(e) =>

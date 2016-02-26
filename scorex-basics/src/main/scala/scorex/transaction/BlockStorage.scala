@@ -18,10 +18,8 @@ trait BlockStorage extends ScorexLogging {
   def state: LagonakiState
 
   //Append block to current state
-  def appendBlock(block: Block): Try[Unit] = BlockStorage.synchronized {
-    val st = System.currentTimeMillis()
+  def appendBlock(block: Block): Try[Unit] = synchronized {
     history.appendBlock(block).map { blocks =>
-      val app = System.currentTimeMillis()
       blocks foreach { b =>
         state.processBlock(b) match {
           case Failure(e) =>
@@ -30,8 +28,6 @@ trait BlockStorage extends ScorexLogging {
             //TODO ???
             System.exit(1)
           case Success(m) =>
-            val cur = System.currentTimeMillis()
-            log.info(s"Block ${block.encodedId} appended in ${app - st} ms, processed in ${cur - app} ms")
         }
       }
     }
