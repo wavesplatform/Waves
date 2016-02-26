@@ -40,6 +40,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   private val GettingExtensionTimeout = application.settings.gettingExtensionTimeout
   private val GettingBlockTimeout = application.settings.gettingBlockTimeout
 
+  var gotLastBlock = System.currentTimeMillis()
+  var gotLastExtensions = System.currentTimeMillis()
+
   override def preStart: Unit = {
     super.preStart()
     //todo: make configurable
@@ -76,7 +79,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       case Unit =>
 
       case nonsense: Any =>
-        log.warn(s"Got something strange: $nonsense")
+        log.warn(s"Got something strange in ${status.name}: $nonsense")
     }: Receive)
 
   def syncing: Receive = state(HistorySynchronizer.Syncing, {
@@ -135,6 +138,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
             val updBlocks = blocks.updated(idx, blockId -> Some(block))
             if (idx == 0) {
               val toProcess = updBlocks.takeWhile(_._2.isDefined).map(_._2.get)
+              log.info(s"Going to process ${toProcess.size} blocks")
               toProcess.find(bp => !processNewBlock(bp, local = false)).foreach { case failedBlock =>
                 log.warn(s"Can't apply block: ${failedBlock.json}")
                 gotoSyncing()

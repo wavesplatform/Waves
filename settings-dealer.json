@@ -14,7 +14,7 @@
   "rpcPort": 9081,
   "rpcAllowed": [],
   "maxRollback": 100,
-  "offlineGeneration": true,
+  "offlineGeneration": false,
   "perma": {
     "isTrustedDealer": true,
     "treeDir": "/opt/scorex/data/tree",
