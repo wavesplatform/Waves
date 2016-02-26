@@ -37,11 +37,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
   private lazy val blockGenerator = application.blockGenerator
 
-  private val GettingExtensionTimeout = application.settings.gettingExtensionTimeout
-  private val GettingBlockTimeout = application.settings.gettingBlockTimeout
+  private val GettingBlockTimeout = application.settings.historySynchronizerTimeout
 
-  var gotLastBlock = System.currentTimeMillis()
-  var gotLastExtensions = System.currentTimeMillis()
+  var lastUpdate = System.currentTimeMillis()
 
   override def preStart: Unit = {
     super.preStart()
@@ -50,6 +48,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       val msg = Message(ScoreMessageSpec, Right(history.score()), None)
       networkControllerRef ! NetworkController.SendToNetwork(msg, SendToRandom)
     }
+
+    context.system.scheduler.schedule(GettingBlockTimeout, GettingBlockTimeout, self, SelfCheck)
+
   }
 
   override def receive: Receive =
@@ -73,7 +74,8 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         log.info("Got no score from outer world")
         if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
 
-      case _: FiniteDuration =>
+      case SelfCheck =>
+        if(System.currentTimeMillis() - lastUpdate > GettingBlockTimeout.toMillis ) gotoSyncing()
 
       //the signal to initialize
       case Unit =>
@@ -95,14 +97,13 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   }: Receive)
 
   def gettingExtension(betterScore: BigInt, witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingExtension, {
-    case GettingExtensionTimeout => gotoSyncing()
-
     //todo: aggregating function for block ids (like score has)
     case DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, connectedPeer)
       if msgId == SignaturesSpec.messageCode &&
         blockIds.cast[Seq[Block.BlockId]].isDefined &&
         witnesses.contains(connectedPeer) => //todo: ban if non-expected sender
 
+      lastUpdate = System.currentTimeMillis()
       val common = blockIds.head
       log.debug(s"Got blockIds: ${blockIds.map(id => Base58.encode(id))}")
 
@@ -123,12 +124,11 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
   def gettingBlocks(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive =
     state(HistorySynchronizer.GettingBlock, {
-      case GettingBlockTimeout =>
-        gotoSyncing()
 
       case DataFromPeer(msgId, block: Block@unchecked, connectedPeer)
         if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
 
+        lastUpdate = System.currentTimeMillis()
         val blockId = block.uniqueId
         log.info("Got block: " + block.encodedId)
 
@@ -173,13 +173,11 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   private def gotoGettingExtension(betterScore: BigInt, witnesses: Seq[ConnectedPeer]): Unit = {
     log.debug("Transition to gettingExtension")
     blockGenerator ! StopGeneration
-    context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
     context become gettingExtension(betterScore, witnesses)
   }
 
   private def gotoGettingBlocks(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive = {
     log.debug("Transition to gettingBlocks")
-    context.system.scheduler.scheduleOnce(GettingBlockTimeout)(self ! GettingBlockTimeout)
     context become gettingBlocks(witnesses, blocks)
     gettingBlocks(witnesses, blocks)
   }
@@ -243,5 +241,7 @@ object HistorySynchronizer {
   case class CheckBlock(id: BlockId)
 
   case object GetStatus
+
+  case object SelfCheck
 
 }

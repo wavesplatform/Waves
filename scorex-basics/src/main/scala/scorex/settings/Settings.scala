@@ -74,10 +74,8 @@ trait Settings extends ScorexLogging {
   lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcAllowed").asOpt[List[String]].getOrElse(DefaultRpcAllowed.split(""))
 
   lazy val offlineGeneration = (settingsJSON \ "offlineGeneration").asOpt[Boolean].getOrElse(false)
-  lazy val gettingExtensionTimeout: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Int]
-    .map(x => x.seconds).getOrElse(DefaultGettingExtensionTimeout)
-  lazy val gettingBlockTimeout: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Int]
-    .map(x => x.seconds).getOrElse(DefaultGettingBlockTimeout)
+  lazy val historySynchronizerTimeout: FiniteDuration = (settingsJSON \ "historySynchronizerTimeout").asOpt[Int]
+    .map(x => x.seconds).getOrElse(DefaultHistorySynchronizerTimeout)
 
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)
@@ -105,7 +103,6 @@ trait Settings extends ScorexLogging {
   private val DefaultRpcAllowed = "127.0.0.1"
 
   private val DefaultBlockGenerationDelay: FiniteDuration = 1.second
-  private val DefaultGettingExtensionTimeout: FiniteDuration = 30.seconds
-  private val DefaultGettingBlockTimeout: FiniteDuration = 30.seconds
+  private val DefaultHistorySynchronizerTimeout: FiniteDuration = 30.seconds
   private val DefaultMiningThreads: Int = 1
 }
