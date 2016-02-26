@@ -34,6 +34,9 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
     case GetStatus =>
       sender() ! Syncing.name
 
+    case CheckWorkers =>
+      workers.foreach(w => w ! Stop)
+
     case m => log.info(s"Unhandled $m in Syncing")
 
   }
