@@ -51,7 +51,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
 
     def heightOf(id: BlockId): Option[Int] = signatures.find(_._2.sameElements(id)).map(_._1)
 
-    def score(): BlockchainScore = scoreMap.get(height())
+    def score(): BlockchainScore = if (height() > 0) scoreMap.get(height()) else 0
 
   }
 
