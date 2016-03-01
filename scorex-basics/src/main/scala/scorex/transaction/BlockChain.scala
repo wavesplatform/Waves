@@ -28,12 +28,5 @@ trait BlockChain extends History with ScorexLogging {
 
   def children(block: Block): Seq[Block]
 
-  def score(): BlockchainScore =
-    (1 to height()).foldLeft(0: BigInt) { case (sc, h) =>
-      sc + blockAt(h).map { bl: Block =>
-        bl.consensusModule.blockScore(bl)(bl.transactionModule)
-      }.getOrElse(0: BigInt)
-    }
-
   override lazy val genesis: Block = blockAt(1).get
 }

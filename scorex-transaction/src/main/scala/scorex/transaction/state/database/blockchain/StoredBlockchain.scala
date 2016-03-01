@@ -6,6 +6,7 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
 import scorex.transaction.BlockStorage._
+import scorex.transaction.History.BlockchainScore
 import scorex.transaction.{BlockChain, TransactionModule}
 import scorex.utils.ScorexLogging
 
@@ -23,12 +24,14 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   case class BlockchainPersistence(database: DB) {
     val blocks = database.treeMap[Int, Array[Byte]]("blocks")
     val signatures = database.treeMap[Int, BlockId]("signatures")
+    val scoreMap = database.treeMap[Int, BigInt]("score")
 
     //if there are some uncommited changes from last run, discard'em
     if (signatures.size() > 0) database.rollback()
 
     def writeBlock(height: Int, block: Block): Try[Unit] = Try {
       blocks.put(height, block.bytes)
+      scoreMap.put(height, score() + block.consensusModule.blockScore(block)(block.transactionModule))
       signatures.put(height, block.uniqueId)
       database.commit()
     }
@@ -47,6 +50,8 @@ class StoredBlockchain(dataFolderOpt: Option[String])
     def height(): Int = signatures.size()
 
     def heightOf(id: BlockId): Option[Int] = signatures.find(_._2.sameElements(id)).map(_._1)
+
+    def score(): BlockchainScore = if (height() > 0) scoreMap.get(height()) else 0
 
   }
 
@@ -116,6 +121,8 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   override def contains(signature: Array[Byte]): Boolean = blockStorage.contains(signature)
 
   override def height(): Int = blockStorage.height()
+
+  override def score(): BlockchainScore = blockStorage.score()
 
   override def heightOf(blockSignature: Array[Byte]): Option[Int] = blockStorage.heightOf(blockSignature)
 

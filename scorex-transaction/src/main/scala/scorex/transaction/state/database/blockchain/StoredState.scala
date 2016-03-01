@@ -62,6 +62,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   val HeightKey = "height"
   val DataKey = "dataset"
   val LastStates = "lastStates"
+  val IncludedTx = "includedTx"
 
   private val db = fileNameOpt match {
     case Some(fileName) =>
@@ -83,6 +84,11 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   val lastStates = db.hashMap[Address, Int](LastStates)
 
+  val includedTx: HTreeMap[Array[Byte], Int] = db.hashMapCreate(IncludedTx)
+    .keySerializer(Serializer.BYTE_ARRAY)
+    .valueSerializer(Serializer.INTEGER)
+    .makeOrGet()
+
   if (Option(db.atomicInteger(HeightKey).get()).isEmpty) db.atomicInteger(HeightKey).set(0)
 
   def stateHeight: Int = db.atomicInteger(HeightKey).get()
@@ -96,6 +102,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1)).getOrElse(0))
       accountChanges(ch._1).put(h, change)
       lastStates.put(ch._1, h)
+      ch._2._2.foreach(t => includedTx.put(t.signature, h))
     }
     db.commit()
   }
@@ -105,7 +112,9 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       val currentHeight = lastStates.get(key)
       if (currentHeight > rollbackTo) {
         val dataMap = accountChanges(key)
-        val prevHeight = dataMap.remove(currentHeight).lastRowHeight
+        val changes = dataMap.remove(currentHeight)
+        changes.reason.foreach(t => includedTx.remove(t.signature))
+        val prevHeight = changes.lastRowHeight
         lastStates.put(key, prevHeight)
         deleteNewer(key)
       }
@@ -189,21 +198,8 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     }
   }
 
-  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = {
-    Option(lastStates.get(tx.recipient.address)).flatMap { lastChangeHeight =>
-      def loop(hh: Int): Option[Int] = if (hh > 0) {
-        val row = accountChanges(tx.recipient.address).get(hh)
-        if (heightOpt.isDefined && heightOpt.get < hh) loop(row.lastRowHeight)
-        else if (row.lastRowHeight > 0) {
-          val inCurrentChange = row.reason.filter(_.isInstanceOf[Transaction])
-            .exists(scr => scr.asInstanceOf[Transaction].signature sameElements tx.signature)
-          if (inCurrentChange) Some(hh)
-          else loop(row.lastRowHeight)
-        } else None
-      } else None
-      loop(lastChangeHeight)
-    }
-  }
+  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] =
+    Option(includedTx.get(tx.signature)).filter(_ < heightOpt.getOrElse(Int.MaxValue))
 
   //return seq of valid transactions
   @tailrec
@@ -211,19 +207,21 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     val height = heightOpt.getOrElse(stateHeight)
     val txs = trans.filter(t => included(t).isEmpty && isValid(t, height))
     val nb = calcNewBalances(txs, Map.empty)
-    val negativeBalance: Option[(Account, (AccState, Reason))] = nb.find(b => b._2._1.balance < 0)
-    negativeBalance match {
-      case Some(b) =>
-        val accTransactions = trans.filter(_.isInstanceOf[PaymentTransaction]).map(_.asInstanceOf[PaymentTransaction])
-          .filter(_.sender.address == b._1.address)
-        var sumBalance = 0L
-        val toRemove: Seq[Transaction] = accTransactions.sortBy(- _.fee).takeWhile { t =>
-          sumBalance = sumBalance - t.amount
-          sumBalance + b._2._1.balance > 0
-        }
-        validate(txs.intersect(toRemove), Some(height))
-      case None => txs
+    val negativeBalances: Map[Account, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
+    val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
+      val accTransactions = trans.filter(_.isInstanceOf[PaymentTransaction]).map(_.asInstanceOf[PaymentTransaction])
+        .filter(_.sender.address == b._1.address)
+      var sumBalance = b._2._1.balance
+      accTransactions.sortBy(-_.amount).takeWhile { t =>
+        val prevSum = sumBalance
+        sumBalance = sumBalance + t.amount + t.fee
+        prevSum < 0
+      }
     }
+    val validTransactions = txs.filter(t => !toRemove.exists(tr => tr.signature sameElements t.signature))
+    if (validTransactions.size == txs.size) txs
+    else if(validTransactions.nonEmpty) validate(validTransactions, heightOpt)
+    else validTransactions
   }
 
   private def isValid(transaction: Transaction, height: Int): Boolean = transaction match {

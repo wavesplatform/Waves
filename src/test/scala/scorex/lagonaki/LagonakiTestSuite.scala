@@ -3,7 +3,6 @@ package scorex.lagonaki
 import org.scalatest.{BeforeAndAfterAll, Suites}
 import scorex.lagonaki.TestingCommons._
 import scorex.lagonaki.integration._
-import scorex.lagonaki.props.BlockStorageSpecification
 import scorex.lagonaki.unit._
 import scorex.transaction.state.database.blockchain.BlockTreeSpecification
 

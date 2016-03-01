@@ -2,7 +2,7 @@ package scorex.storage
 
 import java.io.File
 
-import org.mapdb.{DBMaker, HTreeMap}
+import org.mapdb.{DB, DBMaker, HTreeMap}
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
@@ -12,10 +12,11 @@ import scala.util.{Failure, Success, Try}
   */
 class MapDBStorage[Key, Value](fileName: String) extends Storage[Key, Value] with ScorexLogging {
 
-  protected val db = DBMaker.appendFileDB(new File(fileName))
+  protected val db:DB = DBMaker.appendFileDB(new File(fileName))
     .fileMmapEnableIfSupported()
     .closeOnJvmShutdown()
     .checksumEnable()
+    .transactionDisable()
     .make()
 
   protected val map: HTreeMap[Key, Value] = db.hashMapCreate("map").makeOrGet()

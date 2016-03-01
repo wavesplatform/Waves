@@ -1,24 +1,26 @@
 package scorex.consensus.mining
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorLogging}
 import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.mining.Miner._
-import scorex.utils.ScorexLogging
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Try}
 
-class Miner(application: Application) extends Actor with ScorexLogging {
+class Miner(application: Application) extends Actor with ActorLogging {
 
   // BlockGenerator is trying to generate a new block every $blockGenerationDelay. Should be 0 for PoW consensus model.
   val blockGenerationDelay = application.settings.blockGenerationDelay
+  val BlockGenerationTimeLimit = 5.seconds
+
   var lastTryTime = System.currentTimeMillis()
   var stopped = false
 
   private def scheduleAGuess(delay: Option[FiniteDuration] = None): Unit =
-    if (!stopped) context.system.scheduler.scheduleOnce(delay.getOrElse(blockGenerationDelay), self, GuessABlock)
+    context.system.scheduler.scheduleOnce(delay.getOrElse(blockGenerationDelay), self, GuessABlock)
 
   scheduleAGuess(Some(0.millis))
 
@@ -34,22 +36,20 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       stopped = true
   }
 
-  def tryToGenerateABlock(): Unit = {
+  def tryToGenerateABlock(): Unit = Try {
     implicit val transactionalModule = application.transactionModule
-    lastTryTime = System.currentTimeMillis()
 
     if (blockGenerationDelay > 500.milliseconds) log.info("Trying to generate a new block")
     val accounts = application.wallet.privateKeyAccounts()
-    application.consensusModule.generateNextBlocks(accounts)(application.transactionModule) onComplete {
-      case Success(blocks: Seq[Block]) =>
-        if (blocks.nonEmpty) {
-          val bestBlock = blocks.maxBy(application.consensusModule.blockScore)
-          application.historySynchronizer ! bestBlock
-        }
-        scheduleAGuess()
-      case Failure(ex) =>
-        log.error(s"Failed to generate new block: ${ex.getMessage}")
-    }
+    val blocksFuture = application.consensusModule.generateNextBlocks(accounts)(application.transactionModule)
+    val blocks: Seq[Block] = Await.result(blocksFuture, BlockGenerationTimeLimit)
+    if (blocks.nonEmpty) application.historySynchronizer ! blocks.maxBy(application.consensusModule.blockScore)
+    if(System.currentTimeMillis() - lastTryTime >= blockGenerationDelay.toMillis && !stopped) scheduleAGuess()
+    lastTryTime = System.currentTimeMillis()
+  }.recoverWith {
+    case ex =>
+      log.error(s"Failed to generate new block: ${ex.getMessage}")
+      Failure(ex)
   }
 
 }

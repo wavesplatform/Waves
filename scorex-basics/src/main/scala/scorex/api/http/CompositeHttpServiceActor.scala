@@ -1,6 +1,6 @@
 package scorex.api.http
 
-import akka.actor.{ActorRefFactory, Actor}
+import akka.actor.{Actor, ActorRefFactory}
 import spray.routing.HttpService
 
 import scala.reflect.runtime.universe.Type

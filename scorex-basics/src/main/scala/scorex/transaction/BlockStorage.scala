@@ -18,16 +18,15 @@ trait BlockStorage extends ScorexLogging {
   def state: LagonakiState
 
   //Append block to current state
-  def appendBlock(block: Block): Try[Unit] = BlockStorage.synchronized {
+  def appendBlock(block: Block): Try[Unit] = synchronized {
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
-        state.processBlock(b) match{
+        state.processBlock(b) match {
           case Failure(e) =>
             log.error("Failed to apply block to state", e)
             removeAfter(block.referenceField.value)
             //TODO ???
             System.exit(1)
-
           case Success(m) =>
         }
       }

@@ -1,18 +1,13 @@
 package scorex.lagonaki.unit
 
 import org.scalatest.{FunSuite, Matchers}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
 import scorex.consensus.qora.{QoraLikeConsensusBlockData, QoraLikeConsensusModule}
 import scorex.lagonaki.TestingCommons
-import scorex.lagonaki.TestingCommons._
-import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import scala.util.Random
 
 class BlockSpecification extends FunSuite with Matchers with TestingCommons {

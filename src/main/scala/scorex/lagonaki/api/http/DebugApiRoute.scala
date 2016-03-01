@@ -20,7 +20,7 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
   lazy val wallet = application.wallet
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateAt
+    blocks ~ state ~ stateAt ~ info ~ settings
   }
 
   @Path("/blocks/{howMany}")
@@ -57,6 +57,19 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
     }
   }
 
+  @Path("/state/{height}")
+  @ApiOperation(value = "State at block", notes = "Get state at specified height", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "Int", paramType = "path")
+  ))
+  def stateAt: Route = {
+    path("state" / IntNumber) { case height =>
+      jsonRoute {
+        application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)).toString
+      }
+    }
+  }
+
   @Path("/info")
   @ApiOperation(value = "State", notes = "All info you need to debug", httpMethod = "GET")
   @ApiResponses(Array(
@@ -74,15 +87,15 @@ case class DebugApiRoute(application: Application)(implicit val context: ActorRe
     }
   }
 
-  @Path("/state/{height}")
-  @ApiOperation(value = "State at block", notes = "Get state at specified height", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "Int", paramType = "path")
+  @Path("/settings")
+  @ApiOperation(value = "State", notes = "Settings file", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
   ))
-  def stateAt: Route = {
-    path("state" / IntNumber) { case height =>
+  def settings: Route = {
+    path("settings") {
       jsonRoute {
-        application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)).toString
+        application.settings.settingsJSON.toString()
       }
     }
   }

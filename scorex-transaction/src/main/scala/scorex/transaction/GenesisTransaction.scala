@@ -3,8 +3,8 @@ package scorex.transaction
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Account
-import scorex.crypto.hash.FastCryptographicHash._
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction.LagonakiTransaction.TransactionType
 
 
