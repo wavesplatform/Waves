@@ -11,3 +11,8 @@ Download deb package from [releases](https://github.com/ScorexProject/PermaScore
 # Other system
 
 Compile code and run your node by typing `sbt start` 
+
+
+# Create package
+
+For now it's on;y possible to create deb package with `sbt debian:packageBin` command
