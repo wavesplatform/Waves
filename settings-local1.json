@@ -23,7 +23,7 @@
   "maxRollback": 100,
   "offlineGeneration": true,
   "perma": {
-    "treeDir": "/tmp/scorex/data1/tree",
+    "treeDir": "/tmp/scorex/data1/tree/",
     "authDataStorage": "authDataStorage1.mapDB",
     "isTrustedDealer": true
   },
