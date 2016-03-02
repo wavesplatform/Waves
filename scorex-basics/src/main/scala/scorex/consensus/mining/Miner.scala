@@ -16,7 +16,7 @@ class Miner(application: Application) extends Actor with ActorLogging {
   val blockGenerationDelay = application.settings.blockGenerationDelay
   val BlockGenerationTimeLimit = 5.seconds
 
-  var lastTryTime = System.currentTimeMillis()
+  var lastTryTime = 0L
   var stopped = false
 
   private def scheduleAGuess(delay: Option[FiniteDuration] = None): Unit =
@@ -27,7 +27,7 @@ class Miner(application: Application) extends Actor with ActorLogging {
   override def receive: Receive = {
     case GuessABlock =>
       stopped = false
-      tryToGenerateABlock()
+      if (System.currentTimeMillis() - lastTryTime >= blockGenerationDelay.toMillis) tryToGenerateABlock()
 
     case GetLastGenerationTime =>
       sender ! LastGenerationTime(lastTryTime)
@@ -39,13 +39,13 @@ class Miner(application: Application) extends Actor with ActorLogging {
   def tryToGenerateABlock(): Unit = Try {
     implicit val transactionalModule = application.transactionModule
 
+    lastTryTime = System.currentTimeMillis()
     if (blockGenerationDelay > 500.milliseconds) log.info("Trying to generate a new block")
     val accounts = application.wallet.privateKeyAccounts()
     val blocksFuture = application.consensusModule.generateNextBlocks(accounts)(application.transactionModule)
     val blocks: Seq[Block] = Await.result(blocksFuture, BlockGenerationTimeLimit)
     if (blocks.nonEmpty) application.historySynchronizer ! blocks.maxBy(application.consensusModule.blockScore)
-    if(System.currentTimeMillis() - lastTryTime >= blockGenerationDelay.toMillis && !stopped) scheduleAGuess()
-    lastTryTime = System.currentTimeMillis()
+    if (!stopped) scheduleAGuess()
   }.recoverWith {
     case ex =>
       log.error(s"Failed to generate new block: ${ex.getMessage}")
