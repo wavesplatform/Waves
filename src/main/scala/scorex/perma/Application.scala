@@ -1,5 +1,7 @@
 package scorex.perma
 
+import java.io.File
+
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
 import scorex.api.http._
@@ -15,7 +17,6 @@ import scorex.perma.settings.PermaConstants._
 import scorex.perma.storage.AuthDataStorage
 import scorex.storage.Storage
 import scorex.transaction.SimpleTransactionModule
-import scorex.transaction.state.database.blockchain.HistoryScavenger
 import scorex.utils.ScorexLogging
 
 import scala.reflect.runtime.universe._
@@ -30,7 +31,6 @@ object Application extends App with ScorexLogging {
 
   log.debug("PermaScorex has been started")
   application.run()
-  require(application.blockStorage.state(application.blockStorage.history.lastBlock.uniqueId).isDefined)
 
   if (application.wallet.privateKeyAccounts().isEmpty) application.wallet.generateNewAccounts(1)
 
@@ -51,6 +51,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
   override implicit lazy val settings = new LagonakiSettings(settingsFilename)
 
   override implicit lazy val consensusModule = {
+    new File(settings.treeDir).mkdirs()
     val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
     val rootHash = settings.rootHash
     actorSystem.actorOf(Props(classOf[SegmentsSynchronizer], this, rootHash, authDataStorage))
@@ -96,6 +97,5 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
   require(transactionModule.accountWatchingSupport)
 
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], this))
-  actorSystem.actorOf(Props(classOf[HistoryScavenger], blockStorage))
 
 }
