@@ -88,13 +88,22 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         val target = calcTarget(parent)
         if (validate(keyPair._2, puz, target, ticket, rootHash)) {
           val timestamp = NTP.correctedTime()
-          val consensusData = PermaConsensusBlockData(target, puz, ticket)
-          Some(Block.buildAndSign(Version,
+          log.info("Build Block: Valid ticket generated")
+          val consData = PermaConsensusBlockData(target, puz, ticket)
+          log.info("Build Block: packed consensus data")
+          val transData = transactionModule.packUnconfirmed()
+          log.info("Build Block: packed transaction data")
+          val blockTry = Try(Block.buildAndSign(Version,
             timestamp,
             parent.uniqueId,
-            consensusData,
-            transactionModule.packUnconfirmed(),
+            consData,
+            transData,
             account))
+          blockTry.recoverWith {
+            case e =>
+              log.error("Failed to build block:", e)
+              Failure(e)
+          }.toOption
         } else {
           None
         }
@@ -102,9 +111,9 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
         val segmentIds: Seq[DataSegmentIndex] = 1.to(PermaConstants.l).map(i => calculateIndex(account.publicKey, i - 1))
           .filterNot(authDataStorage.containsKey)
         if (segmentIds.nonEmpty) {
-          val blockMsg = Message(GetSegmentsMessageSpec, Right(segmentIds), None)
+          val msg = Message(GetSegmentsMessageSpec, Right(segmentIds), None)
           if (networkControllerOpt.isDefined) {
-            networkControllerOpt.get ! SendToNetwork(blockMsg, SendToRandom)
+            networkControllerOpt.get ! SendToNetwork(msg, SendToRandom)
           }
           log.warn(s"Failed to generate new ticket, ${segmentIds.length} segments required")
           throw new NotEnoughSegments(segmentIds)
@@ -133,7 +142,7 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   /**
     * Puzzle to a new generate block on top of $block
     */
-  def generatePuz(block: Block): Digest = Hash(block.uniqueId)
+  def generatePuz(block: Block): Digest = Hash(consensusBlockData(block).puz ++ consensusBlockData(block).ticket.s)
 
   private val NoSig = Array[Byte]()
 
@@ -193,10 +202,8 @@ class PermaConsensusModule(rootHash: Array[Byte], networkControllerOpt: Option[A
   }
 
   //calculate index of i-th segment
-  private[consensus] def calculateIndex(pubKey: PublicKey, i: Int): Long = {
-    val h = Hash(pubKey ++ BigInt(i).toByteArray)
-    BigInt(1, h).mod(PermaConstants.n).toLong
-  }
+  private[consensus] def calculateIndex(pubKey: PublicKey, i: Int): Long =
+    BigInt(1, Hash(pubKey ++ BigInt(i).toByteArray)).mod(PermaConstants.n).toLong
 
   private val targetBuf = TrieMap[String, BigInt]()
 

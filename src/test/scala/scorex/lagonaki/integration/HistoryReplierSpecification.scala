@@ -1,7 +1,7 @@
 package scorex.lagonaki.integration
 
-import akka.actor.{Props, ActorSystem}
-import akka.testkit.{TestProbe, ImplicitSender, TestKit}
+import akka.actor.{ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import org.scalatest.{Matchers, WordSpecLike}
 import scorex.lagonaki.TestingCommons
 import scorex.network.HistorySynchronizer

@@ -5,8 +5,9 @@ import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.{ValidationResult, _}
-import scala.util.Try
+
 import scala.concurrent.duration._
+import scala.util.Try
 
 
 abstract class LagonakiTransaction(val transactionType: TransactionType.Value,

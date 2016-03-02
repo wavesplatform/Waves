@@ -1,10 +1,12 @@
 package scorex.network.message
 
 import java.nio.ByteBuffer
+
 import scorex.crypto.hash.FastCryptographicHash
+import scorex.crypto.hash.FastCryptographicHash._
 import scorex.network.ConnectedPeer
+
 import scala.util.Try
-import FastCryptographicHash._
 
 case class MessageHandler(specs: Seq[MessageSpec[_]]) {
 

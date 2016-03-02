@@ -12,7 +12,6 @@ trait Transaction extends StateChangeReason {
   val fee: Long
 
   val timestamp: Long
-  val signature: Array[Byte]
   val recipient: Account
 
   /**

@@ -55,6 +55,7 @@ case class PeerConnectionHandler(application: Application,
       //connection ! Close
 
       connection ! ResumeReading
+      connection ! ResumeWriting
 
     case cc: ConnectionClosed =>
       peerManager ! PeerManager.Disconnected(remote)

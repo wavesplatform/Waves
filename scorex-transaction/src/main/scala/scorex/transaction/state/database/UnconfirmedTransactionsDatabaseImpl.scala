@@ -10,7 +10,7 @@ import scala.collection.concurrent.TrieMap
 object UnconfirmedTransactionsDatabaseImpl extends UnconfirmedTransactionsDatabase with ScorexLogging {
 
   //TODO move to config
-  private val SizeLimit = 10000
+  val SizeLimit = 1000
 
   val transactions = TrieMap[Long, Transaction]()
 

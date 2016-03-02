@@ -4,8 +4,8 @@ import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json._
 import scorex.crypto.ads.merkle.TreeStorage.Position
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.{FastCryptographicHash, CryptographicHash}
 import scorex.crypto.hash.CryptographicHash._
+import scorex.crypto.hash.{CryptographicHash, FastCryptographicHash}
 
 import scala.annotation.tailrec
 import scala.util.Try

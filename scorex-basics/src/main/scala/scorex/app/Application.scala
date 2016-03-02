@@ -5,6 +5,7 @@ import akka.io.IO
 import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
+import scorex.consensus.mining.BlockGeneratorController
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
@@ -51,7 +52,7 @@ trait Application extends ScorexLogging {
   lazy val peerManager = actorSystem.actorOf(Props(classOf[PeerManager], this))
 
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this), "networkController")
-  lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGenerator], this), "blockGenerator")
+  lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], this), "blockGenerator")
 
   //wallet
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))

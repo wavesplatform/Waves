@@ -4,9 +4,10 @@ import akka.actor.Props
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.consensus.mining.BlockGeneratorController._
 import scorex.crypto.encode.Base58
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
-import scorex.network.ScoreObserver.{GetScore, ConsideredValue, UpdateScore}
+import scorex.network.ScoreObserver.{ConsideredValue, GetScore, UpdateScore}
 import scorex.network.message.Message
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
@@ -36,9 +37,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
   private lazy val blockGenerator = application.blockGenerator
 
-  //todo: make configurable
-  private val GettingExtensionTimeout = 10.seconds
-  private val GettingBlockTimeout = 10.seconds
+  private val GettingBlockTimeout = application.settings.historySynchronizerTimeout
+
+  var lastUpdate = System.currentTimeMillis()
 
   override def preStart: Unit = {
     super.preStart()
@@ -47,6 +48,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       val msg = Message(ScoreMessageSpec, Right(history.score()), None)
       networkControllerRef ! NetworkController.SendToNetwork(msg, SendToRandom)
     }
+
+    context.system.scheduler.schedule(GettingBlockTimeout, GettingBlockTimeout, self, SelfCheck)
+
   }
 
   override def receive: Receive =
@@ -70,13 +74,14 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         log.info("Got no score from outer world")
         if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
 
-      case _: FiniteDuration =>
+      case SelfCheck =>
+        if (System.currentTimeMillis() - lastUpdate > GettingBlockTimeout.toMillis) gotoSyncing()
 
       //the signal to initialize
       case Unit =>
 
       case nonsense: Any =>
-        log.warn(s"Got something strange: $nonsense")
+        log.warn(s"Got something strange in ${status.name}: $nonsense")
     }: Receive)
 
   def syncing: Receive = state(HistorySynchronizer.Syncing, {
@@ -92,14 +97,13 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   }: Receive)
 
   def gettingExtension(betterScore: BigInt, witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingExtension, {
-    case GettingExtensionTimeout => gotoSyncing()
-
     //todo: aggregating function for block ids (like score has)
     case DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, connectedPeer)
       if msgId == SignaturesSpec.messageCode &&
         blockIds.cast[Seq[Block.BlockId]].isDefined &&
         witnesses.contains(connectedPeer) => //todo: ban if non-expected sender
 
+      lastUpdate = System.currentTimeMillis()
       val common = blockIds.head
       log.debug(s"Got blockIds: ${blockIds.map(id => Base58.encode(id))}")
 
@@ -120,12 +124,11 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
 
   def gettingBlocks(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive =
     state(HistorySynchronizer.GettingBlock, {
-      case GettingBlockTimeout =>
-        gotoSyncing()
 
       case DataFromPeer(msgId, block: Block@unchecked, connectedPeer)
         if msgId == BlockMessageSpec.messageCode && block.cast[Block].isDefined =>
 
+        lastUpdate = System.currentTimeMillis()
         val blockId = block.uniqueId
         log.info("Got block: " + block.encodedId)
 
@@ -135,11 +138,13 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
             val updBlocks = blocks.updated(idx, blockId -> Some(block))
             if (idx == 0) {
               val toProcess = updBlocks.takeWhile(_._2.isDefined).map(_._2.get)
+              log.info(s"Going to process ${toProcess.size} blocks")
               toProcess.find(bp => !processNewBlock(bp, local = false)).foreach { case failedBlock =>
                 log.warn(s"Can't apply block: ${failedBlock.json}")
                 gotoSyncing()
               }
-              gotoGettingBlocks(witnesses, updBlocks.drop(toProcess.length))
+              if (updBlocks.size > toProcess.size) gotoGettingBlocks(witnesses, updBlocks.drop(toProcess.length))
+              else gotoSyncing()
             } else gotoGettingBlocks(witnesses, updBlocks)
         }
     }: Receive)
@@ -161,27 +166,25 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
     log.debug("Transition to syncing")
     context become syncing
     scoreObserver ! GetScore
-    blockGenerator ! BlockGenerator.StopGeneration
+    blockGenerator ! StopGeneration
     syncing
   }
 
   private def gotoGettingExtension(betterScore: BigInt, witnesses: Seq[ConnectedPeer]): Unit = {
     log.debug("Transition to gettingExtension")
-    blockGenerator ! BlockGenerator.StopGeneration
-    context.system.scheduler.scheduleOnce(GettingExtensionTimeout)(self ! GettingExtensionTimeout)
+    blockGenerator ! StopGeneration
     context become gettingExtension(betterScore, witnesses)
   }
 
   private def gotoGettingBlocks(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])]): Receive = {
     log.debug("Transition to gettingBlocks")
-    context.system.scheduler.scheduleOnce(GettingBlockTimeout)(self ! GettingBlockTimeout)
     context become gettingBlocks(witnesses, blocks)
     gettingBlocks(witnesses, blocks)
   }
 
   private def gotoSynced(): Receive = {
     log.debug("Transition to synced")
-    blockGenerator ! BlockGenerator.StartGeneration
+    blockGenerator ! StartGeneration
     context become synced
     synced
   }
@@ -198,7 +201,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         case Success(_) =>
           block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
           log.info(
-            s"""After appending block(local: $local, parent: ${Base58.encode(block.referenceField.value)}):
+            s"""Block ${block.encodedId} appended:
             (height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})""")
           true
         case Failure(e) =>
@@ -238,5 +241,7 @@ object HistorySynchronizer {
   case class CheckBlock(id: BlockId)
 
   case object GetStatus
+
+  case object SelfCheck
 
 }

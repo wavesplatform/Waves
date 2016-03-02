@@ -1,6 +1,7 @@
 package scorex.network
 
 import java.nio.ByteOrder
+
 import akka.util.ByteString
 
 import scala.annotation.tailrec

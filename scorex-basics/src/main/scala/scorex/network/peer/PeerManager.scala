@@ -13,7 +13,7 @@ import scala.util.Random
 
 /**
   * Must be singleton
-  * @param application
+  * @param application - Scorex-based application
   */
 class PeerManager(application: Application) extends Actor with ScorexLogging {
 
@@ -27,7 +27,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private lazy val peerDatabase = new PeerDatabaseImpl(application)
 
-  settings.knownPeers.foreach{address =>
+  settings.knownPeers.foreach { address =>
     val defaultPeerInfo = PeerInfo(System.currentTimeMillis(), None, None)
     peerDatabase.addOrUpdateKnownPeer(address, defaultPeerInfo)
   }
@@ -38,14 +38,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     else None
   }
 
-  //todo: combine AddKnownPeer & UpdatePeer?
-  private def peerLists: Receive = {
-    case AddKnownPeer(address) =>
-      val peerInfo = PeerInfo(System.currentTimeMillis())
-      peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
-
-    case UpdatePeer(address, peerNonce, peerName) =>
-      val peerInfo = PeerInfo(System.currentTimeMillis(), peerNonce, peerName)
+  private def peerListOperations: Receive = {
+    case AddOrUpdatePeer(address, peerNonceOpt, peerNameOpt) =>
+      val peerInfo = PeerInfo(System.currentTimeMillis(), peerNonceOpt, peerNameOpt)
       peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
 
     case KnownPeers =>
@@ -94,15 +89,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
         toUpdate.keys.foreach(connectedPeers.remove)
 
-        val peerNonce = Some(handshake.nodeNonce)
-        val peerName = Some(handshake.nodeName)
-        self ! UpdatePeer(handshake.declaredAddress.getOrElse(address), peerNonce, peerName)
-
         //drop connection to self if occurred
         if (handshake.nodeNonce == application.settings.nodeNonce) {
           newCp.handlerRef ! PeerConnectionHandler.CloseConnection
         } else {
-          handshake.declaredAddress.foreach(address => self ! PeerManager.AddKnownPeer(address))
+          handshake.declaredAddress.foreach(address => self ! PeerManager.AddOrUpdatePeer(address, None, None))
           connectedPeers += newCp -> Some(handshake)
         }
       }
@@ -124,14 +115,12 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
           }
         }
       }
-  }: Receive) orElse peerLists orElse apiInterface orElse peerCycle
+  }: Receive) orElse peerListOperations orElse apiInterface orElse peerCycle
 }
 
 object PeerManager {
 
-  case class AddKnownPeer(address: InetSocketAddress)
-
-  case class UpdatePeer(address: InetSocketAddress, peerNonce: Option[Long], peerName: Option[String])
+  case class AddOrUpdatePeer(address: InetSocketAddress, peerNonce: Option[Long], peerName: Option[String])
 
   case object KnownPeers
 

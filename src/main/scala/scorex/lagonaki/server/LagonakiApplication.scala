@@ -71,6 +71,16 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
             log.info("Calculate tree")
             val tree = MerkleTree.fromFile(datasetFile, settings.treeDir, PermaConstants.segmentSize, FastCryptographicHash)
             require(tree.nonEmptyBlocks == PermaConstants.n, s"${tree.nonEmptyBlocks} == ${PermaConstants.n}")
+
+            log.info("Put ALL data to local storage")
+            new File(settings.treeDir).mkdirs()
+            def addBlock(i: Long): Unit = {
+              authDataStorage.set(i, tree.byIndex(i).get)
+              if (i > 0) addBlock(i - 1)
+            }
+            addBlock(PermaConstants.n - 1)
+            authDataStorage.commit()
+
             tree
           }
           log.info("Test tree")
@@ -81,15 +91,6 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
           val leaf = tree.byIndex(index).get
           require(leaf.check(index, tree.rootHash)(FastCryptographicHash))
 
-          log.info("Put ALL data to local storage")
-          new File(settings.treeDir).mkdirs()
-          def addBlock(i: Long): Unit = {
-            authDataStorage.set(i, tree.byIndex(i).get)
-            if (i > 0) {
-              addBlock(i - 1)
-            }
-          }
-          addBlock(PermaConstants.n - 1)
         }
         val rootHash = settings.rootHash
 

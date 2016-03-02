@@ -13,6 +13,8 @@ import scorex.storage.Storage
 import scorex.utils.ScorexLogging
 import shapeless.Typeable._
 
+import scala.util.Random
+
 /**
   *
   * Permacoin segments synchronization.
@@ -35,7 +37,7 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], stor
       log.info("GetSegmentsMessage")
 
       val segments: Map[DataSegmentIndex, AuthDataBlock[DataSegment]] =
-        indexes.take(MaxSegmentsInMessage).flatMap(i => storage.get(i).map(s => i -> s)).toMap
+        Random.shuffle(indexes).take(MaxSegmentsInMessage).flatMap(i => storage.get(i).map(s => i -> s)).toMap
 
       val msg = Message(SegmentsMessageSpec, Right(segments), None)
       networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
@@ -46,7 +48,7 @@ class SegmentsSynchronizer(application: Application, rootHash: Array[Byte], stor
 
       if (segments.forall(s => s._2.check(s._1, rootHash)(FastCryptographicHash))) {
         segments.foreach(s => storage.set(s._1, s._2))
-        storage.commit()
+        if(segments.nonEmpty) storage.commit()
       } else {
         log.warn(s"Incorrect segments from " + remote)
         //TODO blacklisting

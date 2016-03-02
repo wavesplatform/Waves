@@ -3,7 +3,6 @@ package scorex.lagonaki.integration
 import play.api.libs.json.Json
 import scorex.api.http.BlocksApiRoute
 import scorex.block.Block
-import scorex.crypto.encode.Base58
 import scorex.lagonaki.TestingCommons
 
 
