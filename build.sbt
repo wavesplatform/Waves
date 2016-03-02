@@ -2,7 +2,7 @@ organization := "org.consensusresearch"
 
 name := "perma-scorex"
 
-version := "0.1.0"
+version := "1.2.0"
 
 scalaVersion := "2.11.7"
 
