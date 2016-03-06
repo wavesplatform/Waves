@@ -32,16 +32,8 @@ lazy val consensus = subModule("consensus")
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
   )
 
-lazy val perma = subModule("perma")
-  .aggregate(basics)
-  .dependsOn(basics)
-  .settings(commonSettings: _*)
-  .settings(
-    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
-  )
-
 lazy val root = Project(id = "scorex", base = file("."))
-  .dependsOn(basics, transaction, consensus, perma)
+  .dependsOn(basics, transaction, consensus)
   .settings(commonSettings: _*)
   .settings(
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
@@ -50,6 +42,7 @@ lazy val root = Project(id = "scorex", base = file("."))
 name := appConf.getString("product")
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
+  "SonaType" at "https://oss.sonatype.org/content/groups/public",
   "Typesafe maven releases" at "http://repo.typesafe.com/typesafe/maven-releases/")
 
 libraryDependencies ++=
@@ -58,7 +51,9 @@ libraryDependencies ++=
   Dependencies.akka ++
   Dependencies.serizalization ++
   Dependencies.testKit ++
-  Dependencies.logging
+  Dependencies.logging :+
+  "org.consensusresearch" %% "scorex-perma" % "+"
+
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
