@@ -10,7 +10,7 @@ class AdressesRoutingSpecification extends RouteTest {
   import TestingCommons._
 
   application.checkGenesis()
-  val adressesRoute = AddressApiRoute(application.wallet, application.blockStorage.state).route
+  val adressesRoute = AddressApiRoute(application).route
 
   "adressesRouting" should "handle root request" in {
     Get("/addresses/") ~> adressesRoute ~> check {

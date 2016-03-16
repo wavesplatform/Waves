@@ -22,7 +22,7 @@
   	"maxRollback" : 100,
   	"offlineGeneration" : false,
 	"perma": {
-		"treeDir": "/tmp/scorex/data3/tree",
+		"treeDir": "/tmp/scorex/data3/tree/",
 		"authDataStorage": "authDataStorage3.mapDB"
 	},
 	"blockGenerationDelay": 501

@@ -99,6 +99,8 @@ trait Settings extends ScorexLogging {
   val MaxBlocksChunks = 10
 
   //API
+  lazy val corsAllowed = (settingsJSON \ "cors").asOpt[Boolean].getOrElse(false)
+
   private val DefaultRpcPort = 9085
   private val DefaultRpcAllowed = "127.0.0.1"
 

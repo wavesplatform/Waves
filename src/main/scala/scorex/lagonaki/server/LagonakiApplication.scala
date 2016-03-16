@@ -108,23 +108,23 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
 
   lazy val consensusApiRoute = consensusModule match {
     case ncm: NxtLikeConsensusModule =>
-      new NxtConsensusApiRoute(ncm, blockStorage)
+      new NxtConsensusApiRoute(this)
     case qcm: QoraLikeConsensusModule =>
-      new QoraConsensusApiRoute(qcm, blockStorage)
+      new QoraConsensusApiRoute(this)
     case pcm: PermaConsensusModule =>
-      new PermaConsensusApiRoute(pcm, blockStorage)
+      new PermaConsensusApiRoute(this)
   }
 
   override lazy val apiRoutes = Seq(
-    BlocksApiRoute(blockStorage.history, wallet),
-    TransactionsApiRoute(blockStorage.state),
+    BlocksApiRoute(this),
+    TransactionsApiRoute(this),
     consensusApiRoute,
-    WalletApiRoute(wallet),
+    WalletApiRoute(this),
     PaymentApiRoute(this),
     ScorexApiRoute(this),
-    SeedApiRoute(),
+    SeedApiRoute(this),
     PeersHttpService(this),
-    AddressApiRoute(wallet, blockStorage.state),
+    AddressApiRoute(this),
     DebugApiRoute(this)
   )
 

@@ -5,14 +5,17 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
+import scorex.app.Application
 import scorex.transaction.LagonakiState
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import spray.routing.Route
 
 
 @Api(value = "/transactions", description = "Information about transactions")
-case class TransactionsApiRoute(state: LagonakiState)(implicit val context: ActorRefFactory)
+case class TransactionsApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
+
+  private val state: LagonakiState = application.blockStorage.state
 
   override lazy val route =
     pathPrefix("transactions") {

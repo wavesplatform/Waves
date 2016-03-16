@@ -4,19 +4,23 @@ import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
-import play.api.libs.json.Json
+import play.api.libs.json.{JsArray, Json}
+import scorex.app.Application
 import scorex.transaction.{BlockChain, History}
 import scorex.wallet.Wallet
 import spray.routing.Route
 
 
 @Api(value = "/blocks", description = "Info about blockchain & individual blocks within it")
-case class BlocksApiRoute(history: History, wallet: Wallet)(implicit val context: ActorRefFactory)
+case class BlocksApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+
+  private val wallet = application.wallet
+  private val history = application.history
 
   override lazy val route =
     pathPrefix("blocks") {
-      signature ~ first ~ last ~ at ~ height ~ heightEncoded ~ child ~ address ~ delay
+      signature ~ first ~ last ~ at ~ seq ~ height ~ heightEncoded ~ child ~ address ~ delay
     }
 
   @Path("/address/{address}")
@@ -117,6 +121,29 @@ case class BlocksApiRoute(history: History, wallet: Wallet)(implicit val context
       }
     }
   }
+
+  @Path("/seq/{from}/{to}")
+  @ApiOperation(value = "Seq", notes = "Get block at specified heights", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "from", value = "Start block height", required = true, dataType = "Int", paramType = "path"),
+    new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "Int", paramType = "path")
+  ))
+  def seq: Route = {
+    path("seq" / IntNumber / IntNumber) { case (start, end) =>
+      jsonRoute {
+        history match {
+          case blockchain: BlockChain =>
+            JsArray(
+            (start to end).map { height =>
+               blockchain.blockAt(height).map(_.json).getOrElse(Json.obj("error" -> s"No block at height $height"))
+            }).toString()
+          case _ =>
+            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain").toString()
+        }
+      }
+    }
+  }
+
 
   @Path("/last")
   @ApiOperation(value = "Last", notes = "Get last block data", httpMethod = "GET")

@@ -1,3 +1,8 @@
+**1.2.1**
+
+* New API call /blocks/seq
+* CORS optional support(to be allowed in settings, disallowed by default)
+
 **1.2.0**
 ---------
 

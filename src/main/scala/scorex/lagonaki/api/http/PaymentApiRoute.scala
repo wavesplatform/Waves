@@ -14,7 +14,7 @@ import spray.routing.Route
 import scala.util.Try
 
 @Api(value = "/payment", description = "Payment operations.", position = 1)
-case class PaymentApiRoute(application: Application)(implicit val context: ActorRefFactory)
+case class PaymentApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   // TODO asInstanceOf

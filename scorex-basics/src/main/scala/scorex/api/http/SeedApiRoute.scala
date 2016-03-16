@@ -6,11 +6,12 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
+import scorex.app.Application
 import scorex.crypto.encode.Base58
 import spray.routing.Route
 
 @Api(value = "/seed", description = "Seed generation functions", position = 3)
-case class SeedApiRoute()(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions {
+case class SeedApiRoute(override val application: Application)(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions {
   val SeedSize = 32
 
   private def seed(length: Int): String = {
