@@ -112,7 +112,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
     case qcm: QoraLikeConsensusModule =>
       new QoraConsensusApiRoute(this)
     case pcm: PermaConsensusModule =>
-      new PermaConsensusApiRoute(pcm, blockStorage)
+      new PermaConsensusApiRoute(this)
   }
 
   override lazy val apiRoutes = Seq(

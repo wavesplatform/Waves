@@ -52,7 +52,7 @@ libraryDependencies ++=
   Dependencies.serizalization ++
   Dependencies.testKit ++
   Dependencies.logging :+
-  "org.consensusresearch" %% "scorex-perma" % "+"
+  "org.consensusresearch" %% "scorex-perma" % "1.2.1"
 
 
 scalacOptions ++= Seq("-feature", "-deprecation")
