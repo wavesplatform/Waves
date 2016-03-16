@@ -13,7 +13,7 @@ import scorex.transaction.state.database.blockchain.StoredState
 import spray.routing.Route
 
 @Api(value = "/debug", description = "Debug methods", position = 1)
-case class DebugApiRoute(application: Application)(implicit val context: ActorRefFactory)
+case class DebugApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   implicit lazy val transactionModule = application.transactionModule

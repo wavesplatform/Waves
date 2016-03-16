@@ -5,14 +5,18 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
+import scorex.app.Application
 import scorex.transaction.{BlockChain, History}
 import scorex.wallet.Wallet
 import spray.routing.Route
 
 
 @Api(value = "/blocks", description = "Info about blockchain & individual blocks within it")
-case class BlocksApiRoute(history: History, wallet: Wallet)(implicit val context: ActorRefFactory)
+case class BlocksApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+
+  private val wallet = application.wallet
+  private val history = application.history
 
   override lazy val route =
     pathPrefix("blocks") {

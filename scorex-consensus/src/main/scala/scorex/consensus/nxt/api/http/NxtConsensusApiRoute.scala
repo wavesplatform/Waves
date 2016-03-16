@@ -6,6 +6,7 @@ import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
+import scorex.app.Application
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.crypto.encode.Base58
 import scorex.transaction.BlockStorage
@@ -13,9 +14,11 @@ import spray.routing.Route
 
 
 @Api(value = "/consensus", description = "Consensus-related calls")
-class NxtConsensusApiRoute(consensusModule: NxtLikeConsensusModule, blockStorage: BlockStorage)
-                          (implicit val context: ActorRefFactory)
+class NxtConsensusApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
+
+  private val consensusModule = application.consensusModule.asInstanceOf[NxtLikeConsensusModule]
+  private val blockStorage = application.blockStorage
 
   override val route: Route =
     pathPrefix("consensus") {

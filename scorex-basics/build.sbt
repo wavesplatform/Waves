@@ -11,6 +11,6 @@ libraryDependencies ++=
     Dependencies.testKit ++
     Dependencies.db ++
     Dependencies.logging ++ Seq(
-      "org.consensusresearch" %% "scrypto" % "1.+",
+      "org.consensusresearch" %% "scrypto" % "1.0.4",
       "commons-net" % "commons-net" % "3.+"
   )

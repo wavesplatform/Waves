@@ -8,10 +8,9 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
+import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.LagonakiState
-import scorex.wallet.Wallet
 import spray.http.MediaTypes._
 import spray.routing.Route
 
@@ -19,8 +18,11 @@ import scala.util.{Failure, Success, Try}
 
 
 @Api(value = "/addresses", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(wallet: Wallet, state: LagonakiState)(implicit val context: ActorRefFactory)
+case class AddressApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+
+  private val wallet = application.wallet
+  private val state = application.blockStorage.state
 
   override lazy val route =
     pathPrefix("addresses") {

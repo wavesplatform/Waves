@@ -19,7 +19,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 @Api(value = "scorex", description = "General commands & information", position = 0)
-case class ScorexApiRoute(application: Application)(implicit val context: ActorRefFactory)
+case class ScorexApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
   override lazy val route =

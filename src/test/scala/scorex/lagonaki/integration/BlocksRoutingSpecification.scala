@@ -16,7 +16,7 @@ class BlocksRoutingSpecification extends RouteTest {
   lazy val genesis = Block.genesis()
   lazy val signature = (genesis.json \ "signature").as[String]
 
-  val blocksRoute = BlocksApiRoute(application.blockStorage.history, application.wallet).route
+  val blocksRoute = BlocksApiRoute(application).route
 
   "blocksRouting" should "return first block" in {
     Get("/blocks/first") ~> blocksRoute ~> check {
