@@ -4,7 +4,7 @@ import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
-import play.api.libs.json.Json
+import play.api.libs.json.{JsArray, Json}
 import scorex.transaction.{BlockChain, History}
 import scorex.wallet.Wallet
 import spray.routing.Route
@@ -16,7 +16,7 @@ case class BlocksApiRoute(history: History, wallet: Wallet)(implicit val context
 
   override lazy val route =
     pathPrefix("blocks") {
-      signature ~ first ~ last ~ at ~ height ~ heightEncoded ~ child ~ address ~ delay
+      signature ~ first ~ last ~ at ~ seq ~ height ~ heightEncoded ~ child ~ address ~ delay
     }
 
   @Path("/address/{address}")
@@ -117,6 +117,29 @@ case class BlocksApiRoute(history: History, wallet: Wallet)(implicit val context
       }
     }
   }
+
+  @Path("/seq/{from}/{to}")
+  @ApiOperation(value = "Seq", notes = "Get block at specified heights", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "from", value = "Start block height", required = true, dataType = "Int", paramType = "path"),
+    new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "Int", paramType = "path")
+  ))
+  def seq: Route = {
+    path("seq" / IntNumber / IntNumber) { case (start, end) =>
+      jsonRoute {
+        history match {
+          case blockchain: BlockChain =>
+            JsArray(
+            (start to end).map { height =>
+               blockchain.blockAt(height).map(_.json).getOrElse(Json.obj("error" -> s"No block at height $height"))
+            }).toString()
+          case _ =>
+            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain").toString()
+        }
+      }
+    }
+  }
+
 
   @Path("/last")
   @ApiOperation(value = "Last", notes = "Get last block data", httpMethod = "GET")
