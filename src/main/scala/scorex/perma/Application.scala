@@ -62,18 +62,18 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
 
   override lazy val blockStorage = transactionModule.blockStorage
 
-  lazy val consensusApiRoute = new PermaConsensusApiRoute(consensusModule, blockStorage)
+  lazy val consensusApiRoute = new PermaConsensusApiRoute(this)
 
   override lazy val apiRoutes = Seq(
-    BlocksApiRoute(blockStorage.history, wallet),
-    TransactionsApiRoute(blockStorage.state),
+    BlocksApiRoute(this),
+    TransactionsApiRoute(this),
     consensusApiRoute,
-    WalletApiRoute(wallet),
+    WalletApiRoute(this),
     PaymentApiRoute(this),
     ScorexApiRoute(this),
-    SeedApiRoute(),
+    SeedApiRoute(this),
     PeersHttpService(this),
-    AddressApiRoute(wallet, blockStorage.state),
+    AddressApiRoute(this),
     DebugApiRoute(this)
   )
 
