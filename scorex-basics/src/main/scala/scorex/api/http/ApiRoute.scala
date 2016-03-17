@@ -16,14 +16,16 @@ trait ApiRoute extends HttpService {
 
   def actorRefFactory: ActorRefFactory = context
 
-  def jsonRoute(fn: => ToResponseMarshallable, method: Directive0 = get): Route = method {
+  def jsonRoute(fn: => ToResponseMarshallable, method: Directive0 = get): Route =
+    incompletedJsonRoute(complete(fn), method)
+
+  def incompletedJsonRoute(fn: => Route, method: Directive0 = get): Route = method {
     val jsonResponse = respondWithMediaType(`application/json`) {
-      complete(
-        fn
-      )
+      fn
     }
 
-    if(corsAllowed) respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*"))(jsonResponse)
+    if (corsAllowed) respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*"))(jsonResponse)
     else jsonResponse
   }
+
 }

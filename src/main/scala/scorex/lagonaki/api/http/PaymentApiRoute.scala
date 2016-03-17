@@ -8,7 +8,6 @@ import scorex.app.Application
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.SimpleTransactionModule
 import scorex.transaction.state.wallet.Payment
-import spray.http.MediaTypes._
 import spray.routing.Route
 
 import scala.util.Try
@@ -38,44 +37,41 @@ case class PaymentApiRoute(override val application: Application)(implicit val c
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
   def payment: Route = path("payment") {
-    post {
-      respondWithMediaType(`application/json`) {
-        entity(as[String]) { body => complete {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[Payment] match {
-                case err: JsError =>
-                  err
-                case JsSuccess(payment: Payment, _) =>
-                  val txOpt = transactionModule.createPayment(payment, wallet)
-                  txOpt match {
-                    case Some(tx) =>
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
-                          tx.json
+    incompletedJsonRoute(
+      entity(as[String]) { body => complete {
+        walletNotExists(wallet).getOrElse {
+          Try(Json.parse(body)).map { js =>
+            js.validate[Payment] match {
+              case err: JsError =>
+                err
+              case JsSuccess(payment: Payment, _) =>
+                val txOpt = transactionModule.createPayment(payment, wallet)
+                txOpt match {
+                  case Some(tx) =>
+                    tx.validate match {
+                      case ValidationResult.ValidateOke =>
+                        tx.json
 
-                        case ValidationResult.InvalidAddress =>
-                          InvalidAddress.json
+                      case ValidationResult.InvalidAddress =>
+                        InvalidAddress.json
 
-                        case ValidationResult.NegativeAmount =>
-                          NegativeAmount.json
+                      case ValidationResult.NegativeAmount =>
+                        NegativeAmount.json
 
-                        case ValidationResult.NegativeFee =>
-                          NegativeFee.json
+                      case ValidationResult.NegativeFee =>
+                        NegativeFee.json
 
-                        case ValidationResult.NoBalance =>
-                          NoBalance.json
-                      }
-                    case None =>
-                      InvalidSender.json
-                  }
-              }
-            }.getOrElse(WrongJson.json)
-          }.toString
-        }
-        }
+                      case ValidationResult.NoBalance =>
+                        NoBalance.json
+                    }
+                  case None =>
+                    InvalidSender.json
+                }
+            }
+          }.getOrElse(WrongJson.json)
+        }.toString
       }
-    }
+      }, post)
   }
 
   // Workaround to show datatype of post request without using it in another route

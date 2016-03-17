@@ -11,7 +11,6 @@ import scorex.account.{Account, PublicKeyAccount}
 import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import spray.http.MediaTypes._
 import spray.routing.Route
 
 import scala.util.{Failure, Success, Try}
@@ -244,67 +243,61 @@ case class AddressApiRoute(override val application: Application)(implicit val c
     }
 
   private def signPath(address: String, encode: Boolean) = {
-    post {
-      respondWithMediaType(`application/json`) {
-        entity(as[String]) { message =>
-          complete {
-            val jsRes = walletNotExists(wallet).getOrElse {
-              if (!Account.isValidAddress(address)) {
-                InvalidAddress.json
-              } else {
-                wallet.privateKeyAccount(address) match {
-                  case None => WalletAddressNotExists.json
-                  case Some(account) =>
-                    Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
-                      case Success(signature) =>
-                        val msg = if (encode) Base58.encode(message.getBytes) else message
-                        Json.obj("message" -> msg,
-                          "publickey" -> Base58.encode(account.publicKey),
-                          "signature" -> Base58.encode(signature))
-                      case Failure(t) => json(t)
-                    }
+    incompletedJsonRoute(entity(as[String]) { message =>
+      complete {
+        val jsRes = walletNotExists(wallet).getOrElse {
+          if (!Account.isValidAddress(address)) {
+            InvalidAddress.json
+          } else {
+            wallet.privateKeyAccount(address) match {
+              case None => WalletAddressNotExists.json
+              case Some(account) =>
+                Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
+                  case Success(signature) =>
+                    val msg = if (encode) Base58.encode(message.getBytes) else message
+                    Json.obj("message" -> msg,
+                      "publickey" -> Base58.encode(account.publicKey),
+                      "signature" -> Base58.encode(signature))
+                  case Failure(t) => json(t)
                 }
-              }
             }
-            jsRes.toString()
           }
         }
+        jsRes.toString()
       }
-    }
+    }, get)
   }
 
   private def verifyPath(address: String, decode: Boolean) = {
-    post {
-      respondWithMediaType(`application/json`) {
-        entity(as[String]) { jsText =>
-          complete {
-            val parsed = Try(Json.parse(jsText)).getOrElse(WrongJson.json)
-            val jsRes = parsed.validate[SignedMessage] match {
-              case err: JsError =>
-                WrongJson.json
-              case JsSuccess(m: SignedMessage, _) =>
-                if (!Account.isValidAddress(address)) {
-                  InvalidAddress.json
-                } else {
-                  //DECODE SIGNATURE
-                  val msg: Try[Array[Byte]] = if (decode) Base58.decode(m.message) else Success(m.message.getBytes)
-                  (msg, Base58.decode(m.signature), Base58.decode(m.publickey)) match {
-                    case (Failure(_), _, _) => InvalidMessage.json
-                    case (_, Failure(_), _) => InvalidSignature.json
-                    case (_, _, Failure(_)) => InvalidPublicKey.json
-                    case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-                      val account = new PublicKeyAccount(pubKeyBytes)
-                      val isValid = account.address == address &&
-                        EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
-                      Json.obj("valid" -> isValid)
-                  }
+    incompletedJsonRoute(
+      entity(as[String]) { jsText =>
+        complete {
+          val parsed = Try(Json.parse(jsText)).getOrElse(WrongJson.json)
+          val jsRes = parsed.validate[SignedMessage] match {
+            case err: JsError =>
+              WrongJson.json
+            case JsSuccess(m: SignedMessage, _) =>
+              if (!Account.isValidAddress(address)) {
+                InvalidAddress.json
+              } else {
+                //DECODE SIGNATURE
+                val msg: Try[Array[Byte]] = if (decode) Base58.decode(m.message) else Success(m.message.getBytes)
+                (msg, Base58.decode(m.signature), Base58.decode(m.publickey)) match {
+                  case (Failure(_), _, _) => InvalidMessage.json
+                  case (_, Failure(_), _) => InvalidSignature.json
+                  case (_, _, Failure(_)) => InvalidPublicKey.json
+                  case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
+                    val account = new PublicKeyAccount(pubKeyBytes)
+                    val isValid = account.address == address &&
+                      EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
+                    Json.obj("valid" -> isValid)
                 }
-            }
-            Json.stringify(jsRes)
+              }
           }
+          Json.stringify(jsRes)
         }
       }
-    }
+      , post)
   }
 
   // Workaround to show datatype of post request without using it in another route
