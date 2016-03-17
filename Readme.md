@@ -1,4 +1,4 @@
-# PermaScorex
+# Lagonaki
 
 This is permacoin implementation on top of Scorex framework.
 
@@ -15,4 +15,4 @@ Compile code and run your node by typing `sbt start`
 
 # Create package
 
-For now it's on;y possible to create deb package with `sbt debian:packageBin` command
+For now it's only possible to create deb package with `sbt debian:packageBin` command
