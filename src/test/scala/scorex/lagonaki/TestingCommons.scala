@@ -32,7 +32,7 @@ object TestingCommons {
         val request = Http(url(peerUrl(a) + "/scorex/status").GET)
         val response = Await.result(request, 10.seconds)
         val json = Json.parse(response.getResponseBody).as[JsObject]
-        assert((json \ "block generator status").asOpt[String].isDefined)
+        assert((json \ "block_generator_status").asOpt[String].isDefined)
       }
     }
     apps
