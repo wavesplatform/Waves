@@ -18,8 +18,8 @@ class APISpecification extends FunSuite with Matchers with BeforeAndAfterAll wit
 
   test("Scorex API route") {
     val json = getRequest("/scorex/status")
-    (json \ "block generator status").asOpt[String].isDefined shouldBe true
-    (json \ "history synchronization status").asOpt[String].isDefined shouldBe true
+    (json \ "block_generator_status").asOpt[String].isDefined shouldBe true
+    (json \ "history_synchronization_status").asOpt[String].isDefined shouldBe true
     (getRequest("/scorex/version") \ "version").as[String] should (startWith("Scorex") and include("v."))
   }
 

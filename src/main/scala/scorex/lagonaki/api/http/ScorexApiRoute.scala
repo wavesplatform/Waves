@@ -58,8 +58,8 @@ case class ScorexApiRoute(override val application: Application)(implicit val co
 
       Future.sequence(Seq(bgf, hsf)).map { case statusesSeq =>
         Json.obj(
-          "block generator status" -> statusesSeq.head,
-          "history synchronization status" -> statusesSeq.tail.head
+          "block_generator_status" -> statusesSeq.head,
+          "history_synchronization_status" -> statusesSeq.tail.head
         ).toString()
       }
     }
