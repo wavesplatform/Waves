@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Ints}
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
@@ -24,7 +24,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 
   override val name = "transactions"
 
-  override lazy val json: JsObject = Json.obj(name -> Json.arr(value.map(_.json)))
+  override lazy val json: JsObject = Json.obj(name -> JsArray(value.map(_.json)))
 
   override lazy val bytes: Array[Byte] = {
     val txCount = value.size.ensuring(_ <= MaxTransactionsPerBlock).toByte
@@ -69,6 +69,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
 
   /**
     * In Lagonaki, transaction-related data is just sequence of transactions. No Merkle-tree root of txs / state etc
+    *
     * @param bytes - serialized sequence of transaction
     * @return
     */
@@ -96,7 +97,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings, applic
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
   override def packUnconfirmed(): StoredInBlock =
-    blockStorage.state.validate(UnconfirmedTransactionsDatabaseImpl.all()).sortBy(- _.fee).take(MaxTransactionsPerBlock)
+    blockStorage.state.validate(UnconfirmedTransactionsDatabaseImpl.all()).sortBy(-_.fee).take(MaxTransactionsPerBlock)
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
