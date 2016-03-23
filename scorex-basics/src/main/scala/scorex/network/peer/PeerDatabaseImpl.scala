@@ -25,11 +25,13 @@ class PeerDatabaseImpl(application: Application, filename: String) extends PeerD
       PeerInfo(peerInfo.lastSeen, nonceOpt, nodeNameOpt)
     }.getOrElse(peerInfo)
     whitelistPersistence.set(address, updatedPeerInfo)
+    whitelistPersistence.commit()
   }
 
   override def blacklistPeer(address: InetSocketAddress): Unit = this.synchronized {
     whitelistPersistence.remove(address)
     blacklist += address -> System.currentTimeMillis()
+    whitelistPersistence.commit()
   }
 
   override def isBlacklisted(address: InetSocketAddress): Boolean =
