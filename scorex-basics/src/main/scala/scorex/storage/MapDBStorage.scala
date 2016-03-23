@@ -5,6 +5,7 @@ import java.io.File
 import org.mapdb.{DB, DBMaker, HTreeMap}
 import scorex.utils.ScorexLogging
 
+import scala.collection.JavaConversions._
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -12,12 +13,12 @@ import scala.util.{Failure, Success, Try}
   */
 class MapDBStorage[Key, Value](fileName: String) extends Storage[Key, Value] with ScorexLogging {
 
-  protected val db:DB = DBMaker.appendFileDB(new File(fileName))
-    .fileMmapEnableIfSupported()
-    .closeOnJvmShutdown()
-    .checksumEnable()
-    .transactionDisable()
-    .make()
+  protected val db: DB = DBMaker.appendFileDB(new File(fileName))
+      .fileMmapEnableIfSupported()
+      .closeOnJvmShutdown()
+      .checksumEnable()
+      .transactionDisable()
+      .make()
 
   protected val map: HTreeMap[Key, Value] = db.hashMapCreate("map").makeOrGet()
 
@@ -42,5 +43,15 @@ class MapDBStorage[Key, Value](fileName: String) extends Storage[Key, Value] wit
         log.debug("Enable to get for key: " + key)
         None
     }
+
+  def remove(key: Key): Option[Value] = Option(map.remove(key))
+
+  def keySet(): Set[Key] = Try(map.keySet()) match{
+    case Success(keys) =>
+      keys.toSet
+    case Failure(e) =>
+      log.warn("Failed to load keyset", e)
+      Set.empty
+  }
 
 }

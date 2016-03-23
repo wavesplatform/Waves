@@ -5,7 +5,7 @@ val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.c
 lazy val commonSettings = Seq(
   organization := "org.consensusresearch",
   version := appConf.getString("version"),
-  scalaVersion := "2.11.7"
+  scalaVersion := "2.11.8"
 )
 
 def subModule(id: String): Project = Project(id = id, base = file(s"scorex-$id"))
