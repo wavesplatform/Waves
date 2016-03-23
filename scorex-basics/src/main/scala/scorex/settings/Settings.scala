@@ -1,5 +1,6 @@
 package scorex.settings
 
+import java.io.File
 import java.net.InetSocketAddress
 
 import play.api.libs.json.{JsObject, Json}
@@ -36,6 +37,13 @@ trait Settings extends ScorexLogging {
     val f = new java.io.File(dirPath)
     f.mkdirs()
     f.exists()
+  }
+
+  lazy val dataDirOpt = {
+    val res = (settingsJSON \ "dataDir").asOpt[String]
+    res.foreach(folder => new File(folder).mkdirs())
+    require(res.isEmpty || new File(res.get).exists())
+    res
   }
 
   //p2p

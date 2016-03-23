@@ -7,6 +7,7 @@ import scorex.app.Application
 import scorex.block.{Block, BlockField}
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
+import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
@@ -36,7 +37,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 }
 
 
-class SimpleTransactionModule(implicit val settings: TransactionSettings, application: Application)
+class SimpleTransactionModule(implicit val settings: TransactionSettings with Settings, application: Application)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
 
   import SimpleTransactionModule._
