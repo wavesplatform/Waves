@@ -1,14 +1,15 @@
-package scorex.perma
+package scorex.lagonaki
 
 import java.io.File
 
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
+import scorex.account.Account
 import scorex.api.http._
 import scorex.app.ApplicationVersion
 import scorex.crypto.ads.merkle.AuthDataBlock
 import scorex.lagonaki.api.http.{DebugApiRoute, PaymentApiRoute, PeersHttpService, ScorexApiRoute}
-import scorex.lagonaki.server.LagonakiSettings
+import scorex.lagonaki.server.{LagonakiApplication, LagonakiSettings}
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.perma.api.http.PermaConsensusApiRoute
 import scorex.perma.consensus.PermaConsensusModule
@@ -16,25 +17,12 @@ import scorex.perma.network.{PermacoinMessagesRepo, SegmentsSynchronizer}
 import scorex.perma.settings.PermaConstants._
 import scorex.perma.storage.AuthDataStorage
 import scorex.storage.Storage
-import scorex.transaction.SimpleTransactionModule
+import scorex.transaction.{BalanceSheet, GenesisTransaction, SimpleTransactionModule, Transaction}
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
-
-
-object Application extends App with ScorexLogging {
-
-  log.debug("Start server with args: {} ", args)
-  val filename = args.headOption.getOrElse("settings.json")
-
-  val application = new Application(filename)
-
-  log.debug("PermaScorex has been started")
-  application.run()
-
-  if (application.wallet.privateKeyAccounts().isEmpty) application.wallet.generateNewAccounts(1)
-
-}
+import scala.util.Random
 
 class Application(val settingsFilename: String) extends scorex.app.Application {
 
@@ -98,4 +86,65 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
 
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], this))
 
+}
+
+object Application extends App with ScorexLogging {
+
+  log.debug("Start server with args: {} ", args)
+  val filename = args.headOption.getOrElse("settings.json")
+
+  val application = new Application(filename)
+
+  log.debug("PermaScorex has been started")
+  application.run()
+
+  if (application.wallet.privateKeyAccounts().isEmpty) application.wallet.generateNewAccounts(1)
+
+  def testingScript(application: LagonakiApplication): Unit = {
+    log.info("Going to execute testing scenario")
+    log.info("Current state is:" + application.blockStorage.state)
+    val wallet = application.wallet
+
+    if (wallet.privateKeyAccounts().isEmpty) {
+      wallet.generateNewAccounts(3)
+      log.info("Generated Accounts:\n" + wallet.privateKeyAccounts().toList.map(_.address).mkString("\n"))
+    }
+
+    log.info("Executing testing scenario with accounts" +
+      s"(${wallet.privateKeyAccounts().size}) : "
+      + wallet.privateKeyAccounts().mkString(" "))
+
+    require(wallet.privateKeyAccounts().nonEmpty)
+
+    Thread.sleep(3.seconds.toMillis)
+
+    val genesisBlock = application.blockStorage.history.genesis
+    val genesisAccs = genesisBlock.transactions.flatMap(_ match {
+      case gtx: GenesisTransaction =>
+        Some(gtx.recipient)
+      case _ =>
+        log.error("Non-genesis tx in the genesis block!")
+        None
+    })
+
+    def genPayment(recipient: Option[Account] = None, amtOpt: Option[Long] = None): Option[Transaction] = {
+      val pkAccs = wallet.privateKeyAccounts().ensuring(_.nonEmpty)
+      val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
+      val senderBalance = application.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
+      val recipientAcc = recipient.getOrElse(genesisAccs(Random.nextInt(genesisAccs.size)))
+      val fee = Random.nextInt(5).toLong + 1
+      if (senderBalance - fee > 0) {
+        val amt = amtOpt.getOrElse(Math.abs(Random.nextLong() % (senderBalance - fee)))
+        Some(application.transactionModule.createPayment(senderAcc, recipientAcc, amt, fee))
+      } else None
+    }
+
+    log.info("Generate 200 transactions")
+    (1 to 200) foreach (_ => genPayment())
+
+    (1 to Int.MaxValue).foreach { _ =>
+      Thread.sleep(Random.nextInt(5.seconds.toMillis.toInt))
+      log.info(s"Payment created: ${genPayment()}")
+    }
+  }
 }
