@@ -1,10 +1,8 @@
 import com.typesafe.config._
 
-val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
-
 lazy val commonSettings = Seq(
   organization := "org.consensusresearch",
-  version := appConf.getString("version"),
+  version := "1.2.1",
   scalaVersion := "2.11.8"
 )
 
@@ -39,7 +37,7 @@ lazy val root = Project(id = "scorex", base = file("."))
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
   )
 
-name := appConf.getString("product")
+name := "scorex"
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",
@@ -51,9 +49,7 @@ libraryDependencies ++=
   Dependencies.akka ++
   Dependencies.serizalization ++
   Dependencies.testKit ++
-  Dependencies.logging :+
-  "org.consensusresearch" %% "scorex-perma" % "1.2.1"
-
+  Dependencies.logging
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
