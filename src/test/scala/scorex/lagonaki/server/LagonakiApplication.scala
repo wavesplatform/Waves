@@ -121,11 +121,9 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
     consensusApiRoute,
     WalletApiRoute(this),
     PaymentApiRoute(this),
-    ScorexApiRoute(this),
     SeedApiRoute(this),
     PeersHttpService(this),
-    AddressApiRoute(this),
-    DebugApiRoute(this)
+    AddressApiRoute(this)
   )
 
   override lazy val apiTypes = Seq(
@@ -138,11 +136,9 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
     },
     typeOf[WalletApiRoute],
     typeOf[PaymentApiRoute],
-    typeOf[ScorexApiRoute],
     typeOf[SeedApiRoute],
     typeOf[PeersHttpService],
-    typeOf[AddressApiRoute],
-    typeOf[DebugApiRoute]
+    typeOf[AddressApiRoute]
   )
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs ++ PermacoinMessagesRepo.specs
