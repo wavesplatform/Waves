@@ -106,7 +106,6 @@ imageNames in docker := Seq(
 // buildOptions in docker := BuildOptions(cache = false)
 
 
-
 //publishing settings
 
 licenses := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
@@ -122,7 +121,7 @@ publishTo := {
   if (isSnapshot.value)
     Some("snapshots" at nexus + "content/repositories/snapshots")
   else
-    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+    Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 
 
