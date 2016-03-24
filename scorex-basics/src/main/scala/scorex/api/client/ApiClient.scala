@@ -1,16 +1,16 @@
-package scorex.lagonaki.client
+package scorex.api.client
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.net.{HttpURLConnection, URL}
 
 import play.libs.Json
-import scorex.lagonaki.server.LagonakiSettings
+import scorex.settings.Settings
 
 import scala.io.StdIn
 import scala.util.{Failure, Success, Try}
 
 
-class ApiClient(settings: LagonakiSettings) {
+class ApiClient(settings: Settings) {
 
   def executeCommand(command: String): String = {
     if (command.equals("help")) {
@@ -54,9 +54,13 @@ class ApiClient(settings: LagonakiSettings) {
 }
 
 object ApiClient {
+
+
   def main(args: Array[String]): Unit = {
     val settingsFilename = args.headOption.getOrElse("settings.json")
-    val settings = new LagonakiSettings(settingsFilename)
+    val settings = new Settings {
+      override val filename = settingsFilename
+    }
     val apiClient = new ApiClient(settings)
 
     println("Welcome to the Scorex command-line client...")
