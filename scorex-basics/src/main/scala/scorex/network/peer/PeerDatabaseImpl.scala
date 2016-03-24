@@ -8,7 +8,7 @@ import scorex.storage.MapDBStorage
 import scala.collection.concurrent.TrieMap
 
 //todo: persistence of known & blacklisted peers
-class PeerDatabaseImpl(application: Application, filename: String) extends PeerDatabase {
+class PeerDatabaseImpl(application: Application, filename: Option[String]) extends PeerDatabase {
 
   class PeersPersistance() extends MapDBStorage[InetSocketAddress, PeerInfo](filename)
 
