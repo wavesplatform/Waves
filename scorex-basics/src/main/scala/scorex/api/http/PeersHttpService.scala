@@ -1,4 +1,4 @@
-package scorex.lagonaki.api.http
+package scorex.api.http
 
 import java.net.InetSocketAddress
 import javax.ws.rs.Path
@@ -7,14 +7,12 @@ import akka.actor.ActorRefFactory
 import akka.pattern.ask
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.Application
 import scorex.network.Handshake
 import scorex.network.peer.{PeerInfo, PeerManager}
 import spray.routing.Route
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success}
 
 @Api(value = "/peers", description = "Get info about peers", position = 2)
 case class PeersHttpService(override val application: Application)(implicit val context: ActorRefFactory)
@@ -68,28 +66,5 @@ case class PeersHttpService(override val application: Application)(implicit val 
     }
   }
 
-  /*  @Path("/score")
-    @ApiOperation(value = "Score", notes = "Node with a maximum blockchain score", httpMethod = "GET")
-    @ApiResponses(Array(
-      new ApiResponse(code = 200, message = "Json with response or error"),
-      new ApiResponse(code = 500, message = "Internal error")
-    ))
-    def score = path("score") {
-      get {
-        respondWithMediaType(`application/json`) {
-          onComplete {
-            (application.blockchainSyncer ? BlockchainGenerator.GetMaxChainScore).map { peerHeightsRaw =>
-              val peerHeights = peerHeightsRaw.asInstanceOf[Map[InetSocketAddress, Int]]
-              Json.arr(peerHeights.map { case (peer, h) =>
-                Json.obj("peer" -> peer.getAddress.getHostAddress, "score" -> h)
-              }).toString()
-            }
-          } {
-            case Success(value) => complete(value)
-            case Failure(ex) => failWith(ex)
-          }
-        }
-      }
-    }*/
 
 }
