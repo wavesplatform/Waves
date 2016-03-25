@@ -8,8 +8,8 @@ import scorex.account.Account
 import scorex.api.http._
 import scorex.app.ApplicationVersion
 import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.lagonaki.api.http.{DebugApiRoute, PaymentApiRoute, PeersHttpService, ScorexApiRoute}
-import scorex.lagonaki.server.{LagonakiApplication, LagonakiSettings}
+import scorex.lagonaki.http.{ScorexApiRoute, DebugApiRoute}
+import scorex.lagonaki.settings.LagonakiSettings
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.perma.api.http.PermaConsensusApiRoute
 import scorex.perma.consensus.PermaConsensusModule
@@ -40,7 +40,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
 
   override implicit lazy val consensusModule = {
     new File(settings.treeDir).mkdirs()
-    val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(settings.authDataStorage)
+    val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(Some(settings.authDataStorage))
     val rootHash = settings.rootHash
     actorSystem.actorOf(Props(classOf[SegmentsSynchronizer], this, rootHash, authDataStorage))
     new PermaConsensusModule(rootHash, Some(networkController))(authDataStorage)
@@ -100,7 +100,7 @@ object Application extends App with ScorexLogging {
 
   if (application.wallet.privateKeyAccounts().isEmpty) application.wallet.generateNewAccounts(1)
 
-  def testingScript(application: LagonakiApplication): Unit = {
+  def testingScript(application: Application): Unit = {
     log.info("Going to execute testing scenario")
     log.info("Current state is:" + application.blockStorage.state)
     val wallet = application.wallet

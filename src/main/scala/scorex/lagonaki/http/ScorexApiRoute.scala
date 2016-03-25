@@ -9,14 +9,12 @@ import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.Application
 import scorex.consensus.mining.BlockGeneratorController._
-import scorex.lagonaki.server.settings.Constants
+import scorex.lagonaki.settings.Constants
 import scorex.network.HistorySynchronizer
-import spray.http.MediaTypes._
 import spray.routing.Route
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
 
 @Api(value = "scorex", description = "General commands & information", position = 0)
 case class ScorexApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
