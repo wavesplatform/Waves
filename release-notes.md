@@ -1,3 +1,10 @@
+**1.2.2**
+
+* LagonakiApplication was moved to [Lagonaki](https://github.com/ScorexProject/Lagonaki) project
+* New API call /addresses/seq
+* API call /blocks/seq fixes
+* Disk-based persistence for peers whitelist/blacklist in PeerDatabaseImpl implemented
+
 **1.2.1**
 
 * New API call /blocks/seq

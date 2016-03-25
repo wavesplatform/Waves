@@ -1,8 +1,8 @@
-import com.typesafe.config._
+
 
 lazy val commonSettings = Seq(
   organization := "org.consensusresearch",
-  version := "1.2.1",
+  version := "1.2.2",
   scalaVersion := "2.11.8"
 )
 
