@@ -15,14 +15,6 @@ class APISpecification extends FunSuite with Matchers with BeforeAndAfterAll wit
 
   import scorex.lagonaki.TestingCommons._
 
-
-  test("Scorex API route") {
-    val json = getRequest("/scorex/status")
-    (json \ "block generator status").asOpt[String].isDefined shouldBe true
-    (json \ "history synchronization status").asOpt[String].isDefined shouldBe true
-    (getRequest("/scorex/version") \ "version").as[String] should (startWith("Scorex") and include("v."))
-  }
-
   test("Seed API route") {
     val length = Random.nextInt(4096)
     Base58.decode((getRequest("/seed/") \ "seed").as[String]).isSuccess shouldBe true

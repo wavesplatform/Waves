@@ -16,3 +16,6 @@ Dockerfile
 
 # logs
 scorex-errors.log
+
+# non-submodules code
+src/main

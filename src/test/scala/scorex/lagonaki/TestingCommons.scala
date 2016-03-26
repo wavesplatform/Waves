@@ -29,10 +29,10 @@ object TestingCommons {
     apps.foreach { a =>
       if (a.wallet.privateKeyAccounts().isEmpty) a.wallet.generateNewAccounts(3)
       untilTimeout(20.seconds, 1.second) {
-        val request = Http(url(peerUrl(a) + "/scorex/status").GET)
+        val request = Http(url(peerUrl(a) + "/consensus/algo").GET)
         val response = Await.result(request, 10.seconds)
         val json = Json.parse(response.getResponseBody).as[JsObject]
-        assert((json \ "block generator status").asOpt[String].isDefined)
+        assert((json \ "consensus-algo").asOpt[String].isDefined)
       }
     }
     apps

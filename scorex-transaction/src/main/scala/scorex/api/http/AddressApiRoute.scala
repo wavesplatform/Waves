@@ -25,7 +25,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
 
   override lazy val route =
     pathPrefix("addresses") {
-      root ~ validate ~ seed ~ confirmationBalance ~ balance ~ generatingBalance ~ verify ~ sign ~ deleteAddress ~ create ~ verifyText ~ signText
+      root ~ validate ~ seed ~ confirmationBalance ~ balance ~ generatingBalance ~ verify ~ sign ~ deleteAddress ~
+        create ~ verifyText ~ signText ~ seq
     }
 
   @Path("/{address}")
@@ -210,6 +211,22 @@ case class AddressApiRoute(override val application: Application)(implicit val c
       jsonRoute {
         val addresses = wallet.privateKeyAccounts().map(_.address)
         Json.arr(addresses).toString()
+      }
+    }
+  }
+
+  @Path("/seq/{from}/{to}")
+  @ApiOperation(value = "Seq", notes = "Get wallet accounts addresses", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "from", value = "Start address", required = true, dataType = "Int", paramType = "path"),
+    new ApiImplicitParam(name = "to", value = "address", required = true, dataType = "Int", paramType = "path")
+  ))
+  def seq: Route = {
+    path("seq" / IntNumber / IntNumber) { case (start, end) =>
+      jsonRoute {
+        JsArray(
+          wallet.privateKeyAccounts().map(a => JsString(a.address)).slice(start, end)
+        ).toString()
       }
     }
   }

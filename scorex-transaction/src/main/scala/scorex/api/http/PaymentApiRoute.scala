@@ -1,9 +1,8 @@
-package scorex.lagonaki.api.http
+package scorex.api.http
 
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
-import scorex.api.http._
 import scorex.app.Application
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.SimpleTransactionModule

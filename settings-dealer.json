@@ -15,6 +15,7 @@
   "rpcAllowed": [],
   "maxRollback": 100,
   "offlineGeneration": false,
+  "cors": true,
   "perma": {
     "isTrustedDealer": true,
     "treeDir": "/opt/scorex/data/tree",

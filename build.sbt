@@ -1,11 +1,9 @@
-import com.typesafe.config._
 
-val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
 
 lazy val commonSettings = Seq(
   organization := "org.consensusresearch",
-  version := appConf.getString("version"),
-  scalaVersion := "2.11.7"
+  version := "1.2.2",
+  scalaVersion := "2.11.8"
 )
 
 def subModule(id: String): Project = Project(id = id, base = file(s"scorex-$id"))
@@ -39,7 +37,7 @@ lazy val root = Project(id = "scorex", base = file("."))
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
   )
 
-name := appConf.getString("product")
+name := "scorex"
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",
@@ -51,9 +49,7 @@ libraryDependencies ++=
   Dependencies.akka ++
   Dependencies.serizalization ++
   Dependencies.testKit ++
-  Dependencies.logging :+
-  "org.consensusresearch" %% "scorex-perma" % "1.2.1"
-
+  Dependencies.logging
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
@@ -110,7 +106,6 @@ imageNames in docker := Seq(
 // buildOptions in docker := BuildOptions(cache = false)
 
 
-
 //publishing settings
 
 licenses := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
@@ -126,7 +121,7 @@ publishTo := {
   if (isSnapshot.value)
     Some("snapshots" at nexus + "content/repositories/snapshots")
   else
-    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+    Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 
 

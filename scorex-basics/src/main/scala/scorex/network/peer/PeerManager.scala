@@ -13,6 +13,7 @@ import scala.util.Random
 
 /**
   * Must be singleton
+  *
   * @param application - Scorex-based application
   */
 class PeerManager(application: Application) extends Actor with ScorexLogging {
@@ -25,7 +26,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private lazy val settings = application.settings
   private lazy val networkController = application.networkController
 
-  private lazy val peerDatabase = new PeerDatabaseImpl(application)
+  //TODO Option[String]
+  private lazy val peerDatabase = new PeerDatabaseImpl(application, settings.dataDirOpt.map(f => f + "/peers.mapDB"))
 
   settings.knownPeers.foreach { address =>
     val defaultPeerInfo = PeerInfo(System.currentTimeMillis(), None, None)
