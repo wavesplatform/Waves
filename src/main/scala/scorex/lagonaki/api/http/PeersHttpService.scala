@@ -11,7 +11,6 @@ import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.Application
 import scorex.network.Handshake
 import scorex.network.peer.{PeerInfo, PeerManager}
-import spray.http.MediaTypes._
 import spray.routing.Route
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -32,25 +31,18 @@ case class PeersHttpService(override val application: Application)(implicit val 
     new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
   def allPeers: Route = path("all") {
-    get {
-      respondWithMediaType(`application/json`) {
-        onComplete {
-          (application.peerManager ? PeerManager.GetAllPeers)
-            .mapTo[Map[InetSocketAddress, PeerInfo]]
-            .map { peers =>
-              Json.arr(peers.map { case (address, peerInfo) =>
-                Json.obj(
-                  "address" -> address.toString,
-                  "nodeName" -> (peerInfo.nodeName.getOrElse("N/A"):String),
-                  "nodeNonce" -> (peerInfo.nonce.map(_.toString).getOrElse("N/A"):String)
-                )
-              })
-            }
-        } {
-          case Success(value) => complete(value.toString())
-          case Failure(ex) => failWith(ex)
+    jsonRoute {
+      (application.peerManager ? PeerManager.GetAllPeers)
+        .mapTo[Map[InetSocketAddress, PeerInfo]]
+        .map { peers =>
+          Json.arr(peers.map { case (address, peerInfo) =>
+            Json.obj(
+              "address" -> address.toString,
+              "nodeName" -> (peerInfo.nodeName.getOrElse("N/A"): String),
+              "nodeNonce" -> (peerInfo.nonce.map(_.toString).getOrElse("N/A"): String)
+            )
+          }).toString()
         }
-      }
     }
   }
 
@@ -60,26 +52,19 @@ case class PeersHttpService(override val application: Application)(implicit val 
     new ApiResponse(code = 200, message = "Json with connected peers or error")
   ))
   def connectedPeers: Route = path("connected") {
-    get {
-      respondWithMediaType(`application/json`) {
-        onComplete {
-          (application.peerManager ? PeerManager.GetConnectedPeers)
-            .mapTo[Seq[Handshake]]
-            .map { handshakes =>
-              val peerData = Json.arr(handshakes.map { handshake =>
-                Json.obj(
-                  "declaredAddress" -> handshake.declaredAddress.toString,
-                  "peerName" -> handshake.nodeName,
-                  "peerNonce" -> handshake.nodeNonce
-                )
-              })
-              Json.obj("peers" -> peerData).toString()
-            }
-        } {
-          case Success(value) => complete(value)
-          case Failure(ex) => failWith(ex)
+    jsonRoute {
+      (application.peerManager ? PeerManager.GetConnectedPeers)
+        .mapTo[Seq[Handshake]]
+        .map { handshakes =>
+          val peerData = Json.arr(handshakes.map { handshake =>
+            Json.obj(
+              "declaredAddress" -> handshake.declaredAddress.toString,
+              "peerName" -> handshake.nodeName,
+              "peerNonce" -> handshake.nodeNonce
+            )
+          })
+          Json.obj("peers" -> peerData).toString()
         }
-      }
     }
   }
 

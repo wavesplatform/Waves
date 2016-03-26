@@ -52,22 +52,15 @@ case class ScorexApiRoute(override val application: Application)(implicit val co
   @Path("/status")
   @ApiOperation(value = "Status", notes = "Get status of the running core(Offline/Syncing/Generating)", httpMethod = "GET")
   def status: Route = path("status") {
-    get {
-      respondWithMediaType(`application/json`) {
-        onComplete {
-          def bgf = (application.blockGenerator ? GetStatus).map(_.toString)
-          def hsf = (application.historySynchronizer ? HistorySynchronizer.GetStatus).map(_.toString)
+    jsonRoute {
+      def bgf = (application.blockGenerator ? GetStatus).map(_.toString)
+      def hsf = (application.historySynchronizer ? HistorySynchronizer.GetStatus).map(_.toString)
 
-          Future.sequence(Seq(bgf, hsf)).map { case statusesSeq =>
-            Json.obj(
-              "block generator status" -> statusesSeq.head,
-              "history synchronization status" -> statusesSeq.tail.head
-            ).toString()
-          }
-        } {
-          case Success(value) => complete(value)
-          case Failure(ex) => failWith(ex)
-        }
+      Future.sequence(Seq(bgf, hsf)).map { case statusesSeq =>
+        Json.obj(
+          "block generator status" -> statusesSeq.head,
+          "history synchronization status" -> statusesSeq.tail.head
+        ).toString()
       }
     }
   }
