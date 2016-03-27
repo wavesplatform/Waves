@@ -1,4 +1,4 @@
-# PermaScorex
+# Lagonaki
 
 This is permacoin implementation on top of Scorex framework.
 
