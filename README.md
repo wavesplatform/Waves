@@ -35,6 +35,16 @@ with an another with just one line of code edited (in PermaConstants.scala)
 **This is the pretty buggy initial release version! Please report bugs found, and contribute with
 fixes, if possible.**
 
+Lagonaki
+--------
+Scorex is modular framework for developers and since version 1.2.2 we have removed
+runnables from it(except of some fake runnables needed for integration tests). If you want
+to run something built on top of Scorex, take a look to Lagonaki, our first application with
+public testnet. It is in another repo: [https://github.com/ScorexProject/Lagonaki](https://github.com/ScorexProject/Lagonaki).
+
+
+
+
 Installation
 ------------
 
@@ -59,17 +69,6 @@ Install SBT(Scala Build Tool):
 `echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list`
 `apt-get update`
 `apt-get install sbt`
-
-# Demo using Docker
-
-* install docker for your platform - [Docker](https://docs.docker.com)
-* run ```sbt docker```
-
-It'll build docker image based on tiny https://www.alpinelinux.org/about/ with OracleJRE 8
-and run scorex.jar inside the container. Image size is about 201.8 MB.
-
-On getting "docker.sock: permission denied" error, add an user to docker group with `sudo usermod -a -G docker <username>`
- then reboot ([https://github.com/docker/docker/issues/5314](https://github.com/docker/docker/issues/5314))
 
 
 Command-Line Client
@@ -120,7 +119,6 @@ Readmes:
 Others:
 
 [API Description](docs/API.md)
-
 
 Please join our mail-list: [https://groups.io/g/scorex-dev](https://groups.io/g/scorex-dev) .
 
