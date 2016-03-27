@@ -1,14 +1,12 @@
-Scorex - Lagonaki Release [![Build Status](http://23.94.190.226:8080/buildStatus/icon?job=scorex/master)](http://23.94.190.226:8080/job/scorex/branch/master)
+Scorex - The modular blockchain framework [![Build Status](http://23.94.190.226:8080/buildStatus/icon?job=scorex/master)](http://23.94.190.226:8080/job/scorex/branch/master)
 =========================
-
-**The modular blockchain framework**
 
 Motivation
 ----------
 
 There are two huge problems around cryptocurrencies development project Scorex aims to weaken:
 
-* Bitcoin source code contains more 100K lines of code(80K of C++ only), Nxt is more than 45K
+* Bitcoin Core source code contains more 100K lines of code(80K of C++ only), Nxt is more than 45K
  line of Java code. All parts of the design(network/transactional/consensus protocols) are mixed in a hard way.
  So researchers and developers are not in good start positions to make experiments.
 
@@ -16,9 +14,8 @@ There are two huge problems around cryptocurrencies development project Scorex a
  could be switched easily(with two consensus algos out of the box, one could be replaced with an another with
   just one line of code edited!)
 
-* Major coins forks are trying to make IPO immediately, often having just one or two pretty controversial
- feature. Scorex is intentionally not production-ready, so please participate in experiments built on top of it,
- but don't buy tokens unless you are 100% sure what are you doing.
+* New coins are trying to make money immediately, often having just one or two pretty controversial
+ feature. Scorex is the free and open tool aiming to make other systems development easier.
 
 Features
 --------
@@ -62,26 +59,6 @@ Install SBT(Scala Build Tool):
 `echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list`
 `apt-get update`
 `apt-get install sbt`
-
-Run
----
-
-Run one or two peers on the local machine:
-
-
-* run "sbt recompile" to (re-)build .jar file
-* run "sbt startLocal1" to run first local peer binded to 127.0.0.1:9084 . Edit settings in settings-local1.json
-   if needed. Access UI via localhost:9085
-* run "sbt startLocal2" to run second local peer binded to 127.0.0.2:9088 . Edit settings in settings-local2.json
-   if needed. Access UI via localhost:9086
-* run "sbt startLocal3" to run second local peer binded to 127.0.0.3:9084 . Edit settings in settings-local2.json
-   if needed. Access UI via localhost:9087
-* You can run first & second peers simultaneously by running "sbt startLocal"
-
-
-You can also run "sbt start" script to connect to the network, but network is down now :)
-You can edit folders / other settings in settings.json file before running ./start.sh.
-
 
 # Demo using Docker
 
