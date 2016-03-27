@@ -15,4 +15,9 @@ libraryDependencies ++= Seq(
   "org.consensusresearch" %% "scorex-transaction" % "1.2.+"
 )
 
+//assembly settings
+assemblyJarName in assembly := "lagonaki.jar"
+
+test in assembly := {}
+
 mainClass in assembly := Some("scorex.perma.Application")
