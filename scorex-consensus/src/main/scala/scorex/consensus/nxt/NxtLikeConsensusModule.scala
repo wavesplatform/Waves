@@ -21,7 +21,7 @@ class NxtLikeConsensusModule
 
   implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = this
 
-  val AvgDelay = 5.seconds.toSeconds
+  val AvgDelay = 5.seconds.toMillis
 
   val version = 1: Byte
 
@@ -103,7 +103,7 @@ class NxtLikeConsensusModule
   private def calcBaseTarget(lastBlockData: NxtLikeConsensusBlockData,
                              lastBlockTimestamp: Long,
                              currentTime: Long): Long = {
-    val eta = (currentTime - lastBlockTimestamp) / 1000 //in seconds
+    val eta = currentTime - lastBlockTimestamp
     val prevBt = BigInt(lastBlockData.baseTarget)
     val t0 = bounded(prevBt * eta / AvgDelay, prevBt / 2, prevBt * 2)
     bounded(t0, 1, Long.MaxValue).toLong
