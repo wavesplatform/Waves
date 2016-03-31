@@ -12,7 +12,7 @@ trait BlockTestingCommons extends TestingCommons {
 
   import TestingCommons._
 
-  implicit val consensusModule = new NxtLikeConsensusModule()
+  implicit val consensusModule = new NxtLikeConsensusModule(1L)
   implicit val transactionModule = new SimpleTransactionModule()(application.settings, application)
 
   val genesis: Block = Block.genesis()

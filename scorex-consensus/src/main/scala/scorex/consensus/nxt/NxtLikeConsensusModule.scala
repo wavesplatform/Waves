@@ -14,14 +14,12 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
 
-class NxtLikeConsensusModule
+class NxtLikeConsensusModule(AvgDelay: Long = 5.seconds.toMillis)
   extends LagonakiConsensusModule[NxtLikeConsensusBlockData] with ScorexLogging {
 
   import NxtLikeConsensusModule._
 
   implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = this
-
-  val AvgDelay = 5.seconds.toMillis
 
   val version = 1: Byte
 
