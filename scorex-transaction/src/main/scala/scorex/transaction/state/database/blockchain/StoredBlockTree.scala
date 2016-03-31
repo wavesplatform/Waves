@@ -16,6 +16,7 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
 /**
+  * TODO fix
   * If no datafolder provided, blocktree lives in RAM (useful for tests)
   */
 class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)

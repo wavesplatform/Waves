@@ -1,5 +1,6 @@
 package scorex.transaction.state.database.blockchain
 
+import org.h2.mvstore.{MVMap, MVStore}
 import org.mapdb.{DB, DBMaker}
 import scorex.account.Account
 import scorex.block.Block
@@ -21,10 +22,10 @@ class StoredBlockchain(dataFolderOpt: Option[String])
                        transactionModule: TransactionModule[_])
   extends BlockChain with ScorexLogging {
 
-  case class BlockchainPersistence(database: DB) {
-    val blocks = database.treeMap[Int, Array[Byte]]("blocks")
-    val signatures = database.treeMap[Int, BlockId]("signatures")
-    val scoreMap = database.treeMap[Int, BigInt]("score")
+  case class BlockchainPersistence(database: MVStore) {
+    val blocks:MVMap[Int, Array[Byte]] = database.openMap("blocks")
+    val signatures:MVMap[Int, BlockId] = database.openMap("signatures")
+    val scoreMap:MVMap[Int, BigInt] = database.openMap("score")
 
     //if there are some uncommited changes from last run, discard'em
     if (signatures.size() > 0) database.rollback()
@@ -58,12 +59,12 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   private val blockStorage: BlockchainPersistence = {
     val db = dataFolderOpt match {
       case Some(dataFolder) =>
-        DBMaker.appendFileDB(new java.io.File(dataFolder + s"/blocks"))
-          .fileMmapEnableIfSupported()
-          .closeOnJvmShutdown()
-          .checksumEnable()
-          .make()
-      case None => DBMaker.memoryDB().make()
+        new MVStore.Builder().
+          fileName(dataFolder + s"/blocks.mvstore").
+          compress().
+          open()
+      case None => new MVStore.Builder().open()
+
     }
     new BlockchainPersistence(db)
   }
