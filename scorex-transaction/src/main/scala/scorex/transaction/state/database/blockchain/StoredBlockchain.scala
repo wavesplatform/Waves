@@ -1,7 +1,6 @@
 package scorex.transaction.state.database.blockchain
 
 import org.h2.mvstore.{MVMap, MVStore}
-import org.mapdb.{DB, DBMaker}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -81,25 +80,8 @@ class StoredBlockchain(dataFolderOpt: Option[String])
           case Success(_) => Seq(block)
           case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
         }
-      } else blockById(parent.value) match {
-        case Some(commonBlock) =>
-          val branchPoint = heightOf(commonBlock).get
-          val blockScore = consensusModule.blockScore(block)
-          val blocksFromBranchPoint = ((branchPoint + 1) to height()).map(i => blockAt(i).get).reverse
-          val currentScore = blocksFromBranchPoint.map(b => consensusModule.blockScore(b)).sum
-          if (blockScore > currentScore) {
-            val toRollback = blocksFromBranchPoint map { b =>
-              val h = heightOf(b).get
-              blockStorage.deleteBlock(h)
-              (b, Reversed)
-            }
-            val h = height() + 1
-            blockStorage.writeBlock(h, block) match {
-              case Success(_) => Seq(block)
-              case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
-            }
-          } else Seq.empty
-        case None => throw new Error(s"Appending block ${block.json} which parent is not in blockchain")
+      } else  {
+         throw new Error(s"Appending block ${block.json} which parent is not last block in blockchain")
       }
     }
   }
