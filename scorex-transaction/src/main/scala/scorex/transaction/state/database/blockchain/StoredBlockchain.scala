@@ -22,9 +22,9 @@ class StoredBlockchain(dataFolderOpt: Option[String])
   extends BlockChain with ScorexLogging {
 
   case class BlockchainPersistence(database: MVStore) {
-    val blocks:MVMap[Int, Array[Byte]] = database.openMap("blocks")
-    val signatures:MVMap[Int, BlockId] = database.openMap("signatures")
-    val scoreMap:MVMap[Int, BigInt] = database.openMap("score")
+    val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks")
+    val signatures: MVMap[Int, BlockId] = database.openMap("signatures")
+    val scoreMap: MVMap[Int, BigInt] = database.openMap("score")
 
     //if there are some uncommited changes from last run, discard'em
     if (signatures.size() > 0) database.rollback()
@@ -57,13 +57,8 @@ class StoredBlockchain(dataFolderOpt: Option[String])
 
   private val blockStorage: BlockchainPersistence = {
     val db = dataFolderOpt match {
-      case Some(dataFolder) =>
-        new MVStore.Builder().
-          fileName(dataFolder + s"/blocks.mvstore").
-          compress().
-          open()
+      case Some(dataFolder) => new MVStore.Builder().fileName(dataFolder + s"/blocks.mvstore").compress().open()
       case None => new MVStore.Builder().open()
-
     }
     new BlockchainPersistence(db)
   }
@@ -80,8 +75,8 @@ class StoredBlockchain(dataFolderOpt: Option[String])
           case Success(_) => Seq(block)
           case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
         }
-      } else  {
-         throw new Error(s"Appending block ${block.json} which parent is not last block in blockchain")
+      } else {
+        throw new Error(s"Appending block ${block.json} which parent is not last block in blockchain")
       }
     }
   }

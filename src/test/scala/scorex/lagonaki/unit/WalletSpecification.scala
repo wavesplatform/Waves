@@ -1,12 +1,12 @@
 package scorex.lagonaki.unit
 
-import org.scalatest.FunSuite
+import org.scalatest.{Matchers, FunSuite}
 import scorex.crypto.encode.Base58
 import scorex.wallet.Wallet
 
 import scala.util.Random
 
-class WalletSpecification extends FunSuite {
+class WalletSpecification extends FunSuite with Matchers {
 
   private val walletSize = 10
 
@@ -37,10 +37,12 @@ class WalletSpecification extends FunSuite {
 
     val w = new Wallet(Some(walletFile), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption)
     w.generateNewAccounts(10)
+    val nonce = w.nonce()
     w.close()
     assert(w.exists())
 
     val w2 = new Wallet(Some(walletFile), "cookies", None)
-    assert(w2.privateKeyAccounts().head.address != null)
+    w2.privateKeyAccounts().head.address should not be null
+    w2.nonce() shouldBe nonce
   }
 }

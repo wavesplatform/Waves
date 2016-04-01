@@ -3,7 +3,7 @@ package scorex.wallet
 import java.io.File
 
 import com.google.common.primitives.{Bytes, Ints}
-import org.mapdb.{DBMaker, Serializer}
+import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
@@ -17,21 +17,21 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
 
   private val NonceFieldName = "nonce"
 
-  private val database = walletFileOpt match {
+  private val database: MVStore = walletFileOpt match {
     case Some(walletFile) =>
       //create parent folders then check their existence
       walletFile.getParentFile.mkdirs().ensuring(walletFile.getParentFile.exists())
+      new MVStore.Builder().fileName(walletFile.getAbsolutePath).encryptionKey(password.toCharArray).compress().open()
 
-      DBMaker.fileDB(walletFile)
-        .checksumEnable()
-        .closeOnJvmShutdown()
-        .encryptionEnable(password)
-        .make
-
-    case None =>
-      DBMaker.memoryDB().encryptionEnable(password).make
+    case None => new MVStore.Builder().open()
   }
-  if (Option(database.atomicVar("seed").get()).isEmpty) {
+
+
+  private val accountsPersistence: MVMap[Int, Array[Byte]] = database.openMap("privkeys")
+  private val seedPersistence: MVMap[String, Array[Byte]] = database.openMap("seed")
+  private val noncePersistence: MVMap[String, Int] = database.openMap("nonce")
+
+  if (Option(seedPersistence.get("seed")).isEmpty) {
     val seed = seedOpt.getOrElse {
       println("Please type your wallet seed")
       def readSeed(): Array[Byte] = Base58.decode(scala.io.StdIn.readLine()).getOrElse {
@@ -40,14 +40,12 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
       }
       readSeed()
     }
-    database.atomicVar("seed").set(seed)
+    seedPersistence.put("seed", seed)
   }
-  val seed: Array[Byte] = database.atomicVar("seed").get()
-
-  private val accountsPersistence = database.hashSet("privkeys", Serializer.BYTE_ARRAY)
+  val seed: Array[Byte] = seedPersistence.get("seed")
 
   private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
-    val accs = accountsPersistence.map(seed => new PrivateKeyAccount(seed))
+    val accs = accountsPersistence.keys.map(k => accountsPersistence.get(k)).map(seed => new PrivateKeyAccount(seed))
     TrieMap(accs.map(acc => acc.address -> acc).toSeq: _*)
   }
 
@@ -65,7 +63,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
     val address = account.address
     val created = if (!accountsCache.containsKey(address)) {
       accountsCache += account.address -> account
-      accountsPersistence.add(account.seed)
+      accountsPersistence.put(accountsPersistence.lastKey() + 1, account.seed)
       database.commit()
       true
     } else false
@@ -81,10 +79,16 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
 
 
   def deleteAccount(account: PrivateKeyAccount): Boolean = synchronized {
-    val res = accountsPersistence.remove(account.seed)
+    //    val res = accountsPersistence.remove(account.seed)
+    val res = accountsPersistence.keys.find { k =>
+      if (accountsPersistence.get(k) sameElements account.seed) {
+        accountsPersistence.remove(k)
+        true
+      } else false
+    }
     database.commit()
     accountsCache -= account.address
-    res
+    res.isDefined
   }
 
   def exportAccountSeed(address: String): Option[Array[Byte]] = privateKeyAccount(address).map(_.seed)
@@ -101,9 +105,10 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
 
   def accounts(): Seq[PrivateKeyAccount] = accountsCache.values.toSeq
 
-  def nonce(): Int = database.atomicInteger(NonceFieldName).intValue()
+  def nonce(): Int = Option(noncePersistence.get(NonceFieldName)).getOrElse(0)
 
-  def setNonce(nonce: Int): Unit = database.atomicInteger(NonceFieldName).set(nonce)
+  def getAndIncrementNonce(): Int = synchronized{
+    noncePersistence.put(NonceFieldName, nonce() + 1) - 1
+  }
 
-  def getAndIncrementNonce(): Int = database.atomicInteger(NonceFieldName).getAndIncrement()
 }
