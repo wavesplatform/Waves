@@ -9,6 +9,7 @@ import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
 
+@deprecated("Use tree storage from scrypto library", "1.2.2")
 class TreeStorage(fileName: String, levels: Int) extends Storage[(Int, Long), Array[Byte]] with ScorexLogging {
 
   import TreeStorage._
