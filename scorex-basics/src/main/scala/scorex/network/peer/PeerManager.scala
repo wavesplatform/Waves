@@ -27,7 +27,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private lazy val networkController = application.networkController
 
   //TODO Option[String]
-  private lazy val peerDatabase = new PeerDatabaseImpl(application, settings.dataDirOpt.map(f => f + "/peers.mapDB"))
+  private lazy val peerDatabase = new PeerDatabaseImpl(application, settings.dataDirOpt.map(f => f + "/peers.dat"))
 
   settings.knownPeers.foreach { address =>
     val defaultPeerInfo = PeerInfo(System.currentTimeMillis(), None, None)
@@ -117,6 +117,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
           }
         }
       }
+    case AddToBlacklist(peer) =>
+      peerDatabase.blacklistPeer(peer)
   }: Receive) orElse peerListOperations orElse apiInterface orElse peerCycle
 }
 
@@ -137,6 +139,8 @@ object PeerManager {
   case class Handshaked(address: InetSocketAddress, handshake: Handshake)
 
   case class Disconnected(remote: InetSocketAddress)
+
+  case class AddToBlacklist(remote: InetSocketAddress)
 
   case class FilterPeers(sendingStrategy: SendingStrategy)
 
