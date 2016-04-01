@@ -117,7 +117,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
           }
         }
       }
+
     case AddToBlacklist(peer) =>
+      log.info(s"Blacklist peer $peer")
       peerDatabase.blacklistPeer(peer)
   }: Receive) orElse peerListOperations orElse apiInterface orElse peerCycle
 }

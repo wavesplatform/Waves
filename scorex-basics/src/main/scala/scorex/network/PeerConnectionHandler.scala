@@ -111,9 +111,8 @@ case class PeerConnectionHandler(application: Application,
 
     case Blacklist =>
       log.info(s"Going to blacklist " + remote)
-    //todo: real blacklisting
-    //  PeerManager.blacklistPeer(remote)
-    //  connection ! Close
+      peerManager ! AddToBlacklist(remote)
+      connection ! Close
   }
 
   private var chunksBuffer: ByteString = CompactByteString()
