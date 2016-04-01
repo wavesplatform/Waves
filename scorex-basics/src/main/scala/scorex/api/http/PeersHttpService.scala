@@ -5,8 +5,9 @@ import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
 import akka.pattern.ask
+import com.fasterxml.jackson.annotation.JsonValue
 import com.wordnik.swagger.annotations._
-import play.api.libs.json.Json
+import play.api.libs.json.{JsString, JsArray, Json}
 import scorex.app.Application
 import scorex.network.Handshake
 import scorex.network.peer.{PeerInfo, PeerManager}
@@ -20,7 +21,7 @@ case class PeersHttpService(override val application: Application)(implicit val 
 
   override lazy val route =
     pathPrefix("peers") {
-      allPeers ~ connectedPeers // TODO implement and fix ~ score
+      allPeers ~ connectedPeers ~ blacklistedPeers
     }
 
   @Path("/all")
@@ -62,6 +63,21 @@ case class PeersHttpService(override val application: Application)(implicit val 
             )
           })
           Json.obj("peers" -> peerData).toString()
+        }
+    }
+  }
+
+  @Path("/blacklisted")
+  @ApiOperation(value = "Blacklisted peers list", notes = "Connected peers list", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with connected peers or error")
+  ))
+  def blacklistedPeers: Route = path("blacklisted") {
+    jsonRoute {
+      (application.peerManager ? PeerManager.GetBlacklistedPeers)
+        .mapTo[Seq[InetSocketAddress]]
+        .map { peers =>
+          JsArray(peers.map(i => JsString(i.getAddress.toString))).toString()
         }
     }
   }
