@@ -77,7 +77,7 @@ case class PeersHttpService(override val application: Application)(implicit val 
       (application.peerManager ? PeerManager.GetBlacklistedPeers)
         .mapTo[Seq[InetSocketAddress]]
         .map { peers =>
-          JsArray(peers.map(i => JsString(i.getAddress.toString))).toString()
+          JsArray(peers.map(i => JsString(i.getHostString + ":" + i.getPort))).toString()
         }
     }
   }
