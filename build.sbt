@@ -2,7 +2,7 @@
 
 lazy val commonSettings = Seq(
   organization := "org.consensusresearch",
-  version := "1.2.2",
+  version := "1.2.3-SNAPSHOT",
   scalaVersion := "2.11.8"
 )
 
