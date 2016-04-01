@@ -4,8 +4,8 @@ import akka.actor.Props
 import com.typesafe.config.ConfigFactory
 import scorex.api.http._
 import scorex.app.{Application, ApplicationVersion}
-import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
+import scorex.lagonaki.mocks.ConsensusMock
 import scorex.network._
 import scorex.transaction._
 
@@ -25,7 +25,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
 
   override implicit lazy val settings = new LagonakiSettings(settingsFilename)
 
-  override implicit lazy val consensusModule = new NxtLikeConsensusModule
+  override implicit lazy val consensusModule = new ConsensusMock
 
   override implicit lazy val transactionModule: SimpleTransactionModule = new SimpleTransactionModule()(settings, this)
 

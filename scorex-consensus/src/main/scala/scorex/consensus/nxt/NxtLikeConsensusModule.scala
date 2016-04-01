@@ -107,7 +107,7 @@ class NxtLikeConsensusModule(AvgDelay: Long = 5.seconds.toMillis)
     bounded(t0, 1, Long.MaxValue).toLong
   }
 
-  private def calcTarget(lastBlockData: NxtLikeConsensusBlockData,
+  protected def calcTarget(lastBlockData: NxtLikeConsensusBlockData,
                          lastBlockTimestamp: Long,
                          generator: PublicKeyAccount)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val eta = (NTP.correctedTime() - lastBlockTimestamp) / 1000 //in seconds

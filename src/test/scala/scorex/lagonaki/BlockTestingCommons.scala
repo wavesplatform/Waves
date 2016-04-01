@@ -4,6 +4,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
+import scorex.lagonaki.mocks.ConsensusMock
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 
 import scala.util.Random
@@ -12,7 +13,7 @@ trait BlockTestingCommons extends TestingCommons {
 
   import TestingCommons._
 
-  implicit val consensusModule = new NxtLikeConsensusModule(1L)
+  implicit val consensusModule = new ConsensusMock
   implicit val transactionModule = new SimpleTransactionModule()(application.settings, application)
 
   val genesis: Block = Block.genesis()

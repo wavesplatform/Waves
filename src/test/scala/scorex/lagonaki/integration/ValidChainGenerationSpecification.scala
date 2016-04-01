@@ -35,12 +35,12 @@ with TransactionTestingCommons {
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
   }
 
-  test("generate 3 blocks and synchronize") {
+  test("generate 100 blocks and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(app.blockStorage.state.generationBalance(_)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
     genValidTransaction()
 
-    waitGenerationOfBlocks(3)
+    waitGenerationOfBlocks(100)
 
     val last = peers.head.blockStorage.history.lastBlock
     untilTimeout(5.minutes, 10.seconds) {
