@@ -71,12 +71,16 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def peerCycle: Receive = {
     case Connected(newPeer@ConnectedPeer(remote, _)) =>
-      connectedPeers += newPeer -> None
-      if (connectingPeer.contains(remote)) {
-        log.info(s"Connected to $remote")
-        connectingPeer = None
+      if(peerDatabase.isBlacklisted(newPeer.socketAddress)) {
+        log.info(s"Got incoming connection from blacklisted $remote")
       } else {
-        log.info(s"Got incoming connection from $remote")
+        connectedPeers += newPeer -> None
+        if (connectingPeer.contains(remote)) {
+          log.info(s"Connected to $remote")
+          connectingPeer = None
+        } else {
+          log.info(s"Got incoming connection from $remote")
+        }
       }
 
     case Handshaked(address, handshake) =>
