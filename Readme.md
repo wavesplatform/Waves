@@ -1,7 +1,6 @@
-# Lagonaki
+# Waves
 
 This is waves implementation with Nxt consensus on top of Scorex framework.
-
 
 ## Run a node
 # Ubuntu
