@@ -1,24 +1,25 @@
 {
   "p2p": {
-    "bindAddress": "0.0.0.0",
+    "bindAddress": "127.0.0.1",
     "upnp": false,
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
-    "port": 9084,
-    "knownPeers": [
-      "23.94.190.226:9080"
-    ],
+    "port": 6868,
+    "knownPeers": ["127.0.0.1"],
     "maxConnections": 10
   },
   "walletDir": "/tmp/scorex/wallet",
   "walletPassword": "cookies",
   "dataDir": "/tmp/scorex/data",
-  "rpcPort": 9085,
+  "rpcPort": 6869,
   "rpcAllowed": [],
   "maxRollback": 100,
   "blockGenerationDelay": 0,
   "perma": {
     "treeDir": "/tmp/scorex/data/tree/",
     "authDataStorage": "permatree.db"
-  }
+  },
+  "maxRollback": 100,
+  "history": "blockchain",
+  "offlineGeneration": false
 }
