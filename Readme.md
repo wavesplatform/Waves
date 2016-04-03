@@ -23,7 +23,9 @@ and agree with license terms
 Install SBT(Scala Build Tool):
 
 echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list 
+
 apt-get update 
+
 apt-get install sbt 
 
 
