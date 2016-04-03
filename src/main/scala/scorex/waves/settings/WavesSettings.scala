@@ -1,6 +1,5 @@
 package scorex.waves.settings
 
-import scorex.perma.settings.PermaSettings
 import scorex.settings.Settings
 import scorex.transaction.TransactionSettings
 

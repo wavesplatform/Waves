@@ -15,10 +15,6 @@
   "rpcAllowed": [],
   "maxRollback": 100,
   "blockGenerationDelay": 0,
-  "perma": {
-    "treeDir": "/tmp/scorex/data/tree/",
-    "authDataStorage": "permatree.db"
-  },
   "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
