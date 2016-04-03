@@ -1,5 +1,7 @@
 # Waves
 
+**Not working** Please do not run the Software yet.
+
 This is waves implementation with Nxt consensus on top of Scorex framework.
 
 ## Installation
