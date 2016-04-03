@@ -1,4 +1,4 @@
-package scorex.lagonaki.settings
+package scorex.waves.settings
 
 import com.typesafe.config.ConfigFactory
 import scorex.utils.ScorexLogging

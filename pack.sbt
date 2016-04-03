@@ -1,7 +1,7 @@
 // Package description
 maintainer := "scorex <scorex-dev@groups.io>"
-packageSummary := "Permacoin implementation on top of Scorex framework"
-packageDescription := "Package for permacoin testnet"
+packageSummary := "Nxt Consensus Implementation for Waves on top of Scorex"
+packageDescription := "Package for Waves testnet"
 
 enablePlugins(JavaAppPackaging)
 

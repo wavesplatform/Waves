@@ -1,6 +1,6 @@
 organization := "org.consensusresearch"
 
-name := "lagonaki"
+name := "waves"
 
 version := "1.2.1"
 
@@ -16,7 +16,7 @@ libraryDependencies ++= Seq(
 )
 
 //assembly settings
-assemblyJarName in assembly := "lagonaki.jar"
+assemblyJarName in assembly := "waves.jar"
 
 test in assembly := {}
 

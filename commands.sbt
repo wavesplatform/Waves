@@ -1,6 +1,6 @@
 import java.io.File
 
-lazy val JarPath = "target/scala-2.11/lagonaki.jar"
+lazy val JarPath = "target/scala-2.11/waves.jar"
 
 val recompile = taskKey[File]("Recompile project")
 val start = taskKey[Unit]("Connect to the network")

@@ -1,4 +1,4 @@
-package scorex.lagonaki.http
+package scorex.waves.http
 
 import javax.ws.rs.Path
 
