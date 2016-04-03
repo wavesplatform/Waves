@@ -1,4 +1,4 @@
-package scorex.lagonaki.http
+package scorex.waves.http
 
 import javax.ws.rs.Path
 
@@ -9,7 +9,7 @@ import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.Application
 import scorex.consensus.mining.BlockGeneratorController._
-import scorex.lagonaki.settings.Constants
+import scorex.waves.settings.Constants
 import scorex.network.HistorySynchronizer
 import spray.routing.Route
 
