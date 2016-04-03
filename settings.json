@@ -8,9 +8,9 @@
     "knownPeers": ["127.0.0.1"],
     "maxConnections": 10
   },
-  "walletDir": "/tmp/scorex/wallet",
-  "walletPassword": "cookies",
-  "dataDir": "/tmp/scorex/data",
+  "walletDir": "/tmp/scorex/waves/wallet",
+  "walletPassword": "mycookies",
+  "dataDir": "/tmp/scorex/waves/data",
   "rpcPort": 6869,
   "rpcAllowed": [],
   "maxRollback": 100,
@@ -19,6 +19,7 @@
     "treeDir": "/tmp/scorex/data/tree/",
     "authDataStorage": "permatree.db"
   },
+  "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
   "offlineGeneration": false
