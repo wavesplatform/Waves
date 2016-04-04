@@ -30,7 +30,7 @@ trait SwaggerService {
         null,
         "kushti@protonmail.ch",
         "License: Creative Commons CC0",
-        "https://github.com/ScorexProject/Scorex-Lagonaki/blob/master/COPYING")
+        "https://github.com/ScorexProject/Scorex/blob/master/COPYING")
     )
 
     //authorizations, not used
