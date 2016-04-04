@@ -71,7 +71,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def peerCycle: Receive = {
     case Connected(newPeer@ConnectedPeer(remote, _)) =>
-      if(peerDatabase.isBlacklisted(newPeer.socketAddress)) {
+      if (peerDatabase.isBlacklisted(newPeer.socketAddress)) {
         log.info(s"Got incoming connection from blacklisted $remote")
       } else {
         connectedPeers += newPeer -> None
@@ -84,26 +84,30 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       }
 
     case Handshaked(address, handshake) =>
-      val toUpdate = connectedPeers.filter { case (cp, h) =>
-        cp.socketAddress == address || h.map(_.nodeNonce == handshake.nodeNonce).getOrElse(true)
-      }
-
-      if (toUpdate.isEmpty) {
-        log.error("No peer to update")
+      if (peerDatabase.isBlacklisted(address)) {
+        log.info(s"Got handshake from blacklisted $address")
       } else {
-        val newCp = toUpdate
-          .find(t => handshake.declaredAddress.contains(t._1.socketAddress))
-          .getOrElse(toUpdate.head)
-          ._1
+        val toUpdate = connectedPeers.filter { case (cp, h) =>
+          cp.socketAddress == address || h.map(_.nodeNonce == handshake.nodeNonce).getOrElse(true)
+        }
 
-        toUpdate.keys.foreach(connectedPeers.remove)
-
-        //drop connection to self if occurred
-        if (handshake.nodeNonce == application.settings.nodeNonce) {
-          newCp.handlerRef ! PeerConnectionHandler.CloseConnection
+        if (toUpdate.isEmpty) {
+          log.error("No peer to update")
         } else {
-          handshake.declaredAddress.foreach(address => self ! PeerManager.AddOrUpdatePeer(address, None, None))
-          connectedPeers += newCp -> Some(handshake)
+          val newCp = toUpdate
+            .find(t => handshake.declaredAddress.contains(t._1.socketAddress))
+            .getOrElse(toUpdate.head)
+            ._1
+
+          toUpdate.keys.foreach(connectedPeers.remove)
+
+          //drop connection to self if occurred
+          if (handshake.nodeNonce == application.settings.nodeNonce) {
+            newCp.handlerRef ! PeerConnectionHandler.CloseConnection
+          } else {
+            handshake.declaredAddress.foreach(address => self ! PeerManager.AddOrUpdatePeer(address, None, None))
+            connectedPeers += newCp -> Some(handshake)
+          }
         }
       }
 

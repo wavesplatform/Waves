@@ -30,9 +30,9 @@ class PeerDatabaseImpl(application: Application, filename: Option[String]) exten
     database.commit()
   }
 
-  override def blacklistPeer(address: InetSocketAddress): Unit = if(!isBlacklisted(address)) {
+  override def blacklistPeer(address: InetSocketAddress): Unit = {
     whitelistPersistence.remove(address)
-    blacklist += address -> System.currentTimeMillis()
+    if (!isBlacklisted(address)) blacklist += address -> System.currentTimeMillis()
     database.commit()
   }
 
