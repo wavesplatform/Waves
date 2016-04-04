@@ -4,10 +4,11 @@ import java.net.InetSocketAddress
 
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.app.Application
+import scorex.settings.Settings
 
 import scala.collection.JavaConversions._
 
-class PeerDatabaseImpl(application: Application, filename: Option[String]) extends PeerDatabase {
+class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends PeerDatabase {
 
 
   val database = filename match {
@@ -18,7 +19,7 @@ class PeerDatabaseImpl(application: Application, filename: Option[String]) exten
   private val whitelistPersistence: MVMap[InetSocketAddress, PeerInfo] = database.openMap("whitelist")
   private val blacklist: MVMap[InetSocketAddress, Long] = database.openMap("blacklist")
 
-  private lazy val ownNonce = application.settings.nodeNonce
+  private lazy val ownNonce = settings.nodeNonce
 
   override def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
     val updatedPeerInfo = Option(whitelistPersistence.get(address)).map { case dbPeerInfo =>
