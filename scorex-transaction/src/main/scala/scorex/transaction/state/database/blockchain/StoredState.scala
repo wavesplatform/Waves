@@ -171,15 +171,11 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       val requiredHeight = atHeight.getOrElse(stateHeight)
       require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
       def loop(hh: Int): Long = {
-        Option(accountChanges(address).get(hh)) match {
-          case Some(row) =>
-            if (row.lastRowHeight < requiredHeight) row.state.balance
-            else if (row.lastRowHeight == 0) 0L
-            else loop(row.lastRowHeight)
-          case None =>
-            log.error(s"accountChanges($address).get($hh) is null")
-            0L
-        }
+        val row = accountChanges(address).get(hh)
+        require(Option(row).isDefined, s"accountChanges($address).get($hh) is null.  lastStates.get(address)=$h")
+        if (row.lastRowHeight < requiredHeight) row.state.balance
+        else if (row.lastRowHeight == 0) 0L
+        else loop(row.lastRowHeight)
       }
       loop(h)
   }
