@@ -1,5 +1,5 @@
 // Package description
-maintainer := "scorex <scorex-dev@groups.io>"
+maintainer := "tosch <toschdev@gmail.com>"
 packageSummary := "Nxt Consensus Implementation for Waves on top of Scorex"
 packageDescription := "Package for Waves testnet"
 
