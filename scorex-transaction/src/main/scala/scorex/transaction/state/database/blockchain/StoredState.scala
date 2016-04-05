@@ -171,11 +171,15 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       val requiredHeight = atHeight.getOrElse(stateHeight)
       require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
       def loop(hh: Int): Long = {
-        val row = accountChanges(address).get(hh)
-        if (Option(row).isEmpty) log.error(s"accountChanges($address).get($hh) is null")
-        if (row.lastRowHeight < requiredHeight) row.state.balance
-        else if (row.lastRowHeight == 0) 0L
-        else loop(row.lastRowHeight)
+        Option(accountChanges(address).get(hh)) match {
+          case Some(row) =>
+            if (row.lastRowHeight < requiredHeight) row.state.balance
+            else if (row.lastRowHeight == 0) 0L
+            else loop(row.lastRowHeight)
+          case None =>
+            log.error(s"accountChanges($address).get($hh) is null")
+            0L
+        }
       }
       loop(h)
   }
@@ -220,7 +224,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     }
     val validTransactions = txs.filter(t => !toRemove.exists(tr => tr.signature sameElements t.signature))
     if (validTransactions.size == txs.size) txs
-    else if(validTransactions.nonEmpty) validate(validTransactions, heightOpt)
+    else if (validTransactions.nonEmpty) validate(validTransactions, heightOpt)
     else validTransactions
   }
 
