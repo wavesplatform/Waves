@@ -2,7 +2,8 @@
 
 **Not working** Please do not run the Software yet.
 
-This is waves implementation with Nxt consensus on top of Scorex framework.
+This is one testnet waves implementation with Nxt consensus on top of Scorex framework.
+There might be several development forks at once.
 
 ## Installation
 # Ubuntu
