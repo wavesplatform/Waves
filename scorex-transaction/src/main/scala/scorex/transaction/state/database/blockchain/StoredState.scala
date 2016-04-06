@@ -166,8 +166,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     balance(address, Some(Math.max(1, stateHeight - confirmations)))
 
   override def balance(address: String, atHeight: Option[Int] = None): Long = Option(lastStates.get(address)) match {
-    case None => 0L
-    case Some(h) =>
+    case Some(h) if h > 0=>
       val requiredHeight = atHeight.getOrElse(stateHeight)
       require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
       def loop(hh: Int): Long = {
@@ -178,6 +177,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
         else loop(row.lastRowHeight)
       }
       loop(h)
+    case _ => 0L
   }
 
   def totalBalance: Long = lastStates.keySet().map(add => balance(add)).sum
