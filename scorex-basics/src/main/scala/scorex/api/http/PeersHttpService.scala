@@ -75,9 +75,9 @@ case class PeersHttpService(override val application: Application)(implicit val 
   def blacklistedPeers: Route = path("blacklisted") {
     jsonRoute {
       (application.peerManager ? PeerManager.GetBlacklistedPeers)
-        .mapTo[Seq[InetSocketAddress]]
+        .mapTo[Seq[String]]
         .map { peers =>
-          JsArray(peers.map(i => JsString(i.getHostString + ":" + i.getPort))).toString()
+          JsArray(peers.map(i => JsString(i))).toString()
         }
     }
   }

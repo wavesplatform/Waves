@@ -3,7 +3,6 @@ package scorex.network.peer
 import java.net.InetSocketAddress
 
 import org.h2.mvstore.{MVMap, MVStore}
-import scorex.app.Application
 import scorex.settings.Settings
 
 import scala.collection.JavaConversions._
@@ -17,7 +16,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
   }
 
   private val whitelistPersistence: MVMap[InetSocketAddress, PeerInfo] = database.openMap("whitelist")
-  private val blacklist: MVMap[InetSocketAddress, Long] = database.openMap("blacklist")
+  private val blacklist: MVMap[String, Long] = database.openMap("blacklist")
 
   private lazy val ownNonce = settings.nodeNonce
 
@@ -33,12 +32,13 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
 
   override def blacklistPeer(address: InetSocketAddress): Unit = {
     whitelistPersistence.remove(address)
-    if (!isBlacklisted(address)) blacklist += address -> System.currentTimeMillis()
+    if (!isBlacklisted(address)) blacklist += address.getHostName -> System.currentTimeMillis()
     database.commit()
   }
 
-  override def isBlacklisted(address: InetSocketAddress): Boolean =
-    blacklist.synchronized(blacklist.contains(address))
+  override def isBlacklisted(address: InetSocketAddress): Boolean = {
+    blacklist.synchronized(blacklist.contains(address.getHostName))
+  }
 
   override def knownPeers(excludeSelf: Boolean): Map[InetSocketAddress, PeerInfo] =
     (excludeSelf match {
@@ -46,6 +46,6 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
       case false => whitelistPersistence.keys.flatMap(k => Option(whitelistPersistence.get(k)).map(v => k -> v))
     }).toMap
 
-  override def blacklistedPeers(): Seq[InetSocketAddress] =
-    blacklist.keys.toSeq
+  override def blacklistedPeers(): Seq[String] = blacklist.keys.toSeq
+
 }

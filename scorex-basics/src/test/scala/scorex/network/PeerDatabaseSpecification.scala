@@ -37,7 +37,7 @@ class PeerDatabaseSpecification extends PropSpec with PropertyChecks with Genera
 
       db.blacklistPeer(address)
       db.knownPeers(false).contains(address) shouldBe false
-      db.blacklistedPeers().contains(address) shouldBe true
+      db.blacklistedPeers().contains(address.getHostName) shouldBe true
     }
   }
 }

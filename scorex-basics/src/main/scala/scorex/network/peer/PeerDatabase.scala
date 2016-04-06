@@ -12,7 +12,7 @@ trait PeerDatabase {
 
   def blacklistPeer(peer: InetSocketAddress): Unit
 
-  def blacklistedPeers(): Seq[InetSocketAddress]
+  def blacklistedPeers(): Seq[String]
 
   def isBlacklisted(address: InetSocketAddress): Boolean
 }
