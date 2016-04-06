@@ -10,7 +10,7 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
+import scorex.transaction.state.database.blockchain.{StoredState, StoredBlockTree, StoredBlockchain}
 import scorex.transaction.state.wallet.Payment
 import scorex.utils._
 import scorex.wallet.Wallet
