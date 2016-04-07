@@ -103,11 +103,9 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
 
   def exists(): Boolean = walletFileOpt.map(_.exists()).getOrElse(true)
 
-  def accounts(): Seq[PrivateKeyAccount] = accountsCache.values.toSeq
-
   def nonce(): Int = Option(noncePersistence.get(NonceFieldName)).getOrElse(0)
 
-  def getAndIncrementNonce(): Int = synchronized{
+  def getAndIncrementNonce(): Int = synchronized {
     noncePersistence.put(NonceFieldName, nonce() + 1) - 1
   }
 
