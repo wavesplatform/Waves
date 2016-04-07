@@ -2,17 +2,16 @@ package scorex.lagonaki.integration
 
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.account.PublicKeyAccount
-import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
+import scorex.transaction.BalanceSheet
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.{BalanceSheet, Transaction}
 import scorex.utils.{ScorexLogging, untilTimeout}
 
 import scala.concurrent.duration._
 
 class ValidChainGenerationSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
-with TransactionTestingCommons {
+  with TransactionTestingCommons {
 
   import TestingCommons._
 
@@ -81,12 +80,15 @@ with TransactionTestingCommons {
   test("Double spending") {
     cleanTransactionPool()
     val recepient = new PublicKeyAccount(Array.empty)
-    val trans = accounts.flatMap { a =>
-      val senderBalance = state.asInstanceOf[BalanceSheet].balance(a.address)
-      (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
+    val (trans, valid) = untilTimeout(5.seconds) {
+      val trans = accounts.flatMap { a =>
+        val senderBalance = state.asInstanceOf[BalanceSheet].balance(a.address)
+        (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
+      }
+      val valid = transactionModule.packUnconfirmed()
+      valid.nonEmpty shouldBe true
+      (trans, valid)
     }
-    val valid = transactionModule.packUnconfirmed()
-    valid.nonEmpty shouldBe true
     state.validate(trans).nonEmpty shouldBe true
     valid.size should be < trans.size
 
