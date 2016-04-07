@@ -40,6 +40,14 @@ case class Row(state: AccState, reason: Reason, lastRowHeight: Int) extends Data
 }
 
 object Row {
+  def deserialize(bytes: Array[Byte]): Row = {
+    val b = ByteBuffer.allocate(bytes.length)
+    b.put(bytes)
+    b.flip()
+    deserialize(b)
+  }
+
+
   def deserialize(b: ByteBuffer): Row = {
     val lrh = b.getInt
     val accBalance = b.getLong

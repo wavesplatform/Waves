@@ -42,6 +42,7 @@ with TransactionTestingCommons {
     val trans = (1 to UnconfirmedTransactionsDatabaseImpl.SizeLimit).map { i =>
       val account = accounts(Random.nextInt(accounts.size))
       val senderBalance = state.asInstanceOf[BalanceSheet].balance(account.address)
+      senderBalance should be > 0L
       val amount = Random.nextLong() % senderBalance
       val fee = Random.nextLong() % senderBalance
       transactionModule.createPayment(acc, recepient, amount, 1)

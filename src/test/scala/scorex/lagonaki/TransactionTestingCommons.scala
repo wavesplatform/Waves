@@ -19,6 +19,7 @@ trait TransactionTestingCommons {
     wallet.generateNewAccounts(3)
   }
   val accounts = wallet.privateKeyAccounts()
+
   val ab = accounts.map(a => transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(a)).sum
   require(ab > 2)
 

@@ -35,7 +35,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   }
   db.rollback()
 
-  private def accountChanges(key: Address): MVMap[Int, Row] = db.openMap(key.toString)
+  private def accountChanges(key: Address): MVMap[Int, Array[Byte]] = db.openMap(key.toString)
 
   val lastStates: MVMap[Address, Int] = db.openMap(LastStates)
 
@@ -54,7 +54,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     val h = stateHeight
     ch.foreach { ch =>
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1)).getOrElse(0))
-      accountChanges(ch._1).put(h, change)
+      accountChanges(ch._1).put(h, change.bytes)
       lastStates.put(ch._1, h)
       ch._2._2.foreach(t => includedTx.put(t.signature, h))
     }
@@ -66,7 +66,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       val currentHeight = lastStates.get(key)
       if (currentHeight > rollbackTo) {
         val dataMap = accountChanges(key)
-        val changes = dataMap.remove(currentHeight)
+        val changes = Row.deserialize(dataMap.remove(currentHeight))
         changes.reason.foreach(t => includedTx.remove(t.signature))
         val prevHeight = changes.lastRowHeight
         lastStates.put(key, prevHeight)
@@ -124,7 +124,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       val requiredHeight = atHeight.getOrElse(stateHeight)
       require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
       def loop(hh: Int): Long = {
-        val row = accountChanges(address).get(hh)
+        val row = Row.deserialize(accountChanges(address).get(hh))
         require(Option(row).isDefined, s"accountChanges($address).get($hh) is null.  lastStates.get(address)=$h")
         if (row.lastRowHeight < requiredHeight) row.state.balance
         else if (row.lastRowHeight == 0) 0L
@@ -141,7 +141,8 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       case Some(accHeight) =>
         val m = accountChanges(account.address)
         def loop(h: Int, acc: Array[LagonakiTransaction]): Array[LagonakiTransaction] = Option(m.get(h)) match {
-          case Some(heightChanges) =>
+          case Some(heightChangesBytes) =>
+            val heightChanges = Row.deserialize(heightChangesBytes)
             val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[LagonakiTransaction])
               .map(_.asInstanceOf[LagonakiTransaction])
             loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
