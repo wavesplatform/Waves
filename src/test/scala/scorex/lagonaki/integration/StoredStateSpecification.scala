@@ -34,6 +34,7 @@ class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfte
 
   }
 
+/*
   test("validate single transaction") {
     val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc.address)
     senderBalance should be > 0L
@@ -76,5 +77,6 @@ class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfte
     state.included(newTx).isDefined shouldBe false
 
   }
+*/
 
 }
