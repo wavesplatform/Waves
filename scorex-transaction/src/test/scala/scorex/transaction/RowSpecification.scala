@@ -1,13 +1,11 @@
 package scorex.transaction
 
-import java.nio.ByteBuffer
+import java.io._
 
 import org.scalacheck.Gen
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.{Account, PrivateKeyAccount}
 import scorex.transaction.state.database.state._
-import scorex.utils._
 
 class RowSpecification extends PropSpec
   with PropertyChecks
@@ -15,22 +13,24 @@ class RowSpecification extends PropSpec
   with Matchers
   with TransactionGen {
 
+  val FileName = "object.data"
+
   property("Row serialize and deserialize") {
-    forAll(paymentGenerator, Gen.posNum[Long], Gen.posNum[Int]) { (payment: PaymentTransaction,
-                                                                   balance: Long,
-                                                                   lastRowHeight: Int) =>
+    forAll(paymentGenerator, Gen.posNum[Long], Gen.posNum[Long], Gen.posNum[Int]) { (payment: PaymentTransaction,
+                                                                                     balance: Long,
+                                                                                     fee: Long,
+                                                                                     lastRowHeight: Int) =>
 
-      val txs = Seq(FeesStateChange(123L), payment)
+      val txs = Seq(FeesStateChange(fee), payment)
       LagonakiTransaction.parse(payment.bytes).get shouldBe payment
-
-
       val row = Row(AccState(balance), txs, lastRowHeight)
 
-      val b = ByteBuffer.allocate(row.bytes.length)
-      b.put(row.bytes)
-      b.flip()
+      val objectOutputStream = new ObjectOutputStream(new FileOutputStream(FileName))
+      objectOutputStream.writeObject(row)
+      objectOutputStream.close()
 
-      val des = Row.deserialize(b.asReadOnlyBuffer())
+      val objectInputStream = new ObjectInputStream(new FileInputStream(FileName))
+      val des = objectInputStream.readObject().asInstanceOf[Row]
       des shouldBe row
     }
   }
