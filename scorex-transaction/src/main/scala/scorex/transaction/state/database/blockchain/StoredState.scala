@@ -37,11 +37,11 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   private def accountChanges(key: Address): MVMap[Int, Array[Byte]] = db.openMap(key.toString)
 
-  val lastStates: MVMap[Address, Int] = db.openMap(LastStates)
+  private val lastStates: MVMap[Address, Int] = db.openMap(LastStates)
 
-  val includedTx: MVMap[Array[Byte], Int] = db.openMap(IncludedTx)
+  private val includedTx: MVMap[Array[Byte], Int] = db.openMap(IncludedTx)
 
-  val heightMap: MVMap[String, Int] = db.openMap(HeightKey)
+  private val heightMap: MVMap[String, Int] = db.openMap(HeightKey)
 
   if (Option(heightMap.get(HeightKey)).isEmpty) heightMap.put(HeightKey, 0)
 
