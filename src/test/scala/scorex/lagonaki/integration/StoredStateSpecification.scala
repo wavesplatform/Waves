@@ -32,7 +32,6 @@ class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfte
     state.included(tx).value shouldBe state.stateHeight
     state invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq(tx))))
 
-
   }
 
   test("validate single transaction") {
