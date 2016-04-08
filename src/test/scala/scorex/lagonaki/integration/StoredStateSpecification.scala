@@ -1,17 +1,17 @@
 package scorex.lagonaki.integration
 
-import org.scalatest.{PrivateMethodTester, BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest._
 import scorex.account.Account
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
-import scorex.transaction.{FeesStateChange, BalanceSheet}
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.state.AccState
+import scorex.transaction.{BalanceSheet, FeesStateChange}
 import scorex.utils.ScorexLogging
 
 import scala.util.Random
 
 class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
-  with TransactionTestingCommons with PrivateMethodTester {
+  with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   import TestingCommons._
 
@@ -29,6 +29,8 @@ class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfte
     val tx = transactionModule.createPayment(acc, new Account(testAdd), 1, 1)
     state invokePrivate applyMethod(Map(testAdd ->(AccState(2L), Seq(FeesStateChange(1L), tx))))
     state.balance(testAdd) shouldBe 2
+    state.included(tx).value shouldBe state.stateHeight
+    state invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq(tx))))
 
 
   }
