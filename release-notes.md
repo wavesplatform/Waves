@@ -2,7 +2,7 @@
 
 * Peer blacklisting implemented
 * Logback configured to rollover log files daily
-* MapDB was replaced with MVStore
+* MapDB replaced with MVStore
 
 **1.2.2**
 
