@@ -35,8 +35,8 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Befo
   }
 
   test("generate 100 blocks and synchronize") {
-//    val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(app.blockStorage.state.generationBalance(_)).sum
-//    genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
+    val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(app.blockStorage.state.generationBalance(_)).sum
+    genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
     genValidTransaction()
 
     waitGenerationOfBlocks(100)
