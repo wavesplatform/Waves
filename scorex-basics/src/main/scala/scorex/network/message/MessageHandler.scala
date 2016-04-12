@@ -2,7 +2,6 @@ package scorex.network.message
 
 import java.nio.ByteBuffer
 
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.network.ConnectedPeer
 

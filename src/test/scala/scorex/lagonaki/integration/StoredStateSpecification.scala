@@ -1,15 +1,17 @@
 package scorex.lagonaki.integration
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest._
+import scorex.account.Account
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
-import scorex.transaction.BalanceSheet
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.transaction.state.database.state.AccState
+import scorex.transaction.{BalanceSheet, FeesStateChange}
 import scorex.utils.ScorexLogging
 
 import scala.util.Random
 
 class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
-with TransactionTestingCommons {
+  with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   import TestingCommons._
 
@@ -19,6 +21,19 @@ with TransactionTestingCommons {
   val history = app.transactionModule.blockStorage.history
   val acc = accounts.head
   val recepient = accounts.last
+
+  test("private methods") {
+    val testAdd = "aPFwzRp5TXCzi6DSuHmpmbQunopXRuxLk"
+    val applyMethod = PrivateMethod[Unit]('applyChanges)
+    state.balance(testAdd) shouldBe 0
+    val tx = transactionModule.createPayment(acc, new Account(testAdd), 1, 1)
+    state invokePrivate applyMethod(Map(testAdd ->(AccState(2L), Seq(FeesStateChange(1L), tx))))
+    state.balance(testAdd) shouldBe 2
+    state.included(tx).value shouldBe state.stateHeight
+    state invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq(tx))))
+
+  }
+
 
   test("validate single transaction") {
     val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc.address)
@@ -42,6 +57,7 @@ with TransactionTestingCommons {
     val trans = (1 to UnconfirmedTransactionsDatabaseImpl.SizeLimit).map { i =>
       val account = accounts(Random.nextInt(accounts.size))
       val senderBalance = state.asInstanceOf[BalanceSheet].balance(account.address)
+      senderBalance should be > 0L
       val amount = Random.nextLong() % senderBalance
       val fee = Random.nextLong() % senderBalance
       transactionModule.createPayment(acc, recepient, amount, 1)
@@ -49,7 +65,7 @@ with TransactionTestingCommons {
     val st = System.currentTimeMillis()
     state.validate(trans).size should be <= trans.size
     //TODO optimization
-//    System.currentTimeMillis() - st should be <= 2000L
+    //    System.currentTimeMillis() - st should be <= 2000L
   }
 
   test("included") {

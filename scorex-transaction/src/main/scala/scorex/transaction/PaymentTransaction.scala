@@ -15,7 +15,8 @@ case class PaymentTransaction(sender: PublicKeyAccount,
                               override val fee: Long,
                               override val timestamp: Long,
                               override val signature: Array[Byte])
-  extends LagonakiTransaction(TransactionType.PaymentTransaction, recipient, amount, fee, timestamp, signature) {
+  extends LagonakiTransaction(TransactionType.PaymentTransaction, recipient, amount, fee, timestamp, signature)
+    with Serializable {
 
   import scorex.transaction.LagonakiTransaction._
   import scorex.transaction.PaymentTransaction._
@@ -121,7 +122,7 @@ object PaymentTransaction {
     //READ SIGNATURE
     val signatureBytes = util.Arrays.copyOfRange(data, position, position + SignatureLength)
 
-    new PaymentTransaction(sender, recipient, amount, fee, timestamp, signatureBytes)
+    PaymentTransaction(sender, recipient, amount, fee, timestamp, signatureBytes)
   }
 
   def generateSignature(sender: PrivateKeyAccount, recipient: Account,

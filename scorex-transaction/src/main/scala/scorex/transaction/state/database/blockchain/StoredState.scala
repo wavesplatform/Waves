@@ -1,15 +1,13 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.{DataInput, DataOutput, File}
-
-import com.google.common.primitives.Longs
-import org.mapdb._
+import org.h2.mvstore.{MVMap, MVStore}
 import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
+import scorex.transaction.state.database.state._
 import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
@@ -25,39 +23,6 @@ import scala.util.Try
   */
 class StoredState(fileNameOpt: Option[String]) extends LagonakiState with ScorexLogging {
 
-  private object RowSerializer extends Serializer[Row] {
-    override def serialize(dataOutput: DataOutput, row: Row): Unit = {
-      DataIO.packInt(dataOutput, row.lastRowHeight)
-      DataIO.packLong(dataOutput, row.state.balance)
-      DataIO.packInt(dataOutput, row.reason.length)
-      row.reason.foreach { scr =>
-        DataIO.packInt(dataOutput, scr.bytes.length)
-        dataOutput.write(scr.bytes)
-      }
-    }
-
-    override def deserialize(dataInput: DataInput, i: Int): Row = {
-      val lastRowHeight = DataIO.unpackInt(dataInput)
-      val b = DataIO.unpackLong(dataInput)
-      val txCount = DataIO.unpackInt(dataInput)
-      val txs = (1 to txCount).toArray.map { _ =>
-        val txSize = DataIO.unpackInt(dataInput)
-        val b = new Array[Byte](txSize)
-        dataInput.readFully(b)
-        if (txSize == 8) FeesStateChange(Longs.fromByteArray(b))
-        else LagonakiTransaction.parse(b).get //todo: .get w/out catching
-      }
-      Row(AccState(b), txs, lastRowHeight)
-    }
-  }
-
-  type Address = String
-
-  case class AccState(balance: Long)
-
-  type Reason = Seq[StateChangeReason]
-
-  case class Row(state: AccState, reason: Reason, lastRowHeight: Int)
 
   val HeightKey = "height"
   val DataKey = "dataset"
@@ -65,35 +30,24 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   val IncludedTx = "includedTx"
 
   private val db = fileNameOpt match {
-    case Some(fileName) =>
-      DBMaker.fileDB(new File(fileName))
-        .closeOnJvmShutdown()
-        .cacheSize(2048)
-        .checksumEnable()
-        .fileMmapEnable()
-        .make()
-    case None => DBMaker.memoryDB().snapshotEnable().make()
+    case Some(fileName) => new MVStore.Builder().fileName(fileName).compress().open()
+    case None => new MVStore.Builder().open()
   }
   db.rollback()
 
-  private def accountChanges(key: Address): HTreeMap[Integer, Row] = db.hashMap(
-    key.toString,
-    Serializer.INTEGER,
-    RowSerializer,
-    null)
+  private def accountChanges(key: Address): MVMap[Int, Row] = db.openMap(key.toString)
 
-  val lastStates = db.hashMap[Address, Int](LastStates)
+  private val lastStates: MVMap[Address, Int] = db.openMap(LastStates)
 
-  val includedTx: HTreeMap[Array[Byte], Int] = db.hashMapCreate(IncludedTx)
-    .keySerializer(Serializer.BYTE_ARRAY)
-    .valueSerializer(Serializer.INTEGER)
-    .makeOrGet()
+  private val includedTx: MVMap[Array[Byte], Int] = db.openMap(IncludedTx)
 
-  if (Option(db.atomicInteger(HeightKey).get()).isEmpty) db.atomicInteger(HeightKey).set(0)
+  private val heightMap: MVMap[String, Int] = db.openMap(HeightKey)
 
-  def stateHeight: Int = db.atomicInteger(HeightKey).get()
+  if (Option(heightMap.get(HeightKey)).isEmpty) heightMap.put(HeightKey, 0)
 
-  private def setStateHeight(height: Int): Unit = db.atomicInteger(HeightKey).set(height)
+  def stateHeight: Int = heightMap.get(HeightKey)
+
+  private def setStateHeight(height: Int): Unit = heightMap.put(HeightKey, height)
 
   private def applyChanges(ch: Map[Address, (AccState, Reason)]): Unit = synchronized {
     setStateHeight(stateHeight + 1)
@@ -166,7 +120,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     balance(address, Some(Math.max(1, stateHeight - confirmations)))
 
   override def balance(address: String, atHeight: Option[Int] = None): Long = Option(lastStates.get(address)) match {
-    case Some(h) if h > 0=>
+    case Some(h) if h > 0 =>
       val requiredHeight = atHeight.getOrElse(stateHeight)
       require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
       def loop(hh: Int): Long = {
@@ -187,7 +141,8 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       case Some(accHeight) =>
         val m = accountChanges(account.address)
         def loop(h: Int, acc: Array[LagonakiTransaction]): Array[LagonakiTransaction] = Option(m.get(h)) match {
-          case Some(heightChanges) =>
+          case Some(heightChangesBytes) =>
+            val heightChanges = heightChangesBytes
             val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[LagonakiTransaction])
               .map(_.asInstanceOf[LagonakiTransaction])
             loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
