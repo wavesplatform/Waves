@@ -1,24 +1,17 @@
 package scorex.waves
 
-import java.io.File
-
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
 import scorex.account.Account
 import scorex.api.http._
 import scorex.app.ApplicationVersion
-import scorex.crypto.ads.merkle.AuthDataBlock
-import scorex.waves.http.{ScorexApiRoute, DebugApiRoute}
-import scorex.waves.settings.WavesSettings
+import scorex.consensus.nxt.NxtLikeConsensusModule
+import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
-import scorex.perma.api.http.PermaConsensusApiRoute
-import scorex.perma.consensus.PermaConsensusModule
-import scorex.perma.network.{PermacoinMessagesRepo, SegmentsSynchronizer}
-import scorex.perma.settings.PermaConstants._
-import scorex.perma.storage.AuthDataStorage
-import scorex.storage.Storage
 import scorex.transaction.{BalanceSheet, GenesisTransaction, SimpleTransactionModule, Transaction}
 import scorex.utils.ScorexLogging
+import scorex.waves.http.{DebugApiRoute, ScorexApiRoute}
+import scorex.waves.settings.WavesSettings
 
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
@@ -38,19 +31,13 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
 
   override implicit lazy val settings = new WavesSettings(settingsFilename)
 
-  override implicit lazy val consensusModule = {
-    new File(settings.treeDir).mkdirs()
-    val authDataStorage: Storage[Long, AuthDataBlock[DataSegment]] = new AuthDataStorage(Some(settings.authDataStorage))
-    val rootHash = settings.rootHash
-    actorSystem.actorOf(Props(classOf[SegmentsSynchronizer], this, rootHash, authDataStorage))
-    new PermaConsensusModule(rootHash, Some(networkController))(authDataStorage)
-  }
+  override implicit lazy val consensusModule = new NxtLikeConsensusModule
 
   override implicit lazy val transactionModule: SimpleTransactionModule = new SimpleTransactionModule()(settings, this)
 
   override lazy val blockStorage = transactionModule.blockStorage
 
-  lazy val consensusApiRoute = new PermaConsensusApiRoute(this)
+  lazy val consensusApiRoute = new NxtConsensusApiRoute(this)
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(this),
@@ -68,7 +55,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
   override lazy val apiTypes = Seq(
     typeOf[BlocksApiRoute],
     typeOf[TransactionsApiRoute],
-    typeOf[PermaConsensusApiRoute],
+    typeOf[NxtConsensusApiRoute],
     typeOf[WalletApiRoute],
     typeOf[PaymentApiRoute],
     typeOf[ScorexApiRoute],
@@ -78,7 +65,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
     typeOf[DebugApiRoute]
   )
 
-  override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs ++ PermacoinMessagesRepo.specs
+  override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
 
   //checks
   require(transactionModule.balancesSupport)
@@ -98,17 +85,16 @@ object Application extends App with ScorexLogging {
   log.debug("PermaScorex has been started")
   application.run()
 
-  if (application.wallet.privateKeyAccounts().isEmpty) application.wallet.generateNewAccounts(1)
+  val wallet = application.wallet
+
+  if (wallet.privateKeyAccounts().isEmpty) {
+    wallet.generateNewAccounts(3)
+    log.info("Generated Accounts:\n" + wallet.privateKeyAccounts().toList.map(_.address).mkString("\n"))
+  }
 
   def testingScript(application: Application): Unit = {
     log.info("Going to execute testing scenario")
     log.info("Current state is:" + application.blockStorage.state)
-    val wallet = application.wallet
-
-    if (wallet.privateKeyAccounts().isEmpty) {
-      wallet.generateNewAccounts(3)
-      log.info("Generated Accounts:\n" + wallet.privateKeyAccounts().toList.map(_.address).mkString("\n"))
-    }
 
     log.info("Executing testing scenario with accounts" +
       s"(${wallet.privateKeyAccounts().size}) : "
