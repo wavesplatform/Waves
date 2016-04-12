@@ -1,5 +1,7 @@
 package scorex.lagonaki.integration
 
+import akka.pattern.ask
+import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.account.PublicKeyAccount
 import scorex.consensus.mining.BlockGeneratorController._
@@ -8,12 +10,16 @@ import scorex.transaction.BalanceSheet
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{ScorexLogging, untilTimeout}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class ValidChainGenerationSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
-  with TransactionTestingCommons {
+with TransactionTestingCommons {
 
   import TestingCommons._
+
+  implicit val timeout = Timeout(1.second)
 
   val peers = applications.tail
   val app = peers.head
@@ -23,7 +29,8 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Befo
   def waitGenerationOfBlocks(howMany: Int): Unit = {
     val height = maxHeight()
     untilTimeout(5.minutes, 10.seconds) {
-      peers.foreach(_.blockStorage.history.height() should be >= height + howMany)
+      val heights = peers.map(_.blockStorage.history.height())
+      heights.foreach(_ should be >= height + howMany)
     }
   }
 
@@ -34,12 +41,12 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Befo
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
   }
 
-  test("generate 100 blocks and synchronize") {
+  test("generate 10 blocks and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(app.blockStorage.state.generationBalance(_)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
     genValidTransaction()
 
-    waitGenerationOfBlocks(100)
+    waitGenerationOfBlocks(10)
 
     val last = peers.head.blockStorage.history.lastBlock
     untilTimeout(5.minutes, 10.seconds) {
@@ -59,13 +66,24 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Befo
         p.blockStorage.state.included(tx).get should be <= h
       }
     }
+    applications.foreach(_.blockGenerator ! StopGeneration)
+
+    untilTimeout(1.second) {
+      val statuses = Await.result(Future.sequence(applications.map(_.blockGenerator ? GetStatus)), timeout.duration)
+      statuses.foreach(_ shouldBe "syncing")
+    }
+
+    Thread.sleep(10000)
 
     cleanTransactionPool()
+
 
     incl.foreach(tx => UnconfirmedTransactionsDatabaseImpl.putIfNew(tx))
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe incl.size
     val tx = genValidTransaction(randomAmnt = false)
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe incl.size + 1
+
+    applications.foreach(_.blockGenerator ! StartGeneration)
 
     waitGenerationOfBlocks(2)
 
