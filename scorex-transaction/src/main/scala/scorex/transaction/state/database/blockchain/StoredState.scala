@@ -153,8 +153,8 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     }
   }
 
-  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] =
-    Option(includedTx.get(tx.signature)).filter(_ < heightOpt.getOrElse(Int.MaxValue))
+  override def included(signature: Array[Byte], heightOpt: Option[Int]): Option[Int] =
+    Option(includedTx.get(signature)).filter(_ < heightOpt.getOrElse(Int.MaxValue))
 
   //return seq of valid transactions
   @tailrec

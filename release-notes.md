@@ -1,3 +1,7 @@
+**1.2.3**
+
+* New API call /transactions/info
+
 **1.2.2**
 
 * LagonakiApplication was moved to [Lagonaki](https://github.com/ScorexProject/Lagonaki) project

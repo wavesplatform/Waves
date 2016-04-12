@@ -6,9 +6,13 @@ import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.app.Application
+import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiState
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.transaction.state.database.blockchain.StoredBlockchain
 import spray.routing.Route
+
+import scala.util.{Success, Try}
 
 
 @Api(value = "/transactions", description = "Information about transactions")
@@ -19,7 +23,7 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
 
   override lazy val route =
     pathPrefix("transactions") {
-      unconfirmed ~ address ~ adressLimit
+      unconfirmed ~ address ~ adressLimit ~ info
     }
 
   //TODO implement general pagination
@@ -32,6 +36,7 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
   def adressLimit: Route = {
     path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
       jsonRoute {
+
         val txJsons = state.accountTransactions(address)
           .takeRight(limit)
           .map(_.json)
@@ -50,6 +55,31 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
       jsonRoute {
         val txJsons = state.accountTransactions(address).map(_.json)
         Json.arr(txJsons).toString()
+      }
+    }
+  }
+
+  @Path("/info/{signature}")
+  @ApiOperation(value = "Info", notes = "Get transaction info", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "signature", value = "transaction signature ", required = true, dataType = "String", paramType = "path")
+  ))
+  def info: Route = {
+    path("info" / Segment) { case encoded =>
+      jsonRoute {
+        Base58.decode(encoded) match {
+          case Success(sig) =>
+            state.included(sig, None) match {
+              case Some(h) =>
+                Try {
+                  val block = application.blockStorage.history.asInstanceOf[StoredBlockchain].blockAt(h).get
+                  val tx = block.transactions.filter(_.signature sameElements sig).head
+                  tx.json
+                }.getOrElse(Json.obj("error" -> "Internal error")).toString
+              case None => Json.obj("error" -> "Transaction is not in blockchain").toString()
+            }
+          case _ => Json.obj("error" -> "Incorrect signature").toString()
+        }
       }
     }
   }
