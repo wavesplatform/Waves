@@ -5,7 +5,6 @@
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
     "port": 6868,
-    "knownPeers": ["127.0.0.1"],
     "maxConnections": 10
   },
   "walletDir": "/tmp/scorex/waves/wallet",
@@ -17,5 +16,5 @@
   "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
-  "offlineGeneration": false
+  "offlineGeneration": true
 }
