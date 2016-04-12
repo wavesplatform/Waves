@@ -6,9 +6,9 @@
     "myAddress": "127.0.0.2",
     "upnp": false,
     "upnpGatewayTimeout": 7000,
-    "upnpDiscoverTimeout": 6868,
+    "upnpDiscoverTimeout": 7000,
     "port": 6870,
-    "knownPeers": ["127.0.0.1:9084"],
+    "knownPeers": ["127.0.0.1:6868"],
     "maxConnections": 10
   },
   "walletDir": "/tmp/scorex/waves2/wallet",

@@ -8,6 +8,7 @@
     "maxConnections": 10
   },
   "walletDir": "/tmp/scorex/waves/wallet",
+  "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
   "walletPassword": "mycookies",
   "dataDir": "/tmp/scorex/waves/data",
   "rpcPort": 6869,
