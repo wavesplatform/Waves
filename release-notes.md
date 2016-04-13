@@ -2,6 +2,12 @@
 
 * New API call /transactions/info
 
+**1.2.3**
+
+* Peer blacklisting implemented
+* Logback configured to rollover log files daily
+* MapDB replaced with MVStore
+
 **1.2.2**
 
 * LagonakiApplication was moved to [Lagonaki](https://github.com/ScorexProject/Lagonaki) project
