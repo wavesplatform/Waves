@@ -40,7 +40,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
     WalletApiRoute(this),
     PaymentApiRoute(this),
     SeedApiRoute(this),
-    PeersHttpService(this),
+    PeersApiRoute(this),
     AddressApiRoute(this)
   )
 
@@ -51,7 +51,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
     typeOf[WalletApiRoute],
     typeOf[PaymentApiRoute],
     typeOf[SeedApiRoute],
-    typeOf[PeersHttpService],
+    typeOf[PeersApiRoute],
     typeOf[AddressApiRoute]
   )
 

@@ -16,7 +16,7 @@ import spray.routing.Route
 import scala.concurrent.ExecutionContext.Implicits.global
 
 @Api(value = "/peers", description = "Get info about peers", position = 2)
-case class PeersHttpService(override val application: Application)(implicit val context: ActorRefFactory)
+case class PeersApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
   override lazy val route =
