@@ -81,6 +81,7 @@ trait Application extends ScorexLogging {
     //on unexpected shutdown
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run() {
+        log.error("Unexpected shutdown")
         stopAll()
       }
     })
