@@ -90,7 +90,7 @@ case class QoraConsensusApiRoute(override val application: Application)
   def algo: Route = {
     path("algo") {
       jsonRoute {
-        Json.obj("consensus-algo" -> "qora").toString()
+        Json.obj("consensusAlgo" -> "qora").toString()
       }
     }
   }

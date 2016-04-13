@@ -36,7 +36,7 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
         withBlock(blockStorage.history, encodedSignature) { block =>
           val gs = consensusModule.consensusBlockData(block).generationSignature
           Json.obj(
-            "generation-signature" -> Base58.encode(gs)
+            "generationSignature" -> Base58.encode(gs)
           )
         }.toString()
       }
@@ -50,7 +50,7 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
       jsonRoute {
         val lastBlock = blockStorage.history.lastBlock
         val gs = consensusModule.consensusBlockData(lastBlock).generationSignature
-        Json.obj("generation-signature" -> Base58.encode(gs)).toString()
+        Json.obj("generationSignature" -> Base58.encode(gs)).toString()
       }
     }
   }
@@ -65,7 +65,7 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
       jsonRoute {
         withBlock(blockStorage.history, encodedSignature) { block =>
           Json.obj(
-            "base-target" -> consensusModule.consensusBlockData(block).baseTarget
+            "baseTarget" -> consensusModule.consensusBlockData(block).baseTarget
           )
         }.toString
       }
@@ -79,7 +79,7 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
       jsonRoute {
         val lastBlock = blockStorage.history.lastBlock
         val bt = consensusModule.consensusBlockData(lastBlock).baseTarget
-        Json.obj("base-target" -> bt).toString()
+        Json.obj("baseTarget" -> bt).toString()
       }
     }
   }
@@ -89,7 +89,7 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
   def algo: Route = {
     path("algo") {
       jsonRoute {
-        Json.obj("consensus-algo" -> "nxt").toString()
+        Json.obj("consensusAlgo" -> "nxt").toString()
       }
     }
   }
