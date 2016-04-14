@@ -1,6 +1,6 @@
 package scorex.api.http
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
@@ -10,6 +10,7 @@ import com.wordnik.swagger.annotations._
 import play.api.libs.json.{JsString, JsArray, Json}
 import scorex.app.Application
 import scorex.network.Handshake
+import scorex.network.NetworkController.ConnectTo
 import scorex.network.peer.{PeerInfo, PeerManager}
 import spray.routing.Route
 
@@ -65,6 +66,19 @@ case class PeersApiRoute(override val application: Application)(implicit val con
           Json.obj("peers" -> peerData).toString()
         }
     }
+  }
+
+  @Path("/connect")
+  @ApiOperation(value = "Connect to peer", notes = "Connect to peer", httpMethod = "POST")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with connected peers or error")
+  ))
+  def connect: Route = path("connect") {
+    jsonRoute ({
+      val add:InetSocketAddress = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1)
+      application.networkController ! ConnectTo(add)
+      Json.obj(add.getHostName -> "Trying to connect").toString()
+    }, post)
   }
 
   @Path("/blacklisted")
