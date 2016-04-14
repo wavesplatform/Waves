@@ -1,7 +1,7 @@
 **1.2.4**
 
 * New API call /transactions/info
-* MVStore is used for state persostance
+* MVStore is used for state persistence
 
 **1.2.3**
 
