@@ -85,6 +85,7 @@ publishTo := {
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 
+fork := true
 
 pomIncludeRepository := { _ => false }
 
