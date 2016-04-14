@@ -12,6 +12,7 @@ import scorex.transaction.{BalanceSheet, GenesisTransaction, SimpleTransactionMo
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, ScorexApiRoute}
 import scorex.waves.settings.WavesSettings
+import scorex.waves.transaction.WavesTransactionModule
 
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
@@ -33,7 +34,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
 
   override implicit lazy val consensusModule = new NxtLikeConsensusModule
 
-  override implicit lazy val transactionModule: SimpleTransactionModule = new SimpleTransactionModule()(settings, this)
+  override implicit lazy val transactionModule: SimpleTransactionModule = new WavesTransactionModule()(settings, this)
 
   override lazy val blockStorage = transactionModule.blockStorage
 
