@@ -30,6 +30,7 @@ with TransactionTestingCommons {
     val height = maxHeight()
     untilTimeout(5.minutes, 10.seconds) {
       val heights = peers.map(_.blockStorage.history.height())
+      log.info(s"Current heights are: $heights. Waiting for ${height + howMany}")
       heights.foreach(_ should be >= height + howMany)
     }
   }

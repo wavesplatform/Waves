@@ -25,5 +25,5 @@
 		"treeDir": "/tmp/scorex/data3/tree/",
 		"authDataStorage": "authDataStorage3.mapDB"
 	},
-	"blockGenerationDelay": 50
+	"blockGenerationDelay": 501
 }

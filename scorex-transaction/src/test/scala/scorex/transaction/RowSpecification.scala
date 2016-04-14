@@ -21,7 +21,7 @@ class RowSpecification extends PropSpec
                                                                                      fee: Long,
                                                                                      lastRowHeight: Int) =>
 
-      val txs = Seq(FeesStateChange(fee), payment)
+      val txs = List(FeesStateChange(fee), payment)
       LagonakiTransaction.parse(payment.bytes).get shouldBe payment
       val row = Row(AccState(balance), txs, lastRowHeight)
 
