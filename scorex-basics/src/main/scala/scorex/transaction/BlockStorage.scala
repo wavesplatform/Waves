@@ -2,6 +2,7 @@ package scorex.transaction
 
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.crypto.encode.Base58
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
@@ -36,10 +37,13 @@ trait BlockStorage extends ScorexLogging {
   //Should be used for linear blockchain only
   def removeAfter(signature: BlockId): Unit = synchronized {
     history match {
-      case h: BlockChain =>
-        val height = h.heightOf(signature).get
-        while (!h.lastBlock.uniqueId.sameElements(signature)) h.discardBlock()
-        state.rollbackTo(height)
+      case h: BlockChain => h.heightOf(signature) match {
+        case Some(height) =>
+          while (!h.lastBlock.uniqueId.sameElements(signature)) h.discardBlock()
+          state.rollbackTo(height)
+        case None =>
+          log.warn(s"RemoveAfter non-existing block ${Base58.encode(signature)}")
+      }
       case _ =>
         throw new RuntimeException("Not available for other option than linear blockchain")
     }
