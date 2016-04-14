@@ -65,7 +65,9 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scalacheck" % "scalacheck_2.11" % "1.12.5",
   "org.scalactic" % "scalactic_2.11" % "2.3.0-SNAP2",
   "org.scalatest" % "scalatest_2.11" % "2.3.0-SNAP2",
+  "org.scoverage" % "scalac-scoverage-plugin_2.11" % "1.1.1",
+  "org.scoverage" % "scalac-scoverage-runtime_2.11" % "1.1.1",
   "org.slf4j" % "slf4j-api" % "1.7.20",
   "org.whispersystems" % "curve25519-java" % "0.2.4"
 )
-// LIBRARY_DEPENDENCIES_HASH 33f6a539bf4b7197f898ca252c66a2b6a7de7b93
+// LIBRARY_DEPENDENCIES_HASH 3b53b401df29ee4105500fd7368a6c25976ccaa5
