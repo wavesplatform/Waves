@@ -19,4 +19,4 @@ assemblyJarName in assembly := "waves.jar"
 
 test in assembly := {}
 
-mainClass in assembly := Some("scorex.perma.Application")
+mainClass in assembly := Some("scorex.waves.Application")

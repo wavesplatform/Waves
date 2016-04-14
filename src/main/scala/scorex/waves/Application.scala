@@ -82,7 +82,7 @@ object Application extends App with ScorexLogging {
 
   val application = new Application(filename)
 
-  log.debug("PermaScorex has been started")
+  log.debug("Waves has been started")
   application.run()
 
   val wallet = application.wallet

@@ -8,7 +8,7 @@ import scorex.utils.ScorexLogging
   */
 
 object Constants extends ScorexLogging {
-  private val appConf = ConfigFactory.load().getConfig("app")
+  private val appConf = ConfigFactory.load("waves.conf").getConfig("app")
 
   val Product = appConf.getString("product")
   val Release = appConf.getString("release")
