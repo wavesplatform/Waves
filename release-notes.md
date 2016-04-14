@@ -3,6 +3,7 @@
 * New API call /transactions/info
 * MVStore is used for state persostance
 * Fixed JSON style in API callsq
+* PeersHttpService was rebaned to PeersApiRoute
 
 **1.2.3**
 
