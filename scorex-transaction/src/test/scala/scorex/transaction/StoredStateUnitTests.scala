@@ -1,4 +1,6 @@
-package scorex.lagonaki.integration
+package scorex.transaction
+
+import java.io.File
 
 import org.h2.mvstore.{MVMap, MVStore}
 import org.scalacheck.Gen
@@ -9,10 +11,12 @@ import scorex.transaction.state.database.state._
 import scorex.transaction.{FeesStateChange, PaymentTransaction, TransactionGen}
 
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
-  with PrivateMethodTester with OptionValues with TransactionGen {
+with PrivateMethodTester with OptionValues with TransactionGen {
 
+  val folder = "/tmp/scorex/test"
+  new File(folder).mkdirs()
 
-  val state = new StoredState(None) // Don't work for Some(file)
+  val state = new StoredState(Some(folder + "state.dat"))
 
   property("private methods") {
     val testAdd = "aPFwzRp5TXCzi6DSuHmpmbQunopXRuxLk"
@@ -29,7 +33,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("DB reopen") {
-    val db = new MVStore.Builder().fileName("/tmp/mvstoretest.dat").open()
+    val db = new MVStore.Builder().fileName(folder + "mvstoretest.dat").open()
 
     forAll(paymentGenerator, Gen.posNum[Long], Gen.posNum[Int]) { (tx: PaymentTransaction,
                                                                    balance: Long,
