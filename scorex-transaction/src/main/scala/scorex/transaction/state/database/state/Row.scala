@@ -7,7 +7,7 @@ import org.h2.mvstore.WriteBuffer
 import org.h2.mvstore.`type`.DataType
 import scorex.transaction.{FeesStateChange, LagonakiTransaction, StateChangeReason}
 
-case class Row(state: AccState, reason: Reason, lastRowHeight: Int) extends DataType {
+case class Row(state: AccState, reason: Reason, lastRowHeight: Int) extends DataType with Serializable {
 
   lazy val bytes: Array[Byte] = Ints.toByteArray(lastRowHeight) ++
     Longs.toByteArray(state.balance) ++
