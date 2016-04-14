@@ -5,9 +5,8 @@ import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
 import akka.pattern.ask
-import com.fasterxml.jackson.annotation.JsonValue
 import com.wordnik.swagger.annotations._
-import play.api.libs.json.{JsString, JsArray, Json}
+import play.api.libs.json.{JsArray, JsString, Json}
 import scorex.app.Application
 import scorex.network.Handshake
 import scorex.network.NetworkController.ConnectTo
@@ -22,7 +21,7 @@ case class PeersApiRoute(override val application: Application)(implicit val con
 
   override lazy val route =
     pathPrefix("peers") {
-      allPeers ~ connectedPeers ~ blacklistedPeers
+      allPeers ~ connectedPeers ~ blacklistedPeers ~ connect
     }
 
   @Path("/all")
@@ -70,15 +69,21 @@ case class PeersApiRoute(override val application: Application)(implicit val con
 
   @Path("/connect")
   @ApiOperation(value = "Connect to peer", notes = "Connect to peer", httpMethod = "POST")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with connected peers or error")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "host", value = "Peer host", required = true, paramType = "body", dataType = "String"),
+    new ApiImplicitParam(name = "port", value = "Peer port", required = true, paramType = "body", dataType = "Int")
   ))
   def connect: Route = path("connect") {
-    jsonRoute ({
-      val add:InetSocketAddress = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1)
-      application.networkController ! ConnectTo(add)
-      Json.obj(add.getHostName -> "Trying to connect").toString()
-    }, post)
+    val host: String = "127.0.0.1"
+    val port: Int = 9084
+
+    incompletedJsonRoute(
+      entity(as[String]) { body => complete {
+        val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(host), port)
+        application.networkController ! ConnectTo(add)
+        Json.obj(add.getHostName -> "Trying to connect").toString()
+      }
+      }, post)
   }
 
   @Path("/blacklisted")
