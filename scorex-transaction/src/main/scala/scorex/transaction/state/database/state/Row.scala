@@ -51,7 +51,7 @@ object Row {
   def deserialize(b: ByteBuffer): Row = {
     val lrh = b.getInt
     val accBalance = b.getLong
-    val reasonLength = b.getInt()
+    val reasonLength = b.getInt
     val reason: Seq[StateChangeReason] = (0 until reasonLength) map { i =>
       val txSize = b.getInt
       val tx = new Array[Byte](txSize)
@@ -59,6 +59,6 @@ object Row {
       if (txSize == 8) FeesStateChange(Longs.fromByteArray(tx))
       else LagonakiTransaction.parse(tx).get //todo: .get w/out catching
     }
-    Row(AccState(accBalance), reason, lrh)
+    Row(AccState(accBalance), reason.toList, lrh)
   }
 }

@@ -4,6 +4,6 @@ import scorex.transaction.StateChangeReason
 
 package object state {
   type Address = String
-  type Reason = Seq[StateChangeReason]
+  type Reason = List[StateChangeReason]
 
 }

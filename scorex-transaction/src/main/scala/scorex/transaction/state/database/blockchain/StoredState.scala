@@ -85,7 +85,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
     val trans = block.transactions
     trans.foreach(t => if (included(t).isDefined) throw new Error(s"Transaction $t is already in state"))
     val fees: Map[Account, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
-      .map(m => m._1 ->(AccState(balance(m._1.address) + m._2), Seq(FeesStateChange(m._2))))
+      .map(m => m._1 ->(AccState(balance(m._1.address) + m._2), List(FeesStateChange(m._2))))
 
     val newBalances: Map[Account, (AccState, Reason)] = calcNewBalances(trans, fees)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
@@ -104,8 +104,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
           tx.balanceChanges().foldLeft(changes) { case (iChanges, (acc, delta)) =>
             //update balances sheet
             val add = acc.address
-            val t: Map[Account, (AccState, Reason)] = iChanges
-            val currentChange: (AccState, Reason) = iChanges.getOrElse(acc, (AccState(balance(add)), Seq.empty))
+            val currentChange: (AccState, Reason) = iChanges.getOrElse(acc, (AccState(balance(add)), List.empty))
             iChanges.updated(acc, (AccState(currentChange._1.balance + delta), tx +: currentChange._2))
           }
 
@@ -199,7 +198,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   override def toString: String = toJson().toString()
 
   def hash: Int = {
-    (BigInt(FastCryptographicHash(toString.getBytes())) % Int.MaxValue).toInt
+    (BigInt(FastCryptographicHash(toString.getBytes)) % Int.MaxValue).toInt
   }
 
   override def finalize(): Unit = {
