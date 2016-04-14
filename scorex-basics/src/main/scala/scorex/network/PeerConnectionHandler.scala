@@ -107,6 +107,7 @@ case class PeerConnectionHandler(application: Application,
   def workingCycleLocalInterface: Receive = {
     case msg: message.Message[_] =>
       val bytes = msg.bytes
+      log.info("Send message " + msg.spec + " to " + remote)
       connection ! Write(ByteString(Ints.toByteArray(bytes.length) ++ bytes))
 
     case Blacklist =>
