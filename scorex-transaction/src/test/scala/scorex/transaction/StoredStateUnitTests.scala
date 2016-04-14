@@ -15,36 +15,33 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
   val folder = "/tmp/scorex/test"
   new File(folder).mkdirs()
+  val stateFile = folder + "state.dat"
 
-  val state = new StoredState(Some(folder + "state.dat"))
+  val state = new StoredState(Some(stateFile))
+  val testAdd = "aPFwzRp5TXCzi6DSuHmpmbQunopXRuxLk"
+  val applyMethod = PrivateMethod[Unit]('applyChanges)
 
   property("private methods") {
-    val testAdd = "aPFwzRp5TXCzi6DSuHmpmbQunopXRuxLk"
-    val applyMethod = PrivateMethod[Unit]('applyChanges)
 
     forAll(paymentGenerator, Gen.posNum[Long]) { (tx: PaymentTransaction,
                                                   balance: Long) =>
       state.balance(testAdd) shouldBe 0
-      state invokePrivate applyMethod(Map(testAdd ->(AccState(balance), Seq(FeesStateChange(balance), tx))))
+      state invokePrivate applyMethod(Map(testAdd ->(AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
       state.balance(testAdd) shouldBe balance
       state.included(tx).value shouldBe state.stateHeight
       state invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq(tx))))
     }
   }
 
-  property("DB reopen") {
-    val db = new MVStore.Builder().fileName(folder + "mvstoretest.dat").open()
+  property("Reopen state") {
+    val balance = 1234L
+    state invokePrivate applyMethod(Map(testAdd ->(AccState(balance), Seq(FeesStateChange(balance)))))
+    state.balance(testAdd) shouldBe balance
+    state.finalize()
 
-    forAll(paymentGenerator, Gen.posNum[Long], Gen.posNum[Int]) { (tx: PaymentTransaction,
-                                                                   balance: Long,
-                                                                   lastRowHeight: Int) =>
-
-      val map: MVMap[Int, Row] = db.openMap("map", new MVMap.Builder[Int, Row])
-      val row = Row(AccState(balance), Seq(tx), lastRowHeight)
-      map.put(lastRowHeight, row)
-      map.get(lastRowHeight) shouldBe row
-    }
-    db.commit()
-
+    val state2 = new StoredState(Some(stateFile))
+    state2.balance(testAdd) shouldBe balance
+    state2 invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq())))
   }
+
 }

@@ -201,4 +201,10 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   def hash: Int = {
     (BigInt(FastCryptographicHash(toString.getBytes())) % Int.MaxValue).toInt
   }
+
+  override def finalize(): Unit = {
+    db.close()
+    super.finalize()
+  }
+
 }
