@@ -2,6 +2,7 @@
 
 * New API call /transactions/info
 * MVStore is used for state persostance
+* Fixed JSON style in API callsq
 
 **1.2.3**
 
