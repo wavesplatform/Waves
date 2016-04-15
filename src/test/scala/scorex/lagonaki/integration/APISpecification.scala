@@ -37,7 +37,13 @@ class APISpecification extends FunSuite with Matchers with BeforeAndAfterAll wit
     (all \\ "address").toList.size should be >= 1
     (all \\ "nodeName").toList.size should be >= 1
     (all \\ "nodeNonce").toList.size should be >= 1
+
+    val blacklisted = getRequest("/peers/blacklisted")
+    blacklisted.toString() shouldBe "[]"
+
+    //TODO peers/connect
   }
+
 
   def getRequest(us: String, peer: String = peerUrl(application)): JsValue = {
     val request = Http(url(peer + us).GET)
