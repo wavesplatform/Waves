@@ -119,30 +119,33 @@ with TransactionTestingCommons {
   }
 
   test("Rollback state") {
-    val last = history.lastBlock
-    val st1 = state.hash
-    val height = history.heightOf(last).get
+    def rollback(i: Int = 5) {
 
-    //Wait for nonEmpty block
-    untilTimeout(1.minute, 1.second) {
-      genValidTransaction()
-      peers.foreach(_.blockStorage.history.height() should be > height)
-      history.height() should be > height
-      state.hash should not be st1
-      peers.foreach(_.transactionModule.blockStorage.history.contains(last))
-    }
-    waitGenerationOfBlocks(0)
+      val last = history.lastBlock
+      val st1 = state.hash
+      val height = history.heightOf(last).get
 
-    untilTimeout(10.seconds) {
-      peers.foreach { p =>
-        p.blockGenerator ! StopGeneration
-        p.transactionModule.blockStorage.removeAfter(last.uniqueId)
-        p.history.lastBlock.encodedId shouldBe last.encodedId
+      //Wait for nonEmpty block
+      untilTimeout(1.minute, 1.second) {
+        genValidTransaction()
+        peers.foreach(_.blockStorage.history.height() should be > height)
+        history.height() should be > height
+        state.hash should not be st1
+        peers.foreach(_.transactionModule.blockStorage.history.contains(last))
       }
-    }
-    peers.foreach(_.blockGenerator ! StartGeneration)
+      waitGenerationOfBlocks(0)
 
-    state.hash shouldBe st1
+      if (history.contains(last) || i < 0) {
+        peers.foreach(_.blockGenerator ! StopGeneration)
+        peers.foreach { p =>
+          p.transactionModule.blockStorage.removeAfter(last.uniqueId)
+          p.history.lastBlock.encodedId shouldBe last.encodedId
+        }
+        state.hash shouldBe st1
+        peers.foreach(_.blockGenerator ! StartGeneration)
+      } else rollback(i - 1)
+    }
+    rollback()
   }
 
 }
