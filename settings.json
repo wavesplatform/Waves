@@ -5,7 +5,8 @@
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
     "port": 6868,
-    "maxConnections": 10
+    "maxConnections": 10,
+    "knownPeers":[]
   },
   "walletDir": "/tmp/scorex/waves/wallet",
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
