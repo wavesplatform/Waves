@@ -64,7 +64,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
         new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
     }
 
-    override val state = new StoredState(settings.dataDirOpt.map(_ + "/state.mapdb"))
+    override val state = new StoredState(settings.dataDirOpt.map(_ + "/state.dat"))
 
   }
 
