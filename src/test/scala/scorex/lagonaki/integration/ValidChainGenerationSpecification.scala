@@ -66,7 +66,6 @@ with TransactionTestingCommons {
     val block = blocks.head
 
     block.transactions shouldBe application.transactionModule.packUnconfirmed()
-    block.transactions.size shouldBe SimpleTransactionModule.MaxTransactionsPerBlock
     block.isValid shouldBe true
 
     startGeneration()
