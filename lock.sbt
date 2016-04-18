@@ -38,11 +38,11 @@ dependencyOverrides in ThisBuild ++= Set(
   "io.spray" % "spray-routing_2.11" % "1.3.3",
   "io.spray" % "spray-util_2.11" % "1.3.3",
   "javax.ws.rs" % "jsr311-api" % "1.1.1",
+  "jline" % "jline" % "2.12.1",
   "joda-time" % "joda-time" % "2.8.1",
   "org.bitlet" % "weupnp" % "0.1.4",
   "org.consensusresearch" % "scorex-basics_2.11" % "1.2.3",
   "org.consensusresearch" % "scorex-consensus_2.11" % "1.2.3",
-  "org.consensusresearch" % "scorex-perma_2.11" % "1.2.3",
   "org.consensusresearch" % "scorex-transaction_2.11" % "1.2.3",
   "org.consensusresearch" % "scrypto_2.11" % "1.0.4",
   "org.joda" % "joda-convert" % "1.7",
@@ -62,4 +62,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.slf4j" % "slf4j-api" % "1.7.20",
   "org.whispersystems" % "curve25519-java" % "0.2.4"
 )
-// LIBRARY_DEPENDENCIES_HASH 111038646dc7c922ca4f2f8b646d0e96e0d35c99
+// LIBRARY_DEPENDENCIES_HASH 5b625a793a072e5a62d77b63dc92ab28046f14c9

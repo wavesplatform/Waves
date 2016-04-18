@@ -86,16 +86,18 @@ object Application extends App with ScorexLogging {
   log.debug("Waves has been started")
   application.run()
 
-  val wallet = application.wallet
+  if (application.wallet.privateKeyAccounts().isEmpty) application.wallet.generateNewAccounts(1)
 
-  if (wallet.privateKeyAccounts().isEmpty) {
-    wallet.generateNewAccounts(3)
-    log.info("Generated Accounts:\n" + wallet.privateKeyAccounts().toList.map(_.address).mkString("\n"))
-  }
 
   def testingScript(application: Application): Unit = {
     log.info("Going to execute testing scenario")
     log.info("Current state is:" + application.blockStorage.state)
+    val wallet = application.wallet
+
+    if (wallet.privateKeyAccounts().isEmpty) {
+      wallet.generateNewAccounts(3)
+      log.info("Generated Accounts:\n" + wallet.privateKeyAccounts().toList.map(_.address).mkString("\n"))
+    }
 
     log.info("Executing testing scenario with accounts" +
       s"(${wallet.privateKeyAccounts().size}) : "
@@ -118,7 +120,7 @@ object Application extends App with ScorexLogging {
       val pkAccs = wallet.privateKeyAccounts().ensuring(_.nonEmpty)
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val senderBalance = application.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
-      val recipientAcc = recipient.getOrElse(genesisAccs(Random.nextInt(genesisAccs.size)))
+      val recipientAcc = recipient.getOrElse(pkAccs(Random.nextInt(pkAccs.size)))
       val fee = Random.nextInt(5).toLong + 1
       if (senderBalance - fee > 0) {
         val amt = amtOpt.getOrElse(Math.abs(Random.nextLong() % (senderBalance - fee)))
