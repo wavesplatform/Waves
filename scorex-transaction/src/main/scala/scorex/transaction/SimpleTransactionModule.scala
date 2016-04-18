@@ -111,6 +111,9 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     UnconfirmedTransactionsDatabaseImpl.all().foreach { tx =>
       if ((lastBlockTs - tx.timestamp).seconds > MaxTimeForUnconfirmed) UnconfirmedTransactionsDatabaseImpl.remove(tx)
     }
+
+    val txs = UnconfirmedTransactionsDatabaseImpl.all()
+    txs.diff(blockStorage.state.validate(txs)).foreach(tx => UnconfirmedTransactionsDatabaseImpl.remove(tx))
   }
 
   override def onNewOffchainTransaction(transaction: Transaction): Unit =
