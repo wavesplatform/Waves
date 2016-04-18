@@ -4,10 +4,11 @@ import akka.pattern.ask
 import akka.util.Timeout
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.account.PublicKeyAccount
+import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
-import scorex.transaction.BalanceSheet
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.transaction.{BalanceSheet, SimpleTransactionModule}
 import scorex.utils.{ScorexLogging, untilTimeout}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -54,6 +55,21 @@ with TransactionTestingCommons {
       peers.head.blockStorage.history.contains(last) shouldBe true
     }
   }
+
+  test("Generate block with plenty of transactions") {
+    stopGeneration()
+    (1 to 10000) foreach (i => genValidTransaction())
+    val blocksFuture = application.consensusModule.generateNextBlocks(accounts)(application.transactionModule)
+
+    val blocks: Seq[Block] = Await.result(blocksFuture, 10.seconds)
+    blocks.nonEmpty shouldBe true
+    blocks.foreach(b => b.isValid shouldBe true)
+    blocks.foreach(b => b.transactions.size shouldBe SimpleTransactionModule.MaxTransactionsPerBlock)
+
+    startGeneration()
+
+  }
+
 
   test("Don't include same transactions twice") {
     val last = history.lastBlock
@@ -136,16 +152,23 @@ with TransactionTestingCommons {
       waitGenerationOfBlocks(0)
 
       if (history.contains(last) || i < 0) {
-        peers.foreach(_.blockGenerator ! StopGeneration)
+        stopGeneration()
         peers.foreach { p =>
           p.transactionModule.blockStorage.removeAfter(last.uniqueId)
           p.history.lastBlock.encodedId shouldBe last.encodedId
         }
         state.hash shouldBe st1
-        peers.foreach(_.blockGenerator ! StartGeneration)
+        startGeneration()
       } else rollback(i - 1)
     }
     rollback()
   }
 
+  def startGeneration(): Unit = {
+    peers.foreach(_.blockGenerator ! StartGeneration)
+  }
+
+  def stopGeneration(): Unit = {
+    peers.foreach(_.blockGenerator ! StopGeneration)
+  }
 }
