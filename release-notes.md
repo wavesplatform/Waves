@@ -1,6 +1,6 @@
 **1.2.5**
 
-* Changed response format for /addresses API call
+* Changed response format for /addresses and /transactions/unconfirmed API call
 
 **1.2.4**
 

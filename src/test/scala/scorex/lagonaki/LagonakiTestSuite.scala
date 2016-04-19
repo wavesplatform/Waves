@@ -23,6 +23,7 @@ class LagonakiTestSuite extends Suites(
   , new PeersAPISpecification
   , new WalletAPISpecification
   , new AdressesAPISpecification
+  , new TransactionsAPISpecification
 
 
 ) with BeforeAndAfterAll {

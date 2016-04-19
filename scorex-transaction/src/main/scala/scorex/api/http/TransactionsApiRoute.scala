@@ -4,7 +4,7 @@ import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
-import play.api.libs.json.Json
+import play.api.libs.json.{JsArray, Json}
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiState
@@ -89,7 +89,7 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
   def unconfirmed: Route = {
     path("unconfirmed") {
       jsonRoute {
-        Json.arr(UnconfirmedTransactionsDatabaseImpl.all().map(_.json)).toString()
+        JsArray(UnconfirmedTransactionsDatabaseImpl.all().map(_.json)).toString()
       }
     }
   }
