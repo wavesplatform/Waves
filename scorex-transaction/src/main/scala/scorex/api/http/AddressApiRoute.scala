@@ -209,8 +209,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   def root: Route = {
     path("") {
       jsonRoute {
-        val addresses = wallet.privateKeyAccounts().map(_.address)
-        Json.arr(addresses).toString()
+        JsArray(wallet.privateKeyAccounts().map(a => JsString(a.address))).toString()
       }
     }
   }
