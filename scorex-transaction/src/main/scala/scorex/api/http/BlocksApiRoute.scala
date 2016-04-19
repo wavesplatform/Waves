@@ -5,6 +5,7 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import com.wordnik.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
+import scorex.account.Account
 import scorex.app.Application
 import scorex.transaction.{BlockChain, History}
 import scorex.wallet.Wallet
@@ -31,9 +32,7 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   def address: Route = {
     path("address" / Segment) { case address =>
       jsonRoute {
-        withPrivateKeyAccount(wallet, address) { account =>
-          Json.arr(history.generatedBy(account).map(_.json))
-        }.toString()
+        JsArray(history.generatedBy(new Account(address)).map(_.json)).toString()
       }
     }
   }
