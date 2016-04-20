@@ -3,6 +3,7 @@ import sbt._
 object Dependencies {
 
   lazy val testKit = Seq(
+    "com.typesafe.akka" %% "akka-testkit" % "2.+",
     "org.scalatest" %% "scalatest" % "2.+" % "test",
     "org.scalactic" %% "scalactic" % "2.+" % "test",
     "org.scalacheck" %% "scalacheck" % "1.12.+" % "test",
@@ -33,7 +34,7 @@ object Dependencies {
   )
 
   lazy val http = Seq(
-    "com.chuusai" %% "shapeless" % "2+",
+    "com.chuusai" %% "shapeless" % "1.+",
     "com.typesafe.akka" % "akka-http-experimental_2.11" % "0+",
     "io.swagger" %% "swagger-scala-module" % "1.+",
     "io.swagger" % "swagger-core" % "1.+",

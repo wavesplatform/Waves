@@ -7,7 +7,7 @@ import akka.stream.ActorMaterializer
 import scala.reflect.runtime.universe.Type
 
 
-case class CompositeHttpService(system: ActorSystem, swaggerApiTypes: Seq[Type], routes: ApiRoute*)
+case class CompositeHttpService(system: ActorSystem, swaggerApiTypes: Seq[Type], routes: Seq[ApiRoute])
   extends SwaggerService {
   implicit val actorSystem = system
 

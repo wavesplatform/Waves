@@ -15,7 +15,7 @@ trait SwaggerService {
   val swaggerApiTypes: Seq[Type]
 
   val swaggerService = new SwaggerHttpService with HasActorSystem {
-    override def apiTypes = swaggerApiTypes
+    override val apiTypes = swaggerApiTypes
 
     override val info: Info = Info("The Web Interface to the Scorex API",
       "1.2.4",

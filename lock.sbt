@@ -4,7 +4,7 @@
 dependencyOverrides in ThisBuild ++= Set(
   "ch.qos.logback" % "logback-classic" % "1.1.7",
   "ch.qos.logback" % "logback-core" % "1.1.7",
-  "com.chuusai" % "shapeless_2.11" % "2.3.0",
+  "com.chuusai" % "shapeless_2.11" % "1.2.4",
   "com.fasterxml.jackson.core" % "jackson-annotations" % "2.5.4",
   "com.fasterxml.jackson.core" % "jackson-core" % "2.5.4",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.5.4",
@@ -34,6 +34,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe.akka" % "akka-http-spray-json-experimental_2.11" % "2.0.3",
   "com.typesafe.akka" % "akka-parsing-experimental_2.11" % "2.0.3",
   "com.typesafe.akka" % "akka-stream-experimental_2.11" % "2.0.3",
+  "com.typesafe.akka" % "akka-testkit_2.11" % "2.4.4",
   "com.typesafe.play" % "play-datacommons_2.11" % "2.4.6",
   "com.typesafe.play" % "play-functional_2.11" % "2.4.6",
   "com.typesafe.play" % "play-iteratees_2.11" % "2.4.6",
@@ -75,8 +76,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scoverage" % "scalac-scoverage-plugin_2.11" % "1.1.1",
   "org.scoverage" % "scalac-scoverage-runtime_2.11" % "1.1.1",
   "org.slf4j" % "slf4j-api" % "1.7.20",
-  "org.typelevel" % "macro-compat_2.11" % "1.1.1",
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.12"
 )
-// LIBRARY_DEPENDENCIES_HASH 13212dc3cff131e4cb14c227504886736d1a9044
+// LIBRARY_DEPENDENCIES_HASH 7f0daea91aff17d4cea36c72ecd7991a5aeac0e8

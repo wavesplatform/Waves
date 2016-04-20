@@ -14,7 +14,6 @@ class LagonakiTestSuite extends Suites(
   //  , new BlockStorageSpecification
   , new WalletSpecification
   , new BlockGeneratorSpecification
-  , new BlocksRoutingSpecification
   , new BlockTreeSpecification
   //integration tests - slow!
   , new ValidChainGenerationSpecification
