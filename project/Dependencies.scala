@@ -3,7 +3,6 @@ import sbt._
 object Dependencies {
 
   lazy val testKit = Seq(
-    "io.spray" %% "spray-testkit" % "1.+" % "test",
     "org.scalatest" %% "scalatest" % "2.+" % "test",
     "org.scalactic" %% "scalactic" % "2.+" % "test",
     "org.scalacheck" %% "scalacheck" % "1.12.+" % "test",
@@ -34,11 +33,7 @@ object Dependencies {
   )
 
   lazy val spray = Seq(
-    "io.spray" %% "spray-routing" % "1.+",
-    "io.spray" %% "spray-can" % "1.+",
-    "io.spray" %% "spray-http" % "1.+",
-    "io.spray" %% "spray-httpx" % "1.+",
-    "io.spray" %% "spray-util" % "1.+",
-    "com.gettyimages" %% "spray-swagger" % "0.+"
+    "com.typesafe.akka" % "akka-http-experimental_2.11" % "0+"
+//    "com.gettyimages" %% "spray-swagger" % "0.+"
   )
 }

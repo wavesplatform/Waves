@@ -1,6 +1,7 @@
 package scorex.app
 
 import akka.actor.{ActorSystem, Props}
+import akka.http.Http
 import akka.io.IO
 import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
 import scorex.block.Block
@@ -13,7 +14,6 @@ import scorex.settings.Settings
 import scorex.transaction.{BlockStorage, History, TransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
-import spray.can.Http
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.runtime.universe.Type
@@ -72,7 +72,8 @@ trait Application extends ScorexLogging {
 
     checkGenesis()
 
-    IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
+//    IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
+//    XXX
 
     historySynchronizer ! Unit
     historyReplier ! Unit
