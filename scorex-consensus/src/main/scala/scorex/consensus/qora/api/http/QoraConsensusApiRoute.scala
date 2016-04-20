@@ -3,14 +3,13 @@ package scorex.consensus.qora.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import com.wordnik.swagger.annotations._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidNotNumber}
 import scorex.app.Application
-import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.qora.QoraLikeConsensusModule
-import scorex.transaction.BlockStorage
-import spray.routing.Route
 
 import scala.util.Try
 

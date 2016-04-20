@@ -32,8 +32,14 @@ object Dependencies {
     "ch.qos.logback" % "logback-core" % "1.+"
   )
 
-  lazy val spray = Seq(
-    "com.typesafe.akka" % "akka-http-experimental_2.11" % "0+"
-//    "com.gettyimages" %% "spray-swagger" % "0.+"
+  lazy val http = Seq(
+    "com.chuusai" %% "shapeless" % "2+",
+    "com.typesafe.akka" % "akka-http-experimental_2.11" % "0+",
+    "io.swagger" %% "swagger-scala-module" % "1.+",
+    "io.swagger" % "swagger-core" % "1.+",
+    "io.swagger" % "swagger-annotations" % "1.+",
+    "io.swagger" % "swagger-models" % "1.+",
+    "io.swagger" % "swagger-jaxrs" % "1.+",
+    "com.github.swagger-akka-http" % "swagger-akka-http_2.11" % "0.+"
   )
 }

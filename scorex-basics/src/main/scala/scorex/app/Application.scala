@@ -1,9 +1,10 @@
 package scorex.app
 
 import akka.actor.{ActorSystem, Props}
-import akka.http.Http
+import akka.http.scaladsl.Http
 import akka.io.IO
-import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
+import akka.stream.ActorMaterializer
+import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.consensus.mining.BlockGeneratorController
@@ -37,7 +38,6 @@ trait Application extends ScorexLogging {
   val apiTypes: Seq[Type]
 
   protected implicit lazy val actorSystem = ActorSystem("lagonaki")
-  lazy val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], apiTypes, apiRoutes), "api")
 
   protected val additionalMessageSpecs: Seq[MessageSpec[_]]
 
@@ -66,14 +66,19 @@ trait Application extends ScorexLogging {
   lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistorySynchronizer")
   lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
+
+
+  implicit val materializer = ActorMaterializer()
+  val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes).compositeRoute
+
+
   def run() {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
 
     checkGenesis()
 
-//    IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
-//    XXX
+    IO(Http) !  Http().bindAndHandle(combinedRoute,  "0.0.0.0", settings.rpcPort)
 
     historySynchronizer ! Unit
     historyReplier ! Unit

@@ -4,14 +4,15 @@ import java.nio.charset.StandardCharsets
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import com.wordnik.swagger.annotations._
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import spray.routing.Route
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import io.swagger.annotations._
 
 import scala.util.{Failure, Success, Try}
 

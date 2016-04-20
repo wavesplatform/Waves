@@ -3,12 +3,12 @@ package scorex.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import com.wordnik.swagger.annotations._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.wallet.Wallet
-import spray.routing.Route
 
 
 @Api(value = "/wallet", description = "Wallet-related calls")

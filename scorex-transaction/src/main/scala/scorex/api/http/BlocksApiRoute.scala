@@ -3,13 +3,13 @@ package scorex.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import com.wordnik.swagger.annotations._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
 import scorex.account.Account
 import scorex.app.Application
-import scorex.transaction.{BlockChain, History}
-import scorex.wallet.Wallet
-import spray.routing.Route
+import scorex.transaction.BlockChain
 
 
 @Api(value = "/blocks", description = "Info about blockchain & individual blocks within it")
@@ -133,9 +133,9 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
         history match {
           case blockchain: BlockChain =>
             JsArray(
-            (start to end).map { height =>
-               blockchain.blockAt(height).map(_.json).getOrElse(Json.obj("error" -> s"No block at height $height"))
-            }).toString()
+              (start to end).map { height =>
+                blockchain.blockAt(height).map(_.json).getOrElse(Json.obj("error" -> s"No block at height $height"))
+              }).toString()
           case _ =>
             Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain").toString()
         }

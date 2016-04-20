@@ -4,14 +4,15 @@ import java.net.{InetAddress, InetSocketAddress}
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import com.wordnik.swagger.annotations._
+import io.swagger.annotations._
 import play.api.libs.json.{JsArray, JsString, Json}
 import scorex.app.Application
 import scorex.network.Handshake
 import scorex.network.NetworkController.ConnectTo
 import scorex.network.peer.{PeerInfo, PeerManager}
-import spray.routing.Route
 
 import scala.concurrent.ExecutionContext.Implicits.global
 

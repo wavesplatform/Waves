@@ -3,14 +3,14 @@ package scorex.consensus.nxt.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import com.wordnik.swagger.annotations._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.Application
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.crypto.encode.Base58
-import scorex.transaction.BlockStorage
-import spray.routing.Route
 
 
 @Api(value = "/consensus", description = "Consensus-related calls")

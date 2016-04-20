@@ -4,11 +4,12 @@ import java.security.SecureRandom
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import com.wordnik.swagger.annotations._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.app.Application
 import scorex.crypto.encode.Base58
-import spray.routing.Route
 
 @Api(value = "/seed", description = "Seed generation functions", position = 3)
 case class SeedApiRoute(override val application: Application)(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions {

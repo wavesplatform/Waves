@@ -45,7 +45,7 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
 
 libraryDependencies ++=
   Dependencies.db ++
-  Dependencies.spray ++
+  Dependencies.http ++
   Dependencies.akka ++
   Dependencies.serizalization ++
   Dependencies.testKit ++

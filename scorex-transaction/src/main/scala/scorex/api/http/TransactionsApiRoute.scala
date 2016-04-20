@@ -3,14 +3,15 @@ package scorex.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import com.wordnik.swagger.annotations._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
+import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiState
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.StoredBlockchain
-import spray.routing.Route
 
 import scala.util.{Success, Try}
 
