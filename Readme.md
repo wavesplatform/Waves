@@ -11,31 +11,31 @@ There might be several development forks at once.
 Ubuntu Server
 Install Oracle Java8 JDK:
 
-`echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list`
+echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list
 
-`echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list`
+echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list
 
-`apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EEA14886`
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EEA14886
 
-`apt-get update`
+apt-get update
 
-`apt-get install oracle-java8-installer`
+apt-get install oracle-java8-installer
 
 and agree with license terms
 
 Install SBT(Scala Build Tool):
 
-`echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list`
+echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list 
 
-`apt-get update`
+apt-get update 
 
-`apt-get install sbt`
+apt-get install sbt 
 
 
-## Run a Testnet node
+## Run a node
 # Ubuntu
 
-Download deb package from [releases](https://github.com/wavesplatform), install it, run "perma-windows settings.json".
+//Download deb package from [releases](https://github.com/ScorexProject/PermaScorex/releases), install it, run "perma-windows settings.json".
 
 # Other system
 
