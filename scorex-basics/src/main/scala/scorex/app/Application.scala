@@ -2,7 +2,6 @@ package scorex.app
 
 import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.Http
-import akka.io.IO
 import akka.stream.ActorMaterializer
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
@@ -67,7 +66,6 @@ trait Application extends ScorexLogging {
   lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
 
-
   implicit val materializer = ActorMaterializer()
   val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes).compositeRoute
 
@@ -78,8 +76,7 @@ trait Application extends ScorexLogging {
 
     checkGenesis()
 
-    // ????
-//    IO(Http) !  Http().bindAndHandle(combinedRoute,  "0.0.0.0", settings.rpcPort)
+    Http().bindAndHandle(combinedRoute, "0.0.0.0", settings.rpcPort)
 
     historySynchronizer ! Unit
     historyReplier ! Unit
