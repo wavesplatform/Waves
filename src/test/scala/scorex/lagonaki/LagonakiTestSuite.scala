@@ -16,8 +16,6 @@ class LagonakiTestSuite extends Suites(
   , new BlockGeneratorSpecification
   , new BlocksRoutingSpecification
   , new BlockTreeSpecification
-  //integration tests - slow!
-  , new ValidChainGenerationSpecification
   // API tests
   , new SeedAPISpecification
   , new PeersAPISpecification
@@ -26,6 +24,8 @@ class LagonakiTestSuite extends Suites(
   , new TransactionsAPISpecification
   , new PaymentAPISpecification
   , new BlockAPISpecification
+  //integration tests - slow!
+  , new ValidChainGenerationSpecification
 
 
 ) with BeforeAndAfterAll {
