@@ -3,7 +3,6 @@ package scorex.consensus.nxt.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
@@ -13,6 +12,7 @@ import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.crypto.encode.Base58
 
 
+@Path("/consensus")
 @Api(value = "/consensus", description = "Consensus-related calls")
 class NxtConsensusApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {

@@ -4,15 +4,15 @@ import java.security.SecureRandom
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Directives, Route}
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 
-@Api(value = "/seed", description = "Seed generation functions", position = 3)
-case class SeedApiRoute(override val application: Application)(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions {
+@Path("/seed")
+@Api(value = "/seed", description = "Seed generation functions", position = 3,  produces = "application/json")
+case class SeedApiRoute(override val application: Application)(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions with Directives {
   val SeedSize = 32
 
   private def seed(length: Int): String = {
@@ -21,7 +21,7 @@ case class SeedApiRoute(override val application: Application)(implicit val cont
     Json.obj("seed" -> Base58.encode(seed)).toString()
   }
 
-  override lazy val route =
+  override val route =
     pathPrefix("seed") {
       seedRoute ~ length
     }

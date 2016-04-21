@@ -1,17 +1,23 @@
 package scorex.api.http
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.server.RouteConcatenation._
-import akka.stream.ActorMaterializer
+import akka.http.scaladsl.server.Directives._
+import scorex.api.http.swagger.{CorsSupport, SwaggerDocService}
 
 import scala.reflect.runtime.universe.Type
 
 
-case class CompositeHttpService(system: ActorSystem, swaggerApiTypes: Seq[Type], routes: Seq[ApiRoute])
-  extends SwaggerService {
+case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes: Seq[ApiRoute]) extends CorsSupport {
   implicit val actorSystem = system
 
-  override val actorMaterializer: ActorMaterializer = ActorMaterializer()
+  val swaggerService = new SwaggerDocService(system, apiTypes)
 
-  val compositeRoute = routes.map(_.route).reduce(_ ~ _) ~ swaggerRoute
+  val compositeRoute = routes.map(_.route).reduce(_ ~ _) ~ corsHandler(swaggerService.routes) ~ get {
+    pathPrefix("") {
+      pathEndOrSingleSlash {
+        getFromResource("swagger-ui/index.html")
+      }
+    } ~
+      getFromResourceDirectory("swagger-ui")
+  }
 }

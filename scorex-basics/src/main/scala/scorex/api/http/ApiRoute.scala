@@ -2,12 +2,11 @@ package scorex.api.http
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.server.{Directive0, Route}
-import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.{Directives, Directive0, Route}
 import akka.actor.ActorRefFactory
 import scorex.app.Application
 
-trait ApiRoute {
+trait ApiRoute extends Directives {
   val application: Application
   val context: ActorRefFactory
   val route: Route

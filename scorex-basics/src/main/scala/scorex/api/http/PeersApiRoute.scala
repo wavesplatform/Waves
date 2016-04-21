@@ -4,7 +4,6 @@ import java.net.{InetAddress, InetSocketAddress}
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import io.swagger.annotations._
@@ -16,6 +15,7 @@ import scorex.network.peer.{PeerInfo, PeerManager}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
+@Path("/peers")
 @Api(value = "/peers", description = "Get info about peers", position = 2)
 case class PeersApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {

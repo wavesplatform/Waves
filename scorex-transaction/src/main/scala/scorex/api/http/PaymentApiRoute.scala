@@ -1,7 +1,8 @@
 package scorex.api.http
 
+import javax.ws.rs.Path
+
 import akka.actor.ActorRefFactory
-import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
@@ -12,6 +13,7 @@ import scorex.transaction.state.wallet.Payment
 
 import scala.util.Try
 
+@Path("/payment")
 @Api(value = "/payment", description = "Payment operations.", position = 1)
 case class PaymentApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
