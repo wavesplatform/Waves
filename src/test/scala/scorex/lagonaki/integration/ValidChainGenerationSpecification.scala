@@ -65,8 +65,8 @@ with TransactionTestingCommons {
     blocks.nonEmpty shouldBe true
     val block = blocks.head
 
-    block.transactions shouldBe application.transactionModule.packUnconfirmed()
     block.isValid shouldBe true
+    block.transactions.nonEmpty shouldBe true
 
     startGeneration()
 
@@ -115,6 +115,7 @@ with TransactionTestingCommons {
   }
 
   test("Double spending") {
+    stopGeneration()
     cleanTransactionPool()
     val recepient = new PublicKeyAccount(Array.empty)
     val (trans, valid) = untilTimeout(5.seconds) {
@@ -134,6 +135,7 @@ with TransactionTestingCommons {
     accounts.foreach(a => state.asInstanceOf[BalanceSheet].balance(a.address) should be >= 0L)
     trans.exists(tx => state.included(tx).isDefined) shouldBe true // Some of transactions should be included in state
     trans.forall(tx => state.included(tx).isDefined) shouldBe false // But some should not
+    startGeneration()
   }
 
   test("Rollback state") {
