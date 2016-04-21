@@ -60,12 +60,13 @@ with TransactionTestingCommons {
     stopGeneration()
     (0 to UnconfirmedTransactionsDatabaseImpl.SizeLimit) foreach (i => genValidTransaction())
 
+    val unconfirmed = application.transactionModule.packUnconfirmed()
     val blocksFuture = application.consensusModule.generateNextBlocks(Seq(accounts.head))(application.transactionModule)
     val blocks: Seq[Block] = Await.result(blocksFuture, 10.seconds)
     blocks.nonEmpty shouldBe true
     val block = blocks.head
 
-    block.transactions shouldBe application.transactionModule.packUnconfirmed()
+    block.transactions shouldBe unconfirmed
     block.isValid shouldBe true
 
     startGeneration()
