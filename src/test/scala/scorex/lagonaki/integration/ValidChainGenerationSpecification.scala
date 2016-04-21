@@ -66,8 +66,8 @@ with TransactionTestingCommons {
     blocks.nonEmpty shouldBe true
     val block = blocks.head
 
-    block.transactions shouldBe unconfirmed
     block.isValid shouldBe true
+    block.transactions.size shouldBe unconfirmed.size
 
     startGeneration()
 
