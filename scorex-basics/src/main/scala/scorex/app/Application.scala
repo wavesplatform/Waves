@@ -104,7 +104,7 @@ trait Application extends ScorexLogging {
 
   def checkGenesis(): Unit = {
     if (transactionModule.blockStorage.history.isEmpty) {
-      transactionModule.blockStorage.appendBlock(Block.genesis())
+      transactionModule.blockStorage.appendBlock(Block.genesis(settings.genesisTimestamp))
       log.info("Genesis block has been added to the state")
     }
   }.ensuring(transactionModule.blockStorage.history.height() >= 1)
