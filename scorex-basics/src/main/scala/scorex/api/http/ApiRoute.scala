@@ -1,6 +1,7 @@
 package scorex.api.http
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.http.scaladsl.model.{ContentType, MediaTypes}
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{Directives, Directive0, Route}
 import akka.actor.ActorRefFactory
@@ -21,13 +22,8 @@ trait ApiRoute extends Directives {
 
 
   def incompletedJsonRoute(fn: => Route, method: Directive0 = get): Route = method {
-    // TODO XXX
-    //    val jsonResponse = respondWithMediaType(`application/json`) {
-    val jsonResponse = fn
-    //    }
-
-    if (corsAllowed) respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*"))(jsonResponse)
-    else jsonResponse
+    if (corsAllowed) respondWithHeaders(RawHeader("Content-Type", "application/json"), RawHeader("Access-Control-Allow-Origin", "*"))(fn)
+    else respondWithHeaders(RawHeader("Content-Type", "application/json"))(fn)
   }
 
 }
