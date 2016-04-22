@@ -9,7 +9,7 @@ import scorex.crypto.EllipticCurveImpl.SignatureLength
 import scorex.lagonaki.TestingCommons
 import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler}
 import scorex.transaction.{History, SimpleTransactionModule}
-import shapeless.Typeable._
+import shapeless.syntax.typeable._
 
 class MessageSpecification extends FunSuite with TestingCommons {
 

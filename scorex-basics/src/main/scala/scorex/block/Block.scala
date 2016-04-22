@@ -100,7 +100,7 @@ trait Block extends ScorexLogging {
   }
 
   override def equals(obj: scala.Any): Boolean = {
-    import shapeless.Typeable._
+    import shapeless.syntax.typeable._
     obj.cast[Block].exists(_.uniqueId.sameElements(this.uniqueId))
   }
 }
