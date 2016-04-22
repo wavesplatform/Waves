@@ -4,7 +4,7 @@
 dependencyOverrides in ThisBuild ++= Set(
   "ch.qos.logback" % "logback-classic" % "1.1.7",
   "ch.qos.logback" % "logback-core" % "1.1.7",
-  "com.chuusai" % "shapeless_2.11" % "1.2.4",
+  "com.chuusai" % "shapeless_2.11" % "2.3.0",
   "com.fasterxml.jackson.core" % "jackson-annotations" % "2.5.4",
   "com.fasterxml.jackson.core" % "jackson-core" % "2.5.4",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.5.4",
@@ -26,14 +26,14 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.ning" % "async-http-client" % "1.9.11",
   "com.thoughtworks.paranamer" % "paranamer" % "2.6",
   "com.typesafe" % "config" % "1.3.0",
-  "com.typesafe" % "ssl-config-akka_2.11" % "0.1.0",
-  "com.typesafe" % "ssl-config-core_2.11" % "0.1.0",
+  "com.typesafe" % "ssl-config-akka_2.11" % "0.2.1",
+  "com.typesafe" % "ssl-config-core_2.11" % "0.2.1",
   "com.typesafe.akka" % "akka-actor_2.11" % "2.4.4",
-  "com.typesafe.akka" % "akka-http-core-experimental_2.11" % "2.0.3",
-  "com.typesafe.akka" % "akka-http-experimental_2.11" % "2.0.3",
+  "com.typesafe.akka" % "akka-http-core_2.11" % "2.4.4",
+  "com.typesafe.akka" % "akka-http-experimental_2.11" % "2.4.4",
   "com.typesafe.akka" % "akka-http-spray-json-experimental_2.11" % "2.0.3",
-  "com.typesafe.akka" % "akka-parsing-experimental_2.11" % "2.0.3",
-  "com.typesafe.akka" % "akka-stream-experimental_2.11" % "2.0.3",
+  "com.typesafe.akka" % "akka-parsing_2.11" % "2.4.4",
+  "com.typesafe.akka" % "akka-stream_2.11" % "2.4.4",
   "com.typesafe.akka" % "akka-testkit_2.11" % "2.4.4",
   "com.typesafe.play" % "play-datacommons_2.11" % "2.4.6",
   "com.typesafe.play" % "play-functional_2.11" % "2.4.6",
@@ -76,7 +76,8 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scoverage" % "scalac-scoverage-plugin_2.11" % "1.1.1",
   "org.scoverage" % "scalac-scoverage-runtime_2.11" % "1.1.1",
   "org.slf4j" % "slf4j-api" % "1.7.20",
+  "org.typelevel" % "macro-compat_2.11" % "1.1.1",
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.12"
 )
-// LIBRARY_DEPENDENCIES_HASH 7f0daea91aff17d4cea36c72ecd7991a5aeac0e8
+// LIBRARY_DEPENDENCIES_HASH 1b1db39a25d157e6c036740e38605e7149eacf15

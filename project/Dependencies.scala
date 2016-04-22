@@ -11,7 +11,7 @@ object Dependencies {
   )
 
   lazy val serizalization = Seq(
-    "com.google.guava" % "guava" % "15.+",
+    "com.google.guava" % "guava" % "18.+",
     "com.typesafe.play" %% "play-json" % "2.4.+"
   )
 
@@ -34,13 +34,13 @@ object Dependencies {
   )
 
   lazy val http = Seq(
-    "com.chuusai" %% "shapeless" % "1.+",
-    "com.typesafe.akka" % "akka-http-experimental_2.11" % "0+",
+    "com.typesafe.akka" %% "akka-http-experimental" % "2.+",
+    "com.chuusai" %% "shapeless" % "2.+",
     "io.swagger" %% "swagger-scala-module" % "1.+",
     "io.swagger" % "swagger-core" % "1.+",
     "io.swagger" % "swagger-annotations" % "1.+",
     "io.swagger" % "swagger-models" % "1.+",
     "io.swagger" % "swagger-jaxrs" % "1.+",
-    "com.github.swagger-akka-http" % "swagger-akka-http_2.11" % "0.+"
+    "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.+"
   )
 }
