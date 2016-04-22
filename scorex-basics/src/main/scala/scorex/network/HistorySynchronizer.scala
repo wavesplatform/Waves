@@ -97,10 +97,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   }: Receive)
 
   def gettingExtension(betterScore: BigInt, witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingExtension, {
-    //todo: aggregating function for block ids (like score has)
+    //todo: aggregating function for block ids (like score has) and blockIds type
     case DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, connectedPeer)
       if msgId == SignaturesSpec.messageCode &&
-        blockIds.cast[Seq[Block.BlockId]].isDefined &&
         witnesses.contains(connectedPeer) => //todo: ban if non-expected sender
 
       lastUpdate = System.currentTimeMillis()
