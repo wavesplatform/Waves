@@ -18,6 +18,7 @@ class SwaggerDocService(system: ActorSystem, val apiTypes: Seq[Type], settings: 
   override implicit val materializer: ActorMaterializer = ActorMaterializer()
 
   override val host = "localhost:" + settings.rpcPort
+  override val apiDocsPath: String = "swagger"
 
   override val info: Info = Info("The Web Interface to the Scorex API",
     "1.2.4",
@@ -26,10 +27,4 @@ class SwaggerDocService(system: ActorSystem, val apiTypes: Seq[Type], settings: 
     Some(Contact("Alex", "https://scorex-dev.groups.io/g/main", "alex.chepurnoy@iohk.io")),
     Some(License("License: Creative Commons CC0", "https://github.com/ScorexProject/Scorex/blob/master/COPYING"))
   )
-
-  override val routes: Route = get {
-    path(removeInitialSlashIfNecessary(apiDocsPath)) {
-      complete(toJsonString(swagger).parseJson.asJsObject)
-    }
-  }
 }
