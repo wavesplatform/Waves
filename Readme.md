@@ -2,40 +2,41 @@
 
 **Not working** Please do not run the Software yet.
 
-This is one testnet waves implementation with Nxt consensus on top of Scorex framework.
+This is one Testnet Waves implementation with Nxt consensus on top of Scorex framework.
 There might be several development forks at once.
 
 ## Installation
 # Ubuntu
 
 Ubuntu Server
-Install Oracle Java8 JDK:
 
-echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list
+#####Install Oracle Java8 JDK:
 
-echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list
+`echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list`
 
-apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EEA14886
+`echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list`
 
-apt-get update
+`apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EEA14886`
 
-apt-get install oracle-java8-installer
+`apt-get update`
+
+`apt-get install oracle-java8-installer`
 
 and agree with license terms
 
-Install SBT(Scala Build Tool):
+#####Install SBT(Scala Build Tool):
 
-echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list 
+`echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list`
 
-apt-get update 
+`apt-get update`
 
-apt-get install sbt 
+`apt-get install sbt`
 
 
 ## Run a node
 # Ubuntu
 
-//Download deb package from [releases](https://github.com/ScorexProject/PermaScorex/releases), install it, run "perma-windows settings.json".
+Download deb package from [releases](https://github.com/wavesplatform/Waves/releases), install it, run `waves waves-testnet.json`.
 
 # Other system
 
@@ -47,7 +48,7 @@ For now it is only possible to create deb package with (sudo) `sbt debian:packag
 
 
 ## Run a private local network
----
+
 
 Run one or two peers on the local machine:
 
