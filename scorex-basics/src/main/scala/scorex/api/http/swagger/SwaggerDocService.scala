@@ -17,7 +17,7 @@ class SwaggerDocService(system: ActorSystem, val apiTypes: Seq[Type], settings: 
   override implicit val actorSystem: ActorSystem = system
   override implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  override val host = "localhost:" + settings.rpcPort
+  override val host = settings.bindAddress + ":" + settings.rpcPort
   override val apiDocsPath: String = "swagger"
 
   override val info: Info = Info("The Web Interface to the Scorex API",
