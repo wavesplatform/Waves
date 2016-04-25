@@ -1,0 +1,23 @@
+{
+  "p2p": {
+    "localOnly": true,
+    "bindAddress": "127.0.0.1",
+    "upnp": false,
+    "knownPeers": ["127.0.0.1"],
+    "port": 9091,
+    "maxConnections": 10
+  },
+
+  "walletPassword": "cookies",
+  "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
+
+  "rpcPort": 9092,
+  "rpcAllowed": [
+    "127.0.0.1",
+    "123.123.123.123"
+  ],
+
+  "maxRollback": 100,
+  "history": "blockchain",
+  "offlineGeneration": false
+}

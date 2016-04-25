@@ -2,11 +2,13 @@
 
 **Not working** Please do not run the Software yet.
 
+**[How to use Testnet](https://github.com/wavesplatform/Waves/blob/master/Testnet.md)**
+
 This is one Testnet Waves implementation with Nxt consensus on top of Scorex framework.
 There might be several development forks at once.
 
-## Installation
-# Ubuntu
+# Installation
+## Ubuntu
 
 Ubuntu Server
 
