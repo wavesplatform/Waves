@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import io.swagger.annotations._
@@ -78,13 +79,14 @@ case class PeersApiRoute(override val application: Application)(implicit val con
     val host: String = "127.0.0.1"
     val port: Int = 9084
 
-    incompletedJsonRoute(
-      entity(as[String]) { body => complete {
+    withCors {
+      entity(as[String]) { body =>
         val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(host), port)
         application.networkController ! ConnectTo(add)
-        Json.obj(add.getHostName -> "Trying to connect").toString()
+        val resp = Json.obj(add.getHostName -> "Trying to connect")
+        complete(HttpEntity(ContentTypes.`application/json`, resp.toString()))
       }
-      }, post)
+    }
   }
 
   @Path("/blacklisted")

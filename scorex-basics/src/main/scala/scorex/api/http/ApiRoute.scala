@@ -28,16 +28,21 @@ trait ApiRoute extends Directives {
 
   def postJsonRoute(fn: JsValue): Route = jsonRoute(fn, post)
 
-  def jsonRoute(fn: JsValue, method: Directive0): Route = method {
+  def postJsonRoute(fn: Future[JsValue]): Route = jsonRoute(Await.result(fn, timeout.duration), post)
+
+  def deleteJsonRoute(fn: JsValue): Route = jsonRoute(fn, delete)
+
+  def deleteJsonRoute(fn: Future[JsValue]): Route = jsonRoute(Await.result(fn, timeout.duration), delete)
+
+  private def jsonRoute(fn: JsValue, method: Directive0): Route = method {
     val resp = complete(HttpEntity(ContentTypes.`application/json`, fn.toString()))
-    if (corsAllowed) respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*"))(resp)
-    else resp
+    withCors(respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*"))(resp))
   }
 
 
-  def incompletedJsonRoute(fn: => Route, method: Directive0 = get): Route = method {
-    if (corsAllowed) respondWithHeaders(RawHeader("Content-Type", "application/json"), RawHeader("Access-Control-Allow-Origin", "*"))(fn)
-    else respondWithHeaders(RawHeader("Content-Type", "application/json"))(fn)
+  def withCors(fn: => Route): Route = {
+    if (corsAllowed) respondWithHeaders(RawHeader("Access-Control-Allow-Origin", "*"))(fn)
+    else fn
   }
 
 }

@@ -6,7 +6,6 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
-import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.app.Application
@@ -36,7 +35,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def deleteAddress: Route = {
     path(Segment) { case address =>
-      jsonRoute({
+      deleteJsonRoute {
         walletNotExists(wallet).getOrElse {
           if (!Account.isValidAddress(address)) {
             InvalidAddress.json
@@ -46,7 +45,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
             Json.obj("deleted" -> deleted)
           }
         }
-      }, delete)
+      }
     }
   }
 
@@ -89,7 +88,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "SignedMessage",
+      dataType = "scorex.api.http.SignedMessage",
       defaultValue = "{\n\t\"message\":\"Base58-encoded message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
     )
   ))
@@ -230,12 +229,12 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   def create: Route = {
     path("") {
       postJsonRoute({
-          walletNotExists(wallet).getOrElse {
-            wallet.generateNewAccount() match {
-              case Some(pka) => Json.obj("address" -> pka.address)
-              case None => Unknown.json
-            }
+        walletNotExists(wallet).getOrElse {
+          wallet.generateNewAccount() match {
+            case Some(pka) => Json.obj("address" -> pka.address)
+            case None => Unknown.json
           }
+        }
       })
     }
   }
@@ -252,33 +251,35 @@ case class AddressApiRoute(override val application: Application)(implicit val c
     }
 
   private def signPath(address: String, encode: Boolean) = {
-    incompletedJsonRoute(entity(as[String]) { message =>
-      complete {
-        val jsRes = walletNotExists(wallet).getOrElse {
-          if (!Account.isValidAddress(address)) {
-            InvalidAddress.json
-          } else {
-            wallet.privateKeyAccount(address) match {
-              case None => WalletAddressNotExists.json
-              case Some(account) =>
-                Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
-                  case Success(signature) =>
-                    val msg = if (encode) Base58.encode(message.getBytes) else message
-                    Json.obj("message" -> msg,
-                      "publickey" -> Base58.encode(account.publicKey),
-                      "signature" -> Base58.encode(signature))
-                  case Failure(t) => json(t)
-                }
+    withCors {
+      entity(as[String]) { message =>
+        complete {
+          val jsRes = walletNotExists(wallet).getOrElse {
+            if (!Account.isValidAddress(address)) {
+              InvalidAddress.json
+            } else {
+              wallet.privateKeyAccount(address) match {
+                case None => WalletAddressNotExists.json
+                case Some(account) =>
+                  Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
+                    case Success(signature) =>
+                      val msg = if (encode) Base58.encode(message.getBytes) else message
+                      Json.obj("message" -> msg,
+                        "publickey" -> Base58.encode(account.publicKey),
+                        "signature" -> Base58.encode(signature))
+                    case Failure(t) => json(t)
+                  }
+              }
             }
           }
+          jsRes.toString()
         }
-        jsRes.toString()
       }
-    }, get)
+    }
   }
 
   private def verifyPath(address: String, decode: Boolean) = {
-    incompletedJsonRoute(
+    withCors {
       entity(as[String]) { jsText =>
         complete {
           val parsed = Try(Json.parse(jsText)).getOrElse(WrongJson.json)
@@ -306,25 +307,6 @@ case class AddressApiRoute(override val application: Application)(implicit val c
           Json.stringify(jsRes)
         }
       }
-      , post)
+    }
   }
-
-  // Workaround to show datatype of post request without using it in another route
-  // Related: https://github.com/swagger-api/swagger-core/issues/606
-  // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
-  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[SignedMessage])
-  protected def messagesModel = Unit
-
-}
-
-case class SignedMessage(message: String, signature: String, publickey: String)
-
-object SignedMessage {
-
-  implicit val messageReads: Reads[SignedMessage] = (
-    (JsPath \ "message").read[String] and
-      (JsPath \ "signature").read[String] and
-      (JsPath \ "publickey").read[String]
-    ) (SignedMessage.apply _)
-
 }
