@@ -29,7 +29,7 @@ object TestingCommons {
         val request = Http(url(peerUrl(a) + "/consensus/algo").GET)
         val response = Await.result(request, 10.seconds)
         val json = Json.parse(response.getResponseBody).as[JsObject]
-        assert((json \ "consensus-algo").asOpt[String].isDefined)
+        assert((json \ "consensusAlgo").asOpt[String].isDefined)
       }
     }
     apps

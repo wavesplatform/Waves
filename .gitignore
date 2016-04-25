@@ -15,4 +15,5 @@ target
 Dockerfile
 
 # logs
+scorex.log
 scorex-errors.log

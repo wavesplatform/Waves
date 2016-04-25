@@ -49,7 +49,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
     PaymentApiRoute(this),
     ScorexApiRoute(this),
     SeedApiRoute(this),
-    PeersHttpService(this),
+    PeersApiRoute(this),
     AddressApiRoute(this),
     DebugApiRoute(this)
   )
@@ -62,7 +62,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
     typeOf[PaymentApiRoute],
     typeOf[ScorexApiRoute],
     typeOf[SeedApiRoute],
-    typeOf[PeersHttpService],
+    typeOf[PeersApiRoute],
     typeOf[AddressApiRoute],
     typeOf[DebugApiRoute]
   )
