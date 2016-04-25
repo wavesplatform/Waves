@@ -33,12 +33,12 @@ case class QoraConsensusApiRoute(override val application: Application)
   ))
   def generating: Route = {
     path("generatingbalance" / Segment) { case encodedSignature =>
-      jsonRoute {
+      getJsonRoute {
         withBlock(blockStorage.history, encodedSignature) { block =>
           Json.obj(
             "generatingbalance" -> consensusModule.consensusBlockData(block).generatingBalance
           )
-        }.toString()
+        }
       }
     }
   }
@@ -47,9 +47,9 @@ case class QoraConsensusApiRoute(override val application: Application)
   @ApiOperation(value = "Next generating balance", notes = "Generating balance of a next block", httpMethod = "GET")
   def nextGenerating: Route = {
     path("generatingbalance") {
-      jsonRoute {
+      getJsonRoute {
         val generatingBalance = consensusModule.getNextBlockGeneratingBalance(blockStorage.history)
-        Json.obj("generatingbalance" -> generatingBalance).toString()
+        Json.obj("generatingbalance" -> generatingBalance)
       }
     }
   }
@@ -61,12 +61,12 @@ case class QoraConsensusApiRoute(override val application: Application)
   ))
   def timeForBalance: Route = {
     path("time" / Segment) { case generatingBalance =>
-      jsonRoute {
+      getJsonRoute {
         val jsRes = Try {
           val timePerBlock = consensusModule.getBlockTime(generatingBalance.toLong)
           Json.obj("time" -> timePerBlock)
         }.getOrElse(InvalidNotNumber.json)
-        jsRes.toString()
+        jsRes
       }
     }
   }
@@ -75,11 +75,11 @@ case class QoraConsensusApiRoute(override val application: Application)
   @ApiOperation(value = "Time", notes = "Estimated time before next block", httpMethod = "GET")
   def time: Route = {
     path("time") {
-      jsonRoute {
+      getJsonRoute {
         val block = blockStorage.history.lastBlock
         val genBalance = consensusModule.consensusBlockData(block).generatingBalance
         val timePerBlock = consensusModule.getBlockTime(genBalance)
-        Json.obj("time" -> timePerBlock).toString()
+        Json.obj("time" -> timePerBlock)
       }
     }
   }
@@ -88,8 +88,8 @@ case class QoraConsensusApiRoute(override val application: Application)
   @ApiOperation(value = "Consensus algo", notes = "Shows which consensus algo being using", httpMethod = "GET")
   def algo: Route = {
     path("algo") {
-      jsonRoute {
-        Json.obj("consensusAlgo" -> "qora").toString()
+      getJsonRoute {
+        Json.obj("consensusAlgo" -> "qora")
       }
     }
   }

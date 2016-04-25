@@ -31,7 +31,7 @@ case class PeersApiRoute(override val application: Application)(implicit val con
     new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
   def allPeers: Route = path("all") {
-    jsonRoute {
+    getJsonRoute {
       (application.peerManager ? PeerManager.GetAllPeers)
         .mapTo[Map[InetSocketAddress, PeerInfo]]
         .map { peers =>
@@ -41,7 +41,7 @@ case class PeersApiRoute(override val application: Application)(implicit val con
               "nodeName" -> (peerInfo.nodeName.getOrElse("N/A"): String),
               "nodeNonce" -> (peerInfo.nonce.map(_.toString).getOrElse("N/A"): String)
             )
-          }).toString()
+          })
         }
     }
   }
@@ -52,7 +52,7 @@ case class PeersApiRoute(override val application: Application)(implicit val con
     new ApiResponse(code = 200, message = "Json with connected peers or error")
   ))
   def connectedPeers: Route = path("connected") {
-    jsonRoute {
+    getJsonRoute {
       (application.peerManager ? PeerManager.GetConnectedPeers)
         .mapTo[Seq[Handshake]]
         .map { handshakes =>
@@ -63,7 +63,7 @@ case class PeersApiRoute(override val application: Application)(implicit val con
               "peerNonce" -> handshake.nodeNonce
             )
           })
-          Json.obj("peers" -> peerData).toString()
+          Json.obj("peers" -> peerData)
         }
     }
   }
@@ -93,11 +93,11 @@ case class PeersApiRoute(override val application: Application)(implicit val con
     new ApiResponse(code = 200, message = "Json with connected peers or error")
   ))
   def blacklistedPeers: Route = path("blacklisted") {
-    jsonRoute {
+    getJsonRoute {
       (application.peerManager ? PeerManager.GetBlacklistedPeers)
         .mapTo[Seq[String]]
         .map { peers =>
-          JsArray(peers.map(i => JsString(i))).toString()
+          JsArray(peers.map(i => JsString(i)))
         }
     }
   }

@@ -35,12 +35,11 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
   ))
   def adressLimit: Route = {
     path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
-      jsonRoute {
-
+      getJsonRoute {
         val txJsons = state.accountTransactions(address)
           .takeRight(limit)
           .map(_.json)
-        Json.arr(txJsons).toString()
+        Json.arr(txJsons)
       }
     }
   }
@@ -52,9 +51,9 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
   ))
   def address: Route = {
     path("address" / Segment) { case address =>
-      jsonRoute {
+      getJsonRoute {
         val txJsons = state.accountTransactions(address).map(_.json)
-        Json.arr(txJsons).toString()
+        Json.arr(txJsons)
       }
     }
   }
@@ -66,7 +65,7 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
   ))
   def info: Route = {
     path("info" / Segment) { case encoded =>
-      jsonRoute {
+      getJsonRoute {
         Base58.decode(encoded) match {
           case Success(sig) =>
             state.included(sig, None) match {
@@ -75,10 +74,10 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
                   val block = application.blockStorage.history.asInstanceOf[StoredBlockchain].blockAt(h).get
                   val tx = block.transactions.filter(_.signature sameElements sig).head
                   tx.json
-                }.getOrElse(Json.obj("status" -> "error", "details" -> "Internal error")).toString
-              case None => Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain").toString()
+                }.getOrElse(Json.obj("status" -> "error", "details" -> "Internal error"))
+              case None => Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain")
             }
-          case _ => Json.obj("status" -> "error", "details" -> "Incorrect signature").toString()
+          case _ => Json.obj("status" -> "error", "details" -> "Incorrect signature")
         }
       }
     }
@@ -88,8 +87,8 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
   @ApiOperation(value = "Unconfirmed", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
   def unconfirmed: Route = {
     path("unconfirmed") {
-      jsonRoute {
-        JsArray(UnconfirmedTransactionsDatabaseImpl.all().map(_.json)).toString()
+      getJsonRoute {
+        JsArray(UnconfirmedTransactionsDatabaseImpl.all().map(_.json))
       }
     }
   }

@@ -37,7 +37,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   def deleteAddress: Route = {
     path(Segment) { case address =>
       jsonRoute({
-        val jsRes = walletNotExists(wallet).getOrElse {
+        walletNotExists(wallet).getOrElse {
           if (!Account.isValidAddress(address)) {
             InvalidAddress.json
           } else {
@@ -46,7 +46,6 @@ case class AddressApiRoute(override val application: Application)(implicit val c
             Json.obj("deleted" -> deleted)
           }
         }
-        jsRes.toString()
       }, delete)
     }
   }
@@ -127,8 +126,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def generatingBalance: Route = {
     path("generatingbalance" / Segment) { case address =>
-      jsonRoute {
-        val jsRes = if (!Account.isValidAddress(address)) {
+      getJsonRoute {
+        if (!Account.isValidAddress(address)) {
           InvalidAddress.json
         } else {
           Json.obj(
@@ -136,7 +135,6 @@ case class AddressApiRoute(override val application: Application)(implicit val c
             "balance" -> state.generationBalance(address)
           )
         }
-        Json.stringify(jsRes)
       }
     }
   }
@@ -148,9 +146,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def balance: Route = {
     path("balance" / Segment) { case address =>
-      jsonRoute {
-        val jsRes = balanceJson(address, 1)
-        Json.stringify(jsRes)
+      getJsonRoute {
+        balanceJson(address, 1)
       }
     }
   }
@@ -164,8 +161,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   def confirmationBalance: Route = {
     path("balance" / Segment / IntNumber) { case (address, confirmations) =>
       //todo: confirmations parameter doesn't work atm
-      jsonRoute {
-        Json.stringify(balanceJson(address, confirmations))
+      getJsonRoute {
+        balanceJson(address, confirmations)
       }
     }
   }
@@ -177,15 +174,14 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def seed: Route = {
     path("seed" / Segment) { case address =>
-      jsonRoute {
-        //CHECK IF WALLET EXISTS
-        val jsRes = withPrivateKeyAccount(wallet, address) { account =>
+      getJsonRoute {
+        //TODO CHECK IF WALLET EXISTS
+        withPrivateKeyAccount(wallet, address) { account =>
           wallet.exportAccountSeed(account.address) match {
             case None => WalletSeedExportFailed.json
             case Some(seed) => Json.obj("address" -> address, "seed" -> Base58.encode(seed))
           }
         }
-        Json.stringify(jsRes)
       }
     }
   }
@@ -197,9 +193,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def validate: Route = {
     path("validate" / Segment) { case address =>
-      jsonRoute {
-        val jsRes = Json.obj("address" -> address, "valid" -> Account.isValidAddress(address))
-        Json.stringify(jsRes)
+      getJsonRoute {
+        Json.obj("address" -> address, "valid" -> Account.isValidAddress(address))
       }
     }
   }
@@ -208,8 +203,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
   def root: Route = {
     path("") {
-      jsonRoute {
-        JsArray(wallet.privateKeyAccounts().map(a => JsString(a.address))).toString()
+      getJsonRoute {
+        JsArray(wallet.privateKeyAccounts().map(a => JsString(a.address)))
       }
     }
   }
@@ -222,10 +217,10 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def seq: Route = {
     path("seq" / IntNumber / IntNumber) { case (start, end) =>
-      jsonRoute {
+      getJsonRoute {
         JsArray(
           wallet.privateKeyAccounts().map(a => JsString(a.address)).slice(start, end)
-        ).toString()
+        )
       }
     }
   }
@@ -234,16 +229,14 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
   def create: Route = {
     path("") {
-      jsonRoute({
-        val jsRes =
+      postJsonRoute({
           walletNotExists(wallet).getOrElse {
             wallet.generateNewAccount() match {
               case Some(pka) => Json.obj("address" -> pka.address)
               case None => Unknown.json
             }
           }
-        Json.stringify(jsRes)
-      }, post)
+      })
     }
   }
 

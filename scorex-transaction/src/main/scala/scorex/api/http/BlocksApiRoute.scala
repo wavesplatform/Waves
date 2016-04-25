@@ -30,8 +30,8 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   ))
   def address: Route = {
     path("address" / Segment) { case address =>
-      jsonRoute {
-        JsArray(history.generatedBy(new Account(address)).map(_.json)).toString()
+      getJsonRoute {
+        JsArray(history.generatedBy(new Account(address)).map(_.json))
       }
     }
   }
@@ -43,7 +43,7 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   ))
   def child: Route = {
     path("child" / Segment) { case encodedSignature =>
-      jsonRoute {
+      getJsonRoute {
         withBlock(history, encodedSignature) { block =>
           history match {
             case blockchain: BlockChain =>
@@ -52,7 +52,7 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
             case _ =>
               Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")
           }
-        }.toString()
+        }
       }
     }
   }
@@ -65,11 +65,11 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   ))
   def delay: Route = {
     path("delay" / Segment / IntNumber) { case (encodedSignature, count) =>
-      jsonRoute {
+      getJsonRoute {
         withBlock(history, encodedSignature) { block =>
           history.averageDelay(block, count).map(d => Json.obj("delay" -> d))
             .getOrElse(Json.obj("status" -> "error", "details" -> "Internal error"))
-        }.toString
+        }
       }
     }
   }
@@ -81,10 +81,10 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   ))
   def heightEncoded: Route = {
     path("height" / Segment) { case encodedSignature =>
-      jsonRoute {
+      getJsonRoute {
         withBlock(history, encodedSignature) { block =>
           Json.obj("height" -> history.heightOf(block))
-        }.toString()
+        }
       }
     }
   }
@@ -93,8 +93,8 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   @ApiOperation(value = "Height", notes = "Get blockchain height", httpMethod = "GET")
   def height: Route = {
     path("height") {
-      jsonRoute {
-        Json.obj("height" -> history.height()).toString()
+      getJsonRoute {
+        Json.obj("height" -> history.height())
       }
     }
   }
@@ -106,15 +106,15 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   ))
   def at: Route = {
     path("at" / IntNumber) { case height =>
-      jsonRoute {
+      getJsonRoute {
         history match {
           case blockchain: BlockChain =>
             blockchain
               .blockAt(height)
               .map(_.json)
-              .getOrElse(Json.obj("status" -> "error", "details" -> "No block for this height")).toString()
+              .getOrElse(Json.obj("status" -> "error", "details" -> "No block for this height"))
           case _ =>
-            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain").toString()
+            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")
         }
       }
     }
@@ -128,15 +128,15 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   ))
   def seq: Route = {
     path("seq" / IntNumber / IntNumber) { case (start, end) =>
-      jsonRoute {
+      getJsonRoute {
         history match {
           case blockchain: BlockChain =>
             JsArray(
               (start to end).map { height =>
                 blockchain.blockAt(height).map(_.json).getOrElse(Json.obj("error" -> s"No block at height $height"))
-              }).toString()
+              })
           case _ =>
-            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain").toString()
+            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")
         }
       }
     }
@@ -147,8 +147,8 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   @ApiOperation(value = "Last", notes = "Get last block data", httpMethod = "GET")
   def last: Route = {
     path("last") {
-      jsonRoute {
-        history.lastBlock.json.toString()
+      getJsonRoute {
+        history.lastBlock.json
       }
     }
   }
@@ -157,8 +157,8 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   @ApiOperation(value = "First", notes = "Get genesis block data", httpMethod = "GET")
   def first: Route = {
     path("first") {
-      jsonRoute {
-        history.genesis.json.toString()
+      getJsonRoute {
+        history.genesis.json
       }
     }
   }
@@ -170,8 +170,8 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   ))
   def signature: Route = {
     path("signature" / Segment) { case encodedSignature =>
-      jsonRoute {
-        withBlock(history, encodedSignature)(_.json).toString()
+      getJsonRoute {
+        withBlock(history, encodedSignature)(_.json)
       }
     }
   }

@@ -26,9 +26,9 @@ case class WalletApiRoute(override val application: Application)(implicit val co
   @ApiOperation(value = "Seed", notes = "Export wallet seed", httpMethod = "GET")
   def seed: Route = {
     path("seed") {
-      jsonRoute {
+      getJsonRoute {
         lazy val seedJs = Json.obj("seed" -> Base58.encode(wallet.seed))
-        walletNotExists(wallet).getOrElse(seedJs).toString
+        walletNotExists(wallet).getOrElse(seedJs)
       }
 
     }
@@ -38,8 +38,8 @@ case class WalletApiRoute(override val application: Application)(implicit val co
   @ApiOperation(value = "Wallet", notes = "Display whether wallet exists or not", httpMethod = "GET")
   def root: Route = {
     path("") {
-      jsonRoute {
-        Json.obj("exists" -> wallet.exists()).toString
+      getJsonRoute {
+        Json.obj("exists" -> wallet.exists())
       }
     }
   }
