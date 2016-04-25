@@ -9,7 +9,7 @@ enablePlugins(JavaAppPackaging)
 enablePlugins(DebianPlugin)
 linuxPackageMappings in Debian := linuxPackageMappings.value
 name in Debian := name.value
-version in Debian := "0.0.1"
+version in Debian := version.value
 genChanges in Debian := new File("changelog.md")
 
 name in Universal := name.value
