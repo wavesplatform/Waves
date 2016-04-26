@@ -1,7 +1,6 @@
 package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import org.joda.time.DateTime
 import play.api.libs.json.Json
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.consensus.ConsensusModule
@@ -213,8 +212,8 @@ object Block extends ScorexLogging {
     build(version, timestamp, reference, consensusData, transactionData, signer, signature)
   }
 
-  def genesis[CDT, TDT]()(implicit consModule: ConsensusModule[CDT],
-                          transModule: TransactionModule[TDT]): Block = new Block {
+  def genesis[CDT, TDT](timestamp: Long = 0L)(implicit consModule: ConsensusModule[CDT],
+                                              transModule: TransactionModule[TDT]): Block = new Block {
     override type ConsensusDataType = CDT
     override type TransactionDataType = TDT
 
@@ -227,9 +226,7 @@ object Block extends ScorexLogging {
     override val consensusDataField: BlockField[CDT] = consensusModule.genesisData
     override val uniqueId: BlockId = Array.fill(BlockIdLength)(0: Byte)
 
-    //todo: inject timestamp from settings
-    override val timestampField: LongBlockField = LongBlockField("timestamp",
-      new DateTime(System.currentTimeMillis()).toDateMidnight.getMillis)
+    override val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
 
     override val signerDataField: SignerDataBlockField = new SignerDataBlockField("signature",
       SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array.fill(EllipticCurveImpl.SignatureLength)(0)))

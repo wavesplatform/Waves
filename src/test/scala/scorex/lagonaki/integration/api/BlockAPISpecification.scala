@@ -3,7 +3,7 @@ package scorex.lagonaki.integration.api
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.JsValue
 import scorex.crypto.encode.Base58
-import scorex.lagonaki.{TransactionTestingCommons, TestingCommons}
+import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
 import scorex.transaction.BlockChain
 
 
@@ -57,6 +57,7 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
   }
 
   test("GET /blocks/signature/{signature} API route") {
+    Base58.decode(genesis.encodedId).toOption.map(signature => history.blockById(signature)).isDefined shouldBe true
     checkGenesis(getRequest(s"/blocks/signature/${genesis.encodedId}"))
     checkBlock(getRequest(s"/blocks/signature/${last.encodedId}"))
   }

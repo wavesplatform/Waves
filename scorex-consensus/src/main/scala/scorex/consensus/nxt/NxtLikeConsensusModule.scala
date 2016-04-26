@@ -82,11 +82,14 @@ class NxtLikeConsensusModule(AvgDelay: Long = 5.seconds.toMillis)
         override val baseTarget: Long = btg
       }
 
+      val unconfirmed = transactionModule.packUnconfirmed()
+      log.debug(s"Build block with ${unconfirmed.asInstanceOf[Seq[Transaction]].size} transactions")
+
       Future(Some(Block.buildAndSign(version,
         timestamp,
         lastBlock.uniqueId,
         consensusData,
-        transactionModule.packUnconfirmed(),
+        unconfirmed,
         account)))
 
     } else Future(None)
