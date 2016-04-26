@@ -8,7 +8,7 @@ class WalletAPISpecification extends FunSuite with Matchers {
   import scorex.lagonaki.TestingCommons._
 
   test("/wallet/ API route") {
-    (getRequest("/wallet/") \ "exists").as[Boolean] shouldBe true
+    (getRequest("/wallet") \ "exists").as[Boolean] shouldBe true
   }
 
   test("/wallet/seed API route") {
