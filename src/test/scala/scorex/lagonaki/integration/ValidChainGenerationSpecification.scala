@@ -150,6 +150,7 @@ with TransactionTestingCommons {
         genValidTransaction()
         peers.foreach(_.blockStorage.history.height() should be > height)
         history.height() should be > height
+        history.lastBlock.transactions.nonEmpty shouldBe true
         state.hash should not be st1
         peers.foreach(_.transactionModule.blockStorage.history.contains(last))
       }
