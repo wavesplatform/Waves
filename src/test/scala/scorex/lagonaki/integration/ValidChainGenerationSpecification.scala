@@ -118,7 +118,7 @@ with TransactionTestingCommons {
     stopGeneration()
     cleanTransactionPool()
     val recepient = new PublicKeyAccount(Array.empty)
-    val (trans, valid) = untilTimeout(5.seconds) {
+    val (trans, valid) = untilTimeout(30.seconds, 1.second) {
       val trans = accounts.flatMap { a =>
         val senderBalance = state.asInstanceOf[BalanceSheet].balance(a.address)
         (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
