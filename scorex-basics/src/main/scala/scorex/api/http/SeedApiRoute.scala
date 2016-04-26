@@ -11,7 +11,7 @@ import scorex.app.Application
 import scorex.crypto.encode.Base58
 
 @Path("/seed")
-@Api(value = "/seed", description = "Seed generation functions", position = 3,  produces = "application/json")
+@Api(value = "/seed", description = "Seed generation functions", position = 3, produces = "application/json")
 case class SeedApiRoute(override val application: Application)(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions with Directives {
   val SeedSize = 32
 
@@ -21,18 +21,14 @@ case class SeedApiRoute(override val application: Application)(implicit val cont
     Json.obj("seed" -> Base58.encode(seed))
   }
 
-  override val route =
-    pathPrefix("seed") {
-      seedRoute ~ length
-    }
-
+  override val route = seedRoute ~ length
 
   @Path("/")
   @ApiOperation(value = "Seed", notes = "Generate random seed", httpMethod = "GET")
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
-  def seedRoute: Route = path("") {
+  def seedRoute: Route = path("seed") {
     getJsonRoute {
       seed(SeedSize)
     }
@@ -44,7 +40,7 @@ case class SeedApiRoute(override val application: Application)(implicit val cont
     new ApiImplicitParam(name = "length", value = "Seed length ", required = true, dataType = "long", paramType = "path")
   ))
   @ApiResponse(code = 200, message = "Json with peer list or error")
-  def length: Route = path(IntNumber) { case length =>
+  def length: Route = path("seed" / IntNumber) { case length =>
     getJsonRoute {
       seed(length)
     }

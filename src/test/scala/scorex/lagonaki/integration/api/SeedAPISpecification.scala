@@ -10,7 +10,7 @@ class SeedAPISpecification extends FunSuite with Matchers {
   import scorex.lagonaki.TestingCommons._
 
   test("/seed API route") {
-    Base58.decode((getRequest("/seed/") \ "seed").as[String]).isSuccess shouldBe true
+    Base58.decode((getRequest("/seed") \ "seed").as[String]).isSuccess shouldBe true
   }
 
   test("/seed/{length} API route") {
