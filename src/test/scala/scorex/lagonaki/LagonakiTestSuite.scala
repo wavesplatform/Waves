@@ -19,7 +19,7 @@ class LagonakiTestSuite extends Suites(
   , new SeedAPISpecification
   , new PeersAPISpecification
   , new WalletAPISpecification
-  , new AdressesAPISpecification
+  , new AddressesAPISpecification
   , new TransactionsAPISpecification
   , new PaymentAPISpecification
   , new BlockAPISpecification

@@ -15,7 +15,7 @@ import scorex.crypto.encode.Base58
 import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
-@Api(value = "/addresses", description = "Info about wallet's accounts and other calls about addresses")
+@Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
 case class AddressApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
@@ -24,9 +24,9 @@ case class AddressApiRoute(override val application: Application)(implicit val c
 
   override lazy val route =
     pathPrefix("addresses") {
-      root ~ validate ~ seed ~ confirmationBalance ~ balance ~ generatingBalance ~ verify ~ sign ~ deleteAddress ~
-        create ~ verifyText ~ signText ~ seq
-    }
+      validate ~ seed ~ confirmationBalance ~ balance ~ generatingBalance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+        signText ~ seq
+    } ~ root ~ create
 
   @Path("/{address}")
   @ApiOperation(value = "Delete", notes = "Remove the account with address {address} from the wallet", httpMethod = "DELETE")
@@ -201,7 +201,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   @Path("/")
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
   def root: Route = {
-    path("") {
+    path("addresses") {
       getJsonRoute {
         JsArray(wallet.privateKeyAccounts().map(a => JsString(a.address)))
       }
@@ -227,7 +227,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   @Path("/")
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
   def create: Route = {
-    path("") {
+    path("addresses") {
       postJsonRoute({
         walletNotExists(wallet).getOrElse {
           wallet.generateNewAccount() match {

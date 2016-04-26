@@ -5,7 +5,7 @@ import scorex.crypto.encode.Base58
 import scorex.lagonaki.TestingCommons
 
 
-class AdressesAPISpecification extends FunSuite with Matchers {
+class AddressesAPISpecification extends FunSuite with Matchers {
 
   import TestingCommons._
 
@@ -86,7 +86,7 @@ class AdressesAPISpecification extends FunSuite with Matchers {
   }
 
   test("/addresses/ API route") {
-    val response = getRequest("/addresses/")
+    val response = getRequest("/addresses")
     response.as[List[String]] shouldBe addresses
   }
 
