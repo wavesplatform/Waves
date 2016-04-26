@@ -175,5 +175,11 @@ with TransactionTestingCommons {
 
   def stopGeneration(): Unit = {
     peers.foreach(_.blockGenerator ! StopGeneration)
+    untilTimeout(5.seconds) {
+      peers.foreach { p =>
+        Await.result(p.blockGenerator ? GetStatus, timeout.duration) shouldBe Syncing.name
+      }
+    }
+
   }
 }
