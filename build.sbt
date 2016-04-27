@@ -45,11 +45,11 @@ resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repos
 
 libraryDependencies ++=
   Dependencies.db ++
-  Dependencies.spray ++
-  Dependencies.akka ++
-  Dependencies.serizalization ++
-  Dependencies.testKit ++
-  Dependencies.logging
+    Dependencies.http ++
+    Dependencies.akka ++
+    Dependencies.serizalization ++
+    Dependencies.testKit ++
+    Dependencies.logging
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 

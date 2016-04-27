@@ -4,17 +4,19 @@ import java.net.{InetAddress, InetSocketAddress}
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import com.wordnik.swagger.annotations._
+import io.swagger.annotations._
 import play.api.libs.json.{JsArray, JsString, Json}
 import scorex.app.Application
 import scorex.network.Handshake
 import scorex.network.NetworkController.ConnectTo
 import scorex.network.peer.{PeerInfo, PeerManager}
-import spray.routing.Route
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
+@Path("/peers")
 @Api(value = "/peers", description = "Get info about peers", position = 2)
 case class PeersApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
@@ -30,7 +32,7 @@ case class PeersApiRoute(override val application: Application)(implicit val con
     new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
   def allPeers: Route = path("all") {
-    jsonRoute {
+    getJsonRoute {
       (application.peerManager ? PeerManager.GetAllPeers)
         .mapTo[Map[InetSocketAddress, PeerInfo]]
         .map { peers =>
@@ -40,7 +42,7 @@ case class PeersApiRoute(override val application: Application)(implicit val con
               "nodeName" -> (peerInfo.nodeName.getOrElse("N/A"): String),
               "nodeNonce" -> (peerInfo.nonce.map(_.toString).getOrElse("N/A"): String)
             )
-          }).toString()
+          })
         }
     }
   }
@@ -51,7 +53,7 @@ case class PeersApiRoute(override val application: Application)(implicit val con
     new ApiResponse(code = 200, message = "Json with connected peers or error")
   ))
   def connectedPeers: Route = path("connected") {
-    jsonRoute {
+    getJsonRoute {
       (application.peerManager ? PeerManager.GetConnectedPeers)
         .mapTo[Seq[Handshake]]
         .map { handshakes =>
@@ -62,7 +64,7 @@ case class PeersApiRoute(override val application: Application)(implicit val con
               "peerNonce" -> handshake.nodeNonce
             )
           })
-          Json.obj("peers" -> peerData).toString()
+          Json.obj("peers" -> peerData)
         }
     }
   }
@@ -77,13 +79,14 @@ case class PeersApiRoute(override val application: Application)(implicit val con
     val host: String = "127.0.0.1"
     val port: Int = 9084
 
-    incompletedJsonRoute(
-      entity(as[String]) { body => complete {
+    withCors {
+      entity(as[String]) { body =>
         val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(host), port)
         application.networkController ! ConnectTo(add)
-        Json.obj(add.getHostName -> "Trying to connect").toString()
+        val resp = Json.obj(add.getHostName -> "Trying to connect")
+        complete(HttpEntity(ContentTypes.`application/json`, resp.toString()))
       }
-      }, post)
+    }
   }
 
   @Path("/blacklisted")
@@ -92,11 +95,11 @@ case class PeersApiRoute(override val application: Application)(implicit val con
     new ApiResponse(code = 200, message = "Json with connected peers or error")
   ))
   def blacklistedPeers: Route = path("blacklisted") {
-    jsonRoute {
+    getJsonRoute {
       (application.peerManager ? PeerManager.GetBlacklistedPeers)
         .mapTo[Seq[String]]
         .map { peers =>
-          JsArray(peers.map(i => JsString(i))).toString()
+          JsArray(peers.map(i => JsString(i)))
         }
     }
   }

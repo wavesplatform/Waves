@@ -14,14 +14,17 @@ class LagonakiTestSuite extends Suites(
   //  , new BlockStorageSpecification
   , new WalletSpecification
   , new BlockGeneratorSpecification
-  , new BlocksRoutingSpecification
   , new BlockTreeSpecification
-  //integration tests - slow!
-  , new ValidChainGenerationSpecification
   // API tests
   , new SeedAPISpecification
   , new PeersAPISpecification
   , new WalletAPISpecification
+  , new AddressesAPISpecification
+  , new TransactionsAPISpecification
+  , new PaymentAPISpecification
+  , new BlockAPISpecification
+  //integration tests - slow!
+  , new ValidChainGenerationSpecification
 
 
 ) with BeforeAndAfterAll {

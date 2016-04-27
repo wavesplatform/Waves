@@ -5,8 +5,6 @@ import scorex.block.Block
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.Message
 import scorex.utils.ScorexLogging
-import shapeless.Typeable._
-
 
 class HistoryReplier(application: Application) extends ViewSynchronizer with ScorexLogging {
 
@@ -17,9 +15,9 @@ class HistoryReplier(application: Application) extends ViewSynchronizer with Sco
 
   override def receive: Receive = {
 
-    //todo: check sender
+    //todo: check sender and otherSigs type
     case DataFromPeer(msgId, otherSigs: Seq[Block.BlockId]@unchecked, remote)
-      if msgId == GetSignaturesSpec.messageCode && otherSigs.cast[Seq[Block.BlockId]].isDefined =>
+      if msgId == GetSignaturesSpec.messageCode =>
 
       log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
 

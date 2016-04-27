@@ -3,16 +3,16 @@ package scorex.consensus.nxt.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import com.wordnik.swagger.annotations._
+import akka.http.scaladsl.server.Route
+import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.Application
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.crypto.encode.Base58
-import scorex.transaction.BlockStorage
-import spray.routing.Route
 
 
+@Path("/consensus")
 @Api(value = "/consensus", description = "Consensus-related calls")
 class NxtConsensusApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
@@ -32,13 +32,13 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
   ))
   def generationSignatureId: Route = {
     path("generationsignature" / Segment) { case encodedSignature =>
-      jsonRoute {
+      getJsonRoute {
         withBlock(blockStorage.history, encodedSignature) { block =>
           val gs = consensusModule.consensusBlockData(block).generationSignature
           Json.obj(
             "generationSignature" -> Base58.encode(gs)
           )
-        }.toString()
+        }
       }
     }
   }
@@ -47,10 +47,10 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
   @ApiOperation(value = "Generation signature last", notes = "Generation signature of a last block", httpMethod = "GET")
   def generationSignature: Route = {
     path("generationsignature") {
-      jsonRoute {
+      getJsonRoute {
         val lastBlock = blockStorage.history.lastBlock
         val gs = consensusModule.consensusBlockData(lastBlock).generationSignature
-        Json.obj("generationSignature" -> Base58.encode(gs)).toString()
+        Json.obj("generationSignature" -> Base58.encode(gs))
       }
     }
   }
@@ -62,12 +62,12 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
   ))
   def baseTargetId: Route = {
     path("basetarget" / Segment) { case encodedSignature =>
-      jsonRoute {
+      getJsonRoute {
         withBlock(blockStorage.history, encodedSignature) { block =>
           Json.obj(
             "baseTarget" -> consensusModule.consensusBlockData(block).baseTarget
           )
-        }.toString
+        }
       }
     }
   }
@@ -76,10 +76,10 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
   @ApiOperation(value = "Base target last", notes = "Base target of a last block", httpMethod = "GET")
   def basetarget: Route = {
     path("basetarget") {
-      jsonRoute {
+      getJsonRoute {
         val lastBlock = blockStorage.history.lastBlock
         val bt = consensusModule.consensusBlockData(lastBlock).baseTarget
-        Json.obj("baseTarget" -> bt).toString()
+        Json.obj("baseTarget" -> bt)
       }
     }
   }
@@ -88,8 +88,8 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
   @ApiOperation(value = "Consensus algo", notes = "Shows which consensus algo being using", httpMethod = "GET")
   def algo: Route = {
     path("algo") {
-      jsonRoute {
-        Json.obj("consensusAlgo" -> "nxt").toString()
+      getJsonRoute {
+        Json.obj("consensusAlgo" -> "nxt")
       }
     }
   }

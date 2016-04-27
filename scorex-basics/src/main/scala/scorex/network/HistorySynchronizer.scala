@@ -11,7 +11,7 @@ import scorex.network.ScoreObserver.{ConsideredValue, GetScore, UpdateScore}
 import scorex.network.message.Message
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
-import shapeless.Typeable._
+import shapeless.syntax.typeable._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -97,10 +97,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
   }: Receive)
 
   def gettingExtension(betterScore: BigInt, witnesses: Seq[ConnectedPeer]): Receive = state(HistorySynchronizer.GettingExtension, {
-    //todo: aggregating function for block ids (like score has)
+    //todo: aggregating function for block ids (like score has) and blockIds type
     case DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, connectedPeer)
       if msgId == SignaturesSpec.messageCode &&
-        blockIds.cast[Seq[Block.BlockId]].isDefined &&
         witnesses.contains(connectedPeer) => //todo: ban if non-expected sender
 
       lastUpdate = System.currentTimeMillis()
@@ -141,7 +140,9 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
               log.info(s"Going to process ${toProcess.size} blocks")
               toProcess.find(bp => !processNewBlock(bp, local = false)).foreach { case failedBlock =>
                 log.warn(s"Can't apply block: ${failedBlock.json}")
-                connectedPeer.handlerRef ! PeerConnectionHandler.Blacklist
+                if (history.contains(failedBlock.referenceField.value)) {
+                  connectedPeer.handlerRef ! PeerConnectionHandler.Blacklist
+                }
                 gotoSyncing()
               }
               if (updBlocks.size > toProcess.size) gotoGettingBlocks(witnesses, updBlocks.drop(toProcess.length))

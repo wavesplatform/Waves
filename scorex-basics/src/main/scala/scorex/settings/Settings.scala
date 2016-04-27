@@ -98,6 +98,8 @@ trait Settings extends ScorexLogging {
   }
   lazy val walletSeed = (settingsJSON \ "walletSeed").asOpt[String].flatMap(s => Base58.decode(s).toOption)
 
+  lazy val genesisTimestamp: Long = (settingsJSON \ "genesisTimestamp").asOpt[Long].getOrElse(DefaultGenesisTimestamp)
+
   //NETWORK
   private val DefaultMaxConnections = 20
   private val DefaultConnectionTimeout = 60
@@ -115,4 +117,6 @@ trait Settings extends ScorexLogging {
   private val DefaultBlockGenerationDelay: FiniteDuration = 1.second
   private val DefaultHistorySynchronizerTimeout: FiniteDuration = 30.seconds
   private val DefaultMiningThreads: Int = 1
+
+  private val DefaultGenesisTimestamp: Long = 1460952000000L
 }

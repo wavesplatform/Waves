@@ -1,8 +1,9 @@
 package scorex.app
 
 import akka.actor.{ActorSystem, Props}
-import akka.io.IO
-import scorex.api.http.{ApiRoute, CompositeHttpServiceActor}
+import akka.http.scaladsl.Http
+import akka.stream.ActorMaterializer
+import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.consensus.mining.BlockGeneratorController
@@ -13,7 +14,6 @@ import scorex.settings.Settings
 import scorex.transaction.{BlockStorage, History, TransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
-import spray.can.Http
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.runtime.universe.Type
@@ -37,7 +37,6 @@ trait Application extends ScorexLogging {
   val apiTypes: Seq[Type]
 
   protected implicit lazy val actorSystem = ActorSystem("lagonaki")
-  lazy val apiActor = actorSystem.actorOf(Props(classOf[CompositeHttpServiceActor], apiTypes, apiRoutes), "api")
 
   protected val additionalMessageSpecs: Seq[MessageSpec[_]]
 
@@ -66,13 +65,18 @@ trait Application extends ScorexLogging {
   lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistorySynchronizer")
   lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
+
+  implicit val materializer = ActorMaterializer()
+  val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
+
+
   def run() {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
 
     checkGenesis()
 
-    IO(Http) ! Http.Bind(apiActor, interface = "0.0.0.0", port = settings.rpcPort)
+    Http().bindAndHandle(combinedRoute, "0.0.0.0", settings.rpcPort)
 
     historySynchronizer ! Unit
     historyReplier ! Unit
@@ -104,7 +108,7 @@ trait Application extends ScorexLogging {
 
   def checkGenesis(): Unit = {
     if (transactionModule.blockStorage.history.isEmpty) {
-      transactionModule.blockStorage.appendBlock(Block.genesis())
+      transactionModule.blockStorage.appendBlock(Block.genesis(settings.genesisTimestamp))
       log.info("Genesis block has been added to the state")
     }
   }.ensuring(transactionModule.blockStorage.history.height() >= 1)

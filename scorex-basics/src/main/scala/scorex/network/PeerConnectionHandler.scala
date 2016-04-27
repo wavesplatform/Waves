@@ -17,7 +17,7 @@ import scala.util.{Failure, Success}
 
 case class ConnectedPeer(socketAddress: InetSocketAddress, handlerRef: ActorRef) {
 
-  import shapeless.Typeable._
+  import shapeless.syntax.typeable._
 
   override def equals(obj: scala.Any): Boolean =
     obj.cast[ConnectedPeer].exists(_.socketAddress == this.socketAddress)

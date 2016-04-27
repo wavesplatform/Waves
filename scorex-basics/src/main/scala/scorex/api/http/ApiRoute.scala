@@ -1,39 +1,48 @@
 package scorex.api.http
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.server.{Directive0, Directives, Route}
+import akka.util.Timeout
+import play.api.libs.json.JsValue
 import scorex.app.Application
-import spray.http.HttpHeaders.RawHeader
-import spray.http.MediaTypes._
-import spray.httpx.marshalling.ToResponseMarshallable
-import spray.routing._
 
-trait ApiRoute extends HttpService {
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
+
+trait ApiRoute extends Directives {
   val application: Application
   val context: ActorRefFactory
   val route: Route
+
+  implicit val timeout = Timeout(5.seconds)
 
   lazy val corsAllowed = application.settings.corsAllowed
 
   def actorRefFactory: ActorRefFactory = context
 
-  def jsonRoute(fn: => ToResponseMarshallable, method: Directive0 = get): Route = method {
-    //TODO use incompletedJsonRoute after permacoin-consensus release
-    val jsonResponse = respondWithMediaType(`application/json`) {
-      complete(fn)
-    }
+  def getJsonRoute(fn: Future[JsValue]): Route = jsonRoute(Await.result(fn, timeout.duration), get)
 
-    if (corsAllowed) respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*"))(jsonResponse)
-    else jsonResponse
+  def getJsonRoute(fn: JsValue): Route = jsonRoute(fn, get)
+
+  def postJsonRoute(fn: JsValue): Route = jsonRoute(fn, post)
+
+  def postJsonRoute(fn: Future[JsValue]): Route = jsonRoute(Await.result(fn, timeout.duration), post)
+
+  def deleteJsonRoute(fn: JsValue): Route = jsonRoute(fn, delete)
+
+  def deleteJsonRoute(fn: Future[JsValue]): Route = jsonRoute(Await.result(fn, timeout.duration), delete)
+
+  private def jsonRoute(fn: JsValue, method: Directive0): Route = method {
+    val resp = complete(HttpEntity(ContentTypes.`application/json`, fn.toString()))
+    withCors(respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*"))(resp))
   }
 
 
-  def incompletedJsonRoute(fn: => Route, method: Directive0 = get): Route = method {
-    val jsonResponse = respondWithMediaType(`application/json`) {
-      fn
-    }
-
-    if (corsAllowed) respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*"))(jsonResponse)
-    else jsonResponse
+  def withCors(fn: => Route): Route = {
+    if (corsAllowed) respondWithHeaders(RawHeader("Access-Control-Allow-Origin", "*"))(fn)
+    else fn
   }
 
 }

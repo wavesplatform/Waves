@@ -11,6 +11,7 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
+import scorex.utils.randomBytes
 
 //todo: add accs txs?
 class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Array[Byte]]) extends ScorexLogging {
@@ -33,10 +34,23 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
 
   if (Option(seedPersistence.get("seed")).isEmpty) {
     val seed = seedOpt.getOrElse {
-      println("Please type your wallet seed")
-      def readSeed(): Array[Byte] = Base58.decode(scala.io.StdIn.readLine()).getOrElse {
-        println("Wallet seed should be correct Base58 encoded string.")
-        readSeed()
+      val Attempts = 10
+      val SeedSize = 64
+      lazy val randomSeed = randomBytes(SeedSize)
+      lazy val encodedSeed = Base58.encode(randomSeed)
+      def readSeed(limit: Int = Attempts): Array[Byte] = {
+        println("Please type your wallet seed or type Enter to generate random one")
+        val typed = scala.io.StdIn.readLine()
+        if (typed == "") {
+          println(s"You random generated seed is $encodedSeed")
+          randomSeed
+        } else
+          Base58.decode(typed).getOrElse {
+            if (limit > 0) {
+              println("Wallet seed should be correct Base58 encoded string.")
+              readSeed(limit - 1)
+            } else throw new Error("Sorry you have made too many incorrect seed guesses")
+          }
       }
       readSeed()
     }

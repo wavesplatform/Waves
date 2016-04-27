@@ -1,3 +1,7 @@
+**1.2.5**
+
+* Changed response format for /addresses, /block/address/{address} and /transactions/unconfirmed API call
+
 **1.2.4**
 
 * New API calls /transactions/info and /peers/connect

@@ -3,7 +3,7 @@ import sbt._
 object Dependencies {
 
   lazy val testKit = Seq(
-    "io.spray" %% "spray-testkit" % "1.+" % "test",
+    "com.typesafe.akka" %% "akka-testkit" % "2.+",
     "org.scalatest" %% "scalatest" % "2.+" % "test",
     "org.scalactic" %% "scalactic" % "2.+" % "test",
     "org.scalacheck" %% "scalacheck" % "1.12.+" % "test",
@@ -11,7 +11,7 @@ object Dependencies {
   )
 
   lazy val serizalization = Seq(
-    "com.google.guava" % "guava" % "15.+",
+    "com.google.guava" % "guava" % "18.+",
     "com.typesafe.play" %% "play-json" % "2.4.+"
   )
 
@@ -33,12 +33,14 @@ object Dependencies {
     "ch.qos.logback" % "logback-core" % "1.+"
   )
 
-  lazy val spray = Seq(
-    "io.spray" %% "spray-routing" % "1.+",
-    "io.spray" %% "spray-can" % "1.+",
-    "io.spray" %% "spray-http" % "1.+",
-    "io.spray" %% "spray-httpx" % "1.+",
-    "io.spray" %% "spray-util" % "1.+",
-    "com.gettyimages" %% "spray-swagger" % "0.+"
+  lazy val http = Seq(
+    "com.typesafe.akka" %% "akka-http-experimental" % "2.+",
+    "com.chuusai" %% "shapeless" % "2.+",
+    "io.swagger" %% "swagger-scala-module" % "1.+",
+    "io.swagger" % "swagger-core" % "1.+",
+    "io.swagger" % "swagger-annotations" % "1.+",
+    "io.swagger" % "swagger-models" % "1.+",
+    "io.swagger" % "swagger-jaxrs" % "1.+",
+    "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.+"
   )
 }

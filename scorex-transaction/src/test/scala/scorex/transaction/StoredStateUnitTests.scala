@@ -2,13 +2,11 @@ package scorex.transaction
 
 import java.io.File
 
-import org.h2.mvstore.{MVMap, MVStore}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state._
-import scorex.transaction.{FeesStateChange, PaymentTransaction, TransactionGen}
 
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
 with PrivateMethodTester with OptionValues with TransactionGen {

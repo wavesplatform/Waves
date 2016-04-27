@@ -10,7 +10,7 @@ import scorex.network.message.Message
 import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.RandomPeers
 import scorex.utils.ScorexLogging
-import shapeless.Typeable._
+import shapeless.syntax.typeable._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._

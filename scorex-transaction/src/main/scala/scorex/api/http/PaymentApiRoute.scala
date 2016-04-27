@@ -1,16 +1,20 @@
 package scorex.api.http
 
+import javax.ws.rs.Path
+
 import akka.actor.ActorRefFactory
-import com.wordnik.swagger.annotations._
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.server.Route
+import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.app.Application
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.SimpleTransactionModule
 import scorex.transaction.state.wallet.Payment
-import spray.routing.Route
 
 import scala.util.Try
 
+@Path("/payment")
 @Api(value = "/payment", description = "Payment operations.", position = 1)
 case class PaymentApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
@@ -28,7 +32,7 @@ case class PaymentApiRoute(override val application: Application)(implicit val c
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "Payment",
+      dataType = "scorex.transaction.state.wallet.Payment",
       defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))
@@ -36,9 +40,9 @@ case class PaymentApiRoute(override val application: Application)(implicit val c
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
   def payment: Route = path("payment") {
-    incompletedJsonRoute(
-      entity(as[String]) { body => complete {
-        walletNotExists(wallet).getOrElse {
+    withCors {
+      entity(as[String]) { body =>
+        val resp = walletNotExists(wallet).getOrElse {
           Try(Json.parse(body)).map { js =>
             js.validate[Payment] match {
               case err: JsError =>
@@ -69,14 +73,10 @@ case class PaymentApiRoute(override val application: Application)(implicit val c
             }
           }.getOrElse(WrongJson.json)
         }.toString
-      }
-      }, post)
-  }
 
-  // Workaround to show datatype of post request without using it in another route
-  // Related: https://github.com/swagger-api/swagger-core/issues/606
-  // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
-  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[Payment])
-  protected def paymentModel = Unit
+        complete(HttpEntity(ContentTypes.`application/json`, resp))
+      }
+    }
+  }
 
 }

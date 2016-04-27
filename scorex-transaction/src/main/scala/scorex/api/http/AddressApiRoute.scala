@@ -4,19 +4,18 @@ import java.nio.charset.StandardCharsets
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import com.wordnik.swagger.annotations._
-import play.api.libs.functional.syntax._
+import akka.http.scaladsl.server.Route
+import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import spray.routing.Route
 
 import scala.util.{Failure, Success, Try}
 
-
-@Api(value = "/addresses", description = "Info about wallet's accounts and other calls about addresses")
+@Path("/addresses")
+@Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
 case class AddressApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
@@ -25,9 +24,9 @@ case class AddressApiRoute(override val application: Application)(implicit val c
 
   override lazy val route =
     pathPrefix("addresses") {
-      root ~ validate ~ seed ~ confirmationBalance ~ balance ~ generatingBalance ~ verify ~ sign ~ deleteAddress ~
-        create ~ verifyText ~ signText ~ seq
-    }
+      validate ~ seed ~ confirmationBalance ~ balance ~ generatingBalance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+        signText ~ seq
+    } ~ root ~ create
 
   @Path("/{address}")
   @ApiOperation(value = "Delete", notes = "Remove the account with address {address} from the wallet", httpMethod = "DELETE")
@@ -36,8 +35,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def deleteAddress: Route = {
     path(Segment) { case address =>
-      jsonRoute({
-        val jsRes = walletNotExists(wallet).getOrElse {
+      deleteJsonRoute {
+        walletNotExists(wallet).getOrElse {
           if (!Account.isValidAddress(address)) {
             InvalidAddress.json
           } else {
@@ -46,8 +45,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
             Json.obj("deleted" -> deleted)
           }
         }
-        jsRes.toString()
-      }, delete)
+      }
     }
   }
 
@@ -90,7 +88,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "SignedMessage",
+      dataType = "scorex.api.http.SignedMessage",
       defaultValue = "{\n\t\"message\":\"Base58-encoded message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
     )
   ))
@@ -127,8 +125,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def generatingBalance: Route = {
     path("generatingbalance" / Segment) { case address =>
-      jsonRoute {
-        val jsRes = if (!Account.isValidAddress(address)) {
+      getJsonRoute {
+        if (!Account.isValidAddress(address)) {
           InvalidAddress.json
         } else {
           Json.obj(
@@ -136,7 +134,6 @@ case class AddressApiRoute(override val application: Application)(implicit val c
             "balance" -> state.generationBalance(address)
           )
         }
-        Json.stringify(jsRes)
       }
     }
   }
@@ -148,9 +145,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def balance: Route = {
     path("balance" / Segment) { case address =>
-      jsonRoute {
-        val jsRes = balanceJson(address, 1)
-        Json.stringify(jsRes)
+      getJsonRoute {
+        balanceJson(address, 1)
       }
     }
   }
@@ -164,8 +160,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   def confirmationBalance: Route = {
     path("balance" / Segment / IntNumber) { case (address, confirmations) =>
       //todo: confirmations parameter doesn't work atm
-      jsonRoute {
-        Json.stringify(balanceJson(address, confirmations))
+      getJsonRoute {
+        balanceJson(address, confirmations)
       }
     }
   }
@@ -177,15 +173,14 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def seed: Route = {
     path("seed" / Segment) { case address =>
-      jsonRoute {
-        //CHECK IF WALLET EXISTS
-        val jsRes = withPrivateKeyAccount(wallet, address) { account =>
+      getJsonRoute {
+        //TODO CHECK IF WALLET EXISTS
+        withPrivateKeyAccount(wallet, address) { account =>
           wallet.exportAccountSeed(account.address) match {
             case None => WalletSeedExportFailed.json
             case Some(seed) => Json.obj("address" -> address, "seed" -> Base58.encode(seed))
           }
         }
-        Json.stringify(jsRes)
       }
     }
   }
@@ -197,9 +192,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def validate: Route = {
     path("validate" / Segment) { case address =>
-      jsonRoute {
-        val jsRes = Json.obj("address" -> address, "valid" -> Account.isValidAddress(address))
-        Json.stringify(jsRes)
+      getJsonRoute {
+        Json.obj("address" -> address, "valid" -> Account.isValidAddress(address))
       }
     }
   }
@@ -207,10 +201,9 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   @Path("/")
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
   def root: Route = {
-    path("") {
-      jsonRoute {
-        val addresses = wallet.privateKeyAccounts().map(_.address)
-        Json.arr(addresses).toString()
+    path("addresses") {
+      getJsonRoute {
+        JsArray(wallet.privateKeyAccounts().map(a => JsString(a.address)))
       }
     }
   }
@@ -223,10 +216,10 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def seq: Route = {
     path("seq" / IntNumber / IntNumber) { case (start, end) =>
-      jsonRoute {
+      getJsonRoute {
         JsArray(
           wallet.privateKeyAccounts().map(a => JsString(a.address)).slice(start, end)
-        ).toString()
+        )
       }
     }
   }
@@ -234,17 +227,15 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   @Path("/")
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
   def create: Route = {
-    path("") {
-      jsonRoute({
-        val jsRes =
-          walletNotExists(wallet).getOrElse {
-            wallet.generateNewAccount() match {
-              case Some(pka) => Json.obj("address" -> pka.address)
-              case None => Unknown.json
-            }
+    path("addresses") {
+      postJsonRoute({
+        walletNotExists(wallet).getOrElse {
+          wallet.generateNewAccount() match {
+            case Some(pka) => Json.obj("address" -> pka.address)
+            case None => Unknown.json
           }
-        Json.stringify(jsRes)
-      }, post)
+        }
+      })
     }
   }
 
@@ -260,33 +251,35 @@ case class AddressApiRoute(override val application: Application)(implicit val c
     }
 
   private def signPath(address: String, encode: Boolean) = {
-    incompletedJsonRoute(entity(as[String]) { message =>
-      complete {
-        val jsRes = walletNotExists(wallet).getOrElse {
-          if (!Account.isValidAddress(address)) {
-            InvalidAddress.json
-          } else {
-            wallet.privateKeyAccount(address) match {
-              case None => WalletAddressNotExists.json
-              case Some(account) =>
-                Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
-                  case Success(signature) =>
-                    val msg = if (encode) Base58.encode(message.getBytes) else message
-                    Json.obj("message" -> msg,
-                      "publickey" -> Base58.encode(account.publicKey),
-                      "signature" -> Base58.encode(signature))
-                  case Failure(t) => json(t)
-                }
+    withCors {
+      entity(as[String]) { message =>
+        complete {
+          val jsRes = walletNotExists(wallet).getOrElse {
+            if (!Account.isValidAddress(address)) {
+              InvalidAddress.json
+            } else {
+              wallet.privateKeyAccount(address) match {
+                case None => WalletAddressNotExists.json
+                case Some(account) =>
+                  Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
+                    case Success(signature) =>
+                      val msg = if (encode) Base58.encode(message.getBytes) else message
+                      Json.obj("message" -> msg,
+                        "publickey" -> Base58.encode(account.publicKey),
+                        "signature" -> Base58.encode(signature))
+                    case Failure(t) => json(t)
+                  }
+              }
             }
           }
+          jsRes.toString()
         }
-        jsRes.toString()
       }
-    }, get)
+    }
   }
 
   private def verifyPath(address: String, decode: Boolean) = {
-    incompletedJsonRoute(
+    withCors {
       entity(as[String]) { jsText =>
         complete {
           val parsed = Try(Json.parse(jsText)).getOrElse(WrongJson.json)
@@ -314,25 +307,6 @@ case class AddressApiRoute(override val application: Application)(implicit val c
           Json.stringify(jsRes)
         }
       }
-      , post)
+    }
   }
-
-  // Workaround to show datatype of post request without using it in another route
-  // Related: https://github.com/swagger-api/swagger-core/issues/606
-  // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
-  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[SignedMessage])
-  protected def messagesModel = Unit
-
-}
-
-case class SignedMessage(message: String, signature: String, publickey: String)
-
-object SignedMessage {
-
-  implicit val messageReads: Reads[SignedMessage] = (
-    (JsPath \ "message").read[String] and
-      (JsPath \ "signature").read[String] and
-      (JsPath \ "publickey").read[String]
-    ) (SignedMessage.apply _)
-
 }

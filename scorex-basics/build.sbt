@@ -7,7 +7,7 @@ libraryDependencies ++=
     Dependencies.akka ++
     Dependencies.p2p ++
     Dependencies.db ++
-    Dependencies.spray ++
+    Dependencies.http ++
     Dependencies.testKit ++
     Dependencies.db ++
     Dependencies.logging ++ Seq(

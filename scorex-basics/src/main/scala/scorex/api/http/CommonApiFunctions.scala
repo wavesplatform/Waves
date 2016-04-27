@@ -10,7 +10,6 @@ import scala.concurrent.duration._
 
 
 trait CommonApiFunctions {
-  implicit val timeout = Timeout(5.seconds)
 
   def json(t: Throwable): JsObject = Json.obj("error" -> Unknown.id, "message" -> t.getMessage)
 
