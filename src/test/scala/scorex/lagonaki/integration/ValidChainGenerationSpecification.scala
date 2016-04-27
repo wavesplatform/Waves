@@ -61,6 +61,7 @@ with TransactionTestingCommons {
     (0 to UnconfirmedTransactionsDatabaseImpl.SizeLimit) foreach (i => genValidTransaction())
 
     val block = untilTimeout(1.minute) {
+      stopGeneration()
       val blocksFuture = application.consensusModule.generateNextBlocks(Seq(accounts.head))(application.transactionModule)
       val blocks: Seq[Block] = Await.result(blocksFuture, 10.seconds)
       blocks.nonEmpty shouldBe true
@@ -87,17 +88,9 @@ with TransactionTestingCommons {
         p.blockStorage.state.included(tx).get should be <= h
       }
     }
-    applications.foreach(_.blockGenerator ! StopGeneration)
 
-    untilTimeout(1.second) {
-      val statuses = Await.result(Future.sequence(applications.map(_.blockGenerator ? GetStatus)), timeout.duration)
-      statuses.foreach(_ shouldBe "syncing")
-    }
-
-    Thread.sleep(10000)
-
+    stopGeneration()
     cleanTransactionPool()
-
 
     incl.foreach(tx => UnconfirmedTransactionsDatabaseImpl.putIfNew(tx))
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe incl.size
@@ -120,7 +113,8 @@ with TransactionTestingCommons {
     stopGeneration()
     cleanTransactionPool()
     val recepient = new PublicKeyAccount(Array.empty)
-    val (trans, valid) = untilTimeout(30.seconds, 1.second) {
+    val (trans, valid) = untilTimeout(5.seconds) {
+      stopGeneration()
       val trans = accounts.flatMap { a =>
         val senderBalance = state.asInstanceOf[BalanceSheet].balance(a.address)
         (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
@@ -176,6 +170,7 @@ with TransactionTestingCommons {
   }
 
   def stopGeneration(): Unit = {
+    log.info("Stop generation for all peers")
     peers.foreach(_.blockGenerator ! StopGeneration)
     untilTimeout(5.seconds) {
       peers.foreach { p =>
