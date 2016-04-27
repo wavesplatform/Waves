@@ -1,6 +1,9 @@
 **1.2.5**
 
 * Changed response format for /addresses, /block/address/{address} and /transactions/unconfirmed API call
+* API routes migrated from spray to akka-http
+* Fixed creation of block with plenty of transactions
+* Issues #78 and #75 fixed
 
 **1.2.4**
 
