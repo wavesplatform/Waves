@@ -59,8 +59,10 @@ with TransactionTestingCommons {
   test("Generate block with plenty of transactions") {
     val block = untilTimeout(1.minute) {
       stopGeneration()
-      (0 to UnconfirmedTransactionsDatabaseImpl.SizeLimit) foreach (i => genValidTransaction())
-      transactionModule.packUnconfirmed().size should be >= UnconfirmedTransactionsDatabaseImpl.SizeLimit
+      if (transactionModule.packUnconfirmed().size < UnconfirmedTransactionsDatabaseImpl.SizeLimit) {
+        (0 to UnconfirmedTransactionsDatabaseImpl.SizeLimit) foreach (i => genValidTransaction())
+
+      }
       val blocksFuture = application.consensusModule.generateNextBlocks(Seq(accounts.head))(transactionModule)
       val blocks: Seq[Block] = Await.result(blocksFuture, 10.seconds)
       blocks.nonEmpty shouldBe true
