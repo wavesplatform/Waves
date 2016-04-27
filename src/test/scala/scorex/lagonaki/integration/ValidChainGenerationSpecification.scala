@@ -7,13 +7,12 @@ import scorex.account.PublicKeyAccount
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
+import scorex.transaction.BalanceSheet
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.{BalanceSheet, SimpleTransactionModule}
 import scorex.utils.{ScorexLogging, untilTimeout}
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 class ValidChainGenerationSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
 with TransactionTestingCommons {
@@ -115,10 +114,12 @@ with TransactionTestingCommons {
     val (trans, valid) = untilTimeout(5.seconds) {
       cleanTransactionPool()
       stopGeneration()
+      accounts.map(a => state.asInstanceOf[BalanceSheet].balance(a.address)).exists(_ > 2) shouldBe true
       val trans = accounts.flatMap { a =>
         val senderBalance = state.asInstanceOf[BalanceSheet].balance(a.address)
         (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
       }
+      state.validate(trans).nonEmpty shouldBe true
       val valid = transactionModule.packUnconfirmed()
       valid.nonEmpty shouldBe true
       (trans, valid)
