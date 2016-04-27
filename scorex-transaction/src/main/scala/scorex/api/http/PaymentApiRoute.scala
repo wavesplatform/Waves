@@ -25,7 +25,21 @@ case class PaymentApiRoute(override val application: Application)(implicit val c
 
   override lazy val route = payment
 
-  @ApiOperation(value = "Send payment", notes = "Send payment to another wallet", httpMethod = "POST", produces = "application/json", consumes = "application/json")
+  @ApiOperation(value = "Send payment",
+    notes = "Send payment to another wallet",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json",
+    authorizations = Array(
+      new Authorization(
+        value = "petoauth",
+        scopes = Array(
+          new AuthorizationScope(
+            scope = "add:pet",
+            description = "allows adding of pets")
+        )
+      )
+    ))
   @ApiImplicitParams(Array(
     new ApiImplicitParam(
       name = "body",

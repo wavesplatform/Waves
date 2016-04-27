@@ -82,7 +82,7 @@ trait Block extends ScorexLogging {
   lazy val bytesWithoutSignature = bytes.dropRight(EllipticCurveImpl.SignatureLength)
 
   def isValid: Boolean = {
-    if (transactionModule.blockStorage.history.contains(this)) true //applyed blocks are valid
+    if (transactionModule.blockStorage.history.contains(this)) true //applied blocks are valid
     else {
       lazy val history = transactionModule.blockStorage.history.contains(referenceField.value)
       lazy val signature = EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
