@@ -1,7 +1,9 @@
 package scorex.api.http
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 import scorex.api.http.swagger.{CorsSupport, SwaggerDocService}
 import scorex.settings.Settings
 
@@ -15,9 +17,13 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
 
   val swaggerService = new SwaggerDocService(system, apiTypes, settings)
 
+  val redirectToSwagger: Route = {
+    redirect("/swagger", StatusCodes.PermanentRedirect)
+  }
+
   val compositeRoute = routes.map(_.route).reduce(_ ~ _) ~ corsHandler(swaggerService.routes) ~
     path("swagger") {
       getFromResource("swagger-ui/index.html")
-    } ~
-    getFromResourceDirectory("swagger-ui")
+    } ~ getFromResourceDirectory("swagger-ui") ~ redirectToSwagger
+
 }
