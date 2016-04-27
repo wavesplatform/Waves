@@ -1,31 +1,35 @@
 **1.2.5**
+---------
 
-* Changed response format for /addresses, /block/address/{address} and /transactions/unconfirmed API call
+* Changed response format for /addresses, /block/address/{address} and /transactions/unconfirmed API calls
 * API routes migrated from spray to akka-http
-* Fixed creation of block with plenty of transactions
+* A bug with a block containing a plenty of transactions has been fixed
 * Issues #78 and #75 fixed
 
 **1.2.4**
+---------
 
 * New API calls /transactions/info and /peers/connect
 * MVStore is used for state persistence
-* Fixed JSON style in API calls
-* PeersHttpService was renamed to PeersApiRoute
+* Fixed JSON styling in API call results
 
 **1.2.3**
+---------
 
 * Peer blacklisting implemented
 * Logback configured to rollover log files daily
-* MapDB replaced with MVStore
+* MapDB has been replaced with MVStore
 
 **1.2.2**
+---------
 
-* LagonakiApplication was moved to [Lagonaki](https://github.com/ScorexProject/Lagonaki) project
+* LagonakiApplication was extracted into [Lagonaki](https://github.com/ScorexProject/Lagonaki) project
 * New API call /addresses/seq
-* API call /blocks/seq fixes
-* Disk-based persistence for peers whitelist/blacklist in PeerDatabaseImpl implemented
+* API call /blocks/seq fixed
+* Disk-based persistence for peers whitelist/blacklist
 
 **1.2.1**
+---------
 
 * New API call /blocks/seq
 * CORS optional support(to be allowed in settings, disallowed by default)
