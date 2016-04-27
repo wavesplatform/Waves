@@ -38,7 +38,7 @@ with TransactionTestingCommons {
 
   def maxHeight(): Int = peers.map(_.blockStorage.history.height()).max
 
-  def cleanTransactionPool(): Unit = {
+  def cleanTransactionPool(): Unit = untilTimeout(1.second) {
     UnconfirmedTransactionsDatabaseImpl.all().foreach(tx => UnconfirmedTransactionsDatabaseImpl.remove(tx))
     UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
   }
@@ -111,10 +111,9 @@ with TransactionTestingCommons {
   }
 
   test("Double spending") {
-    stopGeneration()
-    cleanTransactionPool()
     val recepient = new PublicKeyAccount(Array.empty)
     val (trans, valid) = untilTimeout(5.seconds) {
+      cleanTransactionPool()
       stopGeneration()
       val trans = accounts.flatMap { a =>
         val senderBalance = state.asInstanceOf[BalanceSheet].balance(a.address)
