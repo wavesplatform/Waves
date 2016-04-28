@@ -1,6 +1,5 @@
 # Waves
 
-**Not working** Please do not run the Software yet.
 
 **[How to use Testnet](https://github.com/wavesplatform/Waves/blob/master/Testnet.md)**
 
