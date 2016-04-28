@@ -60,7 +60,7 @@ case class PaymentApiRoute(override val application: Application)(implicit val c
           Try(Json.parse(body)).map { js =>
             js.validate[Payment] match {
               case err: JsError =>
-                err
+                WrongTransactionJson(err).json
               case JsSuccess(payment: Payment, _) =>
                 val txOpt = transactionModule.createPayment(payment, wallet)
                 txOpt match {

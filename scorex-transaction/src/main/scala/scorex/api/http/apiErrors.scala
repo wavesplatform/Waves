@@ -1,5 +1,7 @@
 package scorex.api.http
 
+import play.api.libs.json.{JsArray, JsError, JsString}
+
 //WALLET
 
 case object WalletNotExist extends ApiError {
@@ -50,3 +52,8 @@ case object NegativeFee extends ApiError {
   override val message: String = "negative fee"
 }
 
+case class WrongTransactionJson(err: JsError) extends ApiError {
+  override val id: Int = 113
+  override val message: String =
+    err.errors.map(e => s"Validation failed for field '${e._1}', errors:${e._2}. ").mkString("\n")
+}
