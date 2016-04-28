@@ -11,7 +11,7 @@ import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.transaction.{BalanceSheet, GenesisTransaction, SimpleTransactionModule, Transaction}
 import scorex.utils.ScorexLogging
 import scorex.waves.block.WavesBlock
-import scorex.waves.http.{DebugApiRoute, ScorexApiRoute}
+import scorex.waves.http.{DebugApiRoute, ExternalPaymentApiRoute, ScorexApiRoute}
 import scorex.waves.settings.WavesSettings
 import scorex.waves.transaction.WavesTransactionModule
 
@@ -51,7 +51,8 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
     SeedApiRoute(this),
     PeersApiRoute(this),
     AddressApiRoute(this),
-    DebugApiRoute(this)
+    DebugApiRoute(this),
+    ExternalPaymentApiRoute(this)
   )
 
   override lazy val apiTypes = Seq(
@@ -64,7 +65,8 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
     typeOf[SeedApiRoute],
     typeOf[PeersApiRoute],
     typeOf[AddressApiRoute],
-    typeOf[DebugApiRoute]
+    typeOf[DebugApiRoute],
+    typeOf[ExternalPaymentApiRoute]
   )
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
