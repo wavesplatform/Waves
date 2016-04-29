@@ -9,7 +9,7 @@ import io.swagger.annotations._
 import play.api.libs.json.{JsValue, Json}
 import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.SecureCryptographicHash
+import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
@@ -23,7 +23,7 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
   }
 
   override val route = pathPrefix("utils") {
-    seedRoute ~ length ~ hash
+    seedRoute ~ length ~ hashFast ~ hashSecure
   }
 
   @Path("/seed")
@@ -49,19 +49,37 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
     }
   }
 
-  @Path("/hash")
-  @ApiOperation(value = "Hash", notes = "Return hash of specified message", httpMethod = "POST")
+  @Path("/hash/fast")
+  @ApiOperation(value = "Hash", notes = "Return FastCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "form", dataType = "String")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
-  def hash: Route = {
-    path("hash") {
+  def hashFast: Route = {
+    path("hash" / "secure") {
       formFields("message") { (message) =>
         postJsonRoute {
           Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
+        }
+      }
+    }
+  }
+
+  @Path("/hash/secure")
+  @ApiOperation(value = "Hash", notes = "Return  SecureCryptographicHash of specified message", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "form", dataType = "String")
+  ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
+  ))
+  def hashSecure: Route = {
+    path("hash" / "fast") {
+      formFields("message") { (message) =>
+        postJsonRoute {
+          Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message)))
         }
       }
     }

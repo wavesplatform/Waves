@@ -1,7 +1,7 @@
 **1.2.6**
 
 * SeedApiRoute was renamed to UtilsApiRoute
-* New API call /utils/hash
+* New API calls /utils/hash/secure and /utils/hash/fast
 
 **1.2.5**
 
