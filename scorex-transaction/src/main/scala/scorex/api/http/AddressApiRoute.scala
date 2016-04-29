@@ -253,10 +253,10 @@ case class AddressApiRoute(override val application: Application)(implicit val c
     }
 
   private def signPath(address: String, encode: Boolean) = {
-    withCors {
-      entity(as[String]) { message =>
-        complete {
-          val jsRes = walletNotExists(wallet).getOrElse {
+    entity(as[String]) { message =>
+      withAuth {
+        postJsonRoute {
+          walletNotExists(wallet).getOrElse {
             if (!Account.isValidAddress(address)) {
               InvalidAddress.json
             } else {
@@ -274,11 +274,11 @@ case class AddressApiRoute(override val application: Application)(implicit val c
               }
             }
           }
-          jsRes.toString()
         }
       }
     }
   }
+
 
   private def verifyPath(address: String, decode: Boolean) = {
     withCors {

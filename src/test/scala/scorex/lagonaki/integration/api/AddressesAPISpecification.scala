@@ -2,9 +2,9 @@ package scorex.lagonaki.integration.api
 
 import org.scalatest.{FunSuite, Matchers}
 import scorex.api.http.ApiKeyNotValid
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TestingCommons
-
 
 class AddressesAPISpecification extends FunSuite with Matchers {
 
@@ -51,7 +51,17 @@ class AddressesAPISpecification extends FunSuite with Matchers {
   }
 
   test("POST /addresses/sign/{address} API route") {
-    //TODO
+    val message = "test"
+    val req = postRequest(s"/addresses/sign/$address", body = message)
+    (req \ "message").as[String] shouldBe Base58.encode(message.getBytes)
+    val pubkey = (req \ "publickey").asOpt[String].flatMap(Base58.decode(_).toOption)
+    val signature = (req \ "signature").asOpt[String].flatMap(Base58.decode(_).toOption)
+    pubkey.isDefined shouldBe true
+    signature.isDefined shouldBe true
+
+    EllipticCurveImpl.verify(signature.get, message.getBytes, pubkey.get)
+
+    incorrectApiKeyTest(s"/addresses/sign/$address")
   }
 
   test("/addresses/balance/{address}/{confirmations} API route") {
@@ -77,14 +87,29 @@ class AddressesAPISpecification extends FunSuite with Matchers {
   }
 
   test("POST /addresses/signText/{address} API route") {
-    //TODO
+    val message = "test"
+    val req = postRequest(s"/addresses/signText/$address", body = message)
+    (req \ "message").as[String] shouldBe message
+    val pubkey = (req \ "publickey").asOpt[String].flatMap(Base58.decode(_).toOption)
+    val signature = (req \ "signature").asOpt[String].flatMap(Base58.decode(_).toOption)
+    pubkey.isDefined shouldBe true
+    signature.isDefined shouldBe true
+
+    EllipticCurveImpl.verify(signature.get, message.getBytes, pubkey.get)
+
+    incorrectApiKeyTest(s"/addresses/signText/$address")
   }
 
   test("POST /addresses API route") {
     (postRequest("/addresses") \ "address").asOpt[String].flatMap(Base58.decode(_).toOption).isDefined shouldBe true
+    val add = "/addresses"
 
+    incorrectApiKeyTest("/addresses")
+  }
+
+  def incorrectApiKeyTest(path: String): Unit = {
     Seq(Map[String, String](), Map("api_key" -> "wrong key")) foreach { h =>
-      postRequest("/addresses", headers = h).toString() shouldBe ApiKeyNotValid.json.toString()
+      postRequest(path, headers = h).toString() shouldBe ApiKeyNotValid.json.toString()
     }
   }
 
