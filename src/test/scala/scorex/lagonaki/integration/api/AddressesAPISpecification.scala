@@ -1,6 +1,7 @@
 package scorex.lagonaki.integration.api
 
 import org.scalatest.{FunSuite, Matchers}
+import scorex.api.http.ApiKeyNotValid
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TestingCommons
 
@@ -11,8 +12,6 @@ class AddressesAPISpecification extends FunSuite with Matchers {
 
   val wallet = application.wallet
   if (wallet.privateKeyAccounts().size < 10) wallet.generateNewAccounts(10)
-  val accounts = wallet.privateKeyAccounts()
-  val addresses = accounts.map(_.address)
   val account = accounts.head
   val address = account.address
 
@@ -82,7 +81,11 @@ class AddressesAPISpecification extends FunSuite with Matchers {
   }
 
   test("POST /addresses API route") {
-    //TODO
+    (postRequest("/addresses") \ "address").asOpt[String].flatMap(Base58.decode(_).toOption).isDefined shouldBe true
+
+    Seq(Map[String, String](), Map("api_key" -> "wrong key")) foreach { h =>
+      postRequest("/addresses", headers = h).toString() shouldBe ApiKeyNotValid.json.toString()
+    }
   }
 
   test("/addresses/ API route") {
@@ -94,5 +97,8 @@ class AddressesAPISpecification extends FunSuite with Matchers {
     //TODO
   }
 
+  def accounts = wallet.privateKeyAccounts()
+
+  def addresses = accounts.map(_.address)
 
 }
