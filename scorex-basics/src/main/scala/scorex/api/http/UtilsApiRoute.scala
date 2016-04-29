@@ -9,6 +9,7 @@ import io.swagger.annotations._
 import play.api.libs.json.{JsValue, Json}
 import scorex.app.Application
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.SecureCryptographicHash
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
@@ -22,7 +23,7 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
   }
 
   override val route = pathPrefix("utils") {
-    seedRoute ~ length
+    seedRoute ~ length ~ hash
   }
 
   @Path("/seed")
@@ -45,6 +46,24 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
   def length: Route = path("seed" / IntNumber) { case length =>
     getJsonRoute {
       seed(length)
+    }
+  }
+
+  @Path("/hash")
+  @ApiOperation(value = "Hash", notes = "Return hash of specified message", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "String")
+  ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"Base58-encoded\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
+  ))
+  def hash: Route = {
+    path("hash") {
+      entity(as[String]) { message =>
+        postJsonRoute {
+          Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
+        }
+      }
     }
   }
 
