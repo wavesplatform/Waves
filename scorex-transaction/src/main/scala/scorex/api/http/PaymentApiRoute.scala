@@ -88,9 +88,12 @@ case class PaymentApiRoute(override val application: Application)(implicit val c
           }.getOrElse(WrongJson.json)
         }.toString
 
-        complete(HttpEntity(ContentTypes.`application/json`, resp))
+        optionalHeaderValueByName("api_key") { k =>
+          complete(HttpEntity(ContentTypes.`application/json`, resp))
+        }
       }
     }
   }
+
 
 }

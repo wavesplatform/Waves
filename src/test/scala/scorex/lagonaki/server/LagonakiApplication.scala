@@ -39,7 +39,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
     consensusApiRoute,
     WalletApiRoute(this),
     PaymentApiRoute(this),
-    SeedApiRoute(this),
+    UtilsApiRoute(this),
     PeersApiRoute(this),
     AddressApiRoute(this)
   )
@@ -50,7 +50,7 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
     typeOf[NxtConsensusApiRoute],
     typeOf[WalletApiRoute],
     typeOf[PaymentApiRoute],
-    typeOf[SeedApiRoute],
+    typeOf[UtilsApiRoute],
     typeOf[PeersApiRoute],
     typeOf[AddressApiRoute]
   )

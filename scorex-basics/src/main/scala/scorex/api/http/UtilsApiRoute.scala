@@ -10,9 +10,9 @@ import play.api.libs.json.{JsValue, Json}
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 
-@Path("/seed")
-@Api(value = "/seed", description = "Seed generation functions", position = 3, produces = "application/json")
-case class SeedApiRoute(override val application: Application)(implicit val context: ActorRefFactory) extends ApiRoute with CommonApiFunctions with Directives {
+@Path("/utils")
+@Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
+case class UtilsApiRoute(override val application: Application)(implicit val context: ActorRefFactory) extends ApiRoute {
   val SeedSize = 32
 
   private def seed(length: Int): JsValue = {
@@ -21,9 +21,11 @@ case class SeedApiRoute(override val application: Application)(implicit val cont
     Json.obj("seed" -> Base58.encode(seed))
   }
 
-  override val route = seedRoute ~ length
+  override val route = pathPrefix("utils") {
+    seedRoute ~ length
+  }
 
-  @Path("/")
+  @Path("/seed")
   @ApiOperation(value = "Seed", notes = "Generate random seed", httpMethod = "GET")
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with peer list or error")
@@ -34,7 +36,7 @@ case class SeedApiRoute(override val application: Application)(implicit val cont
     }
   }
 
-  @Path("/{length}")
+  @Path("/seed/{length}")
   @ApiOperation(value = "Seed of specified length", notes = "Generate random seed of specified length", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "length", value = "Seed length ", required = true, dataType = "long", paramType = "path")

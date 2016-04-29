@@ -1,3 +1,7 @@
+**1.2.6**
+
+* SeedApiRoute was renamed to UtilsApiRoute
+
 **1.2.5**
 
 * Changed response format for /addresses, /block/address/{address} and /transactions/unconfirmed API call

@@ -15,7 +15,7 @@ target
 Dockerfile
 
 # logs
-scorex-errors.log
+*.log
 
 # non-submodules code
 src/main

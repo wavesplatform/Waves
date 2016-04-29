@@ -16,7 +16,7 @@ class LagonakiTestSuite extends Suites(
   , new BlockGeneratorSpecification
   , new BlockTreeSpecification
   // API tests
-  , new SeedAPISpecification
+  , new UtilsAPISpecification
   , new PeersAPISpecification
   , new WalletAPISpecification
   , new AddressesAPISpecification

@@ -1,12 +1,10 @@
 package scorex.api.http.swagger
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
 import com.github.swagger.akka.model.{Contact, Info, License}
 import com.github.swagger.akka.{HasActorSystem, SwaggerHttpService}
 import scorex.settings.Settings
-import spray.json._
 
 import scala.reflect.runtime.universe.Type
 

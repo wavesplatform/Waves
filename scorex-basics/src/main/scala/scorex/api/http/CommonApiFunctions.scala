@@ -1,12 +1,9 @@
 package scorex.api.http
 
-import akka.util.Timeout
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.transaction.History
-
-import scala.concurrent.duration._
 
 
 trait CommonApiFunctions {

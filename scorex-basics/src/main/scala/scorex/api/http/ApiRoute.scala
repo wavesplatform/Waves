@@ -11,7 +11,7 @@ import scorex.app.Application
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-trait ApiRoute extends Directives {
+trait ApiRoute extends Directives with CommonApiFunctions {
   val application: Application
   val context: ActorRefFactory
   val route: Route
