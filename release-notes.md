@@ -1,5 +1,7 @@
 **1.2.6**
+---------
 
+* api_key authentication support for API
 * SeedApiRoute was renamed to UtilsApiRoute
 * New API calls /utils/hash/secure and /utils/hash/fast
 
