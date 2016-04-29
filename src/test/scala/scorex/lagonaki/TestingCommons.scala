@@ -43,9 +43,16 @@ object TestingCommons {
   def peerUrl(a: LagonakiApplication = application): String =
     "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
 
+  def postRequest(us: String, params: Map[String, String], peer: String = peerUrl(application)): JsValue = {
+    val request = Http(url(peer + us).POST << params)
+    val response = Await.result(request, 5.seconds)
+    Json.parse(response.getResponseBody)
+  }
+
+
   def getRequest(us: String, peer: String = peerUrl(application)): JsValue = {
     val request = Http(url(peer + us).GET)
-    val response = Await.result(request, 10.seconds)
+    val response = Await.result(request, 5.seconds)
     Json.parse(response.getResponseBody)
   }
 }

@@ -4,7 +4,7 @@ import java.security.SecureRandom
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import akka.http.scaladsl.server.{Directives, Route}
+import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsValue, Json}
 import scorex.app.Application
@@ -52,14 +52,14 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
   @Path("/hash")
   @ApiOperation(value = "Hash", notes = "Return hash of specified message", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "String")
+    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "form", dataType = "String")
   ))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"Base58-encoded\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
+    new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
   def hash: Route = {
     path("hash") {
-      entity(as[String]) { message =>
+      formFields("message") { (message) =>
         postJsonRoute {
           Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
         }
