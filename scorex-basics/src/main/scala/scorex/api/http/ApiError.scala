@@ -20,6 +20,11 @@ case object WrongJson extends ApiError {
   override val message = "failed to parse json message"
 }
 
+//API Auth
+case object ApiKeyNotValid extends ApiError {
+  override val id: Int = 2
+  override val message: String = "Provided API key is not correct"
+}
 
 //VALIDATION
 case object InvalidSignature extends ApiError {

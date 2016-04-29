@@ -228,14 +228,16 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
   def create: Route = {
     path("addresses") {
-      postJsonRoute({
-        walletNotExists(wallet).getOrElse {
-          wallet.generateNewAccount() match {
-            case Some(pka) => Json.obj("address" -> pka.address)
-            case None => Unknown.json
+      withAuth {
+        postJsonRoute {
+          walletNotExists(wallet).getOrElse {
+            wallet.generateNewAccount() match {
+              case Some(pka) => Json.obj("address" -> pka.address)
+              case None => Unknown.json
+            }
           }
         }
-      })
+      }
     }
   }
 

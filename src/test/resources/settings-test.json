@@ -22,5 +22,6 @@
   },
   "maxRollback": 100,
   "history": "blockchain",
+  "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",
   "offlineGeneration": false
 }

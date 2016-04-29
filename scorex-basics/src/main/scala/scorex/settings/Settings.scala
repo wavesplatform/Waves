@@ -5,14 +5,15 @@ import java.net.InetSocketAddress
 
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
 /**
-  * Settings
-  */
+ * Settings
+ */
 
 trait Settings extends ScorexLogging {
 
@@ -97,6 +98,8 @@ trait Settings extends ScorexLogging {
     scala.io.StdIn.readLine()
   }
   lazy val walletSeed = (settingsJSON \ "walletSeed").asOpt[String].flatMap(s => Base58.decode(s).toOption)
+
+  lazy val apiKeyHash = (settingsJSON \ "apiKeyHash").asOpt[String].flatMap(s => Base58.decode(s).toOption)
 
   lazy val genesisTimestamp: Long = (settingsJSON \ "genesisTimestamp").asOpt[Long].getOrElse(DefaultGenesisTimestamp)
 
