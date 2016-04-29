@@ -36,7 +36,7 @@ trait ApiRoute extends Directives with CommonApiFunctions {
 
   private def jsonRoute(fn: JsValue, method: Directive0): Route = method {
     val resp = complete(HttpEntity(ContentTypes.`application/json`, fn.toString()))
-    withCors(respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*"))(resp))
+    withCors(resp)
   }
 
 
