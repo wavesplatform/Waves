@@ -15,10 +15,10 @@ The previous chapter, [Generic Block Structure](modular1.md) described how to sp
 Gluing Things Together
 ----------------------
 
-In the first place, some wrapper for Spray route is needed:
+In the first place, some wrapper for Akka-http route is needed:
 
     trait ApiRoute {
-       val route: spray.routing.Route
+       val route: akka.http.scaladsl.server.Route
     }
 
 Then an actor composing routes:
@@ -27,11 +27,11 @@ Then an actor composing routes:
      
       override def actorRefFactory = context
            
-      override def receive = runRoute(routes.map(_.route).reduce(_ ~ _))
+      override def receive = routes.map(_.route).reduce(_ ~ _)
     }
     
 And then to create a new piece of API, instance of ApiRoute overriding `route` value is needed, see "Longer
-     Example" in [spray-routing documentation](http://spray.io/documentation/1.2.3/spray-routing/) for example of
+     Example" in [akka-http documentation](http://doc.akka.io/docs/akka/2.4.4/scala/http/routing-dsl/index.html#Longer_Example) for example of
      a route definition(or Scorex Lagonaki sources, scorex.api.http package).
       
 Then to glue all things together, we just create concrete actor implementation and bind it to a port. Example from
