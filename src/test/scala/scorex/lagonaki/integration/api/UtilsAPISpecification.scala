@@ -25,11 +25,11 @@ class UtilsAPISpecification extends FunSuite with Matchers {
   }
 
   test("/utils/seed API route") {
-    Base58.decode((getRequest("/utils/seed") \ "seed").as[String]).isSuccess shouldBe true
+    Base58.decode((GET.request("/utils/seed") \ "seed").as[String]).isSuccess shouldBe true
   }
 
   test("/utils/seed/{length} API route") {
     val length = Random.nextInt(4096)
-    Base58.decode((getRequest(s"/utils/seed/$length") \ "seed").as[String]).get.length shouldBe length
+    Base58.decode((GET.request(s"/utils/seed/$length") \ "seed").as[String]).get.length shouldBe length
   }
 }

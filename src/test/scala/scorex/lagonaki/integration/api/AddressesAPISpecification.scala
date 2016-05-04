@@ -17,11 +17,11 @@ class AddressesAPISpecification extends FunSuite with Matchers {
 
 
   test("/addresses/seq/{from}/{to} API route") {
-    val responsed = getRequest("/addresses/seq/1/4").as[List[String]]
+    val responsed = GET.request("/addresses/seq/1/4").as[List[String]]
     responsed.size shouldBe 3
     responsed.foreach(a => addresses should contain(a))
 
-    val r2 = getRequest("/addresses/seq/5/9").as[List[String]]
+    val r2 = GET.request("/addresses/seq/5/9").as[List[String]]
     r2.size shouldBe 4
     r2.foreach(a => addresses should contain(a))
     responsed.intersect(r2).isEmpty shouldBe true
@@ -31,20 +31,20 @@ class AddressesAPISpecification extends FunSuite with Matchers {
   test("/addresses/validate/{address} API route") {
     val toCheck: Seq[(String, Boolean)] = ("wrongA", false) +: addresses.map(a => (a, true))
     toCheck.foreach { a =>
-      val response = getRequest(s"/addresses/validate/${a._1}")
+      val response = GET.request(s"/addresses/validate/${a._1}")
       (response \ "address").as[String] shouldBe a._1
       (response \ "valid").as[Boolean] shouldBe a._2
     }
   }
 
   test("/addresses/seed/{address} API route") {
-    val response = getRequest(s"/addresses/seed/${account.address}")
+    val response = GET.request(s"/addresses/seed/${account.address}")
     (response \ "address").as[String] shouldBe account.address
     (response \ "seed").as[String] shouldBe Base58.encode(account.seed)
   }
 
   test("/addresses/balance/{address} API route") {
-    val response = getRequest(s"/addresses/balance/$address")
+    val response = GET.request(s"/addresses/balance/$address")
     (response \ "address").as[String] shouldBe address
     (response \ "confirmations").as[Int] shouldBe 1
     (response \ "balance").as[Long] should be >= 0L
@@ -66,14 +66,14 @@ class AddressesAPISpecification extends FunSuite with Matchers {
 
   test("/addresses/balance/{address}/{confirmations} API route") {
     val confirmations = Math.min(3, application.blockStorage.state.stateHeight)
-    val response = getRequest(s"/addresses/balance/$address/$confirmations")
+    val response = GET.request(s"/addresses/balance/$address/$confirmations")
     (response \ "address").as[String] shouldBe address
     (response \ "confirmations").as[Int] shouldBe confirmations
     (response \ "balance").as[Long] should be >= 0L
   }
 
   test("/addresses/generatingbalance/{address} API route") {
-    val response = getRequest(s"/addresses/generatingbalance/$address")
+    val response = GET.request(s"/addresses/generatingbalance/$address")
     (response \ "address").as[String] shouldBe address
     (response \ "balance").as[Long] should be >= 0L
   }
@@ -119,7 +119,7 @@ class AddressesAPISpecification extends FunSuite with Matchers {
   }
 
   test("/addresses/ API route") {
-    val response = getRequest("/addresses")
+    val response = GET.request("/addresses")
     response.as[List[String]] shouldBe addresses
   }
 

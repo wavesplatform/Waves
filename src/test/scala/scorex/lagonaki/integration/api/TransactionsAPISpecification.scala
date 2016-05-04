@@ -18,19 +18,19 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
     (1 to 20) foreach (i => genValidTransaction())
     val unconfirmed = UnconfirmedTransactionsDatabaseImpl.all()
     unconfirmed.size should be > 0
-    val tr = getRequest("/transactions/unconfirmed")
+    val tr = GET.request("/transactions/unconfirmed")
     (tr \\ "signature").toList.size shouldBe unconfirmed.size
   }
 
   test("/transactions/address/{address} API route") {
     addresses.foreach { a =>
-      checkTransactionList(getRequest(s"/transactions/address/$a"))
+      checkTransactionList(GET.request(s"/transactions/address/$a"))
     }
   }
 
   test("/transactions/address/{address}/limit/{limit} API route") {
     addresses.foreach { a =>
-      val tr = getRequest(s"/transactions/address/$a/limit/2")
+      val tr = GET.request(s"/transactions/address/$a/limit/2")
       (tr \\ "amount").toList.size should be <= 2
       checkTransactionList(tr)
     }
