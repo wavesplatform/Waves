@@ -80,7 +80,5 @@ case class PaymentApiRoute(override val application: Application)(implicit val c
         }
       }
     }
-
-
   }
 }

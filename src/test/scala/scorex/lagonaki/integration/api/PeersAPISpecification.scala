@@ -26,7 +26,11 @@ class PeersAPISpecification extends FunSuite with Matchers {
   }
 
   test("/peers/connect API route") {
-    //TODO
+    POST.incorrectApiKeyTest("/peers/connect")
+
+    val req = POST.request("/peers/connect", body = "{\"host\":\"127.0.0.1\",\"port\":123}")
+    (req \ s"status").as[String] shouldBe "Trying to connect"
+    (req \ "hostname").asOpt[String].isDefined shouldBe true
   }
 
 }

@@ -5,6 +5,7 @@
 * api_key is required for all POST and DELETE requests
 * SeedApiRoute was renamed to UtilsApiRoute
 * New API calls /utils/hash/secure and /utils/hash/fast
+* Fixed API call /peers/connect
 
 **1.2.5**
 ---------
