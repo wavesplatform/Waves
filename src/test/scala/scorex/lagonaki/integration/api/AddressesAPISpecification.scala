@@ -130,8 +130,8 @@ class AddressesAPISpecification extends FunSuite with Matchers {
     val signed = "{\n  \"message\": \"3yZe7d\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"5Tt2JiPh3F17sTckvBg9GooHKjuFAFyNVXz9epDwrLWZShah4xV5cjXvUeQvbx8R545LmucdnZdPfLeqDkL3PijJ\"\n}"
     (POST.request(s"/addresses/verify/$address", body = signed) \ "valid").as[Boolean] shouldBe true
 
-    val incorrect = "{\n  \"message\": \"test2\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"3cVSpApm5PfqRMxP4a5dw3KYjBorY7316kD4DBjur52r6M7cDjGY53VMtjWLTcqf8e9pr7zAFo2j9mF8eqtRUAvh\"\n}"
-    (POST.request(s"/addresses/verifyText/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
+    val incorrect = "{\n  \"message\": \"3yZea7d\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"5Tt2JiPh3F17sTckvBg9GooHKjuFAFyNVXz9epDwrLWZShah4xV5cjXvUeQvbx8R545LmucdnZdPfLeqDkL3PijJ\"\n}"
+    (POST.request(s"/addresses/verify/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
   }
 
   def accounts = wallet.privateKeyAccounts()
