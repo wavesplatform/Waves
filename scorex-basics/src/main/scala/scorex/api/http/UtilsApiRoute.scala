@@ -49,7 +49,7 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
     }
   }
 
-  @Path("/hash/fast")
+  @Path("/hash/secure")
   @ApiOperation(value = "Hash", notes = "Return FastCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "form", dataType = "String")
@@ -60,14 +60,16 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
   def hashFast: Route = {
     path("hash" / "secure") {
       formFields("message") { (message) =>
-        postJsonRoute {
-          Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
+        withAuth {
+          postJsonRoute {
+            Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
+          }
         }
       }
     }
   }
 
-  @Path("/hash/secure")
+  @Path("/hash/fast")
   @ApiOperation(value = "Hash", notes = "Return  SecureCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "form", dataType = "String")
@@ -78,8 +80,10 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
   def hashSecure: Route = {
     path("hash" / "fast") {
       formFields("message") { (message) =>
-        postJsonRoute {
-          Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message)))
+        withAuth {
+          postJsonRoute {
+            Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message)))
+          }
         }
       }
     }
