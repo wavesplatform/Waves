@@ -61,7 +61,8 @@ object TestingCommons {
   sealed trait RequestType {
     def incorrectApiKeyTest(path: String): Unit = {
       Seq(Map[String, String](), Map("api_key" -> "wrong key")) foreach { h =>
-        assert(request(path, headers = h).toString() == ApiKeyNotValid.json.toString())
+        val resp = request(path, headers = h).toString()
+        assert(resp == ApiKeyNotValid.json.toString(), s"$resp == ${ApiKeyNotValid.json.toString()} is false")
       }
     }
 

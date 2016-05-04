@@ -80,14 +80,21 @@ class AddressesAPISpecification extends FunSuite with Matchers {
 
   test("DELETE /addresses/{address} API route") {
     val address = accounts.last.address
-    DELETE.incorrectApiKeyTest(s"/addresses/signText/$address")
+    DELETE.incorrectApiKeyTest(s"/addresses/$address")
 
-
-    //TODO
+    (DELETE.request(s"/addresses/$address") \ "deleted").as[Boolean] shouldBe true
+    addresses.contains(address) shouldBe false
   }
 
   test("POST /addresses/verifyText/{address} API route") {
-    //TODO
+    val address = "jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS"
+    POST.incorrectApiKeyTest(s"/addresses/verifyText/$address")
+
+    val signed = "{\n  \"message\": \"test\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"3cVSpApm5PfqRMxP4a5dw3KYjBorY7316kD4DBjur52r6M7cDjGY53VMtjWLTcqf8e9pr7zAFo2j9mF8eqtRUAvh\"\n}"
+    (POST.request(s"/addresses/verifyText/$address", body = signed) \ "valid").as[Boolean] shouldBe true
+
+    val incorrect = "{\n  \"message\": \"test2\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"3cVSpApm5PfqRMxP4a5dw3KYjBorY7316kD4DBjur52r6M7cDjGY53VMtjWLTcqf8e9pr7zAFo2j9mF8eqtRUAvh\"\n}"
+    (POST.request(s"/addresses/verifyText/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
   }
 
   test("POST /addresses/signText/{address} API route") {
@@ -117,7 +124,14 @@ class AddressesAPISpecification extends FunSuite with Matchers {
   }
 
   test("POST /addresses/verify/{address} API route") {
-    //TODO
+    val address = "jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS"
+    POST.incorrectApiKeyTest(s"/addresses/verify/$address")
+
+    val signed = "{\n  \"message\": \"3yZe7d\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"5Tt2JiPh3F17sTckvBg9GooHKjuFAFyNVXz9epDwrLWZShah4xV5cjXvUeQvbx8R545LmucdnZdPfLeqDkL3PijJ\"\n}"
+    (POST.request(s"/addresses/verify/$address", body = signed) \ "valid").as[Boolean] shouldBe true
+
+    val incorrect = "{\n  \"message\": \"test2\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"3cVSpApm5PfqRMxP4a5dw3KYjBorY7316kD4DBjur52r6M7cDjGY53VMtjWLTcqf8e9pr7zAFo2j9mF8eqtRUAvh\"\n}"
+    (POST.request(s"/addresses/verifyText/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
   }
 
   def accounts = wallet.privateKeyAccounts()

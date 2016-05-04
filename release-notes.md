@@ -1,7 +1,8 @@
 **1.2.6**
 ---------
 
-* api_key authentication support for API
+* api_key authentication support for API implemented
+* api_key is required for all POST and DELETE requests
 * SeedApiRoute was renamed to UtilsApiRoute
 * New API calls /utils/hash/secure and /utils/hash/fast
 
