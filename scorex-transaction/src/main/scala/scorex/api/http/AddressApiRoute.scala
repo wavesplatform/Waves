@@ -35,14 +35,16 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def deleteAddress: Route = {
     path(Segment) { case address =>
-      deleteJsonRoute {
-        walletNotExists(wallet).getOrElse {
-          if (!Account.isValidAddress(address)) {
-            InvalidAddress.json
-          } else {
-            val deleted = wallet.privateKeyAccount(address).exists(account =>
-              wallet.deleteAccount(account))
-            Json.obj("deleted" -> deleted)
+      withAuth {
+        deleteJsonRoute {
+          walletNotExists(wallet).getOrElse {
+            if (!Account.isValidAddress(address)) {
+              InvalidAddress.json
+            } else {
+              val deleted = wallet.privateKeyAccount(address).exists(account =>
+                wallet.deleteAccount(account))
+              Json.obj("deleted" -> deleted)
+            }
           }
         }
       }

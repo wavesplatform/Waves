@@ -52,7 +52,7 @@ class AddressesAPISpecification extends FunSuite with Matchers {
 
   test("POST /addresses/sign/{address} API route") {
     val message = "test"
-    val req = postRequest(s"/addresses/sign/$address", body = message)
+    val req = POST.request(s"/addresses/sign/$address", body = message)
     (req \ "message").as[String] shouldBe Base58.encode(message.getBytes)
     val pubkey = (req \ "publickey").asOpt[String].flatMap(Base58.decode(_).toOption)
     val signature = (req \ "signature").asOpt[String].flatMap(Base58.decode(_).toOption)
@@ -61,7 +61,7 @@ class AddressesAPISpecification extends FunSuite with Matchers {
 
     EllipticCurveImpl.verify(signature.get, message.getBytes, pubkey.get)
 
-    incorrectApiKeyTest(s"/addresses/sign/$address")
+    POST.incorrectApiKeyTest(s"/addresses/sign/$address")
   }
 
   test("/addresses/balance/{address}/{confirmations} API route") {
@@ -79,6 +79,10 @@ class AddressesAPISpecification extends FunSuite with Matchers {
   }
 
   test("DELETE /addresses/{address} API route") {
+    val address = accounts.last.address
+    DELETE.incorrectApiKeyTest(s"/addresses/signText/$address")
+
+
     //TODO
   }
 
@@ -88,7 +92,7 @@ class AddressesAPISpecification extends FunSuite with Matchers {
 
   test("POST /addresses/signText/{address} API route") {
     val message = "test"
-    val req = postRequest(s"/addresses/signText/$address", body = message)
+    val req = POST.request(s"/addresses/signText/$address", body = message)
     (req \ "message").as[String] shouldBe message
     val pubkey = (req \ "publickey").asOpt[String].flatMap(Base58.decode(_).toOption)
     val signature = (req \ "signature").asOpt[String].flatMap(Base58.decode(_).toOption)
@@ -97,20 +101,14 @@ class AddressesAPISpecification extends FunSuite with Matchers {
 
     EllipticCurveImpl.verify(signature.get, message.getBytes, pubkey.get)
 
-    incorrectApiKeyTest(s"/addresses/signText/$address")
+    POST.incorrectApiKeyTest(s"/addresses/signText/$address")
   }
 
   test("POST /addresses API route") {
-    (postRequest("/addresses") \ "address").asOpt[String].flatMap(Base58.decode(_).toOption).isDefined shouldBe true
+    (POST.request("/addresses") \ "address").asOpt[String].flatMap(Base58.decode(_).toOption).isDefined shouldBe true
     val add = "/addresses"
 
-    incorrectApiKeyTest("/addresses")
-  }
-
-  def incorrectApiKeyTest(path: String): Unit = {
-    Seq(Map[String, String](), Map("api_key" -> "wrong key")) foreach { h =>
-      postRequest(path, headers = h).toString() shouldBe ApiKeyNotValid.json.toString()
-    }
+    POST.incorrectApiKeyTest("/addresses")
   }
 
   test("/addresses/ API route") {
