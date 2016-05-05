@@ -19,7 +19,7 @@ class SwaggerDocService(system: ActorSystem, val apiTypes: Seq[Type], settings: 
   override val apiDocsPath: String = "swagger"
 
   override val info: Info = Info("The Web Interface to the Scorex API",
-    "1.2.5",
+    "1.2.6",
     "Scorex API",
     "License: Creative Commons CC0",
     Some(Contact("Alex", "https://scorex-dev.groups.io/g/main", "alex.chepurnoy@iohk.io")),
