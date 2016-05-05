@@ -58,7 +58,7 @@ trait Application extends ScorexLogging {
   implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed)
 
   //interface to append log and state
-  val blockStorage: BlockStorage
+  lazy val blockStorage: BlockStorage = transactionModule.blockStorage
 
   lazy val history: History = blockStorage.history
 
