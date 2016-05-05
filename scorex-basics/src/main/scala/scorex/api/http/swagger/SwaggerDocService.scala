@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import com.github.swagger.akka.model.{Contact, Info, License}
 import com.github.swagger.akka.{HasActorSystem, SwaggerHttpService}
+import io.swagger.models.Swagger
 import scorex.settings.Settings
 
 import scala.reflect.runtime.universe.Type
@@ -25,4 +26,7 @@ class SwaggerDocService(system: ActorSystem, val apiTypes: Seq[Type], settings: 
     Some(Contact("Alex", "https://scorex-dev.groups.io/g/main", "alex.chepurnoy@iohk.io")),
     Some(License("License: Creative Commons CC0", "https://github.com/ScorexProject/Scorex/blob/master/COPYING"))
   )
+
+  //Let swagger-ui determine the host and port
+  override def swaggerConfig = new Swagger().basePath(prependSlashIfNecessary(basePath)).info(info).scheme(scheme)
 }
