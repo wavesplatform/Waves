@@ -1,7 +1,7 @@
 
 **0.1.3**
 
-* Upgrade to Scorex 1.2.5.
+* Upgrade to Scorex 1.2.6.
 * New http api method /external-payment for lite client
 
 **0.1.2**
