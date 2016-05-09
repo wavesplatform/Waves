@@ -5,7 +5,7 @@
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
     "port": 6868,
-    "knownPeers": ["52.58.115.4:6868", "82.165.138.42:6868", "52.74.26.138:6868"],
+    "knownPeers": ["52.28.28.118:6868", "82.165.138.42:6868", "52.74.26.138:6868"],
     "maxConnections": 10
   },
   "walletDir": "/tmp/scorex/waves/wallet",
@@ -14,7 +14,7 @@
   "dataDir": "/tmp/scorex/waves/data",
   "rpcPort": 6869,
   "rpcAllowed": [],
-  "blockGenerationDelay": 1000,
+  "blockGenerationDelay": 15000,
   "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
