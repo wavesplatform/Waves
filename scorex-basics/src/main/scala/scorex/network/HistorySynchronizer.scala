@@ -140,7 +140,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
               log.info(s"Going to process ${toProcess.size} blocks")
               toProcess.find(bp => !processNewBlock(bp, local = false)).foreach { case failedBlock =>
                 log.warn(s"Can't apply block: ${failedBlock.json}")
-                if (history.contains(failedBlock.referenceField.value)) {
+                if (history.lastBlock.uniqueId sameElements failedBlock.referenceField.value) {
                   connectedPeer.handlerRef ! PeerConnectionHandler.Blacklist
                 }
                 gotoSyncing()

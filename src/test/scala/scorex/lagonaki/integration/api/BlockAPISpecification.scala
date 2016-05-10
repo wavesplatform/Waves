@@ -20,54 +20,54 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
   val last = history.lastBlock
 
   test("GET /blocks/at/{height} API route") {
-    val response = getRequest(s"/blocks/at/1")
+    val response = GET.request(s"/blocks/at/1")
     checkGenesis(response)
   }
 
   test("GET /blocks/seq/{from}/{to} API route") {
-    val response = getRequest(s"/blocks/seq/1/3")
+    val response = GET.request(s"/blocks/seq/1/3")
     checkGenesis(response(0).as[JsValue])
     checkBlock(response(1).as[JsValue])
   }
 
   test("GET /blocks/last API route") {
-    val response = getRequest(s"/blocks/last")
+    val response = GET.request(s"/blocks/last")
     checkBlock(response)
   }
 
   test("GET /blocks/height API route") {
-    val response = getRequest(s"/blocks/height")
+    val response = GET.request(s"/blocks/height")
     (response \ "height").as[Int] shouldBe history.height()
   }
 
   test("GET /blocks/child/{signature} API route") {
-    val response = getRequest(s"/blocks/child/${genesis.encodedId}")
+    val response = GET.request(s"/blocks/child/${genesis.encodedId}")
     checkBlock(response)
     (response \ "signature").as[String] shouldBe history.asInstanceOf[BlockChain].blockAt(2).get.encodedId
   }
 
   test("GET /blocks/delay/{signature}/{blockNum} API route") {
-    val response = getRequest(s"/blocks/delay/${last.encodedId}/1")
+    val response = GET.request(s"/blocks/delay/${last.encodedId}/1")
     (response \ "delay").as[Int] should be > 0
   }
 
   test("GET /blocks/height/{signature} API route") {
-    val response = getRequest(s"/blocks/height/${genesis.encodedId}")
+    val response = GET.request(s"/blocks/height/${genesis.encodedId}")
     (response \ "height").as[Int] shouldBe 1
   }
 
   test("GET /blocks/signature/{signature} API route") {
     Base58.decode(genesis.encodedId).toOption.map(signature => history.blockById(signature)).isDefined shouldBe true
-    checkGenesis(getRequest(s"/blocks/signature/${genesis.encodedId}"))
-    checkBlock(getRequest(s"/blocks/signature/${last.encodedId}"))
+    checkGenesis(GET.request(s"/blocks/signature/${genesis.encodedId}"))
+    checkBlock(GET.request(s"/blocks/signature/${last.encodedId}"))
   }
 
   test("GET /blocks/first API route") {
-    checkGenesis(getRequest(s"/blocks/first"))
+    checkGenesis(GET.request(s"/blocks/first"))
   }
 
   test("GET /blocks/address/{address} API route") {
-    checkGenesis(getRequest(s"/blocks/address/bnWsEwZa8GowXjRSHeGeHJWbu3JaA7135")(0).as[JsValue])
+    checkGenesis(GET.request(s"/blocks/address/bnWsEwZa8GowXjRSHeGeHJWbu3JaA7135")(0).as[JsValue])
   }
 
 

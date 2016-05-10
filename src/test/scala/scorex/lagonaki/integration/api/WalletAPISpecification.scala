@@ -8,11 +8,11 @@ class WalletAPISpecification extends FunSuite with Matchers {
   import scorex.lagonaki.TestingCommons._
 
   test("/wallet/ API route") {
-    (getRequest("/wallet") \ "exists").as[Boolean] shouldBe true
+    (GET.request("/wallet") \ "exists").as[Boolean] shouldBe true
   }
 
   test("/wallet/seed API route") {
-    (getRequest("/wallet/seed") \ "seed").as[String] shouldBe Base58.encode(application.settings.walletSeed.get)
+    (GET.request("/wallet/seed") \ "seed").as[String] shouldBe Base58.encode(application.settings.walletSeed.get)
   }
 
 }

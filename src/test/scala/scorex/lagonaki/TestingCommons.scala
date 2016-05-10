@@ -1,7 +1,8 @@
 package scorex.lagonaki
 
 import dispatch.{Http, url}
-import play.api.libs.json.{JsValue, JsObject, Json}
+import play.api.libs.json.{JsObject, JsValue, Json}
+import scorex.api.http.ApiKeyNotValid
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.TransactionSettings
 import scorex.utils._
@@ -54,9 +55,61 @@ object TestingCommons {
   }
 
 
-  def getRequest(us: String, peer: String = peerUrl(application)): JsValue = {
-    val request = Http(url(peer + us).GET)
-    val response = Await.result(request, 5.seconds)
-    Json.parse(response.getResponseBody)
+  @deprecated("Replace with GET.request", "1.2.6")
+  def getRequest(us: String, peer: String = peerUrl(application)): JsValue = GET.request(us = us, peer = peer)
+
+  sealed trait RequestType {
+    def incorrectApiKeyTest(path: String): Unit = {
+      Seq(Map[String, String](), Map("api_key" -> "wrong key")) foreach { h =>
+        val resp = request(path, headers = h).toString()
+        assert(resp == ApiKeyNotValid.json.toString(), s"$resp == ${ApiKeyNotValid.json.toString()} is false")
+      }
+    }
+
+
+    def request(us: String,
+                params: Map[String, String] = Map.empty,
+                body: String = "",
+                headers: Map[String, String] = Map("api_key" -> "test"),
+                peer: String = peerUrl(application)): JsValue
   }
+
+  case object GET extends RequestType {
+    def request(us: String,
+                params: Map[String, String] = Map.empty,
+                body: String = "",
+                headers: Map[String, String] = Map.empty,
+                peer: String = peerUrl(application)): JsValue = {
+      val request = Http(url(peer + us).GET)
+      val response = Await.result(request, 5.seconds)
+      Json.parse(response.getResponseBody)
+    }
+  }
+
+  case object POST extends RequestType {
+    def request(us: String,
+                params: Map[String, String] = Map.empty,
+                body: String = "",
+                headers: Map[String, String] = Map("api_key" -> "test"),
+                peer: String = peerUrl(application)): JsValue = {
+      val request = Http(url(peer + us).POST << params <:< headers << body)
+      val response = Await.result(request, 5.seconds)
+      Json.parse(response.getResponseBody)
+    }
+
+  }
+
+  case object DELETE extends RequestType {
+    def request(us: String,
+                params: Map[String, String] = Map.empty,
+                body: String = "",
+                headers: Map[String, String] = Map("api_key" -> "test"),
+                peer: String = peerUrl(application)): JsValue = {
+      val request = Http(url(peer + us).DELETE << params <:< headers << body)
+      val response = Await.result(request, 5.seconds)
+      Json.parse(response.getResponseBody)
+    }
+
+  }
+
 }

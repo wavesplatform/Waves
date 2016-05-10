@@ -49,41 +49,44 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
     }
   }
 
-  @Path("/hash/fast")
+  @Path("/hash/secure")
   @ApiOperation(value = "Hash", notes = "Return FastCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "form", dataType = "String")
+    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "String")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
   def hashFast: Route = {
     path("hash" / "secure") {
-      formFields("message") { (message) =>
-        postJsonRoute {
-          Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
+      entity(as[String]) { message =>
+        withAuth {
+          postJsonRoute {
+            Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
+          }
         }
       }
     }
   }
 
-  @Path("/hash/secure")
+  @Path("/hash/fast")
   @ApiOperation(value = "Hash", notes = "Return  SecureCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "form", dataType = "String")
+    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "String")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
   def hashSecure: Route = {
     path("hash" / "fast") {
-      formFields("message") { (message) =>
-        postJsonRoute {
-          Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message)))
+      entity(as[String]) { message =>
+        withAuth {
+          postJsonRoute {
+            Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message)))
+          }
         }
       }
     }
   }
-
 
 }
