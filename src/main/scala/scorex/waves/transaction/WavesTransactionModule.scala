@@ -14,19 +14,6 @@ import scorex.utils.NTP
 class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings, application: Application)
   extends SimpleTransactionModule() {
 
-  //TODO: remove
-  override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
-    val time = NTP.correctedTime()
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
-
-    val senderPubKey = Base58.encode(sender.publicKey)
-    val signature = Base58.encode(sig)
-
-    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
-    if (blockStorage.state.isValid(payment)) onNewOffchainTransaction(payment)
-    payment
-  }
-
   /**
     * Publish signed payment transaction which generated outside node
     */

@@ -14,9 +14,9 @@
   "dataDir": "/tmp/scorex/waves/data",
   "rpcPort": 6869,
   "rpcAllowed": [],
-  "blockGenerationDelay": 10000,
+  "blockGenerationDelay": 15000,
   "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
-  "offlineGeneration": true
+  "offlineGeneration": false
 }
