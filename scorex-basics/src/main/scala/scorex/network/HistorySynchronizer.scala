@@ -75,7 +75,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
         if (application.settings.offlineGeneration) gotoSynced() else gotoSyncing()
 
       case SelfCheck =>
-        if (System.currentTimeMillis() - lastUpdate > GettingBlockTimeout.toMillis) gotoSyncing()
+        if (status != Syncing && System.currentTimeMillis() - lastUpdate > GettingBlockTimeout.toMillis) gotoSyncing()
 
       //the signal to initialize
       case Unit =>
