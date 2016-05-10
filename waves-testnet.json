@@ -18,5 +18,5 @@
   "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
-  "offlineGeneration": true
+  "offlineGeneration": false
 }
