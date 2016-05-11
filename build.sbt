@@ -1,8 +1,8 @@
-
+import sbt.Keys._
 
 lazy val commonSettings = Seq(
   organization := "org.consensusresearch",
-  version := "1.2.6",
+  version := version.value,
   scalaVersion := "2.11.8"
 )
 
