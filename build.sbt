@@ -66,18 +66,17 @@ test in assembly := {}
 
 mainClass in assembly := Some("scorex.lagonaki.server.Server")
 
-
 //publishing settings
 
-licenses := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
+licenses in ThisBuild := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
 
-homepage := Some(url("https://github.com/ConsensusResearch/Scorex-Lagonaki"))
+homepage in ThisBuild := Some(url("https://github.com/ConsensusResearch/Scorex-Lagonaki"))
 
-publishMavenStyle := true
+publishMavenStyle in ThisBuild := true
 
 publishArtifact in Test := false
 
-publishTo := {
+publishTo in ThisBuild := {
   val nexus = "https://oss.sonatype.org/"
   if (isSnapshot.value)
     Some("snapshots" at nexus + "content/repositories/snapshots")
@@ -85,9 +84,9 @@ publishTo := {
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 
-fork := true
+fork in ThisBuild := true
 
-pomIncludeRepository := { _ => false }
+pomIncludeRepository in ThisBuild := { _ => false }
 
 licenses in ThisBuild := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
 
@@ -105,3 +104,5 @@ pomExtra in ThisBuild :=
         <url>http://chepurnoy.org/</url>
       </developer>
     </developers>
+
+credentials in ThisBuild += Credentials(Path.userHome / ".ivy2" / ".credentials")
