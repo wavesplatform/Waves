@@ -24,54 +24,23 @@ Features
 * Modular design
 * Scala language
 * Two 100% Proof-of-Stake consensus algos out of the box, Nxt-like and Qora-like. One algo could be replaced
-with an another with just one line of code edited (in PermaConstants.scala)
+with an another with just one line of code edited.
+* Additional consensus module Proof-of-Work consensus algo is available as [separate module](https://github.com/ScorexProject/Permacoin-consensus)
 * Simplest transactional model
 * Asynchronous network layer on top of TCP
 * JSON API
 * Command line client for the JSON API
 * Cryptographic primitives externalized into [separate scrypto framework](https://github.com/ScorexProject/scrypto)
 
+Getting Started
+---------------
 
-**This is the pretty buggy initial release version! Please report bugs found, and contribute with
-fixes, if possible.**
-
-Lagonaki
---------
-Scorex is modular framework for developers and since version 1.2.2 we have removed
-runnables from it(except of some fake runnables needed for integration tests). If you want
-to run something built on top of Scorex, take a look to Lagonaki, our first application with
-public testnet. It is in another repo: [https://github.com/ScorexProject/Lagonaki](https://github.com/ScorexProject/Lagonaki).
-
-
-
-
-Installation
-------------
-
-* Ubuntu Server
-
-Install Oracle Java8 JDK:
-
-`echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list`
-
-`echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list`
-
-`apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys EEA14886`
-
-`apt-get update`
-
-`apt-get install oracle-java8-installer`
-
-and agree with license terms
-
-Install SBT(Scala Build Tool):
-
-`echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list`
-
-`apt-get update`
-
-`apt-get install sbt`
-
+* [Quick start guide](https://github.com/ScorexProject/Scorex/wiki/Getting-started)
+* [Documentation](https://github.com/ScorexProject/Scorex/wiki)
+* [Example project](https://github.com/ScorexProject/Lagonaki)
+* [Additional consensus module](https://github.com/ScorexProject/Permacoin-consensus)
+* [CI](http://23.94.190.226:8080/job/scorex/)
+* [Releases](https://github.com/ScorexProject/Scorex/releases)
 
 Command-Line Client
 -------------------
@@ -82,27 +51,10 @@ Some examples of CLI commands:
  * GET blocks/first
  * POST payment {"amount":400, "fee":1, "sender":"2kx3DyWJpYYfLErWpRMLHwkL1ZGyKHAPNKr","recipient":"Y2BXLjiAhPUMSo8iBbDEhv81VwKnytTXsH"}
 
+More reading
+------------
 
-Tests
----
-
-Run `sbt test` to run tests.
-Read more about testing with sbt at [http://www.scala-sbt.org/0.13/docs/Testing.html](http://www.scala-sbt.org/0.13/docs/Testing.html)
-
-API
----
-
-There's separate [API.md](docs/API.md) file with API description
-
-
-Current Limitations
--------------------
-
-todo: current glitches / limitations list
-
-
-Documentation and Resources
----------------------------
+Besides of [documentation](https://github.com/ScorexProject/Scorex/wiki) there are other resources describing Scorex:
 
 Articles:
 
