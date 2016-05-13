@@ -11,11 +11,6 @@ import scala.util.Random
 
 trait BlockTestingCommons extends TestingCommons {
 
-  import TestingCommons._
-
-  implicit val consensusModule = new ConsensusMock
-  implicit val transactionModule = new SimpleTransactionModule()(application.settings, application)
-
   val genesis: Block = Block.genesis()
   val gen = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(Byte.MaxValue).toByte))
 

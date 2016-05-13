@@ -3,6 +3,7 @@ package scorex.lagonaki
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.api.http.ApiKeyNotValid
+import scorex.lagonaki.TestingCommons._
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.TransactionSettings
 import scorex.utils._
@@ -16,6 +17,8 @@ trait TestingCommons {
   implicit object TestTransactionLayerSettings extends TransactionSettings {
     override val settingsJSON: JsObject = Json.obj()
   }
+  implicit val consensusModule = application.consensusModule
+  implicit val transactionModule = application.transactionModule
 
 }
 

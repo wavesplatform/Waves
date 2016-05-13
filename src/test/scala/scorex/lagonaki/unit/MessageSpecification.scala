@@ -13,11 +13,6 @@ import shapeless.syntax.typeable._
 
 class MessageSpecification extends FunSuite with TestingCommons {
 
-  import TestingCommons._
-
-  implicit lazy val consensusModule = new NxtLikeConsensusModule
-  implicit lazy val transactionModule = new SimpleTransactionModule()(application.settings, application)
-
   private lazy val repo = new BasicMessagesRepo()
   private lazy val handler = new MessageHandler(repo.specs)
 

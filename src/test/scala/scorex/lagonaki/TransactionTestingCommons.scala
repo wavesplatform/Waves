@@ -8,9 +8,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
 
-trait TransactionTestingCommons {
-  implicit val consensusModule = application.consensusModule
-  implicit val transactionModule = application.transactionModule
+trait TransactionTestingCommons extends TestingCommons {
   if (transactionModule.blockStorage.history.isEmpty) {
     transactionModule.blockStorage.appendBlock(Block.genesis())
   }

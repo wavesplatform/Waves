@@ -5,6 +5,7 @@ import scorex.lagonaki.TestingCommons._
 import scorex.lagonaki.integration._
 import scorex.lagonaki.integration.api._
 import scorex.lagonaki.unit._
+import scorex.transaction.state.StateTest
 import scorex.transaction.state.database.blockchain.BlockTreeSpecification
 
 class LagonakiTestSuite extends Suites(
@@ -15,6 +16,7 @@ class LagonakiTestSuite extends Suites(
   , new WalletSpecification
   , new BlockGeneratorSpecification
   , new BlockTreeSpecification
+  , new StateTest
   // API tests
   , new UtilsAPISpecification
   , new PeersAPISpecification
@@ -25,7 +27,6 @@ class LagonakiTestSuite extends Suites(
   , new BlockAPISpecification
   //integration tests - slow!
   , new ValidChainGenerationSpecification
-
 
 ) with BeforeAndAfterAll {
 
