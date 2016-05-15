@@ -11,9 +11,6 @@ target
 .dockerignore
 .editorconfig
 
-# standalone docker
-Dockerfile
-
 # logs
 scorex.log
 scorex-errors.log
