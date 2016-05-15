@@ -14,14 +14,9 @@ WORKDIR /tmp/
 
 RUN git clone https://github.com/grondilu/bitcoin-bash-tools.git
 
-#RUN wget https://github.com/wavesplatform/Waves/releases/download/v0.0.1/waves-testnet-0.0.1.zip &&\
-#    unzip waves-testnet-0.0.1.zip &&\
-#    dpkg -i waves-testnet-0.0.1/waves_0.0.1_all.deb
-
-RUN wget https://github.com/wavesplatform/Waves/releases/download/v0.1.3/waves-testnet-0.1.3.zip
-RUN unzip waves-testnet-0.1.3.zip
-RUN dpkg -i waves-testnet-0.1.3/waves_0.1.3_all.deb
-
+RUN wget https://github.com/wavesplatform/Waves/releases/download/v0.1.3/waves-testnet-0.1.3.zip &&\
+    unzip waves-testnet-0.1.3.zip &&\
+    dpkg -i waves-testnet-0.1.3/waves_0.1.3_all.deb
 
 ADD initAndStart.sh /tmp/initAndStart.sh
 RUN chmod u+x /tmp/initAndStart.sh
