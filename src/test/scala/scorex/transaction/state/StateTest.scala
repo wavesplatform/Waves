@@ -2,7 +2,7 @@ package scorex.transaction.state
 
 import java.io.File
 
-import org.scalacheck.Gen
+import org.scalacheck.{Prop, Gen}
 import org.scalacheck.commands.Commands
 import org.scalatest.PropSpec
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
@@ -23,7 +23,7 @@ object StateTestSpec extends Commands {
   val TestFolder = "target/test/"
   new File(TestFolder).mkdirs()
   val genesisAcc = new PrivateKeyAccount(randomBytes())
-  val genesisBalance = 1000000
+  val TotalBalance = 1000000
 
   case class State(name: String, height: Int, included: Map[Array[Byte], Int])
 
@@ -70,7 +70,7 @@ object StateTestSpec extends Commands {
   val genGenesis: Gen[PutTransactions] = PutTransactions(Seq(genesisTx))
 
   val genTransaction: Gen[PutTransactions] = Gen.chooseNum(1, 100).map { i =>
-    PutTransactions((1 to i).map(j => createTransaction(Random.nextInt(genesisBalance / 2), i)))
+    PutTransactions((1 to i).map(j => createTransaction(Random.nextInt(TotalBalance / 2), i)))
   }
 
   case class CheckTransaction(signature: Array[Byte]) extends Command {
@@ -91,11 +91,15 @@ object StateTestSpec extends Commands {
       }
   }
 
-  case class PutTransactions(txs: Seq[Transaction]) extends UnitCommand {
+  case class PutTransactions(txs: Seq[Transaction]) extends Command {
+
+    type Result = Long
 
     def run(sut: Sut) = sut.synchronized {
-      val block = new BlockMock(txs)
+      val valid = sut.storedState.validate(txs)
+      val block = new BlockMock(valid)
       sut.storedState.processBlock(block)
+      sut.storedState.totalBalance
     }
 
     def nextState(state: State) = state.copy(
@@ -105,7 +109,7 @@ object StateTestSpec extends Commands {
 
     def preCondition(state: State) = true
 
-    def postCondition(state: State, success: Boolean) = success
+    override def postCondition(state: State, result: Try[Long]): Prop = result == Success(TotalBalance)
   }
 
   def createTransaction(amount: Long, fee: Long) = createPayment(genesisAcc, genesisAcc, amount, fee)
@@ -116,7 +120,7 @@ object StateTestSpec extends Commands {
     new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
   }
 
-  lazy val genesisTx: GenesisTransaction = GenesisTransaction(genesisAcc, genesisBalance, 0L)
+  lazy val genesisTx: GenesisTransaction = GenesisTransaction(genesisAcc, TotalBalance, 0L)
 
 
 }
