@@ -56,6 +56,7 @@ object StateTestSpec extends Commands {
     Gen.oneOf(
       genTransaction,
       genCheckExistingTransaction(state),
+      genValidateTransactions(state),
       genCheckTransaction
     )
   }
@@ -71,6 +72,12 @@ object StateTestSpec extends Commands {
   val genTransaction: Gen[PutTransactions] = Gen.chooseNum(1, 2).map { i =>
     //all transactions should be valid
     PutTransactions((1 to i).map(j => createTransaction()))
+  }
+
+  def genValidateTransactions(state: State): Gen[ValidateTransactions] = Gen.chooseNum(1, MaxTransactions).map { i =>
+    val included = Random.shuffle(state.included.keys).take(i).map((_, true)).toSeq
+    val notIncluded = (0 until MaxTransactions - i).map(j => (createTransaction(), false)).toSeq
+    ValidateTransactions(included ++ notIncluded)
   }
 
   case class CheckTransaction(signature: Transaction) extends Command {
@@ -111,6 +118,23 @@ object StateTestSpec extends Commands {
 
     override def postCondition(state: State, result: Try[Result]): Prop =
       result == Success((state.height + 1, TotalBalance))
+  }
+
+  case class ValidateTransactions(txs: Seq[(Transaction, Boolean)]) extends Command {
+
+    type Result = Seq[Transaction]
+
+    def run(sut: Sut) = sut.synchronized {
+      sut.storedState.validate(txs.map(_._1))
+    }
+
+    def nextState(state: State) = state
+
+    def preCondition(state: State) = true
+
+    override def postCondition(state: State, result: Try[Result]): Prop = {
+      txs.filter(_._2 == false).map(_._1) == result.get
+    }
   }
 
   def createTransaction(): Transaction = createTransaction(1 + Random.nextInt(10), 1 + Random.nextInt(10))
