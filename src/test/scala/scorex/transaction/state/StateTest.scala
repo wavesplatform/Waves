@@ -24,9 +24,11 @@ object StateTestSpec extends Commands {
   new File(TestFolder).mkdirs()
   val accounts = (1 to 10) map (i => new PrivateKeyAccount(randomBytes()))
   val accN = accounts.size
-  val TotalBalance = 1000000
+  val TotalBalance = 10000000
+  val MaxTransactions = 100
+  val genesisTxs: Seq[GenesisTransaction] = accounts.map(a => GenesisTransaction(a, TotalBalance / accN, 0L))
 
-  case class State(name: String, height: Int, included: Map[Array[Byte], Int])
+  case class State(name: String, height: Int, included: Map[Transaction, Int])
 
   case class Sut(fileName: String) {
     val storedState = new StoredState(Some(fileName))
@@ -46,7 +48,7 @@ object StateTestSpec extends Commands {
 
   override def genInitialState: Gen[State] = for {
     name <- Gen.listOfN(16, Gen.alphaLowerChar).map(_.mkString)
-  } yield State(TestFolder + name, 1, genesisTxs.map(_.signature -> 1).toMap)
+  } yield State(TestFolder + name, 1, genesisTxs.map(_ -> 1).toMap)
 
   override def newSut(state: State): Sut = Sut(state.name)
 
@@ -58,7 +60,7 @@ object StateTestSpec extends Commands {
     )
   }
 
-  val genCheckTransaction: Gen[CheckTransaction] = Gen.resultOf(CheckTransaction)
+  val genCheckTransaction: Gen[CheckTransaction] = CheckTransaction(createTransaction())
 
   def genCheckExistingTransaction(state: State): Gen[CheckTransaction] = for {
     key <- Gen.oneOf(state.included.keys.toSeq)
@@ -68,10 +70,10 @@ object StateTestSpec extends Commands {
 
   val genTransaction: Gen[PutTransactions] = Gen.chooseNum(1, 2).map { i =>
     //all transactions should be valid
-    PutTransactions((1 to i).map(j => createTransaction(1 + Random.nextInt(10), i)))
+    PutTransactions((1 to i).map(j => createTransaction()))
   }
 
-  case class CheckTransaction(signature: Array[Byte]) extends Command {
+  case class CheckTransaction(signature: Transaction) extends Command {
     type Result = Option[Int]
 
     def run(sut: Sut) = sut.synchronized {
@@ -102,7 +104,7 @@ object StateTestSpec extends Commands {
 
     def nextState(state: State) = state.copy(
       height = state.height + 1,
-      included = state.included ++ txs.map(_.signature -> (state.height + 1))
+      included = state.included ++ txs.map(_ -> (state.height + 1))
     )
 
     def preCondition(state: State) = true
@@ -111,7 +113,9 @@ object StateTestSpec extends Commands {
       result == Success((state.height + 1, TotalBalance))
   }
 
-  def createTransaction(amount: Long, fee: Long) =
+  def createTransaction(): Transaction = createTransaction(1 + Random.nextInt(10), 1 + Random.nextInt(10))
+
+  def createTransaction(amount: Long, fee: Long): Transaction =
     createPayment(accounts(Random.nextInt(accN)), accounts(Random.nextInt(accN)), amount, fee)
 
   def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
@@ -119,8 +123,5 @@ object StateTestSpec extends Commands {
     val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
     new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
   }
-
-  lazy val genesisTxs: Seq[GenesisTransaction] = accounts.map(a => GenesisTransaction(a, TotalBalance / accN, 0L))
-
 
 }
