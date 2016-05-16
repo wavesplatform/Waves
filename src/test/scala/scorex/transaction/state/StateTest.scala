@@ -2,9 +2,8 @@ package scorex.transaction.state
 
 import java.io.File
 
-import org.scalacheck.{Prop, Gen}
 import org.scalacheck.commands.Commands
-import org.scalatest.PropSpec
+import org.scalacheck.{Gen, Prop}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.lagonaki.mocks.BlockMock
 import scorex.transaction.state.database.blockchain.StoredState
@@ -13,22 +12,25 @@ import scorex.utils._
 
 import scala.util.{Random, Success, Try}
 
-class StateTest extends PropSpec {
-  property("Commands state test") {
-    StateTestSpec.property().check
-  }
+object StateTest extends org.scalacheck.Properties("StateTest") {
+
+  property("state test") = StateTestSpec.property()
+
 }
+
 
 object StateTestSpec extends Commands {
   val TestFolder = "target/test/"
   new File(TestFolder).mkdirs()
-  val genesisAcc = new PrivateKeyAccount(randomBytes())
+  val accounts = (1 to 10) map (i => new PrivateKeyAccount(randomBytes()))
+  val accN = accounts.size
   val TotalBalance = 1000000
 
   case class State(name: String, height: Int, included: Map[Array[Byte], Int])
 
   case class Sut(fileName: String) {
     val storedState = new StoredState(Some(fileName))
+    storedState.processBlock(new BlockMock(genesisTxs))
   }
 
   override def destroySut(sut: Sut): Unit = {
@@ -43,20 +45,15 @@ object StateTestSpec extends Commands {
   }
 
   override def genInitialState: Gen[State] = for {
-    name <- Gen.listOfN(8, Gen.alphaLowerChar).map(_.mkString)
-  } yield State(TestFolder + name, 0, Map.empty)
+    name <- Gen.listOfN(16, Gen.alphaLowerChar).map(_.mkString)
+  } yield State(TestFolder + name, 1, genesisTxs.map(_.signature -> 1).toMap)
 
   override def newSut(state: State): Sut = Sut(state.name)
 
-  override def genCommand(state: State): Gen[Command] = if (state.height > 0) {
+  override def genCommand(state: State): Gen[Command] = {
     Gen.oneOf(
       genTransaction,
       genCheckExistingTransaction(state),
-      genCheckTransaction
-    )
-  } else {
-    Gen.oneOf(
-      genGenesis,
       genCheckTransaction
     )
   }
@@ -67,10 +64,11 @@ object StateTestSpec extends Commands {
     key <- Gen.oneOf(state.included.keys.toSeq)
   } yield CheckTransaction(key)
 
-  val genGenesis: Gen[PutTransactions] = PutTransactions(Seq(genesisTx))
+  val genGenesis: Gen[PutTransactions] = PutTransactions(genesisTxs)
 
-  val genTransaction: Gen[PutTransactions] = Gen.chooseNum(1, 100).map { i =>
-    PutTransactions((1 to i).map(j => createTransaction(Random.nextInt(TotalBalance / 2), i)))
+  val genTransaction: Gen[PutTransactions] = Gen.chooseNum(1, 2).map { i =>
+    //all transactions should be valid
+    PutTransactions((1 to i).map(j => createTransaction(1 + Random.nextInt(10), i)))
   }
 
   case class CheckTransaction(signature: Array[Byte]) extends Command {
@@ -93,13 +91,13 @@ object StateTestSpec extends Commands {
 
   case class PutTransactions(txs: Seq[Transaction]) extends Command {
 
-    type Result = Long
+    type Result = (Int, Long)
 
     def run(sut: Sut) = sut.synchronized {
-      val valid = sut.storedState.validate(txs)
-      val block = new BlockMock(valid)
+      assert(sut.storedState.isValid(txs))
+      val block = new BlockMock(txs)
       sut.storedState.processBlock(block)
-      sut.storedState.totalBalance
+      (sut.storedState.stateHeight, sut.storedState.totalBalance)
     }
 
     def nextState(state: State) = state.copy(
@@ -109,10 +107,12 @@ object StateTestSpec extends Commands {
 
     def preCondition(state: State) = true
 
-    override def postCondition(state: State, result: Try[Long]): Prop = result == Success(TotalBalance)
+    override def postCondition(state: State, result: Try[Result]): Prop =
+      result == Success((state.height + 1, TotalBalance))
   }
 
-  def createTransaction(amount: Long, fee: Long) = createPayment(genesisAcc, genesisAcc, amount, fee)
+  def createTransaction(amount: Long, fee: Long) =
+    createPayment(accounts(Random.nextInt(accN)), accounts(Random.nextInt(accN)), amount, fee)
 
   def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
     val time = NTP.correctedTime()
@@ -120,7 +120,7 @@ object StateTestSpec extends Commands {
     new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
   }
 
-  lazy val genesisTx: GenesisTransaction = GenesisTransaction(genesisAcc, TotalBalance, 0L)
+  lazy val genesisTxs: Seq[GenesisTransaction] = accounts.map(a => GenesisTransaction(a, TotalBalance / accN, 0L))
 
 
 }
