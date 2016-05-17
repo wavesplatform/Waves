@@ -48,7 +48,7 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
 
   test("GET /blocks/delay/{signature}/{blockNum} API route") {
     val response = GET.request(s"/blocks/delay/${last.encodedId}/1")
-    (response \ "delay").as[Int] should be > 0
+    (response \ "delay").as[Long] should be > 0L
   }
 
   test("GET /blocks/height/{signature} API route") {
