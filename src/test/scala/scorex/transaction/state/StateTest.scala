@@ -4,6 +4,8 @@ import java.io.File
 
 import org.scalacheck.commands.Commands
 import org.scalacheck.{Gen, Prop}
+import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.lagonaki.mocks.BlockMock
 import scorex.transaction.state.database.blockchain.StoredState
@@ -12,10 +14,11 @@ import scorex.utils._
 
 import scala.util.{Random, Success, Try}
 
-object StateTest extends org.scalacheck.Properties("StateTest") {
+class StateTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
-  property("state test") = StateTestSpec.property()
-
+  property("state test") {
+    StateTestSpec.property().mainRunner(Array()) shouldBe 0
+  }
 }
 
 
