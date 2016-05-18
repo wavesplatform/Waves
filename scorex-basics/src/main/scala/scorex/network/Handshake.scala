@@ -17,6 +17,9 @@ case class Handshake(applicationName: String,
                      time: Long
                     ) {
 
+  require(Option(applicationName).isDefined)
+  require(Option(applicationVersion).isDefined)
+
   lazy val bytes: Array[Byte] = {
     val anb = applicationName.getBytes
 
@@ -39,6 +42,8 @@ object Handshake extends ScorexLogging {
   def parse(bytes: Array[Byte]): Try[Handshake] = Try {
     var position = 0
     val appNameSize = bytes.head
+    require(appNameSize > 0)
+
     position += 1
 
     val an = new String(bytes.slice(position, position + appNameSize))

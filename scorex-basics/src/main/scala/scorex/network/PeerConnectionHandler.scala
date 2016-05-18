@@ -91,7 +91,7 @@ case class PeerConnectionHandler(application: Application,
           handshakeGot = true
           self ! HandshakeCheck
         case Failure(t) =>
-          log.info(s"Error during parsing a handshake: $t")
+          log.info(s"Error during parsing a handshake", t)
           //todo: blacklist?
           connection ! Close
       }

@@ -23,7 +23,8 @@ trait Application extends ScorexLogging {
 
   val applicationName: String
 
-  val appVersion: ApplicationVersion
+  //redefine it as lazy val
+  def appVersion: ApplicationVersion
 
   //settings
   implicit val settings: Settings
