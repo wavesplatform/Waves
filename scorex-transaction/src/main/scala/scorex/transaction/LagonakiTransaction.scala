@@ -89,10 +89,10 @@ object LagonakiTransaction {
   def parse(data: Array[Byte]): Try[LagonakiTransaction] = Try {
     data.head match {
       case txType: Byte if txType == TransactionType.GenesisTransaction.id =>
-        GenesisTransaction.parse(data.tail)
+        GenesisTransaction.parseTransactionData(data.tail)
 
       case txType: Byte if txType == TransactionType.PaymentTransaction.id =>
-        PaymentTransaction.parse(data.tail)
+        PaymentTransaction.parseTransactionData(data.tail)
 
       case txType => throw new Exception(s"Invalid transaction type: $txType")
     }

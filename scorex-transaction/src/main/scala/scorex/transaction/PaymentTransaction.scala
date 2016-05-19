@@ -89,7 +89,7 @@ object PaymentTransaction {
     PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
   }
 
-  private[transaction] def parse(data: Array[Byte]) = {
+  private[transaction] def parseTransactionData(data: Array[Byte]) = {
     require(data.length >= BaseLength, "Data does not match base length")
 
     var position = 0

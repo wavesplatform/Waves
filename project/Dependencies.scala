@@ -10,7 +10,7 @@ object Dependencies {
     "net.databinder.dispatch" %% "dispatch-core" % "+" % "test"
   )
 
-  lazy val serizalization = Seq(
+  lazy val serialization = Seq(
     "com.google.guava" % "guava" % "18.+",
     "com.typesafe.play" %% "play-json" % "2.4.+"
   )
