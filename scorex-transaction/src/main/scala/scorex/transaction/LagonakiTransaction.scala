@@ -4,8 +4,8 @@ import com.google.common.primitives.Ints
 import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.encode.Base58
-import scorex.serialization.BytesSerializable
-import scorex.transaction.LagonakiTransaction.{ValidationResult, _}
+import scorex.serialization.{BytesSerializable, Deser}
+import scorex.transaction.LagonakiTransaction.TransactionType
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -17,6 +17,8 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
                                    override val fee: Long,
                                    override val timestamp: Long,
                                    override val signature: Array[Byte]) extends Transaction with BytesSerializable {
+
+  import LagonakiTransaction._
 
   lazy val deadline = timestamp + 24.hours.toMillis
 
@@ -60,7 +62,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
   }
 }
 
-object LagonakiTransaction {
+object LagonakiTransaction extends Deser[LagonakiTransaction] {
 
   val MaxBytesPerToken = 512
 
@@ -87,15 +89,15 @@ object LagonakiTransaction {
     val PaymentTransaction = Value(2)
   }
 
-  def parse(data: Array[Byte]): Try[LagonakiTransaction] = Try {
+  def parseBytes(data: Array[Byte]): Try[LagonakiTransaction] =
     data.head match {
       case txType: Byte if txType == TransactionType.GenesisTransaction.id =>
-        GenesisTransaction.parse(data.tail)
+        GenesisTransaction.parseBytes(data.tail)
 
       case txType: Byte if txType == TransactionType.PaymentTransaction.id =>
-        PaymentTransaction.parse(data.tail)
+        PaymentTransaction.parseBytes(data.tail)
 
       case txType => throw new Exception(s"Invalid transaction type: $txType")
     }
-  }
+
 }

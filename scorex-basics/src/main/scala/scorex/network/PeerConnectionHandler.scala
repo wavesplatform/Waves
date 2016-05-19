@@ -83,7 +83,7 @@ case class PeerConnectionHandler(application: Application,
       self ! HandshakeCheck
 
     case Received(data) =>
-      Handshake.parse(data.toArray) match {
+      Handshake.parseBytes(data.toArray) match {
         case Success(handshake) =>
           peerManager ! Handshaked(remote, handshake)
           log.info(s"Got a Handshake from $remote")
@@ -125,7 +125,7 @@ case class PeerConnectionHandler(application: Application,
       chunksBuffer = t._2
 
       t._1.find { packet =>
-        application.messagesHandler.parse(packet.toByteBuffer, Some(selfPeer)) match {
+        application.messagesHandler.parseBytes(packet.toByteBuffer, Some(selfPeer)) match {
           case Success(message) =>
             log.info("received message " + message.spec + " from " + remote)
             networkControllerRef ! message

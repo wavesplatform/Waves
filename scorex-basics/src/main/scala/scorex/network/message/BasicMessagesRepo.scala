@@ -119,7 +119,7 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
 
     override def serializeData(block: Block): Array[Byte] = block.bytes
 
-    override def deserializeData(bytes: Array[Byte]): Try[Block] = Block.parse(bytes)
+    override def deserializeData(bytes: Array[Byte]): Try[Block] = Block.parseBytes(bytes)
   }
 
   object ScoreMessageSpec extends MessageSpec[History.BlockchainScore] {

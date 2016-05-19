@@ -121,7 +121,7 @@ class NxtLikeConsensusModule(AvgDelay: Long = 5.seconds.toMillis)
   private def bounded(value: BigInt, min: BigInt, max: BigInt): BigInt =
     if (value < min) min else if (value > max) max else value
 
-  override def parseBlockData(bytes: Array[Byte]): Try[BlockField[NxtLikeConsensusBlockData]] = Try {
+  override def parseBytes(bytes: Array[Byte]): Try[BlockField[NxtLikeConsensusBlockData]] = Try {
     NxtConsensusBlockField(new NxtLikeConsensusBlockData {
       override val baseTarget: Long = Longs.fromByteArray(bytes.take(BaseTargetLength))
       override val generationSignature: Array[Byte] = bytes.takeRight(GeneratorSignatureLength)

@@ -37,7 +37,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     val timestamp = System.currentTimeMillis()
 
     val block = Block.buildAndSign(version, timestamp, reference, cbd, tbd, gen)
-    val parsedBlock = Block.parse(block.bytes).get
+    val parsedBlock = Block.parseBytes(block.bytes).get
 
     assert(parsedBlock.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData].generationSignature.sameElements(gs))
     assert(parsedBlock.versionField.value == version)
@@ -70,7 +70,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     val timestamp = System.currentTimeMillis()
 
     val block = Block.buildAndSign(version, timestamp, reference, cbd, tbd, gen)
-    val parsedBlock = Block.parse(block.bytes).get
+    val parsedBlock = Block.parseBytes(block.bytes).get
 
     val parsedCdf = parsedBlock.consensusDataField.value.asInstanceOf[QoraLikeConsensusBlockData]
     assert(parsedCdf.generatingBalance == gb)

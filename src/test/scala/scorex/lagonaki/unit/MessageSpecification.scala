@@ -21,7 +21,7 @@ class MessageSpecification extends FunSuite with TestingCommons {
 
     val msg = Message(repo.ScoreMessageSpec, Right(s1), None)
 
-    handler.parse(ByteBuffer.wrap(msg.bytes), None).get.data.get match {
+    handler.parseBytes(ByteBuffer.wrap(msg.bytes), None).get.data.get match {
       case scoreRestored: History.BlockchainScore =>
         assert(s1 == scoreRestored)
 
@@ -36,7 +36,7 @@ class MessageSpecification extends FunSuite with TestingCommons {
     val s1: Block.BlockId = e2 +: Array.fill(SignatureLength - 1)(e1)
 
     val msg = Message(repo.GetSignaturesSpec, Right(Seq(s1)), None)
-    val ss = handler.parse(ByteBuffer.wrap(msg.bytes), None).get.data.get.asInstanceOf[Seq[Block.BlockId]]
+    val ss = handler.parseBytes(ByteBuffer.wrap(msg.bytes), None).get.data.get.asInstanceOf[Seq[Block.BlockId]]
     assert(ss.head.sameElements(s1))
   }
 
@@ -47,7 +47,7 @@ class MessageSpecification extends FunSuite with TestingCommons {
     val s2 = e1 +: Array.fill(SignatureLength - 1)(e2)
 
     val msg = Message(repo.SignaturesSpec, Right(Seq(s1, s2)), None)
-    val ss = handler.parse(ByteBuffer.wrap(msg.bytes), None).get.data.get.asInstanceOf[Seq[Block.BlockId]]
+    val ss = handler.parseBytes(ByteBuffer.wrap(msg.bytes), None).get.data.get.asInstanceOf[Seq[Block.BlockId]]
     assert(ss.head.sameElements(s1))
     assert(ss.tail.head.sameElements(s2))
   }

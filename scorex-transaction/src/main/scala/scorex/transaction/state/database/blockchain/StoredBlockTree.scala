@@ -161,7 +161,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
 
     override def readBlock(key: BlockId): Option[StoredBlock] = Try {
       val stored = map.get(key)
-      (Block.parse(stored._1).get, stored._2, stored._3)
+      (Block.parseBytes(stored._1).get, stored._2, stored._3)
     } match {
       case Success(v) =>
         Some(v)

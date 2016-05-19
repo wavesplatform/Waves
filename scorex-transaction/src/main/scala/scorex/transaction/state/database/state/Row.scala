@@ -58,7 +58,7 @@ object Row {
       val tx = new Array[Byte](txSize)
       b.get(tx)
       if (txSize == 8) FeesStateChange(Longs.fromByteArray(tx))
-      else LagonakiTransaction.parse(tx).get //todo: .get w/out catching
+      else LagonakiTransaction.parseBytes(tx).get //todo: .get w/out catching
     }
     Row(AccState(accBalance), reason.toList, lrh)
   }

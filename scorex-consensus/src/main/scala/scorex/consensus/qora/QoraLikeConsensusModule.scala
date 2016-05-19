@@ -139,7 +139,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     } else Future(None)
   }
 
-  override def parseBlockData(bytes: Array[Byte]): Try[BlockField[QoraLikeConsensusBlockData]] = Try {
+  override def parseBytes(bytes: Array[Byte]): Try[BlockField[QoraLikeConsensusBlockData]] = Try {
     QoraConsensusBlockField(new QoraLikeConsensusBlockData {
       override val generatingBalance: Long = Longs.fromByteArray(bytes.take(GeneratingBalanceLength))
       override val generatorSignature: Array[Byte] = bytes.takeRight(GeneratorSignatureLength)

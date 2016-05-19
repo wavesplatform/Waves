@@ -22,7 +22,7 @@ class RowSpecification extends PropSpec
                                                                                      lastRowHeight: Int) =>
 
       val txs = List(FeesStateChange(fee), payment)
-      LagonakiTransaction.parse(payment.bytes).get shouldBe payment
+      LagonakiTransaction.parseBytes(payment.bytes).get shouldBe payment
       val row = Row(AccState(balance), txs, lastRowHeight)
 
       val objectOutputStream = new ObjectOutputStream(new FileOutputStream(FileName))

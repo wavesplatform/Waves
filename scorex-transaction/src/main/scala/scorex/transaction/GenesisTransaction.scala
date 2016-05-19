@@ -5,7 +5,10 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
+import scorex.serialization.Deser
 import scorex.transaction.LagonakiTransaction.TransactionType
+
+import scala.util.Try
 
 
 case class GenesisTransaction(override val recipient: Account,
@@ -62,7 +65,7 @@ case class GenesisTransaction(override val recipient: Account,
 }
 
 
-object GenesisTransaction {
+object GenesisTransaction extends Deser[GenesisTransaction] {
 
   import scorex.transaction.LagonakiTransaction._
 
@@ -82,7 +85,7 @@ object GenesisTransaction {
     Bytes.concat(h, h)
   }
 
-  private[transaction] def parse(data: Array[Byte]): LagonakiTransaction = {
+  def parseBytes(data: Array[Byte]): Try[GenesisTransaction] = Try {
     require(data.length >= BASE_LENGTH, "Data does not match base length")
 
     var position = 0
