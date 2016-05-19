@@ -24,7 +24,7 @@ class GenesisTransactionTests extends FlatSpec with Matchers {
 
     val bytes = Hex.fromString(serialized)
 
-    val actualTransaction = GenesisTransaction.parseTransactionData(bytes.tail)
+    val actualTransaction = GenesisTransaction.parse(bytes.tail)
 
     val balance = 149857264546L
     val timestamp = 4598723454L
@@ -38,7 +38,7 @@ class GenesisTransactionTests extends FlatSpec with Matchers {
 
     val bytes = source.bytes
 
-    val dest = GenesisTransaction.parseTransactionData(bytes.tail)
+    val dest = GenesisTransaction.parse(bytes.tail)
 
     source should equal (dest)
   }
