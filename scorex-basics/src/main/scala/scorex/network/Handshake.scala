@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import com.google.common.primitives.{Ints, Longs}
 import scorex.app.ApplicationVersion
+import scorex.serialization.BytesSerializable
 import scorex.utils.ScorexLogging
 
 import scala.util.Try
@@ -15,7 +16,7 @@ case class Handshake(applicationName: String,
                      nodeNonce: Long,
                      declaredAddress: Option[InetSocketAddress],
                      time: Long
-                    ) {
+                    ) extends BytesSerializable {
 
   require(Option(applicationName).isDefined)
   require(Option(applicationVersion).isDefined)

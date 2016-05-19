@@ -5,9 +5,10 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Ints, Longs}
 import org.h2.mvstore.WriteBuffer
 import org.h2.mvstore.`type`.DataType
+import scorex.serialization.BytesSerializable
 import scorex.transaction.{FeesStateChange, LagonakiTransaction, StateChangeReason}
 
-case class Row(state: AccState, reason: Reason, lastRowHeight: Int) extends DataType with Serializable {
+case class Row(state: AccState, reason: Reason, lastRowHeight: Int) extends DataType with BytesSerializable {
 
   lazy val bytes: Array[Byte] = Ints.toByteArray(lastRowHeight) ++
     Longs.toByteArray(state.balance) ++

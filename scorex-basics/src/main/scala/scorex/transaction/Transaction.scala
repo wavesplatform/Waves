@@ -1,23 +1,17 @@
 package scorex.transaction
 
-import play.api.libs.json.JsObject
 import scorex.account.Account
+import scorex.serialization.JsonSerializable
 
 
 /**
   * A transaction is an atomic state modifier
   */
 
-trait Transaction extends StateChangeReason {
+trait Transaction extends StateChangeReason with JsonSerializable {
   val fee: Long
 
   val timestamp: Long
   val recipient: Account
-
-  /**
-    * A transaction could be serialized into JSON
-    */
-  def json: JsObject
-
 
 }

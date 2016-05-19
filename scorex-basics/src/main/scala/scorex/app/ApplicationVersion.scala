@@ -1,10 +1,11 @@
 package scorex.app
 
 import com.google.common.primitives.Ints
+import scorex.serialization.BytesSerializable
 
 import scala.util.Try
 
-case class ApplicationVersion(firstDigit: Int, secondDigit: Int, thirdDigit: Int) {
+case class ApplicationVersion(firstDigit: Int, secondDigit: Int, thirdDigit: Int) extends BytesSerializable {
   lazy val bytes: Array[Byte] = Ints.toByteArray(firstDigit) ++ Ints.toByteArray(secondDigit) ++ Ints.toByteArray(thirdDigit)
 }
 

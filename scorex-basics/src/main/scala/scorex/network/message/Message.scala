@@ -3,12 +3,13 @@ package scorex.network.message
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.network.ConnectedPeer
+import scorex.serialization.BytesSerializable
 
 import scala.util.{Success, Try}
 
 case class Message[Content](spec: MessageSpec[Content],
                             input: Either[Array[Byte], Content],
-                            source: Option[ConnectedPeer]){
+                            source: Option[ConnectedPeer]) extends BytesSerializable {
 
   import Message.{ChecksumLength, MAGIC}
 
