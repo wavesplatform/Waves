@@ -31,7 +31,7 @@ with Matchers {
     port <- Gen.choose(0, MaxPort)
   } yield new InetSocketAddress(InetAddress.getByName(s"$ip1.$ip2.$ip3.$ip4"), port)
 
-  val validNumers =
+  val validNumbers =
     for (n <- Gen.choose(Integer.MIN_VALUE + 1, Integer.MAX_VALUE)) yield n
 
   property("handshake should remain the same after serialization/deserialization") {

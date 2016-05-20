@@ -3,7 +3,7 @@ name := "scorex-basics"
 resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
 
 libraryDependencies ++=
-    Dependencies.serizalization ++
+    Dependencies.serialization ++
     Dependencies.akka ++
     Dependencies.p2p ++
     Dependencies.db ++

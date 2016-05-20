@@ -1,3 +1,3 @@
 name := "scorex-consensus"
 
-libraryDependencies ++= Dependencies.testKit ++ Dependencies.serizalization ++ Dependencies.logging
+libraryDependencies ++= Dependencies.testKit ++ Dependencies.serialization ++ Dependencies.logging

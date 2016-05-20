@@ -47,7 +47,7 @@ libraryDependencies ++=
   Dependencies.db ++
     Dependencies.http ++
     Dependencies.akka ++
-    Dependencies.serizalization ++
+    Dependencies.serialization ++
     Dependencies.testKit ++
     Dependencies.logging
 
