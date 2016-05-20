@@ -4,13 +4,8 @@ import com.google.common.primitives.Ints
 import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.encode.Base58
-<<<<<<< HEAD
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.LagonakiTransaction.TransactionType
-=======
-import scorex.serialization.BytesSerializable
-import scorex.transaction.LagonakiTransaction.{ValidationResult, _}
->>>>>>> pull
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Try}
@@ -22,11 +17,8 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
                                    override val fee: Long,
                                    override val timestamp: Long,
                                    override val signature: Array[Byte]) extends Transaction with BytesSerializable {
-<<<<<<< HEAD
 
   import LagonakiTransaction._
-=======
->>>>>>> pull
 
   lazy val deadline = timestamp + 24.hours.toMillis
 
