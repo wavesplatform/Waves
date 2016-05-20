@@ -16,7 +16,7 @@ import scala.util.{Failure, Success, Try}
 /**
   * If no datafolder provided, blockchain lives in RAM (useful for tests)
   */
-class StoredBlockchain(dataFolderOpt: Option[String])
+class StoredBlockchain(db: MVStore)
                       (implicit consensusModule: ConsensusModule[_],
                        transactionModule: TransactionModule[_])
   extends BlockChain with ScorexLogging {
@@ -33,7 +33,6 @@ class StoredBlockchain(dataFolderOpt: Option[String])
       blocks.put(height, block.bytes)
       scoreMap.put(height, score() + block.consensusModule.blockScore(block)(block.transactionModule))
       signatures.put(height, block.uniqueId)
-      database.commit()
     }
 
     def readBlock(height: Int): Option[Block] =
@@ -42,7 +41,6 @@ class StoredBlockchain(dataFolderOpt: Option[String])
     def deleteBlock(height: Int): Unit = {
       blocks.remove(height)
       signatures.remove(height)
-      database.commit()
     }
 
     def contains(id: BlockId): Boolean = signatures.exists(_._2.sameElements(id))
@@ -55,16 +53,7 @@ class StoredBlockchain(dataFolderOpt: Option[String])
 
   }
 
-  private val blockStorage: BlockchainPersistence = {
-    val db = dataFolderOpt match {
-      case Some(dataFolder) => new MVStore.Builder().fileName(dataFolder + s"/blocks.mvstore").compress().open()
-      case None => new MVStore.Builder().open()
-    }
-    new BlockchainPersistence(db)
-  }
-
-
-  log.info(s"Initialized blockchain in $dataFolderOpt with ${height()} blocks")
+  private val blockStorage: BlockchainPersistence = new BlockchainPersistence(db)
 
   override private[transaction] def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
     Try {

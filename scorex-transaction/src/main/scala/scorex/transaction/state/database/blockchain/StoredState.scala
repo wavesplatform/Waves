@@ -21,7 +21,7 @@ import scala.util.Try
   *
   * Use apply method of StoredState object to create new instance
   */
-class StoredState(fileNameOpt: Option[String]) extends LagonakiState with ScorexLogging {
+class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
 
   val HeightKey = "height"
@@ -29,11 +29,7 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
   val LastStates = "lastStates"
   val IncludedTx = "includedTx"
 
-  private val db = fileNameOpt match {
-    case Some(fileName) => new MVStore.Builder().fileName(fileName).compress().open()
-    case None => new MVStore.Builder().open()
-  }
-  db.rollback()
+  if(db.getStoreVersion > 0) db.rollback()
 
   private def accountChanges(key: Address): MVMap[Int, Row] = db.openMap(key.toString)
 
@@ -61,7 +57,6 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       lastStates.put(ch._1, h)
       ch._2._2.foreach(t => includedTx.put(t.signature, h))
     }
-    db.commit()
   }
 
   def rollbackTo(rollbackTo: Int): State = synchronized {
@@ -80,7 +75,6 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
       deleteNewer(key)
     }
     setStateHeight(rollbackTo)
-    db.commit()
     this
   }
 
@@ -202,11 +196,6 @@ class StoredState(fileNameOpt: Option[String]) extends LagonakiState with Scorex
 
   def hash: Int = {
     (BigInt(FastCryptographicHash(toString.getBytes)) % Int.MaxValue).toInt
-  }
-
-  override def finalize(): Unit = {
-    db.close()
-    super.finalize()
   }
 
 }

@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Ints}
+import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
@@ -52,19 +53,24 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
 
   override val blockStorage = new BlockStorage {
 
+    val db = settings.dataDirOpt match {
+      case Some(dataFolder) => new MVStore.Builder().fileName(dataFolder + s"/blockchain.dat").compress().open()
+      case None => new MVStore.Builder().open()
+    }
+
     override val MaxRollback: Int = settings.MaxRollback
 
     override val history: History = settings.history match {
       case s: String if s.equalsIgnoreCase("blockchain") =>
-        new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
+        new StoredBlockchain(db)(consensusModule, instance)
       case s: String if s.equalsIgnoreCase("blocktree") =>
         new StoredBlockTree(settings.dataDirOpt, MaxRollback)(consensusModule, instance)
       case s =>
         log.error(s"Unknown history storage: $s. Use StoredBlockchain...")
-        new StoredBlockchain(settings.dataDirOpt)(consensusModule, instance)
+        new StoredBlockchain(db)(consensusModule, instance)
     }
 
-    override val state = new StoredState(settings.dataDirOpt.map(_ + "/state.dat"))
+    override val state = new StoredState(db)
 
   }
 

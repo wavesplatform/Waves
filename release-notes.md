@@ -2,6 +2,7 @@
 ---------
 
 * Unify bytes/json serialization/deserialization
+* Blockchain and State databased were merged
 * Bugfixes
 
 **1.2.6**
