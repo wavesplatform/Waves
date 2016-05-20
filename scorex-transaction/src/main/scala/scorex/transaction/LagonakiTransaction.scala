@@ -8,7 +8,7 @@ import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.LagonakiTransaction.TransactionType
 
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 
 abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
@@ -97,7 +97,7 @@ object LagonakiTransaction extends Deser[LagonakiTransaction] {
       case txType: Byte if txType == TransactionType.PaymentTransaction.id =>
         PaymentTransaction.parseBytes(data.tail)
 
-      case txType => throw new Exception(s"Invalid transaction type: $txType")
+      case txType => Failure(new Exception(s"Invalid transaction type: $txType"))
     }
 
 }
