@@ -74,7 +74,7 @@ object GenesisTransaction {
   def generateSignature(recipient: Account, amount: Long, timestamp: Long): Array[Byte] = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GenesisTransaction.id), TypeLength, 0)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
-    val amountBytes = BigInteger.valueOf(amount).toByteArray
+    val amountBytes = Longs.toByteArray(amount)
     val amountFill = new Array[Byte](AmountLength - amountBytes.length)
 
     val data = Bytes.concat(typeBytes, timestampBytes,
