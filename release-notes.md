@@ -1,3 +1,9 @@
+**1.2.7**
+---------
+
+* Unify bytes/json serialization/deserialization
+* Bugfixes
+
 **1.2.6**
 ---------
 
