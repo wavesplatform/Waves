@@ -23,7 +23,7 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
   property("GenesisTransaction parse from Bytes should work fine") {
     val bytes = Base58.decode("y9KVfkMyuvik3koq45snK6vP27L12VdmuNSCVBvqPMsESvpDiUjT5dyb").get
 
-    val actualTransaction = GenesisTransaction.parse(bytes.tail)
+    val actualTransaction = GenesisTransaction.parseBytes(bytes.tail).get
 
     val balance = 149857264546L
     val timestamp = 4598723454L
@@ -39,7 +39,7 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
       val recipient = new PrivateKeyAccount(recipientSeed)
       val source = new GenesisTransaction(recipient, amount, time)
       val bytes = source.bytes
-      val dest = GenesisTransaction.parse(bytes.tail)
+      val dest = GenesisTransaction.parseBytes(bytes.tail).get
 
       source should equal(dest)
     }
