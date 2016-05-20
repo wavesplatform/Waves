@@ -6,5 +6,5 @@ class TransactionTestSuite extends Suites(
   new TransactionSpecification,
   new StoredStateUnitTests,
   new RowSpecification,
-  new GenesisTransactionTests
+  new GenesisTransactionSpecification
 )
