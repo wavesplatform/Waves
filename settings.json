@@ -18,5 +18,6 @@
   "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
+  "genesisTimestamp": 1460678400000,
   "offlineGeneration": false
 }

@@ -10,11 +10,12 @@ import scorex.api.http._
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.LagonakiTransaction
+import scorex.transaction.state.database.blockchain.PersistentLagonakiState
 
 @Path("/debug")
 @Api(value = "/debug", description = "Debug methods", position = 1)
-case class DebugApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
+case class DebugApiRoute(override val application: Application[LagonakiTransaction])(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   implicit lazy val transactionModule = application.transactionModule
@@ -53,7 +54,7 @@ case class DebugApiRoute(override val application: Application)(implicit val con
   def state: Route = {
     path("state") {
       getJsonRoute {
-        application.blockStorage.state.asInstanceOf[StoredState].toJson(None)
+        application.blockStorage.state.asInstanceOf[PersistentLagonakiState].toJson(None)
       }
     }
   }
@@ -66,7 +67,7 @@ case class DebugApiRoute(override val application: Application)(implicit val con
   def stateAt: Route = {
     path("state" / IntNumber) { case height =>
       getJsonRoute {
-        application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height))
+        application.blockStorage.state.asInstanceOf[PersistentLagonakiState].toJson(Some(height))
       }
     }
   }
@@ -79,7 +80,7 @@ case class DebugApiRoute(override val application: Application)(implicit val con
   def info: Route = {
     path("info") {
       getJsonRoute {
-        val state = application.blockStorage.state.asInstanceOf[StoredState]
+        val state = application.blockStorage.state.asInstanceOf[PersistentLagonakiState]
         Json.obj(
           "stateHeight" -> state.stateHeight,
           "stateHash" -> state.hash

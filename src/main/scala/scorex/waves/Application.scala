@@ -2,16 +2,15 @@ package scorex.waves
 
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
-import scorex.account.Account
 import scorex.api.http._
 import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
-import scorex.transaction.{BalanceSheet, GenesisTransaction, SimpleTransactionModule, Transaction}
+import scorex.transaction._
+import scorex.transaction.account.{BalanceSheet, Account}
 import scorex.utils.ScorexLogging
-import scorex.waves.block.WavesBlock
-import scorex.waves.http.{DebugApiRoute, WavesApiRoute, ScorexApiRoute}
+import scorex.waves.http.{DebugApiRoute, ScorexApiRoute, WavesApiRoute}
 import scorex.waves.settings.WavesSettings
 import scorex.waves.transaction.WavesTransactionModule
 
@@ -19,7 +18,7 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
 import scala.util.Random
 
-class Application(val settingsFilename: String) extends scorex.app.Application {
+class Application(val settingsFilename: String) extends scorex.app.Application[LagonakiTransaction] {
 
   override val applicationName = "waves"
 
@@ -33,7 +32,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
 
   override implicit lazy val settings = new WavesSettings(settingsFilename)
 
-  override implicit lazy val consensusModule = new NxtLikeConsensusModule
+  override implicit lazy val consensusModule = new NxtLikeConsensusModule[LagonakiTransaction]
 
   override implicit lazy val transactionModule: SimpleTransactionModule = new WavesTransactionModule()(settings, this)
 
@@ -56,10 +55,10 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
   )
 
   override lazy val apiTypes = Seq(
-    typeOf[BlocksApiRoute],
-    typeOf[TransactionsApiRoute],
-    typeOf[NxtConsensusApiRoute],
-    typeOf[WalletApiRoute],
+    typeOf[BlocksApiRoute[LagonakiTransaction]],
+    typeOf[TransactionsApiRoute[LagonakiTransaction]],
+    typeOf[NxtConsensusApiRoute[LagonakiTransaction]],
+    typeOf[WalletApiRoute[LagonakiTransaction]],
     typeOf[PaymentApiRoute],
     typeOf[ScorexApiRoute],
     typeOf[UtilsApiRoute],
@@ -76,14 +75,6 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
   require(transactionModule.accountWatchingSupport)
 
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], this))
-
-  override def checkGenesis(): Unit = {
-
-    if (transactionModule.blockStorage.history.isEmpty) {
-      transactionModule.blockStorage.appendBlock(WavesBlock.genesis())
-      log.info("Genesis block has been added to the state")
-    }
-  }
 
 }
 
@@ -127,7 +118,7 @@ object Application extends App with ScorexLogging {
         None
     })
 
-    def genPayment(recipient: Option[Account] = None, amtOpt: Option[Long] = None): Option[Transaction] = {
+    def genPayment(recipient: Option[Account] = None, amtOpt: Option[Long] = None): Option[PaymentTransaction] = {
       val pkAccs = wallet.privateKeyAccounts().ensuring(_.nonEmpty)
       val senderAcc = pkAccs(Random.nextInt(pkAccs.size))
       val senderBalance = application.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)

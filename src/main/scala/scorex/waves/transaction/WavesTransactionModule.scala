@@ -1,22 +1,21 @@
 package scorex.waves.transaction
 
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.BlockField
 import scorex.crypto.encode.Base58
 import scorex.settings.Settings
 import scorex.transaction._
-import scorex.utils.NTP
+import scorex.transaction.account.{Account, PublicKeyAccount}
 
 /**
-  * Waves Transaction Module
-  */
-class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings, application: Application)
+ * Waves Transaction Module
+ */
+class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings, application: Application[LagonakiTransaction])
   extends SimpleTransactionModule() {
 
   /**
-    * Publish signed payment transaction which generated outside node
-    */
+   * Publish signed payment transaction which generated outside node
+   */
   def broadcastPayment(externalPayment: ExternalPayment): PaymentTransaction = {
     val time = externalPayment.timestamp
     val sigBytes = Base58.decode(externalPayment.signature).get
