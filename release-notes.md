@@ -1,3 +1,9 @@
+**1.2.7**
+---------
+
+* Unify bytes/json serialization/deserialization
+* Blockchain and State database updates made atomic
+
 **1.2.6**
 ---------
 

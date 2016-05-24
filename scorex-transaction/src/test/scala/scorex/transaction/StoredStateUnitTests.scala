@@ -2,6 +2,7 @@ package scorex.transaction
 
 import java.io.File
 
+import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
@@ -15,7 +16,8 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   new File(folder).mkdirs()
   val stateFile = folder + "state.dat"
 
-  val state = new StoredState(Some(stateFile))
+  val db = new MVStore.Builder().fileName(stateFile).compress().open()
+  val state = new StoredState(db)
   val testAdd = "aPFwzRp5TXCzi6DSuHmpmbQunopXRuxLk"
   val applyMethod = PrivateMethod[Unit]('applyChanges)
 
@@ -35,9 +37,9 @@ with PrivateMethodTester with OptionValues with TransactionGen {
     val balance = 1234L
     state invokePrivate applyMethod(Map(testAdd ->(AccState(balance), Seq(FeesStateChange(balance)))))
     state.balance(testAdd) shouldBe balance
-    state.finalize()
+    db.close()
 
-    val state2 = new StoredState(Some(stateFile))
+    val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open())
     state2.balance(testAdd) shouldBe balance
     state2 invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq())))
   }

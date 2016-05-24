@@ -83,7 +83,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
     } else false
 
     if (created) {
-      log.info("Added account #" + nonce)
+      log.info("Added account #" + (nonce + 2))
       Some(account)
     } else None
   }
@@ -93,7 +93,6 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
 
 
   def deleteAccount(account: PrivateKeyAccount): Boolean = synchronized {
-    //    val res = accountsPersistence.remove(account.seed)
     val res = accountsPersistence.keys.find { k =>
       if (accountsPersistence.get(k) sameElements account.seed) {
         accountsPersistence.remove(k)
