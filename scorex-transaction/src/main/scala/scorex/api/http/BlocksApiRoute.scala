@@ -58,7 +58,7 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   }
 
   @Path("/delay/{signature}/{blockNum}")
-  @ApiOperation(value = "Average delay", notes = "Average delay in milliseconds between last $blockNum blocks starting from $height", httpMethod = "GET")
+  @ApiOperation(value = "Average delay", notes = "Average delay in milliseconds between last $blockNum blocks starting from block with $signature", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "String", paramType = "path"),
     new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "String", paramType = "path")
