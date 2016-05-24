@@ -10,16 +10,17 @@ import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
 import scorex.app.Application
 import scorex.consensus.mining.BlockGeneratorController._
-import scorex.waves.settings.Constants
 import scorex.network.HistorySynchronizer
+import scorex.transaction.Transaction
 import scorex.utils.ScorexLogging
+import scorex.waves.settings.Constants
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @Path("/scorex")
 @Api(value = "scorex", description = "General commands & information", position = 0)
-case class ScorexApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
+case class ScorexApiRoute(override val application: Application[_ <: Transaction[_]])(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions with ScorexLogging {
 
   override lazy val route =
@@ -43,7 +44,7 @@ case class ScorexApiRoute(override val application: Application)(implicit val co
   @Path("/stop")
   @ApiOperation(value = "Stop", notes = "Stop the app", httpMethod = "POST")
   def scorex: Route = path("stop") {
-    postJsonRoute{
+    postJsonRoute {
       log.info("Request to stop application")
       Future(application.stopAll())
       Json.obj("stopped" -> true)

@@ -8,19 +8,20 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
-import scorex.account.Account
 import scorex.api.http.{NegativeFee, NoBalance, _}
 import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
+import scorex.transaction.LagonakiTransaction
 import scorex.transaction.LagonakiTransaction.ValidationResult
+import scorex.transaction.account.Account
 import scorex.waves.transaction.{ExternalPayment, WavesTransactionModule}
 
 import scala.util.{Failure, Success, Try}
 
 @Path("/waves")
 @Api(value = "waves", description = "Waves specific commands.", position = 1)
-case class WavesApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
+case class WavesApiRoute(override val application: Application[LagonakiTransaction])(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   // TODO asInstanceOf
@@ -68,7 +69,7 @@ case class WavesApiRoute(override val application: Application)(implicit val con
               WrongJson.json
             case JsSuccess(payment: ExternalPayment, _) =>
               val tx = transactionModule.broadcastPayment(payment)
-              if (!tx.signatureValid)
+              if (!tx.correctAuthorship)
                 InvalidSignature.json
               else {
                 tx.validate match {
