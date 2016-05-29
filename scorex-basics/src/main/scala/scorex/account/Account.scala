@@ -2,6 +2,7 @@ package scorex.account
 
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
+import scorex.utils.ScorexLogging
 
 
 class Account(val address: String) extends Serializable {
@@ -19,7 +20,7 @@ class Account(val address: String) extends Serializable {
 }
 
 
-object Account {
+object Account extends ScorexLogging {
 
   val AddressVersion: Byte = 1
   val ChecksumLength = 4
@@ -37,14 +38,20 @@ object Account {
 
   def isValidAddress(address: String): Boolean =
     Base58.decode(address).map { addressBytes =>
-      if (addressBytes.length != Account.AddressLength)
+      val version = addressBytes.head
+      if (version == AddressVersion) {
+        if (addressBytes.length != Account.AddressLength)
+          false
+        else {
+          val checkSum = addressBytes.takeRight(ChecksumLength)
+
+          val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
+
+          checkSum.sameElements(checkSumGenerated)
+        }
+      } else {
+        log.warn(s"Unknown address version: $version")
         false
-      else {
-        val checkSum = addressBytes.takeRight(ChecksumLength)
-
-        val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
-
-        checkSum.sameElements(checkSumGenerated) && (addressBytes.head == AddressVersion)
       }
     }.getOrElse(false)
 
