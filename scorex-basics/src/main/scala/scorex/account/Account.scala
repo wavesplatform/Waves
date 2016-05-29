@@ -1,7 +1,6 @@
 package scorex.account
 
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.SecureCryptographicHash
 import scorex.crypto.hash.SecureCryptographicHash._
 
 
@@ -45,7 +44,7 @@ object Account {
 
         val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
 
-        checkSum.sameElements(checkSumGenerated)
+        checkSum.sameElements(checkSumGenerated) && (addressBytes.head == AddressVersion)
       }
     }.getOrElse(false)
 
