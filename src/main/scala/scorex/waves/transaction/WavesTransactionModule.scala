@@ -14,6 +14,10 @@ import scorex.utils.NTP
 class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings, application: Application)
   extends SimpleTransactionModule() {
 
+  override val InitialBalance = 60000000000L
+  val GenesisTransactionsTimestamp = 0L
+
+
   /**
     * Publish signed payment transaction which generated outside node
     */
@@ -36,12 +40,11 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
       "bGbB5M5h9NBg2UM6KschsMky1SGm2Gdum"
     )
 
-    val timestamp = 0L
     val totalBalance = InitialBalance
 
     val txs = ipoMembers.map { address =>
       val recipient = new Account(address)
-      GenesisTransaction(recipient, totalBalance / ipoMembers.length, timestamp)
+      GenesisTransaction(recipient, totalBalance / ipoMembers.length, GenesisTransactionsTimestamp)
     }
 
     TransactionsBlockField(txs)
