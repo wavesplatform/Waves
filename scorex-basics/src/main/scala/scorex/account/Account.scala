@@ -26,9 +26,7 @@ class Account(val address: String) extends Serializable {
 object Account extends ScorexLogging {
 
   val AddressVersion: Byte = 1
-  val AddressNetwork: Byte = Try {
-    ConfigFactory.load().getConfig("app").getString("product").head.toByte
-  }.getOrElse(0)
+  val AddressNetwork: Byte = Try(ConfigFactory.load().getConfig("app").getString("product").head.toByte).getOrElse(0)
   val ChecksumLength = 4
   val HashLength = 20
   val AddressLength = 1 + 1 + ChecksumLength + HashLength
