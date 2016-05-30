@@ -1,8 +1,11 @@
 package scorex.account
 
+import com.typesafe.config.ConfigFactory
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
 import scorex.utils.ScorexLogging
+
+import scala.util.Try
 
 
 class Account(val address: String) extends Serializable {
@@ -23,23 +26,33 @@ class Account(val address: String) extends Serializable {
 object Account extends ScorexLogging {
 
   val AddressVersion: Byte = 1
+  val AddressNetwork: Byte = Try {
+    ConfigFactory.load().getConfig("app").getString("product").head.toByte
+  }.getOrElse(0)
   val ChecksumLength = 4
   val HashLength = 20
-  val AddressLength = 1 + ChecksumLength + HashLength
+  val AddressLength = 1 + 1 + ChecksumLength + HashLength
 
   /**
-    * Create account from public key. Used in PublicKeyAccount/PrivateKeyAccount.
-    */
+   * Create account from public key. Used in PublicKeyAccount/PrivateKeyAccount.
+   */
   def fromPublicKey(publicKey: Array[Byte]): String = {
     val publicKeyHash = hash(publicKey).take(HashLength)
-    val withoutChecksum = AddressVersion +: publicKeyHash //prepend ADDRESS_VERSION
+    val withoutChecksum = AddressVersion +: AddressNetwork +: publicKeyHash //prepend ADDRESS_VERSION
     Base58.encode(withoutChecksum ++ calcCheckSum(withoutChecksum))
   }
 
   def isValidAddress(address: String): Boolean =
     Base58.decode(address).map { addressBytes =>
       val version = addressBytes.head
-      if (version == AddressVersion) {
+      val network = addressBytes.tail.head
+      if (version != AddressVersion) {
+        log.warn(s"Unknown address version: $version")
+        false
+      } else if (network != AddressNetwork) {
+        log.warn(s"Unknown network: $network")
+        false
+      } else {
         if (addressBytes.length != Account.AddressLength)
           false
         else {
@@ -49,9 +62,6 @@ object Account extends ScorexLogging {
 
           checkSum.sameElements(checkSumGenerated)
         }
-      } else {
-        log.warn(s"Unknown address version: $version")
-        false
       }
     }.getOrElse(false)
 
