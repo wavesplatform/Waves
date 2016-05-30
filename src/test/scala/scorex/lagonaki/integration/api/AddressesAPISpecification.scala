@@ -1,7 +1,6 @@
 package scorex.lagonaki.integration.api
 
 import org.scalatest.{FunSuite, Matchers}
-import scorex.api.http.ApiKeyNotValid
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TestingCommons
@@ -87,13 +86,13 @@ class AddressesAPISpecification extends FunSuite with Matchers {
   }
 
   test("POST /addresses/verifyText/{address} API route") {
-    val address = "jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS"
+    val address = "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX77hKcmc"
     POST.incorrectApiKeyTest(s"/addresses/verifyText/$address")
 
-    val signed = "{\n  \"message\": \"test\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"3cVSpApm5PfqRMxP4a5dw3KYjBorY7316kD4DBjur52r6M7cDjGY53VMtjWLTcqf8e9pr7zAFo2j9mF8eqtRUAvh\"\n}"
+    val signed = "{\n  \"message\": \"test\",\n  \"publickey\": \"3nU4XEMkwj447BxYBRcHSp4jX2hi3Y8yHnNnfDqcT8J8\",\n  \"signature\": \"5NHde7sCZvkSbc35oaeGE5E52cZLC8p73fyYGz27urjg62e6zNB54NXaQkZgrhiKCPMgLRh5q1PSriMepSLNAkH1\"\n}"
     (POST.request(s"/addresses/verifyText/$address", body = signed) \ "valid").as[Boolean] shouldBe true
 
-    val incorrect = "{\n  \"message\": \"test2\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"3cVSpApm5PfqRMxP4a5dw3KYjBorY7316kD4DBjur52r6M7cDjGY53VMtjWLTcqf8e9pr7zAFo2j9mF8eqtRUAvh\"\n}"
+    val incorrect = "{\n  \"message\": \"test2\",\n  \"publickey\": \"3nU4XEMkwj447BxYBRcHSp4jX2hi3Y8yHnNnfDqcT8J8\",\n  \"signature\": \"5NHde7sCZvkSbc35oaeGE5E52cZLC8p73fyYGz27urjg62e6zNB54NXaQkZgrhiKCPMgLRh5q1PSriMepSLNAkH1\"\n}"
     (POST.request(s"/addresses/verifyText/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
   }
 
@@ -124,13 +123,13 @@ class AddressesAPISpecification extends FunSuite with Matchers {
   }
 
   test("POST /addresses/verify/{address} API route") {
-    val address = "jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS"
+    val address = "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX77hKcmc"
     POST.incorrectApiKeyTest(s"/addresses/verify/$address")
 
-    val signed = "{\n  \"message\": \"3yZe7d\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"5Tt2JiPh3F17sTckvBg9GooHKjuFAFyNVXz9epDwrLWZShah4xV5cjXvUeQvbx8R545LmucdnZdPfLeqDkL3PijJ\"\n}"
+    val signed = "{\n  \"message\": \"3yZe7d\",\n  \"publickey\": \"3nU4XEMkwj447BxYBRcHSp4jX2hi3Y8yHnNnfDqcT8J8\",\n  \"signature\": \"62nn4AZasDof2Avhk8br4ii3UTNAy4HorfeWH6W22a5HAtnqzFPTQau4HVRmrtBo5hNJJu1s5iWBNb5kE8VSKuGu\"\n}"
     (POST.request(s"/addresses/verify/$address", body = signed) \ "valid").as[Boolean] shouldBe true
 
-    val incorrect = "{\n  \"message\": \"3yZea7d\",\n  \"publickey\": \"sZZB5hoNiKfQwyTh2xNTBH87a9FraRGgnjTcCrmu5qa\",\n  \"signature\": \"5Tt2JiPh3F17sTckvBg9GooHKjuFAFyNVXz9epDwrLWZShah4xV5cjXvUeQvbx8R545LmucdnZdPfLeqDkL3PijJ\"\n}"
+    val incorrect = "{\n  \"message\": \"3yZe7dd\",\n  \"publickey\": \"3nU4XEMkwj447BxYBRcHSp4jX2hi3Y8yHnNnfDqcT8J8\",\n  \"signature\": \"62nn4AZasDof2Avhk8br4ii3UTNAy4HorfeWH6W22a5HAtnqzFPTQau4HVRmrtBo5hNJJu1s5iWBNb5kE8VSKuGu\"\n}"
     (POST.request(s"/addresses/verify/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
   }
 

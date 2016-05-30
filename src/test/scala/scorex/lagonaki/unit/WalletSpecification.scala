@@ -15,7 +15,7 @@ class WalletSpecification extends FunSuite with Matchers {
     w.generateNewAccounts(walletSize)
 
     w.privateKeyAccounts().size shouldBe walletSize
-    w.privateKeyAccounts().map(_.address) shouldBe Seq("o1y1pkQyXCDWrtNQZ9K4u6KW1RiFZTnJ1", "UNGBSkyvNyGzdv6CKjEndDnChfpzWJ56E", "jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS", "j6Y2aJEV7bQeU7updafs9kNvYVuHRWgcu", "kNem1scYzD5z3NDRdG2aQVfjAukMDZHCC", "aptcN9CfZouX7apreDB6WG2cJVbkos881", "iCu95ftKuid99F4GsXMhMeBiPTrs9KLfq", "kVVAu6F21Ax2Ugddms4p5uXz4kdZfAp8g", "bGbB5M5h9NBg2UM6KschsMky1SGm2Gdum", "npsGKCQW5cQLheWNtUwvqdkb3snPUo25b")
+    w.privateKeyAccounts().map(_.address) shouldBe Seq("3Mb4mR4taeYS3wci78SntztFwLoaS6Wbg81", "3MkcXZiczXxqEQYVVhRqkUnVaTfzaeMs15e", "3MoFqpXVnxVpMwN1egMj2yH6EEWWYVruvfn", "3MjLQqH3cU6DZ4yFC6SAPmXkHf3ajWmV3LK", "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX77hKcmc", "3MUc8z9WMuMbRR93NU8Jxh1DgwCkfHr78Fu", "3Mo4k51wnV4EYmCmneh4fqDdfKYxcgZgCUT", "3MiSmwnRGJtLmZeNLYg75bje6StYhCEKCrX", "3MjQ5FJEBGggnwBWBNjZtgcwyrYTn4r4shg", "3MkjMybqczyo6SyouuaSniTuSiZqTsMhQQx")
 
   }
 
