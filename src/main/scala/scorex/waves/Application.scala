@@ -11,7 +11,7 @@ import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.transaction.{BalanceSheet, GenesisTransaction, SimpleTransactionModule, Transaction}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute, ScorexApiRoute}
-import scorex.waves.settings.WavesSettings
+import scorex.waves.settings._
 import scorex.waves.transaction.WavesTransactionModule
 
 import scala.concurrent.duration._
@@ -32,7 +32,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
 
   override implicit lazy val settings = new WavesSettings(settingsFilename)
 
-  override implicit lazy val consensusModule = new NxtLikeConsensusModule
+  override implicit lazy val consensusModule = new NxtLikeConsensusModule(Constants.AvgBlockDelay)
 
   override implicit lazy val transactionModule: SimpleTransactionModule = new WavesTransactionModule()(settings, this)
 
@@ -88,7 +88,8 @@ object Application extends App with ScorexLogging {
   log.debug("Waves has been started")
   application.run()
 
-  if (application.wallet.privateKeyAccounts().isEmpty) application.wallet.generateNewAccounts(1)
+  if (application.wallet.privateKeyAccounts().isEmpty)
+    application.wallet.generateNewAccounts(1)
 
 
   def testingScript(application: Application): Unit = {
