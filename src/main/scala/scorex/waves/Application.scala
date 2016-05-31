@@ -1,16 +1,17 @@
 package scorex.waves
 
 import akka.actor.Props
+import akka.http.scaladsl.Http
 import com.typesafe.config.ConfigFactory
 import scorex.account.Account
 import scorex.api.http._
 import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
+import scorex.network.{PeerSynchronizer, TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.transaction.{BalanceSheet, GenesisTransaction, SimpleTransactionModule, Transaction}
 import scorex.utils.ScorexLogging
-import scorex.waves.http.{DebugApiRoute, WavesApiRoute, ScorexApiRoute}
+import scorex.waves.http.{DebugApiRoute, ScorexApiRoute, WavesApiRoute}
 import scorex.waves.settings._
 import scorex.waves.transaction.WavesTransactionModule
 
@@ -75,6 +76,28 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
   require(transactionModule.accountWatchingSupport)
 
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], this))
+
+  // TODO: temporary overriding, remove after migration to scorex 1.2.8
+  override def run() {
+    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
+    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
+
+    checkGenesis()
+
+    Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
+
+    historySynchronizer ! Unit
+    historyReplier ! Unit
+    actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
+
+    //on unexpected shutdown
+    Runtime.getRuntime.addShutdownHook(new Thread() {
+      override def run() {
+        log.error("Unexpected shutdown")
+        stopAll()
+      }
+    })
+  }
 
 }
 
