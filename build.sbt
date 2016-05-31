@@ -31,6 +31,7 @@ lazy val consensus = subModule("consensus")
   )
 
 lazy val root = Project(id = "scorex", base = file("."))
+  .aggregate(basics, transaction, consensus)
   .dependsOn(basics, transaction, consensus)
   .settings(commonSettings: _*)
   .settings(
