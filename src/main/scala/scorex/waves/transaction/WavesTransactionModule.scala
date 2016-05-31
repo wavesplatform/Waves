@@ -14,7 +14,10 @@ import scorex.utils.NTP
 class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings, application: Application)
   extends SimpleTransactionModule() {
 
-  override val InitialBalance = 60000000000L
+  val UnitsInWave = 100000000L
+  val TotalWaves  = 100000000L
+  override val InitialBalance = UnitsInWave * TotalWaves
+
   val GenesisTransactionsTimestamp = 0L
 
 
@@ -36,8 +39,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
     val ipoMembers = List(
       "jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS",
-      "kVVAu6F21Ax2Ugddms4p5uXz4kdZfAp8g",
-      "bGbB5M5h9NBg2UM6KschsMky1SGm2Gdum"
+      "kVVAu6F21Ax2Ugddms4p5uXz4kdZfAp8g"
     )
 
     val totalBalance = InitialBalance
