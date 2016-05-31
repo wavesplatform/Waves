@@ -9,6 +9,6 @@ trait TransactionSettings {
   lazy val history = (settingsJSON \ "history").asOpt[String].getOrElse(DefaultHistory)
 
   private val DefaultMaxRollback = 100
-  lazy val MaxRollback = (settingsJSON \ "max-rollback").asOpt[Int].getOrElse(DefaultMaxRollback)
+  lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(DefaultMaxRollback)
 
 }
