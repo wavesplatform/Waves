@@ -35,7 +35,7 @@ with Matchers {
     for (n <- Gen.choose(Integer.MIN_VALUE + 1, Integer.MAX_VALUE)) yield n
 
   property("handshake should remain the same after serialization/deserialization") {
-    forAll(Gen.alphaStr, appVersionGen, Gen.alphaStr, isGen, Gen.posNum[Long], Gen.posNum[Long]) {
+    forAll(Gen.alphaStr suchThat (_.size > 0), appVersionGen, Gen.alphaStr, isGen, Gen.posNum[Long], Gen.posNum[Long]) {
       (appName: String,
        av: ApplicationVersion,
        nodeName: String,
