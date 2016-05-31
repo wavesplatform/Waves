@@ -2,32 +2,31 @@ package scorex.transaction
 
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.{PrivateKeyAccount, Account}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 
 class GenesisTransactionSpecification extends PropSpec with PropertyChecks with Matchers {
 
-  val defaultRecipient = new Account("jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS")
+  val defaultRecipient = new PublicKeyAccount(Array.fill(32)(0: Byte))
 
   property("GenesisTransaction Signature should be the same") {
     val balance = 457L
     val timestamp = 2398762345L
     val signature = GenesisTransaction.generateSignature(defaultRecipient, balance, timestamp)
 
-    val expected = "cSnrRhxLnMHcsLs2tSi7aGw4xMZzvtc2WMmC3x73emXKg9JY86XYsvhx1NPD2c1bqnCU6AF2y5E6UR7njK2FReu"
+    val expected = "3dzTukYksn9UK3fCwuYQsGrjzqjqUEXyvWXCBmFQtCiKF8YZK6eutuhuBmJhzNPm1vRz6SXcEJnyMzGRnKULgdnK"
     val actual = Base58.encode(signature)
 
     assert(actual == expected)
   }
 
   property("GenesisTransaction parse from Bytes should work fine") {
-    val bytes = Base58.decode("y9KVfkMyuvik3koq45snK6vP27L12VdmuNSCVBvqPMsESvpDiUjT5dyb").get
-
-    val actualTransaction = GenesisTransaction.parseBytes(bytes.tail).get
-
     val balance = 149857264546L
     val timestamp = 4598723454L
     val expectedTransaction = new GenesisTransaction(defaultRecipient, balance, timestamp)
+
+    val bytes = Base58.decode("5GoidY2PcCc7ENdrcapZcmmdq2H57NuiXEdgVkpfnnzkB4o8R575WVR1Xw").get
+    val actualTransaction = GenesisTransaction.parseBytes(bytes.tail).get
 
     actualTransaction should equal(expectedTransaction)
   }
