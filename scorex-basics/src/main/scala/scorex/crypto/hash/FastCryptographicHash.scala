@@ -1,15 +1,21 @@
 package scorex.crypto.hash
 
+import com.typesafe.config.ConfigFactory
 import scorex.crypto.hash.CryptographicHash._
+import scorex.utils._
+
+import scala.util.Try
 
 /**
-  * Interface for fast and secure Blake hash function
-  */
-
+ * Fast and secure hash function
+ */
 object FastCryptographicHash extends CryptographicHash {
 
-  override val DigestSize: Int = Blake256.DigestSize
+  private val hf: CryptographicHash = Try(ConfigFactory.load().getConfig("scorex").getString("fastHash"))
+    .flatMap(s => objectFromString[CryptographicHash](s)).getOrElse(Blake256)
 
-  override def hash(in: Message): Digest = Blake256.hash(in)
+  override val DigestSize: Int = hf.DigestSize
+
+  override def hash(in: Message): Digest = hf.hash(in)
 
 }

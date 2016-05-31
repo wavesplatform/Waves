@@ -1,16 +1,21 @@
 package scorex.crypto.hash
 
-import scorex.crypto._
+import com.typesafe.config.ConfigFactory
 import scorex.crypto.hash.CryptographicHash._
+import scorex.utils._
+
+import scala.util.Try
 
 
 /**
-  * The chain of two hash functions, Blake and Keccak
-  */
-
+ * Hash function for cases, where security is more important, then speed
+ */
 object SecureCryptographicHash extends CryptographicHash {
 
-  override val DigestSize: Int = 32
+  private val hf: CryptographicHash = Try(ConfigFactory.load().getConfig("scorex").getString("secureHash"))
+    .flatMap(s => objectFromString[CryptographicHash](s)).getOrElse(ScorexHashChain)
 
-  override def hash(in: Message): Digest = applyHashes(in, Blake256, Keccak256)
+  override val DigestSize: Int = hf.DigestSize
+
+  override def hash(in: Message): Digest = hf.hash(in)
 }
