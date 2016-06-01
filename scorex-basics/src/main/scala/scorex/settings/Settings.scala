@@ -79,6 +79,7 @@ trait Settings extends ScorexLogging {
   //todo: localOnly & declaredAddress
 
   lazy val rpcPort = (settingsJSON \ "rpcPort").asOpt[Int].getOrElse(DefaultRpcPort)
+  lazy val rpcAddress = (settingsJSON \ "rpcAddress").asOpt[String].getOrElse(DefaultRpcAddress)
   lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcAllowed").asOpt[List[String]].getOrElse(DefaultRpcAllowed.split(""))
 
   lazy val offlineGeneration = (settingsJSON \ "offlineGeneration").asOpt[Boolean].getOrElse(false)
@@ -113,6 +114,7 @@ trait Settings extends ScorexLogging {
   lazy val corsAllowed = (settingsJSON \ "cors").asOpt[Boolean].getOrElse(false)
 
   private val DefaultRpcPort = 9085
+  private val DefaultRpcAddress = "0.0.0.0"
   private val DefaultRpcAllowed = "127.0.0.1"
 
   private val DefaultBlockGenerationDelay: FiniteDuration = 1.second
