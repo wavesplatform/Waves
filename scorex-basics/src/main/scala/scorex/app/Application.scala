@@ -77,7 +77,7 @@ trait Application extends ScorexLogging {
 
     checkGenesis()
 
-    Http().bindAndHandle(combinedRoute, "0.0.0.0", settings.rpcPort)
+    Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
 
     historySynchronizer ! Unit
     historyReplier ! Unit
