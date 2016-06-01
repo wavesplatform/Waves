@@ -37,7 +37,10 @@ class AddressesAPISpecification extends FunSuite with Matchers {
   }
 
   test("/addresses/seed/{address} API route") {
-    val response = GET.request(s"/addresses/seed/${account.address}")
+    val path =  s"/addresses/seed/${account.address}"
+    GET.incorrectApiKeyTest(path)
+
+    val response = GET.request(us = path, headers =  Map("api_key" -> "test"))
     (response \ "address").as[String] shouldBe account.address
     (response \ "seed").as[String] shouldBe Base58.encode(account.seed)
   }
