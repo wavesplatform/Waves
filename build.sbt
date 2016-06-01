@@ -18,9 +18,9 @@ lazy val transaction = subModule("transaction")
   .aggregate(basics)
   .dependsOn(basics)
   .settings(commonSettings: _*)
-  .settings(
-    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
-  )
+//  .settings(
+//    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
+//  )
 
 lazy val consensus = subModule("consensus")
   .aggregate(basics)
