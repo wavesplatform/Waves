@@ -9,7 +9,7 @@ import scala.concurrent.duration._
   */
 
 object Constants extends ScorexLogging {
-  private val appConf = ConfigFactory.load("waves.conf").getConfig("app")
+  private val appConf = ConfigFactory.load().getConfig("app")
 
   val Product = appConf.getString("product")
   val Release = appConf.getString("release")

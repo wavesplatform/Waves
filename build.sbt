@@ -2,7 +2,7 @@ import com.typesafe.config.ConfigFactory
 
 organization := "org.consensusresearch"
 
-val appConf = ConfigFactory.parseFile(new File("src/main/resources/waves.conf")).resolve().getConfig("app")
+val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
 
 name := "waves"
 
