@@ -1,3 +1,11 @@
+**1.2.8**
+---------
+
+* Make hash functions configurable via application.conf
+* One more byte added to address to identify the network
+* Rpc address become configurable via settings.json 
+
+
 **1.2.7**
 ---------
 
