@@ -12,9 +12,10 @@ import scorex.transaction.state.database.state._
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
 with PrivateMethodTester with OptionValues with TransactionGen {
 
-  val folder = "/tmp/scorex/test"
+  val folder = "/tmp/scorex/test/"
   new File(folder).mkdirs()
   val stateFile = folder + "state.dat"
+  new File(stateFile).delete()
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
   val state = new StoredState(db)

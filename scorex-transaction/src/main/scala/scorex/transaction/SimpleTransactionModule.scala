@@ -51,6 +51,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
 
   private val instance = this
 
+  override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl
+
   override val blockStorage = new BlockStorage {
 
     val db = settings.dataDirOpt match {
@@ -105,13 +107,13 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
 
   override def packUnconfirmed(): StoredInBlock = {
     clearIncorrectTransaction()
-    blockStorage.state.validate(UnconfirmedTransactionsDatabaseImpl.all().sortBy(-_.fee).take(MaxTransactionsPerBlock))
+    blockStorage.state.validate(utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock))
   }
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
-    data.foreach(tx => UnconfirmedTransactionsDatabaseImpl.getBySignature(tx.signature) match {
-      case Some(unconfirmedTx) => UnconfirmedTransactionsDatabaseImpl.remove(unconfirmedTx)
+    data.foreach(tx => utxStorage.getBySignature(tx.signature) match {
+      case Some(unconfirmedTx) => utxStorage.remove(unconfirmedTx)
       case None =>
     })
 
@@ -121,17 +123,18 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   //Romove too old or invalid transactions from  UnconfirmedTransactionsPool
   def clearIncorrectTransaction(): Unit = {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-    val txs = UnconfirmedTransactionsDatabaseImpl.all()
+
+    val txs = utxStorage.all()
     val notTooOld = txs.filter { tx =>
-      if ((lastBlockTs - tx.timestamp).seconds > MaxTimeForUnconfirmed) UnconfirmedTransactionsDatabaseImpl.remove(tx)
+      if ((lastBlockTs - tx.timestamp).seconds > MaxTimeForUnconfirmed) utxStorage.remove(tx)
       (lastBlockTs - tx.timestamp).seconds <= MaxTimeForUnconfirmed
     }
 
-    notTooOld.diff(blockStorage.state.validate(txs)).foreach(tx => UnconfirmedTransactionsDatabaseImpl.remove(tx))
+    notTooOld.diff(blockStorage.state.validate(txs)).foreach(tx => utxStorage.remove(tx))
   }
 
   override def onNewOffchainTransaction(transaction: Transaction): Unit =
-    if (UnconfirmedTransactionsDatabaseImpl.putIfNew(transaction)) {
+    if (utxStorage.putIfNew(transaction)) {
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(transaction), None)
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)

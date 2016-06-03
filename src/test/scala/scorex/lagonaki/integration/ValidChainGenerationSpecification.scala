@@ -8,7 +8,6 @@ import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
 import scorex.transaction.BalanceSheet
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{ScorexLogging, untilTimeout}
 
 import scala.concurrent.Await
@@ -38,8 +37,8 @@ with TransactionTestingCommons {
   def maxHeight(): Int = peers.map(_.blockStorage.history.height()).max
 
   def cleanTransactionPool(): Unit = untilTimeout(1.second) {
-    UnconfirmedTransactionsDatabaseImpl.all().foreach(tx => UnconfirmedTransactionsDatabaseImpl.remove(tx))
-    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe 0
+    transactionModule.utxStorage.all().foreach(tx => transactionModule.utxStorage.remove(tx))
+    transactionModule.utxStorage.all().size shouldBe 0
   }
 
   test("generate 10 blocks and synchronize") {
@@ -58,7 +57,7 @@ with TransactionTestingCommons {
   test("Generate block with plenty of transactions") {
     val block = untilTimeout(1.minute) {
       stopGeneration()
-      val toGen = UnconfirmedTransactionsDatabaseImpl.SizeLimit - transactionModule.packUnconfirmed().size
+      val toGen = transactionModule.utxStorage.SizeLimit - transactionModule.packUnconfirmed().size
       (0 until toGen) foreach (i => genValidTransaction())
       val blocksFuture = application.consensusModule.generateNextBlocks(Seq(accounts.head))(transactionModule)
       val blocks: Seq[Block] = Await.result(blocksFuture, 10.seconds)
@@ -90,10 +89,10 @@ with TransactionTestingCommons {
     stopGeneration()
     cleanTransactionPool()
 
-    incl.foreach(tx => UnconfirmedTransactionsDatabaseImpl.putIfNew(tx))
-    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe incl.size
+    incl.foreach(tx => transactionModule.utxStorage.putIfNew(tx))
+    transactionModule.utxStorage.all().size shouldBe incl.size
     val tx = genValidTransaction(randomAmnt = false)
-    UnconfirmedTransactionsDatabaseImpl.all().size shouldBe incl.size + 1
+    transactionModule.utxStorage.all().size shouldBe incl.size + 1
 
     applications.foreach(_.blockGenerator ! StartGeneration)
 

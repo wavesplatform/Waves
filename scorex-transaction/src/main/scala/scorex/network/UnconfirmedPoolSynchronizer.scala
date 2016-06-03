@@ -3,7 +3,6 @@ package scorex.network
 import scorex.app.Application
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.{LagonakiTransaction, Transaction}
 import scorex.utils.ScorexLogging
 
@@ -22,7 +21,7 @@ class UnconfirmedPoolSynchronizer(application: Application) extends ViewSynchron
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
       (tx, transactionModule.blockStorage.state.isValid(tx)) match {
-        case (ltx: LagonakiTransaction, true) => UnconfirmedTransactionsDatabaseImpl.putIfNew(ltx)
+        case (ltx: LagonakiTransaction, true) => transactionModule.utxStorage.putIfNew(ltx)
         case (atx, false) => log.error(s"Transaction $atx is not valid")
         case m => log.error(s"Got unexpected transaction: $m")
       }
