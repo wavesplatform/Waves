@@ -28,6 +28,7 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
   val BaseTargetGamma = normalize(64)
 
   private val AvgDelayInSeconds: Long = AvgDelay.toSeconds
+
   private def normalize(value: Long): Double = value * AvgDelayInSeconds / (60: Double)
 
   override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
@@ -106,7 +107,8 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
   }
 
   private def effectiveBalance[TT](account: Account)(implicit transactionModule: TransactionModule[TT]) =
-    transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].balanceWithConfirmations(account.address, EffectiveBalanceDepth)
+    transactionModule.blockStorage.state.asInstanceOf[BalanceSheet]
+      .balanceWithConfirmations(account.address, EffectiveBalanceDepth)
 
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =
     hash(lastBlockData.generationSignature ++ generator.publicKey)
@@ -123,19 +125,15 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
     val height = history.heightOf(prevBlock).get
     val prevBaseTarget = consensusBlockData(prevBlock).baseTarget
     if (height % 2 == 0) {
-      val blocktimeAverage = (if (height > AvgBlockTimeDepth) {
-        (timestamp - history.parent(prevBlock, AvgBlockTimeDepth - 1).get.timestampField.value) / AvgBlockTimeDepth
-      } else {
-        timestamp - prevBlock.timestampField.value
-      }) / 1000
+      val blocktimeAverage = history.averageDelay(prevBlock, AvgBlockTimeDepth)
+        .getOrElse(timestamp - prevBlock.timestampField.value) / 1000
 
       val baseTarget = (if (blocktimeAverage > AvgDelayInSeconds) {
-          (prevBaseTarget * Math.min(blocktimeAverage, MaxBlocktimeLimit)) / AvgDelayInSeconds
-        } else {
-          prevBaseTarget -
-            prevBaseTarget * BaseTargetGamma * (AvgDelayInSeconds - Math.max(blocktimeAverage, MinBlocktimeLimit)) /
-              (AvgDelayInSeconds * 100)
-        }).toLong
+        (prevBaseTarget * Math.min(blocktimeAverage, MaxBlocktimeLimit)) / AvgDelayInSeconds
+      } else {
+        prevBaseTarget - prevBaseTarget * BaseTargetGamma *
+          (AvgDelayInSeconds - Math.max(blocktimeAverage, MinBlocktimeLimit)) / (AvgDelayInSeconds * 100)
+      }).toLong
       bounded(baseTarget, 1, Long.MaxValue).toLong
     } else {
       prevBaseTarget
