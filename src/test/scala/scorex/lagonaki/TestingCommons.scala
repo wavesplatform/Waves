@@ -83,7 +83,7 @@ object TestingCommons {
                 body: String = "",
                 headers: Map[String, String] = Map.empty,
                 peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).GET)
+      val request = Http(url(peer + us).GET <:< headers)
       val response = Await.result(request, 5.seconds)
       Json.parse(response.getResponseBody)
     }
