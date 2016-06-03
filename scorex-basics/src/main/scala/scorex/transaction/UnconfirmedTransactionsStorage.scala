@@ -1,9 +1,9 @@
-package scorex.transaction.state.database
-
-import scorex.transaction.Transaction
+package scorex.transaction
 
 
-trait UnconfirmedTransactionsDatabase {
+trait UnconfirmedTransactionsStorage {
+  val SizeLimit: Int
+
   def putIfNew(tx: Transaction): Boolean
 
   def all(): Seq[Transaction]

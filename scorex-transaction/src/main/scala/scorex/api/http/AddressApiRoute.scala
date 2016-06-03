@@ -175,12 +175,14 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   ))
   def seed: Route = {
     path("seed" / Segment) { case address =>
-      getJsonRoute {
-        //TODO CHECK IF WALLET EXISTS
-        withPrivateKeyAccount(wallet, address) { account =>
-          wallet.exportAccountSeed(account.address) match {
-            case None => WalletSeedExportFailed.json
-            case Some(seed) => Json.obj("address" -> address, "seed" -> Base58.encode(seed))
+      withAuth {
+        getJsonRoute {
+          //TODO CHECK IF WALLET EXISTS
+          withPrivateKeyAccount(wallet, address) { account =>
+            wallet.exportAccountSeed(account.address) match {
+              case None => WalletSeedExportFailed.json
+              case Some(seed) => Json.obj("address" -> address, "seed" -> Base58.encode(seed))
+            }
           }
         }
       }
