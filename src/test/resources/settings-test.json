@@ -18,6 +18,7 @@
   ],
 
   "maxRollback": 100,
+  "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",
   "history": "blockchain",
   "offlineGeneration": false
 }

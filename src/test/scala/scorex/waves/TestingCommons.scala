@@ -40,8 +40,9 @@ object TestingCommons {
   def peerUrl(a: Application = application): String =
     "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
 
-  def getRequest(us: String, peer: String = peerUrl(application)): JsValue = {
-    val request = Http(url(peer + us).GET)
+  def getRequest(us: String, peer: String = peerUrl(application),
+                 headers: Map[String, String] = Map.empty): JsValue = {
+    val request = Http(url(peer + us).GET <:< headers)
     val response = Await.result(request, 10.seconds)
     Json.parse(response.getResponseBody)
   }

@@ -37,16 +37,25 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   }
 
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
-    val ipoMembers = List(
-      "2nDESCmSiTbcuutek3nJHGKevzgkycxFH9Y"
-    )
+//    val ipoMembers = List(
+//      "2nDESCmSiTbcuutek3nJHGKevzgkycxFH9Y"
+//    )
 
     val totalBalance = InitialBalance
+    val txs = List(
+      GenesisTransaction( new Account("2nDESCmSiTbcuutek3nJHGKevzgkycxFH9Y"), totalBalance - 5 * UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("2nGSYaXexawHYz4wnCBMLzeEtbCVZQSvKRr"), UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("2nQRK9oxzYwg364Cur3N4uqeeFB9U7VDGcV"), UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("2nJHZ17iWSjMsZgCTCxUPoGzeX7hArqoyky"), UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("2n6CbQ2cufQ2ZkmMU3TzGGYa2AGKveqJjSd"), UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("2n7LeuEiZ4Te1zphx3gqGziuNJQ4gL4f2kt"), UnitsInWave, GenesisTransactionsTimestamp)
+    )
+    require(txs.foldLeft(0L)(_ + _.amount) == InitialBalance)
 
-    val txs = ipoMembers.map { address =>
-      val recipient = new Account(address)
-      GenesisTransaction(recipient, totalBalance / ipoMembers.length, GenesisTransactionsTimestamp)
-    }
+//    val txs: List[GenesisTransaction] = ipoMembers.map { address =>
+//      val recipient = new Account(address)
+//      GenesisTransaction(recipient, totalBalance / ipoMembers.length, GenesisTransactionsTimestamp)
+//    }
 
     TransactionsBlockField(txs)
   }

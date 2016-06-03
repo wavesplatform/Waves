@@ -7,5 +7,4 @@ class WavesSettings(override val filename: String) extends Settings with Transac
   override lazy val genesisTimestamp = 1460678400000L
   override val MaxBlocksChunks = 20
 
-  lazy val rpcAddress = (settingsJSON \ "rpcAddress").asOpt[String].getOrElse("0.0.0.0")
 }

@@ -95,8 +95,10 @@ case class DebugApiRoute(override val application: Application)(implicit val con
   ))
   def settings: Route = {
     path("settings") {
-      getJsonRoute {
-        application.settings.settingsJSON
+      withAuth {
+        getJsonRoute {
+          application.settings.settingsJSON
+        }
       }
     }
   }
