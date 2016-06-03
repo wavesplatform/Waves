@@ -3,7 +3,6 @@ package scorex.lagonaki.integration
 import org.scalatest._
 import scorex.account.Account
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.{BalanceSheet, FeesStateChange}
 import scorex.utils.ScorexLogging
@@ -54,7 +53,7 @@ class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfte
   }
 
   test("validate plenty of transactions") {
-    val trans = (1 to UnconfirmedTransactionsDatabaseImpl.SizeLimit).map { i =>
+    val trans = (1 to transactionModule.utxStorage.SizeLimit).map { i =>
       val account = accounts(Random.nextInt(accounts.size))
       val senderBalance = state.asInstanceOf[BalanceSheet].balance(account.address)
       senderBalance should be > 0L

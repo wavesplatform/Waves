@@ -9,7 +9,6 @@ import play.api.libs.json.{JsArray, Json}
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiState
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.transaction.state.database.blockchain.StoredBlockchain
 
 import scala.util.{Success, Try}
@@ -88,7 +87,7 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
   def unconfirmed: Route = {
     path("unconfirmed") {
       getJsonRoute {
-        JsArray(UnconfirmedTransactionsDatabaseImpl.all().map(_.json))
+        JsArray(application.transactionModule.utxStorage.all().map(_.json))
       }
     }
   }

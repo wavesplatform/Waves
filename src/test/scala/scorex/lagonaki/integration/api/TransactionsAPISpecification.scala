@@ -3,7 +3,6 @@ package scorex.lagonaki.integration.api
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.JsValue
 import scorex.lagonaki.TransactionTestingCommons
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 
 class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons {
 
@@ -16,7 +15,7 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
 
   test("/transactions/unconfirmed API route") {
     (1 to 20) foreach (i => genValidTransaction())
-    val unconfirmed = UnconfirmedTransactionsDatabaseImpl.all()
+    val unconfirmed = transactionModule.utxStorage.all()
     unconfirmed.size should be > 0
     val tr = GET.request("/transactions/unconfirmed")
     (tr \\ "signature").toList.size shouldBe unconfirmed.size

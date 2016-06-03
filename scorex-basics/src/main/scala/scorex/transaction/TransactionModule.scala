@@ -6,6 +6,8 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   val blockStorage: BlockStorage
 
+  val utxStorage: UnconfirmedTransactionsStorage
+
   def isValid(block: Block): Boolean
 
   def transactions(block: Block): Seq[Transaction]

@@ -1,16 +1,13 @@
 package scorex.transaction.state.database
 
 import com.google.common.primitives.Longs
-import scorex.transaction.Transaction
+import scorex.transaction.{Transaction, UnconfirmedTransactionsStorage}
 import scorex.utils.ScorexLogging
 
 import scala.collection.concurrent.TrieMap
 
 
-object UnconfirmedTransactionsDatabaseImpl extends UnconfirmedTransactionsDatabase with ScorexLogging {
-
-  //TODO move to config
-  val SizeLimit = 1000
+class UnconfirmedTransactionsDatabaseImpl(val SizeLimit: Int = 1000) extends UnconfirmedTransactionsStorage with ScorexLogging {
 
   val transactions = TrieMap[Long, Transaction]()
 
