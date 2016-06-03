@@ -16,5 +16,5 @@ object Constants extends ScorexLogging {
   val VersionString = appConf.getString("version")
   val AgentName = s"$Product - $Release v. $VersionString"
 
-  val AvgBlockDelay: Long = 60.seconds.toMillis
+  val AvgBlockDelay: Duration = 60.seconds
 }
