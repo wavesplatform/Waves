@@ -105,8 +105,10 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   override def transactions(block: Block): StoredInBlock =
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
-  override def packUnconfirmed(): StoredInBlock =
+  override def packUnconfirmed(): StoredInBlock = {
+    clearIncorrectTransaction()
     blockStorage.state.validate(utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock))
+  }
 
   //todo: check: clear unconfirmed txs on receiving a block
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
@@ -115,13 +117,20 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       case None =>
     })
 
+    clearIncorrectTransaction()
+  }
+
+  //Romove too old or invalid transactions from  UnconfirmedTransactionsPool
+  def clearIncorrectTransaction(): Unit = {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-    utxStorage.all().foreach { tx =>
-      if ((lastBlockTs - tx.timestamp).seconds > MaxTimeForUnconfirmed) utxStorage.remove(tx)
-    }
 
     val txs = utxStorage.all()
-    txs.diff(blockStorage.state.validate(txs)).foreach(tx => utxStorage.remove(tx))
+    val notTooOld = txs.filter { tx =>
+      if ((lastBlockTs - tx.timestamp).seconds > MaxTimeForUnconfirmed) utxStorage.remove(tx)
+      (lastBlockTs - tx.timestamp).seconds <= MaxTimeForUnconfirmed
+    }
+
+    notTooOld.diff(blockStorage.state.validate(txs)).foreach(tx => utxStorage.remove(tx))
   }
 
   override def onNewOffchainTransaction(transaction: Transaction): Unit =
@@ -163,14 +172,19 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     TransactionsBlockField(txs)
   }
 
-  override def isValid(block: Block): Boolean =
-    blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
+  override def isValid(block: Block): Boolean = {
+    val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
+    lazy val txsAreNew = block.transactions.forall(tx => (lastBlockTs - tx.timestamp).seconds <= MaxTxAndBlockDiff)
+    lazy val blockIsValid = blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
+    txsAreNew && blockIsValid
+  }
 
 }
 
 object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
-  val MaxTimeForUnconfirmed = 1.hour
+  val MaxTimeForUnconfirmed = 90.minutes
+  val MaxTxAndBlockDiff = 2.hour
   val MaxTransactionsPerBlock = 100
 }
