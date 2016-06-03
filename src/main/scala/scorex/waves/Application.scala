@@ -23,7 +23,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
 
   override val applicationName = "waves"
 
-  private val appConf = ConfigFactory.load().getConfig("app")
+  private val appConf = ConfigFactory.load("waves.conf").getConfig("app")
 
   override lazy val appVersion = {
     val raw = appConf.getString("version")
@@ -108,8 +108,9 @@ object Application extends App with ScorexLogging {
 
   val application = new Application(filename)
 
-  log.debug("Waves has been started")
   application.run()
+
+  log.debug("Waves has been started")
 
   if (application.wallet.privateKeyAccounts().isEmpty)
     application.wallet.generateNewAccounts(1)

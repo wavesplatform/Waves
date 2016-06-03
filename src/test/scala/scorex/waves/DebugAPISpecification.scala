@@ -9,15 +9,12 @@ class DebugAPISpecification extends FunSuite with Matchers {
 
   test("/debug/state") {
     val state = getRequest("/debug/state")
-    (state \ "kVVAu6F21Ax2Ugddms4p5uXz4kdZfAp8g").as[Long] should be > 0L
-    (state \ "jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS").as[Long] should be > 0L
+    (state \ "2nDESCmSiTbcuutek3nJHGKevzgkycxFH9Y").as[Long] should be > 0L
   }
 
   test("/debug/state/{height}") {
     val state = getRequest("/debug/state/1")
-    (state \ "jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS").as[Long] shouldBe 20000000000L
-    (state \ "kVVAu6F21Ax2Ugddms4p5uXz4kdZfAp8g").as[Long] shouldBe 20000000000L
-    (state \ "bGbB5M5h9NBg2UM6KschsMky1SGm2Gdum").as[Long] shouldBe 20000000000L
+    (state \ "2nDESCmSiTbcuutek3nJHGKevzgkycxFH9Y").as[Long] shouldBe 100000000L * 100000000L
   }
 
   test("/debug/info") {

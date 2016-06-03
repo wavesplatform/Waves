@@ -2,7 +2,7 @@ import com.typesafe.config.ConfigFactory
 
 organization := "org.consensusresearch"
 
-val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
+val appConf = ConfigFactory.parseFile(new File("src/main/resources/waves.conf")).resolve().getConfig("app")
 
 name := "waves"
 
@@ -12,7 +12,7 @@ scalaVersion := "2.11.8"
 
 resolvers += "SonaType" at "https://oss.sonatype.org/content/groups/public"
 
-val modulesVersion = "1.2.7"
+val modulesVersion = "1.2.8-SNAPSHOT"
 
 libraryDependencies ++= Seq(
   "org.consensusresearch" %% "scorex-basics" % modulesVersion,

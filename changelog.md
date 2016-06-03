@@ -1,3 +1,8 @@
+**0.2.0**
+
+* Upgrade to Scorex 1.2.8
+* New Address format
+* New hash chain for Address - Blake2b256, Keccak32
 
 **0.1.3**
 

@@ -38,8 +38,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
 
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
     val ipoMembers = List(
-      "jACSbUoHi4eWgNu6vzAnEx583NwmUAVfS",
-      "kVVAu6F21Ax2Ugddms4p5uXz4kdZfAp8g"
+      "2nDESCmSiTbcuutek3nJHGKevzgkycxFH9Y"
     )
 
     val totalBalance = InitialBalance
