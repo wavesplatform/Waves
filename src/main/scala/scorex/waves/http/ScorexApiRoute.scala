@@ -43,10 +43,12 @@ case class ScorexApiRoute(override val application: Application)(implicit val co
   @Path("/stop")
   @ApiOperation(value = "Stop", notes = "Stop the app", httpMethod = "POST")
   def scorex: Route = path("stop") {
-    postJsonRoute{
-      log.info("Request to stop application")
-      Future(application.stopAll())
-      Json.obj("stopped" -> true)
+    withAuth {
+      postJsonRoute{
+        log.info("Request to stop application")
+        Future(application.stopAll())
+        Json.obj("stopped" -> true)
+      }
     }
   }
 

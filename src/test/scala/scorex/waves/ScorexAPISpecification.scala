@@ -1,6 +1,7 @@
 package scorex.waves
 
 import org.scalatest.{FunSuite, Matchers}
+import scorex.api.http.ApiKeyNotValid
 
 class ScorexAPISpecification extends FunSuite with Matchers {
 
@@ -17,5 +18,10 @@ class ScorexAPISpecification extends FunSuite with Matchers {
     (version \ "version").as[String].contains("Waves") shouldBe true
     (version \ "version").as[String].contains("Release0") shouldBe true
     (version \ "version").as[String].contains("v. 0.2.") shouldBe true
+  }
+
+  test("/scorex/stop API route protected by api key") {
+    val wrongKeyResponse = postRequest(us = "/scorex/stop", headers = Map("api_key" -> "wrong")).toString
+    assert(wrongKeyResponse == ApiKeyNotValid.json.toString(), s"$wrongKeyResponse == ${ApiKeyNotValid.json.toString()} is false")
   }
 }
