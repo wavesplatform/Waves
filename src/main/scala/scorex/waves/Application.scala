@@ -77,28 +77,6 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
 
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], this))
 
-  // TODO: temporary overriding, remove after migration to scorex 1.2.8
-  override def run() {
-    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
-    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
-
-    checkGenesis()
-
-    Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
-
-    historySynchronizer ! Unit
-    historyReplier ! Unit
-    actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
-
-    //on unexpected shutdown
-    Runtime.getRuntime.addShutdownHook(new Thread() {
-      override def run() {
-        log.error("Unexpected shutdown")
-        stopAll()
-      }
-    })
-  }
-
 }
 
 object Application extends App with ScorexLogging {
