@@ -27,9 +27,8 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
   val MaxBlocktimeLimit = normalize(67)
   val BaseTargetGamma = normalize(64)
 
-  private val AvgDelayInSeconds: Long = AvgDelay.toSeconds
-
-  private def normalize(value: Long): Double = value * AvgDelayInSeconds / (60: Double)
+  private def avgDelayInSeconds: Long = AvgDelay.toSeconds
+  private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
   override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
 
@@ -129,11 +128,11 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
         .map( b => (timestamp - b.timestampField.value) / AvgBlockTimeDepth)
         .getOrElse(timestamp - prevBlock.timestampField.value) / 1000
 
-      val baseTarget = (if (blocktimeAverage > AvgDelayInSeconds) {
-        (prevBaseTarget * Math.min(blocktimeAverage, MaxBlocktimeLimit)) / AvgDelayInSeconds
+      val baseTarget = (if (blocktimeAverage > avgDelayInSeconds) {
+        (prevBaseTarget * Math.min(blocktimeAverage, MaxBlocktimeLimit)) / avgDelayInSeconds
       } else {
         prevBaseTarget - prevBaseTarget * BaseTargetGamma *
-          (AvgDelayInSeconds - Math.max(blocktimeAverage, MinBlocktimeLimit)) / (AvgDelayInSeconds * 100)
+          (avgDelayInSeconds - Math.max(blocktimeAverage, MinBlocktimeLimit)) / (avgDelayInSeconds * 100)
       }).toLong
       bounded(baseTarget, 1, Long.MaxValue).toLong
     } else {
