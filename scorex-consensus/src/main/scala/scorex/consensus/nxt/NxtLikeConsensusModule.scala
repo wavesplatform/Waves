@@ -106,7 +106,7 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
     } else Future(None)
   }
 
-  private def effectiveBalance[TT](account: Account)(implicit transactionModule: TransactionModule[TT]) =
+  protected def effectiveBalance[TT](account: Account)(implicit transactionModule: TransactionModule[TT]) =
     transactionModule.blockStorage.state.asInstanceOf[BalanceSheet]
       .balanceWithConfirmations(account.address, EffectiveBalanceDepth)
 
@@ -125,7 +125,8 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
     val height = history.heightOf(prevBlock).get
     val prevBaseTarget = consensusBlockData(prevBlock).baseTarget
     if (height % 2 == 0) {
-      val blocktimeAverage = history.averageDelay(prevBlock, AvgBlockTimeDepth)
+      val blocktimeAverage = history.parent(prevBlock, AvgBlockTimeDepth - 1)
+        .map( b => (timestamp - b.timestampField.value) / AvgBlockTimeDepth)
         .getOrElse(timestamp - prevBlock.timestampField.value) / 1000
 
       val baseTarget = (if (blocktimeAverage > AvgDelayInSeconds) {
