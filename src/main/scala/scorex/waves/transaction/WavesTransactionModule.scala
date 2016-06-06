@@ -37,25 +37,19 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   }
 
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
-//    val ipoMembers = List(
-//      "2nDESCmSiTbcuutek3nJHGKevzgkycxFH9Y"
-//    )
+
 
     val totalBalance = InitialBalance
     val txs = List(
-      GenesisTransaction( new Account("2nDESCmSiTbcuutek3nJHGKevzgkycxFH9Y"), totalBalance - 5 * UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("2nGSYaXexawHYz4wnCBMLzeEtbCVZQSvKRr"), UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("2nQRK9oxzYwg364Cur3N4uqeeFB9U7VDGcV"), UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("2nJHZ17iWSjMsZgCTCxUPoGzeX7hArqoyky"), UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("2n6CbQ2cufQ2ZkmMU3TzGGYa2AGKveqJjSd"), UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("2n7LeuEiZ4Te1zphx3gqGziuNJQ4gL4f2kt"), UnitsInWave, GenesisTransactionsTimestamp)
+      GenesisTransaction( new Account("3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"), totalBalance - 5 * UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3MyTvqfeLWkvjSZ1hwkhQjzipZr7Pk8dyMR"), UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3MqS3mVY4Yr4HoTdpWiEaq9phwbaoWS2W6A"), UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3N3CDuzGXB2qP5vb2NvnnDQ68HahNCfYVBg"), UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3N2sacZ9XTQUkLDdZZgtb1zJUAmr6oziRrU"), UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3N189PMB8BaxngN3fNvDRkFbvbH8xMkk328"), UnitsInWave, GenesisTransactionsTimestamp)
     )
     require(txs.foldLeft(0L)(_ + _.amount) == InitialBalance)
 
-//    val txs: List[GenesisTransaction] = ipoMembers.map { address =>
-//      val recipient = new Account(address)
-//      GenesisTransaction(recipient, totalBalance / ipoMembers.length, GenesisTransactionsTimestamp)
-//    }
 
     TransactionsBlockField(txs)
   }

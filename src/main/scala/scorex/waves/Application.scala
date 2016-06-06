@@ -23,7 +23,7 @@ class Application(val settingsFilename: String) extends scorex.app.Application {
 
   override val applicationName = "waves"
 
-  private val appConf = ConfigFactory.load("waves.conf").getConfig("app")
+  private val appConf = ConfigFactory.load().getConfig("app")
 
   override lazy val appVersion = {
     val raw = appConf.getString("version")
