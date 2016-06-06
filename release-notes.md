@@ -7,6 +7,7 @@
 * Max difference between transaction and block timestamps added 
 * NXT consensus algorithm fixes
 * api_key protection for wallet/seed and addresses/seed API methods added 
+* Limits for /blocks/address/{address} API call added
 
 **1.2.7**
 ---------

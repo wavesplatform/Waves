@@ -16,9 +16,9 @@ import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
 /**
-  * TODO fix
-  * If no datafolder provided, blocktree lives in RAM (useful for tests)
-  */
+ * TODO fix
+ * If no datafolder provided, blocktree lives in RAM (useful for tests)
+ */
 class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
                      (implicit consensusModule: ConsensusModule[_],
                       transactionModule: TransactionModule[_])
@@ -124,9 +124,9 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
     }
 
     /**
-      *
-      * @return true when best block added, false when block score is less then current score
-      */
+     *
+     * @return true when best block added, false when block score is less then current score
+     */
     override def writeBlock(block: Block): Try[Boolean] = Try {
       if (exists(block)) log.warn(s"Trying to add block ${block.encodedId} that is already in tree "
         + s" at height ${readBlock(block).map(_._3)}")
@@ -217,8 +217,8 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
 
   override def blockById(blockId: BlockId): Option[Block] = blockStorage.readBlock(blockId).map(_._1)
 
-  override def generatedBy(account: Account): Seq[Block] = blockStorage.filter { b =>
-    consensusModule.generators(b).contains(account)
+  override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = blockStorage.filter { b =>
+    heightOf(b).exists(bh => bh > from && bh < to) && consensusModule.generators(b).contains(account)
   }.map(_._1)
 
   override def lastBlock: Block = blockStorage.bestBlock.map(_._1).get

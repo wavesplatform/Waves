@@ -14,8 +14,8 @@ import scala.collection.JavaConversions._
 import scala.util.{Failure, Success, Try}
 
 /**
-  * If no datafolder provided, blockchain lives in RAM (useful for tests)
-  */
+ * If no datafolder provided, blockchain lives in RAM (useful for tests)
+ */
 class StoredBlockchain(db: MVStore)
                       (implicit consensusModule: ConsensusModule[_],
                        transactionModule: TransactionModule[_])
@@ -97,12 +97,13 @@ class StoredBlockchain(db: MVStore)
 
   override def children(block: Block): Seq[Block] = heightOf(block).flatMap(h => blockAt(h + 1)).toSeq
 
-  override def generatedBy(account: Account): Seq[Block] =
-    (1 to height()).toStream.flatMap { h =>
+  override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = {
+    (from to to).toStream.flatMap { h =>
       blockAt(h).flatMap { block =>
         if (block.consensusModule.generators(block).contains(account)) Some(block) else None
       }
     }
+  }
 
   override def toString: String = ((1 to height()) map { case h =>
     val bl = blockAt(h).get
