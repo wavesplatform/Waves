@@ -66,13 +66,13 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
     checkGenesis(GET.request(s"/blocks/first"))
   }
 
-  test("GET /blocks/address/{address} API route") {
-    checkGenesis(GET.request(s"/blocks/address/3Mc2PfwgwZ6txN2rhi6DzYfJRLQ88xRLx5p")(0).as[JsValue])
+  test("GET /blocks/address/{address}/{from}/{to} API route") {
+    checkGenesis(GET.request(s"/blocks/address/3Mc2PfwgwZ6txN2rhi6DzYfJRLQ88xRLx5p/0/1")(0).as[JsValue])
   }
 
 
   def checkGenesis(response: JsValue): Unit = {
-    (response \ "reference").as[String] shouldBe "1111111111111111111111111111111111111111111111111111111111111111"
+    (response \ "reference").as[String] shouldBe "67rpwLCuS5DGA8KGZXKsVQ7dnPb9goRLoKfgGbLfQg9WoLUgNY77E2jT11fem3coV9nAkguBACzrU1iyZM4B8roQ"
     (response \ "transactions" \\ "fee").toList.size shouldBe 3
     (response \ "generator").as[String] shouldBe "3Mc2PfwgwZ6txN2rhi6DzYfJRLQ88xRLx5p"
     (response \ "signature").as[String] shouldBe "1111111111111111111111111111111111111111111111111111111111111111"
