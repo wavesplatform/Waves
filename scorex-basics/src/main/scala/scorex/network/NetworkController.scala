@@ -16,12 +16,12 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Random, Success, Try}
 
 /**
-  * Control all network interaction
-  * must be singleton
-  */
+ * Control all network interaction
+ * must be singleton
+ */
 class NetworkController(application: Application) extends Actor with ScorexLogging {
 
   import NetworkController._
@@ -122,9 +122,12 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       }
 
     case SendToNetwork(message, sendingStrategy) =>
-      (peerManager ? PeerManager.FilterPeers(sendingStrategy))
-        .map(_.asInstanceOf[Seq[ConnectedPeer]])
-        .foreach(_.foreach(_.handlerRef ! message))
+      val delay = if (settings.fuzzingDelay > 0) Random.nextInt(settings.fuzzingDelay) else 0
+      system.scheduler.scheduleOnce(delay.millis) {
+        (peerManager ? PeerManager.FilterPeers(sendingStrategy))
+          .map(_.asInstanceOf[Seq[ConnectedPeer]])
+          .foreach(_.foreach(_.handlerRef ! message))
+      }
   }
 
   def peerLogic: Receive = {

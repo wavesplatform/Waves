@@ -1,5 +1,6 @@
 {
   "p2p": {
+    "fuzzingDelay": 3000,
     "nodeName": "Node3",
     "bindAddress": "127.0.0.3",
     "upnp": true,

@@ -1,5 +1,6 @@
 {
   "p2p": {
+    "fuzzingDelay": 1000,
     "nodeName": "Node2",
     "localOnly": true,
     "bindAddress": "127.0.0.2",
