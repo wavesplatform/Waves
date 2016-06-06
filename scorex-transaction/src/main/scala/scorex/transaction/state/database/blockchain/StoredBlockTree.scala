@@ -166,7 +166,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
       case Success(v) =>
         Some(v)
       case Failure(e) =>
-        log.debug("Enable readBlock for key: " + Base58.encode(key))
+        log.debug("Unable readBlock for key: " + Base58.encode(key))
         None
     }
   }
@@ -174,7 +174,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
   private val blockStorage: BlockTreePersistence = dataFolderOpt match {
     case Some(dataFolder) =>
       new File(dataFolder).mkdirs()
-      val file = new File(dataFolder + "blocktree.mapDB")
+      val file = new File(dataFolder + "/blocktree.mapDB")
       val db = DBMaker.appendFileDB(file).fileMmapEnableIfSupported().closeOnJvmShutdown().checksumEnable().make()
       new MapDBBlockTreePersistence(db)
     case _ => new MapDBBlockTreePersistence(DBMaker.memoryDB().make())
@@ -242,7 +242,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
         case _ => acc
       }
     }
-    loop(block, howMany)
+    loop(block, howMany, Seq(block))
   }
 
   override def lastBlocks(howMany: Int): Seq[Block] = {

@@ -224,7 +224,7 @@ object Block extends ScorexLogging {
 
     override val versionField: ByteBlockField = ByteBlockField("version", 1)
     override val transactionDataField: BlockField[TDT] = transactionModule.genesisData
-    override val referenceField: BlockIdField = BlockIdField("reference", Array.fill(BlockIdLength)(0: Byte))
+    override val referenceField: BlockIdField = BlockIdField("reference", Array.fill(BlockIdLength)(-1: Byte))
     override val consensusDataField: BlockField[CDT] = consensusModule.genesisData
     override val uniqueId: BlockId = Array.fill(BlockIdLength)(0: Byte)
 

@@ -89,7 +89,7 @@ class HistorySynchronizer(application: Application) extends ViewSynchronizer wit
       val localScore = history.score()
       if (networkScore > localScore) {
         log.info(s"networkScore=$networkScore > localScore=$localScore")
-        val lastIds = history.lastBlocks(100).map(_.uniqueId)
+        val lastIds = history.lastBlockIds(100)
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
         gotoGettingExtension(networkScore, witnesses)

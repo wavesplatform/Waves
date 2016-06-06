@@ -1,6 +1,5 @@
 {
   "p2p": {
-    "fuzzingDelay": 1000,
     "nodeName": "Node2",
     "localOnly": true,
     "bindAddress": "127.0.0.2",
@@ -23,6 +22,7 @@
   ],
   "maxRollback": 100,
   "offlineGeneration": false,
+  "history": "blocktree",
   "perma": {
     "treeDir": "/tmp/scorex/data2/tree/",
     "authDataStorage": "authDataStorage2.mapDB"
