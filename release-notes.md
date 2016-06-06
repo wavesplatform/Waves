@@ -4,8 +4,9 @@
 * Make hash functions configurable via application.conf
 * One more byte added to address to identify the network
 * Rpc address become configurable via settings.json 
-* Check, that transactions included in block are not too old added
-
+* Max difference between transaction and block timestamps added 
+* NXT consensus algorithm fixes
+* api_key protection for wallet/seed and addresses/seed API methods added 
 
 **1.2.7**
 ---------
