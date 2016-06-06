@@ -60,8 +60,8 @@ trait Settings extends ScorexLogging {
 
   lazy val knownPeers = Try {
     (p2pSettings \ "knownPeers").as[List[String]].map { addr =>
-      val addrParts = addr.split(":")
-      val port = if (addrParts.size == 2) addrParts(1).toInt else DefaultPort
+      val addrParts = addr.split(":").map(_.trim)
+      val port = if (addrParts.length == 2) addrParts(1).toInt else DefaultPort
       new InetSocketAddress(addrParts(0), port)
     }
   }.getOrElse(Seq[InetSocketAddress]())
