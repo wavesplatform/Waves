@@ -32,3 +32,10 @@ assemblyJarName in assembly := "waves.jar"
 test in assembly := {}
 
 mainClass in assembly := Some("scorex.waves.Application")
+
+assemblyMergeStrategy in assembly := {
+  case "application.conf" => MergeStrategy.concat
+  case x =>
+    val oldStrategy = (assemblyMergeStrategy in assembly).value
+    oldStrategy(x)
+}
