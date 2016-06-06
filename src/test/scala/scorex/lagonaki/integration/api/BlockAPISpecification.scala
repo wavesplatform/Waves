@@ -81,7 +81,7 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
   }
 
   def checkBlock(response: JsValue): Unit = {
-    (response \ "version").as[Int] shouldBe 1
+    (response \ "version").asOpt[Int].isDefined shouldBe true
     (response \ "timestamp").as[Long] should be >= 0L
     (response \ "reference").asOpt[String].isDefined shouldBe true
     (response \ "transactions" \\ "fee").toList.size should be >= 0
