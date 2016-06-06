@@ -174,7 +174,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
 
   override def isValid(block: Block): Boolean = {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-    lazy val txsAreNew = block.transactions.forall(tx => (lastBlockTs - tx.timestamp).seconds <= MaxTxAndBlockDiff)
+    lazy val txsAreNew = block.transactions.forall(tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff)
     lazy val blockIsValid = blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
     txsAreNew && blockIsValid
   }
