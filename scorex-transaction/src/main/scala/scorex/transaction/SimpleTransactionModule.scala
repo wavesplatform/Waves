@@ -126,8 +126,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
 
     val txs = utxStorage.all()
     val notTooOld = txs.filter { tx =>
-      if ((lastBlockTs - tx.timestamp).seconds > MaxTimeForUnconfirmed) utxStorage.remove(tx)
-      (lastBlockTs - tx.timestamp).seconds <= MaxTimeForUnconfirmed
+      if ((lastBlockTs - tx.timestamp).millis > MaxTimeForUnconfirmed) utxStorage.remove(tx)
+      (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
     }
 
     notTooOld.diff(blockStorage.state.validate(txs)).foreach(tx => utxStorage.remove(tx))
