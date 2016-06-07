@@ -1,5 +1,7 @@
 
-! Please, put your own walletSeed into waves-testnet.json. It must be random Base58 string.
+**Please, put your own walletSeed into waves-testnet.json. It must be random Base58 string.**
+
+**A part of HTTP API must be closed by apiKeyHash in config. Use /util/hash/secure http api to get hash for your api key.**
 
 
 # You need to install Java SDK

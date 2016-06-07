@@ -1,9 +1,13 @@
 # Waves
 
+**Please, put your own walletSeed into waves-testnet.json. It must be random Base58 string.**
+
+**A part of HTTP API must be closed by apiKeyHash in config. Use /util/hash/secure http api to get hash for your api key.**
+
 
 **[How to use Testnet](https://github.com/wavesplatform/Waves/blob/master/Testnet.md)**
 
-This is one Testnet Waves implementation with Nxt consensus on top of Scorex framework.
+This is one Testnet Waves implementation on top of Scorex framework.
 There might be several development forks at once.
 
 # Installation
