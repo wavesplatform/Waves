@@ -4,6 +4,7 @@
 * Upgrade to Scorex 1.2.8
 * New Address format
 * New hash chain for Address - Blake2b256, Keccak32
+* New Testnet Genesis
 
 **0.1.3**
 
