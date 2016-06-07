@@ -1,5 +1,6 @@
 **0.2.0**
 
+* Incompatible with 0.1.3
 * Upgrade to Scorex 1.2.8
 * New Address format
 * New hash chain for Address - Blake2b256, Keccak32

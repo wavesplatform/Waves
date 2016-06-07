@@ -20,5 +20,6 @@
   "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
-  "offlineGeneration": false
+  "offlineGeneration": false,
+  "apiKeyHash":"ProSPQQWGS3CAbD5DBoFP2tghc7UMUXpH5p1QmjcpEf"
 }
