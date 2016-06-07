@@ -81,21 +81,21 @@ stated now: **One size doesn't fit all.**. I saw many trends in data storage and
  tool to work with. When we are talking about such a specific data storage as blockchain some questions 
  should be answered in prior. Here is example list: 
     
-    * How many participants will be in a network? Are they equal? Are all of them are allowed 
-     to change a global state(so to generate blocks)? 
+* How many participants will be in a network? Are they equal? Are all of them are allowed 
+  to change a global state(so to generate blocks)? 
     
-    * What load is planned? E.g. how many transactions per hour or day.                  
+* What load is planned? E.g. how many transactions per hour or day.                  
     
-    * Data model for global state(ledger) should be considered. Please note blockchain 
-    is replicated data structure, and there is no known work on how to shard it yet.
+* Data model for global state(ledger) should be considered. Please note blockchain 
+  is replicated data structure, and there is no known work on how to shard it yet.
     
-    * Could be state designed in a way to allow some form of pruning? 
+* Could be state designed in a way to allow some form of pruning? 
     
-    * Transaction model should be considered. How many bytes an average transaction is about? 
+* Transaction model should be considered. How many bytes an average transaction is about? 
     
-    * What are security requirements regarding consensus? What could be tolerated?
+* What are security requirements regarding consensus? What could be tolerated?
      
-    * What are privacy requirements? Should be all the data is visible for all? 
+* What are privacy requirements? Should be all the data is visible for all? 
     
         
 Conclusion
