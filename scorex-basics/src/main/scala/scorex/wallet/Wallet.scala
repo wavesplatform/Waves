@@ -83,7 +83,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
     } else false
 
     if (created) {
-      log.info("Added account #" + (nonce + 2))
+      log.info("Added account #" + privateKeyAccounts().size)
       Some(account)
     } else None
   }
@@ -119,7 +119,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
   def nonce(): Int = Option(noncePersistence.get(NonceFieldName)).getOrElse(0)
 
   def getAndIncrementNonce(): Int = synchronized {
-    noncePersistence.put(NonceFieldName, nonce() + 1) - 1
+    noncePersistence.put(NonceFieldName, nonce() + 1)
   }
 
 }
