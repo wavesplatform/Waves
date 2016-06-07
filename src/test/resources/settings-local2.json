@@ -22,7 +22,6 @@
   ],
   "maxRollback": 100,
   "offlineGeneration": false,
-  "history": "blocktree",
   "perma": {
     "treeDir": "/tmp/scorex/data2/tree/",
     "authDataStorage": "authDataStorage2.mapDB"

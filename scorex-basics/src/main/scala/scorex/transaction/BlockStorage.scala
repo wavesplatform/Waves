@@ -23,6 +23,7 @@ trait BlockStorage extends ScorexLogging {
 
   //Append block to current state
   def appendBlock(block: Block): Try[Unit] = synchronized {
+    //TODO Rollback state for blocktree
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
         state.processBlock(b) match {
