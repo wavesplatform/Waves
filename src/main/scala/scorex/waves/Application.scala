@@ -19,17 +19,16 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
 import scala.util.Random
 
-class Application(val settingsFilename: String) extends scorex.app.Application {
-
+class Application(val settingsFilename: String) extends {
   override val applicationName = "waves"
-
   private val appConf = ConfigFactory.load().getConfig("app")
-
-  override lazy val appVersion = {
+  override val appVersion = {
     val raw = appConf.getString("version")
     val parts = raw.split("\\.")
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
   }
+
+} with scorex.app.Application {
 
   override implicit lazy val settings = new WavesSettings(settingsFilename)
 
