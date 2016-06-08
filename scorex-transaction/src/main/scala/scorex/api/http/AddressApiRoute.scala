@@ -25,7 +25,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
 
   override lazy val route =
     pathPrefix("addresses") {
-      validate ~ seed ~ confirmationBalance ~ balance ~ generatingBalance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+      validate ~ seed ~ confirmationBalance ~ balance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq
     } ~ root ~ create
 
@@ -117,27 +117,6 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   def verifyText: Route = {
     path("verifyText" / Segment) { case address =>
       verifyPath(address, decode = false)
-    }
-  }
-
-
-  @Path("/generatingbalance/{address}")
-  @ApiOperation(value = "Generating balance", notes = "Account's generating balance(the same as balance atm)", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
-  ))
-  def generatingBalance: Route = {
-    path("generatingbalance" / Segment) { case address =>
-      getJsonRoute {
-        if (!Account.isValidAddress(address)) {
-          InvalidAddress.json
-        } else {
-          Json.obj(
-            "address" -> address,
-            "balance" -> application.consensusModule.generatingBalance(address)
-          )
-        }
-      }
     }
   }
 

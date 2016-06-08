@@ -3,7 +3,7 @@ package scorex.consensus.qora
 import com.google.common.primitives.{Bytes, Longs}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockField}
-import scorex.consensus.{ConsensusModule, LagonakiConsensusModule}
+import scorex.consensus.{OneGeneratorConsensusModule, ConsensusModule, PoSConsensusModule}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction._
@@ -15,11 +15,12 @@ import scala.concurrent.duration._
 import scala.util.Try
 
 
-class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusBlockData] {
+class QoraLikeConsensusModule extends PoSConsensusModule[QoraLikeConsensusBlockData] with OneGeneratorConsensusModule {
 
   import QoraLikeConsensusModule._
 
   val GeneratingBalanceLength = 8
+  override val generatingBalanceDepth: Int = GeneratingBalanceDepth
 
   private val ReTarget = 10
   private val MinBalance = 1L
@@ -190,8 +191,6 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     case b: QoraLikeConsensusBlockData => b
     case m => throw new AssertionError(s"Only QoraLikeConsensusBlockData is available, $m given")
   }
-
-  override def generatingBalanceDepth: Int = GeneratingBalanceDepth
 
 }
 

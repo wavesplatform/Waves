@@ -36,17 +36,5 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
     Future.sequence(accounts.map(acc => generateNextBlock(acc))).map(_.flatten)
   }
 
-  def generatingBalance[TransactionalBlockData](address: String)
-                           (implicit transactionModule: TransactionModule[TransactionalBlockData]): Long = {
-    transactionModule.blockStorage.state.asInstanceOf[BalanceSheet]
-      .balanceWithConfirmations(address, generatingBalanceDepth)
-  }
-
-  def generatingBalance[TransactionalBlockData](account: Account)
-                           (implicit transactionModule: TransactionModule[TransactionalBlockData]): Long =
-    generatingBalance(account.address)
-
-  def generatingBalanceDepth: Int
-
   def consensusBlockData(block: Block): ConsensusBlockData
 }
