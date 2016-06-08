@@ -42,7 +42,7 @@ with TransactionTestingCommons {
   }
 
   test("generate 10 blocks and synchronize") {
-    val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(app.blockStorage.state.generationBalance(_)).sum
+    val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map( acc => app.consensusModule.generatingBalance(acc.address)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
     genValidTransaction()
 

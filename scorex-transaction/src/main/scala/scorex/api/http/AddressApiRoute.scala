@@ -21,6 +21,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
 
   private val wallet = application.wallet
   private val state = application.blockStorage.state
+  private implicit val transactionModule = application.transactionModule
 
   override lazy val route =
     pathPrefix("addresses") {
@@ -133,7 +134,7 @@ case class AddressApiRoute(override val application: Application)(implicit val c
         } else {
           Json.obj(
             "address" -> address,
-            "balance" -> state.generationBalance(address)
+            "balance" -> application.consensusModule.generatingBalance(address)
           )
         }
       }

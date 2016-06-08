@@ -55,7 +55,7 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
       s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
 
     //check hit < target
-    calcHit(prevBlockData, generator) < calcTarget(prev, blockTime, effectiveBalance(generator))
+    calcHit(prevBlockData, generator) < calcTarget(prev, blockTime, generatingBalance(generator))
   }.recoverWith { case t =>
     log.error("Error while checking a block", t)
     Failure(t)
@@ -71,7 +71,7 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
     val lastBlockTime = lastBlock.timestampField.value
 
     val currentTime = NTP.correctedTime()
-    val effBalance = effectiveBalance(account)
+    val effBalance = generatingBalance(account)
 
     val h = calcHit(lastBlockKernelData, account)
     val t = calcTarget(lastBlock, currentTime, effBalance)
@@ -105,9 +105,7 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
     } else Future(None)
   }
 
-  protected def effectiveBalance[TT](account: Account)(implicit transactionModule: TransactionModule[TT]) =
-    transactionModule.blockStorage.state.asInstanceOf[BalanceSheet]
-      .balanceWithConfirmations(account.address, EffectiveBalanceDepth)
+  override def generatingBalanceDepth = EffectiveBalanceDepth
 
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =
     hash(lastBlockData.generationSignature ++ generator.publicKey)
@@ -188,6 +186,6 @@ object NxtLikeConsensusModule {
   val BaseTargetLength = 8
   val GeneratorSignatureLength = 32
 
-  val EffectiveBalanceDepth: Int = 1440
+  val EffectiveBalanceDepth: Int = 50
   val AvgBlockTimeDepth: Int = 3
 }

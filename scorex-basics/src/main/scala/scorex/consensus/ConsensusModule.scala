@@ -2,7 +2,7 @@ package scorex.consensus
 
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockProcessingModule}
-import scorex.transaction.TransactionModule
+import scorex.transaction.{BalanceSheet, TransactionModule}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -35,6 +35,18 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
                            (implicit transactionModule: TransactionModule[TransactionalBlockData]): Future[Seq[Block]] = {
     Future.sequence(accounts.map(acc => generateNextBlock(acc))).map(_.flatten)
   }
+
+  def generatingBalance[TransactionalBlockData](address: String)
+                           (implicit transactionModule: TransactionModule[TransactionalBlockData]): Long = {
+    transactionModule.blockStorage.state.asInstanceOf[BalanceSheet]
+      .balanceWithConfirmations(address, generatingBalanceDepth)
+  }
+
+  def generatingBalance[TransactionalBlockData](account: Account)
+                           (implicit transactionModule: TransactionModule[TransactionalBlockData]): Long =
+    generatingBalance(account.address)
+
+  def generatingBalanceDepth: Int
 
   def consensusBlockData(block: Block): ConsensusBlockData
 }
