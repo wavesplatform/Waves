@@ -1,6 +1,8 @@
 **0.2.0-RC4**
 
 * Fixed issue with incorrect Handshake
+* Balance with confirmations is the minimum balance
+* /waves/external-payment returns error if account balance invalid
 
 **0.2.0-RC3**
 
