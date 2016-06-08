@@ -10,7 +10,7 @@ import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.LagonakiTransaction.TransactionType
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 case class PaymentTransaction(sender: PublicKeyAccount,
                               override val recipient: Account,
@@ -91,7 +91,16 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
     PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
   }
 
-  def parseBytes(data: Array[Byte]): Try[PaymentTransaction] = Try {
+  def parseBytes(data: Array[Byte]): Try[PaymentTransaction] = {
+    data.head match {
+      case transactionType: Byte if transactionType == TransactionType.PaymentTransaction.id =>
+        parseTail(data.tail)
+      case transactionType =>
+        Failure(new Exception(s"Incorrect transaction type '$transactionType' in PaymentTransaction data"))
+    }
+  }
+
+  def parseTail(data: Array[Byte]): Try[PaymentTransaction] = Try {
     require(data.length >= BaseLength, "Data does not match base length")
 
     var position = 0
