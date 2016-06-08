@@ -1,14 +1,13 @@
 package scorex.waves
 
 import akka.actor.Props
-import akka.http.scaladsl.Http
 import com.typesafe.config.ConfigFactory
 import scorex.account.Account
 import scorex.api.http._
 import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.network.{PeerSynchronizer, TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
+import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.transaction.{BalanceSheet, GenesisTransaction, SimpleTransactionModule, Transaction}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, ScorexApiRoute, WavesApiRoute}
@@ -19,17 +18,16 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
 import scala.util.Random
 
-class Application(val settingsFilename: String) extends scorex.app.Application {
-
+class Application(val settingsFilename: String) extends {
   override val applicationName = "waves"
-
   private val appConf = ConfigFactory.load().getConfig("app")
-
-  override lazy val appVersion = {
+  override val appVersion = {
     val raw = appConf.getString("version")
     val parts = raw.split("\\.")
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
   }
+
+} with scorex.app.Application {
 
   override implicit lazy val settings = new WavesSettings(settingsFilename)
 
