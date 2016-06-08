@@ -12,6 +12,7 @@ import scorex.transaction.{BlockChain, TransactionModule}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
+import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -26,6 +27,9 @@ class StoredBlockchain(db: MVStore)
     val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks")
     val signatures: MVMap[Int, BlockId] = database.openMap("signatures")
     val signaturesReverse: MVMap[BlockId, Int] = database.openMap("signaturesReverse")
+    private val BlocksCacheSizeLimit: Int = 1000
+    private var blocksCacheSize: Int = 0
+    private val blocksCache: TrieMap[Int, Option[Block]] = TrieMap.empty
 
     //TOOD remove when no blockchains without signaturesReverse remains
     if (signaturesReverse.size() != signatures.size()) {
@@ -46,10 +50,19 @@ class StoredBlockchain(db: MVStore)
       signaturesReverse.put(block.uniqueId, height)
     }
 
-    def readBlock(height: Int): Option[Block] =
-      Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).toOption)
+    def readBlock(height: Int): Option[Block] = {
+      if(blocksCacheSize > BlocksCacheSizeLimit) {
+        blocksCacheSize = 0
+        blocksCache.clear()
+      } else {
+        blocksCacheSize = blocksCacheSize + 1
+      }
+      blocksCache.getOrElseUpdate(height,
+        Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).toOption))
+    }
 
     def deleteBlock(height: Int): Unit = {
+      blocksCache.remove(height)
       blocks.remove(height)
       val vOpt = Option(signatures.remove(height))
       vOpt.map(v => signaturesReverse.remove(v))
