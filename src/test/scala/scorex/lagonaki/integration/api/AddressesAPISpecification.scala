@@ -74,12 +74,6 @@ class AddressesAPISpecification extends FunSuite with Matchers {
     (response \ "balance").as[Long] should be >= 0L
   }
 
-  test("/addresses/generatingbalance/{address} API route") {
-    val response = GET.request(s"/addresses/generatingbalance/$address")
-    (response \ "address").as[String] shouldBe address
-    (response \ "balance").as[Long] should be >= 0L
-  }
-
   test("DELETE /addresses/{address} API route") {
     val address = accounts.last.address
     DELETE.incorrectApiKeyTest(s"/addresses/$address")

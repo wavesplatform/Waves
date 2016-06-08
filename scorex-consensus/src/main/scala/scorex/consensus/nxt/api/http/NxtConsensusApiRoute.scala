@@ -6,7 +6,8 @@ import akka.actor.ActorRefFactory
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.api.http.{ApiRoute, CommonApiFunctions}
+import scorex.account.Account
+import scorex.api.http.{InvalidAddress, ApiRoute, CommonApiFunctions}
 import scorex.app.Application
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.crypto.encode.Base58
@@ -22,8 +23,28 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
 
   override val route: Route =
     pathPrefix("consensus") {
-      algo ~ basetarget ~ baseTargetId ~ generationSignature ~ generationSignatureId
+      algo ~ basetarget ~ baseTargetId ~ generationSignature ~ generationSignatureId ~ generatingBalance
     }
+
+  @Path("/generatingbalance/{address}")
+  @ApiOperation(value = "Generating balance", notes = "Account's generating balance(the same as balance atm)", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
+  ))
+  def generatingBalance: Route = {
+    path("generatingbalance" / Segment) { case address =>
+      getJsonRoute {
+        if (!Account.isValidAddress(address)) {
+          InvalidAddress.json
+        } else {
+          Json.obj(
+            "address" -> address,
+            "balance" -> consensusModule.generatingBalance(address)(application.transactionModule)
+          )
+        }
+      }
+    }
+  }
 
   @Path("/generationsignature/{blockId}")
   @ApiOperation(value = "Generation signature", notes = "Generation signature of a block with specified id", httpMethod = "GET")
