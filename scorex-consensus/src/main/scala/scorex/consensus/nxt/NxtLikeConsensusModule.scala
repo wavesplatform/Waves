@@ -3,7 +3,7 @@ package scorex.consensus.nxt
 import com.google.common.primitives.Longs
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
-import scorex.consensus.{ConsensusModule, LagonakiConsensusModule}
+import scorex.consensus.{OneGeneratorConsensusModule, ConsensusModule, PoSConsensusModule}
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
@@ -14,8 +14,8 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
 
-class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
-  extends LagonakiConsensusModule[NxtLikeConsensusBlockData] with ScorexLogging {
+class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
+with OneGeneratorConsensusModule with ScorexLogging {
 
   import NxtLikeConsensusModule._
 
@@ -26,8 +26,10 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
   val MinBlocktimeLimit = normalize(53)
   val MaxBlocktimeLimit = normalize(67)
   val BaseTargetGamma = normalize(64)
+  override val generatingBalanceDepth = EffectiveBalanceDepth
 
   private def avgDelayInSeconds: Long = AvgDelay.toSeconds
+
   private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
   override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
@@ -55,7 +57,7 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
       s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
 
     //check hit < target
-    calcHit(prevBlockData, generator) < calcTarget(prev, blockTime, effectiveBalance(generator))
+    calcHit(prevBlockData, generator) < calcTarget(prev, blockTime, generatingBalance(generator))
   }.recoverWith { case t =>
     log.error("Error while checking a block", t)
     Failure(t)
@@ -71,7 +73,7 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
     val lastBlockTime = lastBlock.timestampField.value
 
     val currentTime = NTP.correctedTime()
-    val effBalance = effectiveBalance(account)
+    val effBalance = generatingBalance(account)
 
     val h = calcHit(lastBlockKernelData, account)
     val t = calcTarget(lastBlock, currentTime, effBalance)
@@ -105,10 +107,6 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
     } else Future(None)
   }
 
-  protected def effectiveBalance[TT](account: Account)(implicit transactionModule: TransactionModule[TT]) =
-    transactionModule.blockStorage.state.asInstanceOf[BalanceSheet]
-      .balanceWithConfirmations(account.address, EffectiveBalanceDepth)
-
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =
     hash(lastBlockData.generationSignature ++ generator.publicKey)
 
@@ -116,8 +114,8 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
     BigInt(1, calcGeneratorSignature(lastBlockData, generator).take(8).reverse)
 
   /**
-    * BaseTarget calculation algorithm fixing the blocktimes.
-    */
+   * BaseTarget calculation algorithm fixing the blocktimes.
+   */
   private def calcBaseTarget[TT](prevBlock: Block, timestamp: Long)
                                 (implicit transactionModule: TransactionModule[TT]): Long = {
     val history = transactionModule.blockStorage.history
@@ -125,7 +123,7 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
     val prevBaseTarget = consensusBlockData(prevBlock).baseTarget
     if (height % 2 == 0) {
       val blocktimeAverage = history.parent(prevBlock, AvgBlockTimeDepth - 1)
-        .map( b => (timestamp - b.timestampField.value) / AvgBlockTimeDepth)
+        .map(b => (timestamp - b.timestampField.value) / AvgBlockTimeDepth)
         .getOrElse(timestamp - prevBlock.timestampField.value) / 1000
 
       val baseTarget = (if (blocktimeAverage > avgDelayInSeconds) {
@@ -141,8 +139,8 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
   }
 
   protected def calcTarget(prevBlock: Block,
-                         timestamp: Long,
-                         effBalance: Long)(implicit transactionModule: TransactionModule[_]): BigInt = {
+                           timestamp: Long,
+                           effBalance: Long)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val prevBlockData = consensusBlockData(prevBlock)
     val prevBlockTimestamp = prevBlock.timestampField.value
 
@@ -188,6 +186,6 @@ object NxtLikeConsensusModule {
   val BaseTargetLength = 8
   val GeneratorSignatureLength = 32
 
-  val EffectiveBalanceDepth: Int = 1440
+  val EffectiveBalanceDepth: Int = 50
   val AvgBlockTimeDepth: Int = 3
 }

@@ -3,7 +3,7 @@ package scorex.consensus.qora
 import com.google.common.primitives.{Bytes, Longs}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockField}
-import scorex.consensus.{ConsensusModule, LagonakiConsensusModule}
+import scorex.consensus.{OneGeneratorConsensusModule, ConsensusModule, PoSConsensusModule}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction._
@@ -15,11 +15,12 @@ import scala.concurrent.duration._
 import scala.util.Try
 
 
-class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusBlockData] {
+class QoraLikeConsensusModule extends PoSConsensusModule[QoraLikeConsensusBlockData] with OneGeneratorConsensusModule {
 
-  import QoraLikeConsensusModule.GeneratorSignatureLength
+  import QoraLikeConsensusModule._
 
   val GeneratingBalanceLength = 8
+  override val generatingBalanceDepth: Int = GeneratingBalanceDepth
 
   private val ReTarget = 10
   private val MinBalance = 1L
@@ -65,7 +66,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
   def getNextBlockGeneratingBalance(block: Block, history: History): Long = {
     if (history.heightOf(block).get % ReTarget == 0) {
       //GET FIRST BLOCK OF TARGET
-      val firstBlock = (1 to ReTarget - 1).foldLeft(block) { case (bl, _) =>
+      val firstBlock = (1 until ReTarget).foldLeft(block) { case (bl, _) =>
         history.parent(bl).get
       }
 
@@ -99,8 +100,8 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     val state = transactionModule.blockStorage.state
 
     require(state.isInstanceOf[State with BalanceSheet])
-    val generationBalance = state.asInstanceOf[State with BalanceSheet].generationBalance(account)
-    require(generationBalance > 0, "Zero generating balance in generateNextBlock")
+    val genBalance = generatingBalance(account)
+    require(genBalance > 0, "Zero generating balance in generateNextBlock")
     require(history.isInstanceOf[BlockChain])
 
     val lastBlock = history.lastBlock
@@ -113,7 +114,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
     val targetBytes = Array.fill(32)(Byte.MaxValue)
     val baseTarget = getBaseTarget(getNextBlockGeneratingBalance(lastBlock, history))
     //MULTIPLY TARGET BY USER BALANCE
-    val target = BigInt(1, targetBytes) / baseTarget * BigInt(generationBalance)
+    val target = BigInt(1, targetBytes) / baseTarget * BigInt(genBalance)
 
     //CALCULATE GUESSES
     val guesses = hashValue / target + 1
@@ -160,7 +161,7 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
       val targetBytes = Array.fill(32)(Byte.MaxValue)
       val baseTarget: BigInt = getBaseTarget(data.generatingBalance)
       val gen = block.signerDataField.value.generator.address
-      val genBalance = BigInt(state.asInstanceOf[BalanceSheet].generationBalance(gen))
+      val genBalance = BigInt(generatingBalance(gen))
       val target0 = BigInt(1, targetBytes) / baseTarget * genBalance
 
       //target bounds
@@ -195,4 +196,5 @@ class QoraLikeConsensusModule extends LagonakiConsensusModule[QoraLikeConsensusB
 
 object QoraLikeConsensusModule {
   val GeneratorSignatureLength = 64
+  val GeneratingBalanceDepth = 50
 }

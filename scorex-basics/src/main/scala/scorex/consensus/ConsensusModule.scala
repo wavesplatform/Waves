@@ -2,7 +2,7 @@ package scorex.consensus
 
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockProcessingModule}
-import scorex.transaction.TransactionModule
+import scorex.transaction.{BalanceSheet, TransactionModule}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

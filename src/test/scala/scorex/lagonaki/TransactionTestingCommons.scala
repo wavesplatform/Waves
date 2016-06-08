@@ -2,7 +2,7 @@ package scorex.lagonaki
 
 import scorex.block.Block
 import scorex.lagonaki.TestingCommons._
-import scorex.transaction.{History, BalanceSheet, GenesisTransaction, Transaction}
+import scorex.transaction.{History, GenesisTransaction, Transaction}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -17,9 +17,9 @@ trait TransactionTestingCommons extends TestingCommons {
     wallet.generateNewAccounts(3)
   }
   val accounts = wallet.privateKeyAccounts()
-    .filter(a => transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(a) > 0)
+    .filter(a => consensusModule.generatingBalance(a) > 0)
 
-  val ab = accounts.map(a => transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(a)).sum
+  val ab = accounts.map(consensusModule.generatingBalance(_)).sum
   require(ab > 2)
 
   def genValidBlock(): Block = {
@@ -38,7 +38,7 @@ trait TransactionTestingCommons extends TestingCommons {
 
   def genValidTransaction(randomAmnt: Boolean = true): Transaction = {
     val senderAcc = accounts(Random.nextInt(accounts.size))
-    val senderBalance = transactionModule.blockStorage.state.asInstanceOf[BalanceSheet].generationBalance(senderAcc)
+    val senderBalance = consensusModule.generatingBalance(senderAcc)
     val fee = Random.nextInt(5).toLong + 1
     if (senderBalance <= fee) {
       genValidTransaction(randomAmnt)
