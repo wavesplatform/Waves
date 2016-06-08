@@ -55,7 +55,7 @@ class StoredBlockchain(db: MVStore)
       vOpt.map(v => signaturesReverse.remove(v))
     }
 
-    def contains(id: BlockId): Boolean = signatures.exists(_._2.sameElements(id))
+    def contains(id: BlockId): Boolean = Option(signaturesReverse.get(id)).isDefined
 
     def height(): Int = signatures.size()
 
