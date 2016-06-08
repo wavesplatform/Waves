@@ -92,10 +92,10 @@ object LagonakiTransaction extends Deser[LagonakiTransaction] {
   def parseBytes(data: Array[Byte]): Try[LagonakiTransaction] =
     data.head match {
       case txType: Byte if txType == TransactionType.GenesisTransaction.id =>
-        GenesisTransaction.parseBytes(data.tail)
+        GenesisTransaction.parseTail(data.tail)
 
       case txType: Byte if txType == TransactionType.PaymentTransaction.id =>
-        PaymentTransaction.parseBytes(data.tail)
+        PaymentTransaction.parseTail(data.tail)
 
       case txType => Failure(new Exception(s"Invalid transaction type: $txType"))
     }
