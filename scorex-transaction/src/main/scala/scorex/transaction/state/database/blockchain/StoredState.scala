@@ -119,12 +119,12 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     case Some(h) if h > 0 =>
       val requiredHeight = atHeight.getOrElse(stateHeight)
       require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
-      def loop(hh: Int): Long = {
+      def loop(hh: Int, min: Long = Long.MaxValue): Long = {
         val row = accountChanges(address).get(hh)
         require(Option(row).isDefined, s"accountChanges($address).get($hh) is null.  lastStates.get(address)=$h")
-        if (row.lastRowHeight < requiredHeight) row.state.balance
+        if (hh <= requiredHeight) Math.min(row.state.balance, min)
         else if (row.lastRowHeight == 0) 0L
-        else loop(row.lastRowHeight)
+        else loop(row.lastRowHeight, Math.min(row.state.balance, min))
       }
       loop(h)
     case _ => 0L

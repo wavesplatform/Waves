@@ -1,16 +1,18 @@
 package scorex.lagonaki.integration
 
 import org.scalatest._
-import scorex.account.Account
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount, Account}
+import scorex.lagonaki.mocks.BlockMock
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.{BalanceSheet, FeesStateChange}
 import scorex.utils.ScorexLogging
+import scorex.utils._
 
 import scala.util.Random
 
 class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
-  with TransactionTestingCommons with PrivateMethodTester with OptionValues {
+with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   import TestingCommons._
 
@@ -20,6 +22,43 @@ class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfte
   val history = app.transactionModule.blockStorage.history
   val acc = accounts.head
   val recepient = accounts.last
+
+  test("balance confirmations") {
+    val rec = new PrivateKeyAccount(randomBytes())
+    val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc.address)
+    state.balance(rec.address) shouldBe 0L
+    senderBalance should be > 100L
+
+    val txs = Seq(transactionModule.createPayment(acc, rec, 5, 1))
+    val block = new BlockMock(txs)
+    state.processBlock(block)
+    state.balance(rec.address) shouldBe 5L
+    state.balanceWithConfirmations(rec.address, 1) shouldBe 0L
+
+    state.processBlock(new BlockMock(Seq()))
+    state.balance(rec.address) shouldBe 5L
+    state.balanceWithConfirmations(rec.address, 1) shouldBe 5L
+    state.balanceWithConfirmations(rec.address, 2) shouldBe 0L
+
+    val spendingBlock = new BlockMock(Seq(transactionModule.createPayment(rec, acc, 2, 1)))
+    state.processBlock(spendingBlock)
+    state.balance(rec.address) shouldBe 2L
+    state.balanceWithConfirmations(rec.address, 1) shouldBe 2L
+
+    state.processBlock(new BlockMock(Seq(transactionModule.createPayment(acc, rec, 5, 1))))
+    state.balance(rec.address) shouldBe 7L
+    state.balanceWithConfirmations(rec.address, 3) shouldBe 2L
+
+
+    state.processBlock(new BlockMock(Seq(transactionModule.createPayment(acc, rec, 5, 1))))
+    state.balance(rec.address) shouldBe 12L
+    state.balanceWithConfirmations(rec.address, 1) shouldBe 7L
+    state.balanceWithConfirmations(rec.address, 2) shouldBe 2L
+    state.balanceWithConfirmations(rec.address, 4) shouldBe 2L
+    state.balanceWithConfirmations(rec.address, 5) shouldBe 0L
+
+
+  }
 
   test("private methods") {
     val testAdd = "aPFwzRp5TXCzi6DSuHmpmbQunopXRuxLk"
@@ -34,6 +73,7 @@ class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfte
   }
 
 
+  /*
   test("validate single transaction") {
     val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc.address)
     senderBalance should be > 0L
@@ -50,7 +90,7 @@ class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfte
     doubleSpending.foreach(t => state.isValid(t) shouldBe true)
     state.isValid(doubleSpending) shouldBe false
     state.validate(doubleSpending).size shouldBe 1
-  }
+  }*/
 
   test("validate plenty of transactions") {
     val trans = (1 to transactionModule.utxStorage.SizeLimit).map { i =>
