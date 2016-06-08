@@ -5,6 +5,7 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
+import scorex.crypto.encode.Base58
 import scorex.transaction.BlockStorage._
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.{BlockChain, TransactionModule}
@@ -24,6 +25,15 @@ class StoredBlockchain(db: MVStore)
   case class BlockchainPersistence(database: MVStore) {
     val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks")
     val signatures: MVMap[Int, BlockId] = database.openMap("signatures")
+    val signaturesReverse: MVMap[BlockId, Int] = database.openMap("signaturesReverse")
+
+    //TOOD remove when no blockchains without signaturesReverse remains
+    if (signaturesReverse.size() != signatures.size()) {
+      signaturesReverse.clear()
+      signatures.keySet().foreach(k => signaturesReverse.put(signatures.get(k), k))
+      database.commit()
+    }
+
     val scoreMap: MVMap[Int, BigInt] = database.openMap("score")
 
     //if there are some uncommited changes from last run, discard'em
@@ -33,6 +43,7 @@ class StoredBlockchain(db: MVStore)
       blocks.put(height, block.bytes)
       scoreMap.put(height, score() + block.consensusModule.blockScore(block)(block.transactionModule))
       signatures.put(height, block.uniqueId)
+      signaturesReverse.put(block.uniqueId, height)
     }
 
     def readBlock(height: Int): Option[Block] =
@@ -40,14 +51,15 @@ class StoredBlockchain(db: MVStore)
 
     def deleteBlock(height: Int): Unit = {
       blocks.remove(height)
-      signatures.remove(height)
+      val vOpt = Option(signatures.remove(height))
+      vOpt.map(v => signaturesReverse.remove(v))
     }
 
     def contains(id: BlockId): Boolean = signatures.exists(_._2.sameElements(id))
 
     def height(): Int = signatures.size()
 
-    def heightOf(id: BlockId): Option[Int] = signatures.find(_._2.sameElements(id)).map(_._1)
+    def heightOf(id: BlockId): Option[Int] = Option(signaturesReverse.get(id))
 
     def score(): BlockchainScore = if (height() > 0) scoreMap.get(height()) else 0
 

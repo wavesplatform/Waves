@@ -140,7 +140,7 @@ class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds)
     }
   }
 
-  private def calcTarget(prevBlock: Block,
+  protected def calcTarget(prevBlock: Block,
                          timestamp: Long,
                          effBalance: Long)(implicit transactionModule: TransactionModule[_]): BigInt = {
     val prevBlockData = consensusBlockData(prevBlock)
