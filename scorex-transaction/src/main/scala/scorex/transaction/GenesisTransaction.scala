@@ -1,7 +1,5 @@
 package scorex.transaction
 
-import java.math.BigInteger
-
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Account
@@ -10,7 +8,7 @@ import scorex.crypto.hash.FastCryptographicHash._
 import scorex.serialization.Deser
 import scorex.transaction.LagonakiTransaction.TransactionType
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 
 case class GenesisTransaction(override val recipient: Account,
@@ -87,7 +85,16 @@ object GenesisTransaction extends Deser[GenesisTransaction] {
     Bytes.concat(h, h)
   }
 
-  def parseBytes(data: Array[Byte]): Try[GenesisTransaction] = Try {
+  def parseBytes(data: Array[Byte]): Try[GenesisTransaction] = {
+    data.head match {
+      case transactionType: Byte if transactionType == TransactionType.GenesisTransaction.id =>
+        parseTail(data.tail)
+      case transactionType =>
+        Failure(new Exception(s"Incorrect transaction type '$transactionType' in GenesisTransaction data"))
+    }
+  }
+
+  def parseTail(data: Array[Byte]): Try[GenesisTransaction] = Try {
     require(data.length >= BASE_LENGTH, "Data does not match base length")
 
     var position = 0

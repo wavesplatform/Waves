@@ -72,7 +72,7 @@ with Matchers {
       val sender = new PrivateKeyAccount(senderSeed)
       val recipient = new PrivateKeyAccount(recipientSeed)
       val tx = PaymentTransaction(sender, recipient, amount, fee, time)
-      val txAfter = LagonakiTransaction.parseBytes(tx.bytes).get
+      val txAfter = PaymentTransaction.parseBytes(tx.bytes).get
 
       txAfter.getClass.shouldBe(tx.getClass)
 
@@ -84,6 +84,32 @@ with Matchers {
       tx.amount shouldEqual txAfter.amount
       tx.fee shouldEqual txAfter.fee
       txAfter.signatureValid shouldEqual true
+    }
+  }
+
+  property("PaymentTransaction should deserialize to LagonakiTransaction") {
+    forAll {
+      (senderSeed: Array[Byte],
+       recipientSeed: Array[Byte],
+       time: Long,
+       amount: Long,
+       fee: Long) =>
+
+        val sender = new PrivateKeyAccount(senderSeed)
+        val recipient = new PrivateKeyAccount(recipientSeed)
+        val tx = PaymentTransaction(sender, recipient, amount, fee, time)
+        val txAfter = LagonakiTransaction.parseBytes(tx.bytes).get
+
+        txAfter.getClass.shouldBe(tx.getClass)
+
+        tx.dataLength shouldEqual txAfter.dataLength
+        tx.signature shouldEqual txAfter.signature
+        tx.sender shouldEqual txAfter.asInstanceOf[PaymentTransaction].sender
+        tx.recipient shouldEqual txAfter.recipient
+        tx.timestamp shouldEqual txAfter.timestamp
+        tx.amount shouldEqual txAfter.amount
+        tx.fee shouldEqual txAfter.fee
+        txAfter.signatureValid shouldEqual true
     }
   }
 }
