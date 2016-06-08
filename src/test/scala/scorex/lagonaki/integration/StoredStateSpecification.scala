@@ -21,7 +21,8 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   val state = app.transactionModule.blockStorage.state
   val history = app.transactionModule.blockStorage.history
   val acc = accounts.head
-  val recepient = accounts.last
+  val recepient = wallet.privateKeyAccounts().last
+  require(acc.address != recepient.address)
 
   test("balance confirmations") {
     val rec = new PrivateKeyAccount(randomBytes())
@@ -73,7 +74,6 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   }
 
 
-  /*
   test("validate single transaction") {
     val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc.address)
     senderBalance should be > 0L
@@ -90,7 +90,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     doubleSpending.foreach(t => state.isValid(t) shouldBe true)
     state.isValid(doubleSpending) shouldBe false
     state.validate(doubleSpending).size shouldBe 1
-  }*/
+  }
 
   test("validate plenty of transactions") {
     val trans = (1 to transactionModule.utxStorage.SizeLimit).map { i =>
@@ -103,8 +103,6 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     }
     val st = System.currentTimeMillis()
     state.validate(trans).size should be <= trans.size
-    //TODO optimization
-    //    System.currentTimeMillis() - st should be <= 2000L
   }
 
   test("included") {
