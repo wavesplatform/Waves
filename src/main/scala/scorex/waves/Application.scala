@@ -1,14 +1,13 @@
 package scorex.waves
 
 import akka.actor.Props
-import akka.http.scaladsl.Http
 import com.typesafe.config.ConfigFactory
 import scorex.account.Account
 import scorex.api.http._
 import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.network.{PeerSynchronizer, TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
+import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.transaction.{BalanceSheet, GenesisTransaction, SimpleTransactionModule, Transaction}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, ScorexApiRoute, WavesApiRoute}
