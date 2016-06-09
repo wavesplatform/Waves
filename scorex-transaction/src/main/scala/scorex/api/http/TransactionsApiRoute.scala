@@ -72,7 +72,7 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
                 Try {
                   val block = application.blockStorage.history.asInstanceOf[StoredBlockchain].blockAt(h).get
                   val tx = block.transactions.filter(_.signature sameElements sig).head
-                  tx.json
+                  tx.json + ("height" -> Json.toJson(h))
                 }.getOrElse(Json.obj("status" -> "error", "details" -> "Internal error"))
               case None => Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain")
             }

@@ -23,7 +23,7 @@ case class GenesisTransaction(override val recipient: Account,
   override lazy val creator: Option[Account] = None
 
   override lazy val json: JsObject =
-    jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount.toString)
+    jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount)
 
   override lazy val bytes: Array[Byte] = {
     val typeBytes = Array(TransactionType.GenesisTransaction.id.toByte)
