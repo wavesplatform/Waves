@@ -11,6 +11,7 @@
 * api_key protection for wallet/seed and addresses/seed API methods added 
 * Limits for /blocks/address/{address} API call added
 * Height added for /transactions/info/{signature} and /blocks/seq/{from}/{to} API methods
+* "p2p"/"fuzzingDelay" setting via settings.json in order to emulate message delays
 
 **1.2.7**
 ---------
