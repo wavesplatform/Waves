@@ -106,7 +106,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
   override def packUnconfirmed(): StoredInBlock = {
-    clearIncorrectTransaction()
+    clearIncorrectTransactions()
     blockStorage.state.validate(utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock))
   }
 
@@ -117,11 +117,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       case None =>
     })
 
-    clearIncorrectTransaction()
+    clearIncorrectTransactions()
   }
 
   //Romove too old or invalid transactions from  UnconfirmedTransactionsPool
-  def clearIncorrectTransaction(): Unit = {
+  def clearIncorrectTransactions(): Unit = {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
 
     val txs = utxStorage.all()

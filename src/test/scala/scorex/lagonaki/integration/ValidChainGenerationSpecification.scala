@@ -42,7 +42,7 @@ with TransactionTestingCommons {
   }
 
   test("generate 10 blocks and synchronize") {
-    val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map( acc => app.consensusModule.generatingBalance(acc.address)).sum
+    val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(acc => app.consensusModule.generatingBalance(acc.address)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
     genValidTransaction()
 
@@ -57,7 +57,8 @@ with TransactionTestingCommons {
   test("Generate block with plenty of transactions") {
     val block = untilTimeout(1.minute) {
       stopGeneration()
-      val toGen = transactionModule.utxStorage.SizeLimit - transactionModule.packUnconfirmed().size
+      transactionModule.clearIncorrectTransactions()
+      val toGen = transactionModule.utxStorage.SizeLimit - transactionModule.utxStorage.all().size
       (0 until toGen) foreach (i => genValidTransaction())
       val blocksFuture = application.consensusModule.generateNextBlocks(Seq(accounts.head))(transactionModule)
       val blocks: Seq[Block] = Await.result(blocksFuture, 10.seconds)
