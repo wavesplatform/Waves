@@ -16,8 +16,8 @@ import scala.collection.concurrent.TrieMap
 import scala.util.{Failure, Success, Try}
 
 /**
- * If no datafolder provided, blockchain lives in RAM (useful for tests)
- */
+  * If no datafolder provided, blockchain lives in RAM (useful for tests)
+  */
 class StoredBlockchain(db: MVStore)
                       (implicit consensusModule: ConsensusModule[_],
                        transactionModule: TransactionModule[_])

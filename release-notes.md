@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 **1.2.8**
 ---------
 
@@ -12,12 +13,18 @@
 * Limits for /blocks/address/{address} API call added
 * Height added for /transactions/info/{signature} and /blocks/seq/{from}/{to} API methods
 
+=======
+>>>>>>> master
 **1.2.7**
 ---------
 
 * Unify bytes/json serialization/deserialization
+<<<<<<< HEAD
 * Blockchain and State databased were merged
 * Bugfixes
+=======
+* Blockchain and State database updates made atomic
+>>>>>>> master
 
 **1.2.6**
 ---------
