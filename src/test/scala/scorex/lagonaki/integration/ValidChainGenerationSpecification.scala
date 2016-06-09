@@ -124,6 +124,9 @@ with TransactionTestingCommons {
       (trans, valid)
     }
     state.validate(trans).nonEmpty shouldBe true
+    if(valid.size >= trans.size) {
+      log.error(s"Double spending: $trans | $valid | ${state.asInstanceOf[BalanceSheet].balance(trans.head.sender.address)}")
+    }
     valid.size should be < trans.size
 
     waitGenerationOfBlocks(2)
