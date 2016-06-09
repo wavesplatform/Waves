@@ -64,7 +64,6 @@ with TransactionTestingCommons {
     }
     waitGenerationOfBlocks(1)
 
-    accounts.map(a => consensusModule.generatingBalance(a)).sum should be >= (transactionModule.InitialBalance / 100)
     val block = untilTimeout(3.minute) {
       stopGeneration()
       transactionModule.clearIncorrectTransactions()
