@@ -1,15 +1,16 @@
 **1.2.8**
 ---------
 
+* Preformance updates
 * Make hash functions configurable via application.conf
-* One more byte added to address to identify the network
 * Rpc address become configurable via settings.json 
+* One more byte added to address to identify the network
 * Max difference between transaction and block timestamps added 
+* Balance with confirmations is now minimum during this period
 * NXT consensus algorithm fixes
 * api_key protection for wallet/seed and addresses/seed API methods added 
 * Limits for /blocks/address/{address} API call added
-* Preformance updates
-* Balance with confirmations is now minimum during this period
+* Height added for /transactions/info/{signature} and /blocks/seq/{from}/{to} API methods
 
 **1.2.7**
 ---------
