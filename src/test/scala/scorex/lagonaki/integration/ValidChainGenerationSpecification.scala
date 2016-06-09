@@ -55,12 +55,13 @@ with TransactionTestingCommons {
   }
 
   test("Generate block with plenty of transactions") {
-    val block = untilTimeout(1.minute) {
+    accounts.map(a => consensusModule.generatingBalance(a)).sum should be >= (transactionModule.InitialBalance / 100)
+    val block = untilTimeout(3.minute) {
       stopGeneration()
       transactionModule.clearIncorrectTransactions()
       val toGen = transactionModule.utxStorage.SizeLimit - transactionModule.utxStorage.all().size
       (0 until toGen) foreach (i => genValidTransaction())
-      val blocksFuture = application.consensusModule.generateNextBlocks(Seq(accounts.head))(transactionModule)
+      val blocksFuture = application.consensusModule.generateNextBlocks(accounts)(transactionModule)
       val blocks: Seq[Block] = Await.result(blocksFuture, 10.seconds)
       blocks.nonEmpty shouldBe true
       blocks.head
