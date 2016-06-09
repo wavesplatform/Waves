@@ -3,6 +3,7 @@
 * Fixed issue with incorrect Handshake
 * Balance with confirmations is the minimum balance
 * /waves/external-payment returns error if account balance invalid
+* New api method /consensus/generatingbalance/{address}
 
 **0.2.0-RC3**
 
