@@ -8,6 +8,8 @@
 * NXT consensus algorithm fixes
 * api_key protection for wallet/seed and addresses/seed API methods added 
 * Limits for /blocks/address/{address} API call added
+* Preformance updates
+* Balance with confirmations is now minimum during this period
 
 **1.2.7**
 ---------
