@@ -55,6 +55,15 @@ with TransactionTestingCommons {
   }
 
   test("Generate block with plenty of transactions") {
+    applications.tail.foreach { app =>
+      app.wallet.privateKeyAccounts().foreach { acc =>
+        if (state.asInstanceOf[BalanceSheet].balance(acc.address) > 0) {
+          genValidTransaction(recepientOpt = accounts.headOption, senderOpt = Some(acc))
+        }
+      }
+    }
+    waitGenerationOfBlocks(1)
+
     accounts.map(a => consensusModule.generatingBalance(a)).sum should be >= (transactionModule.InitialBalance / 100)
     val block = untilTimeout(3.minute) {
       stopGeneration()
@@ -124,7 +133,7 @@ with TransactionTestingCommons {
       (trans, valid)
     }
     state.validate(trans).nonEmpty shouldBe true
-    if(valid.size >= trans.size) {
+    if (valid.size >= trans.size) {
       log.error(s"Double spending: $trans | $valid | ${state.asInstanceOf[BalanceSheet].balance(trans.head.sender.address)}")
     }
     valid.size should be < trans.size

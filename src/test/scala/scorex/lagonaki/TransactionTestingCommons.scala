@@ -1,5 +1,6 @@
 package scorex.lagonaki
 
+import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.lagonaki.TestingCommons._
 import scorex.transaction.{History, GenesisTransaction, Transaction}
@@ -36,18 +37,23 @@ trait TransactionTestingCommons extends TestingCommons {
     case _ => None
   })
 
-  def genValidTransaction(randomAmnt: Boolean = true): Transaction = {
-    val senderAcc = accounts(Random.nextInt(accounts.size))
+  def genValidTransaction(randomAmnt: Boolean = true,
+                          recepientOpt: Option[PrivateKeyAccount] = None,
+                          senderOpt: Option[PrivateKeyAccount] = None
+                         ): Transaction = {
+    val senderAcc = senderOpt.getOrElse(accounts(Random.nextInt(accounts.size)))
     val senderBalance = consensusModule.generatingBalance(senderAcc)
+    require(senderBalance > 0)
     val fee = Random.nextInt(5).toLong + 1
     if (senderBalance <= fee) {
-      genValidTransaction(randomAmnt)
+      genValidTransaction(randomAmnt, recepientOpt, senderOpt)
     } else {
       val amt = if (randomAmnt) Math.abs(Random.nextLong() % (senderBalance - fee))
       else senderBalance - fee
-      val tx = transactionModule.createPayment(senderAcc, accounts(Random.nextInt(accounts.size)), amt, fee)
+      val recepient: PrivateKeyAccount = recepientOpt.getOrElse(accounts(Random.nextInt(accounts.size)))
+      val tx = transactionModule.createPayment(senderAcc, recepient, amt, fee)
       if (transactionModule.blockStorage.state.isValid(tx)) tx
-      else genValidTransaction(randomAmnt)
+      else genValidTransaction(randomAmnt, recepientOpt, senderOpt)
     }
   }
 
