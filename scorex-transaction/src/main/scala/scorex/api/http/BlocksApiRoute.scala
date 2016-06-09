@@ -135,7 +135,8 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
           case blockchain: BlockChain =>
             JsArray(
               (start to end).map { height =>
-                blockchain.blockAt(height).map(_.json).getOrElse(Json.obj("error" -> s"No block at height $height"))
+                blockchain.blockAt(height).map(_.json + ("height" -> Json.toJson(height)))
+                  .getOrElse(Json.obj("error" -> s"No block at height $height"))
               })
           case _ =>
             Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")

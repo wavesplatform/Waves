@@ -14,7 +14,7 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
   val history = application.blockStorage.history
   val genesis = history.genesis
 
-  if (history.height() < 2) {
+  while (history.height() < 3) {
     application.blockStorage.appendBlock(genValidBlock())
   }
   val last = history.lastBlock
@@ -28,6 +28,8 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
     val response = GET.request(s"/blocks/seq/1/3")
     checkGenesis(response(0).as[JsValue])
     checkBlock(response(1).as[JsValue])
+    (response(1) \ "height").as[Int] shouldBe 2
+    (response(2) \ "height").as[Int] shouldBe 3
   }
 
   test("GET /blocks/last API route") {
