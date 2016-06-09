@@ -1,10 +1,9 @@
-<<<<<<< HEAD
 **1.2.8**
 ---------
 
-* Preformance updates
+* Performance updates
 * Make hash functions configurable via application.conf
-* Rpc address become configurable via settings.json 
+* RPC address become configurable via settings.json
 * One more byte added to address to identify the network
 * Max difference between transaction and block timestamps added 
 * Balance with confirmations is now minimum during this period
@@ -13,18 +12,13 @@
 * Limits for /blocks/address/{address} API call added
 * Height added for /transactions/info/{signature} and /blocks/seq/{from}/{to} API methods
 
-=======
->>>>>>> master
 **1.2.7**
 ---------
 
 * Unify bytes/json serialization/deserialization
-<<<<<<< HEAD
 * Blockchain and State databased were merged
 * Bugfixes
-=======
 * Blockchain and State database updates made atomic
->>>>>>> master
 
 **1.2.6**
 ---------
@@ -76,27 +70,19 @@
 
 * Web interface to core API has been added. Please set "rpcport" value in settings.json then visit
    http://localhost:{rpcport}/ after server bootstrapping.
-
 * Permacoin implementation has been added. Permacoin is blockchain consensus protocol based on
 non-interactive Proof-of-Retrievability of a static dataset by A. Miller, E. Shi, J. Katz, B. Parno et at.
  For details please see the paper http://cs.umd.edu/~amiller/permacoin.pdf . Protocol settings could be changed
  in perma.conf.
-
 * For Permacoin module, new API calls are /consensus/target, /consensus/target/{blockId},
  /consensus/puz, /consensus/puz/{blockId} .
-
 * P2P layer is totally rewritten. From now a new module can implement messages and messages handling
 logic separately. Then module p2p logic is to be wired into application's logic.
-
 * UPnP ports mapping
-
 * TCP packets assembling (Akka I/O missing)
-
 * Experimental: a node could store a blocktree explicitly. Storage type could be changed via "history"
 setting(set "blockchain" / "blocktree"). Different nodes can have different storage types.
-
 * New class of API calls, starting with debug/
-
 * peers/ API call has been renamed into peers/connected, peers/all has been added
 
 
@@ -104,10 +90,8 @@ setting(set "blockchain" / "blocktree"). Different nodes can have different stor
 ---------
 
 * API call added: consensus/algo
-
-* API calls added for Qora-like consensus algo: consensus/time, consensus/time/{generatingBalance}, 
+* API calls added for Qora-like consensus algo: consensus/time, consensus/time/{generatingBalance},
  consensus/generatingbalance, consensus/generatingbalance/{blockId}
-
 * API calls added for Nxt-like consensus algo: consensus/basetarget, consensus/basetarget/{blockId},
   consensus/generationsignature, consensus/generationsignature/{blockId}
 
@@ -137,8 +121,5 @@ setting(set "blockchain" / "blocktree"). Different nodes can have different stor
 **1.0.3**
 ---------
 
-* This file has been started :) 
-
-* SBT commands instead of linux shell scripts   
-
- 
+* This file has been started :)
+* SBT commands instead of linux shell scripts
