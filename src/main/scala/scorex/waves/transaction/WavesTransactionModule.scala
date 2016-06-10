@@ -10,6 +10,7 @@ import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
 import scorex.utils.NTP
 
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -53,6 +54,18 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
         .filter(_.timestamp <= currentTime)
         .sortBy(-_.fee)
         .take(SimpleTransactionModule.MaxTransactionsPerBlock))
+  }
+
+  // Remove transactions which are too far in the future
+  override def clearIncorrectTransactions(): Unit = {
+
+    super.clearIncorrectTransactions()
+
+    val currentTime = NTP.correctedTime()
+    val txs = utxStorage.all()
+
+    txs.filter { tx => (tx.timestamp - currentTime).millis > SimpleTransactionModule.MaxTimeForUnconfirmed
+    } foreach { utxStorage.remove }
   }
 
   override def isValid(block: Block): Boolean = {
