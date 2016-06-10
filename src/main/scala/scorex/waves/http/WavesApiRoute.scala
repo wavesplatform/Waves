@@ -67,26 +67,28 @@ case class WavesApiRoute(override val application: Application)(implicit val con
             case err: JsError =>
               WrongJson.json
             case JsSuccess(payment: ExternalPayment, _) =>
-              val tx = transactionModule.broadcastPayment(payment)
-              if (!tx.signatureValid)
-                InvalidSignature.json
-              else {
-                tx.validate match {
-                  case ValidationResult.ValidateOke =>
-                    tx.json
+              val txTry = transactionModule.broadcastPayment(payment)
+              if (txTry.isSuccess) {
+                val tx = txTry.get
+                if (!tx.signatureValid)
+                  InvalidSignature.json
+                else {
+                  tx.validate match {
+                    case ValidationResult.ValidateOke =>
+                      tx.json
 
-                  case ValidationResult.InvalidAddress =>
-                    InvalidAddress.json
+                    case ValidationResult.InvalidAddress =>
+                      InvalidAddress.json
 
-                  case ValidationResult.NegativeAmount =>
-                    NegativeAmount.json
+                    case ValidationResult.NegativeAmount =>
+                      NegativeAmount.json
 
-                  case ValidationResult.NegativeFee =>
-                    NegativeFee.json
-
-                  case ValidationResult.NoBalance =>
-                    NoBalance.json
+                    case ValidationResult.NegativeFee =>
+                      NegativeFee.json
+                  }
                 }
+              } else {
+                NoBalance.json
               }
           }
         }.getOrElse(WrongJson.json).toString
@@ -96,11 +98,11 @@ case class WavesApiRoute(override val application: Application)(implicit val con
     }
   }
 
-//
-//  // Workaround to show datatype of post request without using it in another route
-//  // Related: https://github.com/swagger-api/swagger-core/issues/606
-//  // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
-//  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[Payment])
-//  protected def paymentModel = Unit
+  //
+  //  // Workaround to show datatype of post request without using it in another route
+  //  // Related: https://github.com/swagger-api/swagger-core/issues/606
+  //  // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
+  //  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[Payment])
+  //  protected def paymentModel = Unit
 
 }
