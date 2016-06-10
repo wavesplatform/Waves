@@ -1,14 +1,16 @@
 package scorex.waves.transaction
 
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PublicKeyAccount}
 import scorex.api.http.NoBalance
 import scorex.app.Application
-import scorex.block.BlockField
+import scorex.block.{Block, BlockField}
 import scorex.crypto.encode.Base58
 import scorex.settings.Settings
+import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
 import scorex.utils.NTP
 
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -40,6 +42,38 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
     } else {
       Failure(new Exception(NoBalance.message))
     }
+  }
+
+  override def packUnconfirmed(): StoredInBlock = {
+    clearIncorrectTransactions()
+
+    val currentTime = NTP.correctedTime()
+
+    blockStorage.state.validate(
+      utxStorage.all()
+        .filter(_.timestamp <= currentTime)
+        .sortBy(-_.fee)
+        .take(SimpleTransactionModule.MaxTransactionsPerBlock))
+  }
+
+  override def clearIncorrectTransactions(): Unit = {
+
+    super.clearIncorrectTransactions()
+
+    val currentTime = NTP.correctedTime()
+    val txs = utxStorage.all()
+
+    // Remove transactions which are too far in the future
+    txs.filter {
+      tx => (tx.timestamp - currentTime).millis > SimpleTransactionModule.MaxTimeForUnconfirmed
+    } foreach {
+      utxStorage.remove
+    }
+  }
+
+  override def isValid(block: Block): Boolean = {
+    val blockTimestamp = block.timestampField.value
+    block.transactions.forall( _.timestamp <= blockTimestamp) && super.isValid(block)
   }
 
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
