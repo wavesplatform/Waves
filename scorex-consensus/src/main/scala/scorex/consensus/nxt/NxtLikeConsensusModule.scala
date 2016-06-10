@@ -26,7 +26,10 @@ with OneGeneratorConsensusModule with ScorexLogging {
   val MinBlocktimeLimit = normalize(53)
   val MaxBlocktimeLimit = normalize(67)
   val BaseTargetGamma = normalize(64)
-  override val generatingBalanceDepth = EffectiveBalanceDepth
+  val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
+  val InitialBaseTarget = MaxBaseTarget / 2
+
+  override val generatingBalanceDepth = 50
 
   private def avgDelayInSeconds: Long = AvgDelay.toSeconds
 
@@ -34,30 +37,33 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
   override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
 
-    val history = transactionModule.blockStorage.history
+    val generator = block.signerDataField.value.generator
+    val balance = generatingBalance(generator)
 
     val blockTime = block.timestampField.value
 
-    val prev = history.parent(block).get
-    val prevTime = prev.timestampField.value
+    if(validBalance(balance) && validBlockTime(blockTime)) {
 
-    val prevBlockData = consensusBlockData(prev)
-    val blockData = consensusBlockData(block)
-    val generator = block.signerDataField.value.generator
+      val parent = transactionModule.blockStorage.history.parent(block).get
 
-    //check baseTarget
-    val cbt = calcBaseTarget(prev, blockTime)
-    val bbt = blockData.baseTarget
-    require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
+      val prevBlockData = consensusBlockData(parent)
+      val blockData = consensusBlockData(block)
 
-    //check generation signature
-    val calcGs = calcGeneratorSignature(prevBlockData, generator)
-    val blockGs = blockData.generationSignature
-    require(calcGs.sameElements(blockGs),
-      s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
+      //check baseTarget
+      val cbt = calcBaseTarget(parent, blockTime)
+      val bbt = blockData.baseTarget
+      require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
 
-    //check hit < target
-    calcHit(prevBlockData, generator) < calcTarget(prev, blockTime, generatingBalance(generator))
+      //check generation signature
+      val calcGs = calcGeneratorSignature(prevBlockData, generator)
+      val blockGs = blockData.generationSignature
+      require(calcGs.sameElements(blockGs),
+        s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
+
+      //check hit < target
+      calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, balance)
+
+    } else false
   }.recoverWith { case t =>
     log.error("Error while checking a block", t)
     Failure(t)
@@ -67,45 +73,58 @@ with OneGeneratorConsensusModule with ScorexLogging {
   override def generateNextBlock[TT](account: PrivateKeyAccount)
                                     (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
 
-    val lastBlock = transactionModule.blockStorage.history.lastBlock
-    val lastBlockKernelData = consensusBlockData(lastBlock)
+    val balance = generatingBalance(account)
 
-    val lastBlockTime = lastBlock.timestampField.value
+    val result = if(validBalance(balance)) {
 
-    val currentTime = NTP.correctedTime()
-    val effBalance = generatingBalance(account)
+      val lastBlock = transactionModule.blockStorage.history.lastBlock
+      val lastBlockKernelData = consensusBlockData(lastBlock)
 
-    val h = calcHit(lastBlockKernelData, account)
-    val t = calcTarget(lastBlock, currentTime, effBalance)
+      val lastBlockTime = lastBlock.timestampField.value
 
-    val eta = (currentTime - lastBlockTime) / 1000
+      val currentTime = NTP.correctedTime()
 
-    log.debug(s"hit: $h, target: $t, generating ${h < t}, eta $eta, " +
-      s"account:  $account " +
-      s"account balance: $effBalance"
-    )
+      val h = calcHit(lastBlockKernelData, account)
+      val t = calcTarget(lastBlock, currentTime, balance)
 
-    if (h < t) {
-      val btg = calcBaseTarget(lastBlock, currentTime)
-      val gs = calcGeneratorSignature(lastBlockKernelData, account)
-      val consensusData = new NxtLikeConsensusBlockData {
-        override val generationSignature: Array[Byte] = gs
-        override val baseTarget: Long = btg
-      }
+      val eta = (currentTime - lastBlockTime) / 1000
 
-      val unconfirmed = transactionModule.packUnconfirmed()
-      log.debug(s"Build block with ${unconfirmed.asInstanceOf[Seq[Transaction]].size} transactions")
-      log.debug(s"Block time interval is $eta seconds ")
+      log.debug(s"hit: $h, target: $t, generating ${h < t}, eta $eta, " +
+        s"account:  $account " +
+        s"account balance: $balance"
+      )
 
-      Future(Some(Block.buildAndSign(version,
-        currentTime,
-        lastBlock.uniqueId,
-        consensusData,
-        unconfirmed,
-        account)))
+      if (h < t) {
+        val btg = calcBaseTarget(lastBlock, currentTime)
+        val gs = calcGeneratorSignature(lastBlockKernelData, account)
+        val consensusData = new NxtLikeConsensusBlockData {
+          override val generationSignature: Array[Byte] = gs
+          override val baseTarget: Long = btg
+        }
 
-    } else Future(None)
+        val unconfirmed = transactionModule.packUnconfirmed()
+        log.debug(s"Build block with ${unconfirmed.asInstanceOf[Seq[Transaction]].size} transactions")
+        log.debug(s"Block time interval is $eta seconds ")
+
+        Some(Block.buildAndSign(version,
+          currentTime,
+          lastBlock.uniqueId,
+          consensusData,
+          unconfirmed,
+          account))
+
+      } else None
+    } else {
+      log.debug(s"account: $account, account balance: $balance")
+      None
+    }
+
+    Future(result)
   }
+
+  def validBlockTime(blockTime: Long): Boolean = blockTime <= NTP.correctedTime()
+
+  private def validBalance(balance: Long): Boolean = balance > 0
 
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =
     hash(lastBlockData.generationSignature ++ generator.publicKey)
@@ -132,7 +151,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
         prevBaseTarget - prevBaseTarget * BaseTargetGamma *
           (avgDelayInSeconds - Math.max(blocktimeAverage, MinBlocktimeLimit)) / (avgDelayInSeconds * 100)
       }).toLong
-      bounded(baseTarget, 1, Long.MaxValue).toLong
+      bounded(baseTarget, 1, MaxBaseTarget).toLong
     } else {
       prevBaseTarget
     }
@@ -168,7 +187,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
   override def genesisData: BlockField[NxtLikeConsensusBlockData] =
     NxtConsensusBlockField(new NxtLikeConsensusBlockData {
-      override val baseTarget: Long = 153722867
+      override val baseTarget: Long = InitialBaseTarget
       override val generationSignature: Array[Byte] = Array.fill(32)(0: Byte)
     })
 
@@ -186,6 +205,5 @@ object NxtLikeConsensusModule {
   val BaseTargetLength = 8
   val GeneratorSignatureLength = 32
 
-  val EffectiveBalanceDepth: Int = 50
   val AvgBlockTimeDepth: Int = 3
 }
