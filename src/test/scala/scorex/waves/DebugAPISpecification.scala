@@ -9,17 +9,17 @@ class DebugAPISpecification extends FunSuite with Matchers {
 
   test("/debug/state") {
     val state = getRequest("/debug/state")
-    (state \ "3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen").as[Long] should be > 0L
+    (state \ "3P9NY5HLTKGeyGTYw5Zdyc4XUEmxBoBpbNe").as[Long] should be > 0L
   }
 
   test("/debug/state/{height}") {
     val state = getRequest("/debug/state/1")
-    (state \ "3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen").as[Long] shouldBe 9999999500000000L
-    (state \ "3MyTvqfeLWkvjSZ1hwkhQjzipZr7Pk8dyMR").as[Long] shouldBe 100000000L
-    (state \ "3MqS3mVY4Yr4HoTdpWiEaq9phwbaoWS2W6A").as[Long] shouldBe 100000000L
-    (state \ "3N3CDuzGXB2qP5vb2NvnnDQ68HahNCfYVBg").as[Long] shouldBe 100000000L
-    (state \ "3N2sacZ9XTQUkLDdZZgtb1zJUAmr6oziRrU").as[Long] shouldBe 100000000L
-    (state \ "3N189PMB8BaxngN3fNvDRkFbvbH8xMkk328").as[Long] shouldBe 100000000L
+    (state \ "3P9NY5HLTKGeyGTYw5Zdyc4XUEmxBoBpbNe").as[Long] shouldBe 9999999500000000L
+    (state \ "3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM").as[Long] shouldBe 100000000L
+    (state \ "3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy").as[Long] shouldBe 100000000L
+    (state \ "3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF").as[Long] shouldBe 100000000L
+    (state \ "3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3").as[Long] shouldBe 100000000L
+    (state \ "3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J").as[Long] shouldBe 100000000L
   }
 
   test("/debug/info") {
