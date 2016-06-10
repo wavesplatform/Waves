@@ -21,7 +21,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   val TotalWaves  = 100000000L
   override val InitialBalance = UnitsInWave * TotalWaves
 
-  val GenesisTransactionsTimestamp = 0L
+  val GenesisTransactionsTimestamp = settings.genesisTimestamp
 
 
   /**
