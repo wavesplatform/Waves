@@ -137,12 +137,14 @@ with OneGeneratorConsensusModule with ScorexLogging {
         .getOrElse(timestamp - prevBlock.timestampField.value) / 1000
 
       val baseTarget = (if (blocktimeAverage > avgDelayInSeconds) {
-        (prevBaseTarget * Math.min(blocktimeAverage, MaxBlocktimeLimit)) / avgDelayInSeconds
+        prevBaseTarget * Math.min(blocktimeAverage, MaxBlocktimeLimit) / avgDelayInSeconds
       } else {
         prevBaseTarget - prevBaseTarget * BaseTargetGamma *
           (avgDelayInSeconds - Math.max(blocktimeAverage, MinBlocktimeLimit)) / (avgDelayInSeconds * 100)
       }).toLong
-      bounded(baseTarget, 1, MaxBaseTarget).toLong
+
+      // TODO: think about MinBaseTarget like in Nxt
+      scala.math.min(baseTarget, MaxBaseTarget)
     } else {
       prevBaseTarget
     }
@@ -161,9 +163,6 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     BigInt(prevBlockData.baseTarget) * eta * balance
   }
-
-  private def bounded(value: BigInt, min: BigInt, max: BigInt): BigInt =
-    if (value < min) min else if (value > max) max else value
 
   override def parseBytes(bytes: Array[Byte]): Try[BlockField[NxtLikeConsensusBlockData]] = Try {
     NxtConsensusBlockField(new NxtLikeConsensusBlockData {
