@@ -56,7 +56,6 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
         .take(SimpleTransactionModule.MaxTransactionsPerBlock))
   }
 
-  // Remove transactions which are too far in the future
   override def clearIncorrectTransactions(): Unit = {
 
     super.clearIncorrectTransactions()
@@ -64,8 +63,12 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
     val currentTime = NTP.correctedTime()
     val txs = utxStorage.all()
 
-    txs.filter { tx => (tx.timestamp - currentTime).millis > SimpleTransactionModule.MaxTimeForUnconfirmed
-    } foreach { utxStorage.remove }
+    // Remove transactions which are too far in the future
+    txs.filter {
+      tx => (tx.timestamp - currentTime).millis > SimpleTransactionModule.MaxTimeForUnconfirmed
+    } foreach {
+      utxStorage.remove
+    }
   }
 
   override def isValid(block: Block): Boolean = {
