@@ -55,7 +55,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
 
     val totalBalance = InitialBalance
     val txs = List(
-      GenesisTransaction( new Account("3P9NY5HLTKGeyGTYw5Zdyc4XUEmxBoBpbNe"), totalBalance - 5 * UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ"), totalBalance - 5 * UnitsInWave, GenesisTransactionsTimestamp),
       GenesisTransaction( new Account("3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM"), UnitsInWave, GenesisTransactionsTimestamp),
       GenesisTransaction( new Account("3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy"), UnitsInWave, GenesisTransactionsTimestamp),
       GenesisTransaction( new Account("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF"), UnitsInWave, GenesisTransactionsTimestamp),
