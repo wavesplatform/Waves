@@ -1,3 +1,7 @@
+**0.2.0-RC5**
+
+* /waves/external-payment returns error for incorrect recipient
+
 **0.2.0-RC4**
 
 * Fixed issue with incorrect Handshake

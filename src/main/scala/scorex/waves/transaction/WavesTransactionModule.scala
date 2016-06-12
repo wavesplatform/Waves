@@ -6,6 +6,8 @@ import scorex.app.Application
 import scorex.block.BlockField
 import scorex.crypto.encode.Base58
 import scorex.settings.Settings
+import scorex.transaction.LagonakiTransaction.ValidationResult
+import scorex.transaction.LagonakiTransaction.ValidationResult.ValidationResult
 import scorex.transaction._
 import scorex.utils.NTP
 
@@ -27,18 +29,24 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   /**
     * Publish signed payment transaction which generated outside node
     */
-  def broadcastPayment(externalPayment: ExternalPayment): Try[PaymentTransaction] = {
+  def broadcastPayment(externalPayment: ExternalPayment): Either[PaymentTransaction, ValidationResult] = {
     val time = externalPayment.timestamp
     val sigBytes = Base58.decode(externalPayment.signature).get
     val senderPubKey = Base58.decode(externalPayment.senderPublicKey).get
     val recipientAccount = new Account(externalPayment.recipient)
     val payment = new PaymentTransaction(new PublicKeyAccount(senderPubKey),
       recipientAccount, externalPayment.amount, externalPayment.fee, time, sigBytes)
-    if (blockStorage.state.isValid(payment)) {
-      onNewOffchainTransaction(payment)
-      Success(payment)
-    } else {
-      Failure(new Exception(NoBalance.message))
+
+    payment.validate match {
+      case ValidationResult.ValidateOke => {
+        if (blockStorage.state.isValid(payment)) {
+          onNewOffchainTransaction(payment)
+          Left(payment)
+        } else {
+          Right(ValidationResult.NoBalance)
+        }
+      }
+      case error: ValidationResult => Right(error)
     }
   }
 
