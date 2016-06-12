@@ -14,6 +14,7 @@ resolvers += "SonaType" at "https://oss.sonatype.org/content/groups/public"
 
 val modulesVersion = "1.2.8"
 
+
 libraryDependencies ++= Seq(
   "org.consensusresearch" %% "scorex-basics" % modulesVersion,
   "org.consensusresearch" %% "scorex-consensus" % modulesVersion,
