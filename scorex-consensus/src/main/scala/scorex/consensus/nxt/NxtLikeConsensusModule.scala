@@ -39,30 +39,29 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     val blockTime = block.timestampField.value
 
-    if(validBlockTime(blockTime)) {
+    require((blockTime - NTP.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
 
-      val parent = transactionModule.blockStorage.history.parent(block).get
+    val parent = transactionModule.blockStorage.history.parent(block).get
 
-      val prevBlockData = consensusBlockData(parent)
-      val blockData = consensusBlockData(block)
+    val prevBlockData = consensusBlockData(parent)
+    val blockData = consensusBlockData(block)
 
-      //check baseTarget
-      val cbt = calcBaseTarget(parent, blockTime)
-      val bbt = blockData.baseTarget
-      require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
+    //check baseTarget
+    val cbt = calcBaseTarget(parent, blockTime)
+    val bbt = blockData.baseTarget
+    require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
 
-      val generator = block.signerDataField.value.generator
+    val generator = block.signerDataField.value.generator
 
-      //check generation signature
-      val calcGs = calcGeneratorSignature(prevBlockData, generator)
-      val blockGs = blockData.generationSignature
-      require(calcGs.sameElements(blockGs),
-        s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
+    //check generation signature
+    val calcGs = calcGeneratorSignature(prevBlockData, generator)
+    val blockGs = blockData.generationSignature
+    require(calcGs.sameElements(blockGs),
+      s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
 
-      //check hit < target
-      calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, generatingBalance(generator))
+    //check hit < target
+    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, generatingBalance(generator))
 
-    } else false
   }.recoverWith { case t =>
     log.error("Error while checking a block", t)
     Failure(t)
@@ -114,8 +113,6 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     Future(result)
   }
-
-  def validBlockTime(blockTime: Long): Boolean = { (blockTime - NTP.correctedTime()).millis <  MaxTimeDrift }
 
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =
     hash(lastBlockData.generationSignature ++ generator.publicKey)
