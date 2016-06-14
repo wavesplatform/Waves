@@ -2,21 +2,18 @@ package scorex.waves
 
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
-import scorex.account.Account
 import scorex.api.http._
 import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
-import scorex.transaction.{BalanceSheet, GenesisTransaction, SimpleTransactionModule, Transaction}
+import scorex.transaction.SimpleTransactionModule
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, ScorexApiRoute, WavesApiRoute}
 import scorex.waves.settings._
 import scorex.waves.transaction.WavesTransactionModule
 
-import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
-import scala.util.Random
 
 class Application(val settingsFilename: String) extends {
   override val applicationName = "waves"
@@ -31,7 +28,10 @@ class Application(val settingsFilename: String) extends {
 
   override implicit lazy val settings = new WavesSettings(settingsFilename)
 
-  override implicit lazy val consensusModule = new NxtLikeConsensusModule(Constants.AvgBlockDelay)
+  override implicit lazy val consensusModule =
+    new NxtLikeConsensusModule(Constants.AvgBlockDelay) {
+      override val InitialBaseTarget = 153722867L // for compatibility reason
+    }
 
   override implicit lazy val transactionModule: SimpleTransactionModule = new WavesTransactionModule()(settings, this)
 
