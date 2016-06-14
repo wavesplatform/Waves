@@ -69,11 +69,11 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
 
   override def generateNextBlock[TT](account: PrivateKeyAccount)
-                                    (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
+                                    (implicit tm: TransactionModule[TT]): Future[Option[Block]] = Future {
 
     val balance = generatingBalance(account)
 
-    val lastBlock = transactionModule.blockStorage.history.lastBlock
+    val lastBlock = tm.blockStorage.history.lastBlock
     val lastBlockKernelData = consensusBlockData(lastBlock)
 
     val lastBlockTime = lastBlock.timestampField.value
@@ -90,7 +90,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
       s"account balance: $balance"
     )
 
-    val result = if (h < t) {
+    if (h < t) {
 
       val btg = calcBaseTarget(lastBlock, currentTime)
       val gs = calcGeneratorSignature(lastBlockKernelData, account)
@@ -99,7 +99,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
         override val baseTarget: Long = btg
       }
 
-      val unconfirmed = transactionModule.packUnconfirmed()
+      val unconfirmed = tm.packUnconfirmed()
       log.debug(s"Build block with ${unconfirmed.asInstanceOf[Seq[Transaction]].size} transactions")
       log.debug(s"Block time interval is $eta seconds ")
 
@@ -111,7 +111,6 @@ with OneGeneratorConsensusModule with ScorexLogging {
         account))
     } else None
 
-    Future(result)
   }
 
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =
