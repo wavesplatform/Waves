@@ -40,15 +40,26 @@ and agree with license terms
 
 
 ## Run a node
+
 # Ubuntu
 
-Download deb package from [releases](https://github.com/wavesplatform/Waves/releases), install it, run `waves waves-testnet.json`.
+Download deb package from [releases](https://github.com/wavesplatform/Waves/releases)
 
-# Other system
+Install it
 
-Compile code and run your node by typing `sbt start` 
+`sudo dpkg -i <waves package .deb>`
 
-# Create package
+Run `waves waves-testnet.json`.
 
-For now it is only possible to create deb package with (sudo) `sbt debian:packageBin` command
+
+### Create package
+
+For now it is only possible to create deb package with `sbt debian:packageBin` command
+
+## Other system
+
+Compile code by typing `sbt recompile`
+
+Run a node with `java -jar target/scala-2.11/waves.jar` command
+
 

@@ -35,7 +35,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
     val senderPubKey = Base58.decode(externalPayment.senderPublicKey).get
     val recipientAccount = new Account(externalPayment.recipient)
     val payment = new PaymentTransaction(new PublicKeyAccount(senderPubKey),
-      recipientAccount, externalPayment.amount, externalPayment.fee, time, sigBytes)
+      recipientAccount, externalPayment.amount, externalPayment.fee, time, Array.empty, sigBytes)
 
     payment.validate match {
       case ValidationResult.ValidateOke => {
