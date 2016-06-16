@@ -136,7 +136,8 @@ with TransactionTestingCommons {
     }
     state.validate(trans).nonEmpty shouldBe true
     if (valid.size >= trans.size) {
-      log.error(s"Double spending: $trans | $valid | ${state.asInstanceOf[BalanceSheet].balance(trans.head.sender.address)}")
+      val balance = state.asInstanceOf[BalanceSheet].balance(trans.head.sender.address)
+      log.error(s"Double spending: ${trans.map(_.json)} | ${valid.map(_.json)} | $balance")
     }
     valid.size should be < trans.size
 
