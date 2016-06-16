@@ -27,7 +27,7 @@ with TransactionTestingCommons {
 
   def waitGenerationOfBlocks(howMany: Int): Unit = {
     val height = maxHeight()
-    untilTimeout(5.minutes, 10.seconds) {
+    untilTimeout(5.minutes, 1.seconds) {
       val heights = peers.map(_.blockStorage.history.height())
       log.info(s"Current heights are: $heights. Waiting for ${height + howMany}")
       heights.foreach(_ should be >= height + howMany)
@@ -84,16 +84,19 @@ with TransactionTestingCommons {
 
 
   test("Don't include same transactions twice") {
-    val last = history.lastBlock
-    val h = history.heightOf(last).get
-    val incl = includedTransactions(last, history)
-    require(incl.nonEmpty)
-    waitGenerationOfBlocks(0) // all peer should contain common block
-    peers.foreach { p =>
-      incl foreach { tx =>
-        p.blockStorage.state.included(tx).isDefined shouldBe true
-        p.blockStorage.state.included(tx).get should be <= h
+    //Wait until all peers contain transactions
+    val (incl, h) = untilTimeout(1.minutes, 1.seconds) {
+      val last = history.lastBlock
+      val h = history.heightOf(last).get
+      val incl = includedTransactions(last, history)
+      require(incl.nonEmpty)
+      peers.foreach { p =>
+        incl foreach { tx =>
+          p.blockStorage.state.included(tx).isDefined shouldBe true
+          p.blockStorage.state.included(tx).get should be <= h
+        }
       }
+      (incl, h)
     }
 
     stopGeneration()
