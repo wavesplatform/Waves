@@ -154,27 +154,35 @@ with TransactionTestingCommons {
       val last = history.lastBlock
       val st1 = state.hash
       val height = history.heightOf(last).get
+      val recepient = wallet.generateNewAccount()
 
       //Wait for nonEmpty block
       untilTimeout(1.minute, 1.second) {
-        genValidTransaction()
+        genValidTransaction(recepientOpt = recepient)
         peers.foreach(_.blockStorage.history.height() should be > height)
         history.height() should be > height
         history.lastBlock.transactions.nonEmpty shouldBe true
-        state.hash should not be st1
         peers.foreach(_.transactionModule.blockStorage.history.contains(last))
       }
+      state.hash should not be st1
       waitGenerationOfBlocks(0)
 
-      if (history.contains(last) || i < 0) {
+      if (peers.forall(p => p.history.contains(last))) {
         stopGeneration()
+        peers.foreach { p =>
+          p.transactionModule.blockStorage.removeAfter(last.uniqueId)
+        }
         peers.foreach { p =>
           p.transactionModule.blockStorage.removeAfter(last.uniqueId)
           p.history.lastBlock.encodedId shouldBe last.encodedId
         }
         state.hash shouldBe st1
         startGeneration()
-      } else rollback(i - 1)
+      } else {
+        require(i > 0, "History should contain last block at least sometimes")
+        log.warn("History do not contains last block")
+        rollback(i - 1)
+      }
     }
     rollback()
   }
