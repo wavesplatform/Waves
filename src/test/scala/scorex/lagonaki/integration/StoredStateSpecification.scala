@@ -94,14 +94,9 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   test("validate plenty of transactions") {
     val trans = (1 to transactionModule.utxStorage.SizeLimit).map { i =>
-      val account = accounts(Random.nextInt(accounts.size))
-      val senderBalance = state.asInstanceOf[BalanceSheet].balance(account.address)
-      senderBalance should be > 0L
-      val amount = Random.nextLong() % senderBalance
-      val fee = Random.nextLong() % senderBalance
-      transactionModule.createPayment(acc, recepient, amount, 1)
+      genValidTransaction()
     }
-    val st = System.currentTimeMillis()
+    profile(state.validate(trans)) should be < 1000L
     state.validate(trans).size should be <= trans.size
   }
 
