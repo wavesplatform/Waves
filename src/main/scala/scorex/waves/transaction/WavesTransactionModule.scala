@@ -1,7 +1,6 @@
 package scorex.waves.transaction
 
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.api.http.NoBalance
+import scorex.account.{Account, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.BlockField
 import scorex.crypto.encode.Base58
@@ -9,9 +8,6 @@ import scorex.settings.Settings
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.LagonakiTransaction.ValidationResult.ValidationResult
 import scorex.transaction._
-import scorex.utils.NTP
-
-import scala.util.{Failure, Success, Try}
 
 /**
   * Waves Transaction Module
@@ -52,7 +48,6 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
 
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
 
-
     val totalBalance = InitialBalance
     val txs = List(
       GenesisTransaction( new Account("3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"), totalBalance - 5 * UnitsInWave, GenesisTransactionsTimestamp),
@@ -63,7 +58,6 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
       GenesisTransaction( new Account("3N189PMB8BaxngN3fNvDRkFbvbH8xMkk328"), UnitsInWave, GenesisTransactionsTimestamp)
     )
     require(txs.foldLeft(0L)(_ + _.amount) == InitialBalance)
-
 
     TransactionsBlockField(txs)
   }

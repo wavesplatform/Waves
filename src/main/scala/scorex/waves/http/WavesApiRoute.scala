@@ -47,7 +47,7 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   }
 
   @Path("/external-payment")
-  @ApiOperation(value = "Send payment", notes = "Publish signed payment to the Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
+  @ApiOperation(value = "Broadcast payment", notes = "Publish signed payment to the Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(
       name = "body",
@@ -91,28 +91,6 @@ case class WavesApiRoute(override val application: Application)(implicit val con
                   case ValidationResult.InvalidAddress => InvalidAddress.json
                 }
               }
-//              if (txTry.isSuccess) {
-//                val tx = txTry.get
-//                if (!tx.signatureValid)
-//                  InvalidSignature.json
-//                else {
-//                  tx.validate match {
-//                    case ValidationResult.ValidateOke =>
-//                      tx.json
-//
-//                    case ValidationResult.InvalidAddress =>
-//                      InvalidAddress.json
-//
-//                    case ValidationResult.NegativeAmount =>
-//                      NegativeAmount.json
-//
-//                    case ValidationResult.NegativeFee =>
-//                      NegativeFee.json
-//                  }
-//                }
-//              } else {
-//                NoBalance.json
-//              }
           }
         }.getOrElse(WrongJson.json).toString
 
@@ -120,12 +98,4 @@ case class WavesApiRoute(override val application: Application)(implicit val con
       }
     }
   }
-
-  //
-  //  // Workaround to show datatype of post request without using it in another route
-  //  // Related: https://github.com/swagger-api/swagger-core/issues/606
-  //  // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
-  //  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[Payment])
-  //  protected def paymentModel = Unit
-
 }
