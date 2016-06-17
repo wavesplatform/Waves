@@ -14,6 +14,7 @@ import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.ValidationResult
+import scorex.waves.settings.WavesSettings
 import scorex.waves.transaction.{ExternalPayment, WavesTransactionModule}
 
 import scala.util.{Failure, Success, Try}
@@ -22,6 +23,8 @@ import scala.util.{Failure, Success, Try}
 @Api(value = "waves", description = "Waves specific commands.", position = 1)
 case class WavesApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+
+  val suspendedSenders = application.settings.asInstanceOf[WavesSettings].suspendedSenders
 
   // TODO asInstanceOf
   implicit lazy val transactionModule: WavesTransactionModule = application.transactionModule.asInstanceOf[WavesTransactionModule]
@@ -67,34 +70,46 @@ case class WavesApiRoute(override val application: Application)(implicit val con
             case err: JsError =>
               WrongJson.json
             case JsSuccess(payment: ExternalPayment, _) =>
+              Base58.decode(payment.senderPublicKey) match {
+                case Success(senderPubKeyBytes) =>
+                  val senderAddress = Account.fromPublicKey(senderPubKeyBytes)
+                  if (suspendedSenders.contains(senderAddress))
+                    InvalidSender.json
+                  else
+                    broadcastPayment(payment)
 
-              transactionModule.broadcastPayment(payment) match {
-                case Left(tx) =>
-                  if (!tx.signatureValid) InvalidSignature.json
-                  else {
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
-                          tx.json
-
-                        case ValidationResult.InvalidAddress =>
-                          InvalidAddress.json
-
-                        case ValidationResult.NegativeAmount =>
-                          NegativeAmount.json
-
-                        case ValidationResult.NegativeFee =>
-                          NegativeFee.json
-                      }
-                  }
-                case Right(e) => e match {
-                  case ValidationResult.NoBalance => NoBalance.json
-                  case ValidationResult.InvalidAddress => InvalidAddress.json
-                }
+                case Failure(e) => InvalidSender.json
               }
           }
         }.getOrElse(WrongJson.json).toString
 
         complete(HttpEntity(ContentTypes.`application/json`, resp))
+      }
+    }
+  }
+
+  private def broadcastPayment(payment: ExternalPayment) = {
+    transactionModule.broadcastPayment(payment) match {
+      case Left(tx) =>
+        if (!tx.signatureValid) InvalidSignature.json
+        else {
+          tx.validate match {
+            case ValidationResult.ValidateOke =>
+              tx.json
+
+            case ValidationResult.InvalidAddress =>
+              InvalidAddress.json
+
+            case ValidationResult.NegativeAmount =>
+              NegativeAmount.json
+
+            case ValidationResult.NegativeFee =>
+              NegativeFee.json
+          }
+        }
+      case Right(e) => e match {
+        case ValidationResult.NoBalance => NoBalance.json
+        case ValidationResult.InvalidAddress => InvalidAddress.json
       }
     }
   }
