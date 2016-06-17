@@ -7,5 +7,5 @@ import scorex.waves.settings.Constants
   * Waves Consensus module
   */
 class WavesConsensusModule extends NxtLikeConsensusModule(Constants.AvgBlockDelay) {
-  override val InitialBaseTarget = 153722867L // for compatibility reason
+  //override val InitialBaseTarget = 153722867L // for compatibility reason
 }
