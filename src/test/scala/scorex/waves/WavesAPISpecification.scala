@@ -23,7 +23,7 @@ class WavesAPISpecification extends FunSuite with Matchers {
   }
 
   test("/wave/external-payment can not send from suspendedAddresses") {
-    val senderPublicKey = "5JiSMVVvadkKt2K9dDJjiwLiDzuCMmzcHnNuEzct2LiY"
+    val senderPublicKey = "4ZADu6W3ZBfNv1LLQCkoHAdiVfvatZNNB6reSyo7c9qJ"
     val recipient = "3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"
     val timestamp = 1465391445252L
     val amount = 10000000000000L
