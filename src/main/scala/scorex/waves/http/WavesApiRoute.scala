@@ -14,6 +14,7 @@ import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.ValidationResult
+import scorex.waves.settings.WavesSettings
 import scorex.waves.transaction.{ExternalPayment, WavesTransactionModule}
 
 import scala.util.{Failure, Success, Try}
@@ -22,6 +23,8 @@ import scala.util.{Failure, Success, Try}
 @Api(value = "waves", description = "Waves specific commands.", position = 1)
 case class WavesApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+
+  val suspendedSenders = application.settings.asInstanceOf[WavesSettings].suspendedSenders
 
   // TODO asInstanceOf
   implicit lazy val transactionModule: WavesTransactionModule = application.transactionModule.asInstanceOf[WavesTransactionModule]
@@ -47,7 +50,7 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   }
 
   @Path("/external-payment")
-  @ApiOperation(value = "Send payment", notes = "Publish signed payment to the Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
+  @ApiOperation(value = "Broadcast payment", notes = "Publish signed payment to the Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(
       name = "body",
@@ -67,52 +70,16 @@ case class WavesApiRoute(override val application: Application)(implicit val con
             case err: JsError =>
               WrongJson.json
             case JsSuccess(payment: ExternalPayment, _) =>
+              Base58.decode(payment.senderPublicKey) match {
+                case Success(senderPubKeyBytes) =>
+                  val senderAddress = Account.fromPublicKey(senderPubKeyBytes)
+                  if (suspendedSenders.contains(senderAddress))
+                    InvalidSender.json
+                  else
+                    broadcastPayment(payment)
 
-              transactionModule.broadcastPayment(payment) match {
-                case Left(tx) =>
-                  if (!tx.signatureValid) InvalidSignature.json
-                  else {
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
-                          tx.json
-
-                        case ValidationResult.InvalidAddress =>
-                          InvalidAddress.json
-
-                        case ValidationResult.NegativeAmount =>
-                          NegativeAmount.json
-
-                        case ValidationResult.NegativeFee =>
-                          NegativeFee.json
-                      }
-                  }
-                case Right(e) => e match {
-                  case ValidationResult.NoBalance => NoBalance.json
-                  case ValidationResult.InvalidAddress => InvalidAddress.json
-                }
+                case Failure(e) => InvalidSender.json
               }
-//              if (txTry.isSuccess) {
-//                val tx = txTry.get
-//                if (!tx.signatureValid)
-//                  InvalidSignature.json
-//                else {
-//                  tx.validate match {
-//                    case ValidationResult.ValidateOke =>
-//                      tx.json
-//
-//                    case ValidationResult.InvalidAddress =>
-//                      InvalidAddress.json
-//
-//                    case ValidationResult.NegativeAmount =>
-//                      NegativeAmount.json
-//
-//                    case ValidationResult.NegativeFee =>
-//                      NegativeFee.json
-//                  }
-//                }
-//              } else {
-//                NoBalance.json
-//              }
           }
         }.getOrElse(WrongJson.json).toString
 
@@ -121,11 +88,29 @@ case class WavesApiRoute(override val application: Application)(implicit val con
     }
   }
 
-  //
-  //  // Workaround to show datatype of post request without using it in another route
-  //  // Related: https://github.com/swagger-api/swagger-core/issues/606
-  //  // Why is this still showing even though it's set to hidden? See https://github.com/martypitt/swagger-springmvc/issues/447
-  //  @ApiOperation(value = "IGNORE", notes = "", hidden = true, httpMethod = "GET", response = classOf[Payment])
-  //  protected def paymentModel = Unit
+  private def broadcastPayment(payment: ExternalPayment) = {
+    transactionModule.broadcastPayment(payment) match {
+      case Left(tx) =>
+        if (!tx.signatureValid) InvalidSignature.json
+        else {
+          tx.validate match {
+            case ValidationResult.ValidateOke =>
+              tx.json
 
+            case ValidationResult.InvalidAddress =>
+              InvalidAddress.json
+
+            case ValidationResult.NegativeAmount =>
+              NegativeAmount.json
+
+            case ValidationResult.NegativeFee =>
+              NegativeFee.json
+          }
+        }
+      case Right(e) => e match {
+        case ValidationResult.NoBalance => NoBalance.json
+        case ValidationResult.InvalidAddress => InvalidAddress.json
+      }
+    }
+  }
 }
