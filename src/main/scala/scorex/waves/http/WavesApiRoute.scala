@@ -1,6 +1,5 @@
 package scorex.waves.http
 
-import java.nio.charset.StandardCharsets
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
@@ -11,11 +10,11 @@ import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
 import scorex.api.http.{NegativeFee, NoBalance, _}
 import scorex.app.Application
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.waves.settings.WavesSettings
 import scorex.waves.transaction.{ExternalPayment, WavesTransactionModule}
+import scorex.waves.wallet.Wallet
 
 import scala.util.{Failure, Success, Try}
 
@@ -30,7 +29,65 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   implicit lazy val transactionModule: WavesTransactionModule = application.transactionModule.asInstanceOf[WavesTransactionModule]
 
   override lazy val route = pathPrefix("waves") {
-    payment ~ address
+    payment ~ address ~ signPayment
+  }
+
+
+  @Path("/create-signed-payment")
+  @ApiOperation(value = "Sign payment",
+    notes = "Sign payment by provided wallet seed",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.waves.http.UnsignedPayment",
+      defaultValue = "{\n\t\"timestamp\": 0,\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"recipient\":\"recipientAddress\", \n\t\"senderWalletSeed\":\"seed\",\n\t\"senderAddressNonce\":\"0\"\n}"
+    )
+  ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with response or error")
+  ))
+  def signPayment: Route = path("create-signed-payment") {
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          Try(Json.parse(body)).map { js =>
+            js.validate[UnsignedPayment] match {
+              case err: JsError =>
+                WrongTransactionJson(err).json
+              case JsSuccess(payment: UnsignedPayment, _) =>
+                val senderWalletSeed = Base58.decode(payment.senderWalletSeed).getOrElse(Array.empty)
+                if (senderWalletSeed.isEmpty)
+                  WrongJson.json
+                else {
+                  val senderAccount =  Wallet.generateNewAccount(senderWalletSeed, payment.senderAddressNonce)
+                  val recipientAccount = new Account(payment.recipient)
+
+                  transactionModule.createSignedPayment(senderAccount, recipientAccount,
+                    payment.amount, payment.fee, payment.timestamp) match {
+                    case Left(tx) => {
+                      val signature = Base58.encode(tx.signature)
+                      val senderPubKey = Base58.encode(tx.sender.publicKey)
+                      val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
+                        senderPubKey, tx.sender.address, signature)
+                      Json.toJson(signedTx)
+                    }
+                    case Right(e) => e match {
+                      case ValidationResult.NoBalance => NoBalance.json
+                      case ValidationResult.InvalidAddress => InvalidAddress.json
+                    }
+                  }
+                }
+            }
+          }.getOrElse(WrongJson.json)
+        }
+      }
+    }
   }
 
   @Path("/address")

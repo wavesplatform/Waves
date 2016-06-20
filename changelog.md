@@ -1,3 +1,7 @@
+**0.2.0-RC6**
+
+* New API /waves/create-signed-payment
+
 **0.2.0-RC5**
 
 * /waves/external-payment returns error for incorrect recipient

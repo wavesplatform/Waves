@@ -1,6 +1,6 @@
 package scorex.waves.transaction
 
-import scorex.account.{Account, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.BlockField
 import scorex.crypto.encode.Base58
@@ -8,6 +8,7 @@ import scorex.settings.Settings
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.LagonakiTransaction.ValidationResult.ValidationResult
 import scorex.transaction._
+import scorex.utils.NTP
 
 /**
   * Waves Transaction Module
@@ -21,6 +22,25 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
 
   val GenesisTransactionsTimestamp = settings.genesisTimestamp
 
+
+  /**
+    * Create signed payment transaction
+    */
+  def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[PaymentTransaction, ValidationResult] = {
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp, Array.empty)
+    val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, Array.empty, sig)
+
+    payment.validate match {
+      case ValidationResult.ValidateOke => {
+        if (blockStorage.state.isValid(payment)) {
+          Left(payment)
+        } else {
+          Right(ValidationResult.NoBalance)
+        }
+      }
+      case error: ValidationResult => Right(error)
+    }
+  }
 
   /**
     * Publish signed payment transaction which generated outside node
