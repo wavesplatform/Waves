@@ -1,4 +1,4 @@
-**0.2.0-RC6**
+**0.2.0-RC7**
 
 * New API /waves/create-signed-payment
 
