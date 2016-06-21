@@ -29,7 +29,7 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   implicit lazy val transactionModule: WavesTransactionModule = application.transactionModule.asInstanceOf[WavesTransactionModule]
 
   override lazy val route = pathPrefix("waves") {
-    payment ~ address ~ signPayment
+    payment ~ address ~ signPayment ~broadcastSignedPayment
   }
 
 
@@ -106,6 +106,7 @@ case class WavesApiRoute(override val application: Application)(implicit val con
     }
   }
 
+  @Deprecated
   @Path("/external-payment")
   @ApiOperation(value = "Broadcast payment", notes = "Publish signed payment to the Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
   @ApiImplicitParams(Array(
@@ -120,6 +121,45 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def payment: Route = path("external-payment") {
+    withCors {
+      entity(as[String]) { body =>
+        val resp = Try(Json.parse(body)).map { js =>
+          js.validate[ExternalPayment] match {
+            case err: JsError =>
+              WrongJson.json
+            case JsSuccess(payment: ExternalPayment, _) =>
+              Base58.decode(payment.senderPublicKey) match {
+                case Success(senderPubKeyBytes) =>
+                  val senderAddress = Account.fromPublicKey(senderPubKeyBytes)
+                  if (suspendedSenders.contains(senderAddress))
+                    InvalidSender.json
+                  else
+                    broadcastPayment(payment)
+
+                case Failure(e) => InvalidSender.json
+              }
+          }
+        }.getOrElse(WrongJson.json).toString
+
+        complete(HttpEntity(ContentTypes.`application/json`, resp))
+      }
+    }
+  }
+
+  @Path("/broadcast-signed-payment")
+  @ApiOperation(value = "Broadcast signed payment", notes = "Publish signed payment to the Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.waves.transaction.ExternalPayment",
+      defaultValue = "{\n\t\"timestamp\": 0,\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"senderPublicKey\":\"senderPubKey\",\n\t\"recipient\":\"recipientId\",\n\t\"signature\":\"sig\"\n}"
+    )
+  ))
+  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
+  def broadcastSignedPayment : Route = path("broadcast-signed-payment") {
     withCors {
       entity(as[String]) { body =>
         val resp = Try(Json.parse(body)).map { js =>

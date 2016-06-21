@@ -1,7 +1,9 @@
 **0.2.0-RC7**
 
 * New API /waves/create-signed-payment
-
+* /waves/external-payment renamed to /waves/broadcast-signed-payment.
+  Old method still works but deprecated. Use new one.
+  
 **0.2.0-RC5**
 
 * /waves/external-payment returns error for incorrect recipient
