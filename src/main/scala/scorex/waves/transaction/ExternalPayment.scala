@@ -5,6 +5,7 @@ import play.api.libs.json.{JsPath, Reads, Writes}
 
 case class ExternalPayment(timestamp: Long, amount: Long, fee: Long, senderPublicKey: String, recipient: String, signature: String)
 
+
 object ExternalPayment {
   implicit val paymentWrites: Writes[ExternalPayment] = (
     (JsPath \ "timestamp").write[Long] and

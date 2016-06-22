@@ -3,7 +3,7 @@ package scorex.waves
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 import scorex.api.http.{InvalidAddress, InvalidSender}
-import scorex.waves.transaction.ExternalPayment
+import scorex.waves.transaction.{ExternalPayment, SignedPayment}
 
 class WavesAPISpecification extends FunSuite with Matchers {
 
@@ -15,7 +15,7 @@ class WavesAPISpecification extends FunSuite with Matchers {
     val recipient = "3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J"
     val timestamp = 1465391445252L
     val amount = 10000000000000L
-    val payment = ExternalPayment(timestamp, amount, 1L, senderPublicKey, recipient, "1")
+    val payment = SignedPayment(timestamp, amount, 1L, recipient, senderPublicKey, "", "1")
     val json = Json.toJson(payment).toString
 
     val response = postRequest(us = "/waves/broadcast-signed-payment", body = json)
@@ -27,7 +27,7 @@ class WavesAPISpecification extends FunSuite with Matchers {
     val recipient = "3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"
     val timestamp = 1465391445252L
     val amount = 10000000000000L
-    val payment = ExternalPayment(timestamp, amount, 1L, senderPublicKey, recipient, "1")
+    val payment = SignedPayment(timestamp, amount, 1L, recipient, senderPublicKey, "", "1")
     val json = Json.toJson(payment).toString
     val response = postRequest(us = "/waves/broadcast-signed-payment", body = json)
     assert(response.toString == InvalidSender.json.toString)

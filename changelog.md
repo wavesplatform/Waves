@@ -1,8 +1,9 @@
 **0.2.0-RC7**
 
+* New API /waves/payment returns senderPublicKey
 * New API /waves/create-signed-payment
-* /waves/external-payment renamed to /waves/broadcast-signed-payment.
-  Old method still works but deprecated. Use new one.
+* /waves/external-payment deprecated. 
+  Use new /waves/broadcast-signed-payment.
   
 **0.2.0-RC5**
 

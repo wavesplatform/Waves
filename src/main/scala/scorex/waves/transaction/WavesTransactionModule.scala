@@ -8,7 +8,6 @@ import scorex.settings.Settings
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.LagonakiTransaction.ValidationResult.ValidationResult
 import scorex.transaction._
-import scorex.utils.NTP
 
 /**
   * Waves Transaction Module
@@ -45,6 +44,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   /**
     * Publish signed payment transaction which generated outside node
     */
+  @Deprecated
   def broadcastPayment(externalPayment: ExternalPayment): Either[PaymentTransaction, ValidationResult] = {
     val time = externalPayment.timestamp
     val sigBytes = Base58.decode(externalPayment.signature).get
@@ -66,6 +66,29 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
     }
   }
 
+  /**
+    * Publish signed payment transaction which generated outside node
+    */
+  def broadcastPayment(payment: SignedPayment): Either[PaymentTransaction, ValidationResult] = {
+    val time = payment.timestamp
+    val sigBytes = Base58.decode(payment.signature).get
+    val senderPubKey = Base58.decode(payment.senderPublicKey).get
+    val recipientAccount = new Account(payment.recipient)
+    val tx = new PaymentTransaction(new PublicKeyAccount(senderPubKey),
+      recipientAccount, payment.amount, payment.fee, time, Array.empty, sigBytes)
+
+    tx.validate match {
+      case ValidationResult.ValidateOke => {
+        if (blockStorage.state.isValid(tx)) {
+          onNewOffchainTransaction(tx)
+          Left(tx)
+        } else {
+          Right(ValidationResult.NoBalance)
+        }
+      }
+      case error: ValidationResult => Right(error)
+    }
+  }
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
 
     val totalBalance = InitialBalance
