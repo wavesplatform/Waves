@@ -1,6 +1,6 @@
 package scorex.waves.transaction
 
-import scorex.account.{Account, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.BlockField
 import scorex.crypto.encode.Base58
@@ -23,8 +23,28 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
 
 
   /**
+    * Create signed payment transaction
+    */
+  def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[PaymentTransaction, ValidationResult] = {
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp)
+    val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
+
+    payment.validate match {
+      case ValidationResult.ValidateOke => {
+        if (blockStorage.state.isValid(payment)) {
+          Left(payment)
+        } else {
+          Right(ValidationResult.NoBalance)
+        }
+      }
+      case error: ValidationResult => Right(error)
+    }
+  }
+
+  /**
     * Publish signed payment transaction which generated outside node
     */
+  @Deprecated
   def broadcastPayment(externalPayment: ExternalPayment): Either[PaymentTransaction, ValidationResult] = {
     val time = externalPayment.timestamp
     val sigBytes = Base58.decode(externalPayment.signature).get
@@ -46,6 +66,29 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
     }
   }
 
+  /**
+    * Publish signed payment transaction which generated outside node
+    */
+  def broadcastPayment(payment: SignedPayment): Either[PaymentTransaction, ValidationResult] = {
+    val time = payment.timestamp
+    val sigBytes = Base58.decode(payment.signature).get
+    val senderPubKey = Base58.decode(payment.senderPublicKey).get
+    val recipientAccount = new Account(payment.recipient)
+    val tx = new PaymentTransaction(new PublicKeyAccount(senderPubKey),
+      recipientAccount, payment.amount, payment.fee, time, sigBytes)
+
+    tx.validate match {
+      case ValidationResult.ValidateOke => {
+        if (blockStorage.state.isValid(tx)) {
+          onNewOffchainTransaction(tx)
+          Left(tx)
+        } else {
+          Right(ValidationResult.NoBalance)
+        }
+      }
+      case error: ValidationResult => Right(error)
+    }
+  }
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
 
     val totalBalance = InitialBalance
