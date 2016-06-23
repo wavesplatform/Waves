@@ -32,14 +32,13 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   implicit lazy val transactionModule: WavesTransactionModule = application.transactionModule.asInstanceOf[WavesTransactionModule]
 
   override lazy val route = pathPrefix("waves") {
-    externalPayment ~ address ~ signPayment ~ broadcastSignedPayment ~ payment
+    externalPayment ~ address ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
   }
 
   // TODO: Should be moved to Scorex
-
   @Path("/payment")
   @ApiOperation(value = "Send payment from wallet",
-    notes = "Send payment from wallet to another wallet",
+    notes = "Send payment from wallet to another wallet. Each call sends new payment",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
@@ -96,6 +95,66 @@ case class WavesApiRoute(override val application: Application)(implicit val con
     }
   }
 
+  // TODO: Should be moved to Scorex
+  @Path("/payment/signature")
+  @ApiOperation(value = "Create payment signed by address from wallet",
+    notes = "Create unique payment signed by address from wallet. Without broadcasting to network.",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.transaction.state.wallet.Payment",
+      defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
+    )
+  ))
+  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
+  def signPayment: Route = path("payment" / "signature") {
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          walletNotExists(wallet).getOrElse {
+            Try(Json.parse(body)).map { js =>
+              js.validate[Payment] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).json
+                case JsSuccess(payment: Payment, _) =>
+                  val txOpt = transactionModule.signPayment(payment, wallet)
+                  txOpt match {
+                    case Some(tx) =>
+                      tx.validate match {
+                        case ValidationResult.ValidateOke =>
+                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
+                            Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
+                          Json.toJson(signed)
+
+                        case ValidationResult.InvalidAddress =>
+                          InvalidAddress.json
+
+                        case ValidationResult.NegativeAmount =>
+                          NegativeAmount.json
+
+                        case ValidationResult.NegativeFee =>
+                          NegativeFee.json
+
+                        case ValidationResult.NoBalance =>
+                          NoBalance.json
+                      }
+                    case None =>
+                      InvalidSender.json
+                  }
+              }
+            }.getOrElse(WrongJson.json)
+          }
+        }
+      }
+    }
+  }
+
   @Path("/create-signed-payment")
   @ApiOperation(value = "Sign payment",
     notes = "Sign payment by provided wallet seed",
@@ -115,7 +174,7 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
-  def signPayment: Route = path("create-signed-payment") {
+  def createdSignedPayment: Route = path("create-signed-payment") {
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
