@@ -42,8 +42,8 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
     * TODO: Should be moved to Scorex
     */
   def signPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): PaymentTransaction = {
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp, Array.empty)
-    val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, Array.empty, sig)
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp)
+    val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
     payment
   }
 
