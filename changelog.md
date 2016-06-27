@@ -5,6 +5,7 @@
 * /waves/external-payment deprecated. 
   Use new /waves/broadcast-signed-payment.
 * New API /waves/payment/signature
+* minimumTxFee verification for API
 
 **0.2.0-RC5**
 

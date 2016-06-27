@@ -21,5 +21,6 @@
   "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",
   "history": "blockchain",
   "offlineGeneration": false,
-  "suspendedSenders": ["3P4swGShi4JG9CSEw7kHCY6mWYp2uw9YXNp"]
+  "suspendedSenders": ["3P4swGShi4JG9CSEw7kHCY6mWYp2uw9YXNp"],
+  "minimumTxFee": 333
 }
