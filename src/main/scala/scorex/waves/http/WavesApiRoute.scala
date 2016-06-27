@@ -359,6 +359,8 @@ case class WavesApiRoute(override val application: Application)(implicit val con
       case Right(e) => e match {
         case ValidationResult.NoBalance => NoBalance.json
         case ValidationResult.InvalidAddress => InvalidAddress.json
+        case ValidationResult.NegativeFee => NegativeFee.json
+        case _ => Unknown.json
       }
     }
   }
