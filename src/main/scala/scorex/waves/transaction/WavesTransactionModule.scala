@@ -11,7 +11,7 @@ import scorex.transaction._
 import scorex.transaction.state.wallet.Payment
 import scorex.utils.NTP
 import scorex.wallet.Wallet
-import scorex.waves.settings.WavesSettings
+import scorex.waves.settings.{Constants, WavesSettings}
 
 /**
   * Waves Transaction Module
@@ -19,9 +19,7 @@ import scorex.waves.settings.WavesSettings
 class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings, application: Application)
   extends SimpleTransactionModule() {
 
-  val UnitsInWave = 100000000L
-  val TotalWaves  = 100000000L
-  override val InitialBalance = UnitsInWave * TotalWaves
+  override val InitialBalance = Constants.UnitsInWave * Constants.TotalWaves
 
   val GenesisTransactionsTimestamp = settings.genesisTimestamp
   // TODO: remove asInstanceOf after Scorex update
@@ -102,12 +100,12 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
 
     val totalBalance = InitialBalance
     val txs = List(
-      GenesisTransaction( new Account("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ"), totalBalance - 5 * UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM"), UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy"), UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF"), UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3"), UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J"), UnitsInWave, GenesisTransactionsTimestamp)
+      GenesisTransaction( new Account("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ"), totalBalance - 5 * Constants.UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction( new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J"), Constants.UnitsInWave, GenesisTransactionsTimestamp)
     )
     require(txs.foldLeft(0L)(_ + _.amount) == InitialBalance)
 
