@@ -11,6 +11,7 @@ import scorex.transaction._
 import scorex.transaction.state.wallet.Payment
 import scorex.utils.NTP
 import scorex.wallet.Wallet
+import scorex.waves.settings.WavesSettings
 
 /**
   * Waves Transaction Module
@@ -23,7 +24,8 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   override val InitialBalance = UnitsInWave * TotalWaves
 
   val GenesisTransactionsTimestamp = settings.genesisTimestamp
-
+  // TODO: remove asInstanceOf after Scorex update
+  val minimumTxFee = settings.asInstanceOf[WavesSettings].minimumTxFee
 
   /**
     * Sign payment by keys from wallet
@@ -69,49 +71,29 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   /**
     * Publish signed payment transaction which generated outside node
     */
-  @Deprecated
-  def broadcastPayment(externalPayment: ExternalPayment): Either[PaymentTransaction, ValidationResult] = {
-    val time = externalPayment.timestamp
-    val sigBytes = Base58.decode(externalPayment.signature).get
-    val senderPubKey = Base58.decode(externalPayment.senderPublicKey).get
-    val recipientAccount = new Account(externalPayment.recipient)
-    val payment = new PaymentTransaction(new PublicKeyAccount(senderPubKey),
-      recipientAccount, externalPayment.amount, externalPayment.fee, time, Array.empty, sigBytes)
-
-    payment.validate match {
-      case ValidationResult.ValidateOke => {
-        if (blockStorage.state.isValid(payment)) {
-          onNewOffchainTransaction(payment)
-          Left(payment)
-        } else {
-          Right(ValidationResult.NoBalance)
-        }
-      }
-      case error: ValidationResult => Right(error)
-    }
-  }
-
-  /**
-    * Publish signed payment transaction which generated outside node
-    */
   def broadcastPayment(payment: SignedPayment): Either[PaymentTransaction, ValidationResult] = {
-    val time = payment.timestamp
-    val sigBytes = Base58.decode(payment.signature).get
-    val senderPubKey = Base58.decode(payment.senderPublicKey).get
-    val recipientAccount = new Account(payment.recipient)
-    val tx = new PaymentTransaction(new PublicKeyAccount(senderPubKey),
-      recipientAccount, payment.amount, payment.fee, time, Array.empty, sigBytes)
+    if (payment.fee < minimumTxFee)
+      // TODO : add ValidationResult.InvalidFee to Scorex
+      Right(ValidationResult.NegativeFee)
+    else {
+      val time = payment.timestamp
+      val sigBytes = Base58.decode(payment.signature).get
+      val senderPubKey = Base58.decode(payment.senderPublicKey).get
+      val recipientAccount = new Account(payment.recipient)
+      val tx = new PaymentTransaction(new PublicKeyAccount(senderPubKey),
+        recipientAccount, payment.amount, payment.fee, time, Array.empty, sigBytes)
 
-    tx.validate match {
-      case ValidationResult.ValidateOke => {
-        if (blockStorage.state.isValid(tx)) {
-          onNewOffchainTransaction(tx)
-          Left(tx)
-        } else {
-          Right(ValidationResult.NoBalance)
+      tx.validate match {
+        case ValidationResult.ValidateOke => {
+          if (blockStorage.state.isValid(tx)) {
+            onNewOffchainTransaction(tx)
+            Left(tx)
+          } else {
+            Right(ValidationResult.NoBalance)
+          }
         }
+        case error: ValidationResult => Right(error)
       }
-      case error: ValidationResult => Right(error)
     }
   }
 

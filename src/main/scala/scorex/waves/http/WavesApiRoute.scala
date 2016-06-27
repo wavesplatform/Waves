@@ -326,13 +326,19 @@ case class WavesApiRoute(override val application: Application)(implicit val con
       case Right(e) => e match {
         case ValidationResult.NoBalance => NoBalance.json
         case ValidationResult.InvalidAddress => InvalidAddress.json
+        case ValidationResult.NegativeFee => NegativeFee.json
+        case _ => Unknown.json
       }
     }
   }
 
   @Deprecated
   private def broadcastPayment(payment: ExternalPayment) = {
-    transactionModule.broadcastPayment(payment) match {
+    val sender = Account.fromPublicKey(Base58.decode(payment.senderPublicKey).get)
+    val signedPayment = SignedPayment(payment.timestamp, payment.amount, payment.fee, payment.recipient,
+      payment.senderPublicKey, sender, payment.signature)
+
+    transactionModule.broadcastPayment(signedPayment) match {
       case Left(tx) =>
         if (!tx.signatureValid) InvalidSignature.json
         else {
