@@ -11,7 +11,7 @@ class WavesSettings(override val filename: String) extends Settings with Transac
 
   // TODO: Should be moved to Scorex TransactionSettings
   lazy val minimumTxFee = (settingsJSON \ "minimumTxFee").asOpt[Int].getOrElse(DefaultMinimumTxFee)
-  private val DefaultMinimumTxFee = 1000
+  private val DefaultMinimumTxFee = 100000
 
   val suspendedSenders = Try {
     (settingsJSON \ "suspendedSenders").as[List[String]]
