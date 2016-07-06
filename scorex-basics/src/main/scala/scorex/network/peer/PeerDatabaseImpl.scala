@@ -20,6 +20,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
   private val blacklist: MVMap[String, Long] = database.openMap("blacklist")
 
   private lazy val ownNonce = settings.nodeNonce
+  private lazy val blacklistResidenceTimeMilliseconds = settings.blacklistResidenceTimeMilliseconds
 
   override def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
     if (!isBlacklisted(address)) {
@@ -35,12 +36,13 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
 
   override def blacklistPeer(address: InetSocketAddress): Unit = {
     if (!isBlacklisted(address)) {
-      blacklist += address.getHostName -> System.currentTimeMillis()
+      // todo: check a scala way to copy the iterable
       new util.ArrayList(whitelistPersistence.keyList())
         .filter(_.getHostName == address.getHostName)
         .foreach(whitelistPersistence.remove(_))
-      database.commit()
     }
+    blacklist += address.getHostName -> System.currentTimeMillis()
+    database.commit()
   }
 
   override def removeFromBlacklist(address: InetSocketAddress): Unit = {
@@ -50,7 +52,10 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
   }
 
   override def isBlacklisted(address: InetSocketAddress): Boolean = {
-    blacklist.synchronized(blacklist.contains(address.getHostName))
+    blacklist.synchronized {
+      updateBlacklist()
+      blacklist.contains(address.getHostName)
+    }
   }
 
   override def knownPeers(excludeSelf: Boolean): Map[InetSocketAddress, PeerInfo] =
@@ -61,4 +66,9 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
 
   override def blacklistedPeers(): Seq[String] = blacklist.keys.toSeq
 
+  private def updateBlacklist(): Unit = {
+    val current = System.currentTimeMillis
+    val toRemove = new util.ArrayList(blacklist.filter(_._2 < current - blacklistResidenceTimeMilliseconds).keys)
+    toRemove.foreach(blacklist.remove(_))
+  }
 }
