@@ -3,6 +3,7 @@ package scorex.network.peer
 import java.net.InetSocketAddress
 
 //todo: add optional nonce
+@SerialVersionUID(-8490103514095092419L)
 case class PeerInfo(lastSeen: Long, nonce: Option[Long] = None, nodeName: Option[String] = None)
 
 trait PeerDatabase {

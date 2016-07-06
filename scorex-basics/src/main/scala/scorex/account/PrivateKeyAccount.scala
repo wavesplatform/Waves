@@ -2,6 +2,7 @@ package scorex.account
 
 import scorex.crypto.EllipticCurveImpl
 
+@SerialVersionUID(8568952246932352318L)
 case class PrivateKeyAccount(seed: Array[Byte], privateKey: Array[Byte], override val publicKey: Array[Byte])
   extends PublicKeyAccount(publicKey) {
 

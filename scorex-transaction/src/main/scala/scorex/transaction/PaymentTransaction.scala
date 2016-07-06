@@ -12,6 +12,7 @@ import scorex.transaction.LagonakiTransaction.TransactionType
 
 import scala.util.{Failure, Try}
 
+@SerialVersionUID(-4989881425715590828L)
 case class PaymentTransaction(sender: PublicKeyAccount,
                               override val recipient: Account,
                               override val amount: Long,
