@@ -8,6 +8,7 @@ import org.h2.mvstore.`type`.DataType
 import scorex.serialization.BytesSerializable
 import scorex.transaction.{FeesStateChange, LagonakiTransaction, StateChangeReason}
 
+@SerialVersionUID(-3499112732510272830L)
 case class Row(state: AccState, reason: Reason, lastRowHeight: Int) extends DataType with BytesSerializable {
 
   lazy val bytes: Array[Byte] = Ints.toByteArray(lastRowHeight) ++

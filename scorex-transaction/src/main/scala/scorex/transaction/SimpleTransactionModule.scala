@@ -3,7 +3,7 @@ package scorex.transaction
 import com.google.common.primitives.{Bytes, Ints}
 import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsArray, JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
 import scorex.network.message.Message
@@ -11,7 +11,7 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.database.blockchain.{StoredState, StoredBlockTree, StoredBlockchain}
+import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
 import scorex.transaction.state.wallet.Payment
 import scorex.utils._
 import scorex.wallet.Wallet
@@ -19,6 +19,7 @@ import scorex.wallet.Wallet
 import scala.concurrent.duration._
 import scala.util.Try
 
+@SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
   extends BlockField[Seq[Transaction]] {
 

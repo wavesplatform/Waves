@@ -4,16 +4,22 @@ import java.io._
 
 import org.scalacheck.Gen
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{BeforeAndAfterAll, Matchers, PropSpec}
 import scorex.transaction.state.database.state._
 
 class RowSpecification extends PropSpec
   with PropertyChecks
   with GeneratorDrivenPropertyChecks
   with Matchers
-  with TransactionGen {
+  with TransactionGen
+  with BeforeAndAfterAll {
 
   val FileName = "object.data"
+
+  override def afterAll(): Unit = {
+    val testDataFile = new File(FileName)
+    if (testDataFile.exists) testDataFile.delete
+  }
 
   property("Row serialize and deserialize") {
     forAll(paymentGenerator, Gen.posNum[Long], Gen.posNum[Long], Gen.posNum[Int]) { (payment: PaymentTransaction,

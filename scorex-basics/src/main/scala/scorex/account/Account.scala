@@ -7,7 +7,7 @@ import scorex.utils.ScorexLogging
 
 import scala.util.Try
 
-
+@SerialVersionUID(-5326597598126993189L)
 class Account(val address: String) extends Serializable {
 
   lazy val bytes = Base58.decode(address).get
