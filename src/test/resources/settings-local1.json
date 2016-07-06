@@ -21,7 +21,8 @@
     "127.0.0.1",
     "123.123.123.123"
   ],
-  "maxRollback": 100,
+  "historySynchronizerTimeout": 3,
+  "maxRollback": 10,
   "offlineGeneration": true,
   "perma": {
     "treeDir": "/tmp/scorex/data1/tree/",

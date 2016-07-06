@@ -1,6 +1,7 @@
 package scorex.network.peer
 
 import java.net.InetSocketAddress
+import java.util
 
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.settings.Settings
@@ -19,28 +20,36 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
   private val blacklist: MVMap[String, Long] = database.openMap("blacklist")
 
   private lazy val ownNonce = settings.nodeNonce
-  private lazy val blacklistResidenceTimeMilliseconds = settings.blacklistResidenceTimeMilliseconds
 
   override def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
-    val updatedPeerInfo = Option(whitelistPersistence.get(address)).map { case dbPeerInfo =>
-      val nonceOpt = peerInfo.nonce.orElse(dbPeerInfo.nonce)
-      val nodeNameOpt = peerInfo.nodeName.orElse(dbPeerInfo.nodeName)
-      PeerInfo(peerInfo.lastSeen, nonceOpt, nodeNameOpt)
-    }.getOrElse(peerInfo)
-    whitelistPersistence.put(address, updatedPeerInfo)
-    updateBlacklist()
-    database.commit()
+    if (!isBlacklisted(address)) {
+      val updatedPeerInfo = Option(whitelistPersistence.get(address)).map { case dbPeerInfo =>
+        val nonceOpt = peerInfo.nonce.orElse(dbPeerInfo.nonce)
+        val nodeNameOpt = peerInfo.nodeName.orElse(dbPeerInfo.nodeName)
+        PeerInfo(peerInfo.lastSeen, nonceOpt, nodeNameOpt)
+      }.getOrElse(peerInfo)
+      whitelistPersistence.put(address, updatedPeerInfo)
+      database.commit()
+    }
   }
 
   override def blacklistPeer(address: InetSocketAddress): Unit = {
-    whitelistPersistence.remove(address)
-    if (!isBlacklisted(address)) blacklist += address.getHostName -> System.currentTimeMillis()
-    else blacklist(address.getHostName) = System.currentTimeMillis()
+    if (!isBlacklisted(address)) {
+      blacklist += address.getHostName -> System.currentTimeMillis()
+      new util.ArrayList(whitelistPersistence.keyList())
+        .filter(_.getHostName == address.getHostName)
+        .foreach(whitelistPersistence.remove(_))
+      database.commit()
+    }
+  }
+
+  override def removeFromBlacklist(address: InetSocketAddress): Unit = {
+    blacklist -= address.getHostName
+    whitelistPersistence.put(address, PeerInfo(System.currentTimeMillis(), None, None))
     database.commit()
   }
 
   override def isBlacklisted(address: InetSocketAddress): Boolean = {
-    updateBlacklist()
     blacklist.synchronized(blacklist.contains(address.getHostName))
   }
 
@@ -52,11 +61,4 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
 
   override def blacklistedPeers(): Seq[String] = blacklist.keys.toSeq
 
-  private def updateBlacklist(): Unit = {
-    val current = System.currentTimeMillis
-    blacklist.synchronized({
-      val toRemove = blacklist.filter(b => b._2 < current - blacklistResidenceTimeMilliseconds).keys
-      toRemove.foreach(k => blacklist.synchronized(blacklist.remove(k)))
-    })
-  }
 }
