@@ -1,3 +1,8 @@
+**v1.3.1**
+----------
+
+* Peers blacklist ttl configuration via "p2p"/"blacklistResidenceTimeMilliseconds"
+
 **1.2.8**
 ---------
 
