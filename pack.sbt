@@ -10,7 +10,7 @@ enablePlugins(DebianPlugin)
 linuxPackageMappings in Debian := linuxPackageMappings.value
 name in Debian := name.value
 version in Debian := version.value
-genChanges in Debian := new File("changelog.md")
+genChanges in Debian := new File("release-notes.md")
 
 name in Universal := name.value
 //

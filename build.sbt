@@ -1,6 +1,6 @@
 import com.typesafe.config.ConfigFactory
 
-organization := "org.consensusresearch"
+organization := "com.wavesplatform"
 
 val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
 
@@ -12,13 +12,12 @@ scalaVersion := "2.11.8"
 
 resolvers += "SonaType" at "https://oss.sonatype.org/content/groups/public"
 
-val modulesVersion = "1.2.8"
-
+val modulesVersion = "1.3.1"
 
 libraryDependencies ++= Seq(
-  "org.consensusresearch" %% "scorex-basics" % modulesVersion,
-  "org.consensusresearch" %% "scorex-consensus" % modulesVersion,
-  "org.consensusresearch" %% "scorex-transaction" % modulesVersion,
+  "com.wavesplatform" %% "scorex-basics" % modulesVersion,
+  "com.wavesplatform" %% "scorex-consensus" % modulesVersion,
+  "com.wavesplatform" %% "scorex-transaction" % modulesVersion,
   "io.spray" %% "spray-testkit" % "1.+" % "test",
   "org.scalatest" %% "scalatest" % "2.+" % "test",
   "org.scalactic" %% "scalactic" % "2.+" % "test",

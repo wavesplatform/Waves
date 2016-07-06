@@ -39,6 +39,9 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe.play" % "play-functional_2.11" % "2.4.6",
   "com.typesafe.play" % "play-iteratees_2.11" % "2.4.6",
   "com.typesafe.play" % "play-json_2.11" % "2.4.6",
+  "com.wavesplatform" % "scorex-basics_2.11" % "1.3.1",
+  "com.wavesplatform" % "scorex-consensus_2.11" % "1.3.1",
+  "com.wavesplatform" % "scorex-transaction_2.11" % "1.3.1",
   "commons-net" % "commons-net" % "3.4",
   "io.netty" % "netty" % "3.10.0.Final",
   "io.spray" % "spray-json_2.11" % "1.3.2",
@@ -57,9 +60,6 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.apache.commons" % "commons-lang3" % "3.2.1",
   "org.bitlet" % "weupnp" % "0.1.4",
   "org.codehaus.woodstox" % "stax2-api" % "3.1.4",
-  "org.consensusresearch" % "scorex-basics_2.11" % "1.2.8",
-  "org.consensusresearch" % "scorex-consensus_2.11" % "1.2.8",
-  "org.consensusresearch" % "scorex-transaction_2.11" % "1.2.8",
   "org.consensusresearch" % "scrypto_2.11" % "1.0.4",
   "org.javassist" % "javassist" % "3.18.2-GA",
   "org.joda" % "joda-convert" % "1.7",
@@ -83,4 +83,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.12"
 )
-// LIBRARY_DEPENDENCIES_HASH b5ff93e729d66f10faa35a3feaf8369c4113f7c3
+// LIBRARY_DEPENDENCIES_HASH e54abbb2d4fb8c235009512047e2e231c5671a5b
