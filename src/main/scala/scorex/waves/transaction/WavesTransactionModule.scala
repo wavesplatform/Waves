@@ -42,8 +42,8 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
     * TODO: Should be moved to Scorex
     */
   def signPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): PaymentTransaction = {
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp, Array.empty)
-    val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, Array.empty, sig)
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp)
+    val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
     payment
   }
 
@@ -51,8 +51,8 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
     * Create signed payment transaction and validate it through current state.
     */
   def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[PaymentTransaction, ValidationResult] = {
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp, Array.empty)
-    val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, Array.empty, sig)
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp)
+    val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
 
     payment.validate match {
       case ValidationResult.ValidateOke => {
@@ -79,7 +79,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
       val senderPubKey = Base58.decode(payment.senderPublicKey).get
       val recipientAccount = new Account(payment.recipient)
       val tx = new PaymentTransaction(new PublicKeyAccount(senderPubKey),
-        recipientAccount, payment.amount, payment.fee, time, Array.empty, sigBytes)
+        recipientAccount, payment.amount, payment.fee, time, sigBytes)
 
       tx.validate match {
         case ValidationResult.ValidateOke => {

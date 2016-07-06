@@ -1,3 +1,8 @@
+**0.2.1**
+
+* Peers blacklist ttl configuration via "p2p"/"blacklistResidenceTimeMilliseconds"
+* Upgrade to Waves' Scorex v1.3.1
+
 **0.2.0-RC7**
 
 * New API /waves/payment returns senderPublicKey
@@ -16,7 +21,7 @@
 * Fixed issue with incorrect Handshake
 * Balance with confirmations is the minimum balance
 * /waves/external-payment returns error if account balance invalid
-* New api method /consensus/generatingbalance/{address}
+* New API method /consensus/generatingbalance/{address}
 
 **0.2.0-RC3**
 

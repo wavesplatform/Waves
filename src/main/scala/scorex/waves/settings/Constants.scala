@@ -14,7 +14,7 @@ object Constants extends ScorexLogging {
   val Product = appConf.getString("product")
   val Release = appConf.getString("release")
   val VersionString = appConf.getString("version")
-  val AgentName = s"$Product - $Release v. $VersionString"
+  val AgentName = s"$Product - $Release v$VersionString"
 
   val AvgBlockDelay: Duration = 60.seconds
   val UnitsInWave = 100000000L
