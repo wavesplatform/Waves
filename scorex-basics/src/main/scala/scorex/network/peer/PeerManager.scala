@@ -132,6 +132,10 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     case AddToBlacklist(peer) =>
       log.info(s"Blacklist peer $peer")
       peerDatabase.blacklistPeer(peer)
+
+    case RemoveFromBlacklist(peer) =>
+      log.info(s"Remove peer $peer from blacklist")
+      peerDatabase.removeFromBlacklist(peer)
   }: Receive) orElse peerListOperations orElse apiInterface orElse peerCycle
 }
 
@@ -154,6 +158,8 @@ object PeerManager {
   case class Disconnected(remote: InetSocketAddress)
 
   case class AddToBlacklist(remote: InetSocketAddress)
+
+  case class RemoveFromBlacklist(remote: InetSocketAddress)
 
   case class FilterPeers(sendingStrategy: SendingStrategy)
 

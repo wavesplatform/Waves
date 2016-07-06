@@ -11,25 +11,44 @@ import scorex.utils._
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.util.Random
 
 trait TestingCommons {
 
   implicit object TestTransactionLayerSettings extends TransactionSettings {
     override val settingsJSON: JsObject = Json.obj()
   }
+
   implicit val consensusModule = application.consensusModule
   implicit val transactionModule = application.transactionModule
+
+  def randomFrom[T](seq: Seq[T]): T = {
+    require(seq.nonEmpty)
+    seq(Random.nextInt(seq.length))
+  }
+
+  def profile[R](block: => R): Long = {
+    val start = System.currentTimeMillis()
+    block
+    System.currentTimeMillis() - start
+  }
 
 }
 
 object TestingCommons {
-  lazy val applications = {
-    val apps = List(
-      new LagonakiApplication("settings-test.json"),
-      new LagonakiApplication("settings-local1.json"),
-      new LagonakiApplication("settings-local2.json")
-    )
-    apps.foreach(_.run())
+  lazy val applications = initialize(Seq(
+    "settings-test.json", "settings-local1.json", "settings-local2.json"))
+
+  lazy val application = applications.head
+
+  def initialize(settingsFileNames: Seq[String]): Seq[LagonakiApplication] = {
+    val apps = settingsFileNames.map(new LagonakiApplication(_))
+
+    apps.foreach { app =>
+      app.run()
+      Thread sleep 500
+    }
+
     apps.foreach { a =>
       if (a.wallet.privateKeyAccounts().isEmpty) a.wallet.generateNewAccounts(3)
       untilTimeout(20.seconds, 1.second) {
@@ -39,12 +58,11 @@ object TestingCommons {
         assert((json \ "consensusAlgo").asOpt[String].isDefined)
       }
     }
+
     apps
   }
 
-  lazy val application = applications.head
-
-  def peerUrl(a: LagonakiApplication = application): String =
+  def peerUrl(a: LagonakiApplication): String =
     "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
 
   def postRequest(us: String,

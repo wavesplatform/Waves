@@ -3,7 +3,7 @@ package scorex.transaction
 import com.google.common.primitives.{Bytes, Ints}
 import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsArray, JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
 import scorex.network.message.Message

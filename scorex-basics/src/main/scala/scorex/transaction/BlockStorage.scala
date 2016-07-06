@@ -41,17 +41,17 @@ trait BlockStorage extends ScorexLogging {
   }
 
   //Should be used for linear blockchain only
-  def removeAfter(signature: BlockId): Unit = synchronized {
+  def removeAfter(blockId: BlockId): Unit = synchronized {
     history match {
-      case h: BlockChain => h.heightOf(signature) match {
+      case h: BlockChain => h.heightOf(blockId) match {
         case Some(height) =>
-          while (!h.lastBlock.uniqueId.sameElements(signature)) h.discardBlock()
+          while (!h.lastBlock.uniqueId.sameElements(blockId)) h.discardBlock()
           state.rollbackTo(height)
         case None =>
-          log.warn(s"RemoveAfter non-existing block ${Base58.encode(signature)}")
+          log.warn(s"RemoveAfter non-existing block ${Base58.encode(blockId)}")
       }
       case _ =>
-        throw new RuntimeException("Not available for other option than linear blockchain")
+        // Not available for other option than linear blockchain
     }
   }
 
