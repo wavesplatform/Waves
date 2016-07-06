@@ -17,7 +17,7 @@ class ScorexAPISpecification extends FunSuite with Matchers {
     val version = getRequest("/scorex/version")
     (version \ "version").as[String].contains("Waves") shouldBe true
     (version \ "version").as[String].contains("Release0") shouldBe true
-    (version \ "version").as[String].contains("v. 0.2.") shouldBe true
+    (version \ "version").as[String].contains("v0.2.") shouldBe true
   }
 
   test("/scorex/stop API route protected by api key") {
