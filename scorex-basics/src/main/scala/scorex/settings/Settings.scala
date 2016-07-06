@@ -5,15 +5,14 @@ import java.net.InetSocketAddress
 
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
 /**
- * Settings
- */
+  * Settings
+  */
 
 trait Settings extends ScorexLogging {
 
@@ -55,6 +54,12 @@ trait Settings extends ScorexLogging {
   lazy val nodeNonce: Long = (Random.nextInt(1000) + 1000) * Random.nextInt(1000) + Random.nextInt(1000)
   lazy val nodeName = (p2pSettings \ "nodeName").asOpt[String]
     .getOrElse(Random.nextPrintableChar().toString + nodeNonce)
+
+  private val DefaultBlacklistResidenceTimeMilliseconds: Long = 10 * 60 * 1000
+
+  lazy val blacklistResidenceTimeMilliseconds: Long =
+    (p2pSettings \ "blacklistResidenceTimeMilliseconds").asOpt[Long]
+      .getOrElse(DefaultBlacklistResidenceTimeMilliseconds)
 
   lazy val localOnly = (p2pSettings \ "localOnly").asOpt[Boolean].getOrElse(false)
 
