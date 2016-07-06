@@ -1,4 +1,4 @@
-**0.2.1**
+**0.2.0**
 
 * Peers blacklist ttl configuration via "p2p"/"blacklistResidenceTimeMilliseconds"
 * Upgrade to Waves' Scorex v1.3.1
