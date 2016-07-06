@@ -1,7 +1,7 @@
 import sbt.Keys._
 
 lazy val commonSettings = Seq(
-  organization := "org.consensusresearch",
+  organization := "com.wavesplatform",
   version := version.value,
   scalaVersion := "2.11.8"
 )
@@ -71,7 +71,7 @@ mainClass in assembly := Some("scorex.lagonaki.server.Server")
 
 licenses in ThisBuild := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
 
-homepage in ThisBuild := Some(url("https://github.com/ConsensusResearch/Scorex-Lagonaki"))
+homepage in ThisBuild := Some(url("https://github.com/wavesplatform/Scorex"))
 
 publishMavenStyle in ThisBuild := true
 
@@ -91,19 +91,36 @@ pomIncludeRepository in ThisBuild := { _ => false }
 
 licenses in ThisBuild := Seq("CC0" -> url("https://creativecommons.org/publicdomain/zero/1.0/legalcode"))
 
-homepage in ThisBuild := Some(url("https://github.com/ConsensusResearch/Scorex-Lagonaki"))
+homepage in ThisBuild := Some(url("https://github.com/wavesplatform/Scorex"))
 
 pomExtra in ThisBuild :=
   <scm>
-    <url>git@github.com:ConsensusResearch/Scorex-Lagonaki.git</url>
-    <connection>scm:git:git@github.com:ConsensusResearch/Scorex-Lagonaki.git</connection>
+    <url>git@github.com:wavesplatform/Scorex.git</url>
+    <connection>scm:git@github.com:wavesplatform/Scorex.git</connection>
   </scm>
-    <developers>
-      <developer>
-        <id>kushti</id>
-        <name>Alexander Chepurnoy</name>
-        <url>http://chepurnoy.org/</url>
-      </developer>
-    </developers>
-
-credentials in ThisBuild += Credentials(Path.userHome / ".ivy2" / ".credentials")
+  <developers>
+    <developer>
+      <id>kushti</id>
+      <name>Alexander Chepurnoy</name>
+      <url>http://chepurnoy.org/</url>
+    </developer>
+    <developer>
+      <id>catena2w</id>
+      <name>catena</name>
+      <url>https://github.com/catena2w</url>
+    </developer>
+    <developer>
+      <id>gagarin55</id>
+      <url>https://github.com/gagarin55</url>
+    </developer>
+    <developer>
+      <id>alexeykiselev</id>
+      <name>Alexey Kiselev</name>
+      <url>https://github.com/alexeykiselev</url>
+    </developer>
+    <developer>
+      <id>asolovyov</id>
+      <name>Alexander Solovyov</name>
+      <url>https://github.com/asolovyov</url>
+    </developer>
+  </developers>
