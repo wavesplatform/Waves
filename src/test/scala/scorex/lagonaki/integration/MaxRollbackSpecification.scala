@@ -23,9 +23,6 @@ import scala.language.postfixOps
 
 class MaxRollbackSpecification extends FunSuite with Matchers with BeforeAndAfter with ScorexLogging {
 
-  Runtime.getRuntime.exec("rm -rf /tmp/scorex")
-  Thread sleep 500
-
   import TestingCommons.initialize
 
   val testTimeout = 100.seconds
