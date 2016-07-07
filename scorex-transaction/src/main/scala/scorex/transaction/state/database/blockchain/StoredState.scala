@@ -29,7 +29,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   val LastStates = "lastStates"
   val IncludedTx = "includedTx"
 
-  if(db.getStoreVersion > 0) db.rollback()
+  if (db.getStoreVersion > 0) db.rollback()
 
   private def accountChanges(key: Address): MVMap[Int, Row] = db.openMap(key.toString)
 
