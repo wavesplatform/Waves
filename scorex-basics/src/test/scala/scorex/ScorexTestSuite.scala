@@ -4,7 +4,7 @@ import org.scalatest.Suites
 import scorex.account.AccountSpecification
 import scorex.crypto.SigningFunctionsSpecification
 import scorex.crypto.ads.merkle.{AuthDataBlockSpecification, MerkleSpecification, MerkleTreeStorageSpecification}
-import scorex.network.HandshakeSpecification
+import scorex.network.{BlacklistParallelSpecification, BlacklistSpecification, HandshakeSpecification}
 
 class ScorexTestSuite extends Suites(
   new AccountSpecification,
@@ -12,5 +12,7 @@ class ScorexTestSuite extends Suites(
   new SigningFunctionsSpecification,
   new MerkleSpecification,
   new MerkleTreeStorageSpecification,
-  new HandshakeSpecification
+  new HandshakeSpecification,
+  new BlacklistParallelSpecification,
+  new BlacklistSpecification
 )

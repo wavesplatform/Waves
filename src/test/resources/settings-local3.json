@@ -12,10 +12,10 @@
     "port": 9089,
     "maxConnections": 10
   },
-  "walletDir": "/tmp/scorex/wallet3",
+  "walletDir": "/tmp/scorex-tests/wallet3",
   "walletPassword": "cookies",
   "walletSeed": "3",
-  "dataDir": "/tmp/scorex/data3",
+  "dataDir": "/tmp/scorex-tests/data3",
   "rpcPort": 9087,
   "rpcAllowed": [
     "127.0.0.1",
@@ -24,7 +24,7 @@
   "maxRollback": 100,
   "offlineGeneration": false,
   "perma": {
-    "treeDir": "/tmp/scorex/data3/tree/",
+    "treeDir": "/tmp/scorex-tests/data3/tree/",
     "authDataStorage": "authDataStorage3.mapDB"
   },
   "blockGenerationDelay": 501

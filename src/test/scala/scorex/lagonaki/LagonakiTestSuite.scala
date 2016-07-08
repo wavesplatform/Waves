@@ -31,7 +31,9 @@ class LagonakiTestSuite extends Suites(
 
 ) with BeforeAndAfterAll {
 
-  override protected def beforeAll() = {}
+  override protected def beforeAll() = {
+    Runtime.getRuntime.exec("rm -rf /tmp/scorex-tests")
+  }
 
   override protected def afterAll() = {
     applications.foreach(_.stopAll())
