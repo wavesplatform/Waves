@@ -27,7 +27,7 @@ with TransactionTestingCommons {
 
   def waitGenerationOfBlocks(howMany: Int): Unit = {
     val height = maxHeight()
-    untilTimeout(5.minutes, 10.seconds) {
+    untilTimeout(5.minutes, 1.seconds) {
       val heights = peers.map(_.blockStorage.history.height())
       log.info(s"Current heights are: $heights. Waiting for ${height + howMany}")
       heights.foreach(_ should be >= height + howMany)
@@ -84,16 +84,19 @@ with TransactionTestingCommons {
 
 
   test("Don't include same transactions twice") {
-    val last = history.lastBlock
-    val h = history.heightOf(last).get
-    val incl = includedTransactions(last, history)
-    require(incl.nonEmpty)
-    waitGenerationOfBlocks(0) // all peer should contain common block
-    peers.foreach { p =>
-      incl foreach { tx =>
-        p.blockStorage.state.included(tx).isDefined shouldBe true
-        p.blockStorage.state.included(tx).get should be <= h
+    //Wait until all peers contain transactions
+    val (incl, h) = untilTimeout(1.minutes, 1.seconds) {
+      val last = history.lastBlock
+      val h = history.heightOf(last).get
+      val incl = includedTransactions(last, history)
+      require(incl.nonEmpty)
+      peers.foreach { p =>
+        incl foreach { tx =>
+          p.blockStorage.state.included(tx).isDefined shouldBe true
+          p.blockStorage.state.included(tx).get should be <= h
+        }
       }
+      (incl, h)
     }
 
     stopGeneration()
@@ -133,7 +136,8 @@ with TransactionTestingCommons {
     }
     state.validate(trans).nonEmpty shouldBe true
     if (valid.size >= trans.size) {
-      log.error(s"Double spending: $trans | $valid | ${state.asInstanceOf[BalanceSheet].balance(trans.head.sender.address)}")
+      val balance = state.asInstanceOf[BalanceSheet].balance(trans.head.sender.address)
+      log.error(s"Double spending: ${trans.map(_.json)} | ${valid.map(_.json)} | $balance")
     }
     valid.size should be < trans.size
 
@@ -151,27 +155,35 @@ with TransactionTestingCommons {
       val last = history.lastBlock
       val st1 = state.hash
       val height = history.heightOf(last).get
+      val recepient = wallet.generateNewAccount()
 
       //Wait for nonEmpty block
       untilTimeout(1.minute, 1.second) {
-        genValidTransaction()
+        genValidTransaction(recepientOpt = recepient)
         peers.foreach(_.blockStorage.history.height() should be > height)
         history.height() should be > height
         history.lastBlock.transactions.nonEmpty shouldBe true
-        state.hash should not be st1
         peers.foreach(_.transactionModule.blockStorage.history.contains(last))
       }
+      state.hash should not be st1
       waitGenerationOfBlocks(0)
 
-      if (history.contains(last) || i < 0) {
+      if (peers.forall(p => p.history.contains(last))) {
         stopGeneration()
+        peers.foreach { p =>
+          p.transactionModule.blockStorage.removeAfter(last.uniqueId)
+        }
         peers.foreach { p =>
           p.transactionModule.blockStorage.removeAfter(last.uniqueId)
           p.history.lastBlock.encodedId shouldBe last.encodedId
         }
         state.hash shouldBe st1
         startGeneration()
-      } else rollback(i - 1)
+      } else {
+        require(i > 0, "History should contain last block at least sometimes")
+        log.warn("History do not contains last block")
+        rollback(i - 1)
+      }
     }
     rollback()
   }

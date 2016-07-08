@@ -6,9 +6,7 @@ trait AccountTransactionsHistory {
   def accountTransactions(address: String): Array[_ <: Transaction] = {
     Account.isValidAddress(address) match {
       case false => Array()
-      case true =>
-        val acc = new Account(address)
-        accountTransactions(acc)
+      case true => accountTransactions(new Account(address)).distinct
     }
   }
 

@@ -32,7 +32,6 @@ trait TestingCommons {
     block
     System.currentTimeMillis() - start
   }
-
 }
 
 object TestingCommons {
@@ -87,7 +86,6 @@ object TestingCommons {
       }
     }
 
-
     def request(us: String,
                 params: Map[String, String] = Map.empty,
                 body: String = "",
@@ -117,7 +115,6 @@ object TestingCommons {
       val response = Await.result(request, 5.seconds)
       Json.parse(response.getResponseBody)
     }
-
   }
 
   case object DELETE extends RequestType {
@@ -130,7 +127,5 @@ object TestingCommons {
       val response = Await.result(request, 5.seconds)
       Json.parse(response.getResponseBody)
     }
-
   }
-
 }

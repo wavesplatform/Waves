@@ -66,8 +66,8 @@ object BlockStorage {
 
   case object Reversed extends Direction
 
-  /*
- * Block and direction to process it
- */
+  /**
+    * Block and direction to process it
+    */
   type BlocksToProcess = Seq[Block]
 }

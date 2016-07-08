@@ -14,11 +14,9 @@ trait TransactionTestingCommons extends TestingCommons {
     transactionModule.blockStorage.appendBlock(Block.genesis())
   }
   val wallet = application.wallet
-  if (wallet.privateKeyAccounts().size < 3) {
-    wallet.generateNewAccounts(3)
-  }
-  val accounts = wallet.privateKeyAccounts()
-    .filter(a => consensusModule.generatingBalance(a) > 0)
+  if (wallet.privateKeyAccounts().size < 3) wallet.generateNewAccounts(3)
+
+  def accounts = wallet.privateKeyAccounts().filter(a => consensusModule.generatingBalance(a) > 0)
 
   val ab = accounts.map(consensusModule.generatingBalance(_)).sum
   require(ab > 2)
@@ -41,7 +39,7 @@ trait TransactionTestingCommons extends TestingCommons {
                           recepientOpt: Option[PrivateKeyAccount] = None,
                           senderOpt: Option[PrivateKeyAccount] = None
                          ): Transaction = {
-    val senderAcc = senderOpt.getOrElse(accounts(Random.nextInt(accounts.size)))
+    val senderAcc = senderOpt.getOrElse(randomFrom(accounts))
     val senderBalance = consensusModule.generatingBalance(senderAcc)
     require(senderBalance > 0)
     val fee = Random.nextInt(5).toLong + 1
@@ -50,7 +48,7 @@ trait TransactionTestingCommons extends TestingCommons {
     } else {
       val amt = if (randomAmnt) Math.abs(Random.nextLong() % (senderBalance - fee))
       else senderBalance - fee
-      val recepient: PrivateKeyAccount = recepientOpt.getOrElse(accounts(Random.nextInt(accounts.size)))
+      val recepient = recepientOpt.getOrElse(randomFrom(accounts))
       val tx = transactionModule.createPayment(senderAcc, recepient, amt, fee)
       if (transactionModule.blockStorage.state.isValid(tx)) tx
       else genValidTransaction(randomAmnt, recepientOpt, senderOpt)
