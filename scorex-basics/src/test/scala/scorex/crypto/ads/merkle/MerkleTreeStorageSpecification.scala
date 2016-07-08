@@ -11,7 +11,7 @@ import scorex.crypto.hash.CryptographicHash.Digest
 
 class MerkleTreeStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
-  val treeDirName = "/tmp/scorex-test/test/MapDBStorageSpecification/"
+  val treeDirName = "/tmp/scorex-tests/test/MapDBStorageSpecification/"
   val treeDir = new File(treeDirName)
   treeDir.mkdirs()
   val dbFile = new File(treeDirName + "/db.file")
