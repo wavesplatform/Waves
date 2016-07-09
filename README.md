@@ -1,15 +1,10 @@
-# Waves
+# Waves [![Build Status](https://travis-ci.org/wavesplatform/Waves.svg?branch=devel)](https://travis-ci.org/wavesplatform/Waves)
 
-**Please, put your own walletSeed into waves-testnet.json. It must be random Base58 string.**
-
-**A part of HTTP API must be closed by apiKeyHash in config. Use /utils/hash/secure http api to get hash for your api key.**
 
 [How to configure Waves node](https://github.com/wavesplatform/Waves/wiki/How-to-configure-Waves-node)
 
-**[How to use Testnet](https://github.com/wavesplatform/Waves/blob/master/Testnet.md)**
+**[How to run Testnet node](https://github.com/wavesplatform/Waves/blob/master/Testnet.md)**
 
-This is one Testnet Waves implementation on top of Scorex framework.
-There might be several development forks at once.
 
 # Installation
 ## Ubuntu
@@ -30,13 +25,6 @@ Ubuntu Server
 
 and agree with license terms
 
-#####Install SBT(Scala Build Tool):
-
-`echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list`
-
-`apt-get update`
-
-`apt-get install sbt`
 
 
 ## Run a node
@@ -52,9 +40,23 @@ Install it
 Run `waves waves-testnet.json`.
 
 
-### Create package
+### Compile and Create package
 
-For now it is only possible to create deb package with `sbt debian:packageBin` command
+For now it is only possible to create deb package.
+
+#####Install SBT(Scala Build Tool):
+
+`echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list`
+
+`apt-get update`
+
+`apt-get install sbt`
+
+#####Create package
+
+`sbt debian:packageBin`
+
+.deb package will be in /target folder
 
 ## Other system
 
