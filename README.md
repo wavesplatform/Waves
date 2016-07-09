@@ -1,4 +1,4 @@
-# Waves [![Build Status](https://travis-ci.org/wavesplatform/Waves.svg?branch=devel)](https://travis-ci.org/wavesplatform/Waves)
+# Waves [![Build Status](https://travis-ci.org/wavesplatform/Waves.svg?branch=mainnet)](https://travis-ci.org/wavesplatform/Waves)
 
 
 [How to configure Waves node](https://github.com/wavesplatform/Waves/wiki/How-to-configure-Waves-node)
