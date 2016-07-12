@@ -25,20 +25,20 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       Given("Peer database is empty")
       val peerDatabase = new PeerDatabaseImpl(TestSettings, None)
       assert(peerDatabase.knownPeers(false).isEmpty)
-      assert(peerDatabase.blacklistedPeers().isEmpty)
+      assert(peerDatabase.blacklisted.isEmpty)
 
-      When("Peer adds another peer to whitelist")
+      When("Peer adds another peer to knownPeers")
       val anotherPeer = new PeerInfo(System.currentTimeMillis)
       val port: Int = 1234
       val address = new InetSocketAddress(InetAddress.getByName("localhost"), port)
       peerDatabase.addOrUpdateKnownPeer(address, anotherPeer)
       assert(peerDatabase.knownPeers(false).contains(address))
-      assert(!peerDatabase.blacklistedPeers().contains(address.getHostName))
+      assert(!peerDatabase.blacklisted.contains(address))
 
       And("Peer blacklists another peer")
-      peerDatabase.blacklistPeer(address)
+      peerDatabase.blacklist(address)
       assert(peerDatabase.isBlacklisted(address))
-      assert(peerDatabase.blacklistedPeers().contains(address.getHostName))
+      assert(peerDatabase.blacklisted.contains(address))
       assert(!peerDatabase.knownPeers(false).contains(address))
 
       And("Peer waits for some time")
@@ -47,8 +47,8 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       Then("Another peer disappear from blacklist")
       assert(!peerDatabase.isBlacklisted(address))
 
-      And("Another peer still not in whitelist")
-      assert(!peerDatabase.knownPeers(false).contains(address))
+      And("Another peer became known")
+      assert(peerDatabase.knownPeers(false).contains(address))
     }
   }
 }

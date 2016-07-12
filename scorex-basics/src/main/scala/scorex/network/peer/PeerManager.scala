@@ -66,7 +66,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       sender() ! peerDatabase.knownPeers(true)
 
     case GetBlacklistedPeers =>
-      sender() ! peerDatabase.blacklistedPeers()
+      sender() ! peerDatabase.blacklisted
   }
 
   private def peerCycle: Receive = {
@@ -131,11 +131,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case AddToBlacklist(peer) =>
       log.info(s"Blacklist peer $peer")
-      peerDatabase.blacklistPeer(peer)
+      peerDatabase.blacklist(peer)
 
     case RemoveFromBlacklist(peer) =>
       log.info(s"Remove peer $peer from blacklist")
-      peerDatabase.removeFromBlacklist(peer)
+      peerDatabase.unBlacklist(peer)
   }: Receive) orElse peerListOperations orElse apiInterface orElse peerCycle
 }
 
