@@ -3,6 +3,7 @@ package scorex.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
@@ -24,8 +25,8 @@ case class WalletApiRoute(override val application: Application)(implicit val co
     path("wallet" / "seed") {
       withAuth {
         getJsonRoute {
-          lazy val seedJs = Json.obj("seed" -> Base58.encode(wallet.seed))
-          walletNotExists(wallet).getOrElse(seedJs)
+          lazy val response = JsonResponse(Json.obj("seed" -> Base58.encode(wallet.seed)), StatusCodes.OK)
+          walletNotExists(wallet).getOrElse(response)
         }
       }
     }
@@ -36,7 +37,7 @@ case class WalletApiRoute(override val application: Application)(implicit val co
   def root: Route = {
     path("wallet") {
       getJsonRoute {
-        Json.obj("exists" -> wallet.exists())
+        JsonResponse(Json.obj("exists" -> wallet.exists()), StatusCodes.OK)
       }
     }
   }

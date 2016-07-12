@@ -22,7 +22,7 @@ trait TransactionTestingCommons extends TestingCommons {
   require(ab > 2)
 
   def genValidBlock(): Block = {
-    Await.result(consensusModule.generateNextBlocks(accounts)(transactionModule), 10.seconds).headOption match {
+    Await.result(consensusModule.generateNextBlocks(accounts)(transactionModule), 20.seconds).headOption match {
       case Some(block: Block) if block.isValid => block
       case None =>
         Thread.sleep(500)

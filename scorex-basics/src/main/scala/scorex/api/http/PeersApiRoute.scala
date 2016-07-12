@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import io.swagger.annotations._
@@ -36,13 +37,16 @@ case class PeersApiRoute(override val application: Application)(implicit val con
       (application.peerManager ? PeerManager.GetAllPeers)
         .mapTo[Map[InetSocketAddress, PeerInfo]]
         .map { peers =>
-          Json.arr(peers.map { case (address, peerInfo) =>
-            Json.obj(
-              "address" -> address.toString,
-              "nodeName" -> (peerInfo.nodeName.getOrElse("N/A"): String),
-              "nodeNonce" -> (peerInfo.nonce.map(_.toString).getOrElse("N/A"): String)
-            )
-          })
+          JsonResponse(
+            Json.arr(peers.map { case (address, peerInfo) =>
+              Json.obj(
+                "address" -> address.toString,
+                "nodeName" -> (peerInfo.nodeName.getOrElse("N/A"): String),
+                "nodeNonce" -> (peerInfo.nonce.map(_.toString).getOrElse("N/A"): String)
+              )
+            }),
+            StatusCodes.OK
+          )
         }
     }
   }
@@ -64,7 +68,7 @@ case class PeersApiRoute(override val application: Application)(implicit val con
               "peerNonce" -> handshake.nodeNonce
             )
           })
-          Json.obj("peers" -> peerData)
+          JsonResponse(Json.obj("peers" -> peerData), StatusCodes.OK)
         }
     }
   }
@@ -90,8 +94,9 @@ case class PeersApiRoute(override val application: Application)(implicit val con
             val port = (js \ "port").as[Int]
             val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(host), port)
             application.networkController ! ConnectTo(add)
-            Json.obj("hostname" -> add.getHostName, "status" -> "Trying to connect")
-          }.getOrElse(WrongJson.json)
+
+            JsonResponse(Json.obj("hostname" -> add.getHostName, "status" -> "Trying to connect"), StatusCodes.OK)
+          }.getOrElse(WrongJson.response)
         }
       }
     }
@@ -107,10 +112,8 @@ case class PeersApiRoute(override val application: Application)(implicit val con
       (application.peerManager ? PeerManager.GetBlacklistedPeers)
         .mapTo[Map[InetSocketAddress, PeerInfo]]
         .map { peers =>
-          JsArray(peers.map(i => JsString(i._1.getHostName + ":" + i._1.getPort)).toSeq)
+          JsonResponse(JsArray(peers.map(i => JsString(i._1.getHostName + ":" + i._1.getPort)).toSeq), StatusCodes.OK)
         }
     }
   }
-
-
 }

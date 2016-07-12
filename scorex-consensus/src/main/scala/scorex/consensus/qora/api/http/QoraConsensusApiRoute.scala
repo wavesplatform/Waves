@@ -3,10 +3,11 @@ package scorex.consensus.qora.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidNotNumber}
+import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidNotNumber, JsonResponse}
 import scorex.app.Application
 import scorex.consensus.qora.QoraLikeConsensusModule
 
@@ -49,7 +50,7 @@ case class QoraConsensusApiRoute(override val application: Application)
     path("generatingbalance") {
       getJsonRoute {
         val generatingBalance = consensusModule.getNextBlockGeneratingBalance(blockStorage.history)
-        Json.obj("generatingbalance" -> generatingBalance)
+        JsonResponse(Json.obj("generatingbalance" -> generatingBalance), StatusCodes.OK)
       }
     }
   }
@@ -62,11 +63,10 @@ case class QoraConsensusApiRoute(override val application: Application)
   def timeForBalance: Route = {
     path("time" / Segment) { case generatingBalance =>
       getJsonRoute {
-        val jsRes = Try {
+        Try {
           val timePerBlock = consensusModule.getBlockTime(generatingBalance.toLong)
-          Json.obj("time" -> timePerBlock)
-        }.getOrElse(InvalidNotNumber.json)
-        jsRes
+          JsonResponse(Json.obj("time" -> timePerBlock), StatusCodes.OK)
+        }.getOrElse(InvalidNotNumber.response)
       }
     }
   }
@@ -79,7 +79,7 @@ case class QoraConsensusApiRoute(override val application: Application)
         val block = blockStorage.history.lastBlock
         val genBalance = consensusModule.consensusBlockData(block).generatingBalance
         val timePerBlock = consensusModule.getBlockTime(genBalance)
-        Json.obj("time" -> timePerBlock)
+        JsonResponse(Json.obj("time" -> timePerBlock), StatusCodes.OK)
       }
     }
   }
@@ -89,7 +89,7 @@ case class QoraConsensusApiRoute(override val application: Application)
   def algo: Route = {
     path("algo") {
       getJsonRoute {
-        Json.obj("consensusAlgo" -> "qora")
+        JsonResponse(Json.obj("consensusAlgo" -> "qora"), StatusCodes.OK)
       }
     }
   }

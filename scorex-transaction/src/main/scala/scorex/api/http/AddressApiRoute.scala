@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -40,11 +41,13 @@ case class AddressApiRoute(override val application: Application)(implicit val c
         deleteJsonRoute {
           walletNotExists(wallet).getOrElse {
             if (!Account.isValidAddress(address)) {
-              InvalidAddress.json
+              InvalidAddress.response
             } else {
               val deleted = wallet.privateKeyAccount(address).exists(account =>
                 wallet.deleteAccount(account))
-              Json.obj("deleted" -> deleted)
+              val json = Json.obj("deleted" -> deleted)
+
+              JsonResponse(json, StatusCodes.OK)
             }
           }
         }
@@ -177,7 +180,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   def validate: Route = {
     path("validate" / Segment) { case address =>
       getJsonRoute {
-        Json.obj("address" -> address, "valid" -> Account.isValidAddress(address))
+        val json = Json.obj("address" -> address, "valid" -> Account.isValidAddress(address))
+        JsonResponse(json, StatusCodes.OK)
       }
     }
   }
@@ -187,7 +191,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   def root: Route = {
     path("addresses") {
       getJsonRoute {
-        JsArray(wallet.privateKeyAccounts().map(a => JsString(a.address)))
+        val json = JsArray(wallet.privateKeyAccounts().map(a => JsString(a.address)))
+        JsonResponse(json, StatusCodes.OK)
       }
     }
   }
@@ -201,9 +206,11 @@ case class AddressApiRoute(override val application: Application)(implicit val c
   def seq: Route = {
     path("seq" / IntNumber / IntNumber) { case (start, end) =>
       getJsonRoute {
-        JsArray(
+        val json = JsArray(
           wallet.privateKeyAccounts().map(a => JsString(a.address)).slice(start, end)
         )
+
+        JsonResponse(json, StatusCodes.OK)
       }
     }
   }
@@ -216,8 +223,8 @@ case class AddressApiRoute(override val application: Application)(implicit val c
         postJsonRoute {
           walletNotExists(wallet).getOrElse {
             wallet.generateNewAccount() match {
-              case Some(pka) => Json.obj("address" -> pka.address)
-              case None => Unknown.json
+              case Some(pka) => JsonResponse(Json.obj("address" -> pka.address), StatusCodes.OK)
+              case None => Unknown.response
             }
           }
         }
@@ -225,15 +232,16 @@ case class AddressApiRoute(override val application: Application)(implicit val c
     }
   }
 
-  private def balanceJson(address: String, confirmations: Int) =
+  private def balanceJson(address: String, confirmations: Int): JsonResponse =
     if (!Account.isValidAddress(address)) {
-      InvalidAddress.json
+      InvalidAddress.response
     } else {
-      Json.obj(
+      val json = Json.obj(
         "address" -> address,
         "confirmations" -> confirmations,
         "balance" -> state.balanceWithConfirmations(address, confirmations)
       )
+      JsonResponse(json, StatusCodes.OK)
     }
 
   private def signPath(address: String, encode: Boolean) = {
@@ -242,18 +250,19 @@ case class AddressApiRoute(override val application: Application)(implicit val c
         postJsonRoute {
           walletNotExists(wallet).getOrElse {
             if (!Account.isValidAddress(address)) {
-              InvalidAddress.json
+              InvalidAddress.response
             } else {
               wallet.privateKeyAccount(address) match {
-                case None => WalletAddressNotExists.json
+                case None => WalletAddressNotExists.response
                 case Some(account) =>
                   Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
                     case Success(signature) =>
                       val msg = if (encode) Base58.encode(message.getBytes) else message
-                      Json.obj("message" -> msg,
+                      val json = Json.obj("message" -> msg,
                         "publickey" -> Base58.encode(account.publicKey),
                         "signature" -> Base58.encode(signature))
-                    case Failure(t) => json(t)
+                      JsonResponse(json, StatusCodes.OK)
+                    case Failure(t) => JsonResponse(json(t), StatusCodes.InternalServerError)
                   }
               }
             }
@@ -268,30 +277,33 @@ case class AddressApiRoute(override val application: Application)(implicit val c
     entity(as[String]) { jsText =>
       withAuth {
         postJsonRoute {
-          val parsed = Try(Json.parse(jsText)).getOrElse(WrongJson.json)
-          parsed.validate[SignedMessage] match {
-            case err: JsError =>
-              WrongJson.json
-            case JsSuccess(m: SignedMessage, _) =>
-              if (!Account.isValidAddress(address)) {
-                InvalidAddress.json
-              } else {
-                //DECODE SIGNATURE
-                val msg: Try[Array[Byte]] = if (decode) Base58.decode(m.message) else Success(m.message.getBytes)
-                (msg, Base58.decode(m.signature), Base58.decode(m.publickey)) match {
-                  case (Failure(_), _, _) => InvalidMessage.json
-                  case (_, Failure(_), _) => InvalidSignature.json
-                  case (_, _, Failure(_)) => InvalidPublicKey.json
-                  case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-                    val account = new PublicKeyAccount(pubKeyBytes)
-                    val isValid = account.address == address &&
-                      EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
-                    Json.obj("valid" -> isValid)
+          Try(Json.parse(jsText)) match {
+            case Success(parsed) => parsed.validate[SignedMessage] match {
+              case err: JsError =>
+                WrongJson.response
+              case JsSuccess(m: SignedMessage, _) =>
+                if (!Account.isValidAddress(address)) {
+                  InvalidAddress.response
+                } else {
+                  //DECODE SIGNATURE
+                  val msg: Try[Array[Byte]] = if (decode) Base58.decode(m.message) else Success(m.message.getBytes)
+                  (msg, Base58.decode(m.signature), Base58.decode(m.publickey)) match {
+                    case (Failure(_), _, _) => InvalidMessage.response
+                    case (_, Failure(_), _) => InvalidSignature.response
+                    case (_, _, Failure(_)) => InvalidPublicKey.response
+                    case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
+                      val account = new PublicKeyAccount(pubKeyBytes)
+                      val isValid = account.address == address &&
+                        EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
+                      JsonResponse(Json.obj("valid" -> isValid), StatusCodes.OK)
+                  }
                 }
-              }
-          }
+            }
+          case Failure(_) => WrongJson.response
         }
       }
     }
   }
+}
+
 }

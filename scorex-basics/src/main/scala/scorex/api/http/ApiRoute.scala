@@ -2,7 +2,7 @@ package scorex.api.http
 
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode}
 import akka.http.scaladsl.server.{Directive0, Directives, Route}
 import akka.util.Timeout
 import play.api.libs.json.JsValue
@@ -12,6 +12,8 @@ import scorex.crypto.hash.SecureCryptographicHash
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+
+final case class JsonResponse(response: JsValue, code: StatusCode)
 
 trait ApiRoute extends Directives with CommonApiFunctions {
   val application: Application
@@ -25,21 +27,21 @@ trait ApiRoute extends Directives with CommonApiFunctions {
 
   def actorRefFactory: ActorRefFactory = context
 
-  def getJsonRoute(fn: Future[JsValue]): Route =
+  def getJsonRoute(fn: Future[JsonResponse]): Route =
     jsonRoute(Await.result(fn, timeout.duration), get)
 
-  def getJsonRoute(fn: JsValue): Route = jsonRoute(fn, get)
+  def getJsonRoute(fn: JsonResponse): Route = jsonRoute(fn, get)
 
-  def postJsonRoute(fn: JsValue): Route = jsonRoute(fn, post)
+  def postJsonRoute(fn: JsonResponse): Route = jsonRoute(fn, post)
 
-  def postJsonRoute(fn: Future[JsValue]): Route = jsonRoute(Await.result(fn, timeout.duration), post)
+  def postJsonRoute(fn: Future[JsonResponse]): Route = jsonRoute(Await.result(fn, timeout.duration), post)
 
-  def deleteJsonRoute(fn: JsValue): Route = jsonRoute(fn, delete)
+  def deleteJsonRoute(fn: JsonResponse): Route = jsonRoute(fn, delete)
 
-  def deleteJsonRoute(fn: Future[JsValue]): Route = jsonRoute(Await.result(fn, timeout.duration), delete)
+  def deleteJsonRoute(fn: Future[JsonResponse]): Route = jsonRoute(Await.result(fn, timeout.duration), delete)
 
-  private def jsonRoute(fn: JsValue, method: Directive0): Route = method {
-    val resp = complete(HttpEntity(ContentTypes.`application/json`, fn.toString()))
+  private def jsonRoute(fn: JsonResponse, method: Directive0): Route = method {
+    val resp = complete(fn.code -> HttpEntity(ContentTypes.`application/json`, fn.response.toString()))
     withCors(resp)
   }
 
@@ -51,7 +53,7 @@ trait ApiRoute extends Directives with CommonApiFunctions {
   def withAuth(route: => Route): Route = {
     optionalHeaderValueByName("api_key") { case keyOpt =>
       if (isValid(keyOpt)) route
-      else complete(HttpEntity(ContentTypes.`application/json`, ApiKeyNotValid.json.toString()))
+      else complete(ApiKeyNotValid.code -> HttpEntity(ContentTypes.`application/json`, ApiKeyNotValid.json.toString()))
     }
   }
 

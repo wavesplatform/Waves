@@ -4,9 +4,10 @@ import java.security.SecureRandom
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
-import play.api.libs.json.{JsValue, Json}
+import play.api.libs.json.Json
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
@@ -16,10 +17,11 @@ import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 case class UtilsApiRoute(override val application: Application)(implicit val context: ActorRefFactory) extends ApiRoute {
   val SeedSize = 32
 
-  private def seed(length: Int): JsValue = {
+  private def seed(length: Int): JsonResponse = {
     val seed = new Array[Byte](length)
     new SecureRandom().nextBytes(seed) //seed mutated here!
-    Json.obj("seed" -> Base58.encode(seed))
+    val json = Json.obj("seed" -> Base58.encode(seed))
+    JsonResponse(json, StatusCodes.OK)
   }
 
   override val route = pathPrefix("utils") {
@@ -62,7 +64,9 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
       entity(as[String]) { message =>
         withAuth {
           postJsonRoute {
-            Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
+            val json = Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
+
+            JsonResponse(json, StatusCodes.OK)
           }
         }
       }
@@ -82,7 +86,8 @@ case class UtilsApiRoute(override val application: Application)(implicit val con
       entity(as[String]) { message =>
         withAuth {
           postJsonRoute {
-            Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message)))
+            val json = Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message)))
+            JsonResponse(json, StatusCodes.OK)
           }
         }
       }

@@ -3,6 +3,7 @@ package scorex.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
@@ -38,7 +39,7 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
         val txJsons = state.accountTransactions(address)
           .takeRight(limit)
           .map(_.json)
-        Json.arr(txJsons)
+        JsonResponse(Json.arr(txJsons), StatusCodes.OK)
       }
     }
   }
@@ -52,7 +53,7 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
     path("address" / Segment) { case address =>
       getJsonRoute {
         val txJsons = state.accountTransactions(address).map(_.json)
-        Json.arr(txJsons)
+        JsonResponse(Json.arr(txJsons), StatusCodes.OK)
       }
     }
   }
@@ -72,11 +73,15 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
                 Try {
                   val block = application.blockStorage.history.asInstanceOf[StoredBlockchain].blockAt(h).get
                   val tx = block.transactions.filter(_.signature sameElements sig).head
-                  tx.json + ("height" -> Json.toJson(h))
-                }.getOrElse(Json.obj("status" -> "error", "details" -> "Internal error"))
-              case None => Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain")
+                  val json = tx.json + ("height" -> Json.toJson(h))
+                  JsonResponse(json, StatusCodes.OK)
+                }.getOrElse(JsonResponse(Json.obj("status" -> "error", "details" -> "Internal error"),
+                  StatusCodes.InternalServerError))
+              case None => JsonResponse(Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"),
+                StatusCodes.NotFound)
             }
-          case _ => Json.obj("status" -> "error", "details" -> "Incorrect signature")
+          case _ => JsonResponse(Json.obj("status" -> "error", "details" -> "Incorrect signature"),
+            StatusCodes.UnprocessableEntity)
         }
       }
     }
@@ -87,7 +92,8 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
   def unconfirmed: Route = {
     path("unconfirmed") {
       getJsonRoute {
-        JsArray(application.transactionModule.utxStorage.all().map(_.json))
+        val json = JsArray(application.transactionModule.utxStorage.all().map(_.json))
+        JsonResponse(json, StatusCodes.OK)
       }
     }
   }
