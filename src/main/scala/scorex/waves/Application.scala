@@ -76,7 +76,7 @@ class Application(val settingsFilename: String) extends {
 
 object Application extends App with ScorexLogging {
 
-  log.debug("Start server with args: {} ", args)
+  log.debug(s"Start server with args: $args")
   val filename = args.headOption.getOrElse("settings.json")
 
   val application = new Application(filename)

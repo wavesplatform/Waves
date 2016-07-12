@@ -69,10 +69,10 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   /**
     * Publish signed payment transaction which generated outside node
     */
-  def broadcastPayment(payment: SignedPayment): Either[PaymentTransaction, ValidationResult] = {
+  def broadcastPayment(payment: SignedPayment): Either[ValidationResult, PaymentTransaction] = {
     if (payment.fee < minimumTxFee)
-      // TODO : add ValidationResult.InvalidFee to Scorex
-      Right(ValidationResult.NegativeFee)
+    // TODO : add ValidationResult.InvalidFee to Scorex
+      Left(ValidationResult.NegativeFee)
     else {
       val time = payment.timestamp
       val sigBytes = Base58.decode(payment.signature).get
@@ -85,12 +85,12 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
         case ValidationResult.ValidateOke => {
           if (blockStorage.state.isValid(tx)) {
             onNewOffchainTransaction(tx)
-            Left(tx)
+            Right(tx)
           } else {
-            Right(ValidationResult.NoBalance)
+            Left(ValidationResult.NoBalance)
           }
         }
-        case error: ValidationResult => Right(error)
+        case error: ValidationResult => Left(error)
       }
     }
   }
@@ -99,12 +99,12 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
 
     val totalBalance = InitialBalance
     val txs = List(
-      GenesisTransaction( new Account("3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"), totalBalance - 5 * Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3MyTvqfeLWkvjSZ1hwkhQjzipZr7Pk8dyMR"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3MqS3mVY4Yr4HoTdpWiEaq9phwbaoWS2W6A"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3N3CDuzGXB2qP5vb2NvnnDQ68HahNCfYVBg"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3N2sacZ9XTQUkLDdZZgtb1zJUAmr6oziRrU"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3N189PMB8BaxngN3fNvDRkFbvbH8xMkk328"), Constants.UnitsInWave, GenesisTransactionsTimestamp)
+      GenesisTransaction(new Account("3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"), totalBalance - 5 * Constants.UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction(new Account("3MyTvqfeLWkvjSZ1hwkhQjzipZr7Pk8dyMR"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction(new Account("3MqS3mVY4Yr4HoTdpWiEaq9phwbaoWS2W6A"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction(new Account("3N3CDuzGXB2qP5vb2NvnnDQ68HahNCfYVBg"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction(new Account("3N2sacZ9XTQUkLDdZZgtb1zJUAmr6oziRrU"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
+      GenesisTransaction(new Account("3N189PMB8BaxngN3fNvDRkFbvbH8xMkk328"), Constants.UnitsInWave, GenesisTransactionsTimestamp)
     )
     require(txs.foldLeft(0L)(_ + _.amount) == InitialBalance)
 
