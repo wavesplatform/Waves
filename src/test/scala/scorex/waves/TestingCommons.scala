@@ -1,5 +1,7 @@
 package scorex.waves
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.transaction.TransactionSettings
@@ -36,6 +38,19 @@ object TestingCommons {
   }
 
   lazy val application = applications.head
+
+  lazy val counter: AtomicInteger = new AtomicInteger(0)
+
+  def start(): Unit = {
+    counter.incrementAndGet
+  }
+
+  def stop(): Unit = {
+    if (counter.decrementAndGet == 0) {
+      Http.shutdown()
+      application.stopAll()
+    }
+  }
 
   def peerUrl(a: Application = application): String =
     "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort

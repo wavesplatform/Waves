@@ -31,6 +31,9 @@ assemblyJarName in assembly := "waves.jar"
 
 test in assembly := {}
 
+fork in ThisBuild := true
+parallelExecution in ThisBuild := false
+
 mainClass in assembly := Some("scorex.waves.Application")
 
 assemblyMergeStrategy in assembly := {
