@@ -3,6 +3,7 @@ package scorex.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
@@ -33,7 +34,8 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   def address: Route = {
     path("address" / Segment / IntNumber / IntNumber) { case (address, start, end) =>
       getJsonRoute {
-        JsArray(history.generatedBy(new Account(address), start, end).map(_.json))
+        val json = JsArray(history.generatedBy(new Account(address), start, end).map(_.json))
+        JsonResponse(json, StatusCodes.OK)
       }
     }
   }
@@ -96,7 +98,8 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   def height: Route = {
     path("height") {
       getJsonRoute {
-        Json.obj("height" -> history.height())
+        val json = Json.obj("height" -> history.height())
+        JsonResponse(json, StatusCodes.OK)
       }
     }
   }
@@ -110,13 +113,19 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
     path("at" / IntNumber) { case height =>
       getJsonRoute {
         history match {
-          case blockchain: BlockChain =>
-            blockchain
-              .blockAt(height)
-              .map(_.json)
-              .getOrElse(Json.obj("status" -> "error", "details" -> "No block for this height"))
+          case blockchain: BlockChain => {
+            blockchain.blockAt(height).map(_.json) match {
+              case Some(json) => JsonResponse(json, StatusCodes.OK)
+              case None => {
+                val json = Json.obj("status" -> "error", "details" -> "No block for this height")
+                JsonResponse(json, StatusCodes.NotFound)
+              }
+            }
+          }
           case _ =>
-            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")
+            val json =
+              Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")
+            JsonResponse(json, StatusCodes.NotFound)
         }
       }
     }
@@ -133,13 +142,16 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
       getJsonRoute {
         history match {
           case blockchain: BlockChain =>
-            JsArray(
+            val json = JsArray(
               (start to end).map { height =>
                 blockchain.blockAt(height).map(_.json + ("height" -> Json.toJson(height)))
                   .getOrElse(Json.obj("error" -> s"No block at height $height"))
               })
+            JsonResponse(json, StatusCodes.OK)
           case _ =>
-            Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")
+            JsonResponse(
+              Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain"),
+              StatusCodes.BadRequest)
         }
       }
     }
@@ -151,7 +163,7 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   def last: Route = {
     path("last") {
       getJsonRoute {
-        history.lastBlock.json
+        JsonResponse(history.lastBlock.json, StatusCodes.OK)
       }
     }
   }
@@ -161,7 +173,7 @@ case class BlocksApiRoute(override val application: Application)(implicit val co
   def first: Route = {
     path("first") {
       getJsonRoute {
-        history.genesis.json
+        JsonResponse(history.genesis.json, StatusCodes.OK)
       }
     }
   }

@@ -3,6 +3,7 @@ package scorex.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
@@ -50,32 +51,32 @@ case class PaymentApiRoute(override val application: Application)(implicit val c
             Try(Json.parse(body)).map { js =>
               js.validate[Payment] match {
                 case err: JsError =>
-                  WrongTransactionJson(err).json
+                  WrongTransactionJson(err).response
                 case JsSuccess(payment: Payment, _) =>
                   val txOpt = transactionModule.createPayment(payment, wallet)
                   txOpt match {
                     case Some(tx) =>
                       tx.validate match {
                         case ValidationResult.ValidateOke =>
-                          tx.json
+                          JsonResponse(tx.json, StatusCodes.OK)
 
                         case ValidationResult.InvalidAddress =>
-                          InvalidAddress.json
+                          InvalidAddress.response
 
                         case ValidationResult.NegativeAmount =>
-                          NegativeAmount.json
+                          NegativeAmount.response
 
                         case ValidationResult.NegativeFee =>
-                          NegativeFee.json
+                          NegativeFee.response
 
                         case ValidationResult.NoBalance =>
-                          NoBalance.json
+                          NoBalance.response
                       }
                     case None =>
-                      InvalidSender.json
+                      InvalidSender.response
                   }
               }
-            }.getOrElse(WrongJson.json)
+            }.getOrElse(WrongJson.response)
           }
         }
       }

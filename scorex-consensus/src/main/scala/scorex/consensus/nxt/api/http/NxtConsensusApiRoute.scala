@@ -3,11 +3,12 @@ package scorex.consensus.nxt.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.account.Account
-import scorex.api.http.{InvalidAddress, ApiRoute, CommonApiFunctions}
+import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress, JsonResponse}
 import scorex.app.Application
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.crypto.encode.Base58
@@ -35,12 +36,12 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
     path("generatingbalance" / Segment) { case address =>
       getJsonRoute {
         if (!Account.isValidAddress(address)) {
-          InvalidAddress.json
+          InvalidAddress.response
         } else {
-          Json.obj(
+          val json = Json.obj(
             "address" -> address,
-            "balance" -> consensusModule.generatingBalance(address)(application.transactionModule)
-          )
+            "balance" -> consensusModule.generatingBalance(address)(application.transactionModule))
+          JsonResponse(json, StatusCodes.OK)
         }
       }
     }
@@ -71,7 +72,7 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
       getJsonRoute {
         val lastBlock = blockStorage.history.lastBlock
         val gs = consensusModule.consensusBlockData(lastBlock).generationSignature
-        Json.obj("generationSignature" -> Base58.encode(gs))
+        JsonResponse(Json.obj("generationSignature" -> Base58.encode(gs)), StatusCodes.OK)
       }
     }
   }
@@ -100,7 +101,7 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
       getJsonRoute {
         val lastBlock = blockStorage.history.lastBlock
         val bt = consensusModule.consensusBlockData(lastBlock).baseTarget
-        Json.obj("baseTarget" -> bt)
+        JsonResponse(Json.obj("baseTarget" -> bt), StatusCodes.OK)
       }
     }
   }
@@ -110,7 +111,7 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
   def algo: Route = {
     path("algo") {
       getJsonRoute {
-        Json.obj("consensusAlgo" -> "nxt")
+        JsonResponse(Json.obj("consensusAlgo" -> "nxt"), StatusCodes.OK)
       }
     }
   }
