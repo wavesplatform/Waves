@@ -25,20 +25,20 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       Given("Peer database is empty")
       val peerDatabase = new PeerDatabaseImpl(TestSettings, None)
       assert(peerDatabase.knownPeers(false).isEmpty)
-      assert(peerDatabase.blacklistedPeers().isEmpty)
+      assert(peerDatabase.blacklisted.isEmpty)
 
-      When("Peer adds another peer to whitelist")
+      When("Peer adds another peer to knownPeers")
       val anotherPeer = new PeerInfo(System.currentTimeMillis)
       val port: Int = 1234
       val address = new InetSocketAddress(InetAddress.getByName("ya.ru"), port)
       peerDatabase.addOrUpdateKnownPeer(address, anotherPeer)
       assert(peerDatabase.knownPeers(false).contains(address))
-      assert(!peerDatabase.blacklistedPeers().contains(address.getHostName))
+      assert(!peerDatabase.blacklisted.contains(address))
 
       And("Peer blacklists another peer")
-      peerDatabase.blacklistPeer(address)
+      peerDatabase.blacklist(address)
       assert(peerDatabase.isBlacklisted(address))
-      assert(peerDatabase.blacklistedPeers().contains(address.getHostName))
+      assert(peerDatabase.blacklisted.contains(address))
       assert(!peerDatabase.knownPeers(false).contains(address))
 
       And("Peer waits for some time")
@@ -47,8 +47,8 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       Then("Another peer disappear from blacklist")
       assert(!peerDatabase.isBlacklisted(address))
 
-      And("Another peer still not in whitelist")
-      assert(!peerDatabase.knownPeers(false).contains(address))
+      And("Another peer became knownPeer")
+      assert(peerDatabase.knownPeers(false).contains(address))
     }
 
     scenario("Peer blacklist few peers") {
@@ -56,7 +56,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       Given("Peer database is empty")
       val peerDatabase = new PeerDatabaseImpl(TestSettings, None)
       assert(peerDatabase.knownPeers(false).isEmpty)
-      assert(peerDatabase.blacklistedPeers().isEmpty)
+      assert(peerDatabase.blacklisted.isEmpty)
 
       When("Peer adds other peers")
       val anotherPeer = new PeerInfo(System.currentTimeMillis)
@@ -72,9 +72,9 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(!peerDatabase.isBlacklisted(address3))
 
       And("Peer blacklists other peers")
-      peerDatabase.blacklistPeer(address1)
-      peerDatabase.blacklistPeer(address2)
-      peerDatabase.blacklistPeer(address3)
+      peerDatabase.blacklist(address1)
+      peerDatabase.blacklist(address2)
+      peerDatabase.blacklist(address3)
       assert(peerDatabase.isBlacklisted(address1))
       assert(peerDatabase.isBlacklisted(address2))
       assert(peerDatabase.isBlacklisted(address3))
@@ -83,7 +83,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds / 2)
 
       And("Adds one peer to blacklist one more time")
-      peerDatabase.blacklistPeer(address2)
+      peerDatabase.blacklist(address2)
 
       And("Waits another half of period")
       Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds / 2)

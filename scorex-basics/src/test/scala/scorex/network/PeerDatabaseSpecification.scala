@@ -21,7 +21,7 @@ class PeerDatabaseSpecification extends PropSpec with PropertyChecks with Genera
   val db = new PeerDatabaseImpl(TestSettings, None)
   val pi = PeerInfo(System.currentTimeMillis(), None, None)
   val portGen = Gen.choose(1, 0xFFFF)
-  val addGen = for {
+  val hostGen = for {
     a1: Int <- Gen.choose(1, 255)
     a2: Int <- Gen.choose(1, 255)
     a3: Int <- Gen.choose(1, 255)
@@ -30,14 +30,14 @@ class PeerDatabaseSpecification extends PropSpec with PropertyChecks with Genera
 
 
   property("peer blacklisting") {
-    forAll(addGen, portGen) { (add: String, port: Int) =>
-      val address = new InetSocketAddress(InetAddress.getByName(add), port)
+    forAll(hostGen, portGen) { (host: String, port: Int) =>
+      val address = new InetSocketAddress(InetAddress.getByName(host), port)
       db.addOrUpdateKnownPeer(address, pi)
       db.knownPeers(false).contains(address) shouldBe true
 
-      db.blacklistPeer(address)
+      db.blacklist(address)
       db.knownPeers(false).contains(address) shouldBe false
-      db.blacklistedPeers().contains(address.getHostName) shouldBe true
+      db.blacklisted.contains(address) shouldBe true
     }
   }
 }
