@@ -10,7 +10,19 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   def isValid(block: Block): Boolean
 
+  /**
+    * Check whether tx is valid on current state
+    */
+  def isValid(tx: Transaction): Boolean = blockStorage.state.isValid(tx)
+
   def transactions(block: Block): Seq[Transaction]
+
+  /**
+    * Returns all unconfirmed transactions
+    */
+  def unconfirmedTxs() : Seq[Transaction] = utxStorage.all()
+
+  def putUnconfirmedIfNew(tx: Transaction): Boolean = utxStorage.putIfNew(tx)
 
   def packUnconfirmed(): TransactionBlockData
 

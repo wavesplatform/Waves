@@ -2,7 +2,7 @@ package scorex.transaction
 
 
 trait UnconfirmedTransactionsStorage {
-  val SizeLimit: Int
+  val sizeLimit: Int
 
   def putIfNew(tx: Transaction): Boolean
 
