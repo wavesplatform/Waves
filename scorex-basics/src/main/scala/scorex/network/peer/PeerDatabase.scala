@@ -7,7 +7,12 @@ import java.net.InetSocketAddress
 case class PeerInfo(lastSeen: Long,
                     nonce: Option[Long] = None,
                     nodeName: Option[String] = None,
-                    blacklistingTime: Long = 0L)
+                    blacklistingTime: Long = 0L) {
+
+  def isBlacklisted: Boolean = blacklistingTime > 0L
+  def blacklist: PeerInfo = PeerInfo(lastSeen, nonce, nodeName, System.currentTimeMillis)
+  def unBlacklist: PeerInfo = PeerInfo(lastSeen, nonce, nodeName, 0L)
+}
 
 trait PeerDatabase {
   def addOrUpdateKnownPeer(peer: InetSocketAddress, peerInfo: PeerInfo): Unit

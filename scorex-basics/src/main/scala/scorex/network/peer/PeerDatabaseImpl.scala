@@ -36,8 +36,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
   def blacklist(address: InetSocketAddress): Unit = {
     Option(peersPersistence.get(address)) match {
       case Some(peer) => {
-        val updatedInfo = PeerInfo(peer.lastSeen, peer.nonce, peer.nodeName, System.currentTimeMillis())
-        peersPersistence.put(address, updatedInfo)
+        peersPersistence.put(address, peer.blacklist)
         database.commit()
       }
       case _ =>
@@ -47,8 +46,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
   def unBlacklist(address: InetSocketAddress): Unit = {
     Option(peersPersistence.get(address)) match {
       case Some(peer) => {
-        val updatedInfo = PeerInfo(peer.lastSeen, peer.nonce, peer.nodeName, 0L)
-        peersPersistence.put(address, updatedInfo)
+        peersPersistence.put(address, peer.unBlacklist)
         database.commit()
       }
       case _ =>
@@ -60,8 +58,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
       case Some(peer) => {
         val current = System.currentTimeMillis
         if (peer.blacklistingTime < current - blacklistResidenceTimeMilliseconds) {
-          val updatedInfo = PeerInfo(peer.lastSeen, peer.nonce, peer.nodeName, 0L)
-          peersPersistence.put(address, updatedInfo)
+          peersPersistence.put(address, peer.unBlacklist)
           database.commit()
           false
         } else true
@@ -81,10 +78,10 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
 
   def blacklisted: Map[InetSocketAddress, PeerInfo] = peersPersistence.keys
     .flatMap(k => Option(peersPersistence.get(k)).map(v => k -> v))
-    .filter(p => p._2.blacklistingTime > 0L).toMap
+    .filter(p => p._2.isBlacklisted).toMap
 
   private def notBlacklisted = peersPersistence.keys
     .flatMap(k => Option(peersPersistence.get(k)).map(v => k -> v))
-    .filter(p => p._2.blacklistingTime == 0L)
+    .filter(p => !p._2.isBlacklisted)
 
 }
