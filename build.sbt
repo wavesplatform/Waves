@@ -12,7 +12,7 @@ scalaVersion := "2.11.8"
 
 resolvers += "SonaType" at "https://oss.sonatype.org/content/groups/public"
 
-val modulesVersion = "1.3.1"
+val modulesVersion = "1.3.2-SNAPSHOT"
 
 libraryDependencies ++= Seq(
   "com.wavesplatform" %% "scorex-basics" % modulesVersion,
@@ -30,6 +30,9 @@ libraryDependencies ++= Seq(
 assemblyJarName in assembly := "waves.jar"
 
 test in assembly := {}
+
+fork in ThisBuild := true
+parallelExecution in ThisBuild := false
 
 mainClass in assembly := Some("scorex.waves.Application")
 
