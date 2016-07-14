@@ -7,7 +7,7 @@ import scorex.utils.ScorexLogging
 import scala.collection.concurrent.TrieMap
 
 
-class UnconfirmedTransactionsDatabaseImpl(val SizeLimit: Int = 1000) extends UnconfirmedTransactionsStorage with ScorexLogging {
+class UnconfirmedTransactionsDatabaseImpl(val sizeLimit: Int = 1000) extends UnconfirmedTransactionsStorage with ScorexLogging {
 
   val transactions = TrieMap[Long, Transaction]()
 
@@ -17,7 +17,7 @@ class UnconfirmedTransactionsDatabaseImpl(val SizeLimit: Int = 1000) extends Unc
 
   private def key(tx: Transaction): Long = key(tx.signature)
 
-  override def putIfNew(tx: Transaction): Boolean = if (transactions.size < SizeLimit) {
+  override def putIfNew(tx: Transaction): Boolean = if (transactions.size < sizeLimit) {
     transactions.putIfAbsent(key(tx), tx).isEmpty
   } else {
     log.warn("Transaction pool size limit is reached")

@@ -67,7 +67,7 @@ with TransactionTestingCommons {
     val block = untilTimeout(3.minute) {
       stopGeneration()
       transactionModule.clearIncorrectTransactions()
-      val toGen = transactionModule.utxStorage.SizeLimit - transactionModule.utxStorage.all().size
+      val toGen = transactionModule.utxStorage.sizeLimit - transactionModule.utxStorage.all().size
       (0 until toGen) foreach (i => genValidTransaction())
       val blocksFuture = application.consensusModule.generateNextBlocks(accounts)(transactionModule)
       val blocks: Seq[Block] = Await.result(blocksFuture, 10.seconds)

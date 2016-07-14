@@ -61,5 +61,5 @@ class LagonakiApplication(val settingsFilename: String) extends Application {
   require(transactionModule.balancesSupport)
   require(transactionModule.accountWatchingSupport)
 
-  actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], this))
+  actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings, networkController))
 }

@@ -2,6 +2,9 @@
 ----------
 
 * peers.dat format changed. Remove old peers.dat.
+* Random unconfirmed tx rebroadcast to network periodically
+  (utxRebroadcastInterval seconds in settings.json)
+* If peer receive new unconfirmed tx, will broadcast it to network.
 
 **v1.3.1**
 ----------

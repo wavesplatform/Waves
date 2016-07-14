@@ -18,6 +18,7 @@ trait Settings extends ScorexLogging {
 
   val filename: String
 
+  //TODO: gagarin55 - remove this initialization away from trait!
   lazy val settingsJSON: JsObject = Try {
     val jsonString = scala.io.Source.fromFile(filename).mkString
     Json.parse(jsonString).as[JsObject]

@@ -7,7 +7,8 @@ object Dependencies {
     "org.scalatest" %% "scalatest" % "2.+" % "test",
     "org.scalactic" %% "scalactic" % "2.+" % "test",
     "org.scalacheck" %% "scalacheck" % "1.12.+" % "test",
-    "net.databinder.dispatch" %% "dispatch-core" % "+" % "test"
+    "net.databinder.dispatch" %% "dispatch-core" % "+" % "test",
+    "org.scalamock" %% "scalamock-scalatest-support" % "3.2.2" % "test"
   )
 
   lazy val serialization = Seq(

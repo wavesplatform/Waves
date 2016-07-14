@@ -151,7 +151,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     val time = NTP.correctedTime()
     val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
     val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
-    if (blockStorage.state.isValid(payment)) onNewOffchainTransaction(payment)
+    if (isValid(payment)) onNewOffchainTransaction(payment)
     payment
   }
 
@@ -179,7 +179,6 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     lazy val blockIsValid = blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
     txsAreNew && blockIsValid
   }
-
 }
 
 object SimpleTransactionModule {
