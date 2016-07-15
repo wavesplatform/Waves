@@ -9,6 +9,7 @@ import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.utils.ScorexLogging
 import com.wavesplatform.consensus.WavesConsensusModule
+import org.slf4j.LoggerFactory
 import scorex.waves.http.{DebugApiRoute, ScorexApiRoute, WavesApiRoute}
 import scorex.waves.settings._
 import scorex.waves.transaction.WavesTransactionModule
@@ -78,7 +79,10 @@ class Application(val settingsFilename: String) extends {
 
 object Application extends App with ScorexLogging {
 
-  log.debug(s"Start server with args: $args")
+  // TODO: gagarin55 - add to Scorex LoggerFacade debug(String, Object)
+  private val _log = LoggerFactory.getLogger(this.getClass)
+  _log.debug("Start server with args: {} ", args)
+
   val filename = args.headOption.getOrElse("settings.json")
 
   val application = new Application(filename)
