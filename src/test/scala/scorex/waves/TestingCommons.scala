@@ -2,6 +2,7 @@ package scorex.waves
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import com.wavesplatform.TestNetParams
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.transaction.TransactionSettings
@@ -22,7 +23,9 @@ trait TestingCommons {
 object TestingCommons {
   lazy val applications = {
     val apps = List(
-      new Application("settings-test.json")
+      new Application("settings-test.json") {
+        override def chainParams = TestNetParams
+      }
     )
     apps.foreach(_.run())
     apps.foreach { a =>

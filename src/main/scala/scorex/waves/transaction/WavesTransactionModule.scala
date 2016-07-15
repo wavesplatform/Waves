@@ -1,5 +1,6 @@
 package scorex.waves.transaction
 
+import com.wavesplatform.ChainParameters
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.BlockField
@@ -11,17 +12,18 @@ import scorex.transaction._
 import scorex.transaction.state.wallet.Payment
 import scorex.utils.NTP
 import scorex.wallet.Wallet
-import scorex.waves.settings.{Constants, WavesSettings}
+import scorex.waves.settings.WavesSettings
 
 /**
   * Waves Transaction Module
   */
-class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings, application: Application)
+class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings,
+                             application: Application,
+                             val chainParams: ChainParameters)
   extends SimpleTransactionModule() {
 
-  override val InitialBalance = Constants.UnitsInWave * Constants.TotalWaves
+  override val InitialBalance = chainParams.initialBalance
 
-  val GenesisTransactionsTimestamp = settings.genesisTimestamp
   // TODO: remove asInstanceOf after Scorex update
   val minimumTxFee = settings.asInstanceOf[WavesSettings].minimumTxFee
 
@@ -96,18 +98,6 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   }
 
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
-
-    val totalBalance = InitialBalance
-    val txs = List(
-      GenesisTransaction(new Account("3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"), totalBalance - 5 * Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction(new Account("3MyTvqfeLWkvjSZ1hwkhQjzipZr7Pk8dyMR"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction(new Account("3MqS3mVY4Yr4HoTdpWiEaq9phwbaoWS2W6A"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction(new Account("3N3CDuzGXB2qP5vb2NvnnDQ68HahNCfYVBg"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction(new Account("3N2sacZ9XTQUkLDdZZgtb1zJUAmr6oziRrU"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction(new Account("3N189PMB8BaxngN3fNvDRkFbvbH8xMkk328"), Constants.UnitsInWave, GenesisTransactionsTimestamp)
-    )
-    require(txs.foldLeft(0L)(_ + _.amount) == InitialBalance)
-
-    TransactionsBlockField(txs)
+    TransactionsBlockField(chainParams.genesisTxs)
   }
 }

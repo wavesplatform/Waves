@@ -1,4 +1,4 @@
-package scorex.waves.consensus
+package com.wavesplatform.consensus
 
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.waves.settings.Constants
