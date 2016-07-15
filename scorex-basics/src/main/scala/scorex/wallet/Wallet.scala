@@ -70,9 +70,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
 
   def generateNewAccount(): Option[PrivateKeyAccount] = synchronized {
     val nonce = getAndIncrementNonce()
-
-    val accountSeed = generateAccountSeed(seed, nonce)
-    val account = new PrivateKeyAccount(accountSeed)
+    val account = Wallet.generateNewAccount(seed, nonce)
 
     val address = account.address
     val created = if (!accountsCache.containsKey(address)) {
@@ -87,10 +85,6 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
       Some(account)
     } else None
   }
-
-  def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
-    SecureCryptographicHash(Bytes.concat(Ints.toByteArray(nonce), seed))
-
 
   def deleteAccount(account: PrivateKeyAccount): Boolean = synchronized {
     val res = accountsPersistence.keys.find { k =>
@@ -121,5 +115,18 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
   def getAndIncrementNonce(): Int = synchronized {
     noncePersistence.put(NonceFieldName, nonce() + 1)
   }
+
+}
+
+
+object Wallet {
+
+  def generateNewAccount(seed: Array[Byte], nonce: Int): PrivateKeyAccount = {
+    val accountSeed = generateAccountSeed(seed, nonce)
+    new PrivateKeyAccount(accountSeed)
+  }
+
+  def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
+    SecureCryptographicHash(Bytes.concat(Ints.toByteArray(nonce), seed))
 
 }
