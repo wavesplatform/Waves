@@ -1,5 +1,6 @@
 package scorex.waves.transaction
 
+import com.wavesplatform.ChainParameters
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.BlockField
@@ -11,17 +12,18 @@ import scorex.transaction._
 import scorex.transaction.state.wallet.Payment
 import scorex.utils.NTP
 import scorex.wallet.Wallet
-import scorex.waves.settings.{Constants, WavesSettings}
+import scorex.waves.settings.WavesSettings
 
 /**
   * Waves Transaction Module
   */
-class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings, application: Application)
+class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings,
+                             application: Application,
+                             val chainParams: ChainParameters)
   extends SimpleTransactionModule() {
 
-  override val InitialBalance = Constants.UnitsInWave * Constants.TotalWaves
+  override val InitialBalance = chainParams.initialBalance
 
-  val GenesisTransactionsTimestamp = settings.genesisTimestamp
   // TODO: remove asInstanceOf after Scorex update
   val minimumTxFee = settings.asInstanceOf[WavesSettings].minimumTxFee
 
@@ -70,10 +72,10 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   /**
     * Publish signed payment transaction which generated outside node
     */
-  def broadcastPayment(payment: SignedPayment): Either[PaymentTransaction, ValidationResult] = {
+  def broadcastPayment(payment: SignedPayment): Either[ValidationResult, PaymentTransaction] = {
     if (payment.fee < minimumTxFee)
-      // TODO : add ValidationResult.InvalidFee to Scorex
-      Right(ValidationResult.NegativeFee)
+    // TODO : add ValidationResult.InvalidFee to Scorex
+      Left(ValidationResult.NegativeFee)
     else {
       val time = payment.timestamp
       val sigBytes = Base58.decode(payment.signature).get
@@ -86,29 +88,17 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
         case ValidationResult.ValidateOke => {
           if (blockStorage.state.isValid(tx)) {
             onNewOffchainTransaction(tx)
-            Left(tx)
+            Right(tx)
           } else {
-            Right(ValidationResult.NoBalance)
+            Left(ValidationResult.NoBalance)
           }
         }
-        case error: ValidationResult => Right(error)
+        case error: ValidationResult => Left(error)
       }
     }
   }
 
   override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
-
-    val totalBalance = InitialBalance
-    val txs = List(
-      GenesisTransaction( new Account("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ"), totalBalance - 5 * Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3"), Constants.UnitsInWave, GenesisTransactionsTimestamp),
-      GenesisTransaction( new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J"), Constants.UnitsInWave, GenesisTransactionsTimestamp)
-    )
-    require(txs.foldLeft(0L)(_ + _.amount) == InitialBalance)
-
-    TransactionsBlockField(txs)
+    TransactionsBlockField(chainParams.genesisTxs)
   }
 }

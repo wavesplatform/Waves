@@ -1,5 +1,8 @@
 package scorex.waves
 
+import java.util.concurrent.atomic.AtomicInteger
+
+import com.wavesplatform.TestNetParams
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.transaction.TransactionSettings
@@ -20,7 +23,9 @@ trait TestingCommons {
 object TestingCommons {
   lazy val applications = {
     val apps = List(
-      new Application("settings-test.json")
+      new Application("settings-test.json") {
+        override def chainParams = TestNetParams
+      }
     )
     apps.foreach(_.run())
     apps.foreach { a =>
@@ -36,6 +41,19 @@ object TestingCommons {
   }
 
   lazy val application = applications.head
+
+  lazy val counter: AtomicInteger = new AtomicInteger(0)
+
+  def start(): Unit = {
+    counter.incrementAndGet
+  }
+
+  def stop(): Unit = {
+    if (counter.decrementAndGet == 0) {
+      Http.shutdown()
+      application.stopAll()
+    }
+  }
 
   def peerUrl(a: Application = application): String =
     "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort

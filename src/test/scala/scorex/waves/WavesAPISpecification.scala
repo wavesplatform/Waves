@@ -1,14 +1,22 @@
 package scorex.waves
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSuite, Matchers}
 import play.api.libs.json.Json
 import scorex.api.http.{InvalidAddress, InvalidSender, NegativeFee}
-import scorex.crypto.encode.Base58
-import scorex.waves.transaction.{ExternalPayment, SignedPayment}
+import scorex.waves.transaction.SignedPayment
 
-class WavesAPISpecification extends FunSuite with Matchers {
+@DoNotDiscover
+class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
   import TestingCommons._
+
+  override def beforeAll: Unit = {
+    start()
+  }
+
+  override def afterAll: Unit = {
+    stop()
+  }
 
   test("/waves/broadcast-signed-payment API route can not send to address from another net") {
 

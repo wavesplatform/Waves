@@ -2,13 +2,13 @@ package scorex.waves
 
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.{ChainParameters, MainNetParams, TestNetParams}
 import scorex.api.http._
 import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
-import scorex.transaction.SimpleTransactionModule
 import scorex.utils.ScorexLogging
-import scorex.waves.consensus.WavesConsensusModule
+import com.wavesplatform.consensus.WavesConsensusModule
 import scorex.waves.http.{DebugApiRoute, ScorexApiRoute, WavesApiRoute}
 import scorex.waves.settings._
 import scorex.waves.transaction.WavesTransactionModule
@@ -26,11 +26,13 @@ class Application(val settingsFilename: String) extends {
 
 } with scorex.app.Application {
 
+  def chainParams: ChainParameters = MainNetParams
+
   override implicit lazy val settings = new WavesSettings(settingsFilename)
 
   override implicit lazy val consensusModule = new WavesConsensusModule()
 
-  override implicit lazy val transactionModule: SimpleTransactionModule = new WavesTransactionModule()(settings, this)
+  override implicit lazy val transactionModule = new WavesTransactionModule()(settings, this, chainParams)
 
   override lazy val blockStorage = transactionModule.blockStorage
 
@@ -76,7 +78,7 @@ class Application(val settingsFilename: String) extends {
 
 object Application extends App with ScorexLogging {
 
-  log.debug("Start server with args: {} ", args)
+  log.debug(s"Start server with args: $args")
   val filename = args.headOption.getOrElse("settings.json")
 
   val application = new Application(filename)

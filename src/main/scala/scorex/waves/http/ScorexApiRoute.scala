@@ -3,16 +3,17 @@ package scorex.waves.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.api.http.{ApiRoute, CommonApiFunctions}
+import scorex.api.http.{ApiRoute, CommonApiFunctions, JsonResponse}
 import scorex.app.Application
 import scorex.consensus.mining.BlockGeneratorController._
-import scorex.waves.settings.Constants
 import scorex.network.HistorySynchronizer
 import scorex.utils.ScorexLogging
+import scorex.waves.settings.Constants
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -35,7 +36,7 @@ case class ScorexApiRoute(override val application: Application)(implicit val co
   def version: Route = {
     path("version") {
       getJsonRoute {
-        Json.obj("version" -> Constants.AgentName)
+        JsonResponse(Json.obj("version" -> Constants.AgentName), StatusCodes.OK)
       }
     }
   }
@@ -44,10 +45,10 @@ case class ScorexApiRoute(override val application: Application)(implicit val co
   @ApiOperation(value = "Stop", notes = "Stop the app", httpMethod = "POST")
   def scorex: Route = path("stop") {
     withAuth {
-      postJsonRoute{
+      postJsonRoute {
         log.info("Request to stop application")
         Future(application.stopAll())
-        Json.obj("stopped" -> true)
+        JsonResponse(Json.obj("stopped" -> true), StatusCodes.OK)
       }
     }
   }
@@ -60,10 +61,12 @@ case class ScorexApiRoute(override val application: Application)(implicit val co
       def hsf = (application.historySynchronizer ? HistorySynchronizer.GetStatus).map(_.toString)
 
       Future.sequence(Seq(bgf, hsf)).map { case statusesSeq =>
-        Json.obj(
+        val json = Json.obj(
           "blockGeneratorStatus" -> statusesSeq.head,
           "historySynchronizationStatus" -> statusesSeq.tail.head
         )
+
+        JsonResponse(json, StatusCodes.OK)
       }
     }
   }
