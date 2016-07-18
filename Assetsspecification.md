@@ -23,7 +23,7 @@ State storage reduction is achieved through putting additional information into 
 
 
 
-2. API
+API
 
 
 2.1  Asset creation, deletion, and transfer operation.
