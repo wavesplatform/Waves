@@ -54,41 +54,43 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def payment: Route = path("payment") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[Payment] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(payment: Payment, _) =>
-                  val txOpt = transactionModule.createPayment(payment, wallet)
-                  txOpt match {
-                    case Some(tx) =>
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
-                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
-                            Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
-                          JsonResponse(Json.toJson(signed), StatusCodes.OK)
+    withCors {
+      entity(as[String]) { body =>
+        withAuth {
+          postJsonRoute {
+            walletNotExists(wallet).getOrElse {
+              Try(Json.parse(body)).map { js =>
+                js.validate[Payment] match {
+                  case err: JsError =>
+                    WrongTransactionJson(err).response
+                  case JsSuccess(payment: Payment, _) =>
+                    val txOpt = transactionModule.createPayment(payment, wallet)
+                    txOpt match {
+                      case Some(tx) =>
+                        tx.validate match {
+                          case ValidationResult.ValidateOke =>
+                            val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
+                              Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
+                            JsonResponse(Json.toJson(signed), StatusCodes.OK)
 
-                        case ValidationResult.InvalidAddress =>
-                          InvalidAddress.response
+                          case ValidationResult.InvalidAddress =>
+                            InvalidAddress.response
 
-                        case ValidationResult.NegativeAmount =>
-                          NegativeAmount.response
+                          case ValidationResult.NegativeAmount =>
+                            NegativeAmount.response
 
-                        case ValidationResult.NegativeFee =>
-                          NegativeFee.response
+                          case ValidationResult.NegativeFee =>
+                            NegativeFee.response
 
-                        case ValidationResult.NoBalance =>
-                          NoBalance.response
-                      }
-                    case None =>
-                      InvalidSender.response
-                  }
-              }
-            }.getOrElse(WrongJson.response)
+                          case ValidationResult.NoBalance =>
+                            NoBalance.response
+                        }
+                      case None =>
+                        InvalidSender.response
+                    }
+                }
+              }.getOrElse(WrongJson.response)
+            }
           }
         }
       }
@@ -114,41 +116,43 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def signPayment: Route = path("payment" / "signature") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[Payment] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(payment: Payment, _) =>
-                  val txOpt = transactionModule.signPayment(payment, wallet)
-                  txOpt match {
-                    case Some(tx) =>
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
-                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
-                            Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
-                          JsonResponse(Json.toJson(signed), StatusCodes.OK)
+    withCors {
+      entity(as[String]) { body =>
+        withAuth {
+          postJsonRoute {
+            walletNotExists(wallet).getOrElse {
+              Try(Json.parse(body)).map { js =>
+                js.validate[Payment] match {
+                  case err: JsError =>
+                    WrongTransactionJson(err).response
+                  case JsSuccess(payment: Payment, _) =>
+                    val txOpt = transactionModule.signPayment(payment, wallet)
+                    txOpt match {
+                      case Some(tx) =>
+                        tx.validate match {
+                          case ValidationResult.ValidateOke =>
+                            val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
+                              Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
+                            JsonResponse(Json.toJson(signed), StatusCodes.OK)
 
-                        case ValidationResult.InvalidAddress =>
-                          InvalidAddress.response
+                          case ValidationResult.InvalidAddress =>
+                            InvalidAddress.response
 
-                        case ValidationResult.NegativeAmount =>
-                          NegativeAmount.response
+                          case ValidationResult.NegativeAmount =>
+                            NegativeAmount.response
 
-                        case ValidationResult.NegativeFee =>
-                          NegativeFee.response
+                          case ValidationResult.NegativeFee =>
+                            NegativeFee.response
 
-                        case ValidationResult.NoBalance =>
-                          NoBalance.response
-                      }
-                    case None =>
-                      InvalidSender.response
-                  }
-              }
-            }.getOrElse(WrongJson.response)
+                          case ValidationResult.NoBalance =>
+                            NoBalance.response
+                        }
+                      case None =>
+                        InvalidSender.response
+                    }
+                }
+              }.getOrElse(WrongJson.response)
+            }
           }
         }
       }
@@ -175,8 +179,8 @@ case class WavesApiRoute(override val application: Application)(implicit val con
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
   def createdSignedPayment: Route = path("create-signed-payment") {
-    entity(as[String]) { body =>
-      withAuth {
+    withCors {
+      entity(as[String]) { body =>
         postJsonRoute {
           Try(Json.parse(body)).map { js =>
             js.validate[UnsignedPayment] match {
@@ -243,8 +247,8 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def externalPayment: Route = path("external-payment") {
-    entity(as[String]) { body =>
-      withAuth {
+    withCors {
+      entity(as[String]) { body =>
         postJsonRoute {
           Try {
             val js = Json.parse(body)
@@ -281,8 +285,8 @@ case class WavesApiRoute(override val application: Application)(implicit val con
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def broadcastSignedPayment: Route = path("broadcast-signed-payment") {
-    entity(as[String]) { body =>
-      withCors {
+    withCors {
+      entity(as[String]) { body =>
         postJsonRoute {
           Try(Json.parse(body)).map { js =>
             js.validate[SignedPayment] match {
