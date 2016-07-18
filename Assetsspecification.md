@@ -3,7 +3,7 @@
 
 
 
-1. Goals
+# Goals
 
 
 Waves assets combine scalability enhancements on technical level with usability and versatility on business level. 
@@ -14,7 +14,7 @@ In order to provide scalability in the system core a simplified payment verifica
 
 It is suggested to make use of the fact that most of the the assets won’t have a very high transaction volume, so only a small share of all the assets will be used actively.  Thus it makes sense to store only states of certain top volume assets, and update it using simplified proofs, conceptually similar to SPV lite client verification in Bitcoin.
 
- 
+
 Lite clients are able to verify the assets transactions without even storing the partial system states.
 To that end they can validate the transactions in the new block using root hash of the previous asset state in the last block, root hash in the new block, and the transaction proof.
 
@@ -22,14 +22,13 @@ To that end they can validate the transactions in the new block using root hash 
 State storage reduction is achieved through putting additional information into the blockchain - root hash of the authenticated data structure for the state of the given asset and the cryptographic proof of the asset balance for the given address. It can be shown that the resulting block size increase is manageable due to the usage of compact data structures.
 
 
-
-2. API
-
-
-2.1  Asset creation, deletion, and transfer operation.
+# API
 
 
-2.1.1 Asset creation.
+##  Asset creation, deletion, and transfer operation.
+
+
+### Asset creation.
 
 
 Issue (AssetName, Description, Quantity, Decimals, Reissuable, AssetID, Fee) 
@@ -53,7 +52,7 @@ In case of reissue transaction it is allowed to change the “reissuable” flag
 After the issuing transaction is included in the block transaction id of the issuing transaction can also be used as an Asset ID. Since all the nodes have to store all the root hashes of all the assets they store the ID’s of all the assets too.
 
 
-2.1.2 Asset transfer
+### Asset transfer
 
 
 Send(Sequence(AssetID, SenderAddress, ReceiverAddress, Amount), Sequence(Signature))
@@ -72,7 +71,7 @@ It should be noted that transaction API call does not contain root hashes or pro
 The total amount of different tokens transferred in one transaction should be limited to prevent spam attacks on the network.
 
 
-2.1.3 Asset deletion
+### Asset deletion
 
 
 Delete(AssetID,Amount,Fee,Signature(s))
@@ -88,13 +87,13 @@ Any address holding a given asset can choose to destroy some or all of the asset
 The asset state and skip lists are being recalculated based on the Delete transaction.
 
 
-2.2 Asset exchange operations
+## Asset exchange operations
 
 
 In order to make assets useful they have to be exchanged for one another, with the exchange procedure facilitated by the blockchain settlement. WAVES uses an approach that does not put unnecessary data on to the blockchain, instead using the blockchain for settlement, not order matching operations. Order matching is carried out by centralized nodes, after the orders have been matched the matching service creates a swap transaction and sends it to the both counterparties of the exchange operation for signing.
 
 
-2.2.1 Placing an exchange order
+### Placing an exchange order
 
 
 Order (SpendAddress, SpendTokenID, ReceiveTokenID, price, amount, Signature)
@@ -111,7 +110,7 @@ Signature: Array[Byte] -  cryptographic authorisation of the transaction. All tr
 Order API call is not finalized on the blockchain. In order to be able to control the orders Order API call has to return OrderID, which is stored by the client. OrderID is constructed as a hash of Order transaction.
 
 
-2.2.1 Cancelling an exchange order
+### Cancelling an exchange order
 
 
 Cancel (SpendAddress, OrderID, Signature)
@@ -124,7 +123,7 @@ Signature: Array[Byte] -  cryptographic authorisation of the transaction.
 
 
 
-2.2.2 Finalizing an exchange transaction
+### Finalizing an exchange transaction
 
 
 When Matcher finds a matching orders pair to exchange, she sends unsigned Spend transaction to both counterparties. Upon signing by both parties the transaction is transmitted by the matching service into the network to be included in the next block:
