@@ -14,7 +14,7 @@ In order to provide scalability in the system core a simplified payment verifica
 
 It is suggested to make use of the fact that most of the the assets won’t have a very high transaction volume, so only a small share of all the assets will be used actively.  Thus it makes sense to store only states of certain top volume assets, and update it using simplified proofs, conceptually similar to SPV lite client verification in Bitcoin.
 
-
+ 
 Lite clients are able to verify the assets transactions without even storing the partial system states.
 To that end they can validate the transactions in the new block using root hash of the previous asset state in the last block, root hash in the new block, and the transaction proof.
 
