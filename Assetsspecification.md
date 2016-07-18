@@ -22,7 +22,7 @@ To that end they can validate the transactions in the new block using root hash 
 State storage reduction is achieved through putting additional information into the blockchain - root hash of the authenticated data structure for the state of the given asset and the cryptographic proof of the asset balance for the given address. It can be shown that the resulting block size increase is manageable due to the usage of compact data structures.
 
 
-2. API
+2. API 
 
 
 2.1  Asset creation, deletion, and transfer operation.
