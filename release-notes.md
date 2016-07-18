@@ -1,4 +1,4 @@
-**v1.3.x**
+**v1.3.2**
 ----------
 
 * peers.dat format changed. Remove old peers.dat.
