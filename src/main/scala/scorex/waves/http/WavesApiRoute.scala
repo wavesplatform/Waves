@@ -225,8 +225,10 @@ case class WavesApiRoute(override val application: Application)(implicit val con
     path("address") {
       withCors {
         entity(as[String]) { publicKey =>
-          val addressFromPubKey = Account.fromPublicKey(Base58.decode(publicKey).get)
-          complete(HttpEntity(ContentTypes.`application/json`, Json.obj("address" -> addressFromPubKey).toString))
+          postJsonRoute {
+            val addressFromPubKey = Account.fromPublicKey(Base58.decode(publicKey).get)
+            JsonResponse(Json.obj("address" -> addressFromPubKey), StatusCodes.OK)
+          }
         }
       }
     }
