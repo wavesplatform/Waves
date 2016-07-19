@@ -1,8 +1,8 @@
 **0.2.1**
 
 * peers.dat format changed. Delete old version.
-* Different HTTP status codes in replies in HTTP API were impemented
-* Scorex v1.3.2
+* Different HTTP status codes in replies in HTTP API were implemented
+* Waves' Scorex v1.3.2
 
 **0.2.0**
 
