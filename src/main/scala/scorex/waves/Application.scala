@@ -24,10 +24,9 @@ class Application(val settingsFilename: String) extends {
     val parts = raw.split("\\.")
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
   }
-
 } with scorex.app.Application {
 
-  def chainParams: ChainParameters = TestNetParams
+  implicit lazy val chainParams: ChainParameters = TestNetParams
 
   override implicit lazy val settings = new WavesSettings(settingsFilename)
 

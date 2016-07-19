@@ -24,7 +24,7 @@ object TestingCommons {
   lazy val applications = {
     val apps = List(
       new Application("settings-test.json") {
-        override def chainParams = TestNetParams
+        override lazy val chainParams = TestNetParams
       }
     )
     apps.foreach(_.run())
