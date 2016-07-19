@@ -82,7 +82,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     val trans = block.transactions
     trans.foreach(t => if (included(t).isDefined) throw new Error(s"Transaction $t is already in state"))
     val fees: Map[Account, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
-      .map(m => m._1 ->(AccState(balance(m._1.address) + m._2), List(FeesStateChange(m._2))))
+      .map(m => m._1 ->(AccState(balance(m._1) + m._2), List(FeesStateChange(m._2))))
 
     val newBalances: Map[Account, (AccState, Reason)] = calcNewBalances(trans, fees)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
@@ -101,7 +101,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
           tx.balanceChanges().foldLeft(changes) { case (iChanges, (acc, delta)) =>
             //update balances sheet
             val add = acc.address
-            val currentChange: (AccState, Reason) = iChanges.getOrElse(acc, (AccState(balance(add)), List.empty))
+            val currentChange: (AccState, Reason) = iChanges.getOrElse(acc, (AccState(balance(acc)), List.empty))
             iChanges.updated(acc, (AccState(currentChange._1.balance + delta), tx +: currentChange._2))
           }
 
@@ -112,25 +112,31 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     newBalances
   }
 
-  override def balanceWithConfirmations(address: String, confirmations: Int): Long =
-    balance(address, Some(Math.max(1, stateHeight - confirmations)))
 
-  override def balance(address: String, atHeight: Option[Int] = None): Long = Option(lastStates.get(address)) match {
-    case Some(h) if h > 0 =>
-      val requiredHeight = atHeight.getOrElse(stateHeight)
-      require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
-      def loop(hh: Int, min: Long = Long.MaxValue): Long = {
-        val row = accountChanges(address).get(hh)
-        require(Option(row).isDefined, s"accountChanges($address).get($hh) is null.  lastStates.get(address)=$h")
-        if (hh <= requiredHeight) Math.min(row.state.balance, min)
-        else if (row.lastRowHeight == 0) 0L
-        else loop(row.lastRowHeight, Math.min(row.state.balance, min))
-      }
-      loop(h)
-    case _ => 0L
+  override def balanceWithConfirmations(account: Account, confirmations: Int): Long =
+    balance(account, Some(Math.max(1, stateHeight - confirmations)))
+
+  private def balanceByAddress(address: String, atHeight: Option[Int] = None): Long = {
+    Option(lastStates.get(address)) match {
+      case Some(h) if h > 0 =>
+        val requiredHeight = atHeight.getOrElse(stateHeight)
+        require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
+        def loop(hh: Int, min: Long = Long.MaxValue): Long = {
+          val row = accountChanges(address).get(hh)
+          require(Option(row).isDefined, s"accountChanges($address).get($hh) is null. lastStates.get(address)=$h")
+          if (hh <= requiredHeight) Math.min(row.state.balance, min)
+          else if (row.lastRowHeight == 0) 0L
+          else loop(row.lastRowHeight, Math.min(row.state.balance, min))
+        }
+        loop(h)
+      case _ => 0L
+    }
   }
 
-  def totalBalance: Long = lastStates.keySet().toList.map(add => balance(add)).sum
+  override def balance(account: Account, atHeight: Option[Int] = None): Long =
+    balanceByAddress(account.address, atHeight)
+
+  def totalBalance: Long = lastStates.keySet().toList.map(address => balanceByAddress(address)).sum
 
   override def accountTransactions(account: Account): Array[LagonakiTransaction] = {
     Option(lastStates.get(account.address)) match {
@@ -144,7 +150,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
             loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
           case None => acc
         }
-        loop(accHeight, Array.empty)
+        loop(accHeight, Array.empty).distinct
       case None => Array.empty
     }
   }
@@ -187,7 +193,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   //for debugging purposes only
   def toJson(heightOpt: Option[Int] = None): JsObject = {
-    val ls = lastStates.keySet().map(add => add -> balance(add, heightOpt)).filter(b => b._2 != 0).toList.sortBy(_._1)
+    val ls = lastStates.keySet().map(add => add -> balanceByAddress(add, heightOpt))
+      .filter(b => b._2 != 0).toList.sortBy(_._1)
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
 

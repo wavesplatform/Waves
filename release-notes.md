@@ -1,3 +1,8 @@
+**v1.3.x**
+----------
+
+* AddressScheme added for ChainID injection.
+
 **v1.3.2**
 ----------
 

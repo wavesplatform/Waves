@@ -232,18 +232,19 @@ case class AddressApiRoute(override val application: Application)(implicit val c
     }
   }
 
-  private def balanceJson(address: String, confirmations: Int): JsonResponse =
-    if (!Account.isValidAddress(address)) {
+  private def balanceJson(address: String, confirmations: Int): JsonResponse = {
+    val account = new Account(address)
+    if (!Account.isValid(account)) {
       InvalidAddress.response
     } else {
       val json = Json.obj(
-        "address" -> address,
+        "address" -> account.address,
         "confirmations" -> confirmations,
-        "balance" -> state.balanceWithConfirmations(address, confirmations)
+        "balance" -> state.balanceWithConfirmations(account, confirmations)
       )
       JsonResponse(json, StatusCodes.OK)
     }
-
+  }
   private def signPath(address: String, encode: Boolean) = {
     entity(as[String]) { message =>
       withAuth {

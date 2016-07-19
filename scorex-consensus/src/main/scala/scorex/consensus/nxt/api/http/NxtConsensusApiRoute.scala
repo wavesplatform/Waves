@@ -35,12 +35,13 @@ class NxtConsensusApiRoute(override val application: Application)(implicit val c
   def generatingBalance: Route = {
     path("generatingbalance" / Segment) { case address =>
       getJsonRoute {
-        if (!Account.isValidAddress(address)) {
+        val account = new Account(address)
+        if (!Account.isValid(account)) {
           InvalidAddress.response
         } else {
           val json = Json.obj(
-            "address" -> address,
-            "balance" -> consensusModule.generatingBalance(address)(application.transactionModule))
+            "address" -> account.address,
+            "balance" -> consensusModule.generatingBalance(account)(application.transactionModule))
           JsonResponse(json, StatusCodes.OK)
         }
       }

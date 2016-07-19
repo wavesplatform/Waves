@@ -6,6 +6,7 @@ import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import scorex.account.Account
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state._
 
@@ -20,15 +21,16 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
   val state = new StoredState(db)
   val testAdd = "aPFwzRp5TXCzi6DSuHmpmbQunopXRuxLk"
+  val testAcc = new Account(testAdd)
   val applyMethod = PrivateMethod[Unit]('applyChanges)
 
   property("private methods") {
 
     forAll(paymentGenerator, Gen.posNum[Long]) { (tx: PaymentTransaction,
                                                   balance: Long) =>
-      state.balance(testAdd) shouldBe 0
+      state.balance(testAcc) shouldBe 0
       state invokePrivate applyMethod(Map(testAdd ->(AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
-      state.balance(testAdd) shouldBe balance
+      state.balance(testAcc) shouldBe balance
       state.included(tx).value shouldBe state.stateHeight
       state invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq(tx))))
     }
@@ -37,11 +39,11 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   property("Reopen state") {
     val balance = 1234L
     state invokePrivate applyMethod(Map(testAdd ->(AccState(balance), Seq(FeesStateChange(balance)))))
-    state.balance(testAdd) shouldBe balance
+    state.balance(testAcc) shouldBe balance
     db.close()
 
     val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open())
-    state2.balance(testAdd) shouldBe balance
+    state2.balance(testAcc) shouldBe balance
     state2 invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq())))
   }
 

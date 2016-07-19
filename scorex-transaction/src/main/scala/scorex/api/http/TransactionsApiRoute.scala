@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
+import scorex.account.Account
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiState
@@ -36,7 +37,8 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
   def adressLimit: Route = {
     path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
       getJsonRoute {
-        val txJsons = state.accountTransactions(address)
+        val account = new Account(address)
+        val txJsons = state.accountTransactions(account)
           .takeRight(limit)
           .map(_.json)
         JsonResponse(Json.arr(txJsons), StatusCodes.OK)
@@ -52,7 +54,8 @@ case class TransactionsApiRoute(override val application: Application)(implicit 
   def address: Route = {
     path("address" / Segment) { case address =>
       getJsonRoute {
-        val txJsons = state.accountTransactions(address).map(_.json)
+        val account = new Account(address)
+        val txJsons = state.accountTransactions(account).map(_.json)
         JsonResponse(Json.arr(txJsons), StatusCodes.OK)
       }
     }

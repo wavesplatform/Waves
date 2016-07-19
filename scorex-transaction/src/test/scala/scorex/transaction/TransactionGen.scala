@@ -11,7 +11,7 @@ trait TransactionGen {
     amount: Long <- Arbitrary.arbitrary[Long]
     fee: Long <- Arbitrary.arbitrary[Long]
     timestamp: Long <- Arbitrary.arbitrary[Long]
-  } yield PaymentTransaction(sender, new Account(Account.fromPublicKey(randomBytes(32))), amount, fee, timestamp, randomBytes(64))
+  } yield PaymentTransaction(sender, Account.fromPublicKey(randomBytes(32)), amount, fee, timestamp, randomBytes(64))
 
 
 }
