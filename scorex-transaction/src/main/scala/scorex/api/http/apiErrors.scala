@@ -47,7 +47,7 @@ case object TransactionNotExists extends ApiError {
 case object NoBalance extends ApiError {
   override val id: Int = 2
   override val message: String = "not enough balance"
-  override val code: StatusCode = StatusCodes.Conflict
+  override val code: StatusCode = StatusCodes.BadRequest
 }
 
 case object NegativeAmount extends ApiError {
