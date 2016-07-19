@@ -160,7 +160,7 @@ class QoraLikeConsensusModule extends PoSConsensusModule[QoraLikeConsensusBlockD
       //target base
       val targetBytes = Array.fill(32)(Byte.MaxValue)
       val baseTarget: BigInt = getBaseTarget(data.generatingBalance)
-      val gen = block.signerDataField.value.generator.address
+      val gen = block.signerDataField.value.generator
       val genBalance = BigInt(generatingBalance(gen))
       val target0 = BigInt(1, targetBytes) / baseTarget * genBalance
 

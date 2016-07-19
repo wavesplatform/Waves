@@ -41,9 +41,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     val amountBytes = Longs.toByteArray(amount)
     val feeBytes = Longs.toByteArray(fee)
 
-    Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
-      Base58.decode(recipient.address).get, amountBytes,
-      feeBytes, signature)
+    Bytes.concat(typeBytes, timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes, signature)
   }
 
   override lazy val signatureValid: Boolean = {
@@ -52,7 +50,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   }
 
   override def validate: ValidationResult.Value =
-    if (!Account.isValidAddress(recipient.address)) {
+    if (!Account.isValid(recipient)) {
       ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (amount <= 0) {
       ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
@@ -149,7 +147,6 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
     val amountBytes = Longs.toByteArray(amount)
     val feeBytes = Longs.toByteArray(fee)
 
-    Bytes.concat(typeBytes, timestampBytes, sender.publicKey,
-      Base58.decode(recipient.address).get, amountBytes, feeBytes)
+    Bytes.concat(typeBytes, timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes)
   }
 }

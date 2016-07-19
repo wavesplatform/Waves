@@ -8,6 +8,11 @@ case class LoggerFacade(logger: Logger) {
       logger.trace(message)
   }
 
+  def debug(message: => String, arg: Any): Unit = {
+    if (logger.isDebugEnabled)
+      logger.debug(message, arg)
+  }
+
   def debug(message: => String): Unit = {
     if (logger.isDebugEnabled)
       logger.debug(message)

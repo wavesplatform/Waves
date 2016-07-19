@@ -42,7 +42,7 @@ with TransactionTestingCommons {
   }
 
   test("generate 10 blocks and synchronize") {
-    val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(acc => app.consensusModule.generatingBalance(acc.address)).sum
+    val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(acc => app.consensusModule.generatingBalance(acc)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
     genValidTransaction()
 
@@ -57,7 +57,7 @@ with TransactionTestingCommons {
   test("Generate block with plenty of transactions") {
     applications.tail.foreach { app =>
       app.wallet.privateKeyAccounts().foreach { acc =>
-        if (state.asInstanceOf[BalanceSheet].balance(acc.address) > 0) {
+        if (state.asInstanceOf[BalanceSheet].balance(acc) > 0) {
           genValidTransaction(recepientOpt = accounts.headOption, senderOpt = Some(acc))
         }
       }
@@ -124,9 +124,9 @@ with TransactionTestingCommons {
     val (trans, valid) = untilTimeout(5.seconds) {
       cleanTransactionPool()
       stopGeneration()
-      accounts.map(a => state.asInstanceOf[BalanceSheet].balance(a.address)).exists(_ > 2) shouldBe true
+      accounts.map(a => state.asInstanceOf[BalanceSheet].balance(a)).exists(_ > 2) shouldBe true
       val trans = accounts.flatMap { a =>
-        val senderBalance = state.asInstanceOf[BalanceSheet].balance(a.address)
+        val senderBalance = state.asInstanceOf[BalanceSheet].balance(a)
         (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
       }
       state.validate(trans).nonEmpty shouldBe true
@@ -136,14 +136,14 @@ with TransactionTestingCommons {
     }
     state.validate(trans).nonEmpty shouldBe true
     if (valid.size >= trans.size) {
-      val balance = state.asInstanceOf[BalanceSheet].balance(trans.head.sender.address)
+      val balance = state.asInstanceOf[BalanceSheet].balance(trans.head.sender)
       log.error(s"Double spending: ${trans.map(_.json)} | ${valid.map(_.json)} | $balance")
     }
     valid.size should be < trans.size
 
     waitGenerationOfBlocks(2)
 
-    accounts.foreach(a => state.asInstanceOf[BalanceSheet].balance(a.address) should be >= 0L)
+    accounts.foreach(a => state.asInstanceOf[BalanceSheet].balance(a) should be >= 0L)
     trans.exists(tx => state.included(tx).isDefined) shouldBe true // Some of transactions should be included in state
     trans.forall(tx => state.included(tx).isDefined) shouldBe false // But some should not
     startGeneration()

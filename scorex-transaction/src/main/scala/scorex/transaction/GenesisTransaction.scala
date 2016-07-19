@@ -32,7 +32,7 @@ case class GenesisTransaction(override val recipient: Account,
 
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
 
-    val rcpBytes = Base58.decode(recipient.address).get
+    val rcpBytes = recipient.bytes
     require(rcpBytes.length == Account.AddressLength)
 
     val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, amountBytes)
@@ -46,7 +46,7 @@ case class GenesisTransaction(override val recipient: Account,
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GenesisTransaction.id), TypeLength, 0)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
-    val data = Bytes.concat(typeBytes, timestampBytes, Base58.decode(recipient.address).get, amountBytes)
+    val data = Bytes.concat(typeBytes, timestampBytes, recipient.bytes, amountBytes)
 
     val h = hash(data)
     Bytes.concat(h, h).sameElements(signature)
@@ -55,7 +55,7 @@ case class GenesisTransaction(override val recipient: Account,
   override def validate: ValidationResult.Value =
     if (amount < 0) {
       ValidationResult.NegativeAmount
-    } else if (!Account.isValidAddress(recipient.address)) {
+    } else if (!Account.isValid(recipient)) {
       ValidationResult.InvalidAddress
     } else ValidationResult.ValidateOke
 
@@ -78,8 +78,7 @@ object GenesisTransaction extends Deser[GenesisTransaction] {
     val amountBytes = Longs.toByteArray(amount)
     val amountFill = new Array[Byte](AmountLength - amountBytes.length)
 
-    val data = Bytes.concat(typeBytes, timestampBytes,
-      Base58.decode(recipient.address).get, Bytes.concat(amountFill, amountBytes))
+    val data = Bytes.concat(typeBytes, timestampBytes, recipient.bytes, Bytes.concat(amountFill, amountBytes))
 
     val h = hash(data)
     Bytes.concat(h, h)

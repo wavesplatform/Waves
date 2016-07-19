@@ -9,15 +9,10 @@ import scorex.transaction.{BalanceSheet, TransactionModule}
  */
 trait PoSConsensusModule[ConsensusBlockData] extends ConsensusModule[ConsensusBlockData] {
   
-  def generatingBalance[TransactionalBlockData](address: String)
-                                               (implicit transactionModule: TransactionModule[TransactionalBlockData]): Long = {
-    transactionModule.blockStorage.state.asInstanceOf[BalanceSheet]
-      .balanceWithConfirmations(address, generatingBalanceDepth)
-  }
-
   def generatingBalance[TransactionalBlockData](account: Account)
                                                (implicit transactionModule: TransactionModule[TransactionalBlockData]): Long =
-    generatingBalance(account.address)
+    transactionModule.blockStorage.state.asInstanceOf[BalanceSheet]
+      .balanceWithConfirmations(account, generatingBalanceDepth)
 
   val generatingBalanceDepth: Int
 

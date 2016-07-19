@@ -26,19 +26,27 @@ class Account(val address: String) extends Serializable {
 object Account extends ScorexLogging {
 
   val AddressVersion: Byte = 1
-  val AddressNetwork: Byte = Try(ConfigFactory.load().getConfig("app").getString("product").head.toByte).getOrElse(0)
+  //val AddressNetwork: Byte = Try(ConfigFactory.load().getConfig("app").getString("product").head.toByte).getOrElse(0)
   val ChecksumLength = 4
   val HashLength = 20
   val AddressLength = 1 + 1 + ChecksumLength + HashLength
 
+  private def scheme = AddressScheme.current
+
   /**
-   * Create account from public key. Used in PublicKeyAccount/PrivateKeyAccount.
+   * Create account from public key.
    */
-  def fromPublicKey(publicKey: Array[Byte]): String = {
+  def fromPublicKey(publicKey: Array[Byte]): Account = {
+    new Account(addressFromPublicKey(publicKey))
+  }
+
+  def addressFromPublicKey(publicKey: Array[Byte]) : String = {
     val publicKeyHash = hash(publicKey).take(HashLength)
-    val withoutChecksum = AddressVersion +: AddressNetwork +: publicKeyHash //prepend ADDRESS_VERSION
+    val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
     Base58.encode(withoutChecksum ++ calcCheckSum(withoutChecksum))
   }
+
+  def isValid(account: Account): Boolean = isValidAddress(account.address)
 
   def isValidAddress(address: String): Boolean =
     Base58.decode(address).map { addressBytes =>
@@ -47,7 +55,7 @@ object Account extends ScorexLogging {
       if (version != AddressVersion) {
         log.warn(s"Unknown address version: $version")
         false
-      } else if (network != AddressNetwork) {
+      } else if (network != scheme.chainId) {
         log.warn(s"Unknown network: $network")
         false
       } else {
