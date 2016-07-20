@@ -58,7 +58,7 @@ case class ScorexApiRoute(override val application: Application)(implicit val co
   def status: Route = path("status") {
     getJsonRoute {
       def bgf = (application.blockGenerator ? GetStatus).map(_.toString)
-      def hsf = (application.coordinator ? BlockChainSynchronizer.GetStatus).map(_.toString)
+      def hsf = (application.coordinator ? BlockChainSynchronizer.GetStatus).mapTo[BlockChainSynchronizer.Status].map(_.name)
 
       Future.sequence(Seq(bgf, hsf)).map { case statusesSeq =>
         val json = Json.obj(
