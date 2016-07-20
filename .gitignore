@@ -11,9 +11,10 @@ target
 .dockerignore
 .editorconfig
 
-# standalone docker
-Dockerfile
-
 # logs
 scorex.log
 scorex-errors.log
+scorex-*.log
+
+# local settings
+localsettings.json

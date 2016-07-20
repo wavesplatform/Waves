@@ -5,18 +5,20 @@
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
     "port": 6868,
-    "knownPeers": ["52.28.28.118:6868"],
+    "knownPeers": [],
     "maxConnections": 10
   },
   "walletDir": "/tmp/scorex/waves/wallet",
-  "walletSeed": "tpqGWo8ED",
+  "walletSeed": "mysecretpass",
   "walletPassword": "mycookies",
   "dataDir": "/tmp/scorex/waves/data",
   "rpcPort": 6869,
+  "rpcAddress": "0.0.0.0",
   "rpcAllowed": [],
-  "blockGenerationDelay": 10000,
+  "blockGenerationDelay": 1000,
+  "historySynchronizerTimeout": 15,
   "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
-  "offlineGeneration": false
+  "offlineGeneration": true
 }

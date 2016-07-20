@@ -1,7 +1,11 @@
 package scorex.waves
 
+import java.util.concurrent.atomic.AtomicInteger
+
+import com.wavesplatform.TestNetParams
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
+import scorex.account.AddressScheme
 import scorex.transaction.TransactionSettings
 import scorex.utils._
 
@@ -20,7 +24,10 @@ trait TestingCommons {
 object TestingCommons {
   lazy val applications = {
     val apps = List(
-      new Application("settings-test.json")
+      new Application("settings-test.json") {
+        override lazy val chainParams = TestNetParams
+        AddressScheme.current = TestNetParams.addressScheme
+      }
     )
     apps.foreach(_.run())
     apps.foreach { a =>
@@ -37,12 +44,37 @@ object TestingCommons {
 
   lazy val application = applications.head
 
+  lazy val counter: AtomicInteger = new AtomicInteger(0)
+
+  def start(): Unit = {
+    counter.incrementAndGet
+  }
+
+  def stop(): Unit = {
+    if (counter.decrementAndGet == 0) {
+      Http.shutdown()
+      application.stopAll()
+    }
+  }
+
   def peerUrl(a: Application = application): String =
     "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
 
-  def getRequest(us: String, peer: String = peerUrl(application)): JsValue = {
-    val request = Http(url(peer + us).GET)
+  def getRequest(us: String, peer: String = peerUrl(application),
+                 headers: Map[String, String] = Map.empty): JsValue = {
+    val request = Http(url(peer + us).GET <:< headers)
     val response = Await.result(request, 10.seconds)
+    Json.parse(response.getResponseBody)
+  }
+
+
+  def postRequest(us: String,
+                  params: Map[String, String] = Map.empty,
+                  body: String = "",
+                  headers: Map[String, String] = Map("api_key" -> "test"),
+                  peer: String = peerUrl(application)): JsValue = {
+    val request = Http(url(peer + us).POST << params <:< headers << body)
+    val response = Await.result(request, 5.seconds)
     Json.parse(response.getResponseBody)
   }
 

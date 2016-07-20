@@ -1,0 +1,51 @@
+**0.2.2-SNAPSHOT**
+
+* Switch network by "testnet" in settings. Default value is true."
+
+**0.2.1**
+
+* peers.dat format changed. Delete old version.
+* Different HTTP status codes in replies in HTTP API were implemented
+* Waves' Scorex v1.3.2
+
+**0.2.0**
+
+* Peers blacklist ttl configuration via "p2p"/"blacklistResidenceTimeMilliseconds"
+* Upgrade to Waves' Scorex v1.3.1
+
+**0.2.0-RC7**
+
+* New API /waves/payment returns senderPublicKey
+* New API /waves/create-signed-payment
+* /waves/external-payment deprecated. 
+  Use new /waves/broadcast-signed-payment.
+* New API /waves/payment/signature
+* minimumTxFee verification for API
+
+**0.2.0-RC5**
+
+* /waves/external-payment returns error for incorrect recipient
+
+**0.2.0-RC4**
+
+* Fixed issue with incorrect Handshake
+* Balance with confirmations is the minimum balance
+* /waves/external-payment returns error if account balance invalid
+* New API method /consensus/generatingbalance/{address}
+
+**0.2.0-RC3**
+
+* Incompatible with 0.1.3
+* Upgrade to Scorex 1.2.8
+* New Address format
+* New hash chain for Address - Blake2b256, Keccak32
+* New Testnet Genesis
+
+**0.1.3**
+
+* Upgrade to Scorex 1.2.6.
+* New http api method /external-payment for lite client
+
+**0.1.2**
+
+* Upgrade to Scorex 1.2.4. Clean /scorex/waves/data/ before run.

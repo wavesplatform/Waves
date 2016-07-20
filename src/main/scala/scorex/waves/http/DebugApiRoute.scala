@@ -3,6 +3,7 @@ package scorex.waves.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
@@ -37,10 +38,12 @@ case class DebugApiRoute(override val application: Application)(implicit val con
   def blocks: Route = {
     path("blocks" / IntNumber) { case howMany =>
       getJsonRoute {
-        Json.arr(application.blockStorage.history.lastBlocks(howMany).map { block =>
+        val json = Json.arr(application.blockStorage.history.lastBlocks(howMany).map { block =>
           val bytes = block.bytes
           Json.obj(bytes.length.toString -> Base58.encode(FastCryptographicHash(bytes)))
         })
+
+        JsonResponse(json, StatusCodes.OK)
       }
     }
   }
@@ -53,7 +56,7 @@ case class DebugApiRoute(override val application: Application)(implicit val con
   def state: Route = {
     path("state") {
       getJsonRoute {
-        application.blockStorage.state.asInstanceOf[StoredState].toJson(None)
+        JsonResponse(application.blockStorage.state.asInstanceOf[StoredState].toJson(None), StatusCodes.OK)
       }
     }
   }
@@ -66,7 +69,7 @@ case class DebugApiRoute(override val application: Application)(implicit val con
   def stateAt: Route = {
     path("state" / IntNumber) { case height =>
       getJsonRoute {
-        application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height))
+        JsonResponse(application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)), StatusCodes.OK)
       }
     }
   }
@@ -80,10 +83,12 @@ case class DebugApiRoute(override val application: Application)(implicit val con
     path("info") {
       getJsonRoute {
         val state = application.blockStorage.state.asInstanceOf[StoredState]
-        Json.obj(
+        val json = Json.obj(
           "stateHeight" -> state.stateHeight,
           "stateHash" -> state.hash
         )
+
+        JsonResponse(json, StatusCodes.OK)
       }
     }
   }
@@ -95,8 +100,13 @@ case class DebugApiRoute(override val application: Application)(implicit val con
   ))
   def settings: Route = {
     path("settings") {
-      getJsonRoute {
-        application.settings.settingsJSON
+      withAuth {
+        getJsonRoute {
+          val json = Json.obj()
+          //application.settings.settingsJSON
+
+          JsonResponse(json, StatusCodes.OK)
+        }
       }
     }
   }

@@ -1,7 +1,7 @@
 // Package description
-maintainer := "tosch <toschdev@gmail.com>"
-packageSummary := "Nxt Consensus Implementation for Waves on top of Scorex"
-packageDescription := "Package for Waves testnet"
+maintainer := "wavesplatform.com"
+packageSummary := "Waves node implementation on top of Scorex"
+packageDescription := "Waves node"
 
 enablePlugins(JavaAppPackaging)
 
@@ -10,7 +10,7 @@ enablePlugins(DebianPlugin)
 linuxPackageMappings in Debian := linuxPackageMappings.value
 name in Debian := name.value
 version in Debian := version.value
-genChanges in Debian := new File("changelog.md")
+genChanges in Debian := new File("release-notes.md")
 
 name in Universal := name.value
 //
