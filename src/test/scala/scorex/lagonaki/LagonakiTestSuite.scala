@@ -1,6 +1,6 @@
 package scorex.lagonaki
 
-import org.scalatest.{BeforeAndAfterAll, Suites}
+import org.scalatest.{BeforeAndAfterAll, Sequential}
 import scorex.lagonaki.TestingCommons._
 import scorex.lagonaki.integration._
 import scorex.lagonaki.integration.api._
@@ -8,7 +8,7 @@ import scorex.lagonaki.unit._
 import scorex.transaction.state.StateTest
 import scorex.transaction.state.database.blockchain.BlockTreeSpecification
 
-class LagonakiTestSuite extends Suites(
+class LagonakiTestSuite extends Sequential(
   //unit tests
   new MessageSpecification
   , new BlockSpecification

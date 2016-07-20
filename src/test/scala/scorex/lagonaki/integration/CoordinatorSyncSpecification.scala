@@ -2,14 +2,14 @@ package scorex.lagonaki.integration
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.ask
-import akka.testkit.{TestActorRef, TestKit, TestProbe}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import akka.util.Timeout
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
-import scorex.app.Application
+import org.scalatest._
+import scorex.consensus.mining.BlockGeneratorController.StartGeneration
+import scorex.lagonaki.mocks.ApplicationMock
 import scorex.network.BlockChainSynchronizer.{GetStatus, GettingBlocks}
 import scorex.network.{BlockChainSynchronizer, Coordinator}
-import scorex.settings.SettingsMock
 import scorex.transaction.History
 
 import scala.concurrent.duration._
@@ -18,26 +18,28 @@ import scala.util.Success
 
 class CoordinatorSyncSpecification
   extends TestKit(ActorSystem("CoordinatorSyncSpecification"))
+    with ImplicitSender
     with WordSpecLike
-    with BeforeAndAfterAll
+    with BeforeAndAfter
     with Matchers
     with OneInstancePerTest
     with MockFactory {
 
-  private implicit val _ = Timeout(500 milliseconds)
-
-  override def afterAll {
+  after {
     shutdown()
   }
 
-  object TestSettings extends SettingsMock
-
+  val testNetworkController = TestProbe("NetworkController")
+  val testblockGenerator = TestProbe("blockGenerator")
   val testBlockChainSynchronizer = TestProbe("BlockChainSynchronizer")
 
   val h = stub[History]
 
-  trait A extends Application {
-    override implicit lazy val settings = TestSettings
+  (h.score _).when().returns(BigInt(1))
+
+  trait A extends ApplicationMock {
+    override lazy val networkController: ActorRef = testNetworkController.ref
+    override lazy val blockGenerator: ActorRef = testblockGenerator.ref
     override lazy val blockChainSynchronizer: ActorRef = testBlockChainSynchronizer.ref
     override lazy val history: History = h
   }
@@ -46,19 +48,22 @@ class CoordinatorSyncSpecification
 
   "Coordinator" must {
 
-    val actorRef = TestActorRef(Props(classOf[Coordinator], app))
+    val coordinator = system.actorOf(Props(classOf[Coordinator], app))
 
     "return its status" in {
-      val future = actorRef ? GetStatus
+
+      implicit val _ = Timeout(500 milliseconds)
+
+      val future = coordinator ? GetStatus
       testBlockChainSynchronizer.expectMsg(GetStatus)
       testBlockChainSynchronizer.reply(GettingBlocks)
 
-      val Success(status: BlockChainSynchronizer.Status) = future.value.get
+      val Success(status: BlockChainSynchronizer.Status) = future.mapTo[BlockChainSynchronizer.Status].value.get
       status should be(GettingBlocks)
     }
 
     "start in synced state with blocks generation" in {
-      // copied from HistorySynchronizer test
+      testblockGenerator.expectMsg(StartGeneration)
     }
   }
 }

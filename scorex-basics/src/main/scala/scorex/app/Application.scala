@@ -44,11 +44,8 @@ trait Application extends ScorexLogging {
   lazy val basicMessagesSpecsRepo = new BasicMessagesRepo()
 
   //p2p
-  lazy val upnp = {
-    val value = new UPnP(settings)
-    if (settings.upnpEnabled) value.addPort(settings.port)
-    value
-  }
+  lazy val upnp = new UPnP(settings)
+  if (settings.upnpEnabled) upnp.addPort(settings.port)
 
   lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
 
@@ -56,7 +53,7 @@ trait Application extends ScorexLogging {
 
   //wallet
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
-  implicit lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed)
+  lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed)
 
   //interface to append log and state
   lazy val blockStorage: BlockStorage = transactionModule.blockStorage
@@ -70,8 +67,6 @@ trait Application extends ScorexLogging {
   lazy val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
-
-  implicit val materializer = ActorMaterializer()
   lazy val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
 
 
@@ -81,6 +76,7 @@ trait Application extends ScorexLogging {
 
     checkGenesis()
 
+    implicit val materializer = ActorMaterializer()
     Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
 
     // TODO: in fact, this is an attemption to call Actor.preStart - needs to be replaced!

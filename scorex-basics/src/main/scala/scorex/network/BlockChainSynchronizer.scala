@@ -20,9 +20,9 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
 
   override val messageSpecs = Seq(SignaturesSpec, BlockMessageSpec)
 
-  protected override val networkControllerRef = application.networkController
+  protected override lazy val networkControllerRef = application.networkController
 
-  private val coordinator = application.coordinator
+  private lazy val coordinator = application.coordinator
 
   private val GettingBlockTimeout = application.settings.historySynchronizerTimeout
 

@@ -5,12 +5,11 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
-import scorex.app.Application
+import org.scalatest._
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.EllipticCurveImpl
-import scorex.lagonaki.mocks.BlockMock
+import scorex.lagonaki.mocks.{ApplicationMock, BlockMock}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.{BlockChainSynchronizer, ConnectedPeer, SendToChosen}
@@ -24,10 +23,14 @@ class BlockChainSynchronizerSpecification
   extends TestKit(ActorSystem("BlockChainSynchronizerSpecification"))
     with ImplicitSender
     with WordSpecLike
-    with BeforeAndAfterAll
+    with BeforeAndAfter
     with Matchers
     with OneInstancePerTest
     with MockFactory {
+
+  after {
+    shutdown()
+  }
 
   object TestSettings extends SettingsMock {
     override lazy val historySynchronizerTimeout: FiniteDuration = 1 seconds
@@ -48,7 +51,7 @@ class BlockChainSynchronizerSpecification
   (h.contains(_: BlockId)).when(id1).returns(false)
   (h.contains(_: BlockId)).when(id2).returns(false)
 
-  trait A extends Application {
+  trait A extends ApplicationMock {
     override implicit lazy val settings = TestSettings
     override lazy val networkController: ActorRef = testNetworkController.ref
     override lazy val coordinator: ActorRef = testCoordinator.ref
@@ -63,10 +66,6 @@ class BlockChainSynchronizerSpecification
 
   val blockChainSynchronizerRef =
     system.actorOf(Props(classOf[BlockChainSynchronizer], app))
-
-  override def afterAll {
-    shutdown()
-  }
 
   "BlockChainSynchronizer" must {
 

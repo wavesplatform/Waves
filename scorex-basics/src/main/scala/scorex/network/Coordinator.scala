@@ -4,6 +4,7 @@ import akka.actor.Actor
 import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
+import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockChainSynchronizer.{GetExtension, GetStatus}
 import scorex.network.NetworkController.SendToNetwork
 import scorex.network.ScoreObserver.{ConsideredValue, GetScore}
@@ -28,15 +29,10 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
   private lazy val history = application.history
 
-  override def preStart: Unit = {
-    //todo: make configurable
-    context.system.scheduler.schedule(1.second, 2.seconds) {
-      val msg = Message(ScoreMessageSpec, Right(history.score()), None)
-      networkControllerRef ! NetworkController.SendToNetwork(msg, SendToRandom)
-    }
+  //todo: make configurable
+  context.system.scheduler.schedule(1.second, 2.seconds, self, SendCurrentScore)
 
-    blockGenerator ! StartGeneration
-  }
+  blockGenerator ! StartGeneration
 
   override def receive: Receive = {
     case ConsideredValue(Some(networkScore: History.BlockchainScore), witnesses) =>
@@ -80,6 +76,10 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     case request @ GetStatus =>
       blockChainSynchronizer forward request
 
+    case SendCurrentScore =>
+      val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
+      networkControllerRef ! NetworkController.SendToNetwork(msg, SendToRandom)
+
     // the signal to initialize
     case Unit =>
   }
@@ -105,13 +105,19 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
           false
       }
     } else {
-      log.warn(s"Invalid new block(local: $local): ${block.json}")
+      log.warn(s"Invalid new block(local: $local): ${
+        if (log.logger.isDebugEnabled)
+          block.json
+        else
+          encode(block.uniqueId) + ", parent " + encode(block.referenceField.value)}")
       false
     }
   }.getOrElse(false)
 }
 
 object Coordinator {
+
+  case object SendCurrentScore
 
   case class AddBlock(block: Block, generator: Option[ConnectedPeer])
 
