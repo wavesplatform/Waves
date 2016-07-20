@@ -16,4 +16,6 @@ class WavesSettings(override val filename: String) extends Settings with Transac
   val suspendedSenders = Try {
     (settingsJSON \ "suspendedSenders").as[List[String]]
   }.getOrElse(List[String]())
+
+  lazy val isTestNet: Boolean = (settingsJSON \ "testnet").asOpt[Boolean].getOrElse(true)
 }

@@ -2,14 +2,14 @@ package scorex.waves
 
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.{ChainParameters, TestNetParams}
+import com.wavesplatform.consensus.WavesConsensusModule
+import com.wavesplatform.{ChainParameters, MainNetParams, TestNetParams}
+import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.utils.ScorexLogging
-import com.wavesplatform.consensus.WavesConsensusModule
-import org.slf4j.LoggerFactory
 import scorex.waves.http.{DebugApiRoute, ScorexApiRoute, WavesApiRoute}
 import scorex.waves.settings._
 import scorex.waves.transaction.WavesTransactionModule
@@ -26,9 +26,12 @@ class Application(val settingsFilename: String) extends {
   }
 } with scorex.app.Application {
 
-  implicit lazy val chainParams: ChainParameters = TestNetParams
-
   override implicit lazy val settings = new WavesSettings(settingsFilename)
+
+  implicit lazy val chainParams: ChainParameters = if (settings.isTestNet) TestNetParams else MainNetParams
+
+  // Initialize global var with actual address scheme
+  AddressScheme.current = chainParams.addressScheme
 
   override implicit lazy val consensusModule = new WavesConsensusModule()
 
@@ -73,14 +76,10 @@ class Application(val settingsFilename: String) extends {
   require(transactionModule.accountWatchingSupport)
 
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings, networkController))
-
 }
 
 object Application extends App with ScorexLogging {
-
-  // TODO: gagarin55 - add to Scorex LoggerFacade debug(String, Object)
-  private val _log = LoggerFactory.getLogger(this.getClass)
-  _log.debug("Start server with args: {} ", args)
+  log.debug("Start server with args: {} ", args)
 
   val filename = args.headOption.getOrElse("settings.json")
 
@@ -92,5 +91,4 @@ object Application extends App with ScorexLogging {
 
   if (application.wallet.privateKeyAccounts().isEmpty)
     application.wallet.generateNewAccounts(1)
-
 }

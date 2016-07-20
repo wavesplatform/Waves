@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import scorex.account.Account
+import scorex.account.{Account, AddressScheme}
 import scorex.transaction.{GenesisTransaction, Transaction}
 import scorex.waves.settings.Constants
 
@@ -11,6 +11,7 @@ abstract class ChainParameters {
   val initialBalance: Long
   val genesisTimestamp: Long
   val genesisTxs : Seq[Transaction]
+  val addressScheme: AddressScheme
 }
 
 object TestNetParams extends ChainParameters {
@@ -28,6 +29,9 @@ object TestNetParams extends ChainParameters {
     require(txs.foldLeft(0L)(_ + _.amount) == initialBalance)
     txs
   }
+  override val addressScheme: AddressScheme = new AddressScheme {
+    override val chainId: Byte = 'T'.toByte
+  }
 }
 
 object MainNetParams extends ChainParameters {
@@ -44,5 +48,8 @@ object MainNetParams extends ChainParameters {
     )
     require(txs.foldLeft(0L)(_ + _.amount) == initialBalance)
     txs
+  }
+  override val addressScheme: AddressScheme = new AddressScheme {
+    override val chainId: Byte = 'W'.toByte
   }
 }

@@ -19,4 +19,13 @@ object UnsignedPayment {
       (JsPath \ "senderWalletSeed").read[String] and
       (JsPath \ "senderAddressNonce").read[Int]
     ) (UnsignedPayment.apply _)
+
+  implicit val paymentWrites: Writes[UnsignedPayment] = (
+    (JsPath \ "timestamp").write[Long] and
+      (JsPath \ "amount").write[Long] and
+      (JsPath \ "fee").write[Long] and
+      (JsPath \ "recipient").write[String] and
+      (JsPath \ "senderWalletSeed").write[String] and
+      (JsPath \ "senderAddressNonce").write[Int]
+    ) (unlift(UnsignedPayment.unapply))
 }

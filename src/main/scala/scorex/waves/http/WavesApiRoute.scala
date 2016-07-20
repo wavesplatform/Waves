@@ -3,7 +3,7 @@ package scorex.waves.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
@@ -196,14 +196,14 @@ case class WavesApiRoute(override val application: Application)(implicit val con
 
                   transactionModule.createSignedPayment(senderAccount, recipientAccount,
                     payment.amount, payment.fee, payment.timestamp) match {
-                    case Left(tx) =>
+                    case Right(tx) =>
                       val signature = Base58.encode(tx.signature)
                       val senderPubKey = Base58.encode(tx.sender.publicKey)
                       val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
                         senderPubKey, tx.sender.address, signature)
                       JsonResponse(Json.toJson(signedTx), StatusCodes.OK)
 
-                    case Right(e) => e match {
+                    case Left(e) => e match {
                       case ValidationResult.NoBalance => NoBalance.response
                       case ValidationResult.InvalidAddress => InvalidAddress.response
                     }
@@ -226,8 +226,8 @@ case class WavesApiRoute(override val application: Application)(implicit val con
       withCors {
         entity(as[String]) { publicKey =>
           postJsonRoute {
-            val addressFromPubKey = Account.fromPublicKey(Base58.decode(publicKey).get)
-            JsonResponse(Json.obj("address" -> addressFromPubKey), StatusCodes.OK)
+            val account = Account.fromPublicKey(Base58.decode(publicKey).get)
+            JsonResponse(Json.obj("address" -> account.address), StatusCodes.OK)
           }
         }
       }
@@ -259,8 +259,8 @@ case class WavesApiRoute(override val application: Application)(implicit val con
               case JsSuccess(payment: ExternalPayment, _) =>
                 Base58.decode(payment.senderPublicKey) match {
                   case Success(senderPublicKeyBytes) =>
-                    val senderAddress = Account.fromPublicKey(senderPublicKeyBytes)
-                    if (suspendedSenders.contains(senderAddress))
+                    val senderAccount = Account.fromPublicKey(senderPublicKeyBytes)
+                    if (suspendedSenders.contains(senderAccount.address))
                       InvalidSender.response
                     else
                       broadcastPayment(payment)
@@ -297,8 +297,8 @@ case class WavesApiRoute(override val application: Application)(implicit val con
               case JsSuccess(payment: SignedPayment, _) =>
                 Base58.decode(payment.senderPublicKey) match {
                   case Success(senderPubKeyBytes) =>
-                    val senderAddress = Account.fromPublicKey(senderPubKeyBytes)
-                    if (suspendedSenders.contains(senderAddress)) InvalidSender.response
+                    val senderAccount = Account.fromPublicKey(senderPubKeyBytes)
+                    if (suspendedSenders.contains(senderAccount.address)) InvalidSender.response
                     else broadcastPayment(payment)
                   case Failure(e) => InvalidSender.response
                 }
@@ -339,9 +339,9 @@ case class WavesApiRoute(override val application: Application)(implicit val con
 
   @Deprecated
   private def broadcastPayment(payment: ExternalPayment): JsonResponse = {
-    val sender = Account.fromPublicKey(Base58.decode(payment.senderPublicKey).get)
+    val senderAccount = Account.fromPublicKey(Base58.decode(payment.senderPublicKey).get)
     val signedPayment = SignedPayment(payment.timestamp, payment.amount, payment.fee, payment.recipient,
-      payment.senderPublicKey, sender, payment.signature)
+      payment.senderPublicKey, senderAccount.address, payment.signature)
 
     transactionModule.broadcastPayment(signedPayment) match {
       case Right(tx) =>
