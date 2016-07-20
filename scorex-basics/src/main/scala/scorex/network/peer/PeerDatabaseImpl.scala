@@ -57,7 +57,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
     Option(peersPersistence.get(address)) match {
       case Some(peer) => {
         val current = System.currentTimeMillis
-        if (peer.blacklistingTime < current - blacklistResidenceTimeMilliseconds) {
+        if (peer.blacklistingTime <= current - blacklistResidenceTimeMilliseconds) {
           peersPersistence.put(address, peer.unBlacklist)
           database.commit()
           false
