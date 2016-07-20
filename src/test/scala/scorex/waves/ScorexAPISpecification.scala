@@ -19,7 +19,7 @@ class ScorexAPISpecification extends FunSuite with Matchers with BeforeAndAfterA
   test("/scorex/status API route") {
     val status = getRequest("/scorex/status")
     List("generating", "syncing") should contain((status \ "blockGeneratorStatus").as[String])
-    List("synced", "syncing") should contain((status \ "historySynchronizationStatus").as[String])
+    List("synced", "syncing", "idle") should contain((status \ "historySynchronizationStatus").as[String])
   }
 
   test("/scorex/version API route") {
