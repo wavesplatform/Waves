@@ -30,12 +30,16 @@ class CoordinatorSyncSpecification
     shutdown()
   }
 
+  object TestSettings extends SettingsMock
+
   val testBlockChainSynchronizer = TestProbe("BlockChainSynchronizer")
 
+  val h = stub[History]
+
   trait A extends Application {
-    override implicit lazy val settings = new SettingsMock {}
+    override implicit lazy val settings = TestSettings
     override lazy val blockChainSynchronizer: ActorRef = testBlockChainSynchronizer.ref
-    override lazy val history: History = stub[History]
+    override lazy val history: History = h
   }
 
   val app = stub[A]
