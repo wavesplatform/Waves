@@ -33,9 +33,7 @@ and agree with license terms
 
 Download deb package from [releases](https://github.com/wavesplatform/Waves/releases)
 
-Install it
-
-`sudo dpkg -i <waves package .deb>`
+Install downloaded package using `sudo dpkg -i` command
 
 Run `waves waves-testnet.json`.
 
@@ -44,7 +42,7 @@ Run `waves waves-testnet.json`.
 
 For now it is only possible to create deb package.
 
-#####Install SBT(Scala Build Tool):
+#####Install SBT (Scala Build Tool):
 
 `echo "deb http://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list`
 
