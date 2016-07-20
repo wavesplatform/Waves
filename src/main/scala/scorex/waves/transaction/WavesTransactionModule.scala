@@ -52,19 +52,19 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
   /**
     * Create signed payment transaction and validate it through current state.
     */
-  def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[PaymentTransaction, ValidationResult] = {
+  def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationResult, PaymentTransaction] = {
     val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp)
     val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
 
     payment.validate match {
       case ValidationResult.ValidateOke => {
         if (blockStorage.state.isValid(payment)) {
-          Left(payment)
+          Right(payment)
         } else {
-          Right(ValidationResult.NoBalance)
+          Left(ValidationResult.NoBalance)
         }
       }
-      case error: ValidationResult => Right(error)
+      case error: ValidationResult => Left(error)
     }
   }
 

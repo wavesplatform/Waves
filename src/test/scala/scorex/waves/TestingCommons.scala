@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.wavesplatform.TestNetParams
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
+import scorex.account.AddressScheme
 import scorex.transaction.TransactionSettings
 import scorex.utils._
 
@@ -24,7 +25,8 @@ object TestingCommons {
   lazy val applications = {
     val apps = List(
       new Application("settings-test.json") {
-        override def chainParams = TestNetParams
+        override lazy val chainParams = TestNetParams
+        AddressScheme.current = TestNetParams.addressScheme
       }
     )
     apps.foreach(_.run())

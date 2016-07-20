@@ -1,3 +1,7 @@
+**0.2.2-SNAPSHOT**
+
+* Switch network by "testnet" in settings. Default value is true."
+
 **0.2.1**
 
 * peers.dat format changed. Delete old version.

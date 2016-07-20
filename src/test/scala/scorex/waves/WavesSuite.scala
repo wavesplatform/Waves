@@ -3,7 +3,9 @@ package scorex.waves
 import org.scalatest.{BeforeAndAfterAll, Suites}
 
 class WavesSuite extends Suites(
-  new DebugAPISpecification, new ScorexAPISpecification, new WavesAPISpecification) with BeforeAndAfterAll {
+  new DebugAPISpecification,
+  new ScorexAPISpecification,
+  new WavesAPISpecification) with BeforeAndAfterAll {
 
   import TestingCommons._
 
