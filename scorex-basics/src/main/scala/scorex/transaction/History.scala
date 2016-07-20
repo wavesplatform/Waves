@@ -62,7 +62,7 @@ trait History {
     * @param block - block to append
     * @return Blocks to process in state
     */
-  private[transaction] def appendBlock(block: Block): Try[BlocksToProcess]
+  def appendBlock(block: Block): Try[BlocksToProcess]
 
   def parent(block: Block, back: Int = 1): Option[Block]
 

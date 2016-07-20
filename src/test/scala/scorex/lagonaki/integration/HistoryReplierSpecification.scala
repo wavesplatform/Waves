@@ -1,10 +1,9 @@
 package scorex.lagonaki.integration
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import org.scalatest.{Matchers, WordSpecLike}
 import scorex.lagonaki.TestingCommons
-import scorex.network.HistorySynchronizer
 
 class HistoryReplierSpecification(_system: ActorSystem)
   extends TestKit(_system)
@@ -16,8 +15,6 @@ class HistoryReplierSpecification(_system: ActorSystem)
   def this() = this(ActorSystem("HistoryReplierSpecification"))
 
   val probe = new TestProbe(system)
-
-  val hs = system.actorOf(Props(classOf[HistorySynchronizer], application))
 
   lazy val application = TestingCommons.application
 

@@ -80,7 +80,7 @@ class StoredBlockchain(db: MVStore)
 
   private val blockStorage: BlockchainPersistence = new BlockchainPersistence(db)
 
-  override private[transaction] def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
+  override def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
     Try {
       val parent = block.referenceField
       if ((height() == 0) || (lastBlock.uniqueId sameElements parent.value)) {

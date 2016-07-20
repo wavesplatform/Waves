@@ -182,7 +182,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
 
   override def height(): Int = blockStorage.bestBlock.map(_._3).getOrElse(0)
 
-  override private[transaction] def appendBlock(block: Block): Try[BlocksToProcess] = {
+  override def appendBlock(block: Block): Try[BlocksToProcess] = {
     val parent = block.referenceField
     val h = height()
     if ((h == 0) || (lastBlock.uniqueId sameElements block.referenceField.value)) {

@@ -32,7 +32,7 @@ lazy val consensus = subModule("consensus")
 
 lazy val root = Project(id = "scorex", base = file("."))
   .aggregate(basics, transaction, consensus)
-  .dependsOn(basics, transaction, consensus)
+  .dependsOn(basics % "compile->compile;test->test", transaction, consensus)
   .settings(commonSettings: _*)
   .settings(
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))

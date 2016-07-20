@@ -15,6 +15,8 @@ class LagonakiTestSuite extends Suites(
   //  , new BlockStorageSpecification
   , new WalletSpecification
   , new BlockGeneratorSpecification
+  , new BlockChainSynchronizerSpecification
+  , new CoordinatorSyncSpecification
   , new BlockTreeSpecification
   , new StateTest
   , new StoredStateSpecification

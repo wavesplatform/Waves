@@ -44,15 +44,15 @@ trait Application extends ScorexLogging {
   lazy val basicMessagesSpecsRepo = new BasicMessagesRepo()
 
   //p2p
-  lazy val upnp = new UPnP(settings)
-  if (settings.upnpEnabled) upnp.addPort(settings.port)
+  lazy val upnp = {
+    val value = new UPnP(settings)
+    if (settings.upnpEnabled) value.addPort(settings.port)
+    value
+  }
 
   lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
 
   lazy val peerManager = actorSystem.actorOf(Props(classOf[PeerManager], this))
-
-  lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this), "networkController")
-  lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], this), "blockGenerator")
 
   //wallet
   private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
@@ -63,12 +63,16 @@ trait Application extends ScorexLogging {
 
   lazy val history: History = blockStorage.history
 
-  lazy val historySynchronizer = actorSystem.actorOf(Props(classOf[HistorySynchronizer], this), "HistorySynchronizer")
+  lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this), "NetworkController")
+  lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], this), "BlockGenerator")
+  lazy val scoreObserver = actorSystem.actorOf(Props(classOf[ScoreObserver], this), "ScoreObserver")
+  lazy val blockChainSynchronizer = actorSystem.actorOf(Props(classOf[BlockChainSynchronizer], this), "BlockChainSynchronizer")
+  lazy val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
 
   implicit val materializer = ActorMaterializer()
-  val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
+  lazy val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
 
 
   def run() {
@@ -79,8 +83,9 @@ trait Application extends ScorexLogging {
 
     Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
 
-    historySynchronizer ! Unit
-    historyReplier ! Unit
+    // TODO: in fact, this is an attemption to call Actor.preStart - needs to be replaced!
+    Seq(scoreObserver, blockChainSynchronizer, historyReplier, coordinator) foreach ( _ ! Unit)
+
     actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
 
     //on unexpected shutdown

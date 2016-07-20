@@ -4,6 +4,7 @@ import akka.actor.Actor
 import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.mining.Miner._
+import scorex.network.Coordinator.AddBlock
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.Await
@@ -45,7 +46,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
     val accounts = application.wallet.privateKeyAccounts()
     val blocksFuture = application.consensusModule.generateNextBlocks(accounts)(application.transactionModule)
     val blocks: Seq[Block] = Await.result(blocksFuture, BlockGenerationTimeLimit)
-    if (blocks.nonEmpty) application.historySynchronizer ! blocks.maxBy(application.consensusModule.blockScore)
+    if (blocks.nonEmpty) application.coordinator ! AddBlock(blocks.maxBy(application.consensusModule.blockScore), None)
     if (!stopped) scheduleAGuess()
   }.recoverWith {
     case ex =>
