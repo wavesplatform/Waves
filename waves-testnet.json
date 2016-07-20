@@ -21,5 +21,6 @@
   "maxRollback": 100,
   "history": "blockchain",
   "offlineGeneration": false,
-  "apiKeyHash":""
+  "apiKeyHash":"",
+  "testnet": true
 }

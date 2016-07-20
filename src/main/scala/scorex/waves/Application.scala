@@ -18,10 +18,8 @@ import scala.reflect.runtime.universe._
 
 class Application(val settingsFilename: String) extends {
   override val applicationName = "waves"
-  private val appConf = ConfigFactory.load().getConfig("app")
   override val appVersion = {
-    val raw = appConf.getString("version")
-    val parts = raw.split("\\.")
+    val parts = Constants.VersionString.split("\\.")
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
   }
 } with scorex.app.Application {
