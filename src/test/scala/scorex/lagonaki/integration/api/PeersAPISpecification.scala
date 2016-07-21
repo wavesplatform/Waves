@@ -22,7 +22,7 @@ class PeersAPISpecification extends FunSuite with Matchers {
 
   test("/peers/blacklisted API route") {
     val blacklisted = GET.request("/peers/blacklisted")
-    blacklisted.toString() shouldBe "[]"
+    blacklisted.asOpt[Seq[String]].isDefined shouldBe true
   }
 
   test("/peers/connect API route") {
