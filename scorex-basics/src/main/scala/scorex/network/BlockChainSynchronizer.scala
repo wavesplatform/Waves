@@ -49,7 +49,7 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
 
       val toDownload = blockIds.tail.filter(b => !application.history.contains(b))
       val commonBlockIdExists = application.history.contains(common)
-      if (commonBlockIdExists && toDownload.size > 1) {
+      if (commonBlockIdExists && toDownload.nonEmpty) {
         gotoGettingBlocks(witnesses, toDownload.map(_ -> None), connectedPeer)
         blockIds.tail.foreach { blockId =>
           val msg = Message(GetBlockSpec, Right(blockId), None)

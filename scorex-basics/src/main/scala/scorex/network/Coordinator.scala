@@ -22,8 +22,6 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   import Coordinator._
   import application.basicMessagesSpecsRepo._
 
-  import Option._
-
   private lazy val scoreObserver = application.scoreObserver
   private lazy val blockChainSynchronizer = application.blockChainSynchronizer
   private lazy val blockGenerator = application.blockGenerator
@@ -49,8 +47,6 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       log.info("Got no score from outer world")
 
     case ApplyFork(blocks, fromPeer) =>
-      application.blockStorage.removeAfter(blocks.head.referenceField.value)
-
       log.info(s"Going to process ${blocks.size} blocks")
       processBlocks(blocks, Some(fromPeer))
 
@@ -80,7 +76,11 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       }
 
       if (isBlockToBeAdded) {
-        processBlocks(Some(block), fromPeer)
+        val local = fromPeer.isEmpty
+        if (!processNewBlock(block, local = local)) {
+          // TODO: blacklist here
+          log.warn(s"Can't apply single block, local=$local: ${block.json}")
+        }
       }
 
     case SyncFinished(_) =>
@@ -97,12 +97,26 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     case Unit =>
   }
 
-  private def processBlocks(blocks: Iterable[Block], fromPeer: Option[ConnectedPeer]): Unit = {
+  private def processBlocks(blocks: Seq[Block], fromPeer: Option[ConnectedPeer]): Unit = {
+    val headParent = blocks.head.referenceField.value
+
+    val revertedBlocks =
+      history.heightOf(headParent).map(history.height() - _).filter(_ > 0).toList.flatMap {
+        tailSize =>
+          val tail = history.lastBlocks(tailSize)
+          application.blockStorage.removeAfter(headParent)
+          tail
+      }
+
     val generatedLocally = fromPeer.isEmpty
     blocks.find(!processNewBlock(_, local = generatedLocally)).foreach {
       failedBlock =>
         log.warn(s"Can't apply block: ${failedBlock.json}")
-        if (!generatedLocally && (history.lastBlock.uniqueId sameElements failedBlock.referenceField.value)) {
+        if (blocks.head == failedBlock && revertedBlocks.nonEmpty) {
+          log.warn(s"Return back ${revertedBlocks.size} reverted blocks: ${failedBlock.json}")
+          revertedBlocks.reverse.foreach(application.blockStorage.appendBlock)
+        }
+        if (!generatedLocally && history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)) {
           fromPeer.get.handlerRef ! PeerConnectionHandler.Blacklist
         }
     }
