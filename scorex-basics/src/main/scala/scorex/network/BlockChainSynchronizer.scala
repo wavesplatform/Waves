@@ -26,7 +26,7 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
 
   private val GettingBlockTimeout = application.settings.historySynchronizerTimeout
 
-  var lastUpdate: Option[Long] = None
+  var timeoutData: Option[(Seq[ConnectedPeer], Long)] = None
 
   context.system.scheduler.schedule(GettingBlockTimeout, GettingBlockTimeout, self, SelfCheck)
 
@@ -35,8 +35,6 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
   def idle: Receive = state(Idle, {
     case GetExtension(lastIds, witnesses) =>
 
-      resetLastUpdate()
-
       val msg = Message(GetSignaturesSpec, Right(lastIds), None)
       networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(witnesses))
 
@@ -44,11 +42,7 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
   })
 
   def gettingExtension(witnesses: Seq[ConnectedPeer]): Receive = state(GettingExtension, {
-
-    case SignaturesFromPeer(blockIds, connectedPeer)
-      if witnesses.contains(connectedPeer) => //todo: ban if non-expected sender
-
-      resetLastUpdate()
+    case SignaturesFromPeer(blockIds, connectedPeer) if witnesses.contains(connectedPeer) =>
 
       val common = blockIds.head
       log.debug(s"Got blockIds: ${blockIds.map(Base58.encode)}")
@@ -66,6 +60,8 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
         if (!commonBlockIdExists) log.warn(s"Strange blockIds: ${blockIds.map(Base58.encode)}")
         gotoIdle(success = commonBlockIdExists)
       }
+
+    case SignaturesFromPeer(_, nonWitness) => blacklistPeer(nonWitness)
   })
 
   def gettingBlocks(witnesses: Seq[ConnectedPeer],
@@ -81,9 +77,7 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
     }
 
     state(GettingBlocks, {
-      case BlockFromPeer(idx(block, idx), connectedPeer) =>
-
-        resetLastUpdate()
+      case BlockFromPeer(idx(block, idx), _) =>
 
         val blockId = block.uniqueId
         log.info("Got block: " + block.encodedId)
@@ -110,10 +104,11 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
         coordinator ! AddBlock(block, Some(peer))
 
       case SelfCheck =>
-        if (lastUpdate.exists(System.currentTimeMillis() - _ > GettingBlockTimeout.toMillis)) {
-          lastUpdate = None
-          // todo blacklist
-          gotoIdle(success = false)
+        timeoutData.find(System.currentTimeMillis() - _._2 > GettingBlockTimeout.toMillis).map(_._1).foreach {
+          peersToWatch =>
+            peersToWatch.foreach(blacklistPeer)
+            timeoutData = None
+            gotoIdle(success = false)
         }
 
       case SignaturesFromPeer(_, _) =>
@@ -129,11 +124,15 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
 
   private def gotoGettingExtension(witnesses: Seq[ConnectedPeer]): Unit = {
     log.debug("Transition to gettingExtension")
+    updateTimeoutData(witnesses)
     context become gettingExtension(witnesses)
   }
 
-  private def gotoGettingBlocks(witnesses: Seq[ConnectedPeer], blocks: Seq[(BlockId, Option[Block])], fromPeer: ConnectedPeer): Unit = {
+  private def gotoGettingBlocks(witnesses: Seq[ConnectedPeer],
+                                blocks: Seq[(BlockId, Option[Block])],
+                                fromPeer: ConnectedPeer): Unit = {
     log.debug("Transition to gettingBlocks")
+    updateTimeoutData(Seq(fromPeer))
     context become gettingBlocks(witnesses, blocks, fromPeer)
   }
 
@@ -143,8 +142,12 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
     coordinator ! SyncFinished(success)
   }
 
-  private def resetLastUpdate(): Unit = {
-    lastUpdate = Some(System.currentTimeMillis())
+  private def updateTimeoutData(peersToWatch: Seq[ConnectedPeer]): Unit = {
+    timeoutData = Some(peersToWatch, System.currentTimeMillis())
+  }
+
+  private def blacklistPeer(connectedPeer: ConnectedPeer): Unit = {
+    connectedPeer.handlerRef ! PeerConnectionHandler.Blacklist
   }
 
   object BlockFromPeer {

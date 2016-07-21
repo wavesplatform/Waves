@@ -12,7 +12,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.lagonaki.mocks.{ApplicationMock, BlockMock}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{Message, MessageSpec}
-import scorex.network.{BlockChainSynchronizer, ConnectedPeer, SendToChosen}
+import scorex.network.{BlockChainSynchronizer, ConnectedPeer, PeerConnectionHandler, SendToChosen}
 import scorex.settings.SettingsMock
 import scorex.transaction.History
 
@@ -52,7 +52,7 @@ class BlockChainSynchronizerSpecification
   (h.contains(_: BlockId)).when(id2).returns(false)
 
   trait A extends ApplicationMock {
-    override implicit lazy val settings = TestSettings
+    override lazy val settings = TestSettings
     override lazy val networkController: ActorRef = testNetworkController.ref
     override lazy val coordinator: ActorRef = testCoordinator.ref
     override lazy val history: History = h
@@ -67,7 +67,7 @@ class BlockChainSynchronizerSpecification
   val blockChainSynchronizerRef =
     system.actorOf(Props(classOf[BlockChainSynchronizer], app))
 
-  "BlockChainSynchronizer" must {
+  "BlockChainSynchronizer" when {
 
     def validateStatus(status: Status): Unit = {
       blockChainSynchronizerRef ! GetStatus
@@ -80,7 +80,8 @@ class BlockChainSynchronizerSpecification
       testCoordinator.expectMsg(AddBlock(block, Some(peer)))
     }
 
-    val peer = ConnectedPeer(new InetSocketAddress(9977), null)
+    val testPeerHandler = TestProbe("PeerHandler")
+    val peer = ConnectedPeer(new InetSocketAddress(9977), testPeerHandler.ref)
 
     def networkMessage[Content](spec: MessageSpec[Content], data: Content) = {
       SendToNetwork(Message[Content](spec, Right(data), None), SendToChosen(Seq(peer)))
@@ -99,25 +100,7 @@ class BlockChainSynchronizerSpecification
 
     validateStatus(GettingExtension)
 
-    "become idle on timeout" in {
-      testCoordinator.expectNoMsg(TestSettings.historySynchronizerTimeout.toMillis - (System.currentTimeMillis() - t0) millis)
-      testCoordinator.expectMsg(SyncFinished(success = false))
-
-      validateStatus(Idle)
-    }
-
-    "follow ledger download scenario" in {
-
-      def returnBlock(id: BlockId): Block = {
-        val block =
-          new BlockMock(Seq.empty) {
-            override val uniqueId: BlockId = id
-          }
-
-        blockChainSynchronizerRef ! DataFromPeer(BlockMessageSpec.messageCode, block, peer)
-
-        block
-      }
+    "no timeout happens" should {
 
       assertLatestBlockFromPeerForwarding(peer)
 
@@ -128,12 +111,43 @@ class BlockChainSynchronizerSpecification
 
       validateStatus(GettingBlocks)
 
-      assertLatestBlockFromPeerForwarding(peer)
+      "follow ledger download scenario" in {
+        assertLatestBlockFromPeerForwarding(peer)
 
-      testCoordinator.expectMsg(ApplyFork(Seq(returnBlock(id2), returnBlock(id1)).reverse, peer))
-      testCoordinator.expectMsg(SyncFinished(success = true))
+        def returnBlock(id: BlockId): Block = {
+          val block =
+            new BlockMock(Seq.empty) {
+              override val uniqueId: BlockId = id
+            }
 
-      validateStatus(Idle)
+          blockChainSynchronizerRef ! DataFromPeer(BlockMessageSpec.messageCode, block, peer)
+
+          block
+        }
+        testCoordinator.expectMsg(ApplyFork(Seq(returnBlock(id2), returnBlock(id1)).reverse, peer))
+
+        testCoordinator.expectMsg(SyncFinished(success = true))
+
+        validateStatus(Idle)
+      }
+
+      "react on GetExtension in the Idle state only" in {
+        blockChainSynchronizerRef ! GetExtension(Seq(id1), Seq(peer))
+
+        validateStatus(GettingBlocks)
+      }
+    }
+
+    "meet timeout" should {
+      "become idle on timeout" in {
+        testCoordinator.expectNoMsg(
+          (TestSettings.historySynchronizerTimeout.toMillis - (System.currentTimeMillis() - t0)) millis)
+
+        testPeerHandler.expectMsg(PeerConnectionHandler.Blacklist)
+        testCoordinator.expectMsg(SyncFinished(success = false))
+
+        validateStatus(Idle)
+      }
     }
   }
 }

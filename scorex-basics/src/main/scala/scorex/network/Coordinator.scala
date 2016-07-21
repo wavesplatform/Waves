@@ -22,6 +22,8 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   import Coordinator._
   import application.basicMessagesSpecsRepo._
 
+  import Option._
+
   private lazy val scoreObserver = application.scoreObserver
   private lazy val blockChainSynchronizer = application.blockChainSynchronizer
   private lazy val blockGenerator = application.blockGenerator
@@ -50,24 +52,35 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       application.blockStorage.removeAfter(blocks.head.referenceField.value)
 
       log.info(s"Going to process ${blocks.size} blocks")
-      blocks.find(!processNewBlock(_, local = false)).foreach {
-        failedBlock =>
-          log.warn(s"Can't apply block: ${failedBlock.json}")
-          if (history.lastBlock.uniqueId sameElements failedBlock.referenceField.value) {
-            fromPeer.handlerRef ! PeerConnectionHandler.Blacklist
-          }
-      }
+      processBlocks(blocks, Some(fromPeer))
 
     case AddBlock(block, fromPeer) =>
       val parentBlockId = block.referenceField.value
-      val nonLocal = fromPeer.isDefined
+      val local = fromPeer.isEmpty
 
-      if (nonLocal && !history.contains(parentBlockId)) {
-        log.debug(s"Parent of the block is not yet in the history: ${block.json}")
-      } else if (!(history.lastBlock.uniqueId sameElements parentBlockId)) {
-        log.debug(s"A child for parent of the block already exists: ${block.json}")
-      } else {
-        processNewBlock(block, !nonLocal)
+      def isBlockToBeAdded: Boolean = {
+        if (!local && history.contains(block)) {
+          // we have already got the block - skip
+          return false
+        }
+
+        if (!history.contains(parentBlockId)) {
+          // the block either has come too early or, if local, too late (e.g. removeAfter happened)
+          log.debug(s"Parent of the block is not in the history, local=$local: ${block.json}")
+          return false
+        }
+
+        if (!history.lastBlock.uniqueId.sameElements(parentBlockId)) {
+          // someone has happened to be faster and added a block or blocks in the ledger before
+          log.debug(s"A child for parent of the block already exists, local=$local: ${block.json}")
+          return false
+        }
+
+        true
+      }
+
+      if (isBlockToBeAdded) {
+        processBlocks(Some(block), fromPeer)
       }
 
     case SyncFinished(_) =>
@@ -82,6 +95,17 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
     // the signal to initialize
     case Unit =>
+  }
+
+  private def processBlocks(blocks: Iterable[Block], fromPeer: Option[ConnectedPeer]): Unit = {
+    val generatedLocally = fromPeer.isEmpty
+    blocks.find(!processNewBlock(_, local = generatedLocally)).foreach {
+      failedBlock =>
+        log.warn(s"Can't apply block: ${failedBlock.json}")
+        if (!generatedLocally && (history.lastBlock.uniqueId sameElements failedBlock.referenceField.value)) {
+          fromPeer.get.handlerRef ! PeerConnectionHandler.Blacklist
+        }
+    }
   }
 
   private def processNewBlock(block: Block, local: Boolean): Boolean = Try {
