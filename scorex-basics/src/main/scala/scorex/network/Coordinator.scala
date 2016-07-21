@@ -46,9 +46,9 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     case ConsideredValue(None, _) =>
       log.info("Got no score from outer world")
 
-    case ApplyFork(blocks, fromPeer) =>
+    case ApplyFork(blocks, fromPeer) if blocks.nonEmpty =>
       log.info(s"Going to process ${blocks.size} blocks")
-      processBlocks(blocks, Some(fromPeer))
+      processFork(blocks, Some(fromPeer))
 
     case AddBlock(block, fromPeer) =>
       val parentBlockId = block.referenceField.value
@@ -76,7 +76,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       }
 
       if (isBlockToBeAdded) {
-        if (!processNewBlock(block, fromPeer)) {
+        if (!processNewBlock(block, fromPeer, broadcast = true)) {
           // TODO: blacklist here
           log.warn(s"Can't apply single block, local=${fromPeer.isEmpty}: ${block.json}")
         }
@@ -96,7 +96,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     case Unit =>
   }
 
-  private def processBlocks(blocks: Seq[Block], fromPeer: Option[ConnectedPeer]): Unit = {
+  private def processFork(blocks: Seq[Block], fromPeer: Option[ConnectedPeer]): Unit = {
     val headParent = blocks.head.referenceField.value
 
     val revertedBlocks =
@@ -107,11 +107,11 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
           tail
       }
 
-    blocks.find(!processNewBlock(_, fromPeer)).foreach {
+    blocks.find(!processNewBlock(_, fromPeer, broadcast = false)).foreach {
       failedBlock =>
         log.warn(s"Can't apply block: ${failedBlock.json}")
         if (blocks.head == failedBlock && revertedBlocks.nonEmpty) {
-          log.warn(s"Return back ${revertedBlocks.size} reverted blocks: ${failedBlock.json}")
+          log.warn(s"Return back ${revertedBlocks.size} reverted blocks: ${revertedBlocks.map(_.encodedId)}")
           revertedBlocks.reverse.foreach(application.blockStorage.appendBlock)
         }
 
@@ -121,15 +121,17 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     }
   }
 
-  private def processNewBlock(block: Block, fromPeer: Option[ConnectedPeer]): Boolean = Try {
+  private def processNewBlock(block: Block, fromPeer: Option[ConnectedPeer], broadcast: Boolean): Boolean = Try {
     val local = fromPeer.isEmpty
 
     if (block.isValid) {
       log.info(s"New block(local: $local): ${block.json}")
 
-      val sendingStrategy =
-        if (local) Broadcast else SendToRandomExceptOf(application.settings.MaxPeersToBroadcastBlock, fromPeer.toSeq)
-      networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), sendingStrategy)
+      if (broadcast) {
+        val sendingStrategy =
+          if (local) Broadcast else SendToRandomExceptOf(application.settings.maxPeersToBroadcastBlock, fromPeer.toSeq)
+        networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), sendingStrategy)
+      }
 
       val oldHeight = history.height()
       val oldScore = history.score()

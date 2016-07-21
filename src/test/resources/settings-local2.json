@@ -26,5 +26,6 @@
     "treeDir": "/tmp/scorex-tests/data2/tree/",
     "authDataStorage": "authDataStorage2.mapDB"
   },
-  "blockGenerationDelay": 501
+  "blockGenerationDelay": 501,
+  "forkChunkSize": 1
 }

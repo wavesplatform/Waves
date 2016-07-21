@@ -119,7 +119,13 @@ trait Settings extends ScorexLogging {
   lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(DefaultMaxRollback)
 
   val MaxBlocksChunks = 10
-  val MaxPeersToBroadcastBlock = 3
+
+  val DefaultForkChunkSize = MaxBlocksChunks
+  lazy val forkChunkSize = (settingsJSON \ "forkChunkSize").asOpt[Int].getOrElse(DefaultForkChunkSize)
+
+  val DefaultMaxPeersToBroadcastBlock = 3
+  lazy val maxPeersToBroadcastBlock =
+    (settingsJSON \ "maxPeersToBroadcastBlock").asOpt[Int].getOrElse(DefaultMaxPeersToBroadcastBlock)
 
   //API
   lazy val corsAllowed = (settingsJSON \ "cors").asOpt[Boolean].getOrElse(false)

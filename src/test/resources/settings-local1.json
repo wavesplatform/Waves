@@ -29,5 +29,6 @@
     "isTrustedDealer": true
   },
   "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",
-  "blockGenerationDelay": 5001
+  "blockGenerationDelay": 5001,
+  "forkChunkSize": 1
 }

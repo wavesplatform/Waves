@@ -3,7 +3,7 @@ package scorex.network
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.crypto.encode.Base58
+import scorex.crypto.encode.Base58.encode
 import scorex.network.Coordinator.{AddBlock, ApplyFork, SyncFinished}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.Message
@@ -24,11 +24,12 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
 
   private lazy val coordinator = application.coordinator
 
-  private val GettingBlockTimeout = application.settings.historySynchronizerTimeout
+  private val gettingBlockTimeout = application.settings.historySynchronizerTimeout
+  private val forkChunkSize = application.settings.forkChunkSize
 
   var timeoutData: Option[(Seq[ConnectedPeer], Long)] = None
 
-  context.system.scheduler.schedule(GettingBlockTimeout, GettingBlockTimeout, self, SelfCheck)
+  context.system.scheduler.schedule(gettingBlockTimeout, gettingBlockTimeout, self, SelfCheck)
 
   override def receive: Receive = idle
 
@@ -45,7 +46,7 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
     case SignaturesFromPeer(blockIds, connectedPeer) if witnesses.contains(connectedPeer) =>
 
       val common = blockIds.head
-      log.debug(s"Got blockIds: ${blockIds.map(Base58.encode)}")
+      log.debug(s"Got blockIds: ${blockIds.map(encode)}")
 
       val toDownload = blockIds.tail.filter(b => !application.history.contains(b))
       val commonBlockIdExists = application.history.contains(common)
@@ -57,7 +58,7 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
           networkControllerRef ! NetworkController.SendToNetwork(msg, stn)
         }
       } else {
-        if (!commonBlockIdExists) log.warn(s"Strange blockIds: ${blockIds.map(Base58.encode)}")
+        if (!commonBlockIdExists) log.warn(s"Strange blockIds: ${blockIds.map(encode)}")
         gotoIdle(success = commonBlockIdExists)
       }
 
@@ -67,7 +68,7 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
   def gettingBlocks(witnesses: Seq[ConnectedPeer],
                     blocks: Seq[(BlockId, Option[Block])],
                     fromPeer: ConnectedPeer): Receive = {
-    object idx {
+    object blockIdx {
       def unapply(block: Block): Option[(Block, Int)] = {
         blocks.indexWhere(_._1.sameElements(block.uniqueId)) match {
           case idx: Int if idx != -1 => Some((block, idx))
@@ -77,19 +78,25 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
     }
 
     state(GettingBlocks, {
-      case BlockFromPeer(idx(block, idx), _) =>
+      case BlockFromPeer(blockIdx(block, index), _) if blocks(index)._2.isEmpty =>
 
         val blockId = block.uniqueId
         log.info("Got block: " + block.encodedId)
 
-        val updBlocks = blocks.updated(idx, blockId -> Some(block))
-        if (idx == 0) {
-          val toProcess = updBlocks.takeWhile(_._2.isDefined).map(_._2.get)
-          coordinator ! ApplyFork(toProcess, fromPeer)
-          if (updBlocks.size > toProcess.size)
-            gotoGettingBlocks(witnesses, updBlocks.drop(toProcess.length), fromPeer)
-          else
+        val updBlocks = blocks.updated(index, blockId -> Some(block))
+        val toProcess = updBlocks.map(_._2).takeWhile(_.isDefined)
+
+        val allBlocksInPlace = toProcess.size == updBlocks.size
+
+        if (toProcess.size >= forkChunkSize || allBlocksInPlace) {
+
+          coordinator ! ApplyFork(toProcess.flatten, fromPeer)
+
+          if (allBlocksInPlace)
             gotoIdle(success = true)
+          else
+            gotoGettingBlocks(witnesses, updBlocks.drop(toProcess.size), fromPeer)
+
         } else gotoGettingBlocks(witnesses, updBlocks, fromPeer)
     })
   }
@@ -104,7 +111,7 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
         coordinator ! AddBlock(block, Some(peer))
 
       case SelfCheck =>
-        timeoutData.find(System.currentTimeMillis() - _._2 > GettingBlockTimeout.toMillis).map(_._1).foreach {
+        timeoutData.find(System.currentTimeMillis() - _._2 > gettingBlockTimeout.toMillis).map(_._1).foreach {
           peersToWatch =>
             peersToWatch.foreach(blacklistPeer)
             timeoutData = None
