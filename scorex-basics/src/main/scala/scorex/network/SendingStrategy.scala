@@ -6,10 +6,12 @@ trait SendingStrategy {
   def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer]
 }
 
-object SendToRandom extends SendingStrategy {
-  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = peers.nonEmpty match {
-    case true => Seq(peers(Random.nextInt(peers.length)))
-    case false => Seq()
+object SendToRandom extends SendToRandomExceptOf(1, Seq.empty)
+
+case class SendToRandomExceptOf(maxPeersNumber: Int, exceptOf: Seq[ConnectedPeer]) extends SendingStrategy {
+  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = {
+    val filtered = peers.filterNot(exceptOf.contains)
+    if (filtered.size <= maxPeersNumber) filtered else Random.shuffle(filtered).take(maxPeersNumber)
   }
 }
 
@@ -24,9 +26,4 @@ case class BroadcastExceptOf(exceptOf: Seq[ConnectedPeer]) extends SendingStrate
 
 case class SendToChosen(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy {
   override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = chosenPeers
-}
-
-case class SendToRandomFromChosen(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy {
-  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] =
-    Seq(chosenPeers(Random.nextInt(chosenPeers.length)))
 }

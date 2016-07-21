@@ -39,7 +39,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       val localScore = history.score()
       if (networkScore > localScore) {
         log.info(s"networkScore=$networkScore > localScore=$localScore")
-        val lastIds = history.lastBlockIds(application.blockStorage.MaxRollback)
+        val lastIds = history.lastBlockIds(application.settings.MaxRollback)
         blockChainSynchronizer ! GetExtension(lastIds, witnesses)
       }
 
@@ -76,10 +76,9 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       }
 
       if (isBlockToBeAdded) {
-        val local = fromPeer.isEmpty
-        if (!processNewBlock(block, local = local)) {
+        if (!processNewBlock(block, fromPeer)) {
           // TODO: blacklist here
-          log.warn(s"Can't apply single block, local=$local: ${block.json}")
+          log.warn(s"Can't apply single block, local=${fromPeer.isEmpty}: ${block.json}")
         }
       }
 
@@ -108,25 +107,29 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
           tail
       }
 
-    val generatedLocally = fromPeer.isEmpty
-    blocks.find(!processNewBlock(_, local = generatedLocally)).foreach {
+    blocks.find(!processNewBlock(_, fromPeer)).foreach {
       failedBlock =>
         log.warn(s"Can't apply block: ${failedBlock.json}")
         if (blocks.head == failedBlock && revertedBlocks.nonEmpty) {
           log.warn(s"Return back ${revertedBlocks.size} reverted blocks: ${failedBlock.json}")
           revertedBlocks.reverse.foreach(application.blockStorage.appendBlock)
         }
-        if (!generatedLocally && history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)) {
-          fromPeer.get.handlerRef ! PeerConnectionHandler.Blacklist
+
+        if (history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)) {
+          fromPeer.foreach(_.handlerRef ! PeerConnectionHandler.Blacklist)
         }
     }
   }
 
-  private def processNewBlock(block: Block, local: Boolean): Boolean = Try {
+  private def processNewBlock(block: Block, fromPeer: Option[ConnectedPeer]): Boolean = Try {
+    val local = fromPeer.isEmpty
+
     if (block.isValid) {
       log.info(s"New block(local: $local): ${block.json}")
 
-      if (local) networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), Broadcast)
+      val sendingStrategy =
+        if (local) Broadcast else SendToRandomExceptOf(application.settings.MaxPeersToBroadcastBlock, fromPeer.toSeq)
+      networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), sendingStrategy)
 
       val oldHeight = history.height()
       val oldScore = history.score()

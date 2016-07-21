@@ -115,7 +115,11 @@ trait Settings extends ScorexLogging {
   private val DefaultConnectionTimeout = 60
   private val DefaultBindAddress = "127.0.0.1"
 
+  private val DefaultMaxRollback = 100
+  lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(DefaultMaxRollback)
+
   val MaxBlocksChunks = 10
+  val MaxPeersToBroadcastBlock = 3
 
   //API
   lazy val corsAllowed = (settingsJSON \ "cors").asOpt[Boolean].getOrElse(false)
