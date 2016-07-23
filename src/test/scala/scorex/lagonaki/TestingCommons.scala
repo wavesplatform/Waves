@@ -19,8 +19,7 @@ trait TestingCommons {
     override val settingsJSON: JsObject = Json.obj()
   }
 
-  implicit val consensusModule = application.consensusModule
-  implicit val transactionModule = application.transactionModule
+  lazy val application = TestingCommons.application
 
   def randomFrom[T](seq: Seq[T]): T = {
     require(seq.nonEmpty)

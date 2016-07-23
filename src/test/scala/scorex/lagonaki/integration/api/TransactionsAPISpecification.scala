@@ -10,7 +10,7 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
 
   import scorex.lagonaki.TestingCommons._
 
-  if (wallet.privateKeyAccounts().size < 10) wallet.generateNewAccounts(10)
+  if (application.wallet.privateKeyAccounts().size < 10) application.wallet.generateNewAccounts(10)
   val addresses = accounts.map(_.address)
   val account = accounts.head
   val address = account.address

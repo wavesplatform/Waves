@@ -27,7 +27,7 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
 
   override def preStart: Unit = {
     super.preStart()
-    context.system.scheduler.schedule(1.second, rndBroadcastInterval, self, BroadcastRandom)
+    context.system.scheduler.schedule(2.second, rndBroadcastInterval, self, BroadcastRandom)
   }
 
   override def receive: Receive = {

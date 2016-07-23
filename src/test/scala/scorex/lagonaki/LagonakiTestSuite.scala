@@ -29,7 +29,7 @@ class LagonakiTestSuite extends Sequential(
   , new PaymentAPISpecification
   , new BlockAPISpecification
   //integration tests - slow!
-  , new ValidChainGenerationSpecification
+  //, new ValidChainGenerationSpecification
 
 ) with BeforeAndAfterAll {
 

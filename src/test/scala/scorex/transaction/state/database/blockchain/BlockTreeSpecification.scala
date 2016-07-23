@@ -40,7 +40,7 @@ with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
         blockTree.appendBlock(block).isSuccess shouldBe true
 
         blockTree.height() shouldBe prevH + 1
-        blockTree.score() shouldBe prevS + consensusModule.blockScore(block)
+        blockTree.score() shouldBe prevS + application.consensusModule.blockScore(block)
         blockTree.lastBlock.uniqueId should contain theSameElementsAs block.uniqueId
         blockTree.parent(block).get.uniqueId should contain theSameElementsAs prevB.uniqueId
         blockTree.contains(block) shouldBe true
