@@ -11,7 +11,7 @@ import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions, JsonResponse}
 import scorex.app.Application
 import scorex.consensus.mining.BlockGeneratorController._
-import scorex.network.BlockChainSynchronizer
+import scorex.network.BlockchainSynchronizer
 import scorex.utils.ScorexLogging
 import scorex.waves.settings.Constants
 
@@ -58,9 +58,9 @@ case class ScorexApiRoute(override val application: Application)(implicit val co
   def status: Route = path("status") {
     getJsonRoute {
       def bgf = (application.blockGenerator ? GetStatus).map(_.toString)
-      def hsf = (application.coordinator ? BlockChainSynchronizer.GetStatus).mapTo[BlockChainSynchronizer.Status].map(_.name)
+      def hsf = (application.coordinator ? BlockchainSynchronizer.GetStatus).mapTo[BlockchainSynchronizer.Status].map(_.name)
 
-      Future.sequence(Seq(bgf, hsf)).map { case statusesSeq =>
+      Future.sequence(Seq(bgf, hsf)).map { statusesSeq =>
         val json = Json.obj(
           "blockGeneratorStatus" -> statusesSeq.head,
           "historySynchronizationStatus" -> statusesSeq.tail.head
