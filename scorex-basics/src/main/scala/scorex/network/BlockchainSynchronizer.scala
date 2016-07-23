@@ -13,9 +13,9 @@ import shapeless.syntax.typeable._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 
-class BlockChainSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
+class BlockchainSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
 
-  import BlockChainSynchronizer._
+  import BlockchainSynchronizer._
   import application.basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq(SignaturesSpec, BlockMessageSpec)
@@ -184,7 +184,7 @@ class BlockChainSynchronizer(application: Application) extends ViewSynchronizer 
   }
 }
 
-object BlockChainSynchronizer {
+object BlockchainSynchronizer {
 
   sealed trait Status {
     val name: String

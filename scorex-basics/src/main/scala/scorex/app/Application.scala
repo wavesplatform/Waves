@@ -63,7 +63,7 @@ trait Application extends ScorexLogging {
   lazy val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this), "NetworkController")
   lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], this), "BlockGenerator")
   lazy val scoreObserver = actorSystem.actorOf(Props(classOf[ScoreObserver], this), "ScoreObserver")
-  lazy val blockChainSynchronizer = actorSystem.actorOf(Props(classOf[BlockChainSynchronizer], this), "BlockChainSynchronizer")
+  lazy val blockchainSynchronizer = actorSystem.actorOf(Props(classOf[BlockchainSynchronizer], this), "BlockchainSynchronizer")
   lazy val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
@@ -80,7 +80,7 @@ trait Application extends ScorexLogging {
     Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
 
     // TODO: in fact, this is an attemption to call Actor.preStart - needs to be replaced!
-    Seq(scoreObserver, blockChainSynchronizer, historyReplier, coordinator) foreach ( _ ! Unit)
+    Seq(scoreObserver, blockchainSynchronizer, historyReplier, coordinator) foreach ( _ ! Unit)
 
     actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
 

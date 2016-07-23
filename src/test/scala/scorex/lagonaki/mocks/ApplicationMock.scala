@@ -16,7 +16,7 @@ trait ApplicationMock extends Application  {
   override lazy val networkController: ActorRef = ???
   override lazy val blockGenerator: ActorRef = ???
   override lazy val scoreObserver: ActorRef = ???
-  override lazy val blockChainSynchronizer: ActorRef = ???
+  override lazy val blockchainSynchronizer: ActorRef = ???
   override lazy val coordinator: ActorRef = ???
   override lazy val historyReplier: ActorRef = ???
   override lazy val combinedRoute: Route = ???

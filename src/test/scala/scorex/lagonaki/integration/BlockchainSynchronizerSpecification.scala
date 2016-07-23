@@ -2,35 +2,23 @@ package scorex.lagonaki.integration
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import org.scalamock.scalatest.MockFactory
-import org.scalatest._
+import akka.actor.{ActorRef, Props}
+import akka.testkit.TestProbe
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.EllipticCurveImpl
+import scorex.lagonaki.ActorTestingCommons
 import scorex.lagonaki.mocks.{ApplicationMock, BlockMock}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{Message, MessageSpec}
-import scorex.network.{BlockChainSynchronizer, ConnectedPeer, PeerConnectionHandler, SendToChosen}
+import scorex.network.{BlockchainSynchronizer, ConnectedPeer, PeerConnectionHandler, SendToChosen}
 import scorex.settings.SettingsMock
 import scorex.transaction.History
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.postfixOps
 
-class BlockChainSynchronizerSpecification
-  extends TestKit(ActorSystem("BlockChainSynchronizerSpecification"))
-    with ImplicitSender
-    with WordSpecLike
-    with BeforeAndAfter
-    with Matchers
-    with OneInstancePerTest
-    with MockFactory {
-
-  after {
-    shutdown()
-  }
+class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
   object TestSettings extends SettingsMock {
     override lazy val historySynchronizerTimeout: FiniteDuration = 1 seconds
@@ -60,14 +48,13 @@ class BlockChainSynchronizerSpecification
 
   val app = stub[A]
 
-  import BlockChainSynchronizer._
+  import BlockchainSynchronizer._
   import app.basicMessagesSpecsRepo._
   import scorex.network.Coordinator._
 
-  val blockChainSynchronizerRef =
-    system.actorOf(Props(classOf[BlockChainSynchronizer], app))
+  val blockChainSynchronizerRef = system.actorOf(Props(classOf[BlockchainSynchronizer], app))
 
-  "BlockChainSynchronizer" when {
+  testSafely {
 
     def validateStatus(status: Status): Unit = {
       blockChainSynchronizerRef ! GetStatus
@@ -100,7 +87,7 @@ class BlockChainSynchronizerSpecification
 
     validateStatus(GettingExtension)
 
-    "no timeout happens" should {
+    "no timeout happens" - {
 
       assertLatestBlockFromPeerForwarding(peer)
 
@@ -138,7 +125,7 @@ class BlockChainSynchronizerSpecification
       }
     }
 
-    "meet timeout" should {
+    "timeout" - {
       "become idle on timeout" in {
         testCoordinator.expectNoMsg(
           (TestSettings.historySynchronizerTimeout.toMillis - (System.currentTimeMillis() - t0)) millis)
