@@ -11,8 +11,13 @@ import scorex.utils._
 
 import scala.util.Random
 
+//TODO: Should be independed
 class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
 with TransactionTestingCommons with PrivateMethodTester with OptionValues {
+
+  override def beforeAll(): Unit = super.beforeAll()
+
+  override def afterAll(): Unit = super.afterAll()
 
   import TestingCommons._
 
@@ -21,7 +26,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   val state = app.transactionModule.blockStorage.state
   val history = app.transactionModule.blockStorage.history
   val acc = accounts.head
-  val recepient = wallet.privateKeyAccounts().last
+  val recepient = application.wallet.privateKeyAccounts().last
   require(acc.address != recepient.address)
 
   test("balance confirmations") {
@@ -73,7 +78,6 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     state invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq(tx))))
 
   }
-
 
   test("validate single transaction") {
     val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc)

@@ -20,6 +20,9 @@ with TransactionTestingCommons {
 
   implicit val timeout = Timeout(1.second)
 
+  implicit override val transactionModule = application.transactionModule
+  implicit override val consensusModule = application.consensusModule
+
   val peers = applications.tail
   val app = peers.head
   val state = app.transactionModule.blockStorage.state
@@ -155,7 +158,7 @@ with TransactionTestingCommons {
       val last = history.lastBlock
       val st1 = state.hash
       val height = history.heightOf(last).get
-      val recepient = wallet.generateNewAccount()
+      val recepient = application.wallet.generateNewAccount()
 
       //Wait for nonEmpty block
       untilTimeout(1.minute, 1.second) {

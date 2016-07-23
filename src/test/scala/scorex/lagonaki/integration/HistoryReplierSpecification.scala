@@ -16,7 +16,7 @@ class HistoryReplierSpecification(_system: ActorSystem)
 
   val probe = new TestProbe(system)
 
-  lazy val application = TestingCommons.application
+  //lazy val application = TestingCommons.application
 
   //todo: get tests done
   "HistoryReplier actor" must {
