@@ -4,13 +4,18 @@ import java.io.{File, FileOutputStream}
 
 import org.scalacheck.Gen
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{BeforeAndAfterAll, Matchers, PropSpec}
 import scorex.crypto.hash.FastCryptographicHash
 
-import scala.util.Random
+import scala.reflect.io.Path
+import scala.util.{Random, Try}
 
-class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
+class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with BeforeAndAfterAll {
 
+  override protected def afterAll(): Unit = {
+    val path: Path = Path ("/tmp/scorex-ads-tests")
+    Try(path.deleteRecursively())
+  }
 
   property("value returned from byIndex() is valid for random dataset") {
     //fix block numbers for faster tests
@@ -48,14 +53,14 @@ class MerkleSpecification extends PropSpec with PropertyChecks with GeneratorDri
 
 
   def generateFile(blocks: Int, subdir: String = "1"): (String, File, String) = {
-    val treeDirName = "/tmp/scorex-tests/test/" + subdir + "/"
+    val treeDirName = "/tmp/scorex-ads-tests/test/" + subdir + "/"
     val treeDir = new File(treeDirName)
+    treeDir.mkdirs()
     val tempFile = treeDirName + "/data.file"
 
 
     val data = new Array[Byte](1024 * blocks)
     Random.nextBytes(data)
-    treeDir.mkdirs()
     for (file <- treeDir.listFiles) file.delete
 
     val fos = new FileOutputStream(tempFile)
