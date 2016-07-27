@@ -93,6 +93,15 @@ trait Settings extends ScorexLogging {
   lazy val historySynchronizerTimeout: FiniteDuration = (settingsJSON \ "historySynchronizerTimeout").asOpt[Int]
     .map(x => x.seconds).getOrElse(DefaultHistorySynchronizerTimeout)
 
+  private val DefaultMaxRollback = 100
+  lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(DefaultMaxRollback)
+
+  val MaxBlocksChunks = 10
+  lazy val forkMaxLength = (settingsJSON \ "forkMaxLength").asOpt[Int].getOrElse(DefaultMaxRollback)
+  lazy val forkResolveQuorumSize = (settingsJSON \ "forkResolveQuorumSize").asOpt[Int].getOrElse(1)
+  lazy val maxPeersToBroadcastBlock = (settingsJSON \ "maxPeersToBroadcastBlock").asOpt[Int].getOrElse(3)
+  val scoreTTL: FiniteDuration = 1.minute
+
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)
 
@@ -114,19 +123,6 @@ trait Settings extends ScorexLogging {
   private val DefaultMaxConnections = 20
   private val DefaultConnectionTimeout = 60
   private val DefaultBindAddress = "127.0.0.1"
-
-  lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(100)
-
-  val MaxBlocksChunks = 10
-
-  private val DefaultForkChunkSize = MaxBlocksChunks
-  lazy val forkChunkSize = (settingsJSON \ "forkChunkSize").asOpt[Int].getOrElse(DefaultForkChunkSize)
-
-  lazy val forkResolveQuorumSize = (settingsJSON \ "forkResolveQuorumSize").asOpt[Int].getOrElse(1)
-
-  lazy val maxPeersToBroadcastBlock = (settingsJSON \ "maxPeersToBroadcastBlock").asOpt[Int].getOrElse(3)
-
-  val scoreTTL: FiniteDuration = 1.minute
 
   //API
   lazy val corsAllowed = (settingsJSON \ "cors").asOpt[Boolean].getOrElse(false)

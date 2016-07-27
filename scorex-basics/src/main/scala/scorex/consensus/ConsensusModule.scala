@@ -2,7 +2,7 @@ package scorex.consensus
 
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.{Block, BlockProcessingModule}
-import scorex.transaction.{BalanceSheet, TransactionModule}
+import scorex.transaction.TransactionModule
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -25,6 +25,12 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
     * @return
     */
   def generators(block: Block): Seq[Account]
+
+  /**
+    * A naive but still a way to emphasize that cumulative score is sum of block scores
+    */
+  def cumulativeBlockScore(previousCumulativeScore: BigInt, blockScore: BigInt): BigInt =
+    previousCumulativeScore + blockScore
 
   def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt
 

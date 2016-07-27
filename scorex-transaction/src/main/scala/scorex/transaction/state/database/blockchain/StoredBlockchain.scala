@@ -5,7 +5,6 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
-import scorex.crypto.encode.Base58
 import scorex.transaction.BlockStorage._
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.{BlockChain, TransactionModule}
@@ -45,7 +44,8 @@ class StoredBlockchain(db: MVStore)
 
     def writeBlock(height: Int, block: Block): Try[Unit] = Try {
       blocks.put(height, block.bytes)
-      scoreMap.put(height, score() + block.consensusModule.blockScore(block)(block.transactionModule))
+      val blockScore = consensusModule.blockScore(block)(block.transactionModule)
+      scoreMap.put(height, consensusModule.cumulativeBlockScore(score(), blockScore))
       signatures.put(height, block.uniqueId)
       signaturesReverse.put(block.uniqueId, height)
     }
@@ -78,7 +78,7 @@ class StoredBlockchain(db: MVStore)
 
   }
 
-  private val blockStorage: BlockchainPersistence = new BlockchainPersistence(db)
+  private val blockStorage: BlockchainPersistence = BlockchainPersistence(db)
 
   override def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
     Try {
@@ -125,12 +125,12 @@ class StoredBlockchain(db: MVStore)
   override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = {
     (from to to).toStream.flatMap { h =>
       blockAt(h).flatMap { block =>
-        if (block.consensusModule.generators(block).contains(account)) Some(block) else None
+        if (consensusModule.generators(block).contains(account)) Some(block) else None
       }
     }
   }
 
-  override def toString: String = ((1 to height()) map { case h =>
+  override def toString: String = ((1 to height()) map { h =>
     val bl = blockAt(h).get
     s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
   }).mkString("\n")

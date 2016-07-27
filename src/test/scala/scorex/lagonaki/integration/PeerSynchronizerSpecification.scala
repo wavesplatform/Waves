@@ -17,7 +17,6 @@ import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.{KnownPeers, RandomPeers}
 import scorex.network.{ConnectedPeer, PeerSynchronizer}
 
-//TODO move to basics
 class PeerSynchronizerSpecification(_system: ActorSystem)
   extends TestKit(_system)
   with ImplicitSender
@@ -26,7 +25,6 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
   with ScalaFutures
   with TestingCommons {
 
-  import TestingCommons._
   import application.basicMessagesSpecsRepo._
 
   def this() = this(ActorSystem("PeerSynchronizerSpecification"))
@@ -35,7 +33,7 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
 
   val ps = system.actorOf(Props(classOf[PeerSynchronizer], application))
 
-  val peer = new ConnectedPeer(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1), probe.ref)
+  val peer = ConnectedPeer(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 1), probe.ref)
 
   implicit val config = PatienceConfig(Span(2, Seconds), Span(5, Millis))
 
@@ -60,7 +58,10 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
         .futureValue
       newPeers.length shouldBe 2
       ps ! DataFromPeer(GetPeersSpec.messageCode, Right, peer)
-      probe.expectMsg(Message(PeersSpec, Right(newPeers), None))
+      probe.expectMsgPF() {
+        case Message(spec, Right(p: Seq[InetSocketAddress]), None)
+          if spec == PeersSpec && p.toSet == newPeers.toSet =>
+      }
     }
 
     "add more peers" in {
@@ -73,7 +74,10 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
       val peers: Seq[InetSocketAddress] = Seq(newPeer)
       ps ! DataFromPeer(PeersSpec.messageCode, peers, peer)
       ps ! DataFromPeer(GetPeersSpec.messageCode, Right, peer)
-      probe.expectMsg(Message(PeersSpec, Right(peersBefore ++ Seq(newPeer)), None))
+      probe.expectMsgPF() {
+        case Message(spec, Right(p: Seq[InetSocketAddress]), None)
+          if spec == PeersSpec && p.toSet == peersBefore.toSet + newPeer =>
+      }
     }
   }
 }

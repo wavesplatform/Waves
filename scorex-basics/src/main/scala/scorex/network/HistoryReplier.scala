@@ -26,7 +26,7 @@ class HistoryReplier(application: Application) extends ViewSynchronizer with Sco
 
         if (headers.nonEmpty) {
           val msg = Message(SignaturesSpec, Right(Seq(parent) ++ headers), None)
-          val ss = SendToChosen(Seq(remote))
+          val ss = SendToChosen(remote)
           networkControllerRef ! SendToNetwork(msg, ss)
           true
         } else false
@@ -38,7 +38,7 @@ class HistoryReplier(application: Application) extends ViewSynchronizer with Sco
 
       application.history.blockById(sig).foreach { b =>
         val msg = Message(BlockMessageSpec, Right(b), None)
-        val ss = SendToChosen(Seq(remote))
+        val ss = SendToChosen(remote)
         networkControllerRef ! SendToNetwork(msg, ss)
       }
 

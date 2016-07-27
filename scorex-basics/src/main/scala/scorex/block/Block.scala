@@ -109,6 +109,7 @@ trait Block extends ScorexLogging {
 
 object Block extends ScorexLogging {
   type BlockId = Array[Byte]
+  type BlockIds = Seq[BlockId]
 
   val BlockIdLength = EllipticCurveImpl.SignatureLength
 

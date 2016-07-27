@@ -19,11 +19,10 @@ case object Broadcast extends SendingStrategy {
   override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = peers
 }
 
-case class BroadcastExceptOf(exceptOf: Seq[ConnectedPeer]) extends SendingStrategy {
-  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] =
-    peers.filterNot(exceptOf.contains)
-}
-
 case class SendToChosen(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy {
   override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = chosenPeers
+}
+
+object SendToChosen {
+  def apply(connectedPeer: ConnectedPeer): SendToChosen = SendToChosen(Seq(connectedPeer))
 }

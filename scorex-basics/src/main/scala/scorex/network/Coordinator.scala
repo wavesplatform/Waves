@@ -30,6 +30,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   private lazy val history = application.history
 
   private val forkResolveQuorumSize = application.settings.forkResolveQuorumSize
+  private val maxPeersToBroadcastBlock = application.settings.maxPeersToBroadcastBlock
 
   //todo: make configurable
   context.system.scheduler.schedule(1.second, 2.seconds, self, SendCurrentScore)
@@ -47,7 +48,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       } else {
         log.info(s"min networkScore=${peers.minBy(_._2)} > localScore=$localScore")
         val lastIds = history.lastBlockIds(application.settings.MaxRollback)
-        blockchainSynchronizer ! GetExtension(lastIds, peers.map(_._1))
+        blockchainSynchronizer ! GetExtension(lastIds, peers.toMap)
       }
 
     case ApplyFork(blocks, fromPeer) if blocks.nonEmpty =>
@@ -86,6 +87,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
         }
       }
 
+      // todo: duplicated
     case SyncFinished(_) =>
       scoreObserver ! GetScore
 
@@ -132,8 +134,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       log.info(s"New block(local: $local): ${block.json}")
 
       if (broadcast) {
-        val sendingStrategy =
-          if (local) Broadcast else SendToRandomExceptOf(application.settings.maxPeersToBroadcastBlock, fromPeer.toSeq)
+        val sendingStrategy = if (local) Broadcast else SendToRandomExceptOf(maxPeersToBroadcastBlock, fromPeer.toSeq)
         networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), sendingStrategy)
       }
 

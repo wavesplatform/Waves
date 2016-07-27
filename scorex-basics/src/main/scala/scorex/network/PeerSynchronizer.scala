@@ -47,7 +47,7 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
         .mapTo[Seq[InetSocketAddress]]
         .foreach { peers =>
           val msg = Message(PeersSpec, Right(peers), None)
-          networkControllerRef ! SendToNetwork(msg, SendToChosen(Seq(remote)))
+          networkControllerRef ! SendToNetwork(msg, SendToChosen(remote))
         }
 
     case nonsense: Any => log.warn(s"PeerSynchronizer: got something strange $nonsense")
