@@ -101,6 +101,7 @@ trait Settings extends ScorexLogging {
   lazy val forkResolveQuorumSize = (settingsJSON \ "forkResolveQuorumSize").asOpt[Int].getOrElse(1)
   lazy val maxPeersToBroadcastBlock = (settingsJSON \ "maxPeersToBroadcastBlock").asOpt[Int].getOrElse(3)
   val scoreTTL: FiniteDuration = 1.minute
+  lazy val operationAttempts = (settingsJSON \ "operationAttempts").asOpt[Int].getOrElse(1)
 
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)

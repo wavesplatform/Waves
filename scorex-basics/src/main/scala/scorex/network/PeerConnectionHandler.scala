@@ -21,6 +21,8 @@ case class ConnectedPeer(socketAddress: InetSocketAddress, handlerRef: ActorRef)
 
   override def equals(obj: scala.Any): Boolean =
     obj.cast[ConnectedPeer].exists(_.socketAddress == this.socketAddress)
+
+  override def toString: String = socketAddress.toString
 }
 
 

@@ -1,8 +1,10 @@
 package scorex.network
 
+import scorex.utils.ScorexLogging
+
 import scala.util.Random
 
-trait SendingStrategy {
+trait SendingStrategy extends ScorexLogging {
   def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer]
 }
 
@@ -20,7 +22,11 @@ case object Broadcast extends SendingStrategy {
 }
 
 case class SendToChosen(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy {
-  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = chosenPeers
+  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = {
+    val filtered = peers.filter(chosenPeers.contains)
+    if (filtered.isEmpty) log.debug(s"No peers match $chosenPeers")
+    filtered
+  }
 }
 
 object SendToChosen {

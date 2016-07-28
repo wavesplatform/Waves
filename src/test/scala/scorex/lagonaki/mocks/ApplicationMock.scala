@@ -23,16 +23,6 @@ trait ApplicationMock extends Application  {
   override lazy val blockStorage: BlockStorage = ???
   override lazy val history: History = ???
   override protected lazy val actorSystem: ActorSystem = ???
-/*
-  TODO: not needed, remove after test stabilization
-  override lazy val applicationName: String = ???
-  override def appVersion: ApplicationVersion = ???
-  override lazy val consensusModule: ConsensusModule[_] = null
-  override lazy val transactionModule: TransactionModule[_] = null
-  override lazy val apiRoutes: Seq[ApiRoute] = ???
-  override lazy val apiTypes: Seq[_root_.scala.reflect.runtime.universe.Type] = ???
-  override lazy protected val additionalMessageSpecs: Seq[MessageSpec[_]] = ???
-*/
 
   object DefaultTestSettings extends SettingsMock
 }

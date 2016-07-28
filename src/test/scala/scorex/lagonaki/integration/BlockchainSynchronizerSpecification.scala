@@ -8,9 +8,8 @@ import scorex.block.Block
 import scorex.block.Block._
 import scorex.lagonaki.ActorTestingCommons
 import scorex.lagonaki.mocks.{ApplicationMock, BlockMock}
-import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
-import scorex.network.message.{Message, MessageSpec}
-import scorex.network.{BlockchainSynchronizer, ConnectedPeer, PeerConnectionHandler, SendToChosen}
+import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler}
+import scorex.network.{BlockchainSynchronizer, ConnectedPeer, PeerConnectionHandler}
 import scorex.settings.SettingsMock
 import scorex.transaction.History
 
@@ -29,33 +28,19 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     history
   }
 
-  private def blockIds(i: Int*): BlockIds = i.map(toBlockId)
-  private implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
-
-  private def mockBlock[Id](id: Id)(implicit conv: Id => BlockId): Block =
-    new BlockMock(Seq.empty) {
-      override val uniqueId: BlockId = id
-    }
-
   private val h = mockHistory(10)
 
-  private val networkController = TestProbe("NetworkController")
   private val coordinator = TestProbe("Coordinator")
-
-  private val peerHandler = TestProbe("PeerHandler")
-  private val peer = ConnectedPeer(new InetSocketAddress(9977), peerHandler.ref)
 
   object TestSettings extends SettingsMock {
     override lazy val historySynchronizerTimeout: FiniteDuration = 1 seconds
     override lazy val forkMaxLength: Int = 10
+    override lazy val operationAttempts: Int = 1
   }
-
-  private def synchronizerTimeout = TestSettings.historySynchronizerTimeout
-  private def withinReasonableTimeInterval = synchronizerTimeout / 10
 
   trait A extends ApplicationMock {
     override lazy val settings = TestSettings
-    override lazy val networkController: ActorRef = BlockchainSynchronizerSpecification.this.networkController.ref
+    override lazy val networkController: ActorRef = networkControllerMock
     override lazy val coordinator: ActorRef = BlockchainSynchronizerSpecification.this.coordinator.ref
     override lazy val history: History = h
   }
@@ -65,65 +50,55 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   import app.basicMessagesSpecsRepo._
 
   private def validateStatus(status: Status): Unit = {
-    blockChainSynchronizerRef ! GetStatus
+    actorRef ! GetStatus
     expectMsg(status)
   }
 
   private def assertLatestBlockFromNonSyncPeer(): Unit = {
     val testPeerHandler = TestProbe()
-    val peer = ConnectedPeer(new InetSocketAddress(9977), testPeerHandler.ref)
+    val peer = ConnectedPeer(new InetSocketAddress(peerId + 1), testPeerHandler.ref)
 
     val block = new BlockMock(Seq.empty)
-    blockChainSynchronizerRef ! DataFromPeer(BlockMessageSpec.messageCode, block, peer)
+    actorRef ! DataFromPeer(BlockMessageSpec.messageCode, block, peer)
     coordinator.expectMsg(AddBlock(block, Some(peer)))
   }
 
-  trait TestDataExtraction[T] {
-    def extract(actual: T) : Any
-  }
-
-  implicit object GetSignaturesSpecExtraction extends TestDataExtraction[BlockIds] {
-    override def extract(blockIds: BlockIds): Seq[Int] = blockIds.map(GetBlockSpecExtraction.extract)
-  }
-
-  implicit object GetBlockSpecExtraction extends TestDataExtraction[BlockId] {
-    override def extract(blockId: BlockId): Int = blockId(0)
-  }
-
-  private def expectNetworkMessage[Content : TestDataExtraction](expectedSpec: MessageSpec[Content], expectedData: Any): Unit =
-    networkController.expectMsgPF() {
-      case SendToNetwork(Message(spec, Right(data: Content@unchecked), None), SendToChosen(peers)) =>
-        peers should contain (peer)
-        spec shouldEqual expectedSpec
-        implicitly[TestDataExtraction[Content]].extract(data) shouldEqual expectedData
-    }
-
   private def expectedGetSignaturesSpec(blockIds: Int*): Unit = expectNetworkMessage(GetSignaturesSpec, blockIds.toSeq)
+  private def sendBlock(block: Block): Unit = dataFromNetwork(BlockMessageSpec, block)
+  private def sendSignatures(blockIds: BlockId*): Unit = dataFromNetwork(SignaturesSpec, blockIds.toSeq)
 
-  private def sendData[C](spec: MessageSpec[C], data: C, fromPeer: ConnectedPeer = peer): Unit =
-    blockChainSynchronizerRef ! DataFromPeer(spec.messageCode, data, fromPeer)
-
-  private def sendBlock(block: Block): Unit = sendData(BlockMessageSpec, block)
-  private def sendSignatures(blockIds: BlockId*): Unit = sendData(SignaturesSpec, blockIds.toSeq)
-
-  val blockChainSynchronizerRef = system.actorOf(Props(classOf[BlockchainSynchronizer], app))
+  protected override val actorRef = system.actorOf(Props(classOf[BlockchainSynchronizer], app))
 
   testSafely {
-
-    networkController.expectMsgType[RegisterMessagesHandler]
 
     validateStatus(Idle)
     assertLatestBlockFromNonSyncPeer()
 
     val t = System.currentTimeMillis()
-    def adjustedSynchronizerTimeout = synchronizerTimeout.toMillis - (System.currentTimeMillis() - t) millis
 
-    blockChainSynchronizerRef ! GetExtension(blockIds(10, 9), Map(peer -> 0))
+    def adjustedTimeout(correction: Float): Long = {
+      val withElapsedTime = TestSettings.historySynchronizerTimeout.toMillis - (System.currentTimeMillis() - t)
+      withElapsedTime * correction toLong
+    }
+
+    def aBitLessThanTimeout = adjustedTimeout(0.9f) millis
+    def aBitLongerThanTimeout = adjustedTimeout(1.1f) millis
+    def withinReasonableTimeInterval = (TestSettings.historySynchronizerTimeout.toMillis / 2) millis
+
+    actorRef ! GetExtension(blockIds(10, 9), Map(peer -> 0)) // ids come in reverse order
     expectedGetSignaturesSpec(10, 9)
 
-    "go to GettingExtension" - {
+    validateStatus(GettingExtension)
 
-      validateStatus(GettingExtension)
+    "become idle on timeout in GettingExtension" in {
+      coordinator.expectNoMsg(aBitLessThanTimeout)
+
+      coordinator.expectMsg(SyncFinished(success = false))
+
+      validateStatus(Idle)
+    }
+
+    "go to GettingExtension" - {
 
       assertLatestBlockFromNonSyncPeer()
 
@@ -144,7 +119,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
         "extension tail from another peer(s)" - {
           val anotherPeer = TestProbe("another")
-          sendData(SignaturesSpec, validBlockIds, ConnectedPeer(new InetSocketAddress(8967), anotherPeer.ref))
+          dataFromNetwork(SignaturesSpec, validBlockIds, ConnectedPeer(new InetSocketAddress(peerId + 2), anotherPeer.ref))
 
           "should not lead to blackkisting of the peers" in {
             peerHandler.expectNoMsg(withinReasonableTimeInterval)
@@ -153,6 +128,15 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
           "should not lead to any futher actions" in {
             peerHandler.expectNoMsg(withinReasonableTimeInterval)
           }
+        }
+
+        "blacklist on timeout in states following GettingExtension" in {
+          coordinator.expectNoMsg(aBitLessThanTimeout)
+
+          peerHandler.expectMsg(PeerConnectionHandler.Blacklist)
+          coordinator.expectMsg(SyncFinished(success = false))
+
+          validateStatus(Idle)
         }
 
         "follow ledger download scenario" - {
@@ -178,7 +162,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
               sendBlock(mockBlock(aBlockId))
 
-              Thread sleep (adjustedSynchronizerTimeout.toMillis * 0.99).toLong
+              Thread sleep aBitLessThanTimeout.toMillis
 
               sendBlock(mockBlock(aBlockId))
 
@@ -197,26 +181,17 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               coordinator.expectMsg(SyncFinished(success = true))
               validateStatus(Idle)
 
-              peerHandler.expectNoMsg((synchronizerTimeout.toMillis * 1.1).toLong millis)
+              peerHandler.expectNoMsg(aBitLongerThanTimeout)
             }
           }
 
           "react on GetExtension in the Idle state only" in {
-            blockChainSynchronizerRef ! GetExtension(blockIds(10), Map(peer -> 0))
+            actorRef ! GetExtension(blockIds(10), Map(peer -> 0))
 
             validateStatus(GettingBlocks)
           }
         }
       }
-    }
-
-    "become idle on timeout" in {
-      coordinator.expectNoMsg(adjustedSynchronizerTimeout)
-
-      peerHandler.expectMsg(PeerConnectionHandler.Blacklist)
-      coordinator.expectMsg(SyncFinished(success = false))
-
-      validateStatus(Idle)
     }
   }
 }

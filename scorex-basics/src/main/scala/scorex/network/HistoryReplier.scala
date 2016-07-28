@@ -13,6 +13,8 @@ class HistoryReplier(application: Application) extends ViewSynchronizer with Sco
   override val messageSpecs = Seq(GetSignaturesSpec, GetBlockSpec)
   protected override lazy val networkControllerRef = application.networkController
 
+  private def history = application.history
+
   override def receive: Receive = {
 
     //todo: check sender and otherSigs type
@@ -22,7 +24,7 @@ class HistoryReplier(application: Application) extends ViewSynchronizer with Sco
       log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
 
       otherSigs.exists { parent =>
-        val headers = application.history.lookForward(parent, application.settings.MaxBlocksChunks)
+        val headers = history.lookForward(parent, application.settings.MaxBlocksChunks)
 
         if (headers.nonEmpty) {
           val msg = Message(SignaturesSpec, Right(Seq(parent) ++ headers), None)
@@ -36,7 +38,7 @@ class HistoryReplier(application: Application) extends ViewSynchronizer with Sco
     case DataFromPeer(msgId, sig: Block.BlockId@unchecked, remote)
       if msgId == GetBlockSpec.messageCode =>
 
-      application.history.blockById(sig).foreach { b =>
+      history.blockById(sig).foreach { b =>
         val msg = Message(BlockMessageSpec, Right(b), None)
         val ss = SendToChosen(remote)
         networkControllerRef ! SendToNetwork(msg, ss)

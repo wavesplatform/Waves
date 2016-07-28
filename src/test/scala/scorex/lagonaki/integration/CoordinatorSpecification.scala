@@ -15,7 +15,6 @@ import scala.concurrent.Await
 
 class CoordinatorSpecification extends ActorTestingCommons {
 
-  val testNetworkController = TestProbe("NetworkController")
   val testblockGenerator = TestProbe("blockGenerator")
   val testBlockChainSynchronizer = TestProbe("BlockChainSynchronizer")
 
@@ -30,21 +29,19 @@ class CoordinatorSpecification extends ActorTestingCommons {
 
   trait A extends ApplicationMock {
     override lazy val settings = TestSettings
-    override lazy val networkController: ActorRef = testNetworkController.ref
+    override lazy val networkController: ActorRef = networkControllerMock
     override lazy val blockGenerator: ActorRef = testblockGenerator.ref
     override lazy val blockchainSynchronizer: ActorRef = testBlockChainSynchronizer.ref
     override lazy val history: History = h
   }
 
-  val app = stub[A]
+  override protected val actorRef = system.actorOf(Props(classOf[Coordinator], stub[A]))
 
   testSafely {
 
-    val coordinator = system.actorOf(Props(classOf[Coordinator], app))
-
     "returns its status" in {
 
-      val future = coordinator ? GetStatus
+      val future = actorRef ? GetStatus
 
       testBlockChainSynchronizer.expectMsg(GetStatus)
       testBlockChainSynchronizer.reply(GettingBlocks)

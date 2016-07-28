@@ -18,7 +18,6 @@ import scala.language.{implicitConversions, postfixOps}
 
 class ScoreObserverSpecification extends ActorTestingCommons {
 
-  val testNetworkController = TestProbe("NetworkController")
   val testCoordinator = TestProbe("Coordinator")
 
   object TestSettings extends SettingsMock {
@@ -27,13 +26,11 @@ class ScoreObserverSpecification extends ActorTestingCommons {
 
   trait A extends ApplicationMock {
     override lazy val settings = TestSettings
-    override lazy val networkController: ActorRef = testNetworkController.ref
+    override lazy val networkController: ActorRef = networkControllerMock
     override lazy val coordinator: ActorRef = testCoordinator.ref
   }
 
-  val app = stub[A]
-
-  val scoreObserver = system.actorOf(Props(classOf[ScoreObserver], app))
+  protected override val actorRef = system.actorOf(Props(classOf[ScoreObserver], stub[A]))
 
   testSafely {
     "no-score case" in {
@@ -47,7 +44,7 @@ class ScoreObserverSpecification extends ActorTestingCommons {
       def expectScores(values: (ConnectedPeer, BlockchainScore)*): ConsideredValue =
         testCoordinator.expectMsg(ConsideredValue(values.toSeq))
 
-      def updateScore(value: (ConnectedPeer, BlockchainScore)): Unit = scoreObserver ! UpdateScore(Some(value))
+      def updateScore(value: (ConnectedPeer, BlockchainScore)): Unit = actorRef ! UpdateScore(Some(value))
 
       updateScore(peer(1) -> BigInt(100))
       expectScores(peer(1) -> BigInt(100))
@@ -90,5 +87,5 @@ class ScoreObserverSpecification extends ActorTestingCommons {
     }
   }
 
-  private def scores = Await.result((scoreObserver ? GetScore).mapTo[ConsideredValue], testDuration).scores
+  private def scores = Await.result((actorRef ? GetScore).mapTo[ConsideredValue], testDuration).scores
 }
