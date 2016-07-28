@@ -43,6 +43,10 @@ trait Application extends ScorexLogging {
 
   lazy val basicMessagesSpecsRepo = new BasicMessagesRepo()
 
+  //wallet
+  private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
+  val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed)
+
   //p2p
   lazy val upnp = new UPnP(settings)
   if (settings.upnpEnabled) upnp.addPort(settings.port)
@@ -50,10 +54,6 @@ trait Application extends ScorexLogging {
   lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
 
   lazy val peerManager = actorSystem.actorOf(Props(classOf[PeerManager], this))
-
-  //wallet
-  private lazy val walletFileOpt = settings.walletDirOpt.map(walletDir => new java.io.File(walletDir, "wallet.s.dat"))
-  lazy val wallet = new Wallet(walletFileOpt, settings.walletPassword, settings.walletSeed)
 
   //interface to append log and state
   lazy val blockStorage: BlockStorage = transactionModule.blockStorage

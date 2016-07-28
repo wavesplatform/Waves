@@ -27,7 +27,6 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
     case None => new MVStore.Builder().open()
   }
 
-
   private val accountsPersistence: MVMap[Int, Array[Byte]] = database.openMap("privkeys")
   private val seedPersistence: MVMap[String, Array[Byte]] = database.openMap("seed")
   private val noncePersistence: MVMap[String, Int] = database.openMap("nonce")
@@ -59,8 +58,8 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
   val seed: Array[Byte] = seedPersistence.get("seed")
 
   private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
-    val accs = accountsPersistence.keys.map(k => accountsPersistence.get(k)).map(seed => new PrivateKeyAccount(seed))
-    TrieMap(accs.map(acc => acc.address -> acc).toSeq: _*)
+    val accounts = accountsPersistence.keys.map(k => accountsPersistence.get(k)).map(seed => new PrivateKeyAccount(seed))
+    TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
   }
 
   def privateKeyAccounts(): Seq[PrivateKeyAccount] = accountsCache.values.toSeq
@@ -112,7 +111,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
 
   def nonce(): Int = Option(noncePersistence.get(NonceFieldName)).getOrElse(0)
 
-  def getAndIncrementNonce(): Int = synchronized {
+  private def getAndIncrementNonce(): Int = synchronized {
     noncePersistence.put(NonceFieldName, nonce() + 1)
   }
 
