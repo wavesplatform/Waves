@@ -9,14 +9,14 @@ import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress, JsonResponse}
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.crypto.encode.Base58
 
 
 @Path("/consensus")
 @Api(value = "/consensus", description = "Consensus-related calls")
-class NxtConsensusApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
+class NxtConsensusApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
   private val consensusModule = application.consensusModule.asInstanceOf[NxtLikeConsensusModule]

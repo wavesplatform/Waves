@@ -8,13 +8,13 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(override val application: Application)(implicit val context: ActorRefFactory) extends ApiRoute {
+case class UtilsApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory) extends ApiRoute {
   val SeedSize = 32
 
   private def seed(length: Int): JsonResponse = {

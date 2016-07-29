@@ -1,7 +1,7 @@
 package scorex.network
 
 import akka.actor.Actor
-import scorex.app.Application
+import scorex.app.{Application, RunnableApplication}
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
 import scorex.crypto.encode.Base58.encode

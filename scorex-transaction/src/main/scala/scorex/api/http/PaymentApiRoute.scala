@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.SimpleTransactionModule
 import scorex.transaction.state.wallet.Payment
@@ -16,7 +16,7 @@ import scala.util.Try
 
 @Path("/payment")
 @Api(value = "/payment", description = "Payment operations.", position = 1)
-case class PaymentApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
+case class PaymentApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   // TODO asInstanceOf

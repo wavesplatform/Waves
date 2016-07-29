@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.pattern.ask
 import akka.util.Timeout
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.Message
 import scorex.network.peer.PeerManager
@@ -16,7 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 
-class PeerSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
+class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronizer with ScorexLogging {
 
   import application.basicMessagesSpecsRepo._
 

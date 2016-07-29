@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode}
 import akka.http.scaladsl.server.{Directive0, Directives, Route}
 import akka.util.Timeout
 import play.api.libs.json.JsValue
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.crypto.hash.CryptographicHash.Digest
 import scorex.crypto.hash.SecureCryptographicHash
 
@@ -16,7 +16,7 @@ import scala.concurrent.{Await, Future}
 final case class JsonResponse(response: JsValue, code: StatusCode)
 
 trait ApiRoute extends Directives with CommonApiFunctions {
-  val application: Application
+  val application: RunnableApplication
   val context: ActorRefFactory
   val route: Route
 

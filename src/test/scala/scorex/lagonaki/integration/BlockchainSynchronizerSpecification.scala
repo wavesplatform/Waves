@@ -4,14 +4,17 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
+import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block._
+import scorex.consensus.ConsensusModule
 import scorex.lagonaki.ActorTestingCommons
 import scorex.lagonaki.mocks.{ApplicationMock, BlockMock}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler}
+import scorex.network.message.BasicMessagesRepo
 import scorex.network.{BlockchainSynchronizer, ConnectedPeer, PeerConnectionHandler}
 import scorex.settings.SettingsMock
-import scorex.transaction.History
+import scorex.transaction.{History, TransactionModule}
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.{implicitConversions, postfixOps}
@@ -38,7 +41,10 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     override lazy val operationAttempts: Int = 1
   }
 
-  trait A extends ApplicationMock {
+  trait A extends Application {
+    implicit val txModule = mock[TransactionModule[Int]]
+    implicit val consModule = mock[ConsensusModule[Int]]
+    override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     override lazy val settings = TestSettings
     override lazy val networkController: ActorRef = networkControllerMock
     override lazy val coordinator: ActorRef = BlockchainSynchronizerSpecification.this.coordinator.ref

@@ -1,6 +1,6 @@
 package scorex.network
 
-import scorex.app.Application
+import scorex.app.{Application, RunnableApplication}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.MessageSpec
 import scorex.transaction.History

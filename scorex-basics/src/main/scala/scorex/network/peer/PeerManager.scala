@@ -3,7 +3,7 @@ package scorex.network.peer
 import java.net.InetSocketAddress
 
 import akka.actor.Actor
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.network._
 import scorex.utils.ScorexLogging
 
@@ -16,7 +16,7 @@ import scala.util.Random
   *
   * @param application - Scorex-based application
   */
-class PeerManager(application: Application) extends Actor with ScorexLogging {
+class PeerManager(application: RunnableApplication) extends Actor with ScorexLogging {
 
   import PeerManager._
 

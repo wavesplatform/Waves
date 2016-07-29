@@ -5,12 +5,15 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
+import scorex.consensus.ConsensusModule
 import scorex.lagonaki.ActorTestingCommons
 import scorex.lagonaki.mocks.ApplicationMock
 import scorex.network.ScoreObserver.{ConsideredValue, GetScore, UpdateScore}
+import scorex.network.message.BasicMessagesRepo
 import scorex.network.{ConnectedPeer, ScoreObserver}
 import scorex.settings.SettingsMock
 import scorex.transaction.History.BlockchainScore
+import scorex.transaction.TransactionModule
 
 import scala.concurrent.Await
 import scala.concurrent.duration.{FiniteDuration, _}
@@ -25,6 +28,9 @@ class ScoreObserverSpecification extends ActorTestingCommons {
   }
 
   trait A extends ApplicationMock {
+    implicit val txModule = mock[TransactionModule[Int]]
+    implicit val consModule = mock[ConsensusModule[Int]]
+    override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     override lazy val settings = TestSettings
     override lazy val networkController: ActorRef = networkControllerMock
     override lazy val coordinator: ActorRef = testCoordinator.ref
