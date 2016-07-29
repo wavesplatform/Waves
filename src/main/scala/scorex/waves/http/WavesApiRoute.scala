@@ -9,7 +9,7 @@ import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
 import scorex.api.http.{NegativeFee, NoBalance, _}
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.state.wallet.Payment
@@ -21,7 +21,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/waves")
 @Api(value = "waves", description = "Waves specific commands.", position = 1)
-case class WavesApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
+case class WavesApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   lazy val wallet = application.wallet

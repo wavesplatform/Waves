@@ -2,7 +2,7 @@ package scorex.waves.transaction
 
 import com.wavesplatform.ChainParameters
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.block.BlockField
 import scorex.crypto.encode.Base58
 import scorex.settings.Settings
@@ -18,7 +18,7 @@ import scorex.waves.settings.WavesSettings
   * Waves Transaction Module
   */
 class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings,
-                             application: Application,
+                             application: RunnableApplication,
                              val chainParams: ChainParameters)
   extends SimpleTransactionModule() {
 

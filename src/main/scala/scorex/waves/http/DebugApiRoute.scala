@@ -8,14 +8,14 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http._
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.state.database.blockchain.StoredState
 
 @Path("/debug")
 @Api(value = "/debug", description = "Debug methods", position = 1)
-case class DebugApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
+case class DebugApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   implicit lazy val transactionModule = application.transactionModule
