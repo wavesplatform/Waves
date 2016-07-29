@@ -1,7 +1,6 @@
 package scorex.waves
 
 import akka.actor.Props
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.consensus.WavesConsensusModule
 import com.wavesplatform.{ChainParameters, MainNetParams, TestNetParams}
 import scorex.account.AddressScheme
@@ -22,7 +21,7 @@ class Application(val settingsFilename: String) extends {
     val parts = Constants.VersionString.split("\\.")
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
   }
-} with scorex.app.Application {
+} with scorex.app.RunnableApplication {
 
   override implicit lazy val settings = new WavesSettings(settingsFilename)
 

@@ -9,7 +9,7 @@ import akka.pattern.ask
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions, JsonResponse}
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.network.BlockchainSynchronizer
 import scorex.utils.ScorexLogging
@@ -20,7 +20,7 @@ import scala.concurrent.Future
 
 @Path("/scorex")
 @Api(value = "scorex", description = "General commands & information", position = 0)
-case class ScorexApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
+case class ScorexApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions with ScorexLogging {
 
   override lazy val route =
