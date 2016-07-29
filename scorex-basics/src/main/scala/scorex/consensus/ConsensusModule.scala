@@ -32,7 +32,7 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
   def cumulativeBlockScore(previousCumulativeScore: BigInt, blockScore: BigInt): BigInt =
     previousCumulativeScore + blockScore
 
-  def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt
+  def blockScore(block: Block): BigInt
 
   def generateNextBlock[TransactionalBlockData](account: PrivateKeyAccount)
                            (implicit transactionModule: TransactionModule[TransactionalBlockData]): Future[Option[Block]]

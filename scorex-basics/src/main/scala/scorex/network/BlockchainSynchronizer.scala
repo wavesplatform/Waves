@@ -2,11 +2,11 @@ package scorex.network
 
 import akka.actor.Actor.Receive
 import akka.actor.Cancellable
-import scorex.app.{Application, RunnableApplication}
+import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.crypto.encode.Base58.encode
-import scorex.network.Coordinator.{AddBlock, ApplyFork, SyncFinished}
+import scorex.network.Coordinator.{AddBlock, SyncFinished}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.Message
 import scorex.transaction.History
@@ -21,6 +21,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class BlockchainSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   import BlockchainSynchronizer._
+  import Coordinator.SyncFinished._
   import application.basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq(SignaturesSpec, BlockMessageSpec)
@@ -31,7 +32,9 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
   private val gettingBlockTimeout = application.settings.historySynchronizerTimeout
   private val forkMaxLength = application.settings.forkMaxLength
-  private val operationAttempts = application.settings.operationAttempts
+  private val operationRetries = application.settings.operationRetries
+  private val retriesBeforeBlacklisted = application.settings.retriesBeforeBlacklisted
+  private val pinToInitialPeer = application.settings.pinToInitialPeer
 
   private var timeoutData = Option.empty[Cancellable]
 
@@ -39,16 +42,16 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
   def idle: Receive = state(Idle) {
     case GetExtension(lastIds, peerScores) =>
-      noPeersData("gettingExtension") { _ =>
+      start("gettingExtension") { _ =>
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peerScores.keys.toSeq))
 
-        gettingExtension(peerScores)
+        gettingExtension(lastIds.map(InnerId), peerScores.map(peer => peer._1 -> Peer(peer._2)))
       }
   }
 
-  def gettingExtension(scores: PeerScores): Receive =
-    state(GettingExtension, senderIn(scores.keySet)) {
+  def gettingExtension(requestedIds: InnerIds, peers: Peers): Receive =
+    state(GettingExtension, acceptSignaturesSpecOnlyFrom(peers.keySet)) {
       case SignaturesFromPeer(blockIds, connectedPeer) =>
 
         log.debug(s"Got blockIds: $blockIds")
@@ -56,19 +59,26 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         blockIdsToStartDownload(blockIds, application.history) match {
           case None =>
             log.warn(s"Strange blockIds: $blockIds")
-            gotoIdle(success = false)
+            finishUnsuccessfully()
 
           case Some((_, toDownload)) if toDownload.isEmpty =>
             log.debug(s"All blockIds are already in the local blockchain: $blockIds")
-            gotoIdle(success = true)
+            finish(withEmptyResult)
 
-          case Some((commonBlockId, tail)) =>
-            gotoGettingExtensionTail(DownloadInfo(commonBlockId), tail)(PeersData(connectedPeer, scores))
+          case Some((commonBlockId, tail)) if requestedIds.contains(commonBlockId) =>
+            implicit val peerSet = PeerSet(
+              connectedPeer, if (pinToInitialPeer) peers.filterKeys(_ == connectedPeer) else peers)
+
+            gotoGettingExtensionTail(DownloadInfo(commonBlockId), tail)
+
+          case Some((commonBlockId, _)) =>
+            blacklistPeer(s"Block id: $commonBlockId has not been requested", connectedPeer)
+            finishUnsuccessfully()
         }
     }
 
-  private def gotoGettingExtensionTail(downloadInfo: DownloadInfo, tail: InnerIds)(implicit peersData: PeersData): Unit = {
-    val activePeer = peersData.active
+  private def gotoGettingExtensionTail(downloadInfo: DownloadInfo, tail: InnerIds)(implicit peers: PeerSet): Unit = {
+    val activePeer = peers.active
     val blockIdsToDownload = downloadInfo.blockIds ++ tail
 
     if (blockIdsToDownload.size > forkMaxLength || tail.isEmpty) {
@@ -76,58 +86,58 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
       fork.find(id => application.history.contains(id.blockId)) match {
         case Some(suspiciousBlockId) =>
-          blacklistPeer(activePeer, s"Suspicious block id: $suspiciousBlockId among blocks to be downloaded")
-          gotoIdle(success = false)
+          blacklistPeer(s"Suspicious block id: $suspiciousBlockId among blocks to be downloaded", activePeer)
+          finishUnsuccessfully()
 
         case None =>
           val blocks = mutable.Seq(fork.map(_ -> Option.empty[Block]):_*)
 
-          run("gettingBlocks") { case Some(updated) =>
+          run("gettingBlocks") { updatedPeerData =>
 
             val ids = blocks.filter(_._2.isEmpty).map(_._1)
 
-            log.debug(s"Going to request ${ids.size} blocks, peer: ${updated.active}")
+            log.debug(s"Going to request ${ids.size} blocks, peer: ${updatedPeerData.active}")
 
             ids.foreach { blockId =>
               val msg = Message(GetBlockSpec, Right(blockId.blockId), None)
-              networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(updated.active))
+              networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(updatedPeerData.active))
             }
 
-            gettingBlocks(blocks, updated)
+            gettingBlocks(blocks, updatedPeerData)
           }
       }
     } else {
       val withTail = downloadInfo.copy(blockIds = blockIdsToDownload)
       val overlap = withTail.lastTwoBlockIds
 
-      run("gettingExtensionTail") { case Some(updated) =>
+      run("gettingExtensionTail") { updatedPeersData =>
         val msg = Message(GetSignaturesSpec, Right(overlap.reverse.map(_.blockId)), None)
-        networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(updated.active))
+        networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(updatedPeersData.active))
 
-        gettingExtensionTail(withTail, overlap, updated)
+        gettingExtensionTail(withTail, overlap, updatedPeersData)
       }
     }
   }
 
-  def gettingExtensionTail(downloadInfo: DownloadInfo, overlap: InnerIds, peersData: PeersData): Receive =
-    state(GettingExtensionTail, senderIn(Set(peersData.active))) {
+  def gettingExtensionTail(downloadInfo: DownloadInfo, overlap: InnerIds, peers: PeerSet): Receive =
+    state(GettingExtensionTail, acceptSignaturesSpecOnlyFrom(peers.active)) {
       case SignaturesFromPeer(tail, connectedPeer) =>
 
         log.debug(s"Got tail blockIds: $tail")
 
         if (tail == overlap) {
-          gotoGettingExtensionTail(downloadInfo, Seq.empty)(peersData)
+          gotoGettingExtensionTail(downloadInfo, Seq.empty)(peers)
         } else if (tail.indexOf(overlap.last) == 0) {
-          gotoGettingExtensionTail(downloadInfo, tail.tail)(peersData)
+          gotoGettingExtensionTail(downloadInfo, tail.tail)(peers)
         } else if (tail.lastOption.exists(downloadInfo.blockIds.contains)) {
           log.warn(s"Tail blockIds have been already recieved - possible msg duplication: $tail")
         } else {
-          blacklistPeer(connectedPeer, s"Tail does not correspond to the overlap $overlap: $tail")
-          gotoIdle(success = false)
+          blacklistPeer(s"Tail does not correspond to the overlap $overlap: $tail", connectedPeer)
+          finishUnsuccessfully()
         }
     }
 
-  def gettingBlocks(blocks: mutable.Seq[(InnerId, Option[Block])], peersData: PeersData): Receive = {
+  def gettingBlocks(blocks: mutable.Seq[(InnerId, Option[Block])], peers: PeerSet): Receive = {
     object blockIdx {
       def unapply(block: Block): Option[(Block, Int)] = {
         blocks.indexWhere(_._1 == InnerId(block.uniqueId)) match {
@@ -137,60 +147,34 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
       }
     }
     state(GettingBlocks) {
-      case BlockFromPeer(blockIdx(block, index), connectedPeer) if peersData.active == connectedPeer =>
+      case BlockFromPeer(blockIdx(block, index), connectedPeer) if peers.active == connectedPeer =>
         if (blocks(index)._2.isEmpty) {
           log.info("Got block: " + block.encodedId)
 
           blocks(index) = InnerId(block.uniqueId) -> Some(block)
 
           if (blocks.forall(_._2.isDefined)) {
-            val expectedScore = peersData.scores(peersData.active)
-            // TODO score check! initial vs actual vs expected
-            coordinator ! ApplyFork(blocks.flatMap(_._2), connectedPeer)
-            gotoIdle(success = true)
+            val author = Some(connectedPeer).filterNot(_ => peers.activeChanged)
+            finish(SyncFinished(success = true, Some(blocks.flatMap(_._2), author)))
           }
         }
     }
   }
 
-  private def state(status: Status, signaturesFromPeerPredicate: SenderCheck= _ => true)(logic: Receive): Receive = {
+  private def state(status: Status, stopFilter: StopFilter = noFilter)(logic: Receive): Receive = {
     //combine specific logic with common for all the states
 
-    val signaturesFromPeerCheckLogic: Receive = {
-      case SignaturesFromPeer(_, fromPeer) if ! signaturesFromPeerPredicate(fromPeer) => // just ignore the block ids
-    }
-
-    signaturesFromPeerCheckLogic orElse logic orElse ({
+    ignoreFor(stopFilter) orElse logic orElse {
       case GetStatus =>
         sender() ! status
 
       case BlockFromPeer(block, peer) =>
         coordinator ! AddBlock(block, Some(peer))
 
-      case TimeoutExceeded(s, f, peersData, runs) =>
-        if (timeoutData.exists(!_.isCancelled)) {
-          log.warn(s"Attempt number $runs to rerun $s")
-          if (runs < operationAttempts) {
-            run(s, peersData, runs + 1) { f(_) }
-          } else {
-            log.debug("Trying to find a new active peer...")
-            val updated = peersData.flatMap {
-              case PeersData(active, scores) =>
-                blacklistPeer(active, "Timeout exceeded")
-                val haveLargerScore = (scores - active).filter(_._2 >= scores(active))
-                haveLargerScore.headOption.map {
-                  case (peer, _) =>
-                    log.debug(s"New active peer is $peer")
-                    PeersData(peer, haveLargerScore)
-                }
-            }
+      case SignaturesFromPeer(_, _) =>
 
-            updated match {
-              case Some(updatedPeersData) => run(s) { f(_) } (updatedPeersData)
-              case None => gotoIdle(success = false)
-            }
-          }
-        }
+      case t @ TimeoutExceeded(_, _, _, _) =>
+        if (timeoutData.exists(!_.isCancelled)) handleTimeout(t)
 
       case GetExtension(_, _) => // ignore if not idle
 
@@ -199,27 +183,85 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
       case nonsense: Any =>
         log.warn(s"Got something strange in ${status.name}: $nonsense")
-    }: Receive)
+    }
   }
 
-  private def gotoIdle(success: Boolean): Unit = {
-    log.debug("Transition to idle")
+  private def handleTimeout(t: TimeoutExceeded): Unit = {
+    val TimeoutExceeded(s, f, peerSet, runs) = t
+
+    log.debug(s"Attempt #$runs to rerun $s")
+
+    val updated = if (runs < operationRetries) updatedPeerSet(peerSet)
+    else {
+      log.info(s"Max number of retries ($operationRetries) is reached")
+      None
+    }
+
+    updated match {
+      case Some(updatedPeerSet) =>
+        log.info(s"New active peer is ${updatedPeerSet.active}" +
+          s" (was ${peerSet.map(_.active.toString).getOrElse("no one")})")
+
+        run(s, updated, runs + 1) {
+          f
+        }
+
+      case None => finishUnsuccessfully()
+    }
+  }
+
+  private def updatedPeerSet(peerSet: Option[PeerSet]): Option[PeerSet] =
+    peerSet.flatMap {
+      case PeerSet(active, peers, activeChanged) =>
+
+        log.debug("Trying to find a new active peer...")
+
+        val peerData @ Peer(score, retries) = peers(active)
+        val updatedRetries = retries + 1
+
+        val updatedPeers = (if (updatedRetries >= retriesBeforeBlacklisted) {
+          if (!activeChanged) blacklistPeer("Timeout exceeded", active)
+          peers - active
+        } else peers + (active -> peerData.copy(retries = updatedRetries))).filterNot(_._2.score < score)
+
+        val sortedByScore = updatedPeers.toSeq.sortBy(_._2.score).map(_._1)
+
+        sortedByScore.filterNot(_ == active).headOption
+          .orElse(sortedByScore.headOption)
+          .map(newActive => PeerSet(newActive, updatedPeers, activeChanged || newActive != active))
+    }
+
+  private def ignoreFor(stopFilter: StopFilter): Receive = {
+    case data @ DataFromPeer(msgId, _, connectedPeer) if stopFilter(msgId, connectedPeer) =>
+      log.debug(s"Ignoring data: $data")
+  }
+
+  private def acceptSignaturesSpecOnlyFrom(peer: ConnectedPeer): StopFilter =
+    acceptSignaturesSpecOnlyFrom(Set(peer))
+
+  private def acceptSignaturesSpecOnlyFrom(peers: Set[ConnectedPeer]): StopFilter = {
+    (code, peer) => (!peers.contains(peer)) && SignaturesSpec.messageCode == code
+  }
+
+  private def finishUnsuccessfully(): Unit = finish(unsuccessfully)
+
+  private def finish(result: SyncFinished): Unit = {
+    log.debug(s"Transition to idle, success == ${result.success}")
     cancelPreviousTimeoutCountdown()
     context become idle
-    coordinator ! SyncFinished(success)
+    coordinator ! result
   }
 
+  private def run(status: String)(f: RepeatableCodeBlock)(implicit peers: PeerSet): Unit =
+    run(status, Some(peers), 1)(f)
 
-  private def run(status: String)(f: Option[PeersData] => Receive)(implicit peersData: PeersData): Unit =
-    run(status, Some(peersData), 1)(f)
+  private def start(status: String)(f: RepeatableCodeBlock): Unit = run(status, None, 1)(f)
 
-  private def noPeersData(status: String)(f: Option[PeersData] => Receive): Unit = run(status, None, 1)(f)
-
-  private def run(status: String, peersData: Option[PeersData], runs: Int)(f: Option[PeersData] => Receive): Unit = {
+  private def run(status: String, initialPeerSet: Option[PeerSet], runs: Int)(f: RepeatableCodeBlock): Unit = {
     log.debug(s"Transition to $status")
     cancelPreviousTimeoutCountdown()
-    val behaviour = f(peersData)
-    val timeoutInfo = TimeoutExceeded(status, f, peersData, runs)
+    val behaviour = f(initialPeerSet.orNull)
+    val timeoutInfo = TimeoutExceeded(status, f, initialPeerSet, runs)
     val cancellable = context.system.scheduler.scheduleOnce(gettingBlockTimeout, self, timeoutInfo)
     timeoutData = Some(cancellable)
     context become behaviour
@@ -230,8 +272,8 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     timeoutData = None
   }
 
-  private def blacklistPeer(connectedPeer: ConnectedPeer, reason: String): Unit = {
-    log.warn(s"$reason, peer: $connectedPeer")
+  private def blacklistPeer(reason: String, connectedPeer: ConnectedPeer): Unit = {
+    log.warn(s"$reason, blacklisted peer: $connectedPeer")
     connectedPeer.handlerRef ! PeerConnectionHandler.Blacklist
   }
 
@@ -286,22 +328,18 @@ object BlockchainSynchronizer {
 
   case object GetStatus
 
-  type PeerScores = Map[ConnectedPeer, BlockchainScore]
-
-  case class GetExtension(lastBlockIds: BlockIds, peerScores: PeerScores)
+  case class GetExtension(lastBlockIds: BlockIds, peerScores: Map[ConnectedPeer, BlockchainScore])
 
   case class InnerId(blockId: BlockId) {
-    override def equals(obj: scala.Any): Boolean = {
+    override def equals(obj: Any): Boolean = {
       import shapeless.syntax.typeable._
       obj.cast[InnerId].exists(_.blockId.sameElements(this.blockId))
     }
-    override def hashCode(): Int = blockId.hashCode()
+    override def hashCode(): Int = scala.util.hashing.MurmurHash3.seqHash(blockId)
     override def toString: String = encode(blockId)
   }
 
   type InnerIds = Seq[InnerId]
-
-  private case class TimeoutExceeded(status: String, f: Option[PeersData] => Receive, peersData: Option[PeersData], runs: Integer)
 
   private[network] def blockIdsToStartDownload(blockIds: InnerIds, history: History): Option[(InnerId, InnerIds)] = {
     val (common, toDownload) = blockIds.span(id => history.contains(id.blockId))
@@ -312,9 +350,13 @@ object BlockchainSynchronizer {
     def lastTwoBlockIds: InnerIds = if (blockIds.size > 1) blockIds.takeRight(2) else lastCommon +: blockIds
   }
 
-  private type SenderCheck = ConnectedPeer => Boolean
+  private type StopFilter = (Message.MessageCode, ConnectedPeer) => Boolean
+  private def noFilter: StopFilter = (_, _) => false
 
-  private def senderIn(peers: Set[ConnectedPeer]): SenderCheck = peers.contains
+  private type RepeatableCodeBlock = PeerSet => Receive
+  private case class TimeoutExceeded(status: String, f: RepeatableCodeBlock, peers: Option[PeerSet], runs: Integer)
 
-  private case class PeersData(active: ConnectedPeer, scores: PeerScores)
+  private case class Peer(score: BlockchainScore, retries: Int = 0)
+  private type Peers = Map[ConnectedPeer, Peer]
+  private case class PeerSet(active: ConnectedPeer, peers: Peers, activeChanged: Boolean = false)
 }

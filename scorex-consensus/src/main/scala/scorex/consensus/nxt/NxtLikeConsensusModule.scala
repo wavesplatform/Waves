@@ -167,7 +167,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
     })
   }
 
-  override def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = {
+  override def blockScore(block: Block): BigInt = {
     val baseTarget = consensusBlockData(block).baseTarget
     BigInt("18446744073709551616") / baseTarget
   }.ensuring(_ > 0)

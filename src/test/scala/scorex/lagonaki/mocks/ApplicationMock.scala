@@ -1,12 +1,6 @@
 package scorex.lagonaki.mocks
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.http.scaladsl.server.Route
-import scorex.app.{Application, RunnableApplication}
-import scorex.network.UPnP
-import scorex.settings.SettingsMock
-import scorex.transaction.{BlockStorage, History}
-import scorex.wallet.Wallet
+import scorex.app.Application
 
 trait ApplicationMock extends Application  {
 //  override lazy val settings = DefaultTestSettings

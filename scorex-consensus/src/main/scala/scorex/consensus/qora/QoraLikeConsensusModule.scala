@@ -185,7 +185,7 @@ class QoraLikeConsensusModule extends PoSConsensusModule[QoraLikeConsensusBlockD
   override def formBlockData(data: QoraLikeConsensusBlockData): BlockField[QoraLikeConsensusBlockData] =
     QoraConsensusBlockField(data)
 
-  override def blockScore(block: Block)(implicit transactionModule: TransactionModule[_]): BigInt = BigInt(1)
+  override def blockScore(block: Block): BigInt = BigInt(1)
 
   override def consensusBlockData(block: Block): QoraLikeConsensusBlockData = block.consensusDataField.value match {
     case b: QoraLikeConsensusBlockData => b

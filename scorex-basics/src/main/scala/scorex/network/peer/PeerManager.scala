@@ -55,7 +55,9 @@ class PeerManager(application: RunnableApplication) extends Actor with ScorexLog
       sender() ! Random.shuffle(peerDatabase.knownPeers(false).keys.toSeq).take(howMany)
 
     case FilterPeers(sendingStrategy: SendingStrategy) =>
-      sender() ! sendingStrategy.choose(connectedPeers.keys.toSeq)
+      val chosen = sendingStrategy.choose(connectedPeers.keys.toSeq)
+      if (chosen.isEmpty) log.debug("No peers chosen")
+      sender() ! chosen
   }
 
   private def apiInterface: Receive = {

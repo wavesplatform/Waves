@@ -93,15 +93,18 @@ trait Settings extends ScorexLogging {
   lazy val historySynchronizerTimeout: FiniteDuration = (settingsJSON \ "historySynchronizerTimeout").asOpt[Int]
     .map(x => x.seconds).getOrElse(DefaultHistorySynchronizerTimeout)
 
+  // TODO: too many fork* settings - maybe intruduce a section for them
   private val DefaultMaxRollback = 100
   lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(DefaultMaxRollback)
 
   val MaxBlocksChunks = 10
-  lazy val forkMaxLength = (settingsJSON \ "forkMaxLength").asOpt[Int].getOrElse(DefaultMaxRollback)
+  lazy val forkMaxLength = (settingsJSON \ "forkMaxLength").asOpt[Int].getOrElse(MaxBlocksChunks)
   lazy val forkResolveQuorumSize = (settingsJSON \ "forkResolveQuorumSize").asOpt[Int].getOrElse(1)
   lazy val maxPeersToBroadcastBlock = (settingsJSON \ "maxPeersToBroadcastBlock").asOpt[Int].getOrElse(3)
   val scoreTTL: FiniteDuration = 1.minute
-  lazy val operationAttempts = (settingsJSON \ "operationAttempts").asOpt[Int].getOrElse(1)
+  lazy val operationRetries = (settingsJSON \ "operationRetries").asOpt[Int].getOrElse(3)
+  lazy val retriesBeforeBlacklisted = (settingsJSON \ "retriesBeforeBlacklisted").asOpt[Int].getOrElse(1)
+  lazy val pinToInitialPeer = (settingsJSON \ "pinToInitialPeer").asOpt[Boolean].getOrElse(true)
 
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)

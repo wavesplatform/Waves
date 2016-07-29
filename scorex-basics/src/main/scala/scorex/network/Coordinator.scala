@@ -1,7 +1,7 @@
 package scorex.network
 
 import akka.actor.Actor
-import scorex.app.{Application, RunnableApplication}
+import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
 import scorex.crypto.encode.Base58.encode
@@ -9,7 +9,6 @@ import scorex.network.BlockchainSynchronizer.{GetExtension, GetStatus}
 import scorex.network.NetworkController.SendToNetwork
 import scorex.network.ScoreObserver.{ConsideredValue, GetScore}
 import scorex.network.message.Message
-import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -51,45 +50,16 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
         blockchainSynchronizer ! GetExtension(lastIds, peers.toMap)
       }
 
-    case ApplyFork(blocks, fromPeer) if blocks.nonEmpty =>
-      log.info(s"Going to process ${blocks.size} blocks")
-      processFork(blocks, Some(fromPeer))
-
-    case AddBlock(block, fromPeer) =>
-      val parentBlockId = block.referenceField.value
-      val local = fromPeer.isEmpty
-
-      def isBlockToBeAdded: Boolean = {
-        if (!local && history.contains(block)) {
-          // we have already got the block - skip
-          return false
-        }
-
-        if (!history.contains(parentBlockId)) {
-          // the block either has come too early or, if local, too late (e.g. removeAfter happened)
-          log.debug(s"Parent of the block is not in the history, local=$local: ${block.json}")
-          return false
-        }
-
-        if (!history.lastBlock.uniqueId.sameElements(parentBlockId)) {
-          // someone has happened to be faster and added a block or blocks in the ledger before
-          log.debug(s"A child for parent of the block already exists, local=$local: ${block.json}")
-          return false
-        }
-
-        true
-      }
-
-      if (isBlockToBeAdded) {
-        if (!processNewBlock(block, fromPeer, broadcast = true)) {
-          // TODO: blacklist here
-          log.warn(s"Can't apply single block, local=${fromPeer.isEmpty}: ${block.json}")
-        }
-      }
-
-      // todo: duplicated
-    case SyncFinished(_) =>
+    case SyncFinished(_, result) =>
       scoreObserver ! GetScore
+      result foreach {
+        case (blocks, from) =>
+          log.info(s"Going to process ${blocks.size} blocks")
+          processFork(blocks, from)
+      }
+
+    case AddBlock(block, from) =>
+      processSingleBlock(block, from)
 
     case request @ GetStatus =>
       blockchainSynchronizer forward request
@@ -102,39 +72,90 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     case Unit =>
   }
 
-  private def processFork(blocks: Seq[Block], fromPeer: Option[ConnectedPeer]): Unit = {
-    val headParent = blocks.head.referenceField.value
+  private def processSingleBlock(block: Block, from: Option[ConnectedPeer]): Unit = {
+    val parentBlockId = block.referenceField.value
+    val local = from.isEmpty
 
-    val revertedBlocks =
-      history.heightOf(headParent).map(history.height() - _).filter(_ > 0).toList.flatMap {
-        tailSize =>
-          val tail = history.lastBlocks(tailSize)
-          application.blockStorage.removeAfter(headParent)
-          tail
+    def isBlockToBeAdded: Boolean = {
+      if (!local && history.contains(block)) {
+        // we have already got the block - skip
+        return false
       }
 
-    blocks.find(!processNewBlock(_, fromPeer, broadcast = false)).foreach {
-      failedBlock =>
-        log.warn(s"Can't apply block: ${failedBlock.json}")
-        if (blocks.head == failedBlock && revertedBlocks.nonEmpty) {
-          log.warn(s"Return back ${revertedBlocks.size} reverted blocks: ${revertedBlocks.map(_.encodedId)}")
-          revertedBlocks.reverse.foreach(application.blockStorage.appendBlock)
-        }
+      if (!history.contains(parentBlockId)) {
+        // the block either has come too early or, if local, too late (e.g. removeAfter happened)
+        log.debug(s"Parent of the block is not in the history, local=$local: ${block.json}")
+        return false
+      }
 
-        if (history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)) {
-          fromPeer.foreach(_.handlerRef ! PeerConnectionHandler.Blacklist)
-        }
+      if (!history.lastBlock.uniqueId.sameElements(parentBlockId)) {
+        // someone has happened to be faster and added a block or blocks in the ledger before
+        log.debug(s"A child for parent of the block already exists, local=$local: ${block.json}")
+        return false
+      }
+
+      true
+    }
+
+    if (isBlockToBeAdded) {
+      if (!processNewBlock(block, from, local = true)) {
+        // TODO: blacklist here
+        log.warn(s"Can't apply single block, local=${from.isEmpty}: ${block.json}")
+      }
     }
   }
 
-  private def processNewBlock(block: Block, fromPeer: Option[ConnectedPeer], broadcast: Boolean): Boolean = Try {
-    val local = fromPeer.isEmpty
+  private def processFork(blocks: Seq[Block], from: Option[ConnectedPeer]): Unit =
+    blocks.headOption.map(_.referenceField.value).foreach { lastCommonBlockId =>
 
+      def blacklist() = from.foreach(_.handlerRef ! PeerConnectionHandler.Blacklist)
+
+      val initialScore = history.score()
+
+      val expectedScore = blocks.foldLeft(history.score(lastCommonBlockId)) {
+        (sum, block) =>
+          val c = application.consensusModule
+          c.cumulativeBlockScore(sum, c.blockScore(block))
+      }
+
+      if (expectedScore <= initialScore) {
+        log.warn(s"Expected score ($expectedScore) is less than initial ($initialScore), the fork is rejected")
+        blacklist()
+      } else {
+
+        log.debug(s"Expected score ($expectedScore) vs initial ($initialScore)")
+
+        val revertedBlocks =
+          history.heightOf(lastCommonBlockId).map(history.height() - _).filter(_ > 0).toList.flatMap {
+            tailSize =>
+              val lastBlocks = history.lastBlocks(tailSize)
+              application.blockStorage.removeAfter(lastCommonBlockId)
+              lastBlocks
+          }
+
+        blocks.find(!processNewBlock(_, None, local = false)).foreach { failedBlock =>
+          log.warn(s"Can't apply block: ${failedBlock.json}")
+          if (history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)) {
+            blacklist()
+          }
+          if (blocks.head == failedBlock && revertedBlocks.nonEmpty) {
+            log.warn(s"Return back ${revertedBlocks.size} reverted blocks: ${revertedBlocks.map(_.encodedId)}")
+            revertedBlocks.reverse.foreach(application.blockStorage.appendBlock)
+          }
+        }
+
+        val finalScore = history.score()
+        if (finalScore != expectedScore) log.debug(s"Final score ($finalScore) not equal expected ($expectedScore)")
+        if (finalScore <= initialScore) log.debug(s"Final score ($finalScore) is less than initial ($initialScore)")
+      }
+    }
+
+  private def processNewBlock(block: Block, from: Option[ConnectedPeer], local: Boolean): Boolean = Try {
     if (block.isValid) {
       log.info(s"New block(local: $local): ${block.json}")
 
-      if (broadcast) {
-        val sendingStrategy = if (local) Broadcast else SendToRandomExceptOf(maxPeersToBroadcastBlock, fromPeer.toSeq)
+      from.foreach { peer =>
+        val sendingStrategy = if (local) Broadcast else SendToRandomExceptOf(maxPeersToBroadcastBlock, Seq(peer))
         networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), sendingStrategy)
       }
 
@@ -169,7 +190,10 @@ object Coordinator {
 
   case class AddBlock(block: Block, generator: Option[ConnectedPeer])
 
-  case class ApplyFork(blocks: Seq[Block], generator: ConnectedPeer)
+  case class SyncFinished(success: Boolean, result: Option[(Seq[Block], Option[ConnectedPeer])])
 
-  case class SyncFinished(success: Boolean)
+  object SyncFinished {
+    def unsuccessfully: SyncFinished = SyncFinished(success = false, None)
+    def withEmptyResult: SyncFinished = SyncFinished(success = true, None)
+  }
 }

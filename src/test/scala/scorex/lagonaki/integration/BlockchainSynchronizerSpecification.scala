@@ -4,13 +4,12 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
-import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.consensus.ConsensusModule
 import scorex.lagonaki.ActorTestingCommons
 import scorex.lagonaki.mocks.{ApplicationMock, BlockMock}
-import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler}
+import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.BasicMessagesRepo
 import scorex.network.{BlockchainSynchronizer, ConnectedPeer, PeerConnectionHandler}
 import scorex.settings.SettingsMock
@@ -31,17 +30,20 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     history
   }
 
-  private val h = mockHistory(10)
+  private val lastHistoryBlockId = 10
+  private val h = mockHistory(lastHistoryBlockId)
 
   private val coordinator = TestProbe("Coordinator")
 
   object TestSettings extends SettingsMock {
     override lazy val historySynchronizerTimeout: FiniteDuration = 1 seconds
-    override lazy val forkMaxLength: Int = 10
-    override lazy val operationAttempts: Int = 1
+    override lazy val forkMaxLength: Int = lastHistoryBlockId
+    override lazy val retriesBeforeBlacklisted: Int = 1
+    override lazy val operationRetries: Int = retriesBeforeBlacklisted + 13930975
+    override lazy val pinToInitialPeer: Boolean = true
   }
 
-  trait A extends Application {
+  private trait A extends ApplicationMock {
     implicit val txModule = mock[TransactionModule[Int]]
     implicit val consModule = mock[ConsensusModule[Int]]
     override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
@@ -51,9 +53,11 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     override lazy val history: History = h
   }
 
-  val app = stub[A]
+  private val app = stub[A]
 
   import app.basicMessagesSpecsRepo._
+
+  private def reasonableTimeInterval = (TestSettings.historySynchronizerTimeout.toMillis / 2) millis
 
   private def validateStatus(status: Status): Unit = {
     actorRef ! GetStatus
@@ -67,6 +71,13 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     val block = new BlockMock(Seq.empty)
     actorRef ! DataFromPeer(BlockMessageSpec.messageCode, block, peer)
     coordinator.expectMsg(AddBlock(block, Some(peer)))
+  }
+
+  private def assertThatPeerGotBlacklisted(): Unit = {
+    within(reasonableTimeInterval) {
+      peerHandler.expectMsg(PeerConnectionHandler.Blacklist)
+      coordinator.expectMsg(SyncFinished.unsuccessfully)
+    }
   }
 
   private def expectedGetSignaturesSpec(blockIds: Int*): Unit = expectNetworkMessage(GetSignaturesSpec, blockIds.toSeq)
@@ -86,20 +97,27 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
       val withElapsedTime = TestSettings.historySynchronizerTimeout.toMillis - (System.currentTimeMillis() - t)
       withElapsedTime * correction toLong
     }
-
     def aBitLessThanTimeout = adjustedTimeout(0.9f) millis
     def aBitLongerThanTimeout = adjustedTimeout(1.1f) millis
-    def withinReasonableTimeInterval = (TestSettings.historySynchronizerTimeout.toMillis / 2) millis
 
-    actorRef ! GetExtension(blockIds(10, 9), Map(peer -> 0)) // ids come in reverse order
-    expectedGetSignaturesSpec(10, 9)
+    actorRef ! GetExtension(blockIds(lastHistoryBlockId, 9), Map(peer -> 0)) // ids come in reverse order
+    expectedGetSignaturesSpec(lastHistoryBlockId, 9)
 
     validateStatus(GettingExtension)
+
+    "at least one block id in response must be among requested ones" in {
+      val notInTheHistoryBlockId = lastHistoryBlockId + 1
+      val notRequestedBlockFromHistoryBeginning = 1
+
+      sendSignatures(notRequestedBlockFromHistoryBeginning, notInTheHistoryBlockId)
+
+      assertThatPeerGotBlacklisted()
+    }
 
     "become idle on timeout in GettingExtension" in {
       coordinator.expectNoMsg(aBitLessThanTimeout)
 
-      coordinator.expectMsg(SyncFinished(success = false))
+      coordinator.expectMsg(SyncFinished.unsuccessfully)
 
       validateStatus(Idle)
     }
@@ -108,13 +126,13 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
       assertLatestBlockFromNonSyncPeer()
 
-      sendSignatures(9, 10, 11, 12, 13)
+      sendSignatures(9, lastHistoryBlockId, 11, 12, 13)
 
       expectedGetSignaturesSpec(13, 12)
 
       "sending same signatures twice should not lead to blacklisting" in {
-        sendSignatures(9, 10, 11, 12, 13)
-        peerHandler.expectNoMsg(withinReasonableTimeInterval)
+        sendSignatures(9, lastHistoryBlockId, 11, 12, 13)
+        peerHandler.expectNoMsg(reasonableTimeInterval)
       }
 
       "go to GettingExtensionTail" - {
@@ -128,19 +146,18 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
           dataFromNetwork(SignaturesSpec, validBlockIds, ConnectedPeer(new InetSocketAddress(peerId + 2), anotherPeer.ref))
 
           "should not lead to blackkisting of the peers" in {
-            peerHandler.expectNoMsg(withinReasonableTimeInterval)
+            peerHandler.expectNoMsg(reasonableTimeInterval)
           }
 
           "should not lead to any futher actions" in {
-            peerHandler.expectNoMsg(withinReasonableTimeInterval)
+            peerHandler.expectNoMsg(reasonableTimeInterval)
           }
         }
 
         "blacklist on timeout in states following GettingExtension" in {
           coordinator.expectNoMsg(aBitLessThanTimeout)
 
-          peerHandler.expectMsg(PeerConnectionHandler.Blacklist)
-          coordinator.expectMsg(SyncFinished(success = false))
+          assertThatPeerGotBlacklisted()
 
           validateStatus(Idle)
         }
@@ -159,6 +176,12 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
           validateStatus(GettingBlocks)
 
+          "react on GetExtension in the Idle state only" in {
+            actorRef ! GetExtension(blockIds(lastHistoryBlockId), Map(peer -> 0))
+
+            validateStatus(GettingBlocks)
+          }
+
           "blocks loading" - {
 
             assertLatestBlockFromNonSyncPeer()
@@ -172,29 +195,22 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
               sendBlock(mockBlock(aBlockId))
 
-              peerHandler.expectMsg(withinReasonableTimeInterval, PeerConnectionHandler.Blacklist)
+              assertThatPeerGotBlacklisted()
             }
 
             "happy path" in {
               Random.shuffle(finalBlockIdInterval) foreach { id => sendBlock(mockBlock(id)) }
 
               coordinator.expectMsgPF(hint = s"${finalBlockIdInterval.size} fork blocks") {
-                case ApplyFork(blocks, connectedPeer) =>
+                case SyncFinished(true, Some((blocks, Some(connectedPeer)))) =>
                   connectedPeer == peer
                   blocks.map(id => InnerId(id.uniqueId)) == blockIds(finalBlockIdInterval: _*).map(InnerId)
               }
 
-              coordinator.expectMsg(SyncFinished(success = true))
               validateStatus(Idle)
 
               peerHandler.expectNoMsg(aBitLongerThanTimeout)
             }
-          }
-
-          "react on GetExtension in the Idle state only" in {
-            actorRef ! GetExtension(blockIds(10), Map(peer -> 0))
-
-            validateStatus(GettingBlocks)
           }
         }
       }

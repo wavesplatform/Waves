@@ -19,8 +19,10 @@ case class ConnectedPeer(socketAddress: InetSocketAddress, handlerRef: ActorRef)
 
   import shapeless.syntax.typeable._
 
-  override def equals(obj: scala.Any): Boolean =
+  override def equals(obj: Any): Boolean =
     obj.cast[ConnectedPeer].exists(_.socketAddress == this.socketAddress)
+
+  override def hashCode(): Int = socketAddress.hashCode()
 
   override def toString: String = socketAddress.toString
 }
@@ -60,7 +62,8 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
     case cc: ConnectionClosed =>
       peerManager ! PeerManager.Disconnected(remote)
-      log.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
+      val reason = if (cc.isErrorClosed) cc.getErrorCause else if (cc.isPeerClosed) "by remote" else s"${cc.isConfirmed} - ${cc.isAborted}"
+      log.info(s"Connection closed to $remote: $reason in state $stateName")
       context stop self
 
     case CloseConnection =>

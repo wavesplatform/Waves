@@ -11,5 +11,6 @@ class BasicsTestSuite extends Suites(
   new HandshakeSpecification,
   new BlacklistParallelSpecification,
   new BlacklistSpecification,
-  new BlockchainSynchronizerObjectSpecification
+  new BlockchainSynchronizerObjectSpecification,
+  new SendingStrategySpecification
 )

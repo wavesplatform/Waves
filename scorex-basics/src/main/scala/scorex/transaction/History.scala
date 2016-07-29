@@ -34,6 +34,8 @@ trait History {
     */
   def score(): BlockchainScore
 
+  def score(id: BlockId): BlockchainScore
+
   /**
     * Is there's no history, even genesis block
     * @return

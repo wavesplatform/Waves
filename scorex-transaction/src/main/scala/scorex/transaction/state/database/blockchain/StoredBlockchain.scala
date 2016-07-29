@@ -44,7 +44,7 @@ class StoredBlockchain(db: MVStore)
 
     def writeBlock(height: Int, block: Block): Try[Unit] = Try {
       blocks.put(height, block.bytes)
-      val blockScore = consensusModule.blockScore(block)(block.transactionModule)
+      val blockScore = consensusModule.blockScore(block)
       scoreMap.put(height, consensusModule.cumulativeBlockScore(score(), blockScore))
       signatures.put(height, block.uniqueId)
       signaturesReverse.put(block.uniqueId, height)
@@ -75,6 +75,8 @@ class StoredBlockchain(db: MVStore)
     def heightOf(id: BlockId): Option[Int] = Option(signaturesReverse.get(id))
 
     def score(): BlockchainScore = if (height() > 0) scoreMap.get(height()) else 0
+
+    def score(id: BlockId): BlockchainScore = heightOf(id).map(scoreMap.get(_)).getOrElse(0)
 
   }
 
@@ -115,6 +117,8 @@ class StoredBlockchain(db: MVStore)
   override def height(): Int = blockStorage.height()
 
   override def score(): BlockchainScore = blockStorage.score()
+
+  override def score(id: BlockId): BlockchainScore = blockStorage.score(id)
 
   override def heightOf(blockSignature: Array[Byte]): Option[Int] = blockStorage.heightOf(blockSignature)
 

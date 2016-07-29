@@ -251,6 +251,8 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
 
   override def score(): BigInt = blockStorage.bestBlock.map(_._2).getOrElse(BigInt(0))
 
+  def score(id: BlockId): BigInt = ??? // TODO to be implemented
+
   override def parent(block: Block, back: Int = 1): Option[Block] = {
     require(back > 0)
     val p = blockStorage.readBlock(block.referenceField.value).map(_._1)
