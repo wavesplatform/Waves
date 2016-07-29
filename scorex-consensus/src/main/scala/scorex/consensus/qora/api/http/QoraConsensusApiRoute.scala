@@ -8,14 +8,14 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidNotNumber, JsonResponse}
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.consensus.qora.QoraLikeConsensusModule
 
 import scala.util.Try
 
 @Path("/consensus")
 @Api(value = "/consensus", description = "Consensus-related calls")
-case class QoraConsensusApiRoute(override val application: Application)
+case class QoraConsensusApiRoute(override val application: RunnableApplication)
                                 (implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 

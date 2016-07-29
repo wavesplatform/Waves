@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
 import scorex.account.Account
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiState
 import scorex.transaction.state.database.blockchain.StoredBlockchain
@@ -17,7 +17,7 @@ import scala.util.{Success, Try}
 
 @Path("/transactions")
 @Api(value = "/transactions", description = "Information about transactions")
-case class TransactionsApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
+case class TransactionsApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
   private val state: LagonakiState = application.blockStorage.state

@@ -8,12 +8,12 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
 import scorex.account.Account
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.transaction.BlockChain
 
 @Path("/blocks")
 @Api(value = "/blocks", description = "Info about blockchain & individual blocks within it")
-case class BlocksApiRoute(override val application: Application)(implicit val context: ActorRefFactory)
+case class BlocksApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   private val wallet = application.wallet

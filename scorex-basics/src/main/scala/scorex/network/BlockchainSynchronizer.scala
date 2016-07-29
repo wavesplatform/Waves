@@ -2,7 +2,7 @@ package scorex.network
 
 import akka.actor.Actor.Receive
 import akka.actor.Cancellable
-import scorex.app.Application
+import scorex.app.{Application, RunnableApplication}
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.crypto.encode.Base58.encode

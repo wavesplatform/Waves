@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.block.{Block, BlockField}
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
@@ -39,7 +39,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 }
 
 
-class SimpleTransactionModule(implicit val settings: TransactionSettings with Settings, application: Application)
+class SimpleTransactionModule(implicit val settings: TransactionSettings with Settings, application: RunnableApplication)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
 
   import SimpleTransactionModule._

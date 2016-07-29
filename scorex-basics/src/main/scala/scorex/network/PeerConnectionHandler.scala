@@ -7,7 +7,7 @@ import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.{AddToBlacklist, Handshaked}
 import scorex.utils.ScorexLogging
@@ -30,7 +30,7 @@ case object Ack extends Event
 
 
 //todo: timeout on Ack waiting
-case class PeerConnectionHandler(application: Application,
+case class PeerConnectionHandler(application: RunnableApplication,
                                  connection: ActorRef,
                                  remote: InetSocketAddress) extends Actor with Buffering with ScorexLogging {
 

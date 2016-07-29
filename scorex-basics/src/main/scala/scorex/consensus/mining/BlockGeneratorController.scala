@@ -3,7 +3,7 @@ package scorex.consensus.mining
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.consensus.mining.Miner._
 import scorex.utils.ScorexLogging
@@ -12,7 +12,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Success
 
-class BlockGeneratorController(application: Application) extends Actor with ScorexLogging {
+class BlockGeneratorController(application: RunnableApplication) extends Actor with ScorexLogging {
 
   val threads = application.settings.mininigThreads
   val FailedGenerationDelay: FiniteDuration = Math.max(10, application.settings.blockGenerationDelay.toSeconds).seconds

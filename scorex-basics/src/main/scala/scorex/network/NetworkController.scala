@@ -7,7 +7,7 @@ import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
-import scorex.app.Application
+import scorex.app.RunnableApplication
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager
 import scorex.utils.ScorexLogging
@@ -22,7 +22,7 @@ import scala.util.{Failure, Random, Success, Try}
  * Control all network interaction
  * must be singleton
  */
-class NetworkController(application: Application) extends Actor with ScorexLogging {
+class NetworkController(application: RunnableApplication) extends Actor with ScorexLogging {
 
   import NetworkController._
 
