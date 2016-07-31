@@ -6,14 +6,12 @@ import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import scorex.block.Block
 import scorex.block.Block._
-import scorex.consensus.ConsensusModule
 import scorex.lagonaki.ActorTestingCommons
-import scorex.lagonaki.mocks.{ApplicationMock, BlockMock}
+import scorex.lagonaki.mocks.BlockMock
 import scorex.network.NetworkController.DataFromPeer
-import scorex.network.message.BasicMessagesRepo
 import scorex.network.{BlockchainSynchronizer, ConnectedPeer, PeerConnectionHandler}
 import scorex.settings.SettingsMock
-import scorex.transaction.{History, TransactionModule}
+import scorex.transaction.History
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.{implicitConversions, postfixOps}
@@ -43,17 +41,13 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     override lazy val pinToInitialPeer: Boolean = true
   }
 
-  private trait A extends ApplicationMock {
-    implicit val txModule = mock[TransactionModule[Int]]
-    implicit val consModule = mock[ConsensusModule[Int]]
-    override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
+  private trait App extends ApplicationMock {
     override lazy val settings = TestSettings
-    override lazy val networkController: ActorRef = networkControllerMock
     override lazy val coordinator: ActorRef = BlockchainSynchronizerSpecification.this.coordinator.ref
     override lazy val history: History = h
   }
 
-  private val app = stub[A]
+  private val app = stub[App]
 
   import app.basicMessagesSpecsRepo._
 

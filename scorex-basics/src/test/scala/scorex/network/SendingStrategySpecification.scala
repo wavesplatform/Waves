@@ -10,7 +10,7 @@ class SendingStrategySpecification extends FreeSpec
   with Matchers
   with OneInstancePerTest {
 
-  "SendToChosen should filter, not just return a peer to avoid non-actual actor usage" in {
+  "SendToChosen should filter (not just return a peer) to avoid non-actual actor usage" in {
     val address = new InetSocketAddress(1111)
     val aPeer = ConnectedPeer(address, null)
     val anActualAlivePeer = ConnectedPeer(address, null)

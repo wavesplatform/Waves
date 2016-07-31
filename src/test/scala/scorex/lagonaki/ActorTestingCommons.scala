@@ -7,12 +7,15 @@ import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Matchers
+import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block._
+import scorex.consensus.ConsensusModule
 import scorex.lagonaki.mocks.BlockMock
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
-import scorex.network.message.{Message, MessageSpec}
+import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen}
+import scorex.transaction.TransactionModule
 
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
@@ -89,4 +92,11 @@ abstract class ActorTestingCommons extends TestKitBase
         spec shouldEqual expectedSpec
         implicitly[TestDataExtraction[Content]].extract(data) shouldEqual expectedData
     }
+
+  trait ApplicationMock extends Application {
+    implicit val transactionModule = stub[TransactionModule[Int]]
+    implicit val consensusModule = stub[ConsensusModule[Int]]
+    final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
+    final override lazy val networkController: ActorRef = networkControllerMock
+  }
 }

@@ -15,7 +15,7 @@ class BlockchainSynchronizerObjectSpecification extends FreeSpec
   import BlockchainSynchronizer._
 
   "a (sub)sequience of block ids to download" - {
-    "a sequience" in {
+    "a sample sequience" in {
       test(Seq(1, 2, 3, 4), historyContaining(1, 2), 2, Seq(3, 4))
     }
 
@@ -27,7 +27,7 @@ class BlockchainSynchronizerObjectSpecification extends FreeSpec
       test(Seq(1, 2, 3, 4), historyContaining(1, 3), 1, Seq(2, 3, 4))
     }
 
-    "first block(s) are not history" in {
+    "first block(s) are not in history" in {
       blockIdsToStartDownload(Seq(10000, 2, 3, 4), historyContaining(1, 2, 3)) shouldEqual None
     }
   }

@@ -3,13 +3,14 @@ package scorex.lagonaki.integration
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
+import org.h2.mvstore.MVStore
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
 import scorex.lagonaki.ActorTestingCommons
-import scorex.lagonaki.mocks.ApplicationMock
 import scorex.network.BlockchainSynchronizer.{GetStatus, GettingBlocks}
 import scorex.network.{BlockchainSynchronizer, Coordinator}
 import scorex.settings.SettingsMock
 import scorex.transaction.History
+import scorex.transaction.state.database.blockchain.StoredBlockchain
 
 import scala.concurrent.Await
 
@@ -18,24 +19,19 @@ class CoordinatorSpecification extends ActorTestingCommons {
   val testblockGenerator = TestProbe("blockGenerator")
   val testBlockChainSynchronizer = TestProbe("BlockChainSynchronizer")
 
-  val h = stub[History]
-
-  (h.score _).when().returns(BigInt(1))
-
   object TestSettings extends SettingsMock {
     override lazy val forkResolveQuorumSize: Int = 2
     override lazy val maxPeersToBroadcastBlock: Int = 1
   }
 
-  trait A extends ApplicationMock {
+  trait App extends ApplicationMock {
     override lazy val settings = TestSettings
-    override lazy val networkController: ActorRef = networkControllerMock
     override lazy val blockGenerator: ActorRef = testblockGenerator.ref
     override lazy val blockchainSynchronizer: ActorRef = testBlockChainSynchronizer.ref
-    override lazy val history: History = h
+    override lazy val history: History = new StoredBlockchain(new MVStore.Builder().open())
   }
 
-  override protected val actorRef = system.actorOf(Props(classOf[Coordinator], stub[A]))
+  override protected val actorRef = system.actorOf(Props(classOf[Coordinator], stub[App]))
 
   testSafely {
 

@@ -112,7 +112,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
       val initialScore = history.score()
 
-      val expectedScore = blocks.foldLeft(history.score(lastCommonBlockId)) {
+      val expectedScore = blocks.foldLeft(history.scoreOf(lastCommonBlockId)) {
         (sum, block) =>
           val c = application.consensusModule
           c.cumulativeBlockScore(sum, c.blockScore(block))

@@ -118,7 +118,7 @@ class StoredBlockchain(db: MVStore)
 
   override def score(): BlockchainScore = blockStorage.score()
 
-  override def score(id: BlockId): BlockchainScore = blockStorage.score(id)
+  override def scoreOf(id: BlockId): BlockchainScore = blockStorage.score(id)
 
   override def heightOf(blockSignature: Array[Byte]): Option[Int] = blockStorage.heightOf(blockSignature)
 

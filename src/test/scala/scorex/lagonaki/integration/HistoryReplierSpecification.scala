@@ -2,14 +2,12 @@ package scorex.lagonaki.integration
 
 import akka.actor.{ActorRef, Props}
 import scorex.block.Block._
-import scorex.consensus.ConsensusModule
 import scorex.lagonaki.ActorTestingCommons
-import scorex.lagonaki.mocks.ApplicationMock
 import scorex.network.BlockchainSynchronizer.{InnerId, InnerIds}
 import scorex.network.HistoryReplier
 import scorex.network.message.BasicMessagesRepo
 import scorex.settings.SettingsMock
-import scorex.transaction.{History, TransactionModule}
+import scorex.transaction.History
 
 import scala.language.implicitConversions
 
@@ -33,16 +31,12 @@ class HistoryReplierSpecification extends ActorTestingCommons {
   private val lastHistoryBlockId = 20
   private val h = mockHistory(1 to lastHistoryBlockId)
 
-  private trait A extends ApplicationMock {
-    implicit val txModule = mock[TransactionModule[Int]]
-    implicit val consModule = mock[ConsensusModule[Int]]
-    override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
+  private trait App extends ApplicationMock {
     override lazy val settings = TestSettings
-    override lazy val networkController: ActorRef = networkControllerMock
     override lazy val history: History = h
   }
 
-  private val app = stub[A]
+  private val app = stub[App]
 
   import app.basicMessagesSpecsRepo._
 
