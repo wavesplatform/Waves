@@ -81,7 +81,8 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     val activePeer = peers.active
     val blockIdsToDownload = downloadInfo.blockIds ++ tail
 
-    if (blockIdsToDownload.size > forkMaxLength || tail.isEmpty) {
+    val noMoreBlockIds = tail.isEmpty
+    if (blockIdsToDownload.size > forkMaxLength || noMoreBlockIds) {
       val fork = blockIdsToDownload.take(forkMaxLength)
 
       fork.find(id => application.history.contains(id.blockId)) match {
@@ -103,7 +104,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
               networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(updatedPeerData.active))
             }
 
-            gettingBlocks(blocks, updatedPeerData)
+            gettingBlocks(blocks, noMoreBlockIds, updatedPeerData)
           }
       }
     } else {
@@ -137,7 +138,9 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         }
     }
 
-  def gettingBlocks(blocks: mutable.Seq[(InnerId, Option[Block])], peers: PeerSet): Receive = {
+  def gettingBlocks(blocks: mutable.Seq[(InnerId, Option[Block])],
+                    noMoreBlockIds: Boolean,
+                    peers: PeerSet): Receive = {
     object blockIdx {
       def unapply(block: Block): Option[(Block, Int)] = {
         blocks.indexWhere(_._1 == InnerId(block.uniqueId)) match {
@@ -155,7 +158,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
           if (blocks.forall(_._2.isDefined)) {
             val author = Some(connectedPeer).filterNot(_ => peers.activeChanged)
-            finish(SyncFinished(success = true, Some(blocks.flatMap(_._2), author)))
+            finish(SyncFinished(success = true, Some(blocks.flatMap(_._2), author, noMoreBlockIds)))
           }
         }
     }
@@ -262,7 +265,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     cancelPreviousTimeoutCountdown()
     val behaviour = f(initialPeerSet.orNull)
     val timeoutInfo = TimeoutExceeded(status, f, initialPeerSet, runs)
-    val cancellable = context.system.scheduler.scheduleOnce(gettingBlockTimeout, self, timeoutInfo)
+    val cancellable = context.system.scheduler.schedule(gettingBlockTimeout, gettingBlockTimeout, self, timeoutInfo)
     timeoutData = Some(cancellable)
     context become behaviour
   }

@@ -196,7 +196,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               Random.shuffle(finalBlockIdInterval) foreach { id => sendBlock(mockBlock(id)) }
 
               coordinator.expectMsgPF(hint = s"${finalBlockIdInterval.size} fork blocks") {
-                case SyncFinished(true, Some((blocks, Some(connectedPeer)))) =>
+                case SyncFinished(true, Some((blocks, Some(connectedPeer), true))) =>
                   connectedPeer == peer
                   blocks.map(id => InnerId(id.uniqueId)) == blockIds(finalBlockIdInterval: _*).map(InnerId)
               }

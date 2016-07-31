@@ -53,9 +53,9 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     case SyncFinished(_, result) =>
       scoreObserver ! GetScore
       result foreach {
-        case (blocks, from) =>
+        case (blocks, from, noMoreBlockIds) =>
           log.info(s"Going to process ${blocks.size} blocks")
-          processFork(blocks, from)
+          processFork(blocks, from, noMoreBlockIds)
       }
 
     case AddBlock(block, from) =>
@@ -88,7 +88,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
         return false
       }
 
-      if (!history.lastBlock.uniqueId.sameElements(parentBlockId)) {
+      if (!(local || history.lastBlock.uniqueId.sameElements(parentBlockId))) {
         // someone has happened to be faster and added a block or blocks in the ledger before
         log.debug(s"A child for parent of the block already exists, local=$local: ${block.json}")
         return false
@@ -105,7 +105,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     }
   }
 
-  private def processFork(blocks: Seq[Block], from: Option[ConnectedPeer]): Unit =
+  private def processFork(blocks: Seq[Block], from: Option[ConnectedPeer], noMoreBlockIds: Boolean): Unit =
     blocks.headOption.map(_.referenceField.value).foreach { lastCommonBlockId =>
 
       def blacklist() = from.foreach(_.handlerRef ! PeerConnectionHandler.Blacklist)
@@ -118,7 +118,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
           c.cumulativeBlockScore(sum, c.blockScore(block))
       }
 
-      if (expectedScore <= initialScore) {
+      if (expectedScore <= initialScore && noMoreBlockIds) {
         log.warn(s"Expected score ($expectedScore) is less than initial ($initialScore), the fork is rejected")
         blacklist()
       } else {
@@ -190,7 +190,7 @@ object Coordinator {
 
   case class AddBlock(block: Block, generator: Option[ConnectedPeer])
 
-  case class SyncFinished(success: Boolean, result: Option[(Seq[Block], Option[ConnectedPeer])])
+  case class SyncFinished(success: Boolean, result: Option[(Seq[Block], Option[ConnectedPeer], Boolean)])
 
   object SyncFinished {
     def unsuccessfully: SyncFinished = SyncFinished(success = false, None)
