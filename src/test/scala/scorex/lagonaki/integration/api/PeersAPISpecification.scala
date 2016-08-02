@@ -8,6 +8,7 @@ class PeersAPISpecification extends FunSuite with Matchers {
 
   test("/peers/connected API route") {
     val connected = GET.request("/peers/connected")
+    (connected \\ "address").toList.size should be >= 1
     (connected \\ "declaredAddress").toList.size should be >= 1
     (connected \\ "peerName").toList.size should be >= 1
     (connected \\ "peerNonce").toList.size should be >= 1
@@ -18,6 +19,7 @@ class PeersAPISpecification extends FunSuite with Matchers {
     (all \\ "address").toList.size should be >= 1
     (all \\ "nodeName").toList.size should be >= 1
     (all \\ "nodeNonce").toList.size should be >= 1
+    (all \\ "lastSeen").toList.size should be >= 1
   }
 
   test("/peers/blacklisted API route") {

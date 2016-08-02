@@ -38,13 +38,14 @@ case class PeersApiRoute(override val application: RunnableApplication)(implicit
         .mapTo[Map[InetSocketAddress, PeerInfo]]
         .map { peers =>
           JsonResponse(
-            Json.arr(peers.map { case (address, peerInfo) =>
+            JsArray(peers.map { case (address, peerInfo) =>
               Json.obj(
                 "address" -> address.toString,
                 "nodeName" -> (peerInfo.nodeName.getOrElse("N/A"): String),
-                "nodeNonce" -> (peerInfo.nonce.map(_.toString).getOrElse("N/A"): String)
+                "nodeNonce" -> (peerInfo.nonce.map(_.toString).getOrElse("N/A"): String),
+                "lastSeen" -> peerInfo.lastSeen
               )
-            }),
+            }.toList),
             StatusCodes.OK
           )
         }
@@ -59,13 +60,14 @@ case class PeersApiRoute(override val application: RunnableApplication)(implicit
   def connectedPeers: Route = path("connected") {
     getJsonRoute {
       (application.peerManager ? PeerManager.GetConnectedPeers)
-        .mapTo[Seq[Handshake]]
-        .map { handshakes =>
-          val peerData = Json.arr(handshakes.map { handshake =>
+        .mapTo[List[(InetSocketAddress, Handshake)]]
+        .map { connectedPeers =>
+          val peerData = JsArray(connectedPeers.map { peer =>
             Json.obj(
-              "declaredAddress" -> handshake.declaredAddress.toString,
-              "peerName" -> handshake.nodeName,
-              "peerNonce" -> handshake.nodeNonce
+              "address" -> peer._1.toString,
+              "declaredAddress" -> (peer._2.declaredAddress.map(_.toString).getOrElse("N/A"): String),
+              "peerName" -> peer._2.nodeName,
+              "peerNonce" -> peer._2.nodeNonce
             )
           })
           JsonResponse(Json.obj("peers" -> peerData), StatusCodes.OK)

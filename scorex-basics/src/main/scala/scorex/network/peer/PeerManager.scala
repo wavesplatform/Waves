@@ -3,7 +3,7 @@ package scorex.network.peer
 import java.net.InetSocketAddress
 
 import akka.actor.Actor
-import scorex.app.RunnableApplication
+import scorex.app.Application
 import scorex.network._
 import scorex.utils.ScorexLogging
 
@@ -16,7 +16,7 @@ import scala.util.Random
   *
   * @param application - Scorex-based application
   */
-class PeerManager(application: RunnableApplication) extends Actor with ScorexLogging {
+class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   import PeerManager._
 
@@ -62,7 +62,8 @@ class PeerManager(application: RunnableApplication) extends Actor with ScorexLog
 
   private def apiInterface: Receive = {
     case GetConnectedPeers =>
-      sender() ! (connectedPeers.values.flatten.toSeq: Seq[Handshake])
+      val peers = connectedPeers.filter(_._2.isDefined).map { case (k, v) => (k.socketAddress, v.get)}.toList
+      sender() ! peers
 
     case GetAllPeers =>
       sender() ! peerDatabase.knownPeers(true)
@@ -120,17 +121,7 @@ class PeerManager(application: RunnableApplication) extends Actor with ScorexLog
       }
   }
 
-  override def receive: Receive = ({
-    case CheckPeers =>
-      if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
-        randomPeer().foreach { address =>
-          if (!connectedPeers.map(_._1.socketAddress).contains(address)) {
-            connectingPeer = Some(address)
-            networkController ! NetworkController.ConnectTo(address)
-          }
-        }
-      }
-
+  private def blackListOperations: Receive = {
     case AddToBlacklist(peer) =>
       log.info(s"Blacklist peer $peer")
       peerDatabase.blacklist(peer)
@@ -138,7 +129,20 @@ class PeerManager(application: RunnableApplication) extends Actor with ScorexLog
     case RemoveFromBlacklist(peer) =>
       log.info(s"Remove peer $peer from blacklist")
       peerDatabase.unBlacklist(peer)
-  }: Receive) orElse peerListOperations orElse apiInterface orElse peerCycle
+  }
+
+  override def receive: Receive = ({
+    case CheckPeers =>
+      if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
+        randomPeer().foreach { address =>
+          log.debug(s"Trying connect to random peer $address")
+          if (!connectedPeers.map(_._1.socketAddress).contains(address)) {
+            connectingPeer = Some(address)
+            networkController ! NetworkController.ConnectTo(address)
+          }
+        }
+      }
+  }: Receive) orElse blackListOperations orElse peerListOperations orElse apiInterface orElse peerCycle
 }
 
 object PeerManager {

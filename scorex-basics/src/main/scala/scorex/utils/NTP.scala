@@ -23,7 +23,7 @@ object NTP extends ScorexLogging {
         log.info("Adjusting time with " + offset + " milliseconds.")
       } recover {
         case e: Throwable =>
-          log.warn("Enable to get corrected time", e)
+          log.warn("Unable to get corrected time", e)
       }
     }
 
