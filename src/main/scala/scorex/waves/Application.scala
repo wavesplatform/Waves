@@ -2,6 +2,7 @@ package scorex.waves
 
 import akka.actor.Props
 import com.wavesplatform.consensus.WavesConsensusModule
+import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.{ChainParameters, MainNetParams, TestNetParams}
 import scorex.account.AddressScheme
 import scorex.api.http._
@@ -49,7 +50,8 @@ class Application(val settingsFilename: String) extends {
     PeersApiRoute(this),
     AddressApiRoute(this),
     DebugApiRoute(this),
-    WavesApiRoute(this)
+    WavesApiRoute(this),
+    NodeApiRoute(this)
   )
 
   override lazy val apiTypes = Seq(
@@ -63,7 +65,8 @@ class Application(val settingsFilename: String) extends {
     typeOf[PeersApiRoute],
     typeOf[AddressApiRoute],
     typeOf[DebugApiRoute],
-    typeOf[WavesApiRoute]
+    typeOf[WavesApiRoute],
+    typeOf[NodeApiRoute]
   )
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs

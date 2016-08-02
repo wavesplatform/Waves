@@ -60,6 +60,6 @@ For now it is only possible to create deb package.
 
 Compile code by typing `sbt recompile`
 
-Run a node with `java -jar target/scala-2.11/waves.jar` command
+Run a node with `java -jar target/scala-2.11/waves.jar settings.json` command
 
 

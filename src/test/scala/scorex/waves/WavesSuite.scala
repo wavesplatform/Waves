@@ -5,6 +5,7 @@ import org.scalatest.{BeforeAndAfterAll, Suites}
 class WavesSuite extends Suites(
   new DebugAPISpecification,
   new ScorexAPISpecification,
+  new NodeAPISpecification,
   new WavesAPISpecification) with BeforeAndAfterAll {
 
   import TestingCommons._
