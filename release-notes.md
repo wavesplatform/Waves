@@ -1,6 +1,7 @@
 **0.2.2-SNAPSHOT**
 
 * Switch network by "testnet" in settings. Default value is true."
+* /scorex/* HTTP API deprecated. Use /node/* instead.
 
 **0.2.1**
 

@@ -1,4 +1,4 @@
-package scorex.waves.http
+package com.wavesplatform.http
 
 import javax.ws.rs.Path
 
@@ -18,22 +18,20 @@ import scorex.waves.settings.Constants
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-@Deprecated
-@Path("/scorex")
-@Api(value = "scorex", description = "General commands & information", position = 0)
-case class ScorexApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
+@Path("/node")
+@Api(value = "node")
+case class NodeApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions with ScorexLogging {
 
   override lazy val route =
-    pathPrefix("scorex") {
-      scorex ~ status ~ version
+    pathPrefix("node") {
+      stop ~ status ~ version
     }
 
-  @Deprecated
   @Path("/version")
-  @ApiOperation(value = "Version", notes = "get Scorex version", httpMethod = "GET")
+  @ApiOperation(value = "Version", notes = "Get Waves node version", httpMethod = "GET")
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json Scorex version")
+    new ApiResponse(code = 200, message = "Json Waves node version")
   ))
   def version: Route = {
     path("version") {
@@ -43,10 +41,9 @@ case class ScorexApiRoute(override val application: RunnableApplication)(implici
     }
   }
 
-  @Deprecated
   @Path("/stop")
-  @ApiOperation(value = "Stop", notes = "Stop the app", httpMethod = "POST")
-  def scorex: Route = path("stop") {
+  @ApiOperation(value = "Stop", notes = "Stop the node", httpMethod = "POST")
+  def stop: Route = path("stop") {
     withAuth {
       postJsonRoute {
         log.info("Request to stop application")
@@ -56,7 +53,6 @@ case class ScorexApiRoute(override val application: RunnableApplication)(implici
     }
   }
 
-  @Deprecated
   @Path("/status")
   @ApiOperation(value = "Status", notes = "Get status of the running core(Offline/Syncing/Generating)", httpMethod = "GET")
   def status: Route = path("status") {
