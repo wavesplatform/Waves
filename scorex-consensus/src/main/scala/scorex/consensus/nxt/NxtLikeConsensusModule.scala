@@ -3,13 +3,11 @@ package scorex.consensus.nxt
 import com.google.common.primitives.Longs
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
-import scorex.consensus.{OneGeneratorConsensusModule, ConsensusModule, PoSConsensusModule}
+import scorex.consensus.{ConsensusModule, OneGeneratorConsensusModule, PoSConsensusModule}
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Try}
 
@@ -69,7 +67,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
 
   override def generateNextBlock[TT](account: PrivateKeyAccount)
-                                    (implicit tm: TransactionModule[TT]): Future[Option[Block]] = Future {
+                                    (implicit tm: TransactionModule[TT]): Option[Block] = {
 
     val balance = generatingBalance(account)
 
@@ -111,6 +109,18 @@ with OneGeneratorConsensusModule with ScorexLogging {
         account))
     } else None
 
+  }
+
+  override def nextBlockForgingTime[TT](lastBlock: Block, account: PublicKeyAccount)
+                                       (implicit tm: TransactionModule[TT]): Option[Long] = {
+    val cData = consensusBlockData(lastBlock)
+    val hit = calcHit(cData, account)
+
+    val balance = generatingBalance(account)
+
+    if (balance == 0) None else {
+      Some((hit / (cData.baseTarget * balance)).toLong * 1000 + lastBlock.timestampField.value)
+    }
   }
 
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =

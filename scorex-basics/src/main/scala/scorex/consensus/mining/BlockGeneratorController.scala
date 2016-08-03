@@ -28,7 +28,7 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
   def syncing: Receive = {
     case StartGeneration =>
       log.info("StartGeneration")
-      workers.foreach(w => w ! GuessABlock)
+      workers.foreach(w => w ! Miner.GuessABlock)
       context.become(generating)
 
     case GetStatus =>
@@ -59,20 +59,28 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
 
     case CheckWorkers =>
       log.info(s"Check $workers")
+      val t = System.currentTimeMillis()
       val incTime =
         workers.foreach { w =>
-          (w ? GetLastGenerationTime) onComplete {
-            case Success(LastGenerationTime(t)) if System.currentTimeMillis() - t < FailedGenerationDelay.toMillis =>
-              log.info(s"Miner $w works fine, last try was ${System.currentTimeMillis() - t} millis ago")
-            case Success(LastGenerationTime(t)) if System.currentTimeMillis() - t > FailedGenerationDelay.toMillis =>
-              log.warn(s"Miner $w don't generate blocks")
-              w ! GuessABlock
+          (w ? HealthCheck) onComplete {
+            case Success(HealthOk) =>
+              val responseTime = System.currentTimeMillis() - t
+              if (responseTime < FailedGenerationDelay.toMillis) {
+                log.trace(s"Miner $w works fine, last try was $responseTime millis ago")
+              } else {
+                log.warn(s"Miner $w responds slowly ($responseTime millis)")
+                w ! Miner.GuessABlock
+              }
             case m =>
               log.warn(s"Restart miner $w: $m")
               w ! Stop
           }
         }
       if (threads - workers.size > 0) workers = workers ++ newWorkers(threads - workers.size)
+
+    case Miner.GuessABlock =>
+      log.info(s"Enforce miners to forge: $workers")
+      workers.foreach(w => w ! Miner.GuessABlock)
 
     case m => log.info(s"Unhandled $m in Generating")
   }

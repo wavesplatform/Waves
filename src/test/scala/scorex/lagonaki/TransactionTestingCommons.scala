@@ -2,11 +2,8 @@ package scorex.lagonaki
 
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-import scorex.lagonaki.TestingCommons._
-import scorex.transaction.{History, GenesisTransaction, Transaction}
+import scorex.transaction.{GenesisTransaction, History, Transaction}
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import scala.util.Random
 
 trait TransactionTestingCommons extends TestingCommons {
@@ -26,7 +23,7 @@ trait TransactionTestingCommons extends TestingCommons {
   require(ab > 2)
 
   def genValidBlock(): Block = {
-    Await.result(application.consensusModule.generateNextBlocks(accounts)(application.transactionModule), 20.seconds).headOption match {
+    application.consensusModule.generateNextBlocks(accounts)(application.transactionModule).headOption match {
       case Some(block: Block) if block.isValid => block
       case None =>
         Thread.sleep(500)

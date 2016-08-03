@@ -72,8 +72,7 @@ with TransactionTestingCommons {
       transactionModule.clearIncorrectTransactions()
       val toGen = transactionModule.utxStorage.sizeLimit - transactionModule.utxStorage.all().size
       (0 until toGen) foreach (i => genValidTransaction())
-      val blocksFuture = application.consensusModule.generateNextBlocks(accounts)(transactionModule)
-      val blocks: Seq[Block] = Await.result(blocksFuture, 10.seconds)
+      val blocks = application.consensusModule.generateNextBlocks(accounts)(transactionModule)
       blocks.nonEmpty shouldBe true
       blocks.head
     }

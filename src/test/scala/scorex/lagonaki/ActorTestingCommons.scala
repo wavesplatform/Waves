@@ -11,7 +11,6 @@ import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.consensus.ConsensusModule
-import scorex.lagonaki.mocks.BlockMock
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen}
@@ -68,10 +67,15 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids:_*)
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
-  protected def mockBlock[Id](id: Id)(implicit conv: Id => BlockId): Block =
-    new BlockMock(Seq.empty) {
+  protected def mockBlock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
+    trait BlockMock extends Block {
+      override type ConsensusDataType = Unit
+      override type TransactionDataType = Unit
+
       override val uniqueId: BlockId = id
     }
+    mock[BlockMock]
+  }
 
   protected trait TestDataExtraction[T] {
     def extract(actual: T) : Any
@@ -94,8 +98,8 @@ abstract class ActorTestingCommons extends TestKitBase
     }
 
   trait ApplicationMock extends Application {
-    implicit val transactionModule = stub[TransactionModule[Int]]
-    implicit val consensusModule = stub[ConsensusModule[Int]]
+    implicit val transactionModule = mock[TransactionModule[Unit]]
+    implicit val consensusModule = mock[ConsensusModule[Unit]]
     final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock
   }

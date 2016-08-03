@@ -4,6 +4,7 @@ import akka.actor.Actor
 import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
+import scorex.consensus.mining.Miner.GuessABlock
 import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetStatus}
 import scorex.network.NetworkController.SendToNetwork
@@ -72,35 +73,42 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     case Unit =>
   }
 
-  private def processSingleBlock(block: Block, from: Option[ConnectedPeer]): Unit = {
-    val parentBlockId = block.referenceField.value
-    val local = from.isEmpty
+  private def processSingleBlock(comingBlock: Block, from: Option[ConnectedPeer]): Unit = {
+    val parentBlockId = comingBlock.referenceField.value
+    val locallyGenerated = from.isEmpty
 
-    def isBlockToBeAdded: Boolean = {
-      if (!local && history.contains(block)) {
-        // we have already got the block - skip
-        return false
-      }
+    val isBlockToBeAdded = if (!locallyGenerated && history.contains(comingBlock)) {
+      // we have already got the block - skip
+      false
+    } else if (history.contains(parentBlockId)) {
 
-      if (!history.contains(parentBlockId)) {
-        // the block either has come too early or, if local, too late (e.g. removeAfter happened)
-        log.debug(s"Parent of the block is not in the history, local=$local: ${block.json}")
-        return false
-      }
+      val lastBlock = history.lastBlock
 
-      if (!(local || history.lastBlock.uniqueId.sameElements(parentBlockId))) {
-        // someone has happened to be faster and added a block or blocks in the ledger before
-        log.debug(s"A child for parent of the block already exists, local=$local: ${block.json}")
-        return false
-      }
+      if (!lastBlock.uniqueId.sameElements(parentBlockId)) {
+        // someone has happened to be faster and already added a block or blocks after the parent
+        log.debug(s"A child for parent of the block already exists, local=$locallyGenerated: ${comingBlock.json}")
 
-      true
+        val cmp = application.consensusModule.blockOrdering
+        if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, comingBlock)) {
+          log.debug(s"The coming block ${comingBlock.json} is better than last ${lastBlock.json}")
+        }
+
+        false
+
+      } else true
+
+    } else {
+      // the block either has come too early or, if local, too late (e.g. removeAfter() has come earlier)
+      log.debug(s"Parent of the block is not in the history, local=$locallyGenerated: ${comingBlock.json}")
+      false
     }
 
     if (isBlockToBeAdded) {
-      if (!processNewBlock(block, from, local = true)) {
+      if (processNewBlock(comingBlock, from, local = locallyGenerated)) {
+        blockGenerator ! GuessABlock
+      } else {
         // TODO: blacklist here
-        log.warn(s"Can't apply single block, local=${from.isEmpty}: ${block.json}")
+        log.warn(s"Can't apply single block, local=${from.isEmpty}: ${comingBlock.json}")
       }
     }
   }
@@ -145,8 +153,8 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
         }
 
         val finalScore = history.score()
-        if (finalScore != expectedScore) log.debug(s"Final score ($finalScore) not equal expected ($expectedScore)")
-        if (finalScore <= initialScore) log.debug(s"Final score ($finalScore) is less than initial ($initialScore)")
+        // todo if (finalScore != expectedScore) log.debug(s"Final score ($finalScore) not equal expected ($expectedScore)")
+        if (finalScore <= initialScore) log.warn(s"Final score ($finalScore) is less than initial ($initialScore)")
       }
     }
 

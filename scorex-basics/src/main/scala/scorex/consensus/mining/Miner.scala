@@ -1,59 +1,85 @@
 package scorex.consensus.mining
 
-import akka.actor.Actor
+import akka.actor.{Actor, Cancellable}
 import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.mining.Miner._
 import scorex.network.Coordinator.AddBlock
 import scorex.utils.ScorexLogging
 
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.{Failure, Try}
 
 class Miner(application: Application) extends Actor with ScorexLogging {
 
-  // BlockGenerator is trying to generate a new block every $blockGenerationDelay. Should be 0 for PoW consensus model.
-  val blockGenerationDelay = application.settings.blockGenerationDelay
-  val BlockGenerationTimeLimit = 5.seconds
+  import System.currentTimeMillis
 
-  var lastTryTime = 0L
-  var stopped = false
+  private implicit lazy val transactionModule = application.transactionModule
+  private lazy val consensusModule = application.consensusModule
 
-  private def scheduleAGuess(delay: Option[FiniteDuration] = None): Unit =
-    context.system.scheduler.scheduleOnce(delay.getOrElse(blockGenerationDelay), self, GuessABlock)
+  private var currentState = Option.empty[(Seq[Cancellable], Block)]
 
-  scheduleAGuess(Some(0.millis))
+  private def accounts = application.wallet.privateKeyAccounts()
+
+  self ! GuessABlock
 
   override def receive: Receive = {
     case GuessABlock =>
-      stopped = false
-      if (System.currentTimeMillis() - lastTryTime >= blockGenerationDelay.toMillis) tryToGenerateABlock()
+      val lastBlock = application.history.lastBlock
+      if (!currentState.exists(_._2 == lastBlock)) {
+        stop()
+        scheduleForging(lastBlock)
+      }
 
-    case GetLastGenerationTime =>
-      sender ! LastGenerationTime(lastTryTime)
+    case Forge => tryToGenerateABlock()
 
-    case Stop =>
-      stopped = true
+    case HealthCheck => sender ! HealthOk
+
+    case Stop => stop()
   }
 
-  def tryToGenerateABlock(): Unit = Try {
-    implicit val transactionalModule = application.transactionModule
+  private def stop(): Unit = {
+    currentState.foreach { case (cancellable, _) =>
+      cancellable.foreach(_.cancel())
+      currentState = None
+    }
+  }
 
-    lastTryTime = System.currentTimeMillis()
-    if (blockGenerationDelay > 500.milliseconds) log.info("Trying to generate a new block")
-    val accounts = application.wallet.privateKeyAccounts()
-    val blocksFuture = application.consensusModule.generateNextBlocks(accounts)(application.transactionModule)
-    val blocks: Seq[Block] = Await.result(blocksFuture, BlockGenerationTimeLimit)
-    if (blocks.nonEmpty) application.coordinator ! AddBlock(blocks.maxBy(application.consensusModule.blockScore), None)
-    if (!stopped) scheduleAGuess()
+  private def tryToGenerateABlock(): Unit = Try {
+    log.info("Trying to generate a new block")
+
+    val blocks = application.consensusModule.generateNextBlocks(accounts)
+    if (blocks.nonEmpty) {
+      application.coordinator ! AddBlock(blocks.max(consensusModule.blockOrdering), None)
+    }
   }.recoverWith {
     case ex =>
       log.error(s"Failed to generate new block: ${ex.getMessage}")
       Failure(ex)
   }
 
+  private def scheduleForging(lastBlock: Block): Unit = {
+    val currentTime = currentTimeMillis
+
+    val blockGenerationDelayInMillis = application.settings.blockGenerationDelay.toMillis
+
+    val calculatedSchedule = accounts
+      .flatMap(acc => consensusModule.nextBlockForgingTime(lastBlock, acc).map(_ + ForgingTimeShift.toMillis))
+      .map(t => math.max(t - currentTime, blockGenerationDelayInMillis))
+
+    val finalSchedule =
+      if (calculatedSchedule.nonEmpty) calculatedSchedule else {
+        Seq(blockGenerationDelayInMillis)
+      }
+
+    log.debug(s"Block forging schedule in seconds: ${finalSchedule.map(_ / 1000).take(7).mkString(", ")} etc...")
+
+    val tasks = finalSchedule.map { t => context.system.scheduler.scheduleOnce(t millis, self, Forge) }
+
+    currentState = Some(tasks, lastBlock)
+  }
 }
 
 object Miner {
@@ -62,8 +88,12 @@ object Miner {
 
   case object GuessABlock
 
-  case object GetLastGenerationTime
+  case object HealthCheck
 
-  case class LastGenerationTime(time: Long)
+  case object HealthOk
+
+  private case object Forge
+
+  val ForgingTimeShift = 1 second
 
 }

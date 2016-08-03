@@ -1,16 +1,14 @@
 package scorex.consensus.qora
 
 import com.google.common.primitives.{Bytes, Longs}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
-import scorex.consensus.{OneGeneratorConsensusModule, ConsensusModule, PoSConsensusModule}
+import scorex.consensus.{ConsensusModule, OneGeneratorConsensusModule, PoSConsensusModule}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction._
 import scorex.utils.NTP
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -93,7 +91,7 @@ class QoraLikeConsensusModule extends PoSConsensusModule[QoraLikeConsensusBlockD
   override def generators(block: Block): Seq[Account] = Seq(block.signerDataField.value.generator)
 
   override def generateNextBlock[TT](account: PrivateKeyAccount)
-                                    (implicit transactionModule: TransactionModule[TT]): Future[Option[Block]] = {
+                                    (implicit transactionModule: TransactionModule[TT]): Option[Block] = {
     val version = 1: Byte
 
     val history = transactionModule.blockStorage.history
@@ -131,14 +129,17 @@ class QoraLikeConsensusModule extends PoSConsensusModule[QoraLikeConsensusBlockD
         override val generatorSignature: Array[Byte] = signature
         override val generatingBalance: Long = getNextBlockGeneratingBalance(lastBlock, history)
       }
-      Future(Some(Block.buildAndSign(version,
+      Some(Block.buildAndSign(version,
         timestamp,
         lastBlock.uniqueId,
         consensusData,
         transactionModule.packUnconfirmed(),
-        account)))
-    } else Future(None)
+        account))
+    } else None
   }
+
+  override def nextBlockForgingTime[TT](b: Block, acc: PublicKeyAccount)
+                                       (implicit tm: TransactionModule[TT]): Option[Long] = None
 
   override def parseBytes(bytes: Array[Byte]): Try[BlockField[QoraLikeConsensusBlockData]] = Try {
     QoraConsensusBlockField(new QoraLikeConsensusBlockData {

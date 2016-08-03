@@ -56,7 +56,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case FilterPeers(sendingStrategy: SendingStrategy) =>
       val chosen = sendingStrategy.choose(connectedPeers.keys.toSeq)
-      if (chosen.isEmpty) log.debug("No peers chosen")
+      if (chosen.isEmpty) log.trace("No peers chosen")
       sender() ! chosen
   }
 
