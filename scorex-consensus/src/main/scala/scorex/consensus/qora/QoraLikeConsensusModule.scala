@@ -138,8 +138,8 @@ class QoraLikeConsensusModule extends PoSConsensusModule[QoraLikeConsensusBlockD
     } else None
   }
 
-  override def nextBlockForgingTime[TT](b: Block, acc: PublicKeyAccount)
-                                       (implicit tm: TransactionModule[TT]): Option[Long] = None
+  override def nextBlockGenerationTime[TT](b: Block, acc: PublicKeyAccount)
+                                          (implicit tm: TransactionModule[TT]): Option[Long] = None
 
   override def parseBytes(bytes: Array[Byte]): Try[BlockField[QoraLikeConsensusBlockData]] = Try {
     QoraConsensusBlockField(new QoraLikeConsensusBlockData {

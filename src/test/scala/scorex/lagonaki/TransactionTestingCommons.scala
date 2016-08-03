@@ -7,8 +7,8 @@ import scorex.transaction.{GenesisTransaction, History, Transaction}
 import scala.util.Random
 
 trait TransactionTestingCommons extends TestingCommons {
-  implicit val consensusModule = application.consensusModule
-  implicit val transactionModule = application.transactionModule
+  implicit lazy val consensusModule = application.consensusModule
+  implicit lazy val transactionModule = application.transactionModule
 
   if (application.transactionModule.blockStorage.history.isEmpty) {
     application.transactionModule.blockStorage.appendBlock(Block.genesis())

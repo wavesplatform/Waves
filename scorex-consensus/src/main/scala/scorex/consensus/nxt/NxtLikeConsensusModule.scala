@@ -111,11 +111,10 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
   }
 
-  override def nextBlockForgingTime[TT](lastBlock: Block, account: PublicKeyAccount)
-                                       (implicit tm: TransactionModule[TT]): Option[Long] = {
+  override def nextBlockGenerationTime[TT](lastBlock: Block, account: PublicKeyAccount)
+                                          (implicit tm: TransactionModule[TT]): Option[Long] = {
     val cData = consensusBlockData(lastBlock)
     val hit = calcHit(cData, account)
-
     val balance = generatingBalance(account)
 
     if (balance == 0) None else {

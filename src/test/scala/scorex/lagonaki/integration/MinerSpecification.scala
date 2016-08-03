@@ -40,27 +40,27 @@ class MinerSpecification extends ActorTestingCommons {
   f.expects(*).never
   (testConsensusModule.blockOrdering(_: TransactionModule[Unit])).expects(*).returns(Ordering.by(f))
 
-  def setBlockForgingExpectations(expected: Seq[Block]): Unit =
+  def setBlockGenExpectations(expected: Seq[Block]): Unit =
     (testConsensusModule.generateNextBlocks(_: Seq[PrivateKeyAccount])(_: TransactionModule[Unit]))
       .expects(Seq(account), *)
       .returns(expected)
       .once
 
-  def setForgingTimeExpectations(block: Block, time: Long): Unit =
-    (testConsensusModule.nextBlockForgingTime(_: Block, _: PublicKeyAccount)(_: TransactionModule[Unit]))
+  def setBlockGenTimeExpectations(block: Block, time: Long): Unit =
+    (testConsensusModule.nextBlockGenerationTime(_: Block, _: PublicKeyAccount)(_: TransactionModule[Unit]))
       .expects(block, account, *)
       .returns(Some(time))
       .once
 
   def setLastBlockExpectations(block: Block): Unit = (testHistory.lastBlock _).expects().returns(block).once
 
-  def setExpectations(lastBlockId: Int, t: Long, forgedBlock: Option[Block]): Unit = {
+  def setExpectations(lastBlockId: Int, t: Long, generatedBlock: Option[Block]): Unit = {
     val lastBlock = mockBlock(lastBlockId)
 
     inSequence {
       setLastBlockExpectations(lastBlock)
-      setForgingTimeExpectations(lastBlock, t + delay)
-      setBlockForgingExpectations(forgedBlock.toSeq)
+      setBlockGenTimeExpectations(lastBlock, t + delay)
+      setBlockGenExpectations(generatedBlock.toSeq)
     }
   }
 
@@ -78,9 +78,9 @@ class MinerSpecification extends ActorTestingCommons {
 
   testSafely {
 
-    val maxDelay = (math.max(delay, TestSettings.blockGenerationDelay.toMillis) millis) + Miner.ForgingTimeShift
+    val maxDelay = (math.max(delay, TestSettings.blockGenerationDelay.toMillis) millis) + Miner.BlockGenerationTimeShift
 
-    "forge a block, then stop" in {
+    "generate a block, then stop" in {
 
       testCoordinator.expectNoMsg(maxDelay * 2)
 

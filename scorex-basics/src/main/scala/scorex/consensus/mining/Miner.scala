@@ -30,13 +30,13 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       val lastBlock = application.history.lastBlock
       if (!currentState.exists(_._2 == lastBlock)) {
         stop()
-        scheduleForging(lastBlock)
+        scheduleBlockGeneration(lastBlock)
       }
 
-    case Forge(repeat) =>
+    case GenerateBlock(repeat) =>
       tryToGenerateABlock()
       if (repeat) {
-        currentState.foreach(_ => scheduleForging(application.history.lastBlock))
+        currentState.foreach(_ => scheduleBlockGeneration(application.history.lastBlock))
       }
 
     case HealthCheck => sender ! HealthOk
@@ -64,23 +64,22 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       Failure(ex)
   }
 
-  private def scheduleForging(lastBlock: Block): Unit = {
+  private def scheduleBlockGeneration(lastBlock: Block): Unit = {
     val currentTime = currentTimeMillis
 
     val blockGenerationDelayInMillis = application.settings.blockGenerationDelay.toMillis
 
     val schedule = accounts
-      .flatMap(acc => consensusModule.nextBlockForgingTime(lastBlock, acc).map(_ + ForgingTimeShift.toMillis))
+      .flatMap(acc => consensusModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
       .map(t => math.max(t - currentTime, blockGenerationDelayInMillis))
 
     val systemScheduler = context.system.scheduler
     val tasks = if (schedule.nonEmpty) {
-      log.debug(s"Block forging schedule in seconds: ${schedule.map(_ / 1000).take(7).mkString(", ")}...")
-      schedule.map { t => systemScheduler.scheduleOnce(t millis, self, Forge(false)) }
+      log.debug(s"Block generation schedule in seconds: ${schedule.map(_ / 1000).take(7).mkString(", ")}...")
+      schedule.map { t => systemScheduler.scheduleOnce(t millis, self, GenerateBlock(false)) }
     } else {
-      Seq(systemScheduler.scheduleOnce(application.settings.blockGenerationDelay, self, Forge(true)))
+      Seq(systemScheduler.scheduleOnce(application.settings.blockGenerationDelay, self, GenerateBlock(true)))
     }
-
     currentState = Some(tasks, lastBlock)
   }
 }
@@ -95,8 +94,7 @@ object Miner {
 
   case object HealthOk
 
-  private case class Forge(repeat: Boolean)
+  private case class GenerateBlock(repeat: Boolean)
 
-  val ForgingTimeShift = 1 second
-
+  val BlockGenerationTimeShift = 1 second
 }

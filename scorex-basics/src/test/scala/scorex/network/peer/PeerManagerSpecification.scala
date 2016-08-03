@@ -28,9 +28,8 @@ class PeerManagerSpecification extends FunSuite with Matchers with MockFactory w
   }
 
   private object MySettings extends Settings {
-    override lazy val settingsJSON: JsObject = Json.obj(
-      "dataDir" -> "/tmp/scorex-tests/peer-mgr-spec"
-    )
+    override lazy val settingsJSON: JsObject = Json.obj()
+    override lazy val dataDirOpt: Option[String] = None
     override val filename: String = ""
     override lazy val knownPeers = Seq.empty[InetSocketAddress]
   }

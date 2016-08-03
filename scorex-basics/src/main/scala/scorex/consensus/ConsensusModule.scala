@@ -29,15 +29,16 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
 
   def blockScore(block: Block): BigInt
 
-  def blockOrdering[TT](implicit tm: TransactionModule[TT]): Ordering[(Block)] = Ordering.by {
-    block =>
-      val score = blockScore(block)
-      val parent = tm.blockStorage.history.blockById(block.referenceField.value).get
-      val blockCreationTime = nextBlockForgingTime(parent, block.signerDataField.value.generator)
-        .getOrElse(block.timestampField.value)
+  def blockOrdering[TransactionalBlockData](implicit transactionModule: TransactionModule[TransactionalBlockData]): Ordering[(Block)] =
+    Ordering.by {
+      block =>
+        val score = blockScore(block)
+        val parent = transactionModule.blockStorage.history.blockById(block.referenceField.value).get
+        val blockCreationTime = nextBlockGenerationTime(parent, block.signerDataField.value.generator)
+          .getOrElse(block.timestampField.value)
 
-      (score, -blockCreationTime)
-  }
+        (score, -blockCreationTime)
+    }
 
   def generateNextBlock[TransactionalBlockData](account: PrivateKeyAccount)
                            (implicit transactionModule: TransactionModule[TransactionalBlockData]): Option[Block]
@@ -46,8 +47,8 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
                            (implicit transactionModule: TransactionModule[TransactionalBlockData]): Seq[Block] =
     accounts.flatMap(acc => generateNextBlock(acc))
 
-  def nextBlockForgingTime[TT](lastBlock: Block, account: PublicKeyAccount)
-                              (implicit tm: TransactionModule[TT]): Option[Long]
+  def nextBlockGenerationTime[TransactionalBlockData](lastBlock: Block, account: PublicKeyAccount)
+                                 (implicit transactionModule: TransactionModule[TransactionalBlockData]): Option[Long]
 
   def consensusBlockData(block: Block): ConsensusBlockData
 }
