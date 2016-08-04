@@ -33,7 +33,11 @@ class Miner(application: Application) extends Actor with ScorexLogging {
         scheduleForging(lastBlock)
       }
 
-    case Forge => tryToGenerateABlock()
+    case Forge(repeat) =>
+      tryToGenerateABlock()
+      if (repeat) {
+        currentState.foreach(_ => scheduleForging(application.history.lastBlock))
+      }
 
     case HealthCheck => sender ! HealthOk
 
@@ -65,18 +69,17 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
     val blockGenerationDelayInMillis = application.settings.blockGenerationDelay.toMillis
 
-    val calculatedSchedule = accounts
+    val schedule = accounts
       .flatMap(acc => consensusModule.nextBlockForgingTime(lastBlock, acc).map(_ + ForgingTimeShift.toMillis))
       .map(t => math.max(t - currentTime, blockGenerationDelayInMillis))
 
-    val finalSchedule =
-      if (calculatedSchedule.nonEmpty) calculatedSchedule else {
-        Seq(blockGenerationDelayInMillis)
-      }
-
-    log.debug(s"Block forging schedule in seconds: ${finalSchedule.map(_ / 1000).take(7).mkString(", ")} etc...")
-
-    val tasks = finalSchedule.map { t => context.system.scheduler.scheduleOnce(t millis, self, Forge) }
+    val systemScheduler = context.system.scheduler
+    val tasks = if (schedule.nonEmpty) {
+      log.debug(s"Block forging schedule in seconds: ${schedule.map(_ / 1000).take(7).mkString(", ")}...")
+      schedule.map { t => systemScheduler.scheduleOnce(t millis, self, Forge(false)) }
+    } else {
+      Seq(systemScheduler.scheduleOnce(application.settings.blockGenerationDelay, self, Forge(true)))
+    }
 
     currentState = Some(tasks, lastBlock)
   }
@@ -92,7 +95,7 @@ object Miner {
 
   case object HealthOk
 
-  private case object Forge
+  private case class Forge(repeat: Boolean)
 
   val ForgingTimeShift = 1 second
 

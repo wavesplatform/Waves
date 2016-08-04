@@ -209,5 +209,39 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
         }
       }
     }
+
+    "a (sub)sequience of block ids to download" - {
+
+      implicit def toInnerIds(i: Seq[Int]): InnerIds = i.map(toInnerId)
+      implicit def toInnerId(i: Int): InnerId = InnerId(Array(i.toByte))
+
+      def historyContaining(blockIds: Int*): History = {
+        val history = mock[History]
+        (history.contains(_: BlockId)) expects * onCall { id: BlockId => blockIds.contains(id.head.toInt) } anyNumberOfTimes()
+        history
+      }
+
+      def test(blockIds: InnerIds, h: History, expectedLastCommon: InnerId, expected: Seq[Int]): Unit = {
+        val Some((commonId, tail)) = BlockchainSynchronizer.blockIdsToStartDownload(blockIds, h)
+        commonId shouldBe expectedLastCommon
+        tail should contain theSameElementsInOrderAs toInnerIds(expected)
+      }
+
+      "a sample sequience" in {
+        test(Seq(1, 2, 3, 4), historyContaining(1, 2), 2, Seq(3, 4))
+      }
+
+      "all blocks are in history" in {
+        test(Seq(1, 2, 3, 4), historyContaining(1, 2, 3, 4), 4, Seq())
+      }
+
+      "suspicious block id" in {
+        test(Seq(1, 2, 3, 4), historyContaining(1, 3), 1, Seq(2, 3, 4))
+      }
+
+      "first block(s) are not in history" in {
+        blockIdsToStartDownload(Seq(10000, 2, 3, 4), historyContaining(1, 2, 3)) shouldEqual None
+      }
+    }
   }
 }

@@ -344,12 +344,12 @@ object BlockchainSynchronizer {
 
   type InnerIds = Seq[InnerId]
 
-  private[network] def blockIdsToStartDownload(blockIds: InnerIds, history: History): Option[(InnerId, InnerIds)] = {
+  def blockIdsToStartDownload(blockIds: InnerIds, history: History): Option[(InnerId, InnerIds)] = {
     val (common, toDownload) = blockIds.span(id => history.contains(id.blockId))
     if (common.nonEmpty) Some((common.last, toDownload)) else None
   }
 
-  private[network] case class DownloadInfo(lastCommon: InnerId, blockIds: InnerIds = Seq.empty) {
+  case class DownloadInfo(lastCommon: InnerId, blockIds: InnerIds = Seq.empty) {
     def lastTwoBlockIds: InnerIds = if (blockIds.size > 1) blockIds.takeRight(2) else lastCommon +: blockIds
   }
 
