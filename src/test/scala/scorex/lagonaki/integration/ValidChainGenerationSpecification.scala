@@ -20,8 +20,8 @@ with TransactionTestingCommons {
 
   implicit val timeout = Timeout(1.second)
 
-  implicit override val transactionModule = application.transactionModule
-  implicit override val consensusModule = application.consensusModule
+  implicit override lazy val transactionModule = application.transactionModule
+  implicit override lazy val consensusModule = application.consensusModule
 
   val peers = applications.tail
   val app = peers.head

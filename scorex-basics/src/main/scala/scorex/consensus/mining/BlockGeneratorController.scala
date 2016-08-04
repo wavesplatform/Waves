@@ -79,7 +79,7 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
       if (threads - workers.size > 0) workers = workers ++ newWorkers(threads - workers.size)
 
     case Miner.GuessABlock =>
-      log.info(s"Enforce miners to forge: $workers")
+      log.info(s"Enforce miners to generate block: $workers")
       workers.foreach(w => w ! Miner.GuessABlock)
 
     case m => log.info(s"Unhandled $m in Generating")
