@@ -1,9 +1,8 @@
-package scorex.waves
+package com.wavesplatform
 
 import akka.actor.Props
 import com.wavesplatform.consensus.WavesConsensusModule
 import com.wavesplatform.http.NodeApiRoute
-import com.wavesplatform.{ChainParameters, MainNetParams, TestNetParams}
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.app.ApplicationVersion
@@ -16,20 +15,15 @@ import scorex.waves.transaction.WavesTransactionModule
 
 import scala.reflect.runtime.universe._
 
-class Application(val settingsFilename: String) extends {
+class Application(val chainParams: ChainParameters, appSettings: WavesSettings) extends {
+  override implicit val settings = appSettings
   override val applicationName = "waves"
   override val appVersion = {
     val parts = Constants.VersionString.split("\\.")
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
   }
+
 } with scorex.app.RunnableApplication {
-
-  override implicit lazy val settings = new WavesSettings(settingsFilename)
-
-  implicit lazy val chainParams: ChainParameters = if (settings.isTestNet) TestNetParams else MainNetParams
-
-  // Initialize global var with actual address scheme
-  AddressScheme.current = chainParams.addressScheme
 
   override implicit lazy val consensusModule = new WavesConsensusModule()
 
@@ -81,10 +75,14 @@ class Application(val settingsFilename: String) extends {
 object Application extends App with ScorexLogging {
   log.debug("Start server with args: {} ", args)
 
-  val filename = args.headOption.getOrElse("settings.json")
+  private val filename = args.headOption.getOrElse("settings.json")
+  private val settings = new WavesSettings(filename)
+  private val chainParams: ChainParameters = if (settings.isTestNet) TestNetParams else MainNetParams
 
-  val application = new Application(filename)
+  // Initialize global var with actual address scheme
+  AddressScheme.current = chainParams.addressScheme
 
+  val application = new Application(chainParams, settings)
   application.run()
 
   log.debug("Waves has been started")

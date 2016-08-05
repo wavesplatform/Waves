@@ -2,12 +2,13 @@ package scorex.waves
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.wavesplatform.TestNetParams
+import com.wavesplatform.{Application, TestNetParams}
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.account.AddressScheme
 import scorex.transaction.TransactionSettings
 import scorex.utils._
+import scorex.waves.settings.WavesSettings
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -22,12 +23,10 @@ trait TestingCommons {
 }
 
 object TestingCommons {
+  AddressScheme.current = TestNetParams.addressScheme
   lazy val applications = {
     val apps = List(
-      new Application("settings-test.json") {
-        override lazy val chainParams = TestNetParams
-        AddressScheme.current = TestNetParams.addressScheme
-      }
+      new Application(TestNetParams, new WavesSettings("settings-test.json"))
     )
     apps.foreach(_.run())
     apps.foreach { a =>
