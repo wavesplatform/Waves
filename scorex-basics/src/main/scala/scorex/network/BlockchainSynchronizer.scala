@@ -141,7 +141,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
     val requestedIds = forkStorage.idsWithoutBlock.take(minForkChunks)
 
-    log.debug(s"Going to request ${requestedIds.size} blocks, peer: ${peers.active}")
+    log.info(s"Going to request ${requestedIds.size} blocks, peer: ${peers.active}")
 
     requestedIds.foreach { blockId =>
       val msg = Message(GetBlockSpec, Right(blockId.blockId), None)
