@@ -34,7 +34,7 @@ test in assembly := {}
 fork in ThisBuild := true
 parallelExecution in ThisBuild := false
 
-mainClass in assembly := Some("scorex.waves.Application")
+mainClass in assembly := Some("com.wavesplatform.Application")
 
 assemblyMergeStrategy in assembly := {
   case "application.conf" => MergeStrategy.concat
