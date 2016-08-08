@@ -74,7 +74,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
     val systemScheduler = context.system.scheduler
     val tasks = if (schedule.nonEmpty) {
-      log.debug(s"Block generation schedule in seconds: ${schedule.map(_ / 1000).take(7).mkString(", ")}...")
+      log.debug(s"Block generation schedule in seconds: ${schedule.sorted.map(_ / 1000).take(7).mkString(", ")}...")
       schedule.map { t => systemScheduler.scheduleOnce(t millis, self, GenerateBlock(false)) }
     } else {
       Seq(systemScheduler.scheduleOnce(blockGenerationDelay, self, GenerateBlock(true)))
