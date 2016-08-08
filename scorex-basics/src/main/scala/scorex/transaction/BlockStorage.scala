@@ -13,13 +13,11 @@ import scala.util.{Failure, Success, Try}
   */
 trait BlockStorage extends ScorexLogging {
 
-  val db: MVStore
-
-  val MaxRollback: Int
-
-  val history: History
+  def history: History
 
   def state: LagonakiState
+
+  def blockSeq: BlockSeq
 
   //Append block to current state
   def appendBlock(block: Block): Try[Unit] = {
@@ -55,7 +53,7 @@ trait BlockStorage extends ScorexLogging {
     }
   }
 
-
+  protected[this] val db: MVStore
 }
 
 object BlockStorage {

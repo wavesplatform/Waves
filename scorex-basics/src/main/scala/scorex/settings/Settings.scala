@@ -90,26 +90,31 @@ trait Settings extends ScorexLogging {
   lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcAllowed").asOpt[List[String]].getOrElse(DefaultRpcAllowed.split(""))
 
   lazy val offlineGeneration = (settingsJSON \ "offlineGeneration").asOpt[Boolean].getOrElse(false)
-  lazy val historySynchronizerTimeout: FiniteDuration = (settingsJSON \ "historySynchronizerTimeout").asOpt[Int]
-    .map(x => x.seconds).getOrElse(DefaultHistorySynchronizerTimeout)
 
-  // TODO: too many fork* settings - maybe intruduce a section for them
+  // Blockchain download & sync settings
   private val DefaultMaxRollback = 100
   lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(DefaultMaxRollback)
-
   val MaxBlocksChunks = 10
+  lazy val minForkChunks = (settingsJSON \ "minForkChunks").asOpt[Int].getOrElse(20)
   lazy val forkMaxLength = (settingsJSON \ "forkMaxLength").asOpt[Int].getOrElse(MaxBlocksChunks)
   lazy val forkResolveQuorumSize = (settingsJSON \ "forkResolveQuorumSize").asOpt[Int].getOrElse(1)
-  lazy val maxPeersToBroadcastBlock = (settingsJSON \ "maxPeersToBroadcastBlock").asOpt[Int].getOrElse(3)
-  val scoreTTL: FiniteDuration = 1.minute
-  lazy val operationRetries = (settingsJSON \ "operationRetries").asOpt[Int].getOrElse(3)
-  lazy val retriesBeforeBlacklisted = (settingsJSON \ "retriesBeforeBlacklisted").asOpt[Int].getOrElse(1)
-  lazy val pinToInitialPeer = (settingsJSON \ "pinToInitialPeer").asOpt[Boolean].getOrElse(true)
+  lazy val forkFileName = (settingsJSON \ "forkFileName").asOpt[String]
 
+  // Blockchain download & sync retry settings
+  lazy val historySynchronizerTimeout: FiniteDuration = (settingsJSON \ "historySynchronizerTimeout").asOpt[Int]
+    .map(x => x.seconds).getOrElse(DefaultHistorySynchronizerTimeout)
+  lazy val pinToInitialPeer = (settingsJSON \ "pinToInitialPeer").asOpt[Boolean].getOrElse(true)
+  lazy val retriesBeforeBlacklisted = (settingsJSON \ "retriesBeforeBlacklisted").asOpt[Int].getOrElse(2)
+  lazy val operationRetries = (settingsJSON \ "operationRetries").asOpt[Int].getOrElse(
+    if (pinToInitialPeer) retriesBeforeBlacklisted + 1 else forkResolveQuorumSize)
+
+  // Miner settings
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)
-
   lazy val mininigThreads: Int = (settingsJSON \ "mininigThreads").asOpt[Int].getOrElse(DefaultMiningThreads)
+
+  lazy val maxPeersToBroadcastBlock = (settingsJSON \ "maxPeersToBroadcastBlock").asOpt[Int].getOrElse(1)
+  val scoreTTL: FiniteDuration = 1.minute
 
   lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))

@@ -66,20 +66,20 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
   private def scheduleBlockGeneration(lastBlock: Block): Unit = {
     val currentTime = currentTimeMillis
-
-    val blockGenerationDelayInMillis = application.settings.blockGenerationDelay.toMillis
+    val blockGenerationDelay = application.settings.blockGenerationDelay
 
     val schedule = accounts
       .flatMap(acc => consensusModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
-      .map(t => math.max(t - currentTime, blockGenerationDelayInMillis))
+      .map(t => math.max(t - currentTime, blockGenerationDelay.toMillis))
 
     val systemScheduler = context.system.scheduler
     val tasks = if (schedule.nonEmpty) {
       log.debug(s"Block generation schedule in seconds: ${schedule.map(_ / 1000).take(7).mkString(", ")}...")
       schedule.map { t => systemScheduler.scheduleOnce(t millis, self, GenerateBlock(false)) }
     } else {
-      Seq(systemScheduler.scheduleOnce(application.settings.blockGenerationDelay, self, GenerateBlock(true)))
+      Seq(systemScheduler.scheduleOnce(blockGenerationDelay, self, GenerateBlock(true)))
     }
+
     currentState = Some(tasks, lastBlock)
   }
 }

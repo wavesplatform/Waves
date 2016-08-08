@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
+import org.h2.mvstore.MVStore
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.lagonaki.ActorTestingCommons
@@ -11,7 +12,8 @@ import scorex.lagonaki.mocks.BlockMock
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.{BlockchainSynchronizer, ConnectedPeer, PeerConnectionHandler}
 import scorex.settings.SettingsMock
-import scorex.transaction.History
+import scorex.transaction.state.database.blockchain.StoredBlockSeq
+import scorex.transaction.{BlockSeq, BlockStorage, History}
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.{implicitConversions, postfixOps}
@@ -29,9 +31,9 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   }
 
   private val lastHistoryBlockId = 10
-  private val h = mockHistory(lastHistoryBlockId)
+  private val testHistory = mockHistory(lastHistoryBlockId)
 
-  private val coordinator = TestProbe("Coordinator")
+  private val testCoordinator = TestProbe("Coordinator")
 
   object TestSettings extends SettingsMock {
     override lazy val historySynchronizerTimeout: FiniteDuration = 1 seconds
@@ -39,12 +41,29 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     override lazy val retriesBeforeBlacklisted: Int = 1
     override lazy val operationRetries: Int = retriesBeforeBlacklisted + 13930975
     override lazy val pinToInitialPeer: Boolean = true
+    override lazy val minForkChunks: Int = 5
   }
 
+  private val blockScore = BigInt(100)
+
   private trait App extends ApplicationMock {
+
+    class StoredBlockSeqMock extends StoredBlockSeq(new MVStore.Builder().open()) {
+      override protected[this] def toBytes(block: Block): Array[Byte] = block.uniqueId
+      override protected[this] def fromBytes(bytes: Array[Byte]): Option[Block] = Some(mockBlock(bytes))
+    }
+
+    val forkStorage: BlockSeq = new StoredBlockSeqMock
+
+    private val testBlockStorage = mock[BlockStorage]
+    testBlockStorage.blockSeq _ expects() returns forkStorage anyNumberOfTimes
+
+    consensusModule.blockScore _ expects * returns blockScore anyNumberOfTimes()
+
     override lazy val settings = TestSettings
-    override lazy val coordinator: ActorRef = BlockchainSynchronizerSpecification.this.coordinator.ref
-    override lazy val history: History = h
+    override lazy val coordinator: ActorRef = testCoordinator.ref
+    override lazy val history: History = testHistory
+    override val blockStorage: BlockStorage = testBlockStorage
   }
 
   private val app = stub[App]
@@ -64,13 +83,13 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
     val block = new BlockMock(Seq.empty)
     actorRef ! DataFromPeer(BlockMessageSpec.messageCode, block, peer)
-    coordinator.expectMsg(AddBlock(block, Some(peer)))
+    testCoordinator.expectMsg(AddBlock(block, Some(peer)))
   }
 
   private def assertThatPeerGotBlacklisted(): Unit = {
     within(reasonableTimeInterval) {
       peerHandler.expectMsg(PeerConnectionHandler.Blacklist)
-      coordinator.expectMsg(SyncFinished.unsuccessfully)
+      testCoordinator.expectMsg(SyncFinished.unsuccessfully)
     }
   }
 
@@ -109,9 +128,9 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     }
 
     "become idle on timeout in GettingExtension" in {
-      coordinator.expectNoMsg(aBitLessThanTimeout)
+      testCoordinator.expectNoMsg(aBitLessThanTimeout)
 
-      coordinator.expectMsg(SyncFinished.unsuccessfully)
+      testCoordinator.expectMsg(SyncFinished.unsuccessfully)
 
       validateStatus(Idle)
     }
@@ -139,7 +158,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
           val anotherPeer = TestProbe("another")
           dataFromNetwork(SignaturesSpec, validBlockIds, ConnectedPeer(new InetSocketAddress(peerId + 2), anotherPeer.ref))
 
-          "should not lead to blackkisting of the peers" in {
+          "should not lead to blacklisting of the peers" in {
             peerHandler.expectNoMsg(reasonableTimeInterval)
           }
 
@@ -149,7 +168,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
         }
 
         "blacklist on timeout in states following GettingExtension" in {
-          coordinator.expectNoMsg(aBitLessThanTimeout)
+          testCoordinator.expectNoMsg(aBitLessThanTimeout)
 
           assertThatPeerGotBlacklisted()
 
@@ -161,6 +180,14 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
           sendSignatures(validBlockIds: _*)
 
           expectedGetSignaturesSpec(15, 14)
+
+          val initialScore = BigInt(1000)
+
+          testHistory.scoreOf _ expects * onCall {
+            blockId: BlockId =>
+              assert(BlockIdExtraction.extract(blockId) == lastHistoryBlockId, s"defined only for block id $lastHistoryBlockId")
+              initialScore
+          } noMoreThanOnce()
 
           sendSignatures(14, 15)
 
@@ -180,30 +207,56 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
             assertLatestBlockFromNonSyncPeer()
 
-            "same block twice should not reset timeout" in {
-              val aBlockId = finalBlockIdInterval.head
+            val numberIfBlocks = finalBlockIdInterval.size
 
-              sendBlock(mockBlock(aBlockId))
-
-              Thread sleep aBitLessThanTimeout.toMillis
-
-              sendBlock(mockBlock(aBlockId))
-
-              assertThatPeerGotBlacklisted()
+            def setScoreExpectations(delta: Int): Unit = {
+              testHistory.score _ expects() returns (initialScore + (numberIfBlocks * blockScore) + delta) repeat (1 to numberIfBlocks)
             }
 
-            "happy path" in {
-              Random.shuffle(finalBlockIdInterval) foreach { id => sendBlock(mockBlock(id)) }
+            def sendBlocks(): Unit = Random.shuffle(finalBlockIdInterval) foreach { id => sendBlock(mockBlock(id)) }
 
-              coordinator.expectMsgPF(hint = s"${finalBlockIdInterval.size} fork blocks") {
-                case SyncFinished(true, Some((blocks, Some(connectedPeer), true))) =>
-                  connectedPeer == peer
-                  blocks.map(id => InnerId(id.uniqueId)) == blockIds(finalBlockIdInterval: _*).map(InnerId)
-              }
+            "fork has slower score" in {
+              setScoreExpectations(1)
+
+              sendBlocks()
+
+              assertThatPeerGotBlacklisted()
 
               validateStatus(Idle)
+            }
 
-              peerHandler.expectNoMsg(aBitLongerThanTimeout)
+            "fork has better score" - {
+
+              setScoreExpectations(-1)
+
+              "same block twice should not reset timeout" in {
+                val aBlockId = finalBlockIdInterval.head
+
+                sendBlock(mockBlock(aBlockId))
+
+                Thread sleep aBitLessThanTimeout.toMillis
+
+                sendBlock(mockBlock(aBlockId))
+
+                assertThatPeerGotBlacklisted()
+              }
+
+              "happy path" in {
+                sendBlocks()
+
+                testCoordinator.expectMsgPF(hint = s"$numberIfBlocks fork blocks") {
+                  case SyncFinished(true, Some((lastCommonBlockId, blockIterator, Some(connectedPeer)))) =>
+                    connectedPeer shouldBe  peer
+                    BlockIdExtraction.extract(lastCommonBlockId) shouldBe lastHistoryBlockId
+
+                    val forkStorageBlockIds = blockIterator.map(id => InnerId(id.uniqueId)).toSeq
+                    forkStorageBlockIds shouldBe blockIds(finalBlockIdInterval: _*).map(InnerId)
+                }
+
+                validateStatus(Idle)
+
+                peerHandler.expectNoMsg(aBitLongerThanTimeout)
+              }
             }
           }
         }

@@ -9,12 +9,11 @@ import scorex.crypto.encode.Base58.encode
 import scorex.network.Coordinator.{AddBlock, SyncFinished}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.Message
-import scorex.transaction.History
 import scorex.transaction.History._
+import scorex.transaction.{BlockSeq, History}
 import scorex.utils.ScorexLogging
 import shapeless.syntax.typeable._
 
-import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 
 
@@ -33,8 +32,8 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
   private val gettingBlockTimeout = application.settings.historySynchronizerTimeout
   private val forkMaxLength = application.settings.forkMaxLength
   private val operationRetries = application.settings.operationRetries
-  private val retriesBeforeBlacklisted = application.settings.retriesBeforeBlacklisted
   private val pinToInitialPeer = application.settings.pinToInitialPeer
+  private val minForkChunks = application.settings.minForkChunks
 
   private var timeoutData = Option.empty[Cancellable]
 
@@ -91,20 +90,16 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
           finishUnsuccessfully()
 
         case None =>
-          val blocks = mutable.Seq(fork.map(_ -> Option.empty[Block]):_*)
+
+          val forkStorage = application.blockStorage.blockSeq
+
+          val lastCommonBlockId = downloadInfo.lastCommon.blockId
+          val initialScore = application.history.scoreOf(lastCommonBlockId)
+
+          forkStorage.initialize(fork, initialScore)
 
           run("gettingBlocks") { updatedPeerData =>
-
-            val ids = blocks.filter(_._2.isEmpty).map(_._1)
-
-            log.debug(s"Going to request ${ids.size} blocks, peer: ${updatedPeerData.active}")
-
-            ids.foreach { blockId =>
-              val msg = Message(GetBlockSpec, Right(blockId.blockId), None)
-              networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(updatedPeerData.active))
-            }
-
-            gettingBlocks(blocks, noMoreBlockIds, updatedPeerData)
+            gettingBlocks(forkStorage, lastCommonBlockId, updatedPeerData)
           }
       }
     } else {
@@ -138,28 +133,43 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         }
     }
 
-  def gettingBlocks(blocks: mutable.Seq[(InnerId, Option[Block])],
-                    noMoreBlockIds: Boolean,
+  def gettingBlocks(forkStorage: BlockSeq,
+                    lastCommonBlockId: BlockId,
                     peers: PeerSet): Receive = {
-    object blockIdx {
-      def unapply(block: Block): Option[(Block, Int)] = {
-        blocks.indexWhere(_._1 == InnerId(block.uniqueId)) match {
-          case idx: Int if idx != -1 => Some((block, idx))
-          case _ => None
-        }
-      }
+
+    val before = forkStorage.numberOfBlocks
+
+    val requestedIds = forkStorage.idsWithoutBlock.take(minForkChunks)
+
+    log.debug(s"Going to request ${requestedIds.size} blocks, peer: ${peers.active}")
+
+    requestedIds.foreach { blockId =>
+      val msg = Message(GetBlockSpec, Right(blockId.blockId), None)
+      networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peers.active))
     }
+
     state(GettingBlocks) {
-      case BlockFromPeer(blockIdx(block, index), connectedPeer) if peers.active == connectedPeer =>
-        if (blocks(index)._2.isEmpty) {
+      case BlockFromPeer(block, connectedPeer) if peers.active == connectedPeer && forkStorage.containsBlockId(block.uniqueId) =>
+        if (forkStorage.addIfNotContained(block)) {
           log.info("Got block: " + block.encodedId)
 
-          blocks(index) = InnerId(block.uniqueId) -> Some(block)
+          val currentScore = application.history.score()
+          val forkScore = forkStorage.cumulativeBlockScore
 
-          if (blocks.forall(_._2.isDefined)) {
-            val author = Some(connectedPeer).filterNot(_ => peers.activeChanged)
-            finish(SyncFinished(success = true, Some(blocks.flatMap(_._2), author, noMoreBlockIds)))
+          val author = Some(connectedPeer).filterNot(_ => peers.activeChanged)
+
+          val allBlocksAreLoaded = forkStorage.noIdsWithoutBlock
+
+          if (forkScore > currentScore) {
+            if (forkStorage.numberOfBlocks >= minForkChunks || allBlocksAreLoaded) {
+              finish(SyncFinished(success = true, Some(lastCommonBlockId, forkStorage.blocksInOrder, author)))
+            }
+          } else if (allBlocksAreLoaded) {
+            author.foreach { blacklistPeer("All blocks are loaded, but still not enough score", _) }
+            finish(SyncFinished.unsuccessfully)
           }
+        } else if (forkStorage.numberOfBlocks - before >= minForkChunks) {
+          gettingBlocks(forkStorage, lastCommonBlockId, peers)
         }
     }
   }
@@ -205,9 +215,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         log.info(s"New active peer is ${updatedPeerSet.active}" +
           s" (was ${peerSet.map(_.active.toString).getOrElse("no one")})")
 
-        run(s, updated, runs + 1) {
-          f
-        }
+        run(s, updated, runs + 1) { f }
 
       case None => finishUnsuccessfully()
     }
@@ -222,8 +230,8 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         val peerData @ Peer(score, retries) = peers(active)
         val updatedRetries = retries + 1
 
-        val updatedPeers = (if (updatedRetries >= retriesBeforeBlacklisted) {
-          if (!activeChanged) blacklistPeer("Timeout exceeded", active)
+        val updatedPeers = (if (updatedRetries >= application.settings.retriesBeforeBlacklisted) {
+          if (pinToInitialPeer) blacklistPeer("Timeout exceeded", active)
           peers - active
         } else peers + (active -> peerData.copy(retries = updatedRetries))).filterNot(_._2.score < score)
 
