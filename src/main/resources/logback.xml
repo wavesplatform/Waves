@@ -6,7 +6,7 @@
             <level>WARN</level>
         </filter>
         <encoder>
-            <pattern>%date{yyyy-MM-dd HH:mm:ss} %-5level[%.15thread] %logger{26} - %msg%n</pattern>
+            <pattern>%date{yyyy-MM-dd HH:mm:ss} %-5level [%.15thread] %logger{26} - %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -33,7 +33,7 @@
             <onMatch>DENY</onMatch>
         </filter>
         <encoder>
-            <pattern>%date{yyyy-MM-dd HH:mm:ss} %-5level[%.15thread] %logger{26} - %msg%n</pattern>
+            <pattern>%date{yyyy-MM-dd HH:mm:ss} %-5level [%.15thread] %logger{26} - %msg%n</pattern>
         </encoder>
     </appender>
 

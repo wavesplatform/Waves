@@ -13,9 +13,9 @@ import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction.state.wallet.Payment
-import scorex.waves.settings.WavesSettings
+import com.wavesplatform.settings.WavesSettings
+import scorex.wallet.Wallet
 import scorex.waves.transaction.{ExternalPayment, SignedPayment, WavesTransactionModule}
-import scorex.waves.wallet.Wallet
 
 import scala.util.{Failure, Success, Try}
 

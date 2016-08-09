@@ -8,7 +8,7 @@ import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.account.AddressScheme
 import scorex.transaction.TransactionSettings
 import scorex.utils._
-import scorex.waves.settings.WavesSettings
+import com.wavesplatform.settings.WavesSettings
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -26,7 +26,9 @@ object TestingCommons {
   AddressScheme.current = TestNetParams.addressScheme
   lazy val applications = {
     val apps = List(
-      new Application(TestNetParams, new WavesSettings("settings-test.json"))
+      new Application(new WavesSettings("settings-test.json") {
+        override lazy val chainParams = TestNetParams
+      })
     )
     apps.foreach(_.run())
     apps.foreach { a =>

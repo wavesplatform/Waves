@@ -13,7 +13,7 @@ import scorex.app.RunnableApplication
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.network.BlockchainSynchronizer
 import scorex.utils.ScorexLogging
-import scorex.waves.settings.Constants
+import com.wavesplatform.settings.Constants
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

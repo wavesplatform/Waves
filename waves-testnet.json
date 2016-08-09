@@ -23,5 +23,6 @@
   "history": "blockchain",
   "offlineGeneration": false,
   "apiKeyHash":"",
-  "testnet": true
+  "testnet": true,
+  "loggingLevel": "debug"
 }
