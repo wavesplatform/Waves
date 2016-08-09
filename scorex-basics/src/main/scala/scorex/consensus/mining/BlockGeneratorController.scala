@@ -27,7 +27,7 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
 
   def syncing: Receive = {
     case StartGeneration =>
-      log.info("StartGeneration")
+      log.info("Start block generation")
       workers.foreach(w => w ! Miner.GuessABlock)
       context.become(generating)
 
@@ -46,36 +46,35 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
 
   def generating: Receive = {
     case StopGeneration =>
-      log.info(s"StopGeneration")
+      log.info(s"Stop block generation")
       workers.foreach(w => w ! Stop)
       context.become(syncing)
 
     case Terminated(worker) =>
-      log.info(s"Terminated $worker")
+      log.info(s"Miner terminated $worker")
       workers = workers.filter(w => w != worker)
 
     case GetStatus =>
       sender() ! Generating.name
 
     case CheckWorkers =>
-      log.info(s"Check $workers")
+      log.info(s"Check ${workers.size} miners")
       val t = System.currentTimeMillis()
-      val incTime =
-        workers.foreach { w =>
-          (w ? HealthCheck) onComplete {
-            case Success(HealthOk) =>
-              val responseTime = System.currentTimeMillis() - t
-              if (responseTime < FailedGenerationDelay.toMillis) {
-                log.trace(s"Miner $w works fine, last try was $responseTime millis ago")
-              } else {
-                log.warn(s"Miner $w responds slowly ($responseTime millis)")
-                w ! Miner.GuessABlock
-              }
-            case m =>
-              log.warn(s"Restart miner $w: $m")
-              w ! Stop
-          }
+      workers.foreach { worker =>
+        (worker ? HealthCheck) onComplete {
+          case Success(HealthOk) =>
+            val responseTime = System.currentTimeMillis() - t
+            if (responseTime < FailedGenerationDelay.toMillis) {
+              log.trace(s"Miner $worker works fine, last try was $responseTime millis ago")
+            } else {
+              log.warn(s"Miner $worker responds slowly ($responseTime millis)")
+              worker ! Miner.GuessABlock
+            }
+          case m =>
+            log.warn(s"Restart miner $worker: $m")
+            worker ! Stop
         }
+      }
       if (threads - workers.size > 0) workers = workers ++ newWorkers(threads - workers.size)
 
     case Miner.GuessABlock =>

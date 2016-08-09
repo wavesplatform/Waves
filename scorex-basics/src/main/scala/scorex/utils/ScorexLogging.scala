@@ -23,6 +23,11 @@ case class LoggerFacade(logger: Logger) {
       logger.info(message)
   }
 
+  def info(message: => String, arg: Any): Unit = {
+    if (logger.isInfoEnabled)
+      logger.info(message, arg)
+  }
+
   def info(message: => String, throwable: Throwable): Unit = {
     if (logger.isInfoEnabled)
       logger.info(message, throwable)
