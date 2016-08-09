@@ -1,7 +1,7 @@
 package com.wavesplatform.consensus
 
 import scorex.consensus.nxt.NxtLikeConsensusModule
-import scorex.waves.settings.Constants
+import com.wavesplatform.settings.Constants
 
 /**
   * Waves Consensus module

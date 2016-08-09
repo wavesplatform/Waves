@@ -2,6 +2,7 @@
 
 * Switch network by "testnet" in settings. Default value is true."
 * /scorex/* HTTP API deprecated. Use /node/* instead.
+* All logs goes to stdout and stderr. Use "loggingLevel" in config. 
 
 **0.2.1**
 

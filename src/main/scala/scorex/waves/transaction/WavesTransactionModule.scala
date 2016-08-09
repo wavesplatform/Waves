@@ -12,7 +12,7 @@ import scorex.transaction._
 import scorex.transaction.state.wallet.Payment
 import scorex.utils.NTP
 import scorex.wallet.Wallet
-import scorex.waves.settings.WavesSettings
+import com.wavesplatform.settings.WavesSettings
 
 /**
   * Waves Transaction Module

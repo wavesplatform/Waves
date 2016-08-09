@@ -1,4 +1,4 @@
-package scorex.waves.settings
+package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
 import scorex.utils.ScorexLogging

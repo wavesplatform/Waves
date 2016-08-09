@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import scorex.account.{Account, AddressScheme}
 import scorex.transaction.{GenesisTransaction, Transaction}
-import scorex.waves.settings.Constants
+import com.wavesplatform.settings.Constants
 
 /**
   * ChainParameters contains the data needed for working with an instantiation of particular chain
