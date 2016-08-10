@@ -139,9 +139,9 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
       connection ! Register(handler, keepOpenOnPeerClosed = false, useResumeWriting = true)
-      val newPeer = new ConnectedPeer(remote, handler)
-      newPeer.handlerRef ! handshakeTemplate.copy(time = System.currentTimeMillis() / 1000)
+      val newPeer = ConnectedPeer(remote, handler)
       peerManager ! PeerManager.Connected(newPeer)
+      newPeer.handlerRef ! handshakeTemplate.copy(time = System.currentTimeMillis() / 1000)
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)

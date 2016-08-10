@@ -28,7 +28,7 @@ class StoredBlockSeq(db: MVStore)
     score = initialScore
   }
 
-  override def idsWithoutBlock: InnerIds = blockIds.filterNot(id => blocks.containsKey(id.blockId)).toSeq
+  override def firstIdWithoutBlock: Option[InnerId] = blockIds.filterNot(id => blocks.containsKey(id.blockId)).headOption
 
   override def containsBlockId(blockId: BlockId): Boolean = blockIds.contains(InnerId(blockId))
 

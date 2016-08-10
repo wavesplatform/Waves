@@ -38,13 +38,15 @@ class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronize
     case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)
       if msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
 
-      peers.foreach(isa => peerManager ! PeerManager.AddOrUpdatePeer(isa, None, None))
+      peers.foreach(isa => peerManager ! PeerManager.AddOrUpdatePeer(isa, None, None, None))
 
     case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
 
       //todo: externalize the number, check on receiving
       (peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
+        .map(_.filterNot(_ == remote.socketAddress))
+        .filter(_.nonEmpty)
         .foreach { peers =>
           val msg = Message(PeersSpec, Right(peers), None)
           networkControllerRef ! SendToNetwork(msg, SendToChosen(remote))

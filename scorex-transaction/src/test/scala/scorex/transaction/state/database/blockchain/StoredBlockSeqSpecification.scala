@@ -83,6 +83,6 @@ class StoredBlockSeqSpecification extends FreeSpec
 
     storedBlockSeq.initialize(Seq(13), 1000)
     storedBlockSeq.cumulativeBlockScore shouldBe 1000
-    storedBlockSeq.idsWithoutBlock shouldBe Seq(InnerId(13))
+    storedBlockSeq.firstIdWithoutBlock shouldBe Some(InnerId(13))
   }
 }
