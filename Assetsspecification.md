@@ -93,21 +93,22 @@ The asset state and skip lists are being recalculated based on the Delete transa
 In order to make assets useful they have to be exchanged for one another, with the exchange procedure facilitated by the blockchain settlement. WAVES uses an approach that does not put unnecessary data on to the blockchain, instead using the blockchain for settlement, not order matching operations. Order matching is carried out by centralized nodes, after the orders have been matched the matching service creates a swap transaction and sends it to the both counterparties of the exchange operation for signing.
 
 
-### Placing an exchange order
+### Placing an exchange order (Limit order)
 
 
-Order (SpendAddress, SpendTokenID, ReceiveTokenID, price, amount, Signature)
+Order (SpendAddress, MatcherAddress, SpendTokenID, ReceiveTokenID, price, amount, MaxTimestamp,MatcherFee, Signature)
 
 
-SpendAddress: Waves address - order sender address in WAVES address format
+SpendAddress: Waves address - order sender address in WAVES address format. The assets will be spent and sent from/to this address. The matcher checks if the address has a sufficient asset balance
+MatcherAddress:  matched orders should be signed by this address
 SpendTokenID: Array[Byte] - ID of the token to be spent
 ReceiveTokenID: Array[Byte] - ID of the token to be received
-Price: Int - how much of the asset to be spent should be paid for the the asset to be received multiplied to 10^8.
+Price: Int -how much of the asset to be spent should be paid for the the asset to be received multiplied to 10^8.
 Amount: Long - amount of the asset to be received.
-Signature: Array[Byte] -  cryptographic authorisation of the transaction. All transactions have to be signed in order to authenticate the node.  
-
-
-Order API call is not finalized on the blockchain. In order to be able to control the orders Order API call has to return OrderID, which is stored by the client. OrderID is constructed as a hash of Order transaction.
+MaxTimeStamp - Maximum TimeStamp until which the order is valid
+Signature: Array[Byte] -  cryptographic authorisation of the transaction. All transactions have to be signed in order to authenticate the node.  It is considered to be the Order Id.
+MatcherFee: Long - Matcher charges a fee for the order matching process. It should be bigger than the fee for asset swap, so Macher can do partial order matching
+Matcher responds with a signed confirmation of order acceptance, and begins the matching process. In case if some order parameers are wrong Matcher returns an error message
 
 
 ### Cancelling an exchange order
@@ -120,21 +121,32 @@ SpendAddress: Array[Byte] - order sender address in WAVES address format
 OrderID : Long - Order Identificator
 Signature: Array[Byte] -  cryptographic authorisation of the transaction. 
 
+If a user wants to cancel her order she sends a Cancel transaction, which should be signed by Matcher. If later this order appears on the blockchain with a higher timestamp  node can submit an order cancelation proof. If the matcher in not trusted a node can send this transaction to blockchain, paying the corresponding fee. In this case all system participants are able to verify that this transaction cannot be accepted.
+
 
 
 
 ### Finalizing an exchange transaction
 
 
-When Matcher finds a matching orders pair to exchange, she sends unsigned Spend transaction to both counterparties. Upon signing by both parties the transaction is transmitted by the matching service into the network to be included in the next block:
-Send(((SpendTokenID, SenderAddress, ReceiverAddress, SpendTokenAmount), (ReceiveTokenID, ReceiverAddress, SenderAddress, ReceiveTokenAmount), (MatcherFeeTokenID, ReceiverAddress, MatcherAddress, MatcherFee), (NetworkFeeTokenID, SenderAddress, None, MinerFee)), (SignatureSpender, SignatureReceiver))
+When Matcher finds a matching orders pair to exchange, she sends OrderMatch transaction into the network:
 
+OrderMatch(Order1,Order2, MatcherFee,Fee,TimeStamp,matcherSignature)
+Order1, Order2 - Orders of both parties. Network nodes check the correctness of the signatures and its validity at the given time.
+price: Long - Order price, nodes check that it corresponds to Order1 and Order2
+Amount: Network nodes verify that it corresponds to Order1 and Order2. OrderMatch history should be used for the verification
+matcherFee: Long  - Fee sent to the Matcher. Cannot exceed the commission in Order1 and Order2 combined. 
+Fee: Long - Miner's fee
+TimeStamp: Long - TransactionTime
+MatcherSignature: Array[Byte] - Macher signature corresponding to MatcherAddress in Order1, Order2. Network nodes can verify it.
 
-SpendTokenID, ReceiveTokenID, SpendAddress, ReceiveAddress  are set to ensure the correct exchange direction.
-SpendTokenAmount, ReceiveTokenAmount  are the result of the matching operation. They can be validated by the both parties of the exchange, if they find the amount to be incorrect they may choose not to sign the transaction.
-MatcherAddress - Matching service Waves address for the fee payment. Matching service can impose a certain fee for its services.
-MatcherFee - Amount to be paid to the matching service.
-SignatureSpender, SignatureReceiver - signatures of the both parties. The transaction has to be signed by both counterparties in order to be finalized on the blockchain. Both signatures are only known by Matcher service, so exchange participants can’t cheat and don’t pay reward to the Matcher.
+Besides, network nodes verify that spendTokenID1=receiveTokenID2 and spendTokenID2=receiveTokenID1
 
+As a result of this transaction the  balances are modified in the following way:
+Matcher recevies fee equal to (matcherFee - fee), in Waves tokens.
 
-“Send” transaction is used for blockchain order settlement, no special transaction type is created. It should be noted that the exchange participants sign the transaction as a whole, so exchange is atomic and it’s impossible to steal someone assets without sending corresponding assets in return.
+Order1 address spends amount / (price / 10^8) assets с id spendTokenID1 and receives amount assets of  id receiveTokenID1
+Order2 receives amount / (price / 10^8)  of assets with id spendTokenID1 and spends amount of assets with id receiveTokenID1
+
+The order sent to a Matcher is an order in obligation, that is if it is matched with another order a node that submitted it cannot prevent it from execution. This scheme mimics the way centralized exchanges work, with the only exception being Matcher does not control users' funds.
+
