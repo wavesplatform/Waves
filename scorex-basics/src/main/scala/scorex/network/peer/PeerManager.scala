@@ -104,24 +104,18 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       } foreach { case (connectedPeer, h) =>
 
       def updateHandshakedPeer() = addOrUpdatePeer(
-          connectedPeer.socketAddress,
-          Some(handshake.nodeNonce),
-          Some(handshake.nodeName),
-          handshake.declaredAddress)
+        connectedPeer.socketAddress, Some(handshake.nodeNonce), Some(handshake.nodeName), handshake.declaredAddress)
 
       if (h.nonEmpty) {
         log.warn(s"Peer $address is already connected")
       } else if (knownPeerNonces.contains(handshake.nodeNonce)) {
-        val pp = connectedPeers
-          .filter(_._2.nonEmpty)
-          .filter(_._2.get.nodeNonce == handshake.nodeNonce)
-          .map(_._1.socketAddress)
-          .toSeq
-        log.info(s"Peer $address has come with an existing nonce ${handshake.nodeNonce}, corresponding to: ${pp.mkString(".")}")
+        val peers = connectedPeers.filter(_._2.exists(_.nodeNonce == handshake.nodeNonce)).map(_._1.socketAddress).toSeq
+        log.info(s"Peer $address has come with an existing nonce ${handshake.nodeNonce}, corresponding to: ${peers.mkString(",")}")
         updateHandshakedPeer()
         connectedPeer.handlerRef ! PeerConnectionHandler.CloseConnection
       } else if (handshake.nodeNonce == application.settings.nodeNonce) {
-        //drop connection to self if occurred
+        log.info("Drop connection to self")
+        updateHandshakedPeer()
         connectedPeer.handlerRef ! PeerConnectionHandler.CloseConnection
       } else {
         updateHandshakedPeer()
@@ -132,10 +126,12 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private def addOrUpdatePeer(address: InetSocketAddress,
                               peerNonce: Option[Long],
                               peerName: Option[String],
-                              declaredAddress: Option[InetSocketAddress]): Unit = {
-    val peerInfo = PeerInfo(System.currentTimeMillis(), peerNonce, peerName)
-    peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
-  }
+                              declaredAddress: Option[InetSocketAddress]): Unit =
+    // we don't have to remember TCP client connections
+    if (address.getPort < application.settings.minEphemeralPortNumber) {
+      val peerInfo = PeerInfo(System.currentTimeMillis(), peerNonce, peerName)
+      peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
+    }
 
   private def blackListOperations: Receive = {
     case AddToBlacklist(peer) =>

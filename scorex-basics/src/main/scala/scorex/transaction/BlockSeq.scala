@@ -2,7 +2,7 @@ package scorex.transaction
 
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.network.BlockchainSynchronizer.{InnerId, InnerIds}
+import scorex.network.BlockchainSynchronizer.InnerIds
 import scorex.transaction.History.BlockchainScore
 
 trait BlockSeq {
@@ -11,7 +11,7 @@ trait BlockSeq {
 
   def containsBlockId(blockId: BlockId): Boolean
 
-  def firstIdWithoutBlock: Option[InnerId]
+  def firstIdsWithoutBlock(n: Int): InnerIds
 
   def noIdsWithoutBlock: Boolean
 

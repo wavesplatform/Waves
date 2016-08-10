@@ -61,7 +61,7 @@ class ScoreObserverSpecification extends ActorTestingCommons {
       }
 
       "clean old scores on timeout" in {
-        def sleepHalfTTL(): Unit = Thread sleep TestSettings.scoreTTL.toMillis / 2
+        def sleepHalfTTL(): Unit = Thread sleep TestSettings.scoreTTL.toMillis / 2 + 100
 
         sleepHalfTTL()
 

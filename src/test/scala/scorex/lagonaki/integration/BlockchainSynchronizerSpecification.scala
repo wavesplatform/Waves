@@ -34,13 +34,17 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
   private val testCoordinator = TestProbe("Coordinator")
 
+  private val entireForkLoad = mockFunction[Boolean]
+  private def setloadEntireForkChunk(value: Boolean) = entireForkLoad expects() returns value anyNumberOfTimes
+
   object TestSettings extends SettingsMock {
     override lazy val historySynchronizerTimeout: FiniteDuration = 1 second
     override lazy val forkMaxLength: Int = lastHistoryBlockId
     override lazy val retriesBeforeBlacklisted: Int = 1
     override lazy val operationRetries: Int = retriesBeforeBlacklisted + 13930975
     override lazy val pinToInitialPeer: Boolean = true
-    override lazy val loadEntireForkChunk: Boolean = true
+    override lazy val minForkChunkSize: Int = 1
+    override lazy val loadEntireForkChunk: Boolean = entireForkLoad()
   }
 
   private val blockScore = BigInt(100)
@@ -204,57 +208,73 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
             val numberOfBlocks = finalBlockIdInterval.size
 
-            def setScoreExpectations(delta: Int): Unit = {
+            def setHistoryScoreExpectations(delta: BigInt): Unit =
               testHistory.score _ expects() returns (initialScore + (numberOfBlocks * blockScore) + delta) repeat (0 to numberOfBlocks)
-            }
 
-            def sendBlocks(): Unit = finalBlockIdInterval foreach {
-              id =>
-                expectNetworkMessage(GetBlockSpec, id)
-                sendBlock(mockBlock(id))
-            }
+            def sendBlocks(): Unit = finalBlockIdInterval foreach { id =>
+              expectNetworkMessage(GetBlockSpec, id); sendBlock(mockBlock(id)) }
 
-            "fork has lower score" in {
-              setScoreExpectations(1)
+            def assertThatBlocksLoaded(): Unit = {
+              testCoordinator.expectMsgPF(hint = s"$numberOfBlocks fork blocks") {
+                case SyncFinished(true, Some((lastCommonBlockId, blockIterator, Some(connectedPeer)))) =>
+                  connectedPeer shouldBe peer
+                  BlockIdExtraction.extract(lastCommonBlockId) shouldBe lastHistoryBlockId
 
-              sendBlocks()
-
-              assertThatPeerGotBlacklisted()
-
-              validateStatus(Idle)
-            }
-
-            "fork has better score" - {
-
-              setScoreExpectations(-1)
-
-              "same block twice should not reset timeout" in {
-                val firstSubsequentBlockId = finalBlockIdInterval.head
-
-                sendBlock(mockBlock(firstSubsequentBlockId))
-
-                Thread sleep aBitLessThanTimeout.toMillis
-
-                sendBlock(mockBlock(firstSubsequentBlockId))
-
-                testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
+                  val forkStorageBlockIds = blockIterator.map(id => InnerId(id.uniqueId)).toSeq
+                  forkStorageBlockIds shouldBe blockIds(finalBlockIdInterval: _*).map(InnerId)
               }
 
-              "happy path" in {
+              validateStatus(Idle)
+              peerHandler.expectNoMsg(aBitLongerThanTimeout)
+            }
+
+            "entire fork loading" - {
+
+              setloadEntireForkChunk(true)
+
+              "fork has two blocks better score" in {
+                setHistoryScoreExpectations(-(blockScore*2 + 1))
+
                 sendBlocks()
 
-                testCoordinator.expectMsgPF(hint = s"$numberOfBlocks fork blocks") {
-                  case SyncFinished(true, Some((lastCommonBlockId, blockIterator, Some(connectedPeer)))) =>
-                    connectedPeer shouldBe  peer
-                    BlockIdExtraction.extract(lastCommonBlockId) shouldBe lastHistoryBlockId
+                assertThatBlocksLoaded()
+              }
+            }
 
-                    val forkStorageBlockIds = blockIterator.map(id => InnerId(id.uniqueId)).toSeq
-                    forkStorageBlockIds shouldBe blockIds(finalBlockIdInterval: _*).map(InnerId)
-                }
+            "partial fork laoding" - {
+
+              setloadEntireForkChunk(false)
+
+              "fork has lower score" in {
+                setHistoryScoreExpectations(1)
+
+                sendBlocks()
+
+                assertThatPeerGotBlacklisted()
 
                 validateStatus(Idle)
+              }
 
-                peerHandler.expectNoMsg(aBitLongerThanTimeout)
+              "fork has better score" - {
+
+                setHistoryScoreExpectations(-1)
+
+                "same block twice should not reset timeout" in {
+                  val firstSubsequentBlockId = finalBlockIdInterval.head
+
+                  sendBlock(mockBlock(firstSubsequentBlockId))
+
+                  Thread sleep aBitLessThanTimeout.toMillis
+
+                  sendBlock(mockBlock(firstSubsequentBlockId))
+
+                  testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
+                }
+
+                "happy path" in {
+                  sendBlocks()
+                  assertThatBlocksLoaded()
+                }
               }
             }
           }
