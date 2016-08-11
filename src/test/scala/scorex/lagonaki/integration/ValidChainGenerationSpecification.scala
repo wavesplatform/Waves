@@ -2,9 +2,8 @@ package scorex.lagonaki.integration
 
 import akka.pattern.ask
 import akka.util.Timeout
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PublicKeyAccount
-import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
 import scorex.transaction.BalanceSheet
@@ -13,7 +12,7 @@ import scorex.utils.{ScorexLogging, untilTimeout}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class ValidChainGenerationSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
+class ValidChainGenerationSpecification extends FunSuite with TestLock with Matchers with ScorexLogging
 with TransactionTestingCommons {
 
   import TestingCommons._
@@ -44,12 +43,12 @@ with TransactionTestingCommons {
     transactionModule.utxStorage.all().size shouldBe 0
   }
 
-  test("generate 10 blocks and synchronize") {
+  test("generate 27 blocks and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(acc => app.consensusModule.generatingBalance(acc)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
     genValidTransaction()
 
-    waitGenerationOfBlocks(10)
+    waitGenerationOfBlocks(27)
 
     val last = peers.head.blockStorage.history.lastBlock
     untilTimeout(5.minutes, 10.seconds) {
@@ -57,7 +56,7 @@ with TransactionTestingCommons {
     }
   }
 
-  test("Generate block with plenty of transactions") {
+  ignore("Generate block with plenty of transactions") {
     applications.tail.foreach { app =>
       app.wallet.privateKeyAccounts().foreach { acc =>
         if (state.asInstanceOf[BalanceSheet].balance(acc) > 0) {
@@ -85,7 +84,7 @@ with TransactionTestingCommons {
   }
 
 
-  test("Don't include same transactions twice") {
+  ignore("Don't include same transactions twice") {
     //Wait until all peers contain transactions
     val (incl, h) = untilTimeout(1.minutes, 1.seconds) {
       val last = history.lastBlock
@@ -121,7 +120,7 @@ with TransactionTestingCommons {
     }
   }
 
-  test("Double spending") {
+  ignore("Double spending") {
     val recepient = new PublicKeyAccount(Array.empty)
     val (trans, valid) = untilTimeout(5.seconds) {
       cleanTransactionPool()
@@ -151,7 +150,7 @@ with TransactionTestingCommons {
     startGeneration()
   }
 
-  test("Rollback state") {
+  ignore("Rollback state") {
     def rollback(i: Int = 5) {
 
       val last = history.lastBlock

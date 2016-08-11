@@ -12,12 +12,8 @@ import scorex.utils._
 import scala.util.Random
 
 //TODO: Should be independed
-class StoredStateSpecification extends FunSuite with Matchers with BeforeAndAfterAll with ScorexLogging
+class StoredStateSpecification extends FunSuite with TestLock with Matchers with ScorexLogging
 with TransactionTestingCommons with PrivateMethodTester with OptionValues {
-
-  override def beforeAll(): Unit = super.beforeAll()
-
-  override def afterAll(): Unit = super.afterAll()
 
   import TestingCommons._
 

@@ -2,8 +2,9 @@ package scorex.lagonaki.integration.api
 
 import org.scalatest.{FunSuite, Matchers}
 import scorex.crypto.encode.Base58
+import scorex.lagonaki.integration.TestLock
 
-class WalletAPISpecification extends FunSuite with Matchers {
+class WalletAPISpecification extends FunSuite with TestLock with Matchers {
 
   import scorex.lagonaki.TestingCommons._
 

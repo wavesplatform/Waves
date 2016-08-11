@@ -1,5 +1,8 @@
 package scorex.lagonaki
 
+import java.util.concurrent.Semaphore
+import java.util.concurrent.locks.ReentrantLock
+
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.api.http.ApiKeyNotValid
@@ -34,6 +37,9 @@ trait TestingCommons {
 }
 
 object TestingCommons {
+
+  val lock = new ReentrantLock(true)
+
   lazy val applications = {
     val apps = List(
       new LagonakiApplication("settings-test.json"),

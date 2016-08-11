@@ -3,10 +3,11 @@ package scorex.lagonaki.integration.api
 import org.scalatest.{FunSuite, Matchers}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
+import scorex.lagonaki.integration.TestLock
 
 import scala.util.Random
 
-class UtilsAPISpecification extends FunSuite with Matchers {
+class UtilsAPISpecification extends FunSuite with TestLock with Matchers {
 
   import scorex.lagonaki.TestingCommons._
 

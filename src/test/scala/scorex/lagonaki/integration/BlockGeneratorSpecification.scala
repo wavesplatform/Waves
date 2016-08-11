@@ -11,8 +11,9 @@ import scala.concurrent.duration._
 
 class BlockGeneratorSpecification(_system: ActorSystem)
   extends TestKit(_system)
-  with ImplicitSender
   with WordSpecLike
+  with TestLock
+  with ImplicitSender
   with Matchers
   with TestingCommons {
 

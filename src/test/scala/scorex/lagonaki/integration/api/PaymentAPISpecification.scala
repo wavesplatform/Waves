@@ -2,8 +2,9 @@ package scorex.lagonaki.integration.api
 
 import org.scalatest.{FunSuite, Matchers}
 import scorex.lagonaki.TransactionTestingCommons
+import scorex.lagonaki.integration.TestLock
 
-class PaymentAPISpecification extends FunSuite with Matchers with TransactionTestingCommons {
+class PaymentAPISpecification extends FunSuite with TestLock with Matchers with TransactionTestingCommons {
 
   import scorex.lagonaki.TestingCommons._
 
