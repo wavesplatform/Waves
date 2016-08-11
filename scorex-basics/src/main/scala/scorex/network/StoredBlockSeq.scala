@@ -1,4 +1,4 @@
-package scorex.transaction.state.database.blockchain
+package scorex.network
 
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.block.Block
@@ -6,7 +6,7 @@ import scorex.block.Block._
 import scorex.consensus.ConsensusModule
 import scorex.network.BlockchainSynchronizer.{InnerId, InnerIds}
 import scorex.transaction.History._
-import scorex.transaction.{BlockSeq, TransactionModule}
+import scorex.transaction.TransactionModule
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable

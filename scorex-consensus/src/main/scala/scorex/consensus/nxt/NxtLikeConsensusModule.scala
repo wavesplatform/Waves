@@ -118,7 +118,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
     val balance = generatingBalance(account)
 
     if (balance == 0) None else {
-      Some((hit / (cData.baseTarget * balance)).toLong * 1000 + lastBlock.timestampField.value)
+      Some(((hit * 1000) / (BigInt(cData.baseTarget) * balance)).toLong + lastBlock.timestampField.value)
     }
   }
 

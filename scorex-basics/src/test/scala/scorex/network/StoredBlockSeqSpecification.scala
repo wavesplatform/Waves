@@ -1,4 +1,4 @@
-package scorex.transaction.state.database.blockchain
+package scorex.network
 
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.MockFactory

@@ -1,9 +1,9 @@
-package scorex.transaction
+package scorex.network
 
 import scorex.block.Block
-import scorex.block.Block.BlockId
+import scorex.block.Block._
 import scorex.network.BlockchainSynchronizer.InnerIds
-import scorex.transaction.History.BlockchainScore
+import scorex.transaction.History._
 
 trait BlockSeq {
 

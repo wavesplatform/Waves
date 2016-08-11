@@ -4,6 +4,7 @@ import org.h2.mvstore.MVStore
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
+import scorex.network.BlockSeq
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}

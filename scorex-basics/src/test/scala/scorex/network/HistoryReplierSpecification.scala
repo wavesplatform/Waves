@@ -1,11 +1,9 @@
-package scorex.lagonaki.integration
+package scorex.network
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
+import scorex.ActorTestingCommons
 import scorex.block.Block._
-import scorex.lagonaki.ActorTestingCommons
 import scorex.network.BlockchainSynchronizer.{InnerId, InnerIds}
-import scorex.network.HistoryReplier
-import scorex.network.message.BasicMessagesRepo
 import scorex.settings.SettingsMock
 import scorex.transaction.History
 

@@ -2,8 +2,9 @@ package scorex.transaction.state.database
 
 import org.h2.mvstore.MVStore
 import scorex.consensus.ConsensusModule
+import scorex.network.StoredBlockSeq
 import scorex.settings.Settings
-import scorex.transaction.state.database.blockchain.{StoredBlockSeq, StoredBlockTree, StoredBlockchain, StoredState}
+import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
 import scorex.transaction._
 
 class BlockStorageImpl(settings: TransactionSettings with Settings)

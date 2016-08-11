@@ -15,11 +15,7 @@ class LagonakiTestSuite extends Sequential(
   //  , new BlockStorageSpecification
   , new WalletSpecification
   , new BlockGeneratorSpecification
-  , new MinerSpecification
-  , new BlockchainSynchronizerSpecification
   , new CoordinatorSpecification
-  , new ScoreObserverSpecification
-  , new HistoryReplierSpecification
   , new BlockTreeSpecification
   , new StateTest
   , new StoredStateSpecification

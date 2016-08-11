@@ -23,20 +23,22 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
   private def accounts = application.wallet.privateKeyAccounts()
 
-  self ! GuessABlock
-
   override def receive: Receive = {
     case GuessABlock =>
       val lastBlock = application.history.lastBlock
       if (!currentState.exists(_._2 == lastBlock)) {
-        stop()
         scheduleBlockGeneration(lastBlock)
       }
 
     case GenerateBlock(repeat) =>
-      tryToGenerateABlock()
-      if (repeat) {
-        currentState.foreach(_ => scheduleBlockGeneration(application.history.lastBlock))
+      val notStopped = currentState.nonEmpty
+
+      if (notStopped) {
+        tryToGenerateABlock()
+
+        if (repeat) {
+          scheduleBlockGeneration(application.history.lastBlock)
+        }
       }
 
     case HealthCheck => sender ! HealthOk
@@ -65,19 +67,25 @@ class Miner(application: Application) extends Actor with ScorexLogging {
   }
 
   private def scheduleBlockGeneration(lastBlock: Block): Unit = {
+
+    stop()
+
     val currentTime = currentTimeMillis
     val blockGenerationDelay = application.settings.blockGenerationDelay
 
     val schedule = accounts
       .flatMap(acc => consensusModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
       .map(t => math.max(t - currentTime, blockGenerationDelay.toMillis))
+      .map(_ millis)
+      .distinct.sorted
 
     val systemScheduler = context.system.scheduler
-    val tasks = if (schedule.nonEmpty) {
-      log.debug(s"Block generation schedule in seconds: ${schedule.sorted.map(_ / 1000).take(7).mkString(", ")}...")
-      schedule.map { t => systemScheduler.scheduleOnce(t millis, self, GenerateBlock(false)) }
-    } else {
+    val tasks = if (schedule.isEmpty) {
+      log.info(s"Next block generation will start in $blockGenerationDelay")
       Seq(systemScheduler.scheduleOnce(blockGenerationDelay, self, GenerateBlock(true)))
+    } else {
+      log.info(s"Block generation schedule: ${schedule.take(7).mkString(", ")}...")
+      schedule.map { t => systemScheduler.scheduleOnce(t, self, GenerateBlock(t == blockGenerationDelay)) }
     }
 
     currentState = Some(tasks, lastBlock)

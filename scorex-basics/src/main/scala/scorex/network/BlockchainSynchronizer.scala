@@ -9,8 +9,8 @@ import scorex.crypto.encode.Base58.encode
 import scorex.network.Coordinator.{AddBlock, SyncFinished}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.Message
+import scorex.transaction.History
 import scorex.transaction.History._
-import scorex.transaction.{BlockSeq, History}
 import scorex.utils.ScorexLogging
 import shapeless.syntax.typeable._
 

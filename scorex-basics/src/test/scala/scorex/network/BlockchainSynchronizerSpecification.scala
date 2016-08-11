@@ -1,18 +1,15 @@
-package scorex.lagonaki.integration
+package scorex.network
 
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import org.h2.mvstore.MVStore
+import scorex.ActorTestingCommons
 import scorex.block.Block
 import scorex.block.Block._
-import scorex.lagonaki.ActorTestingCommons
-import scorex.lagonaki.mocks.BlockMock
 import scorex.network.NetworkController.DataFromPeer
-import scorex.network.{BlockchainSynchronizer, ConnectedPeer, PeerConnectionHandler}
 import scorex.settings.SettingsMock
-import scorex.transaction.state.database.blockchain.StoredBlockSeq
 import scorex.transaction.{BlockStorage, History}
 
 import scala.concurrent.duration.{FiniteDuration, _}
@@ -53,7 +50,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
     class StoredBlockSeqMock extends StoredBlockSeq(new MVStore.Builder().open()) {
       override protected[this] def toBytes(block: Block): Array[Byte] = block.uniqueId
-      override protected[this] def fromBytes(bytes: Array[Byte]): Option[Block] = Some(mockBlock(bytes))
+      override protected[this] def fromBytes(bytes: Array[Byte]): Option[Block] = Some(blockMock(bytes))
     }
 
     private val testBlockStorage = mock[BlockStorage]
@@ -82,7 +79,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     val testPeerHandler = TestProbe()
     val peer = ConnectedPeer(new InetSocketAddress(peerId + 1), testPeerHandler.ref)
 
-    val block = new BlockMock(Seq.empty)
+    val block = blockMock(lastHistoryBlockId + 3729047)
     actorRef ! DataFromPeer(BlockMessageSpec.messageCode, block, peer)
     testCoordinator.expectMsg(AddBlock(block, Some(peer)))
   }
@@ -212,7 +209,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               testHistory.score _ expects() returns (initialScore + (numberOfBlocks * blockScore) + delta) repeat (0 to numberOfBlocks)
 
             def sendBlocks(): Unit = finalBlockIdInterval foreach { id =>
-              expectNetworkMessage(GetBlockSpec, id); sendBlock(mockBlock(id)) }
+              expectNetworkMessage(GetBlockSpec, id); sendBlock(blockMock(id)) }
 
             def assertThatBlocksLoaded(): Unit = {
               testCoordinator.expectMsgPF(hint = s"$numberOfBlocks fork blocks") {
@@ -262,11 +259,11 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
                 "same block twice should not reset timeout" in {
                   val firstSubsequentBlockId = finalBlockIdInterval.head
 
-                  sendBlock(mockBlock(firstSubsequentBlockId))
+                  sendBlock(blockMock(firstSubsequentBlockId))
 
                   Thread sleep aBitLessThanTimeout.toMillis
 
-                  sendBlock(mockBlock(firstSubsequentBlockId))
+                  sendBlock(blockMock(firstSubsequentBlockId))
 
                   testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
                 }

@@ -1,4 +1,4 @@
-package scorex.lagonaki
+package scorex
 
 import java.net.InetSocketAddress
 
@@ -67,7 +67,7 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids:_*)
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
-  protected def mockBlock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
+  protected def blockMock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
     trait BlockMock extends Block {
       override type ConsensusDataType = Unit
       override type TransactionDataType = Unit

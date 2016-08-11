@@ -2,6 +2,7 @@ package scorex
 
 import org.scalatest.Suites
 import scorex.account.AccountSpecification
+import scorex.consensus.mining.MinerSpecification
 import scorex.crypto.SigningFunctionsSpecification
 import scorex.network._
 import scorex.network.peer.PeerManagerSpecification
@@ -13,5 +14,10 @@ class BasicsTestSuite extends Suites(
   new BlacklistParallelSpecification,
   new BlacklistSpecification,
   new SendingStrategySpecification,
-  new PeerManagerSpecification
+  new PeerManagerSpecification,
+  // new MinerSpecification,
+  new BlockchainSynchronizerSpecification,
+  new StoredBlockSeqSpecification,
+  new ScoreObserverSpecification,
+  new HistoryReplierSpecification
 )

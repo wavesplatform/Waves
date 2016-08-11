@@ -85,7 +85,9 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
   }
 
   def newWorkers(count: Int): Seq[ActorRef] = (1 to count).map { i =>
-    context.watch(context.actorOf(Props(classOf[Miner], application), s"Worker-${System.currentTimeMillis()}-$i"))
+    val worker = context.actorOf(Props(classOf[Miner], application), s"Worker-${System.currentTimeMillis()}-$i")
+    worker ! Miner.GuessABlock
+    context.watch(worker)
   }
 }
 

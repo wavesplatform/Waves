@@ -1,13 +1,12 @@
-package scorex.lagonaki.integration
+package scorex.network
 
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
-import scorex.lagonaki.ActorTestingCommons
+import scorex.ActorTestingCommons
 import scorex.network.ScoreObserver.{ConsideredValue, GetScore, UpdateScore}
-import scorex.network.{ConnectedPeer, ScoreObserver}
 import scorex.settings.SettingsMock
 import scorex.transaction.History.BlockchainScore
 

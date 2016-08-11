@@ -4,8 +4,8 @@ import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
 import org.h2.mvstore.MVStore
+import scorex.ActorTestingCommons
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
-import scorex.lagonaki.ActorTestingCommons
 import scorex.network.BlockchainSynchronizer.{GetStatus, GettingBlocks}
 import scorex.network.{BlockchainSynchronizer, Coordinator}
 import scorex.settings.SettingsMock
