@@ -91,4 +91,22 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     assert(response.toString == NegativeFee.json.toString)
   }
 
+  test("/waves/address returns correct CORS header") {
+    val response = postRequestWithResponse(
+      us = "/waves/address", body = "GvXeYd2iFJUNV7KgeGV2cdnScyrEvrr9uPYJeQFtvg21")
+    assert(response.getHeaders("Access-Control-Allow-Origin").size == 1)
+  }
+
+  test("/waves/* API returns correct CORS header") {
+    val urls = List("/waves/address",
+      "/waves/broadcast-signed-payment",
+      "/waves/create-signed-payment",
+      "/waves/external-payment")
+    urls.foreach {
+      url => {
+        val response = postRequestWithResponse(us = url, body = "")
+        assert(response.getHeaders("Access-Control-Allow-Origin").size == 1, url)
+      }
+    }
+  }
 }

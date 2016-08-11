@@ -2,6 +2,7 @@ package scorex.waves
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import com.ning.http.client.Response
 import com.wavesplatform.{Application, TestNetParams}
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
@@ -79,4 +80,12 @@ object TestingCommons {
     Json.parse(response.getResponseBody)
   }
 
+  def postRequestWithResponse(us: String,
+                              params: Map[String, String] = Map.empty,
+                              body: String = "",
+                              headers: Map[String, String] = Map("api_key" -> "test"),
+                              peer: String = peerUrl(application)): Response = {
+    val request = Http(url(peer + us).POST << params <:< headers << body)
+    Await.result(request, 5.seconds)
+  }
 }
