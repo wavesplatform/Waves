@@ -21,7 +21,7 @@ class MinerSpecification extends ActorTestingCommons {
   import Miner._
 
   object TestSettings extends SettingsMock {
-    override lazy val blockGenerationDelay: FiniteDuration = 500 millis
+    override lazy val blockGenerationDelay: FiniteDuration = 1500 millis
   }
 
   val testWallet = new Wallet(None, null, Option("seed".getBytes()))
@@ -29,7 +29,7 @@ class MinerSpecification extends ActorTestingCommons {
 
   val testCoordinator = TestProbe("Coordinator")
 
-  val blockGenDelay = 1500 millis
+  val blockGenDelay = 2000 millis
 
   val testHistory = mock[History]
   val testConsensusModule = mock[ConsensusModule[Unit]]

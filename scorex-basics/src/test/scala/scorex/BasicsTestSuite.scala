@@ -8,16 +8,16 @@ import scorex.network._
 import scorex.network.peer.PeerManagerSpecification
 
 class BasicsTestSuite extends Suites(
+  new MinerSpecification,
+  new BlockchainSynchronizerSpecification,
+  new StoredBlockSeqSpecification,
+  new ScoreObserverSpecification,
+  new HistoryReplierSpecification,
   new AccountSpecification,
   new SigningFunctionsSpecification,
   new HandshakeSpecification,
   new BlacklistParallelSpecification,
   new BlacklistSpecification,
   new SendingStrategySpecification,
-  new PeerManagerSpecification,
-  // new MinerSpecification,
-  new BlockchainSynchronizerSpecification,
-  new StoredBlockSeqSpecification,
-  new ScoreObserverSpecification,
-  new HistoryReplierSpecification
+  new PeerManagerSpecification
 )
