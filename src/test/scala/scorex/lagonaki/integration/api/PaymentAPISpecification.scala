@@ -27,4 +27,8 @@ class PaymentAPISpecification extends FunSuite with TestLock with Matchers with 
 
   }
 
+  test("POST /payment API route returns correct CORS for invalid api key") {
+    val response = POST.requestRaw(us = "/payment", headers = Map("api_key" -> "invalid"))
+    assert(response.getHeaders("Access-Control-Allow-Origin").size == 1)
+  }
 }

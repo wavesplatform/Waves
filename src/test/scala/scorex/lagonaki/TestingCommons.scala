@@ -3,6 +3,7 @@ package scorex.lagonaki
 import java.util.concurrent.Semaphore
 import java.util.concurrent.locks.ReentrantLock
 
+import com.ning.http.client.Response
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.api.http.ApiKeyNotValid
@@ -64,19 +65,19 @@ object TestingCommons {
   def peerUrl(a: LagonakiApplication = application): String =
     "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
 
-  def postRequest(us: String,
-                  params: Map[String, String] = Map.empty,
-                  body: String = "",
-                  headers: Map[String, String] = Map("api_key" -> "test"),
-                  peer: String = peerUrl(application)): JsValue = {
-    val request = Http(url(peer + us).POST << params <:< headers << body)
-    val response = Await.result(request, 5.seconds)
-    Json.parse(response.getResponseBody)
-  }
+//  def postRequest(us: String,
+//                  params: Map[String, String] = Map.empty,
+//                  body: String = "",
+//                  headers: Map[String, String] = Map("api_key" -> "test"),
+//                  peer: String = peerUrl(application)): JsValue = {
+//    val request = Http(url(peer + us).POST << params <:< headers << body)
+//    val response = Await.result(request, 5.seconds)
+//    Json.parse(response.getResponseBody)
+//  }
 
 
-  @deprecated("Replace with GET.request", "1.2.6")
-  def getRequest(us: String, peer: String = peerUrl(application)): JsValue = GET.request(us = us, peer = peer)
+//  @deprecated("Replace with GET.request", "1.2.6")
+//  def getRequest(us: String, peer: String = peerUrl(application)): JsValue = GET.request(us = us, peer = peer)
 
   sealed trait RequestType {
     def incorrectApiKeyTest(path: String): Unit = {
@@ -91,6 +92,12 @@ object TestingCommons {
                 body: String = "",
                 headers: Map[String, String] = Map("api_key" -> "test"),
                 peer: String = peerUrl(application)): JsValue
+
+    def requestRaw(us: String,
+                params: Map[String, String] = Map.empty,
+                body: String = "",
+                headers: Map[String, String] = Map("api_key" -> "test"),
+                peer: String = peerUrl(application)): Response
   }
 
   case object GET extends RequestType {
@@ -100,8 +107,13 @@ object TestingCommons {
                 headers: Map[String, String] = Map.empty,
                 peer: String = peerUrl(application)): JsValue = {
       val request = Http(url(peer + us).GET <:< headers)
-      val response = Await.result(request, 5.seconds)
+      val response: Response = Await.result(request, 5.seconds)
       Json.parse(response.getResponseBody)
+    }
+
+    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
+      val request = Http(url(peer + us).GET <:< headers)
+      Await.result(request, 5.seconds)
     }
   }
 
@@ -115,6 +127,11 @@ object TestingCommons {
       val response = Await.result(request, 5.seconds)
       Json.parse(response.getResponseBody)
     }
+
+    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
+      val request = Http(url(peer + us).POST << params <:< headers << body)
+      Await.result(request, 5.seconds)
+    }
   }
 
   case object DELETE extends RequestType {
@@ -126,6 +143,11 @@ object TestingCommons {
       val request = Http(url(peer + us).DELETE << params <:< headers << body)
       val response = Await.result(request, 5.seconds)
       Json.parse(response.getResponseBody)
+    }
+
+    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
+      val request = Http(url(peer + us).DELETE << params <:< headers << body)
+      Await.result(request, 5.seconds)
     }
   }
 }

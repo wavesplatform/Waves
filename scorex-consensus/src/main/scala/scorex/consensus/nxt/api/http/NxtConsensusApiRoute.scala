@@ -15,10 +15,11 @@ import scorex.crypto.encode.Base58
 
 
 @Path("/consensus")
-@Api(value = "/consensus", description = "Consensus-related calls")
-class NxtConsensusApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
+@Api(value = "/consensus")
+class NxtConsensusApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
+  val settings = application.settings
   private val consensusModule = application.consensusModule.asInstanceOf[NxtLikeConsensusModule]
   private val blockStorage = application.blockStorage
 

@@ -40,7 +40,7 @@ class PeerManagerSpecification extends FunSuite with Matchers with MockFactory w
     override val settings: Settings = MySettings
   }
 
-  test("PeerManager returns on GetConnectedPeers list of pairs (InetScoketAddress, Handshake)") {
+  test("PeerManager returns on GetConnectedPeers list of pairs (InetSocketAddress, Handshake)") {
     val app = stub[MyApp]
     val peerManager = TestActorRef(new PeerManager(app))
 
@@ -57,9 +57,9 @@ class PeerManagerSpecification extends FunSuite with Matchers with MockFactory w
     // assert
     val Success(result2 : List[(InetSocketAddress, Handshake)]) = (peerManager ? GetConnectedPeers).value.get
     assert(result2.nonEmpty)
-    val peer = result2.head
-    assert(peer._1 == peerAddress)
-    assert(peer._2.applicationName == "scorex")
+    val (address, h) = result2.head
+    assert(address == peerAddress)
+    assert(h.applicationName == "scorex")
 
     peerManager.stop()
   }

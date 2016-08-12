@@ -25,7 +25,6 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
     r2.size shouldBe 4
     r2.foreach(a => addresses should contain(a))
     responsed.intersect(r2).isEmpty shouldBe true
-
   }
 
   test("/addresses/validate/{address} API route") {
@@ -57,7 +56,7 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
     val message = "test"
     val req = POST.request(s"/addresses/sign/$address", body = message)
     (req \ "message").as[String] shouldBe Base58.encode(message.getBytes)
-    val pubkey = (req \ "publickey").asOpt[String].flatMap(Base58.decode(_).toOption)
+    val pubkey = (req \ "publicKey").asOpt[String].flatMap(Base58.decode(_).toOption)
     val signature = (req \ "signature").asOpt[String].flatMap(Base58.decode(_).toOption)
     pubkey.isDefined shouldBe true
     signature.isDefined shouldBe true
@@ -98,7 +97,7 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
     val message = "test"
     val req = POST.request(s"/addresses/signText/$address", body = message)
     (req \ "message").as[String] shouldBe message
-    val pubkey = (req \ "publickey").asOpt[String].flatMap(Base58.decode(_).toOption)
+    val pubkey = (req \ "publicKey").asOpt[String].flatMap(Base58.decode(_).toOption)
     val signature = (req \ "signature").asOpt[String].flatMap(Base58.decode(_).toOption)
     pubkey.isDefined shouldBe true
     signature.isDefined shouldBe true
@@ -113,6 +112,11 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
     val add = "/addresses"
 
     POST.incorrectApiKeyTest("/addresses")
+  }
+
+  test("POST /addresses  API route returns correct CORS for invalid api key") {
+    val response = POST.requestRaw(us = "/addresses", headers = Map("api_key" -> "invalid"))
+    assert(response.getHeaders("Access-Control-Allow-Origin").size == 1)
   }
 
   test("/addresses/ API route") {

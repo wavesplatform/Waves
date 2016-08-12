@@ -15,10 +15,11 @@ import scala.util.Try
 
 @Path("/consensus")
 @Api(value = "/consensus", description = "Consensus-related calls")
-case class QoraConsensusApiRoute(override val application: RunnableApplication)
+case class QoraConsensusApiRoute(application: RunnableApplication)
                                 (implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
+  val settings = application.settings
   private val consensusModule = application.consensusModule.asInstanceOf[QoraLikeConsensusModule]
   private val blockStorage = application.blockStorage
 

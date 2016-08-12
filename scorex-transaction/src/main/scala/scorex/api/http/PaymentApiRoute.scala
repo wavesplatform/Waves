@@ -16,8 +16,9 @@ import scala.util.Try
 
 @Path("/payment")
 @Api(value = "/payment", description = "Payment operations.", position = 1)
-case class PaymentApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
+case class PaymentApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+  val settings = application.settings
 
   // TODO asInstanceOf
   implicit lazy val transactionModule: SimpleTransactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
@@ -66,8 +67,8 @@ case class PaymentApiRoute(override val application: RunnableApplication)(implic
                         case ValidationResult.NegativeAmount =>
                           NegativeAmount.response
 
-                        case ValidationResult.NegativeFee =>
-                          NegativeFee.response
+                        case ValidationResult.InsufficientFee =>
+                          InsufficientFee.response
 
                         case ValidationResult.NoBalance =>
                           NoBalance.response

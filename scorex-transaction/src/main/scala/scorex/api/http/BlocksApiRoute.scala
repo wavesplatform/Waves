@@ -8,16 +8,15 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, JsNull, Json}
 import scorex.account.Account
-import scorex.app.RunnableApplication
-import scorex.crypto.encode.Base58
+import scorex.app.Application
 import scorex.transaction.BlockChain
 
 @Path("/blocks")
-@Api(value = "/blocks", description = "Info about blockchain & individual blocks within it")
-case class BlocksApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
+@Api(value = "/blocks")
+case class BlocksApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
-  private val wallet = application.wallet
+  val settings = application.settings
   private val history = application.history
 
   override lazy val route =
@@ -63,7 +62,8 @@ case class BlocksApiRoute(override val application: RunnableApplication)(implici
   }
 
   @Path("/delay/{signature}/{blockNum}")
-  @ApiOperation(value = "Average delay", notes = "Average delay in milliseconds between last $blockNum blocks starting from block with $signature", httpMethod = "GET")
+  @ApiOperation(value = "Average delay",
+    notes = "Average delay in milliseconds between last $blockNum blocks starting from block with $signature", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "String", paramType = "path"),
     new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "String", paramType = "path")
@@ -187,8 +187,11 @@ case class BlocksApiRoute(override val application: RunnableApplication)(implici
   def signature: Route = {
     path("signature" / Segment) { encodedSignature =>
       getJsonRoute {
-        val height = Base58.decode(encodedSignature).toOption.flatMap(history.heightOf)
-        withBlock(history, encodedSignature)(_.json + ("height" -> height.map(Json.toJson(_)).getOrElse(JsNull)))
+        withBlock(history, encodedSignature){ block =>
+          val height = history.heightOf(block.uniqueId).map(Json.toJson(_))
+            .getOrElse(JsNull)
+          block.json + ("height" -> height)
+        }
       }
     }
   }

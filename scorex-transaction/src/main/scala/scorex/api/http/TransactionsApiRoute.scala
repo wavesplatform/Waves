@@ -17,8 +17,9 @@ import scala.util.{Success, Try}
 
 @Path("/transactions")
 @Api(value = "/transactions", description = "Information about transactions")
-case class TransactionsApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
+case class TransactionsApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
+  val settings = application.settings
 
   private val state: LagonakiState = application.blockStorage.state
 
