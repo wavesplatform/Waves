@@ -23,5 +23,7 @@
   "offlineGeneration": false,
   "suspendedSenders": ["3N8j8ZrvcaRtJE1oPLA3enbBZAbyHEzRBw5"],
   "minimumTxFee": 333,
-  "cors": true
+  "cors": true,
+
+  "scoreBroadcastDelay": 2000
 }
