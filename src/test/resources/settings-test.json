@@ -16,10 +16,7 @@
     "127.0.0.1",
     "123.123.123.123"
   ],
-  "perma": {
-    "treeDir": "/tmp/scorex-tests/perma/data/tree",
-    "authDataStorage": "authDataStorage.mapDB"
-  },
+  "scoreBroadcastDelay": 700,
   "maxRollback": 100,
   "history": "blockchain",
   "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",

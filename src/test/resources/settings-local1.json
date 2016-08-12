@@ -23,11 +23,7 @@
   ],
   "maxRollback": 100,
   "offlineGeneration": true,
-  "perma": {
-    "treeDir": "/tmp/scorex-tests/data1/tree/",
-    "authDataStorage": "authDataStorage1.mapDB",
-    "isTrustedDealer": true
-  },
+  "scoreBroadcastDelay": 700,
   "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",
   "blockGenerationDelay": 5001,
   "forkChunkSize": 1

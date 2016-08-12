@@ -34,7 +34,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   private val maxPeersToBroadcastBlock = application.settings.maxPeersToBroadcastBlock
 
   //todo: make configurable
-  context.system.scheduler.schedule(1.second, 2.seconds, self, SendCurrentScore)
+  context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, SendCurrentScore)
 
   blockGenerator ! StartGeneration
 
