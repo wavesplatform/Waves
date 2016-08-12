@@ -60,9 +60,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
       case ValidationResult.ValidateOke => {
         if (blockStorage.state.isValid(payment)) {
           Right(payment)
-        } else {
-          Left(ValidationResult.NoBalance)
-        }
+        } else Left(ValidationResult.NoBalance)
       }
       case error: ValidationResult => Left(error)
     }
@@ -73,8 +71,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
     */
   def broadcastPayment(payment: SignedPayment): Either[ValidationResult, PaymentTransaction] = {
     if (payment.fee < minimumTxFee)
-    // TODO : add ValidationResult.InvalidFee to Scorex
-      Left(ValidationResult.NegativeFee)
+      Left(ValidationResult.InsufficientFee)
     else {
       val time = payment.timestamp
       val sigBytes = Base58.decode(payment.signature).get
@@ -88,9 +85,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
           if (blockStorage.state.isValid(tx)) {
             onNewOffchainTransaction(tx)
             Right(tx)
-          } else {
-            Left(ValidationResult.NoBalance)
-          }
+          } else Left(ValidationResult.NoBalance)
         }
         case error: ValidationResult => Left(error)
       }
