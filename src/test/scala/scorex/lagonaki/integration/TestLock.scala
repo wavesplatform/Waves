@@ -18,7 +18,7 @@ trait TestLock extends BeforeAndAfterAll with BeforeAndAfterEach with TimeLimite
   private var locked = false
 
   override protected def beforeAll(): Unit = {
-    locked = lock.tryLock(timeLimit.toMillis / 10, TimeUnit.MILLISECONDS)
+    locked = lock.tryLock(timeLimit.toMillis - 100, TimeUnit.MILLISECONDS)
     super.beforeAll()
   }
 

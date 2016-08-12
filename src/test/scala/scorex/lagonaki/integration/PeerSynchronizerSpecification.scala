@@ -51,7 +51,7 @@ class PeerSynchronizerSpecification(_system: ActorSystem)
       probe.expectMsg(msg)
 
       val newPeer = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 2)
-      application.peerManager ! PeerManager.AddOrUpdatePeer(newPeer, None, None, None)
+      application.peerManager ! PeerManager.AddOrUpdatePeer(newPeer, None, None)
 
       val newPeers = (application.peerManager ? RandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]

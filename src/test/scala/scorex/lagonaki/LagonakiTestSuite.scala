@@ -9,23 +9,23 @@ import scorex.transaction.state.StateTest
 
 class LagonakiTestSuite extends Sequential(
 
-  //unit tests
-  new MessageSpecification
-  , new BlockSpecification
-  , new WalletSpecification
-  , new BlockGeneratorSpecification
-  , new CoordinatorSpecification
-  , new StateTest
-  , new StoredStateSpecification
-
   // API tests
-  ,new BlockAPISpecification
+  new BlockAPISpecification
   , new UtilsAPISpecification
   , new PeersAPISpecification
   , new WalletAPISpecification
   , new AddressesAPISpecification
   , new TransactionsAPISpecification
   , new PaymentAPISpecification
+
+//unit tests
+  , new MessageSpecification
+  , new BlockSpecification
+  , new WalletSpecification
+  , new BlockGeneratorSpecification
+  , new CoordinatorSpecification
+  , new StateTest
+  , new StoredStateSpecification
 
 //integration tests - slow!
   , new ValidChainGenerationSpecification

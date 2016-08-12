@@ -38,7 +38,9 @@ class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronize
     case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)
       if msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
 
-      peers.foreach(isa => peerManager ! PeerManager.AddOrUpdatePeer(isa, None, None, None))
+      peers
+        .filter(_.getPort < application.settings.minEphemeralPortNumber)
+        .foreach(isa => peerManager ! PeerManager.AddOrUpdatePeer(isa, None, None))
 
     case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
 
