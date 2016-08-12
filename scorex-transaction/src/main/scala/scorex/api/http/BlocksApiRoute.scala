@@ -6,9 +6,10 @@ import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
-import play.api.libs.json.{JsArray, Json}
+import play.api.libs.json.{JsArray, JsNull, Json}
 import scorex.account.Account
 import scorex.app.RunnableApplication
+import scorex.crypto.encode.Base58
 import scorex.transaction.BlockChain
 
 @Path("/blocks")
@@ -184,9 +185,10 @@ case class BlocksApiRoute(override val application: RunnableApplication)(implici
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "String", paramType = "path")
   ))
   def signature: Route = {
-    path("signature" / Segment) { case encodedSignature =>
+    path("signature" / Segment) { encodedSignature =>
       getJsonRoute {
-        withBlock(history, encodedSignature)(_.json)
+        val height = Base58.decode(encodedSignature).toOption.flatMap(history.heightOf)
+        withBlock(history, encodedSignature)(_.json + ("height" -> height.map(Json.toJson(_)).getOrElse(JsNull)))
       }
     }
   }

@@ -16,6 +16,9 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
   import System.currentTimeMillis
 
+  private lazy val blockGenerationDelay =
+    math.max(application.settings.blockGenerationDelay.toMillis, BlockGenerationTimeShift.toMillis) millis
+
   private implicit lazy val transactionModule = application.transactionModule
   private lazy val consensusModule = application.consensusModule
 
@@ -71,13 +74,14 @@ class Miner(application: Application) extends Actor with ScorexLogging {
     stop()
 
     val currentTime = currentTimeMillis
-    val blockGenerationDelay = application.settings.blockGenerationDelay
 
-    val schedule = accounts
-      .flatMap(acc => consensusModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
-      .map(t => math.max(t - currentTime, blockGenerationDelay.toMillis))
-      .map(_ millis)
-      .distinct.sorted
+    val schedule = if (application.settings.tflikeScheduling) {
+      accounts
+        .flatMap(acc => consensusModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
+        .map(t => math.max(t - currentTime, blockGenerationDelay.toMillis))
+        .map(_ millis)
+        .distinct.sorted
+    } else Seq.empty
 
     val systemScheduler = context.system.scheduler
     val tasks = if (schedule.isEmpty) {
@@ -104,5 +108,5 @@ object Miner {
 
   private case class GenerateBlock(repeat: Boolean)
 
-  val BlockGenerationTimeShift = 1 second
+  private[mining] val BlockGenerationTimeShift = 1 second
 }

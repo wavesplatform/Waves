@@ -3,7 +3,6 @@
     "nodeName": "Node2",
     "localOnly": true,
     "bindAddress": "127.0.0.2",
-    "myAddress": "127.0.0.2",
     "upnp": false,
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
@@ -20,5 +19,5 @@
   "offlineGeneration": false,
   "scoreBroadcastDelay": 700,
   "blockGenerationDelay": 501,
-  "forkChunkSize": 1
+  "tflikeScheduling": false
 }

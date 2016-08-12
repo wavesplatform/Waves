@@ -62,7 +62,9 @@ class BlockAPISpecification extends FunSuite with TestLock with Matchers with Tr
   test("GET /blocks/signature/{signature} API route") {
     Base58.decode(genesis.encodedId).toOption.map(signature => history.blockById(signature)).isDefined shouldBe true
     checkGenesis(GET.request(s"/blocks/signature/${genesis.encodedId}"))
-    checkBlock(GET.request(s"/blocks/signature/${last.encodedId}"))
+    val response = GET.request(s"/blocks/signature/${last.encodedId}")
+    checkBlock(response)
+    (response \ "height").as[Int] shouldBe history.heightOf(last).get
   }
 
   test("GET /blocks/first API route") {

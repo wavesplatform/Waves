@@ -20,8 +20,12 @@ class MinerSpecification extends ActorTestingCommons {
 
   import Miner._
 
+  val tf = mockFunction[Boolean]
+  def setTF(value: Boolean) = tf expects() returns value anyNumberOfTimes()
+
   object TestSettings extends SettingsMock {
     override lazy val blockGenerationDelay: FiniteDuration = 1500 millis
+    override lazy val tflikeScheduling: Boolean = tf()
   }
 
   val testWallet = new Wallet(None, null, Option("seed".getBytes()))
@@ -76,59 +80,88 @@ class MinerSpecification extends ActorTestingCommons {
 
   testSafely {
 
-    "generate blocks" - {
+    "TF-like scheduling approach" - {
 
-      setExpectations(1, Some(blockGenDelay), None)
+      setTF(false)
 
-      actorRef ! GuessABlock
-      testCoordinator.expectNoMsg(blockGenDelay * 2)
+      "plain schedule" in {
 
-      "broken schedule shoud fallback to default" in {
-        val lastBlock = blockMock(3)
-        val newBlock = blockMock(111)
+        val newBlock = blockMock(333)
 
         inSequence {
-          setLastBlockExpectations(lastBlock)
-          setBlockGenTimeExpectations(lastBlock, Some(currentTimeMillis - 10000))
+          val block = blockMock(1)
+          setLastBlockExpectations(block)
+          setBlockGenExpectations(Seq.empty)
+          setLastBlockExpectations(block)
           setBlockGenExpectations(Seq(newBlock))
+          setLastBlockExpectations(block)
         }
-        setExpectations(3, None, None)
 
         actorRef ! GuessABlock
 
-        testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
+        testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay * 2)
         testCoordinator.expectMsg(AddBlock(newBlock, None))
       }
+    }
 
-      "scheduling" - {
-        val firstNewBlock = blockMock(101)
-        setExpectations(2, Some(blockGenDelay), Some(firstNewBlock))
+    "TF-like scheduling approach" - {
 
-        actorRef ! GuessABlock
+      setTF(true)
 
-        testCoordinator.expectNoMsg(blockGenDelay)
-        testCoordinator.expectMsg(AddBlock(firstNewBlock, None))
+      "generate blocks" - {
 
-        val secondNewBlock = blockMock(102)
-        setExpectations(3, None, Some(secondNewBlock))
-        setExpectations(3, None, None)
+        setExpectations(1, Some(blockGenDelay), None)
 
         actorRef ! GuessABlock
+        testCoordinator.expectNoMsg(blockGenDelay * 2)
 
-        testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
-        testCoordinator.expectMsg(AddBlock(secondNewBlock, None))
+        "broken schedule shoud fallback to default" in {
+          val lastBlock = blockMock(3)
+          val newBlock = blockMock(111)
 
-        "repeat" in {
-          val thirdNewBlock = blockMock(103)
-          setExpectations(3, None, Some(thirdNewBlock))
+          inSequence {
+            setLastBlockExpectations(lastBlock)
+            setBlockGenTimeExpectations(lastBlock, Some(currentTimeMillis - 10000))
+            setBlockGenExpectations(Seq(newBlock))
+          }
+          setExpectations(3, None, None)
+
+          actorRef ! GuessABlock
 
           testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
-          testCoordinator.expectMsg(AddBlock(thirdNewBlock, None))
+          testCoordinator.expectMsg(AddBlock(newBlock, None))
         }
 
-        "stop" in {
-          actorRef ! Stop
-          testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay + Miner.BlockGenerationTimeShift)
+        "scheduling" - {
+          val firstNewBlock = blockMock(101)
+          setExpectations(2, Some(blockGenDelay), Some(firstNewBlock))
+
+          actorRef ! GuessABlock
+
+          testCoordinator.expectNoMsg(blockGenDelay)
+          testCoordinator.expectMsg(AddBlock(firstNewBlock, None))
+
+          val secondNewBlock = blockMock(102)
+          setExpectations(3, None, Some(secondNewBlock))
+          setExpectations(3, None, None)
+
+          actorRef ! GuessABlock
+
+          testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
+          testCoordinator.expectMsg(AddBlock(secondNewBlock, None))
+
+          "repeat" in {
+            val thirdNewBlock = blockMock(103)
+            setExpectations(3, None, Some(thirdNewBlock))
+
+            testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
+            testCoordinator.expectMsg(AddBlock(thirdNewBlock, None))
+          }
+
+          "stop" in {
+            actorRef ! Stop
+            testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay + Miner.BlockGenerationTimeShift)
+          }
         }
       }
     }

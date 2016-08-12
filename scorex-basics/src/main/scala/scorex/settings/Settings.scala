@@ -88,7 +88,6 @@ trait Settings extends ScorexLogging {
 
   lazy val rpcPort = (settingsJSON \ "rpcPort").asOpt[Int].getOrElse(DefaultRpcPort)
   lazy val rpcAddress = (settingsJSON \ "rpcAddress").asOpt[String].getOrElse(DefaultRpcAddress)
-  lazy val rpcAllowed: Seq[String] = (settingsJSON \ "rpcAllowed").asOpt[List[String]].getOrElse(DefaultRpcAllowed.split(""))
 
   lazy val offlineGeneration = (settingsJSON \ "offlineGeneration").asOpt[Boolean].getOrElse(false)
 
@@ -114,6 +113,7 @@ trait Settings extends ScorexLogging {
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)
   lazy val mininigThreads: Int = (settingsJSON \ "mininigThreads").asOpt[Int].getOrElse(DefaultMiningThreads)
+  lazy val tflikeScheduling = (settingsJSON \ "tflikeScheduling").asOpt[Boolean].getOrElse(true)
 
   lazy val maxPeersToBroadcastBlock = (settingsJSON \ "maxPeersToBroadcastBlock").asOpt[Int].getOrElse(1)
 

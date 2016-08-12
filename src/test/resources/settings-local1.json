@@ -17,14 +17,9 @@
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
   "dataDir": "/tmp/scorex-tests/data1",
   "rpcPort": 9085,
-  "rpcAllowed": [
-    "127.0.0.1",
-    "123.123.123.123"
-  ],
   "maxRollback": 100,
   "offlineGeneration": true,
   "scoreBroadcastDelay": 700,
   "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",
-  "blockGenerationDelay": 5001,
-  "forkChunkSize": 1
+  "blockGenerationDelay": 5001
 }
