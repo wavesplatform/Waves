@@ -21,8 +21,10 @@ import scala.concurrent.Future
 @Deprecated
 @Path("/scorex")
 @Api(value = "scorex", description = "General commands & information", position = 0)
-case class ScorexApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
+case class ScorexApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions with ScorexLogging {
+
+  val settings = application.settings
 
   override lazy val route =
     pathPrefix("scorex") {

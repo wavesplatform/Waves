@@ -2,7 +2,7 @@ package scorex.waves
 
 import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.api.http.{InvalidAddress, InvalidSender, NegativeFee, NoBalance}
+import scorex.api.http._
 import scorex.waves.http.UnsignedPayment
 import scorex.waves.transaction.{ExternalPayment, SignedPayment}
 
@@ -88,7 +88,7 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     val json = Json.toJson(payment).toString
 
     val response = postRequest(us = "/waves/broadcast-signed-payment", body = json)
-    assert(response.toString == NegativeFee.json.toString)
+    assert(response.toString == InsufficientFee.json.toString)
   }
 
   test("/waves/address returns correct CORS header") {
@@ -101,7 +101,9 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     val urls = List("/waves/address",
       "/waves/broadcast-signed-payment",
       "/waves/create-signed-payment",
-      "/waves/external-payment")
+      "/waves/external-payment",
+      "/waves/payment",
+      "/waves/payment/signature")
     urls.foreach {
       url => {
         val response = postRequestWithResponse(us = url, body = "")

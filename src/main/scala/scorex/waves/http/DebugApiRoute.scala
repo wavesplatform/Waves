@@ -14,15 +14,16 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.state.database.blockchain.StoredState
 
 @Path("/debug")
-@Api(value = "/debug", description = "Debug methods", position = 1)
-case class DebugApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
+@Api(value = "/debug")
+case class DebugApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
+  val settings = application.settings
   implicit lazy val transactionModule = application.transactionModule
   lazy val wallet = application.wallet
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ stateAt ~ info ~ settings
+    blocks ~ state ~ stateAt ~ info ~ getSettings
   }
 
   @Path("/blocks/{howMany}")
@@ -98,7 +99,7 @@ case class DebugApiRoute(override val application: RunnableApplication)(implicit
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json state")
   ))
-  def settings: Route = {
+  def getSettings: Route = {
     path("settings") {
       withAuth {
         getJsonRoute {
