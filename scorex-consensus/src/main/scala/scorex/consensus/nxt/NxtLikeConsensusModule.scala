@@ -129,7 +129,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
       val result =
         Some((hit * 1000) / (BigInt(t) * balance) + lastBlock.timestampField.value)
-          .filter(_ < Long.MaxValue)
+          .filter(_ > 0).filter(_ < Long.MaxValue)
           .map(_.toLong)
 
       log.debug(s"Next block gen time: $result " +

@@ -33,7 +33,6 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   private val forkResolveQuorumSize = application.settings.forkResolveQuorumSize
   private val maxPeersToBroadcastBlock = application.settings.maxPeersToBroadcastBlock
 
-  //todo: make configurable
   context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, SendCurrentScore)
 
   blockGenerator ! StartGeneration
@@ -44,7 +43,9 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
       val peers = candidates.filter(_._2 > localScore)
 
-      if (peers.size < forkResolveQuorumSize) {
+      if (peers.isEmpty) {
+        log.trace(s"No peers to sync with, local score: $localScore")
+      } else if (peers.size < forkResolveQuorumSize) {
         log.debug(s"Quorum to download fork is not reached: ${peers.size} peers but should be $forkResolveQuorumSize")
       } else {
         log.info(s"min networkScore=${peers.minBy(_._2)} > localScore=$localScore")
@@ -78,7 +79,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     val parentBlockId = comingBlock.referenceField.value
     val locallyGenerated = from.isEmpty
 
-    val isBlockToBeAdded = if (!locallyGenerated && history.contains(comingBlock)) {
+    val isBlockToBeAdded = if (history.contains(comingBlock)) {
       // we have already got the block - skip
       false
     } else if (history.contains(parentBlockId)) {

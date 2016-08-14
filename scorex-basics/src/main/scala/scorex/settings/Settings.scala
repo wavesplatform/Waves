@@ -81,6 +81,9 @@ trait Settings extends ScorexLogging {
   lazy val declaredAddress = (p2pSettings \ "myAddress").asOpt[String]
   lazy val fuzzingDelay = (p2pSettings \ "fuzzingDelay").asOpt[Int].getOrElse(0)
   lazy val minEphemeralPortNumber = (p2pSettings \ "minEphemeralPortNumber").asOpt[Int].getOrElse(32768)
+  lazy val peersDataBroadcastDelay = (p2pSettings \ "peersDataBroadcastDelay").asOpt[Long]
+    .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(30.seconds)
+
 
   //p2p settings assertions
   assert(!(localOnly && upnpEnabled), "Both localOnly and upnp enabled")

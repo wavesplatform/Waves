@@ -30,8 +30,9 @@ class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronize
   override def preStart: Unit = {
     super.preStart()
 
+    val peersDataBroadcastDelay = application.settings.peersDataBroadcastDelay
     val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(), None), SendToRandom)
-    context.system.scheduler.schedule(2.seconds, 10.seconds)(networkControllerRef ! stn)
+    context.system.scheduler.schedule(peersDataBroadcastDelay, peersDataBroadcastDelay)(networkControllerRef ! stn)
   }
 
   override def receive: Receive = {

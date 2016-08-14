@@ -10,7 +10,8 @@
     "upnpDiscoverTimeout": 3000,
     "port": 9084,
     "knownPeers": ["127.0.0.2:9088"],
-    "maxConnections": 10
+    "maxConnections": 10,
+    "peersDataBroadcastDelay": 900
   },
   "walletDir": "/tmp/scorex-tests/wallet1",
   "walletPassword": "cookies",

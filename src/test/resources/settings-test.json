@@ -5,7 +5,8 @@
     "upnp": false,
     "knownPeers": ["127.0.0.1"],
     "port": 9091,
-    "maxConnections": 10
+    "maxConnections": 10,
+    "peersDataBroadcastDelay": 900
   },
 
   "walletPassword": "cookies",
