@@ -4,7 +4,7 @@ import akka.actor.{Actor, Cancellable}
 import scorex.app.Application
 import scorex.consensus.mining.Miner._
 import scorex.network.Coordinator.AddBlock
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -12,8 +12,6 @@ import scala.language.postfixOps
 import scala.util.{Failure, Try}
 
 class Miner(application: Application) extends Actor with ScorexLogging {
-
-  import System.currentTimeMillis
 
   private lazy val blockGenerationDelay =
     math.max(application.settings.blockGenerationDelay.toMillis, BlockGenerationTimeShift.toMillis) millis
@@ -67,7 +65,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
     val schedule = if (application.settings.tflikeScheduling) {
       val lastBlock = application.history.lastBlock
-      val currentTime = currentTimeMillis
+      val currentTime = NTP.correctedTime()
 
       accounts
         .flatMap(acc => consensusModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))

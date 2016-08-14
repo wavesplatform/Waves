@@ -135,9 +135,11 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     if (block.isValid) {
       log.info(s"New block(local: $local): ${block.json}")
 
-      from.foreach { peer =>
-        val sendingStrategy = if (local) Broadcast else SendToRandomExceptOf(maxPeersToBroadcastBlock, Seq(peer))
-        networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), sendingStrategy)
+      val sendingStrategy =
+        if (local) Option(Broadcast) else from.map(peer => SendToRandomExceptOf(maxPeersToBroadcastBlock, Seq(peer)))
+
+      sendingStrategy.foreach {
+        networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), _)
       }
 
       val oldHeight = history.height()
