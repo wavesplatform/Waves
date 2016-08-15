@@ -27,9 +27,9 @@ and agree with license terms
 
 
 
-## Run a node
+## Run a node from package
 
-# Ubuntu
+### Ubuntu
 
 Download deb package from [releases](https://github.com/wavesplatform/Waves/releases)
 
@@ -38,7 +38,7 @@ Install downloaded package using `sudo dpkg -i` command
 Run `waves waves-testnet.json`.
 
 
-### Compile and Create package
+## Compile and Create package from source
 
 For now it is only possible to create deb package.
 
