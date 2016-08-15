@@ -20,7 +20,7 @@
   "rpcPort": 9085,
   "maxRollback": 100,
   "offlineGeneration": true,
-  "scoreBroadcastDelay": 700,
+  "scoreBroadcastDelay": 1000,
   "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",
   "blockGenerationDelay": 5001
 }

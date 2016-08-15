@@ -69,7 +69,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
     case SendCurrentScore =>
       val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
-      networkControllerRef ! NetworkController.SendToNetwork(msg, SendToRandom)
+      networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
 
     // the signal to initialize
     case Unit =>

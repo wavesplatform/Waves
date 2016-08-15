@@ -13,7 +13,7 @@
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
 
   "rpcPort": 9092,
-  "scoreBroadcastDelay": 700,
+  "scoreBroadcastDelay": 1000,
   "maxRollback": 100,
   "history": "blockchain",
   "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",

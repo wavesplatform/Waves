@@ -42,28 +42,30 @@ class MinerSpecification extends ActorTestingCommons {
   f.expects(*).never
   (testConsensusModule.blockOrdering(_: TransactionModule[Unit])).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
 
-  private def setBlockGenExpectations(expected: Seq[Block]): Unit =
+  private def mayBe(b: Boolean): Range = (if (b) 0 else 1) to 1
+
+  private def setBlockGenExpectations(expected: Seq[Block], maybe: Boolean = false): Unit =
     (testConsensusModule.generateNextBlocks(_: Seq[PrivateKeyAccount])(_: TransactionModule[Unit]))
       .expects(Seq(account), *)
       .returns(expected)
-      .once
+      .repeat(mayBe(maybe))
 
-  private def setBlockGenTimeExpectations(block: Block, time: Option[Long]): Unit =
+  private def setBlockGenTimeExpectations(block: Block, time: Option[Long], maybe: Boolean = false): Unit =
     (testConsensusModule.nextBlockGenerationTime(_: Block, _: PublicKeyAccount)(_: TransactionModule[Unit]))
       .expects(block, account, *)
       .returns(time)
-      .once
+      .repeat(mayBe(maybe))
 
-  private def setLastBlockExpectations(block: Block): Unit = {
-    (testHistory.lastBlock _).expects().returns(block).once
+  private def setLastBlockExpectations(block: Block, maybe: Boolean = false): Unit = {
+    (testHistory.lastBlock _).expects().returns(block).repeat(mayBe(maybe))
   }
 
-  private def setExpectations(lastBlockId: Int, d: Option[Duration]): Unit = {
+  private def setExpectations(lastBlockId: Int, d: Option[Duration], maybe: Boolean = false): Unit = {
     val lastBlock = blockMock(lastBlockId)
 
     inSequence {
-      setLastBlockExpectations(lastBlock)
-      setBlockGenTimeExpectations(lastBlock, d.map(currentTimeMillis + _.toMillis))
+      setLastBlockExpectations(lastBlock, maybe)
+      setBlockGenTimeExpectations(lastBlock, d.map(currentTimeMillis + _.toMillis), maybe)
     }
   }
 
@@ -135,22 +137,35 @@ class MinerSpecification extends ActorTestingCommons {
 
             setExpectations(1, Some(calculatedGenDelay))
 
+            setBlockGenExpectations(Seq.empty, maybe = true)
+            setExpectations(1, Some(calculatedGenDelay), maybe = true)
+
             actorRef ! GuessABlock
             testCoordinator.expectNoMsg(calculatedGenDelay + genTimeShift * 2)
           }
         }
       }
 
-      "broken schedule should fallback to default" in {
+      "broken schedule should fallback to default" - {
 
-        setExpectations(1, Some(currentTimeMillis - 10000).map(_ millis))
-        setBlockGenExpectations(Seq(newBlock))
+        def incorrectScheduleScenario(timePoint: Long): Unit = {
+          setExpectations(1, Some(timePoint).map(_ millis))
+          setBlockGenExpectations(Seq(newBlock))
 
-        actorRef ! GuessABlock
+          actorRef ! GuessABlock
 
-        testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
-        testCoordinator.expectMsg(AddBlock(newBlock, None))
-        testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay + genTimeShift)
+          testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
+          testCoordinator.expectMsg(AddBlock(newBlock, None))
+          testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay + genTimeShift)
+        }
+
+        "past" in {
+          incorrectScheduleScenario(currentTimeMillis - 10000)
+        }
+
+        "far future" in {
+          incorrectScheduleScenario(MaxBlockGenerationDelay.toMillis + 174305)
+        }
       }
     }
   }

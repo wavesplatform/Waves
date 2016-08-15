@@ -2,7 +2,7 @@
   "p2p": {
     "nodeName": "Node2",
     "localOnly": true,
-    "bindAddress": "127.0.0.2",
+    "bindAddress": "127.0.0.1",
     "upnp": false,
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
@@ -18,7 +18,7 @@
   "rpcPort": 9086,
   "maxRollback": 100,
   "offlineGeneration": false,
-  "scoreBroadcastDelay": 700,
+  "scoreBroadcastDelay": 1000,
   "blockGenerationDelay": 501,
   "tflikeScheduling": false
 }

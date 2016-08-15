@@ -122,7 +122,7 @@ trait Settings extends ScorexLogging {
 
   val scoreTTL: FiniteDuration = 1.minute
   lazy val scoreBroadcastDelay: FiniteDuration = (settingsJSON \ "scoreBroadcastDelay").asOpt[Long]
-    .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(10.seconds)
+    .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(30.seconds)
 
   lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))

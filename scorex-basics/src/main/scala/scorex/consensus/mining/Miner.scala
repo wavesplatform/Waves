@@ -105,5 +105,5 @@ object Miner {
 
   private[mining] val FailedGenerationDelay = 10 seconds
 
-  private val MaxBlockGenerationDelay = 1 hour
+  private[mining] val MaxBlockGenerationDelay = 1 hour
 }
