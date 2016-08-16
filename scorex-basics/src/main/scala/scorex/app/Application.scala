@@ -22,6 +22,8 @@ trait Application {
 
   val blockStorage: BlockStorage
 
+  val peerManager: ActorRef
+
   val networkController: ActorRef
 
   val coordinator: ActorRef
