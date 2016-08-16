@@ -25,13 +25,6 @@ case class Order(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAsset
   lazy val priceAssetId: Array[Byte] = if (ByteArray.compare(spendAssetId, receiveAssetId) > 0) receiveAssetId
   else spendAssetId
 
-  /**
-    * In what assets is amount
-    */
-  lazy val amountAsset: Array[Byte] = if (priceAssetId sameElements spendAssetId) receiveAssetId
-  else spendAssetId
-
-
   def isValid: Boolean = {
     amount > 0 && price > 0 && maxTimestamp - NTP.correctedTime() < MaxLiveTime &&
       NTP.correctedTime() < maxTimestamp && EllipticCurveImpl.verify(signature, toSign, sender.publicKey)

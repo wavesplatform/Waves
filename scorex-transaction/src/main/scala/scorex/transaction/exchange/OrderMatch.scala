@@ -29,7 +29,7 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
       (order1.matcher.address == order2.matcher.address) &&
         (order1.spendAssetId sameElements order2.receiveAssetId) &&
         (order2.spendAssetId sameElements order1.receiveAssetId) && priceMatches
-    }.ensuring(a => !a || (order1.amountAsset sameElements order2.amountAsset))
+    }.ensuring(a => !a || (order1.priceAssetId sameElements order2.priceAssetId))
     lazy val priceIsValid: Boolean = (order1.price == price) || (order2.price == price)
     lazy val amountIsValid: Boolean = {
       lazy val order1Total = order1Transactions.map(_.amount).sum + amount
