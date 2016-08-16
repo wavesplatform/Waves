@@ -2,7 +2,8 @@ package scorex.transaction
 
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
-import scorex.transaction.exchange.Order
+import scorex.crypto.EllipticCurveImpl
+import scorex.transaction.exchange.{Order, OrderMatch}
 import scorex.utils.NTP
 
 trait TransactionGen {
@@ -42,6 +43,26 @@ trait TransactionGen {
     maxtTime: Long <- Arbitrary.arbitrary[Long]
     matcherFee: Long <- Arbitrary.arbitrary[Long]
   } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
+
+  val orderMatchGenerator: Gen[OrderMatch] = for {
+    sender1: PrivateKeyAccount <- accountGen
+    sender2: PrivateKeyAccount <- accountGen
+    matcher: PrivateKeyAccount <- accountGen
+    spendAssetID: Array[Byte] <- bytes32gen
+    receiveAssetID: Array[Byte] <- bytes32gen
+    price: Long <- positiveLongGen
+    amount: Long <- positiveLongGen
+    maxtTime: Long <- Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
+    timestamp: Long <- positiveLongGen
+    matcherFee: Long <- positiveLongGen
+    fee: Long <- positiveLongGen
+  } yield {
+    val o1 = Order(sender1, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
+    val o2 = Order(sender2, matcher, receiveAssetID, spendAssetID, price, amount, maxtTime, matcherFee)
+    val unsigned = OrderMatch(o1, o2, price, amount, matcherFee * 2, fee, timestamp, Array())
+    val sig = EllipticCurveImpl.sign(matcher, unsigned.toSign)
+    OrderMatch(o1, o2, price, amount, matcherFee * 2, fee, timestamp, sig)
+  }
 
 
 }
