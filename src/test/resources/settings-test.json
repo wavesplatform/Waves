@@ -5,24 +5,19 @@
     "upnp": false,
     "knownPeers": ["127.0.0.1"],
     "port": 9091,
-    "maxConnections": 10
+    "maxConnections": 10,
+    "peersDataBroadcastDelay": 900
   },
 
   "walletPassword": "cookies",
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
 
   "rpcPort": 9092,
-  "rpcAllowed": [
-    "127.0.0.1",
-    "123.123.123.123"
-  ],
-  "perma": {
-    "treeDir": "/tmp/scorex-tests/perma/data/tree",
-    "authDataStorage": "authDataStorage.mapDB"
-  },
+  "scoreBroadcastDelay": 1000,
   "maxRollback": 100,
   "history": "blockchain",
   "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",
   "offlineGeneration": false,
-  "forkChunkSize": 1
+  "forkChunkSize": 1,
+  "cors": true
 }

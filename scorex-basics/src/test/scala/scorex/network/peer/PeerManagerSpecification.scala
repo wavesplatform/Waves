@@ -17,6 +17,8 @@ import scala.util.Success
 import scala.concurrent.duration._
 import akka.util.Timeout
 
+import scala.language.postfixOps
+
 class PeerManagerSpecification extends FunSuite with Matchers with MockFactory with BeforeAndAfterAll {
 
   implicit val actorSystem = ActorSystem("PeerManagerSpecification")
@@ -38,7 +40,7 @@ class PeerManagerSpecification extends FunSuite with Matchers with MockFactory w
     override val settings: Settings = MySettings
   }
 
-  test("PeerManager returns on GetConnectedPeers list of pairs (InetScoketAddress, Handshake)") {
+  test("PeerManager returns on GetConnectedPeers list of pairs (InetSocketAddress, Handshake)") {
     val app = stub[MyApp]
     val peerManager = TestActorRef(new PeerManager(app))
 
@@ -54,10 +56,10 @@ class PeerManagerSpecification extends FunSuite with Matchers with MockFactory w
 
     // assert
     val Success(result2 : List[(InetSocketAddress, Handshake)]) = (peerManager ? GetConnectedPeers).value.get
-    assert(!result2.isEmpty)
-    val peer = result2.head
-    assert(peer._1 == peerAddress)
-    assert(peer._2.applicationName == "scorex")
+    assert(result2.nonEmpty)
+    val (address, h) = result2.head
+    assert(address == peerAddress)
+    assert(h.applicationName == "scorex")
 
     peerManager.stop()
   }

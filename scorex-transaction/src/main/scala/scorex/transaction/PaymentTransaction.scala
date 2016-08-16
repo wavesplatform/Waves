@@ -55,7 +55,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     } else if (amount <= 0) {
       ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
-      ValidationResult.NegativeFee //CHECK IF FEE IS POSITIVE
+      ValidationResult.InsufficientFee //CHECK IF FEE IS POSITIVE
     } else ValidationResult.ValidateOke
 
 

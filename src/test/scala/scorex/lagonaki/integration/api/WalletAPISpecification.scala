@@ -2,8 +2,9 @@ package scorex.lagonaki.integration.api
 
 import org.scalatest.{FunSuite, Matchers}
 import scorex.crypto.encode.Base58
+import scorex.lagonaki.integration.TestLock
 
-class WalletAPISpecification extends FunSuite with Matchers {
+class WalletAPISpecification extends FunSuite with TestLock with Matchers {
 
   import scorex.lagonaki.TestingCommons._
 
@@ -17,5 +18,4 @@ class WalletAPISpecification extends FunSuite with Matchers {
     val response = GET.request("/wallet/seed", headers =  Map("api_key" -> "test"))
     (response \ "seed").as[String] shouldBe Base58.encode(application.settings.walletSeed.get)
   }
-
 }

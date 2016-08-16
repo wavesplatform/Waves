@@ -2,30 +2,23 @@
   "p2p": {
     "nodeName": "Node2",
     "localOnly": true,
-    "bindAddress": "127.0.0.2",
-    "myAddress": "127.0.0.2",
+    "bindAddress": "127.0.0.1",
     "upnp": false,
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
     "port": 9088,
     "knownPeers": ["127.0.0.1:9084"],
-    "maxConnections": 10
+    "maxConnections": 10,
+    "peersDataBroadcastDelay": 900
   },
   "walletDir": "/tmp/scorex-tests/wallet2",
   "walletPassword": "cookies",
   "walletSeed": "111",
   "dataDir": "/tmp/scorex-tests/data2",
   "rpcPort": 9086,
-  "rpcAllowed": [
-    "127.0.0.2",
-    "123.123.123.123"
-  ],
   "maxRollback": 100,
   "offlineGeneration": false,
-  "perma": {
-    "treeDir": "/tmp/scorex-tests/data2/tree/",
-    "authDataStorage": "authDataStorage2.mapDB"
-  },
+  "scoreBroadcastDelay": 1000,
   "blockGenerationDelay": 501,
-  "forkChunkSize": 1
+  "tflikeScheduling": false
 }

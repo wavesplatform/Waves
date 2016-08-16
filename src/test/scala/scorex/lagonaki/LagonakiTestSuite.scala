@@ -6,33 +6,29 @@ import scorex.lagonaki.integration._
 import scorex.lagonaki.integration.api._
 import scorex.lagonaki.unit._
 import scorex.transaction.state.StateTest
-import scorex.transaction.state.database.blockchain.BlockTreeSpecification
 
 class LagonakiTestSuite extends Sequential(
-  //unit tests
-  new MessageSpecification
-  , new BlockSpecification
-  //  , new BlockStorageSpecification
-  , new WalletSpecification
-  , new BlockGeneratorSpecification
-  , new MinerSpecification
-  , new BlockchainSynchronizerSpecification
-  , new CoordinatorSpecification
-  , new ScoreObserverSpecification
-  , new HistoryReplierSpecification
-  , new BlockTreeSpecification
-  , new StateTest
-  , new StoredStateSpecification
+
   // API tests
+  new BlockAPISpecification
   , new UtilsAPISpecification
   , new PeersAPISpecification
   , new WalletAPISpecification
   , new AddressesAPISpecification
   , new TransactionsAPISpecification
   , new PaymentAPISpecification
-  , new BlockAPISpecification
-  //integration tests - slow!
-  //, new ValidChainGenerationSpecification
+
+//unit tests
+  , new MessageSpecification
+  , new BlockSpecification
+  , new WalletSpecification
+  , new BlockGeneratorSpecification
+  , new CoordinatorSpecification
+  , new StateTest
+  , new StoredStateSpecification
+
+//integration tests - slow!
+  , new ValidChainGenerationSpecification
 
 ) with BeforeAndAfterAll {
 

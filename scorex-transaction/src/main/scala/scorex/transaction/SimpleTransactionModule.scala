@@ -1,7 +1,6 @@
 package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Ints}
-import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.RunnableApplication
@@ -10,8 +9,7 @@ import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
+import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet.Payment
 import scorex.utils._
 import scorex.wallet.Wallet
@@ -44,38 +42,14 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
 
   import SimpleTransactionModule._
 
-  val consensusModule = application.consensusModule
   val networkController = application.networkController
 
   val TransactionSizeLength = 4
   val InitialBalance = 60000000000L
 
-  private val instance = this
-
   override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl
 
-  override val blockStorage = new BlockStorage {
-
-    val db = settings.dataDirOpt match {
-      case Some(dataFolder) => new MVStore.Builder().fileName(dataFolder + s"/blockchain.dat").compress().open()
-      case None => new MVStore.Builder().open()
-    }
-
-    override val MaxRollback: Int = settings.MaxRollback
-
-    override val history: History = settings.history match {
-      case s: String if s.equalsIgnoreCase("blockchain") =>
-        new StoredBlockchain(db)(consensusModule, instance)
-      case s: String if s.equalsIgnoreCase("blocktree") =>
-        new StoredBlockTree(settings.dataDirOpt, MaxRollback)(consensusModule, instance)
-      case s =>
-        log.error(s"Unknown history storage: $s. Use StoredBlockchain...")
-        new StoredBlockchain(db)(consensusModule, instance)
-    }
-
-    override val state = new StoredState(db)
-
-  }
+  override val blockStorage = new BlockStorageImpl(settings)(application.consensusModule, this)
 
   /**
     * In Lagonaki, transaction-related data is just sequence of transactions. No Merkle-tree root of txs / state etc

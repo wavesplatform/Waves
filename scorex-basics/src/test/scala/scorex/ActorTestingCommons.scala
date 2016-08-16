@@ -1,4 +1,4 @@
-package scorex.lagonaki
+package scorex
 
 import java.net.InetSocketAddress
 
@@ -13,7 +13,7 @@ import scorex.block.Block._
 import scorex.consensus.ConsensusModule
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
-import scorex.network.{ConnectedPeer, SendToChosen}
+import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
 import scorex.transaction.TransactionModule
 
 import scala.concurrent.duration._
@@ -67,7 +67,7 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids:_*)
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
-  protected def mockBlock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
+  protected def blockMock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
     trait BlockMock extends Block {
       override type ConsensusDataType = Unit
       override type TransactionDataType = Unit
@@ -90,9 +90,14 @@ abstract class ActorTestingCommons extends TestKitBase
   }
 
   protected def expectNetworkMessage[Content : TestDataExtraction](expectedSpec: MessageSpec[Content], expectedData: Any): Unit =
+    expectNetworkMessage(expectedSpec, expectedData, { _.asInstanceOf[SendToChosen].chosenPeers.contains(peer) })
+
+  protected def expectNetworkMessage[Content : TestDataExtraction](expectedSpec: MessageSpec[Content],
+                                                                   expectedData: Any,
+                                                                   strategyAssertion: SendingStrategy => Boolean): Unit =
     networkController.expectMsgPF(hint = expectedData.toString) {
-      case SendToNetwork(Message(spec, Right(data: Content@unchecked), None), SendToChosen(peers)) =>
-        peers should contain (peer)
+      case SendToNetwork(Message(spec, Right(data: Content@unchecked), None), st) =>
+        strategyAssertion(st) shouldBe true
         spec shouldEqual expectedSpec
         implicitly[TestDataExtraction[Content]].extract(data) shouldEqual expectedData
     }

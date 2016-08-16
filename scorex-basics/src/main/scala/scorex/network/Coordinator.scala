@@ -3,6 +3,7 @@ package scorex.network
 import akka.actor.Actor
 import scorex.app.Application
 import scorex.block.Block
+import scorex.block.Block.BlockId
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
 import scorex.consensus.mining.Miner.GuessABlock
 import scorex.crypto.encode.Base58.encode
@@ -32,8 +33,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   private val forkResolveQuorumSize = application.settings.forkResolveQuorumSize
   private val maxPeersToBroadcastBlock = application.settings.maxPeersToBroadcastBlock
 
-  //todo: make configurable
-  context.system.scheduler.schedule(1.second, 2.seconds, self, SendCurrentScore)
+  context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, SendCurrentScore)
 
   blockGenerator ! StartGeneration
 
@@ -43,7 +43,9 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
       val peers = candidates.filter(_._2 > localScore)
 
-      if (peers.size < forkResolveQuorumSize) {
+      if (peers.isEmpty) {
+        log.trace(s"No peers to sync with, local score: $localScore")
+      } else if (peers.size < forkResolveQuorumSize) {
         log.debug(s"Quorum to download fork is not reached: ${peers.size} peers but should be $forkResolveQuorumSize")
       } else {
         log.info(s"min networkScore=${peers.minBy(_._2)} > localScore=$localScore")
@@ -54,9 +56,9 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     case SyncFinished(_, result) =>
       scoreObserver ! GetScore
       result foreach {
-        case (blocks, from, noMoreBlockIds) =>
-          log.info(s"Going to process ${blocks.size} blocks")
-          processFork(blocks, from, noMoreBlockIds)
+        case (lastCommonBlockId, blocks, from) =>
+          log.info(s"Going to process a fork")
+          processFork(lastCommonBlockId, blocks, from)
       }
 
     case AddBlock(block, from) =>
@@ -67,7 +69,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
     case SendCurrentScore =>
       val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
-      networkControllerRef ! NetworkController.SendToNetwork(msg, SendToRandom)
+      networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
 
     // the signal to initialize
     case Unit =>
@@ -77,7 +79,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     val parentBlockId = comingBlock.referenceField.value
     val locallyGenerated = from.isEmpty
 
-    val isBlockToBeAdded = if (!locallyGenerated && history.contains(comingBlock)) {
+    val isBlockToBeAdded = if (history.contains(comingBlock)) {
       // we have already got the block - skip
       false
     } else if (history.contains(parentBlockId)) {
@@ -113,63 +115,36 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     }
   }
 
-  private def processFork(blocks: Seq[Block], from: Option[ConnectedPeer], noMoreBlockIds: Boolean): Unit =
-    blocks.headOption.map(_.referenceField.value).foreach { lastCommonBlockId =>
+  private def processFork(lastCommonBlockId: BlockId, blocks: Iterator[Block], from: Option[ConnectedPeer]): Unit = {
+    val initialScore = history.score()
 
-      def blacklist() = from.foreach(_.handlerRef ! PeerConnectionHandler.Blacklist)
+    application.blockStorage.removeAfter(lastCommonBlockId)
 
-      val initialScore = history.score()
-
-      val expectedScore = blocks.foldLeft(history.scoreOf(lastCommonBlockId)) {
-        (sum, block) =>
-          val c = application.consensusModule
-          c.cumulativeBlockScore(sum, c.blockScore(block))
-      }
-
-      if (expectedScore <= initialScore && noMoreBlockIds) {
-        log.warn(s"Expected score ($expectedScore) is less than initial ($initialScore), the fork is rejected")
-        blacklist()
-      } else {
-
-        log.debug(s"Expected score ($expectedScore) vs initial ($initialScore)")
-
-        val revertedBlocks =
-          history.heightOf(lastCommonBlockId).map(history.height() - _).filter(_ > 0).toList.flatMap {
-            tailSize =>
-              val lastBlocks = history.lastBlocks(tailSize)
-              application.blockStorage.removeAfter(lastCommonBlockId)
-              lastBlocks
-          }
-
-        blocks.find(!processNewBlock(_, None, local = false)).foreach { failedBlock =>
-          log.warn(s"Can't apply block: ${failedBlock.json}")
-          if (history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)) {
-            blacklist()
-          }
-          if (blocks.head == failedBlock && revertedBlocks.nonEmpty) {
-            log.warn(s"Return back ${revertedBlocks.size} reverted blocks: ${revertedBlocks.map(_.encodedId)}")
-            revertedBlocks.reverse.foreach(application.blockStorage.appendBlock)
-          }
-        }
-
-        val finalScore = history.score()
-        // todo if (finalScore != expectedScore) log.debug(s"Final score ($finalScore) not equal expected ($expectedScore)")
-        if (finalScore <= initialScore) log.warn(s"Final score ($finalScore) is less than initial ($initialScore)")
+    blocks.find(!processNewBlock(_, None, local = false)).foreach { failedBlock =>
+      log.warn(s"Can't apply block: ${failedBlock.json}")
+      if (history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)) {
+        from.foreach(_.handlerRef ! PeerConnectionHandler.Blacklist)
       }
     }
+
+    val finalScore = history.score()
+    if (finalScore < initialScore) log.warn(s"Final score ($finalScore) is less than initial ($initialScore)")
+  }
 
   private def processNewBlock(block: Block, from: Option[ConnectedPeer], local: Boolean): Boolean = Try {
     if (block.isValid) {
       log.info(s"New block(local: $local): ${block.json}")
 
-      from.foreach { peer =>
-        val sendingStrategy = if (local) Broadcast else SendToRandomExceptOf(maxPeersToBroadcastBlock, Seq(peer))
-        networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), sendingStrategy)
+      val sendingStrategy =
+        if (local) Option(Broadcast) else from.map(peer => SendToRandomExceptOf(maxPeersToBroadcastBlock, Seq(peer)))
+
+      sendingStrategy.foreach {
+        networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), _)
       }
 
       val oldHeight = history.height()
       val oldScore = history.score()
-      transactionalModule.blockStorage.appendBlock(block) match {
+      application.blockStorage.appendBlock(block) match {
         case Success(_) =>
           block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
           log.info(
@@ -198,7 +173,7 @@ object Coordinator {
 
   case class AddBlock(block: Block, generator: Option[ConnectedPeer])
 
-  case class SyncFinished(success: Boolean, result: Option[(Seq[Block], Option[ConnectedPeer], Boolean)])
+  case class SyncFinished(success: Boolean, result: Option[(BlockId, Iterator[Block], Option[ConnectedPeer])])
 
   object SyncFinished {
     def unsuccessfully: SyncFinished = SyncFinished(success = false, None)

@@ -46,7 +46,7 @@ trait History {
 
   def contains(id: BlockId): Boolean = blockById(id).isDefined
 
-  def blockById(blockId: Block.BlockId): Option[Block]
+  def blockById(blockId: BlockId): Option[Block]
 
   def blockById(blockId: String): Option[Block] = Base58.decode(blockId).toOption.flatMap(blockById)
 
@@ -55,7 +55,7 @@ trait History {
     */
   def heightOf(block: Block): Option[Int] = heightOf(block.uniqueId)
 
-  def heightOf(blockId: Block.BlockId): Option[Int]
+  def heightOf(blockId: BlockId): Option[Int]
 
   /**
     * Use BlockStorage.appendBlock(block: Block) if you want to automatically update state

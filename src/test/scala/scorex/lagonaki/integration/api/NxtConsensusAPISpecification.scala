@@ -4,8 +4,9 @@ import org.scalatest.{FunSuite, Matchers}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TestingCommons
+import scorex.lagonaki.integration.TestLock
 
-class NxtConsensusAPISpecification extends FunSuite with Matchers {
+class NxtConsensusAPISpecification extends FunSuite with TestLock with Matchers {
 
   import TestingCommons._
 

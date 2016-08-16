@@ -137,7 +137,7 @@ class StoredBlockTree(dataFolderOpt: Option[String], MaxRollback: Int)
           if (height() - p._3 > MaxRollback) {
             throw new Error(s"Trying to add block with too old parent")
           } else {
-            val s = consensusModule.cumulativeBlockScore(p._2, blockScore)
+            val s = ConsensusModule.cumulativeBlockScore(p._2, blockScore)
             map.put(block.uniqueId, (block.bytes, s, p._3 + 1))
             db.commit()
             if (s >= score()) {

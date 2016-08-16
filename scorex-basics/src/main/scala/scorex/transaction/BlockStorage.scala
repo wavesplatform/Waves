@@ -4,6 +4,7 @@ import org.h2.mvstore.MVStore
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
+import scorex.network.BlockSeq
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success, Try}
@@ -13,13 +14,11 @@ import scala.util.{Failure, Success, Try}
   */
 trait BlockStorage extends ScorexLogging {
 
-  val db: MVStore
-
-  val MaxRollback: Int
-
-  val history: History
+  def history: History
 
   def state: LagonakiState
+
+  def blockSeq: BlockSeq
 
   //Append block to current state
   def appendBlock(block: Block): Try[Unit] = {
@@ -55,7 +54,7 @@ trait BlockStorage extends ScorexLogging {
     }
   }
 
-
+  protected[this] val db: MVStore
 }
 
 object BlockStorage {

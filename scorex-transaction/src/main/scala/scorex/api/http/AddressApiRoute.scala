@@ -17,8 +17,9 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
+case class AddressApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+  val settings = application.settings
 
   private val wallet = application.wallet
   private val state = application.blockStorage.state
@@ -217,15 +218,13 @@ case class AddressApiRoute(override val application: RunnableApplication)(implic
 
   @Path("/")
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
-  def create: Route = {
-    path("addresses") {
-      withAuth {
-        postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            wallet.generateNewAccount() match {
-              case Some(pka) => JsonResponse(Json.obj("address" -> pka.address), StatusCodes.OK)
-              case None => Unknown.response
-            }
+  def create: Route = path("addresses") {
+    withAuth {
+      postJsonRoute {
+        walletNotExists(wallet).getOrElse {
+          wallet.generateNewAccount() match {
+            case Some(pka) => JsonResponse(Json.obj("address" -> pka.address), StatusCodes.OK)
+            case None => Unknown.response
           }
         }
       }
@@ -245,6 +244,7 @@ case class AddressApiRoute(override val application: RunnableApplication)(implic
       JsonResponse(json, StatusCodes.OK)
     }
   }
+
   private def signPath(address: String, encode: Boolean) = {
     entity(as[String]) { message =>
       withAuth {
@@ -260,7 +260,7 @@ case class AddressApiRoute(override val application: RunnableApplication)(implic
                     case Success(signature) =>
                       val msg = if (encode) Base58.encode(message.getBytes) else message
                       val json = Json.obj("message" -> msg,
-                        "publickey" -> Base58.encode(account.publicKey),
+                        "publicKey" -> Base58.encode(account.publicKey),
                         "signature" -> Base58.encode(signature))
                       JsonResponse(json, StatusCodes.OK)
                     case Failure(t) => JsonResponse(json(t), StatusCodes.InternalServerError)

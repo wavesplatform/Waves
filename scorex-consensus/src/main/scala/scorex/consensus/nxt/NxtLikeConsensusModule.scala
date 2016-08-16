@@ -71,7 +71,9 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     val balance = generatingBalance(account)
 
-    val lastBlock = tm.blockStorage.history.lastBlock
+    val history = tm.blockStorage.history
+
+    val lastBlock = history.lastBlock
     val lastBlockKernelData = consensusBlockData(lastBlock)
 
     val lastBlockTime = lastBlock.timestampField.value
@@ -85,7 +87,10 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     log.debug(s"hit: $h, target: $t, generating ${h < t}, eta $eta, " +
       s"account:  $account " +
-      s"account balance: $balance"
+      s"account balance: $balance " +
+      s"last block id: ${lastBlock.encodedId}, " +
+      s"height: ${history.heightOf(lastBlock)}, " +
+      s"last block target: ${lastBlockKernelData.baseTarget}"
     )
 
     if (h < t) {
@@ -113,12 +118,32 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
   override def nextBlockGenerationTime[TT](lastBlock: Block, account: PublicKeyAccount)
                                           (implicit tm: TransactionModule[TT]): Option[Long] = {
-    val cData = consensusBlockData(lastBlock)
-    val hit = calcHit(cData, account)
     val balance = generatingBalance(account)
 
     if (balance == 0) None else {
-      Some((hit / (cData.baseTarget * balance)).toLong * 1000 + lastBlock.timestampField.value)
+      val cData = consensusBlockData(lastBlock)
+      val hit = calcHit(cData, account)
+      val t = cData.baseTarget
+
+      val history = tm.blockStorage.history
+
+      val result =
+        Some((hit * 1000) / (BigInt(t) * balance) + lastBlock.timestampField.value)
+          .filter(_ > 0).filter(_ < Long.MaxValue)
+          .map(_.toLong)
+
+      val currentTime =  NTP.correctedTime()
+
+      log.debug(s"Next block gen time: $result " +
+        s"in ${result.map(t => (t - currentTime) / 1000)} seconds, " +
+        s"hit: $hit, target: $t, " +
+        s"account:  $account " +
+        s"account balance: $balance " +
+        s"last block id: ${lastBlock.encodedId}, " +
+        s"height: ${history.heightOf(lastBlock)}"
+      )
+
+      result
     }
   }
 

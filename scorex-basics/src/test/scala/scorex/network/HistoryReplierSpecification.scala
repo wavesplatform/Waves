@@ -1,11 +1,9 @@
-package scorex.lagonaki.integration
+package scorex.network
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.Props
+import scorex.ActorTestingCommons
 import scorex.block.Block._
-import scorex.lagonaki.ActorTestingCommons
 import scorex.network.BlockchainSynchronizer.{InnerId, InnerIds}
-import scorex.network.HistoryReplier
-import scorex.network.message.BasicMessagesRepo
 import scorex.settings.SettingsMock
 import scorex.transaction.History
 
@@ -25,7 +23,7 @@ class HistoryReplierSpecification extends ActorTestingCommons {
   }
 
   private object TestSettings extends SettingsMock {
-    override val MaxBlocksChunks = 5
+    override lazy val forkMaxLength = 5
   }
 
   private val lastHistoryBlockId = 20
@@ -52,7 +50,7 @@ class HistoryReplierSpecification extends ActorTestingCommons {
     "return block signatures" in {
       val last = 10
       sendSignatures(last, 8) // according to the protocol ids come in reverse order!
-      expectedSignaturesSpec(last to last + TestSettings.MaxBlocksChunks)
+      expectedSignaturesSpec(last to last + TestSettings.forkMaxLength)
     }
 
     "history contains less block signatures than requested" in {

@@ -1,7 +1,9 @@
-**v1.3.x**
+**v1.3.3**
 ----------
 
 * AddressScheme added for ChainID injection.
+* New Blockchain synchronization algo
+* Fixed invalid CORS headers in HTTP API
 
 **v1.3.2**
 ----------

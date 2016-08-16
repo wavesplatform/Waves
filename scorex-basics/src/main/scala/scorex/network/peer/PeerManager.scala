@@ -9,6 +9,7 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
+import scala.collection.mutable.{Set => MutableSet}
 import scala.util.Random
 
 /**
@@ -23,6 +24,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private val connectedPeers = mutable.Map[ConnectedPeer, Option[Handshake]]()
   private var connectingPeer: Option[InetSocketAddress] = None
 
+  private val nonces = new mutable.HashMap[Long, MutableSet[InetSocketAddress]] with mutable.MultiMap[Long, InetSocketAddress]
+  nonces += application.settings.nodeNonce -> MutableSet.empty
+
+  assert(nonces.keys.size == 1, "app nonce should be registered on start")
+
   private lazy val settings = application.settings
   private lazy val networkController = application.networkController
 
@@ -34,29 +40,25 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     peerDatabase.addOrUpdateKnownPeer(address, defaultPeerInfo)
   }
 
-  private def randomPeer(): Option[InetSocketAddress] = {
-    val peers = peerDatabase.knownPeers(true).keys.toSeq
+  private def randomPeer(): Option[(InetSocketAddress, PeerInfo)] = {
+    val peers = peerDatabase.knownPeers(true).toSeq
     if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
     else None
   }
 
   private def peerListOperations: Receive = {
     case AddOrUpdatePeer(address, peerNonceOpt, peerNameOpt) =>
-      val peerInfo = PeerInfo(System.currentTimeMillis(), peerNonceOpt, peerNameOpt)
-      peerDatabase.addOrUpdateKnownPeer(address, peerInfo)
+      addOrUpdatePeer(address, peerNonceOpt, peerNameOpt)
 
     case KnownPeers =>
       sender() ! peerDatabase.knownPeers(false).keys.toSeq
 
-    case RandomPeer =>
-      sender() ! randomPeer()
-
-    case RandomPeers(howMany: Int) =>
-      sender() ! Random.shuffle(peerDatabase.knownPeers(false).keys.toSeq).take(howMany)
+    case RandomPeers(howMany, excludeSelf) =>
+      sender() ! Random.shuffle(peerDatabase.knownPeers(excludeSelf).keys.toSeq).take(howMany)
 
     case FilterPeers(sendingStrategy: SendingStrategy) =>
       val chosen = sendingStrategy.choose(connectedPeers.keys.toSeq)
-      if (chosen.isEmpty) log.trace("No peers chosen")
+      log.trace(s"${chosen.length} peers has been chosen")
       sender() ! chosen
   }
 
@@ -90,36 +92,51 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       if (peerDatabase.isBlacklisted(address)) {
         log.info(s"Got handshake from blacklisted $address")
       } else {
-        val toUpdate = connectedPeers.filter { case (cp, h) =>
-          cp.socketAddress == address || h.map(_.nodeNonce == handshake.nodeNonce).getOrElse(true)
-        }
-
-        if (toUpdate.isEmpty) {
-          log.error("No peer to update")
-        } else {
-          val newCp = toUpdate
-            .find(t => handshake.declaredAddress.contains(t._1.socketAddress))
-            .getOrElse(toUpdate.head)
-            ._1
-
-          toUpdate.keys.foreach(connectedPeers.remove)
-
-          //drop connection to self if occurred
-          if (handshake.nodeNonce == application.settings.nodeNonce) {
-            newCp.handlerRef ! PeerConnectionHandler.CloseConnection
-          } else {
-            handshake.declaredAddress.foreach(address => self ! PeerManager.AddOrUpdatePeer(address, None, None))
-            connectedPeers += newCp -> Some(handshake)
-          }
-        }
+        handleHandshake(address, handshake)
       }
 
     case Disconnected(remote) =>
-      connectedPeers.retain { case (p, _) => p.socketAddress != remote }
       if (connectingPeer.contains(remote)) {
         connectingPeer = None
       }
-  }
+      connectedPeers.find(_._1.socketAddress == remote).flatMap(_._2).map(_.nodeNonce)
+        .foreach {
+          nonce =>
+            val peersWithTheNonce = nonces(nonce)
+            connectedPeers.retain { case (p, _) => ! peersWithTheNonce.contains(p.socketAddress) }
+            nonces -= nonce
+        }
+ }
+
+  private def handleHandshake(address: InetSocketAddress, handshake: Handshake): Unit =
+    connectedPeers.find(peer => peer._1.socketAddress == address && peer._2.isEmpty)
+      .orElse ( { log.error("No peer to validate"); None } )
+      .foreach { case (connectedPeer, _) =>
+
+        val handshakeNonce = handshake.nodeNonce
+
+        def updateHandshakedPeer() = nonces.addBinding(handshakeNonce, address)
+
+        if (nonces.keys.contains(handshakeNonce)) {
+          val peers = nonces(handshakeNonce)
+
+          if (peers.nonEmpty)
+            log.info(s"Peer $address has come with nonce $handshakeNonce corresponding to: ${peers.mkString(",")}")
+          else
+            log.info("Drop connection to self")
+
+          updateHandshakedPeer()
+          connectedPeers -= connectedPeer
+          connectedPeer.handlerRef ! PeerConnectionHandler.CloseConnection
+        } else {
+          updateHandshakedPeer()
+          handshake.declaredAddress.foreach { addOrUpdatePeer(_, None, None) }
+          connectedPeers += connectedPeer -> Some(handshake)
+        }
+      }
+
+  private def addOrUpdatePeer(address: InetSocketAddress, peerNonce: Option[Long], nodeName: Option[String]) =
+    peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(System.currentTimeMillis(), peerNonce, nodeName))
 
   private def blackListOperations: Receive = {
     case AddToBlacklist(peer) =>
@@ -134,15 +151,17 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   override def receive: Receive = ({
     case CheckPeers =>
       if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
-        randomPeer().foreach { address =>
-          log.debug(s"Trying connect to random peer $address")
-          if (!connectedPeers.map(_._1.socketAddress).contains(address)) {
+        randomPeer().foreach { case (address, _) =>
+          val addresses = connectedPeers.map(_._1.socketAddress)
+          if ( ! (nonces.values.flatten.contains(address) || addresses.contains(address)) ) {
+            log.debug(s"Trying connect to random peer $address")
             connectingPeer = Some(address)
             networkController ! NetworkController.ConnectTo(address)
           }
         }
       }
   }: Receive) orElse blackListOperations orElse peerListOperations orElse apiInterface orElse peerCycle
+
 }
 
 object PeerManager {
@@ -151,9 +170,7 @@ object PeerManager {
 
   case object KnownPeers
 
-  case object RandomPeer
-
-  case class RandomPeers(hawMany: Int)
+  case class RandomPeers(howMany: Int, excludeSelf: Boolean = true)
 
   case object CheckPeers
 

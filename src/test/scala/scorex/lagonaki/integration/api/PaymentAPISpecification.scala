@@ -2,8 +2,9 @@ package scorex.lagonaki.integration.api
 
 import org.scalatest.{FunSuite, Matchers}
 import scorex.lagonaki.TransactionTestingCommons
+import scorex.lagonaki.integration.TestLock
 
-class PaymentAPISpecification extends FunSuite with Matchers with TransactionTestingCommons {
+class PaymentAPISpecification extends FunSuite with TestLock with Matchers with TransactionTestingCommons {
 
   import scorex.lagonaki.TestingCommons._
 
@@ -26,4 +27,8 @@ class PaymentAPISpecification extends FunSuite with Matchers with TransactionTes
 
   }
 
+  test("POST /payment API route returns correct CORS for invalid api key") {
+    val response = POST.requestRaw(us = "/payment", headers = Map("api_key" -> "invalid"))
+    assert(response.getHeaders("Access-Control-Allow-Origin").size == 1)
+  }
 }

@@ -1,8 +1,6 @@
 package scorex.lagonaki.mocks
 
-import scorex.account.PublicKeyAccount
-import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
-import scorex.transaction.TransactionModule
+import scorex.consensus.nxt.NxtLikeConsensusModule
 
 class ConsensusMock extends NxtLikeConsensusModule {
 

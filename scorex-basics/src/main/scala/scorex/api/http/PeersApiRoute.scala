@@ -19,8 +19,10 @@ import scala.util.Try
 
 @Path("/peers")
 @Api(value = "/peers", description = "Get info about peers", position = 2)
-case class PeersApiRoute(override val application: RunnableApplication)(implicit val context: ActorRefFactory)
+case class PeersApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute {
+
+  val settings = application.settings
 
   override lazy val route =
     pathPrefix("peers") {

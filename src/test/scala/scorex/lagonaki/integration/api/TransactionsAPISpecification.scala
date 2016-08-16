@@ -6,8 +6,9 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.GenesisTransaction
+import scorex.lagonaki.integration.TestLock
 
-class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons {
+class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with TestLock {
 
   import scorex.lagonaki.TestingCommons._
 

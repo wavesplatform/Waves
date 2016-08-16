@@ -21,12 +21,6 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
     */
   def generators(block: Block): Seq[Account]
 
-  /**
-    * A naive but still a way to emphasize that cumulative score is sum of block scores
-    */
-  def cumulativeBlockScore(previousCumulativeScore: BigInt, blockScore: BigInt): BigInt =
-    previousCumulativeScore + blockScore
-
   def blockScore(block: Block): BigInt
 
   def blockOrdering[TransactionalBlockData](implicit transactionModule: TransactionModule[TransactionalBlockData]): Ordering[(Block)] =
@@ -51,4 +45,12 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
                                  (implicit transactionModule: TransactionModule[TransactionalBlockData]): Option[Long]
 
   def consensusBlockData(block: Block): ConsensusBlockData
+}
+
+object ConsensusModule {
+
+  /**
+    * A naive but still a way to emphasize that cumulative score is sum of block scores
+    */
+  def cumulativeBlockScore(previousCumulativeScore: BigInt, blockScore: BigInt): BigInt = previousCumulativeScore + blockScore
 }

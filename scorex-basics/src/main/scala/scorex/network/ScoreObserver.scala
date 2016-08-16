@@ -9,6 +9,7 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 //todo: break a connection if no score message from remote for some time?
 
