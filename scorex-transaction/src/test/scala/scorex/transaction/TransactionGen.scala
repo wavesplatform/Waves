@@ -32,4 +32,16 @@ trait TransactionGen {
     matcherFee: Long <- positiveLongGen
   } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
 
+  val invalidOrderGenerator: Gen[Order] = for {
+    sender: PrivateKeyAccount <- accountGen
+    matcher: PrivateKeyAccount <- accountGen
+    spendAssetID: Array[Byte] <- bytes32gen
+    receiveAssetID: Array[Byte] <- bytes32gen
+    price: Long <- Arbitrary.arbitrary[Long]
+    amount: Long <- Arbitrary.arbitrary[Long]
+    maxtTime: Long <- Arbitrary.arbitrary[Long]
+    matcherFee: Long <- Arbitrary.arbitrary[Long]
+  } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
+
+
 }

@@ -1,9 +1,12 @@
 package scorex.transaction.exchange
 
+import com.google.common.primitives.{Ints, Longs}
 import play.api.libs.json.JsObject
 import scorex.crypto.EllipticCurveImpl
-import scorex.serialization.BytesSerializable
+import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.Transaction
+
+import scala.util.Try
 
 case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, matcherFee: Long, fee: Long,
                       timestamp: Long, signature: Array[Byte]) extends Transaction with BytesSerializable {
@@ -44,8 +47,26 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
       matcherFeeIsValid && matcherSignatureIsValid
   }
 
-  lazy val toSign: Array[Byte] = ???
+  lazy val toSign: Array[Byte] = Ints.toByteArray(order1.bytes.length) ++ Ints.toByteArray(order2.bytes.length) ++
+    order1.bytes ++ order2.bytes ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+    Longs.toByteArray(matcherFee) ++ Longs.toByteArray(fee) ++ Longs.toByteArray(timestamp)
 
   override def bytes: Array[Byte] = toSign ++ signature
 }
 
+object OrderMatch extends Deser[OrderMatch] {
+  override def parseBytes(bytes: Array[Byte]): Try[OrderMatch] = Try {
+    val o1Size = Ints.fromByteArray(bytes.slice(0, 4))
+    val o2Size = Ints.fromByteArray(bytes.slice(4, 8))
+    val o1 = Order.parseBytes(bytes.slice(8, 8 + o1Size)).get
+    val o2 = Order.parseBytes(bytes.slice(8 + o1Size, 8 + o1Size + o2Size)).get
+    val s = 8 + o1Size + o2Size
+    val price = Longs.fromByteArray(bytes.slice(s, s + 8))
+    val amount = Longs.fromByteArray(bytes.slice(s + 8, s + 16))
+    val matcherFee = Longs.fromByteArray(bytes.slice(s + 16, s + 24))
+    val fee = Longs.fromByteArray(bytes.slice(s + 24, s + 32))
+    val timestamp = Longs.fromByteArray(bytes.slice(s + 32, s + 40))
+    val signature = bytes.slice(s + 40, bytes.length)
+    OrderMatch(o1, o2, price, amount, matcherFee, fee, timestamp, signature)
+  }
+}
