@@ -1,8 +1,9 @@
 package scorex.transaction.exchange
 
 import com.google.common.primitives.{Ints, Longs}
-import play.api.libs.json.JsObject
+import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.Transaction
 
@@ -11,7 +12,16 @@ import scala.util.Try
 case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, matcherFee: Long, fee: Long,
                       timestamp: Long, signature: Array[Byte]) extends Transaction with BytesSerializable {
 
-  override def json: JsObject = ???
+  override def json: JsObject = Json.obj(
+    "order1" -> order1.json,
+    "order2" -> order2.json,
+    "price" -> price,
+    "amount" -> amount,
+    "matcherFee" -> matcherFee,
+    "fee" -> fee,
+    "timestamp" -> timestamp,
+    "signature" -> Base58.encode(signature)
+  )
 
   def isValid(previousMatches: Seq[OrderMatch]): Boolean = {
     lazy val order1Transactions = previousMatches.filter { om =>
