@@ -12,6 +12,5 @@ trait Transaction extends StateChangeReason with JsonSerializable {
   val fee: Long
 
   val timestamp: Long
-  val recipient: Account
 
 }

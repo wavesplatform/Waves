@@ -12,7 +12,7 @@ import scala.util.{Failure, Try}
 
 
 abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
-                                   override val recipient: Account,
+                                   val recipient: Account,
                                    val amount: Long,
                                    override val fee: Long,
                                    override val timestamp: Long,

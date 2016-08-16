@@ -3,6 +3,7 @@ package scorex.transaction
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.exchange.Order
+import scorex.utils.NTP
 
 trait TransactionGen {
 
@@ -27,8 +28,8 @@ trait TransactionGen {
     receiveAssetID: Array[Byte] <- bytes32gen
     price: Long <- positiveLongGen
     amount: Long <- positiveLongGen
-    maxTime: Long <- positiveLongGen
+    maxtTime: Long <- Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
     matcherFee: Long <- positiveLongGen
-  } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxTime, matcherFee)
+  } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
 
 }

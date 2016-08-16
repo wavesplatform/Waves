@@ -41,7 +41,7 @@ case class Order(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAsset
 }
 
 object Order extends Deser[Order] {
-  val MaxLiveTime = 30 * 24 * 60 * 60 * 1000
+  val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
   private val AssetIdLength = 32
 
   def apply(sender: PrivateKeyAccount, matcher: PublicKeyAccount, spendAssetID: Array[Byte],

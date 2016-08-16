@@ -1,11 +1,14 @@
 package scorex.transaction.exchange
 
+import play.api.libs.json.JsObject
 import scorex.crypto.EllipticCurveImpl
 import scorex.serialization.BytesSerializable
+import scorex.transaction.Transaction
 
 case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, matcherFee: Long, fee: Long,
-                      timestamp: Long, matcherSignature: Array[Byte])
-  extends BytesSerializable {
+                      timestamp: Long, signature: Array[Byte]) extends Transaction with BytesSerializable {
+
+  override def json: JsObject = ???
 
   def isValid(previousMatches: Seq[OrderMatch]): Boolean = {
     lazy val order1Transactions = previousMatches.filter { om =>
@@ -35,7 +38,7 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
       matcherFee <= (o1maxFee + o2maxFee)
     }
     lazy val matcherSignatureIsValid: Boolean =
-      EllipticCurveImpl.verify(matcherSignature, toSign, order1.matcher.publicKey)
+      EllipticCurveImpl.verify(signature, toSign, order1.matcher.publicKey)
 
     amount > 0 && price > 0 && ordersMatches && order1.isValid && order2.isValid && priceIsValid && amountIsValid &&
       matcherFeeIsValid && matcherSignatureIsValid
@@ -43,6 +46,6 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
 
   lazy val toSign: Array[Byte] = ???
 
-  override def bytes: Array[Byte] = toSign ++ matcherSignature
+  override def bytes: Array[Byte] = toSign ++ signature
 }
 

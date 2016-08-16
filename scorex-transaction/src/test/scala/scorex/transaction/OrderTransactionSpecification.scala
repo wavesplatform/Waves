@@ -12,4 +12,10 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
       recovered.bytes shouldEqual order.bytes
     }
   }
+
+  property("Order generator should generate valid orders") {
+    forAll(orderGenerator) { order: Order =>
+      order.isValid shouldBe true
+    }
+  }
 }
