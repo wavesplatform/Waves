@@ -1,32 +1,23 @@
 package scorex.transaction.exchange
 
 import com.google.common.primitives.Longs
-import play.api.libs.json.{Json, JsObject}
+import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.{JsonSerializable, BytesSerializable, Deser}
+import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.utils.{ByteArray, NTP}
 
 import scala.util.Try
 
+/**
+  * Order to matcher service for asset exchange
+  */
 case class Order(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAssetId: Array[Byte],
                  receiveAssetId: Array[Byte], price: Long, amount: Long, maxTimestamp: Long, matcherFee: Long,
                  signature: Array[Byte]) extends BytesSerializable with JsonSerializable {
 
   import Order._
-
-  override def json: JsObject = Json.obj(
-    "sender" -> sender.address,
-    "matcher" -> matcher.address,
-    "spendAssetId" -> Base58.encode(spendAssetId),
-    "receiveAssetId" -> Base58.encode(receiveAssetId),
-    "price" -> price,
-    "amount" -> amount,
-    "maxTimestamp" -> maxTimestamp,
-    "matcherFee" -> matcherFee,
-    "signature" -> Base58.encode(signature)
-  )
 
   /**
     * In what assets is price
@@ -50,8 +41,20 @@ case class Order(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAsset
     Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++ Longs.toByteArray(maxTimestamp) ++
     Longs.toByteArray(matcherFee)
 
-
   override def bytes: Array[Byte] = toSign ++ signature
+
+  override def json: JsObject = Json.obj(
+    "sender" -> sender.address,
+    "matcher" -> matcher.address,
+    "spendAssetId" -> Base58.encode(spendAssetId),
+    "receiveAssetId" -> Base58.encode(receiveAssetId),
+    "price" -> price,
+    "amount" -> amount,
+    "maxTimestamp" -> maxTimestamp,
+    "matcherFee" -> matcherFee,
+    "signature" -> Base58.encode(signature)
+  )
+
 }
 
 object Order extends Deser[Order] {
