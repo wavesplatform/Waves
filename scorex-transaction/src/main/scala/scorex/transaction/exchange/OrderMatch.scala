@@ -25,16 +25,16 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
     }
 
     lazy val ordersMatches: Boolean = {
-      val priceMatches = if (order1.priceAssetId sameElements order1.receiveAssetId) order1.price <= order2.price
-      else order2.price >= order1.price
+      lazy val priceMatches = if (order1.priceAssetId sameElements order1.receiveAssetId) order1.price >= order2.price
+      else order2.price <= order1.price
       (order1.matcher.address == order2.matcher.address) &&
         (order1.spendAssetId sameElements order2.receiveAssetId) &&
         (order2.spendAssetId sameElements order1.receiveAssetId) && priceMatches
     }.ensuring(a => !a || (order1.priceAssetId sameElements order2.priceAssetId))
     lazy val priceIsValid: Boolean = (order1.price == price) || (order2.price == price)
     lazy val amountIsValid: Boolean = {
-      lazy val order1Total = order1Transactions.map(_.amount).sum + amount
-      lazy val order2Total = order2Transactions.map(_.amount).sum + amount
+      val order1Total = order1Transactions.map(_.amount).sum + amount
+      val order2Total = order2Transactions.map(_.amount).sum + amount
       (order1Total <= order1.amount) && (order2Total <= order2.amount)
     }
     lazy val matcherFeeIsValid: Boolean = {
@@ -46,8 +46,8 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
     lazy val matcherSignatureIsValid: Boolean =
       EllipticCurveImpl.verify(signature, toSign, order1.matcher.publicKey)
 
-    amount > 0 && price > 0 && ordersMatches && order1.isValid && order2.isValid && priceIsValid && amountIsValid &&
-      matcherFeeIsValid && matcherSignatureIsValid
+    fee > 0 && amount > 0 && price > 0 && ordersMatches && order1.isValid(timestamp) && order2.isValid(timestamp) &&
+      priceIsValid && amountIsValid && matcherFeeIsValid && matcherSignatureIsValid
   }
 
   lazy val toSign: Array[Byte] = Ints.toByteArray(order1.bytes.length) ++ Ints.toByteArray(order2.bytes.length) ++
