@@ -6,6 +6,8 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.exchange.{Order, OrderMatch}
 import scorex.utils.NTP
 
+import scala.util.Random
+
 trait TransactionGen {
 
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray)
@@ -51,17 +53,19 @@ trait TransactionGen {
     spendAssetID: Array[Byte] <- bytes32gen
     receiveAssetID: Array[Byte] <- bytes32gen
     price: Long <- positiveLongGen
-    amount: Long <- positiveLongGen
+    amount1: Long <- positiveLongGen
+    amount2: Long <- positiveLongGen
+    matchedAmount: Long <- Gen.choose(1L, Math.min(amount1, amount2))
     maxtTime: Long <- Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
     timestamp: Long <- positiveLongGen
     matcherFee: Long <- positiveLongGen
     fee: Long <- positiveLongGen
   } yield {
-    val o1 = Order(sender1, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
-    val o2 = Order(sender2, matcher, receiveAssetID, spendAssetID, price, amount, maxtTime, matcherFee)
-    val unsigned = OrderMatch(o1, o2, price, amount, matcherFee * 2, fee, timestamp, Array())
+    val o1 = Order(sender1, matcher, spendAssetID, receiveAssetID, price, amount1, maxtTime, matcherFee)
+    val o2 = Order(sender2, matcher, receiveAssetID, spendAssetID, price, amount2, maxtTime, matcherFee)
+    val unsigned = OrderMatch(o1, o2, price, matchedAmount, matcherFee * 2, fee, timestamp, Array())
     val sig = EllipticCurveImpl.sign(matcher, unsigned.toSign)
-    OrderMatch(o1, o2, price, amount, matcherFee * 2, fee, timestamp, sig)
+    OrderMatch(o1, o2, price, matchedAmount, matcherFee * 2, fee, timestamp, sig)
   }
 
 

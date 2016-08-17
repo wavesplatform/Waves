@@ -13,8 +13,8 @@ import scala.util.Try
 /**
   * Order to matcher service for asset exchange
   */
-case class Order(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAssetId: Array[Byte],
-                 receiveAssetId: Array[Byte], price: Long, amount: Long, maxTimestamp: Long, matcherFee: Long,
+case class Order(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAssetId: AssetId,
+                 receiveAssetId: AssetId, price: Long, amount: Long, maxTimestamp: Long, matcherFee: Long,
                  signature: Array[Byte]) extends BytesSerializable with JsonSerializable {
 
   import Order._
@@ -22,7 +22,7 @@ case class Order(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAsset
   /**
     * In what assets is price
     */
-  lazy val priceAssetId: Array[Byte] = if (ByteArray.compare(spendAssetId, receiveAssetId) > 0) receiveAssetId
+  lazy val priceAssetId: AssetId = if (ByteArray.compare(spendAssetId, receiveAssetId) > 0) receiveAssetId
   else spendAssetId
 
   def isValid: Boolean = {

@@ -19,4 +19,19 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
     }
   }
 
+  property("OrderMatch validation") {
+    forAll(orderMatchGenerator) { om: OrderMatch =>
+      om.isValid(Seq()) shouldBe true
+      om.isValid(Seq(om)) shouldBe false
+      //TODO incorrect price/matcherFee/matcherSignature/NonMatched orders/ amount with partial match
+    }
+  }
+
+  property("OrderMatch balance changes") {
+    forAll(orderMatchGenerator) { om: OrderMatch =>
+      om.isValid(Seq()) shouldBe true
+      //TODO test
+    }
+  }
+
 }

@@ -2,6 +2,7 @@ package scorex.transaction.exchange
 
 import com.google.common.primitives.{Ints, Longs}
 import play.api.libs.json.{JsObject, Json}
+import scorex.account.Account
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
@@ -40,7 +41,7 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
       //TODO Matcher takes all his fee on his first match and takes nothing after that
       val o1maxFee = if (order1Transactions.isEmpty) order1.matcherFee else 0
       val o2maxFee = if (order2Transactions.isEmpty) order2.matcherFee else 0
-      matcherFee <= (o1maxFee + o2maxFee)
+      matcherFee == (o1maxFee + o2maxFee)
     }
     lazy val matcherSignatureIsValid: Boolean =
       EllipticCurveImpl.verify(signature, toSign, order1.matcher.publicKey)
@@ -66,6 +67,35 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
     "signature" -> Base58.encode(signature)
   )
 
+  def balanceChanges(previousMatches: Seq[OrderMatch]): Seq[(Account, (AssetId, Long))] = {
+    lazy val order1FirstMatch = !previousMatches.exists { om =>
+      (om.order1.signature sameElements order1.signature) || (om.order2.signature sameElements order1.signature)
+    }
+    lazy val order2FirstMatch = !previousMatches.exists { om =>
+      (om.order1.signature sameElements order2.signature) || (om.order2.signature sameElements order2.signature)
+    }
+
+    val matcherChange = Seq((order1.matcher, (WavesAssetId, matcherFee - fee)))
+    val o1feeChange = if (order1FirstMatch) Seq((order1.sender, (WavesAssetId, -order1.matcherFee))) else Seq()
+    val o2feeChange = if (order2FirstMatch) Seq((order2.sender, (WavesAssetId, -order2.matcherFee))) else Seq()
+
+    val exchange = if (order1.priceAssetId sameElements order1.spendAssetId) {
+      Seq(
+        (order1.sender, (order1.receiveAssetId, amount)),
+        (order2.sender, (order1.receiveAssetId, -amount)),
+        (order1.sender, (order1.spendAssetId, -amount * price / PriceConstant)),
+        (order2.sender, (order1.spendAssetId, +amount * price / PriceConstant))
+      )
+    } else {
+      Seq(
+        (order1.sender, (order1.spendAssetId, amount)),
+        (order2.sender, (order1.spendAssetId, -amount)),
+        (order1.sender, (order1.receiveAssetId, -amount * price / PriceConstant)),
+        (order2.sender, (order1.receiveAssetId, +amount * price / PriceConstant))
+      )
+    }
+    o1feeChange ++ o2feeChange ++ matcherChange ++ exchange
+  }
 }
 
 object OrderMatch extends Deser[OrderMatch] {
