@@ -80,6 +80,7 @@ trait Settings extends ScorexLogging {
   lazy val port = (p2pSettings \ "port").asOpt[Int].getOrElse(DefaultPort)
   lazy val declaredAddress = (p2pSettings \ "myAddress").asOpt[String]
   lazy val fuzzingDelay = (p2pSettings \ "fuzzingDelay").asOpt[Int].getOrElse(0)
+  lazy val outboundBufferSize = (p2pSettings \ "outboundBufferSize").asOpt[Int].getOrElse(maxConnections * forkMaxLength)
   lazy val minEphemeralPortNumber = (p2pSettings \ "minEphemeralPortNumber").asOpt[Int].getOrElse(32768)
   lazy val peersDataBroadcastDelay = (p2pSettings \ "peersDataBroadcastDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(30.seconds)
@@ -107,7 +108,7 @@ trait Settings extends ScorexLogging {
   // Blockchain download & sync retry settings
   lazy val historySynchronizerTimeout: FiniteDuration = (settingsJSON \ "historySynchronizerTimeout").asOpt[Int]
     .map(x => x.seconds).getOrElse(DefaultHistorySynchronizerTimeout)
-  lazy val pinToInitialPeer = (settingsJSON \ "pinToInitialPeer").asOpt[Boolean].getOrElse(true)
+  lazy val pinToInitialPeer = (settingsJSON \ "pinToInitialPeer").asOpt[Boolean].getOrElse(false)
   lazy val retriesBeforeBlacklisted = (settingsJSON \ "retriesBeforeBlacklisted").asOpt[Int].getOrElse(2)
   lazy val operationRetries = (settingsJSON \ "operationRetries").asOpt[Int].getOrElse(
     if (pinToInitialPeer) retriesBeforeBlacklisted + 1 else forkResolveQuorumSize)

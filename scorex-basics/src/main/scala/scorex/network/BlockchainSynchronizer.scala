@@ -66,8 +66,8 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
             finish(withEmptyResult)
 
           case Some((commonBlockId, tail)) if requestedIds.contains(commonBlockId) =>
-            implicit val peerSet = PeerSet(
-              connectedPeer, if (pinToInitialPeer) peers.filterKeys(_ == connectedPeer) else peers)
+            implicit val peerSet = PeerSet(connectedPeer,
+              if (pinToInitialPeer) peers.filterKeys(_ == connectedPeer) else peers)
 
             gotoGettingExtensionTail(GettingExtension, DownloadInfo(commonBlockId), tail)
 

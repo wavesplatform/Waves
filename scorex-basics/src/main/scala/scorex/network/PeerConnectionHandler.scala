@@ -23,7 +23,7 @@ case class ConnectedPeer(socketAddress: InetSocketAddress, handlerRef: ActorRef)
 }
 
 
-//todo: timeout on Ack waiting
+//todo: timeout on Ack waiting (perhaps not needed since absence of Ack ==  TCP connection t/o)
 case class PeerConnectionHandler(application: RunnableApplication,
                                  connection: ActorRef,
                                  remote: InetSocketAddress) extends Actor with Buffering with ScorexLogging {
@@ -34,10 +34,11 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
   private lazy val networkControllerRef: ActorRef = application.networkController
   private lazy val peerManager: ActorRef = application.peerManager
-  private val selfPeer = new ConnectedPeer(remote, self)
+  private lazy val outboundBufferSize = application.settings.outboundBufferSize
+  private val selfPeer = ConnectedPeer(remote, self)
+
   private var handshakeGot = false
   private var handshakeSent = false
-  val MaxOutboundBufferMessages = 200
 
   context watch connection
 
@@ -82,7 +83,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
     * */
   private def workingCycleInterface: Receive = {
     case msg: message.Message[_] =>
-      log.debug("Sending message " + msg.spec + " to " + remote)
+      log.trace("Sending message " + msg.spec + " to " + remote)
       val bytes = msg.bytes
       val data = ByteString(Ints.toByteArray(bytes.length) ++ bytes)
       buffer(data)
@@ -99,12 +100,28 @@ case class PeerConnectionHandler(application: RunnableApplication,
     * */
   private def workingCycleWaitingAckInterface: Receive = {
     case msg: message.Message[_] =>
-      log.debug(s"Buffering outbound message " + msg.spec + " to " + remote)
+      log.trace(s"Buffering outbound message " + msg.spec + " to " + remote)
       val bytes = msg.bytes
       val data = ByteString(Ints.toByteArray(bytes.length) ++ bytes)
       buffer(data)
 
     case Ack => acknowledge()
+
+    case Received(data: ByteString) =>
+      processReceivedData(data)
+      connection ! ResumeReading
+  }
+
+  private def workingCycleWaitingWritingResumedInterface: Receive = {
+    case msg: message.Message[_] =>
+      log.trace(s"Buffering outbound message " + msg.spec + " to " + remote)
+      val bytes = msg.bytes
+      val data = ByteString(Ints.toByteArray(bytes.length) ++ bytes)
+      buffer(data)
+
+    case WritingResumed =>
+      log.trace("WritingResumed")
+      connection ! Write(outboundBuffer(0), Ack)
 
     case Received(data: ByteString) =>
       processReceivedData(data)
@@ -122,7 +139,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
   private def buffer(data: ByteString) = {
     outboundBuffer :+= data
-    if (outboundBuffer.length > MaxOutboundBufferMessages) {
+    if (outboundBuffer.length > outboundBufferSize) {
       log.warn(s"Drop connection to $remote : outbound buffer overrun")
       connection ! Close
     }
@@ -149,7 +166,6 @@ case class PeerConnectionHandler(application: RunnableApplication,
         log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
     }
 
-
   private def workingCycleWaitingAck: Receive =
     workingCycleWaitingAckInterface orElse blackListingInterface orElse
       processErrors(CommunicationState.WorkingCycleWaitingAck.toString) orElse {
@@ -157,14 +173,18 @@ case class PeerConnectionHandler(application: RunnableApplication,
         log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
     }
 
+  private def workingCycleWaitingWritingResumed: Receive =
+    workingCycleWaitingWritingResumedInterface orElse blackListingInterface orElse
+      processErrors(CommunicationState.WorkingCycleWaitingAck.toString) orElse {
+      case nonsense: Any =>
+        log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
+    }
 
   private def processErrors(stateName: String): Receive = {
     case CommandFailed(w: Write) =>
       log.warn(s"Write failed :$w " + remote + s" in state $stateName")
-      //      peerManager ! AddToBlacklist(remote)
-      connection ! Close
-      connection ! ResumeReading
       connection ! ResumeWriting
+      context become workingCycleWaitingWritingResumed
 
     case cc: ConnectionClosed =>
       peerManager ! PeerManager.Disconnected(remote)
@@ -178,7 +198,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
     case CommandFailed(cmd: Tcp.Command) =>
       log.warn("Failed to execute command : " + cmd + s" in state $stateName")
-      connection ! ResumeReading
+      connection ! Close
   }
 
   private var chunksBuffer: ByteString = CompactByteString()
@@ -190,7 +210,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
     pkt.find { packet =>
       application.messagesHandler.parseBytes(packet.toByteBuffer, Some(selfPeer)) match {
         case Success(message) =>
-          log.debug("Received message " + message.spec + " from " + remote)
+          log.trace("Received message " + message.spec + " from " + remote)
           networkControllerRef ! message
           false
 
