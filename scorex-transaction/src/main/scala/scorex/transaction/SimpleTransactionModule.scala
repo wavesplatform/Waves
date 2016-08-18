@@ -3,7 +3,7 @@ package scorex.transaction
 import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.app.RunnableApplication
+import scorex.app.Application
 import scorex.block.{Block, BlockField}
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
@@ -37,7 +37,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 }
 
 
-class SimpleTransactionModule(implicit val settings: TransactionSettings with Settings, application: RunnableApplication)
+class SimpleTransactionModule(implicit val settings: TransactionSettings with Settings, application: Application)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
 
   import SimpleTransactionModule._
@@ -82,7 +82,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
 
   override def packUnconfirmed(): StoredInBlock = {
     clearIncorrectTransactions()
-    blockStorage.state.validate(utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock))
+    utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock)
   }
 
   //todo: check: clear unconfirmed txs on receiving a block
@@ -95,17 +95,19 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     clearIncorrectTransactions()
   }
 
-  //Romove too old or invalid transactions from  UnconfirmedTransactionsPool
+  /**
+    * Removes too old or invalid transactions from UnconfirmedTransactionsPool
+    */
   def clearIncorrectTransactions(): Unit = {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
 
     val txs = utxStorage.all()
-    val notTooOld = txs.filter { tx =>
-      if ((lastBlockTs - tx.timestamp).millis > MaxTimeForUnconfirmed) utxStorage.remove(tx)
+    val notExpired = txs.filter { tx =>
       (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
     }
-
-    notTooOld.diff(blockStorage.state.validate(txs)).foreach(tx => utxStorage.remove(tx))
+    val valid = blockStorage.state.validate(notExpired)
+    // remove non valid or expired from storage
+    txs.diff(valid).foreach(tx => utxStorage.remove(tx))
   }
 
   override def onNewOffchainTransaction(transaction: Transaction): Unit =
@@ -145,6 +147,14 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     }
 
     TransactionsBlockField(txs)
+  }
+
+  /** Check whether tx is valid on current state and not expired yet
+    */
+  override def isValid(tx: Transaction): Boolean = {
+    val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
+    val notExpired = (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
+    notExpired && super.isValid(tx)
   }
 
   override def isValid(block: Block): Boolean = {

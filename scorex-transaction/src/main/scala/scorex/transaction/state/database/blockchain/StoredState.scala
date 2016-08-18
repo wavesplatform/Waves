@@ -158,7 +158,9 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   override def included(signature: Array[Byte], heightOpt: Option[Int]): Option[Int] =
     Option(includedTx.get(signature)).filter(_ < heightOpt.getOrElse(Int.MaxValue))
 
-  //return seq of valid transactions
+  /**
+    * Returns sequence of valid transactions
+    */
   @tailrec
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)

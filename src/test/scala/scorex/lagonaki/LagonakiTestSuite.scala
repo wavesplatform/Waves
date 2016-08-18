@@ -18,7 +18,7 @@ class LagonakiTestSuite extends Sequential(
   , new TransactionsAPISpecification
   , new PaymentAPISpecification
 
-//unit tests
+  //unit tests
   , new MessageSpecification
   , new BlockSpecification
   , new WalletSpecification
@@ -26,8 +26,9 @@ class LagonakiTestSuite extends Sequential(
   , new CoordinatorSpecification
   , new StateTest
   , new StoredStateSpecification
+  , new SimpleTransactionModuleSpecification
 
-//integration tests - slow!
+  //integration tests - slow!
   , new ValidChainGenerationSpecification
 
 ) with BeforeAndAfterAll {

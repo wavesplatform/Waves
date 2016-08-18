@@ -11,6 +11,8 @@ class BlockStorageImpl(settings: TransactionSettings with Settings)
                       (implicit consensusModule: ConsensusModule[_], transactionModule: TransactionModule[_])
   extends BlockStorage {
 
+  require(consensusModule != null)
+
   private val database: MVStore = createMVStore(Option("blockchain.dat"))
 
   def createMVStore(fileName: Option[String]): MVStore = {

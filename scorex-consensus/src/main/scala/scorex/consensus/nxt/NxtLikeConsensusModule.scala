@@ -132,16 +132,15 @@ with OneGeneratorConsensusModule with ScorexLogging {
           .filter(_ > 0).filter(_ < Long.MaxValue)
           .map(_.toLong)
 
-      val currentTime =  NTP.correctedTime()
-
-      log.debug(s"Next block gen time: $result " +
-        s"in ${result.map(t => (t - currentTime) / 1000)} seconds, " +
-        s"hit: $hit, target: $t, " +
-        s"account:  $account " +
-        s"account balance: $balance " +
-        s"last block id: ${lastBlock.encodedId}, " +
-        s"height: ${history.heightOf(lastBlock)}"
-      )
+      log.debug({
+          val currentTime = NTP.correctedTime()
+          s"Next block gen time: $result " +
+            s"in ${result.map(t => (t - currentTime) / 1000)} seconds, " +
+            s"hit: $hit, target: $t, " +
+            s"account:  $account, account balance: $balance " +
+            s"last block id: ${lastBlock.encodedId}, " +
+            s"height: ${history.heightOf(lastBlock)}"
+        })
 
       result
     }
