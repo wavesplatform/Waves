@@ -24,10 +24,9 @@ class Miner(application: Application) extends Actor with ScorexLogging {
   private def accounts = application.wallet.privateKeyAccounts()
 
   override def receive: Receive = {
-    case GuessABlock =>
-      if (currentState.isEmpty) {
-        scheduleBlockGeneration()
-      }
+    case GuessABlock(rescheduleImmediately) =>
+      if (rescheduleImmediately) { cancel() }
+      if (currentState.isEmpty) { scheduleBlockGeneration() }
 
     case GenerateBlock =>
       cancel()
@@ -62,7 +61,6 @@ class Miner(application: Application) extends Actor with ScorexLogging {
   }.getOrElse(false)
 
   private def scheduleBlockGeneration(): Unit = {
-
     val schedule = if (application.settings.tflikeScheduling) {
       val lastBlock = application.history.lastBlock
       val currentTime = NTP.correctedTime()
@@ -95,7 +93,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
 object Miner {
 
-  case object GuessABlock
+  case class GuessABlock(rescheduleImmediately: Boolean)
 
   case object Stop
 

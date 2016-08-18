@@ -23,7 +23,7 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
   def syncing: Receive = {
     case StartGeneration =>
       log.info("Start block generation")
-      workers.foreach(w => w ! GuessABlock)
+      workers.foreach(w => w ! GuessABlock(false))
       context.become(generating)
 
     case GetStatus =>
@@ -55,11 +55,11 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
     case CheckWorkers =>
       log.info(s"Check ${workers.size} miners")
       if (threads - workers.size > 0) workers = workers ++ newWorkers(threads - workers.size)
-      workers.foreach { _ ! GuessABlock }
+      workers.foreach { _ ! GuessABlock(false) }
 
-    case GuessABlock =>
+    case genRequest @ GuessABlock(_) =>
       log.info(s"Enforce miners to generate block: $workers")
-      workers.foreach(w => w ! GuessABlock)
+      workers.foreach(w => w ! genRequest)
 
     case m => log.info(s"Unhandled $m in Generating")
   }

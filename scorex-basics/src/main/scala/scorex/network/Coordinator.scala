@@ -107,7 +107,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
     if (isBlockToBeAdded) {
       if (processNewBlock(comingBlock, from, local = locallyGenerated)) {
-        blockGenerator ! GuessABlock
+        blockGenerator ! GuessABlock(rescheduleImmediately = true)
       } else {
         // TODO: blacklist here
         log.warn(s"Can't apply single block, local=${from.isEmpty}: ${comingBlock.json}")

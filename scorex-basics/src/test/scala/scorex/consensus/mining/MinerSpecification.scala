@@ -96,7 +96,7 @@ class MinerSpecification extends ActorTestingCommons {
           setBlockGenExpectations(Seq(newBlock))
         }
 
-        actorRef ! GuessABlock
+        actorRef ! GuessABlock(false)
 
         testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay * 2)
         testCoordinator.expectMsg(AddBlock(newBlock, None))
@@ -113,7 +113,7 @@ class MinerSpecification extends ActorTestingCommons {
         setExpectations(1, Some(calculatedGenDelay))
 
         "stop" in {
-          actorRef ! GuessABlock
+          actorRef ! GuessABlock(false)
           Thread sleep genTimeShift.toMillis
           actorRef ! Stop
           testCoordinator.expectNoMsg(calculatedGenDelay + genTimeShift)
@@ -125,7 +125,7 @@ class MinerSpecification extends ActorTestingCommons {
 
             setBlockGenExpectations(Seq(newBlock))
 
-            actorRef ! GuessABlock
+            actorRef ! GuessABlock(false)
 
             testCoordinator.expectNoMsg(calculatedGenDelay)
             testCoordinator.expectMsg(AddBlock(newBlock, None))
@@ -140,10 +140,29 @@ class MinerSpecification extends ActorTestingCommons {
             setBlockGenExpectations(Seq.empty, maybe = true)
             setExpectations(1, Some(calculatedGenDelay), maybe = true)
 
-            actorRef ! GuessABlock
+            actorRef ! GuessABlock(false)
             testCoordinator.expectNoMsg(calculatedGenDelay + genTimeShift * 2)
           }
         }
+      }
+
+      "reschedule" in {
+
+        val veryLongDelay = calculatedGenDelay * 100
+
+        setExpectations(1, Some(veryLongDelay))
+
+        actorRef ! GuessABlock(false)
+
+        val shortDelay = calculatedGenDelay / 2
+
+        setExpectations(1, Some(shortDelay))
+
+        setBlockGenExpectations(Seq(newBlock))
+
+        actorRef ! GuessABlock(rescheduleImmediately = true)
+
+        testCoordinator.expectMsg(shortDelay + calculatedGenDelay, AddBlock(newBlock, None))
       }
 
       "broken schedule should fallback to default" - {
@@ -152,7 +171,7 @@ class MinerSpecification extends ActorTestingCommons {
           setExpectations(1, Some(timePoint).map(_ millis))
           setBlockGenExpectations(Seq(newBlock))
 
-          actorRef ! GuessABlock
+          actorRef ! GuessABlock(false)
 
           testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
           testCoordinator.expectMsg(AddBlock(newBlock, None))
