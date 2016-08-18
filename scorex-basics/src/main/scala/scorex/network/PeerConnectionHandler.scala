@@ -34,7 +34,10 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
   private lazy val networkControllerRef: ActorRef = application.networkController
   private lazy val peerManager: ActorRef = application.peerManager
-  private lazy val outboundBufferSize = application.settings.outboundBufferSize
+
+  private lazy val outboundBufferSize = application.settings.outboundBufferSize +
+    application.settings.maxConnections * application.basicMessagesSpecsRepo.specs.size * 10
+
   private val selfPeer = ConnectedPeer(remote, self)
 
   private var handshakeGot = false

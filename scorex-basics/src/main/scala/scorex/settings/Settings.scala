@@ -102,7 +102,6 @@ trait Settings extends ScorexLogging {
   lazy val forkMaxLength = (settingsJSON \ "forkMaxLength").asOpt[Int].getOrElse(DefaultMaxRollback + 1)
   lazy val forkResolveQuorumSize = (settingsJSON \ "forkResolveQuorumSize").asOpt[Int].getOrElse(1)
   lazy val forkFileName = (settingsJSON \ "forkFileName").asOpt[String]
-  lazy val minForkChunkSize = (settingsJSON \ "minForkChunkSize").asOpt[Int].getOrElse(1)
   lazy val loadEntireForkChunk = (settingsJSON \ "loadEntireForkChunk").asOpt[Boolean].getOrElse(true)
 
   // Blockchain download & sync retry settings

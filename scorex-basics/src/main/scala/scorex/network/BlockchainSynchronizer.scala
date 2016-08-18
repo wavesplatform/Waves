@@ -33,7 +33,6 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
   private lazy val forkMaxLength = application.settings.forkMaxLength
   private lazy val operationRetries = application.settings.operationRetries
   private lazy val pinToInitialPeer = application.settings.pinToInitialPeer
-  private lazy val minForkChunkSize = application.settings.minForkChunkSize
   private lazy val partialBlockLoading = !application.settings.loadEntireForkChunk
 
   private var timeoutData = Option.empty[Cancellable]
@@ -98,7 +97,9 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
           val forkStorage = application.blockStorage.blockSeq
           forkStorage.initialize(fork, initialScore)
 
-          gotoGettingBlocks(initial, forkStorage, lastCommonBlockId)
+          run(initial, GettingBlocks) { updatedPeerData =>
+            gettingBlocks(forkStorage, lastCommonBlockId, updatedPeerData)
+          }
       }
     } else {
       val withTail = downloadInfo.copy(blockIds = blockIdsToDownload)
@@ -112,12 +113,6 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
       }
     }
   }
-
-  private def gotoGettingBlocks(initial: Status, forkStorage: BlockSeq, lastCommonBlockId: BlockId)
-                               (implicit peers: PeerSet): Unit =
-    run(initial, GettingBlocks) { updatedPeerData =>
-      gettingBlocks(forkStorage, lastCommonBlockId, updatedPeerData)
-    }
 
   def gettingExtensionTail(downloadInfo: DownloadInfo, overlap: InnerIds, peers: PeerSet): Receive =
     state(GettingExtensionTail, acceptSignaturesSpecOnlyFrom(peers.active)) {
@@ -141,16 +136,12 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
                     lastCommonBlockId: BlockId,
                     peers: PeerSet): Receive = {
 
-    val blockIds = forkStorage.firstIdsWithoutBlock(minForkChunkSize)
+    val blockIds = forkStorage.allIdsWithoutBlock
     log.info(s"Going to request blocks: ${blockIds.mkString(",")}, peer: ${peers.active}")
     blockIds.foreach { blockId =>
       val msg = Message(GetBlockSpec, Right(blockId.blockId), None)
       networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peers.active))
     }
-
-    def requestNextChunkOfBlocks() = gotoGettingBlocks(GettingBlocks, forkStorage, lastCommonBlockId)(peers)
-
-    val before = forkStorage.numberOfBlocks
 
     state(GettingBlocks) {
       case BlockFromPeer(block, connectedPeer)
@@ -167,18 +158,14 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
           val allBlocksAreLoaded = forkStorage.noIdsWithoutBlock
 
           if (forkScore > currentScore) {
-            if ((partialBlockLoading && forkStorage.numberOfBlocks - before >= minForkChunkSize) || allBlocksAreLoaded) {
+            if (partialBlockLoading || allBlocksAreLoaded) {
               finish(SyncFinished(success = true, Some(lastCommonBlockId, forkStorage.blocksInOrder, author)))
-            } else {
-              requestNextChunkOfBlocks()
             }
           } else if (allBlocksAreLoaded) {
             author.foreach {
               blacklistPeer("All blocks are loaded, but still not enough score", _)
             }
             finish(SyncFinished.unsuccessfully)
-          } else {
-            requestNextChunkOfBlocks()
           }
 
         }

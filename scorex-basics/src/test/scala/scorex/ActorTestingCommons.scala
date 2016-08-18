@@ -103,8 +103,8 @@ abstract class ActorTestingCommons extends TestKitBase
     }
 
   trait ApplicationMock extends Application {
-    implicit val transactionModule = mock[TransactionModule[Unit]]
-    implicit val consensusModule = mock[ConsensusModule[Unit]]
+    implicit val transactionModule = stub[TransactionModule[Unit]]
+    implicit val consensusModule = stub[ConsensusModule[Unit]]
     final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock
   }

@@ -11,7 +11,7 @@ trait BlockSeq {
 
   def containsBlockId(blockId: BlockId): Boolean
 
-  def firstIdsWithoutBlock(n: Int): InnerIds
+  def allIdsWithoutBlock: InnerIds
 
   def noIdsWithoutBlock: Boolean
 
