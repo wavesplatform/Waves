@@ -201,7 +201,6 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
     case CommandFailed(cmd: Tcp.Command) =>
       log.warn("Failed to execute command : " + cmd + s" in state $stateName")
-      connection ! Close
   }
 
   private var chunksBuffer: ByteString = CompactByteString()

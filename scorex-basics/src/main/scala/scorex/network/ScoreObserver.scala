@@ -42,7 +42,7 @@ class ScoreObserver(application: Application) extends ViewSynchronizer with Scor
       candidates = clearOld(candidates)
 
       scoreToAdd.foreach { case (connectedPeer, value) =>
-        candidates = candidates + (connectedPeer -> PeerData(value, System.currentTimeMillis()))
+        candidates += connectedPeer -> PeerData(value, System.currentTimeMillis())
       }
 
       val newMaxScore = maxScore(candidates)

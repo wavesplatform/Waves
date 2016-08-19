@@ -37,7 +37,9 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
   blockGenerator ! StartGeneration
 
-  override def receive: Receive = {
+  override def receive: Receive = idle
+
+  private def idle: Receive = state(CIdle) {
     case ConsideredValue(candidates) =>
       val localScore = history.score()
 
@@ -51,28 +53,37 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
         log.info(s"min networkScore=${peers.minBy(_._2)} > localScore=$localScore")
         val lastIds = history.lastBlockIds(application.settings.MaxRollback)
         blockchainSynchronizer ! GetExtension(lastIds, peers.toMap)
+        context become syncing
       }
+  }
 
+  private def syncing: Receive = state(CSyncing) {
     case SyncFinished(_, result) =>
+      context become idle
       scoreObserver ! GetScore
+
       result foreach {
         case (lastCommonBlockId, blocks, from) =>
           log.info(s"Going to process a fork")
           processFork(lastCommonBlockId, blocks, from)
       }
+  }
 
-    case AddBlock(block, from) =>
-      processSingleBlock(block, from)
+  private def state(status: CoordinatorStatus)(logic: Receive): Receive = {
+    logic orElse {
+      case GetCoordinatorStatus => sender() ! status
 
-    case request @ GetStatus =>
-      blockchainSynchronizer forward request
+      case request @ GetStatus => blockchainSynchronizer forward request
 
-    case SendCurrentScore =>
-      val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
-      networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
+      case AddBlock(block, from) => processSingleBlock(block, from)
 
-    // the signal to initialize
-    case Unit =>
+      case SendCurrentScore =>
+        val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
+        networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
+
+      // the signal to initialize
+      case Unit =>
+    }
   }
 
   private def processSingleBlock(comingBlock: Block, from: Option[ConnectedPeer]): Unit = {
@@ -169,7 +180,19 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
 object Coordinator {
 
-  case object SendCurrentScore
+  case object GetCoordinatorStatus
+
+  sealed trait CoordinatorStatus {
+    val name: String
+  }
+
+  case object CIdle extends CoordinatorStatus {
+    override val name = "idle"
+  }
+
+  case object CSyncing extends CoordinatorStatus {
+    override val name = "syncing"
+  }
 
   case class AddBlock(block: Block, generator: Option[ConnectedPeer])
 
@@ -179,4 +202,6 @@ object Coordinator {
     def unsuccessfully: SyncFinished = SyncFinished(success = false, None)
     def withEmptyResult: SyncFinished = SyncFinished(success = true, None)
   }
+
+  private case object SendCurrentScore
 }

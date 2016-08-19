@@ -42,17 +42,17 @@ class BlockGeneratorSpecification(_system: ActorSystem)
       }
       bg ! StopGeneration
       bg ! GetStatus
-      expectMsg(Syncing.name)
+      expectMsg(Idle.name)
     }
 
-    "StopGeneration command don't change state from syncing" in {
+    "StopGeneration command don't change state from idle" in {
       bg ! StartGeneration
       bg ! StopGeneration
       bg ! GetStatus
-      expectMsg(Syncing.name)
+      expectMsg(Idle.name)
       bg ! StopGeneration
       bg ! GetStatus
-      expectMsg(Syncing.name)
+      expectMsg(Idle.name)
     }
   }
 }

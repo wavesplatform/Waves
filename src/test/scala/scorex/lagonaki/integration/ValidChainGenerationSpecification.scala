@@ -198,7 +198,7 @@ with TransactionTestingCommons {
     peers.foreach(_.blockGenerator ! StopGeneration)
     untilTimeout(5.seconds) {
       peers.foreach { p =>
-        Await.result(p.blockGenerator ? GetStatus, timeout.duration) shouldBe Syncing.name
+        Await.result(p.blockGenerator ? GetStatus, timeout.duration) shouldBe Idle.name
       }
     }
 

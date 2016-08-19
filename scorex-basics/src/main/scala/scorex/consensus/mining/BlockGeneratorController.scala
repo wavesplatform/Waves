@@ -18,16 +18,16 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
   context.system.scheduler.schedule(FailedGenerationDelay, FailedGenerationDelay, self, CheckWorkers)
 
 
-  override def receive: Receive = syncing
+  override def receive: Receive = idle
 
-  def syncing: Receive = {
+  def idle: Receive = {
     case StartGeneration =>
       log.info("Start block generation")
       workers.foreach(w => w ! GuessABlock(false))
       context.become(generating)
 
     case GetStatus =>
-      sender() ! Syncing.name
+      sender() ! Idle.name
 
     case CheckWorkers =>
       log.info(s"Check miners: $workers vs ${context.children}")
@@ -36,14 +36,14 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
 
     case StopGeneration =>
 
-    case m => log.warn(s"Unhandled $m in Syncing")
+    case m => log.warn(s"Unhandled $m in Idle")
   }
 
   def generating: Receive = {
     case StopGeneration =>
       log.info(s"Stop block generation")
       workers.foreach(w => w ! Stop)
-      context.become(syncing)
+      context.become(idle)
 
     case Terminated(worker) =>
       log.info(s"Miner terminated $worker")
@@ -75,8 +75,8 @@ object BlockGeneratorController {
     val name: String
   }
 
-  case object Syncing extends Status {
-    override val name = "syncing"
+  case object Idle extends Status {
+    override val name = "idle"
   }
 
   case object Generating extends Status {
