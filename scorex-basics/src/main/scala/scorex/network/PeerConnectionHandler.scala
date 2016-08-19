@@ -35,8 +35,9 @@ case class PeerConnectionHandler(application: RunnableApplication,
   private lazy val networkControllerRef: ActorRef = application.networkController
   private lazy val peerManager: ActorRef = application.peerManager
 
-  private lazy val outboundBufferSize = application.settings.outboundBufferSize +
-    application.settings.maxConnections * application.basicMessagesSpecsRepo.specs.size * 10
+  private lazy val outboundBufferSize = math.max(
+    application.settings.outboundBufferSize,
+    application.settings.forkMaxLength + application.basicMessagesSpecsRepo.specs.size * 10)
 
   private val selfPeer = ConnectedPeer(remote, self)
 
@@ -46,6 +47,11 @@ case class PeerConnectionHandler(application: RunnableApplication,
   context watch connection
 
   override def preStart: Unit = connection ! ResumeReading
+
+  override def postRestart(thr: Throwable): Unit = {
+    log.warn(s"Restart because of $thr.getMessage")
+    connection ! Close
+  }
 
   // there is not recovery for broken connections
   override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
