@@ -17,25 +17,15 @@ class BlockGeneratorSpecification(_system: ActorSystem)
   with Matchers
   with TestingCommons {
 
-  import TestingCommons._
-
   def this() = this(ActorSystem("MySpec"))
 
   val bg = application.blockGenerator
 
   "BlockGenerator actor" must {
 
-    "generate after downloading state" in {
+    "StopGeneration command change state to idle from generating" in {
       bg ! StartGeneration
       //Wait up to 5 seconds to download blockchain and become generating
-      untilTimeout(5.seconds) {
-        bg ! GetStatus
-        expectMsg(Generating.name)
-      }
-    }
-
-    "StopGeneration command change state to syncing from generating" in {
-      bg ! StartGeneration
       untilTimeout(5.seconds) {
         bg ! GetStatus
         expectMsg(Generating.name)

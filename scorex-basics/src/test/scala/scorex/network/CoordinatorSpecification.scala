@@ -1,4 +1,4 @@
-package scorex.lagonaki.integration
+package scorex.network
 
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
@@ -6,8 +6,6 @@ import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
 import scorex.network.BlockchainSynchronizer.{GetStatus, GettingBlocks}
-import scorex.network.Coordinator.AddBlock
-import scorex.network.{BlockchainSynchronizer, Coordinator}
 import scorex.settings.SettingsMock
 import scorex.transaction.History
 
@@ -51,12 +49,6 @@ class CoordinatorSpecification extends ActorTestingCommons {
 
     "starts in synced state with blocks generation" in {
       testblockGenerator.expectMsg(StartGeneration)
-    }
-
-    "add single block" - {
-      "local" in {
-        // actorRef ! AddBlock(block, from)
-      }
     }
   }
 }

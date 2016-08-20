@@ -23,7 +23,6 @@ class LagonakiTestSuite extends Sequential(
   , new BlockSpecification
   , new WalletSpecification
   , new BlockGeneratorSpecification
-  , new CoordinatorSpecification
   , new StateTest
   , new StoredStateSpecification
   , new SimpleTransactionModuleSpecification

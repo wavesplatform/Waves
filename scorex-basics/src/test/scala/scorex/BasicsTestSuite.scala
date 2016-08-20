@@ -19,5 +19,6 @@ class BasicsTestSuite extends Suites(
   new BlacklistParallelSpecification,
   new BlacklistSpecification,
   new SendingStrategySpecification,
-  new PeerManagerSpecification
+  new PeerManagerSpecification,
+  new CoordinatorSpecification
 )
