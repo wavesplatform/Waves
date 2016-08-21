@@ -35,9 +35,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
   private lazy val networkControllerRef: ActorRef = application.networkController
   private lazy val peerManager: ActorRef = application.peerManager
 
-  private lazy val outboundBufferSize = math.max(
-    application.settings.outboundBufferSize,
-    application.settings.forkMaxLength + application.basicMessagesSpecsRepo.specs.size * 10)
+  private lazy val outboundBufferSize = application.settings.outboundBufferSize
 
   private val selfPeer = ConnectedPeer(remote, self)
 
@@ -148,7 +146,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
   private def buffer(data: ByteString) = {
     outboundBuffer :+= data
-    if (outboundBuffer.length > outboundBufferSize) {
+    if (outboundBuffer.map(_.size).sum > outboundBufferSize) {
       log.warn(s"Drop connection to $remote : outbound buffer overrun")
       connection ! Close
     }
