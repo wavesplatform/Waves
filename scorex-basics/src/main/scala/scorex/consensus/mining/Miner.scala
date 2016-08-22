@@ -68,8 +68,8 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       accounts
         .flatMap(acc => consensusModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
         .map(t => math.max(t - currentTime, blockGenerationDelay.toMillis))
+        .filter(_ < MaxBlockGenerationDelay.toMillis)
         .map(_ millis)
-        .filter(_ < MaxBlockGenerationDelay)
         .distinct.sorted
     } else Seq.empty
 
