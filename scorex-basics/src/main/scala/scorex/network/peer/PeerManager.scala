@@ -136,7 +136,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       }
 
   private def addOrUpdatePeer(address: InetSocketAddress, peerNonce: Option[Long], nodeName: Option[String]) =
-    peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(System.currentTimeMillis(), peerNonce, nodeName))
+    if (application.settings.acceptExternalPeerData) {
+      peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(System.currentTimeMillis(), peerNonce, nodeName))
+    }
 
   private def blackListOperations: Receive = {
     case AddToBlacklist(peer) =>
