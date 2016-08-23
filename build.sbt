@@ -55,7 +55,7 @@ libraryDependencies ++=
 scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
 
 javaOptions ++= Seq(
-  "-server"
+  "-server", "-Xmx1G"
 )
 
 testOptions in Test += Tests.Argument("-oD", "-u", "target/test-reports")
