@@ -82,7 +82,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     val blockIdsToDownload = downloadInfo.blockIds ++ tail
 
     val noMoreBlockIds = tail.isEmpty
-    if (blockIdsToDownload.size > forkMaxLength || noMoreBlockIds) {
+    if (blockIdsToDownload.size >= forkMaxLength || noMoreBlockIds) {
       val fork = blockIdsToDownload.take(forkMaxLength)
 
       fork.find(id => application.history.contains(id.blockId)) match {
