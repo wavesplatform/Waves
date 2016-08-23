@@ -1,5 +1,7 @@
 package scorex.transaction
 
+import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import org.scalamock.scalatest.MockFactory
@@ -47,12 +49,13 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
         override lazy val utxRebroadcastInterval = 100.seconds
       }
       val actorRef = TestActorRef(new UnconfirmedPoolSynchronizer(transactionModule, settings, testActor))
-      actorRef ! DataFromPeer(TransactionMessageSpec.messageCode, tx, ConnectedPeer(null, null))
+      val sender = ConnectedPeer(new InetSocketAddress(1111), null)
+      actorRef ! DataFromPeer(TransactionMessageSpec.messageCode, tx, sender)
 
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(tx), None)
       expectMsg(NetworkController.RegisterMessagesHandler(Seq(spec), actorRef))
-      expectMsg(NetworkController.SendToNetwork(ntwMsg, Broadcast))
+      expectMsg(NetworkController.SendToNetwork(ntwMsg, BroadcastExceptOf(sender)))
       actorRef.stop()
     }
 
