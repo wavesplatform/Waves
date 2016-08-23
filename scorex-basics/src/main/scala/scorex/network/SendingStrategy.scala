@@ -25,3 +25,9 @@ case class SendToChosen(chosenPeers: Seq[ConnectedPeer]) extends SendingStrategy
 object SendToChosen {
   def apply(connectedPeer: ConnectedPeer): SendToChosen = SendToChosen(Seq(connectedPeer))
 }
+
+case class BroadcastExceptOf(except: ConnectedPeer) extends SendingStrategy {
+  override def choose(peers: Seq[ConnectedPeer]): Seq[ConnectedPeer] = {
+    peers.filterNot(p => p == except)
+  }
+}

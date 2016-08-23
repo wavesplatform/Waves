@@ -19,6 +19,27 @@ class SendingStrategySpecification extends FreeSpec
 
     chosen shouldEqual aPeer
     chosen should be theSameInstanceAs anActualAlivePeer
-    chosen should not be theSameInstanceAs (aPeer)
+    chosen should not be theSameInstanceAs(aPeer)
+  }
+
+  "BroadcastExceptOf should filter out sender" in {
+    val sender = ConnectedPeer(new InetSocketAddress(1111), null)
+
+    val selectedPeers = BroadcastExceptOf(sender).choose(Seq(sender))
+
+    selectedPeers.isEmpty shouldEqual true
+  }
+
+  "Broadcast should select all peers except given one" in {
+    val sender = ConnectedPeer(new InetSocketAddress(1111), null)
+    val peer1 = ConnectedPeer(new InetSocketAddress(2222), null)
+    val peer2 = ConnectedPeer(new InetSocketAddress(3333), null)
+
+    val selectedPeers = BroadcastExceptOf(sender).choose(Seq(sender, peer1, peer2))
+
+    selectedPeers.isEmpty shouldEqual false
+    selectedPeers.contains(peer1) shouldEqual true
+    selectedPeers.contains(peer2) shouldEqual true
+    selectedPeers.contains(sender) shouldEqual false
   }
 }
