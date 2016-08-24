@@ -88,7 +88,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
     applyChanges(newBalances.map(a => a._1.address -> a._2))
-    log.debug(s"New state height is $stateHeight, hash: $hash, totalBalance: $totalBalance")
+    log.trace(s"New state height is $stateHeight, hash: $hash, totalBalance: $totalBalance")
 
     this
   }

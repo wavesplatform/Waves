@@ -20,7 +20,6 @@ class CoordinatorSpecification extends ActorTestingCommons {
 
   object TestSettings extends SettingsMock {
     override lazy val forkResolveQuorumSize: Int = 2
-    override lazy val maxPeersToBroadcastBlock: Int = 1
     override lazy val scoreBroadcastDelay: FiniteDuration = 1000 seconds
   }
 

@@ -31,9 +31,8 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   private lazy val history = application.history
 
   private val forkResolveQuorumSize = application.settings.forkResolveQuorumSize
-  private val maxPeersToBroadcastBlock = application.settings.maxPeersToBroadcastBlock
 
-  context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, SendCurrentScore)
+  context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, BroadcastCurrentScore)
 
   blockGenerator ! StartGeneration
 
@@ -77,7 +76,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
       case AddBlock(block, from) => processSingleBlock(block, from)
 
-      case SendCurrentScore =>
+      case BroadcastCurrentScore =>
         val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
 
@@ -146,11 +145,10 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     if (block.isValid) {
       log.info(s"New block(local: $local): ${block.json}")
 
-      val sendingStrategy =
-        if (local) Option(Broadcast) else from.map(peer => SendToRandomExceptOf(maxPeersToBroadcastBlock, Seq(peer)))
-
-      sendingStrategy.foreach {
-        networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), _)
+      if (local) {
+        networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), Broadcast)
+      } else {
+        self ! BroadcastCurrentScore
       }
 
       val oldHeight = history.height()
@@ -203,5 +201,5 @@ object Coordinator {
     def withEmptyResult: SyncFinished = SyncFinished(success = true, None)
   }
 
-  private case object SendCurrentScore
+  private case object BroadcastCurrentScore
 }
