@@ -65,8 +65,10 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
             finish(withEmptyResult)
 
           case Some((commonBlockId, tail)) if requestedIds.contains(commonBlockId) =>
-            implicit val peerSet = PeerSet(connectedPeer,
-              if (pinToInitialPeer) peers.filterKeys(_ == connectedPeer) else peers)
+            implicit val peerSet = PeerSet(
+              connectedPeer,
+              if (pinToInitialPeer) peers.filterKeys(_ == connectedPeer) else peers,
+              connectedPeer)
 
             gotoGettingExtensionTail(GettingExtension, DownloadInfo(commonBlockId), tail)
 
@@ -224,7 +226,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
   private def updatedPeerSet(peerSet: Option[PeerSet]): Option[PeerSet] =
     peerSet.flatMap {
-      case PeerSet(active, peers, activeChanged) =>
+      case ps @ PeerSet(active, peers, _) =>
 
         log.debug("Trying to find a new active peer...")
 
@@ -232,7 +234,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         val updatedRetries = retries + 1
 
         val updatedPeers = (if (updatedRetries > application.settings.retriesBeforeBlacklisted) {
-          if (!activeChanged) blacklistPeer("Timeout exceeded", active)
+          if (!ps.activeChanged) blacklistPeer("Timeout exceeded", active)
           peers - active
         } else peers + (active -> peerData.copy(retries = updatedRetries))).filterNot(_._2.score < score)
 
@@ -240,7 +242,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
         sortedByScore.filterNot(_ == active).headOption
           .orElse(sortedByScore.headOption)
-          .map(newActive => PeerSet(newActive, updatedPeers, activeChanged || newActive != active))
+          .map(newActive => ps.copy(active = newActive, peers = updatedPeers))
     }
 
   private def ignoreFor(stopFilter: StopFilter): Receive = {
@@ -373,5 +375,7 @@ object BlockchainSynchronizer {
 
   private case class Peer(score: BlockchainScore, retries: Int = 0)
   private type Peers = Map[ConnectedPeer, Peer]
-  private case class PeerSet(active: ConnectedPeer, peers: Peers, activeChanged: Boolean = false)
+  private case class PeerSet(active: ConnectedPeer, peers: Peers, initiallyActive: ConnectedPeer) {
+    def activeChanged = active != initiallyActive
+  }
 }

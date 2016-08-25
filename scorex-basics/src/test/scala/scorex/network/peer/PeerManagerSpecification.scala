@@ -78,7 +78,6 @@ class PeerManagerSpecification extends ActorTestingCommons {
         nodeNonce shouldEqual nonce
 
         actorRef ! Disconnected(anAddress)
-
         getConnectedPeers shouldBe empty
       }
 
@@ -97,6 +96,9 @@ class PeerManagerSpecification extends ActorTestingCommons {
         networkController.expectNoMsg(testDuration)
 
         getConnectedPeers.size shouldBe 1
+
+        actorRef ! Disconnected(anAddress)
+        getConnectedPeers shouldBe empty
       }
 
       "msg from network routing" - {
