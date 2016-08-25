@@ -133,7 +133,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     blocks.find(!processNewBlock(_, None, local = false)).foreach { failedBlock =>
       log.warn(s"Can't apply block: ${failedBlock.json}")
       if (history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)) {
-        from.foreach(_.handlerRef ! PeerConnectionHandler.Blacklist)
+        from.foreach(_.blacklist())
       }
     }
 

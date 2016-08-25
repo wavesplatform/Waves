@@ -1,7 +1,5 @@
 package scorex.network
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
@@ -36,25 +34,28 @@ class ScoreObserverSpecification extends ActorTestingCommons {
 
     "consider incoming updates" - {
 
-      def peer(port: Int) = ConnectedPeer(new InetSocketAddress(port), null)
+      def peerMock(port: Int): ConnectedPeer = stub[ConnectedPeer]
 
       def expectScores(values: (ConnectedPeer, BlockchainScore)*): ConsideredValue =
         testCoordinator.expectMsg(ConsideredValue(values.toSeq))
 
       def updateScore(value: (ConnectedPeer, BlockchainScore)): Unit = actorRef ! UpdateScore(Some(value))
 
-      updateScore(peer(1) -> BigInt(100))
-      expectScores(peer(1) -> BigInt(100))
+      val peer = stub[ConnectedPeer]
 
-      updateScore(peer(3) -> BigInt(300))
-      expectScores(peer(1) -> BigInt(100), peer(3) -> BigInt(300))
+      updateScore(peer -> BigInt(100))
+      expectScores(peer -> BigInt(100))
+
+      val peer3 = stub[ConnectedPeer]
+      updateScore(peer3 -> BigInt(300))
+      expectScores(peer -> BigInt(100), peer3 -> BigInt(300))
 
       "no update in case of lesser score" in {
         val lesserScore = BigInt(200)
 
-        updateScore(peer(1) -> lesserScore)
-        updateScore(peer(2) -> lesserScore)
-        updateScore(peer(7) -> lesserScore)
+        updateScore(peer -> lesserScore)
+        updateScore(stub[ConnectedPeer] -> lesserScore)
+        updateScore(stub[ConnectedPeer] -> lesserScore)
 
         expectNoMsg(testDuration)
       }
@@ -64,22 +65,24 @@ class ScoreObserverSpecification extends ActorTestingCommons {
 
         sleepHalfTTL()
 
-        scores should be(Seq(peer(1) -> BigInt(100), peer(3) -> BigInt(300)))
+        scores should be(Seq(peer -> BigInt(100), peer3 -> BigInt(300)))
 
         val tinyScore = BigInt(10)
 
-        updateScore(peer(5) -> tinyScore)
+        val peer5 = stub[ConnectedPeer]
+
+        updateScore(peer5 -> tinyScore)
         sleepHalfTTL()
 
-        scores shouldEqual Seq(peer(5) -> tinyScore)
+        scores shouldEqual Seq(peer5 -> tinyScore)
 
         sleepHalfTTL()
         scores shouldBe empty
 
         val secondRoundScore = BigInt(1)
 
-        updateScore(peer(1) -> secondRoundScore)
-        expectScores(peer(1) -> secondRoundScore)
+        updateScore(peer -> secondRoundScore)
+        expectScores(peer -> secondRoundScore)
       }
     }
   }

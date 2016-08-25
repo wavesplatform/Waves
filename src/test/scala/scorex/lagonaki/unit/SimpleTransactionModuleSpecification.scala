@@ -14,6 +14,7 @@ import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transact
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 //TODO: gagarin55 - Can't move it to appropriate module due to dependancy on some ConsesusModule impl
 class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {

@@ -3,7 +3,7 @@ package scorex.settings
 import play.api.libs.json.{JsObject, Json}
 
 trait SettingsMock extends Settings {
-  override lazy val settingsJSON: JsObject = Json.obj()
-  override val filename: String = ""
-  override lazy val upnpEnabled: Boolean = false
+  override final lazy val settingsJSON: JsObject = Json.obj()
+  override final val filename: String = ""
+  override final lazy val upnpEnabled: Boolean = false
 }

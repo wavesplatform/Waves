@@ -1,66 +1,173 @@
 package scorex.network.peer
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 
-import akka.actor.ActorSystem
+import akka.actor.Props
 import akka.pattern.ask
-import akka.testkit.TestActorRef
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
-import play.api.libs.json.{JsObject, Json}
-import scorex.app.{Application, ApplicationVersion}
-import scorex.network.{ConnectedPeer, Handshake}
-import scorex.network.peer.PeerManager.{Connected, GetConnectedPeers, Handshaked}
-import scorex.settings.Settings
+import akka.testkit.TestProbe
+import scorex.ActorTestingCommons
+import scorex.app.ApplicationVersion
+import scorex.network.NetworkController.SendToNetwork
+import scorex.network.PeerConnectionHandler.CloseConnection
+import scorex.network._
+import scorex.network.message.Message
+import scorex.network.message.MessageHandler.RawNetworkData
+import scorex.settings.SettingsMock
 
-import scala.util.Success
-import scala.concurrent.duration._
-import akka.util.Timeout
-
+import scala.concurrent.Await
 import scala.language.postfixOps
+import scala.util.Left
 
-class PeerManagerSpecification extends FunSuite with Matchers with MockFactory with BeforeAndAfterAll {
+class PeerManagerSpecification extends ActorTestingCommons {
 
-  implicit val actorSystem = ActorSystem("PeerManagerSpecification")
+  import PeerManager._
 
-  implicit val duration: Timeout = 20 seconds
+  val hostname = "localhost"
+  val knownAddress = new InetSocketAddress(hostname, 6789)
 
-  override def afterAll(): Unit = {
-    actorSystem.terminate()
-  }
-
-  private object MySettings extends Settings {
-    override lazy val settingsJSON: JsObject = Json.obj()
+  object TestSettings extends SettingsMock {
     override lazy val dataDirOpt: Option[String] = None
-    override val filename: String = ""
-    override lazy val knownPeers = Seq.empty[InetSocketAddress]
+    override lazy val knownPeers: Seq[InetSocketAddress] = Seq(knownAddress)
+    override lazy val nodeNonce: Long = 123456789
   }
 
-  trait MyApp extends Application {
-    override val settings: Settings = MySettings
+  trait App extends ApplicationMock {
+    override lazy val settings = TestSettings
   }
 
-  test("PeerManager returns on GetConnectedPeers list of pairs (InetSocketAddress, Handshake)") {
-    val app = stub[MyApp]
-    val peerManager = TestActorRef(new PeerManager(app))
+  private val app = stub[App]
 
-    val Success(result : List[(InetSocketAddress, Handshake)]) = (peerManager ? GetConnectedPeers).value.get
-    assert(result.isEmpty)
+  import app.basicMessagesSpecsRepo._
 
-    // prepare
-    val peerAddress = new InetSocketAddress(InetAddress.getByAddress(Array[Byte](1, 1, 1, 1)), 1234)
-    peerManager ! Connected(ConnectedPeer(peerAddress, null))
+  protected override val actorRef = system.actorOf(Props(classOf[PeerManager], app))
 
-    val handshake = Handshake("scorex", ApplicationVersion(1, 1, 1), "", 1, None, 0)
-    peerManager ! Handshaked(peerAddress, handshake)
+  testSafely {
 
-    // assert
-    val Success(result2 : List[(InetSocketAddress, Handshake)]) = (peerManager ? GetConnectedPeers).value.get
-    assert(result2.nonEmpty)
-    val (address, h) = result2.head
-    assert(address == peerAddress)
-    assert(h.applicationName == "scorex")
+    val peerConnectionHandler = TestProbe("connection-handler")
 
-    peerManager.stop()
+    def connected(address: InetSocketAddress) = Connected(address, peerConnectionHandler.ref)
+
+    def handshaked(address: InetSocketAddress, noneNonce: Long) =
+      Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", noneNonce, None, 0))
+
+    def connect(address: InetSocketAddress, noneNonce: Long): Unit = {
+      actorRef ! connected(address)
+      actorRef ! handshaked(address, noneNonce)
+    }
+
+    def getConnectedPeers =
+      Await.result((actorRef ? GetConnectedPeers).mapTo[Seq[(InetSocketAddress, Handshake)]], testDuration)
+
+    val anAddress = new InetSocketAddress(hostname, knownAddress.getPort + 1)
+
+    "peer cycle" - {
+      val nonce = 777
+
+      connect(anAddress, nonce)
+
+      val connectedPeers = getConnectedPeers
+      val (addr, Handshake(_, _, _, nodeNonce, _, _)) = connectedPeers.head
+
+      "connect - disconnect" in {
+        connectedPeers.size shouldBe 1
+
+        addr shouldEqual anAddress
+        nodeNonce shouldEqual nonce
+
+        actorRef ! Disconnected(anAddress)
+
+        getConnectedPeers shouldBe empty
+      }
+
+      "double connect" in {
+
+        actorRef ! CheckPeers
+
+        networkController.expectMsg(NetworkController.ConnectTo(knownAddress))
+
+        connect(knownAddress, nonce)
+
+        getConnectedPeers.size shouldBe 1
+
+        actorRef ! CheckPeers
+
+        networkController.expectNoMsg(testDuration)
+
+        getConnectedPeers.size shouldBe 1
+      }
+
+      "msg from network routing" - {
+        val rawData = RawNetworkData(BlockMessageSpec, Array[Byte](23), anAddress)
+        actorRef ! rawData
+
+        def assertThatMessageGotten(): Unit = networkController.expectMsgPF() {
+          case Message(spec, Left(bytes), Some(p)) =>
+            spec shouldEqual rawData.spec
+            bytes shouldEqual rawData.data
+            p.nonce shouldEqual nodeNonce
+        }
+
+        "msg is gotten" in {
+          assertThatMessageGotten()
+        }
+
+        "surviving reconnect" in {
+          actorRef ! Disconnected(anAddress)
+
+          val sameClientAnotherPort = new InetSocketAddress(hostname, knownAddress.getPort + 2)
+          connect(sameClientAnotherPort, nonce)
+
+          assertThatMessageGotten()
+        }
+      }
+
+      "msg to network routing" in {
+        val p = mock[ConnectedPeer]
+        p.nonce _ expects() returns nonce
+
+        val msg = Message(BlockMessageSpec, Left(Array[Byte](27)), None)
+        actorRef ! SendToNetwork(msg, SendToChosen(p))
+
+        peerConnectionHandler.expectMsg(msg)
+      }
+
+      "blacklisting" in {
+        // workaround for peer database bug
+        actorRef ! AddOrUpdatePeer(anAddress, None, None)
+
+        actorRef ! AddToBlacklist(nonce)
+
+        peerConnectionHandler.expectMsg(CloseConnection)
+
+        val blacklistedPeers =
+          Await.result((actorRef ? GetBlacklistedPeers).mapTo[Map[InetSocketAddress, PeerInfo]], testDuration)
+
+        blacklistedPeers.size shouldBe 1
+      }
+    }
+
+    "PeerManager returns on GetConnectedPeers list of pairs (InetSocketAddress, Handshake)" in {
+      assert(getConnectedPeers.isEmpty)
+
+      // prepare
+      connect(anAddress, 655)
+
+      // assert
+      val result2 = getConnectedPeers
+      assert(result2.nonEmpty)
+      val (a, h) = result2.head
+      assert(a == anAddress)
+      assert(h.applicationName == "scorex")
+    }
+
+    "get random peers" in {
+      actorRef ! AddOrUpdatePeer(new InetSocketAddress(100), Some(TestSettings.nodeNonce), None)
+      actorRef ! AddOrUpdatePeer(new InetSocketAddress(101), Some(1), None)
+
+      val peers = Await.result((actorRef ? GetRandomPeers(3)).mapTo[Seq[InetSocketAddress]], testDuration)
+
+      peers.size shouldBe 2
+      peers.map(_.getPort) should not contain 100
+    }
   }
 }

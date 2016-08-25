@@ -8,7 +8,7 @@ import scorex.app.RunnableApplication
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.Message
 import scorex.network.peer.PeerManager
-import scorex.network.peer.PeerManager.RandomPeers
+import scorex.network.peer.PeerManager.GetRandomPeers
 import scorex.utils.ScorexLogging
 import shapeless.syntax.typeable._
 
@@ -46,9 +46,8 @@ class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronize
     case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
 
       //todo: externalize the number, check on receiving
-      (peerManager ? RandomPeers(3))
+      (peerManager ? GetRandomPeers(3))
         .mapTo[Seq[InetSocketAddress]]
-        .map(_.filterNot(_ == remote.socketAddress))
         .filter(_.nonEmpty)
         .foreach { peers =>
           val msg = Message(PeersSpec, Right(peers), None)

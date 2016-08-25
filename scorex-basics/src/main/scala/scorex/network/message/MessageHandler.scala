@@ -1,9 +1,9 @@
 package scorex.network.message
 
+import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
 import scorex.crypto.hash.FastCryptographicHash._
-import scorex.network.ConnectedPeer
 
 import scala.util.Try
 
@@ -15,8 +15,7 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
     .ensuring(m => m.size == specs.size, "Duplicate message codes")
 
   //MAGIC ++ Array(spec.messageCode) ++ Ints.toByteArray(dataLength) ++ dataWithChecksum
-  // TODO Deser[Message[_]]
-  def parseBytes(bytes: ByteBuffer, sourceOpt: Option[ConnectedPeer]): Try[Message[_]] = Try {
+  def parseBytes(bytes: ByteBuffer): Try[(MessageSpec[_], Array[Byte])] = Try {
     val magic = new Array[Byte](MagicLength)
     bytes.get(magic)
 
@@ -49,6 +48,10 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
 
     val spec = specsMap.get(msgCode).ensuring(_.isDefined, "No message handler").get
 
-    Message(spec, Left(msgData), sourceOpt)
+    (spec, msgData)
   }
+}
+
+object MessageHandler {
+  case class RawNetworkData(spec: MessageSpec[_], data: Array[Byte], remote: InetSocketAddress)
 }

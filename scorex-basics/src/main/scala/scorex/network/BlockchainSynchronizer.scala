@@ -230,12 +230,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         val updatedRetries = retries + 1
 
         val updatedPeers = (if (updatedRetries >= application.settings.retriesBeforeBlacklisted) {
-          /*
-            * TODO: blacklisting by timeout makes sense in case of peer indentification by hostname and nonce,
-            * othetwise we have chances to blacklist an innocent peer which have already reastablished
-            * its TCP connection using another client TCP port number.
-            * if (pinToInitialPeer) blacklistPeer("Timeout exceeded", active)
-           */
+          if (!activeChanged) blacklistPeer("Timeout exceeded", active)
           peers - active
         } else peers + (active -> peerData.copy(retries = updatedRetries))).filterNot(_._2.score < score)
 
@@ -292,7 +287,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
   private def blacklistPeer(reason: String, connectedPeer: ConnectedPeer): Unit = {
     log.warn(s"$reason, blacklisted peer: $connectedPeer")
-    connectedPeer.handlerRef ! PeerConnectionHandler.Blacklist
+    connectedPeer.blacklist()
   }
 
   private object BlockFromPeer {

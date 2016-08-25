@@ -1,43 +1,30 @@
 package scorex.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, SupervisorStrategy}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
 import scorex.app.RunnableApplication
+import scorex.network.message.MessageHandler.RawNetworkData
 import scorex.network.peer.PeerManager
-import scorex.network.peer.PeerManager.{AddToBlacklist, Handshaked}
+import scorex.network.peer.PeerManager.Handshaked
 import scorex.utils.ScorexLogging
+
 import scala.util.{Failure, Success}
 
-case class ConnectedPeer(socketAddress: InetSocketAddress, handlerRef: ActorRef) {
-  import shapeless.syntax.typeable._
-
-  override def equals(obj: Any): Boolean =
-    obj.cast[ConnectedPeer].exists(_.socketAddress == this.socketAddress)
-
-  override def hashCode(): Int = socketAddress.hashCode()
-  override def toString: String = socketAddress.toString
-}
-
-
-//todo: timeout on Ack waiting (perhaps not needed since absence of Ack ==  TCP connection t/o)
 case class PeerConnectionHandler(application: RunnableApplication,
                                  connection: ActorRef,
                                  remote: InetSocketAddress) extends Actor with Buffering with ScorexLogging {
   import PeerConnectionHandler._
 
-  case object Ack extends Event
-  private object HandshakeCheck
-
-  private lazy val networkControllerRef: ActorRef = application.networkController
-  private lazy val peerManager: ActorRef = application.peerManager
+  private lazy val peerManager = application.peerManager
 
   private lazy val outboundBufferSize = application.settings.outboundBufferSize
 
-  private val selfPeer = ConnectedPeer(remote, self)
+  private var outboundBuffer = Vector.empty[ByteString]
 
   private var handshakeGot = false
   private var handshakeSent = false
@@ -54,9 +41,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
   // there is not recovery for broken connections
   override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
-  override def receive: Receive = handshakeCycle
-
-  private def handshakeCycle: Receive = ({
+  override def receive: Receive = state(CommunicationState.AwaitingHandshake) {
     case h: Handshake =>
       connection ! Write(ByteString(h.bytes))
       log.info(s"Handshake sent to $remote")
@@ -82,67 +67,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
         connection ! ResumeReading
         context become workingCycle
       }
-  }: Receive) orElse processErrors(CommunicationState.AwaitingHandshake.toString)
-
-
-  /**
-    * Akka message handler when we don't wait ACK of last Write operation.
-    * */
-  private def workingCycleInterface: Receive = {
-    case msg: message.Message[_] =>
-      log.trace("Sending message " + msg.spec + " to " + remote)
-      val bytes = msg.bytes
-      val data = ByteString(Ints.toByteArray(bytes.length) ++ bytes)
-      buffer(data)
-      connection ! Write(data, Ack)
-      context become workingCycleWaitingAck
-
-    case Received(data: ByteString) =>
-      processReceivedData(data)
-      connection ! ResumeReading
   }
-
-  /**
-    * Akka message handler when we wait ACK of last Write.
-    * */
-  private def workingCycleWaitingAckInterface: Receive = {
-    case msg: message.Message[_] =>
-      log.trace(s"Buffering outbound message " + msg.spec + " to " + remote)
-      val bytes = msg.bytes
-      val data = ByteString(Ints.toByteArray(bytes.length) ++ bytes)
-      buffer(data)
-
-    case Ack => acknowledge()
-
-    case Received(data: ByteString) =>
-      processReceivedData(data)
-      connection ! ResumeReading
-  }
-
-  private def workingCycleWaitingWritingResumedInterface: Receive = {
-    case msg: message.Message[_] =>
-      log.trace(s"Buffering outbound message " + msg.spec + " to " + remote)
-      val bytes = msg.bytes
-      val data = ByteString(Ints.toByteArray(bytes.length) ++ bytes)
-      buffer(data)
-
-    case WritingResumed =>
-      log.trace("WritingResumed")
-      connection ! Write(outboundBuffer(0), Ack)
-
-    case Received(data: ByteString) =>
-      processReceivedData(data)
-      connection ! ResumeReading
-  }
-
-  private def blackListingInterface: Receive = {
-    case Blacklist =>
-      log.info(s"Going to blacklist " + remote)
-      peerManager ! AddToBlacklist(remote)
-      connection ! Close
-  }
-
-  private var outboundBuffer = Vector.empty[ByteString]
 
   private def buffer(data: ByteString) = {
     outboundBuffer :+= data
@@ -166,25 +91,47 @@ case class PeerConnectionHandler(application: RunnableApplication,
     }
   }
 
-  private def workingCycle: Receive =
-    workingCycleInterface orElse blackListingInterface orElse
-      processErrors(CommunicationState.WorkingCycle.toString) orElse {
-      case nonsense: Any =>
-        log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
-    }
+  private def workingCycle: Receive = state(CommunicationState.WorkingCycle) {
+    case msg: message.Message[_] =>
+      log.trace("Sending message " + msg.spec + " to " + remote)
+      val bytes = msg.bytes
+      val data = ByteString(Ints.toByteArray(bytes.length) ++ bytes)
+      buffer(data)
+      connection ! Write(data, Ack)
+      context become workingCycleWaitingAck
 
-  private def workingCycleWaitingAck: Receive =
-    workingCycleWaitingAckInterface orElse blackListingInterface orElse
-      processErrors(CommunicationState.WorkingCycleWaitingAck.toString) orElse {
-      case nonsense: Any =>
-        log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
-    }
+    case Received(data: ByteString) => processReceivedData(data)
+  }
 
-  private def workingCycleWaitingWritingResumed: Receive =
-    workingCycleWaitingWritingResumedInterface orElse blackListingInterface orElse
-      processErrors(CommunicationState.WorkingCycleWaitingAck.toString) orElse {
-      case nonsense: Any =>
-        log.warn(s"Strange input for PeerConnectionHandler: $nonsense")
+  private def workingCycleWaitingAck: Receive = state(CommunicationState.WorkingCycleWaitingAck) {
+    case msg: message.Message[_] =>
+      log.trace(s"Buffering outbound message " + msg.spec + " to " + remote)
+      val bytes = msg.bytes
+      val data = ByteString(Ints.toByteArray(bytes.length) ++ bytes)
+      buffer(data)
+
+    case Ack => acknowledge()
+
+    case Received(data: ByteString) => processReceivedData(data)
+  }
+
+  private def workingCycleWaitingWritingResumed: Receive = state(CommunicationState.WorkingCycleWaitingWritingResumed) {
+    case msg: message.Message[_] =>
+      log.trace(s"Buffering outbound message " + msg.spec + " to " + remote)
+      val bytes = msg.bytes
+      val data = ByteString(Ints.toByteArray(bytes.length) ++ bytes)
+      buffer(data)
+
+    case WritingResumed =>
+      log.trace("WritingResumed")
+      connection ! Write(outboundBuffer(0), Ack)
+
+    case Received(data: ByteString) => processReceivedData(data)
+  }
+
+  private def state(state: CommunicationState.Value)(logic: Receive): Receive =
+    logic orElse processErrors(state.toString) orElse {
+      case nonsense: Any => log.warn(s"Strange input in state $state: $nonsense")
     }
 
   private def processErrors(stateName: String): Receive = {
@@ -214,10 +161,10 @@ case class PeerConnectionHandler(application: RunnableApplication,
     chunksBuffer = remainder
 
     pkt.find { packet =>
-      application.messagesHandler.parseBytes(packet.toByteBuffer, Some(selfPeer)) match {
-        case Success(message) =>
-          log.trace("Received message " + message.spec + " from " + remote)
-          networkControllerRef ! message
+      application.messagesHandler.parseBytes(packet.toByteBuffer) match {
+        case Success((spec, msgData)) =>
+          log.trace("Received message " + spec + " from " + remote)
+          peerManager ! RawNetworkData(spec, msgData, remote)
           false
 
         case Failure(e) =>
@@ -227,6 +174,8 @@ case class PeerConnectionHandler(application: RunnableApplication,
           true
       }
     }
+
+    connection ! ResumeReading
   }
 }
 
@@ -238,9 +187,11 @@ object PeerConnectionHandler {
     val AwaitingHandshake = Value("AwaitingHandshake")
     val WorkingCycle = Value("WorkingCycle")
     val WorkingCycleWaitingAck = Value("WorkingCycleWaitingAck")
+    val WorkingCycleWaitingWritingResumed = Value("WorkingCycleWaitingWritingResumed")
   }
 
-  case object CloseConnection
+  private case object Ack extends Event
+  private case object HandshakeCheck
 
-  case object Blacklist
+  case object CloseConnection
 }

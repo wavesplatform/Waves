@@ -4,6 +4,7 @@ import akka.actor.Props
 import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.network.Coordinator.AddBlock
@@ -13,6 +14,10 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
+
+class MinerMock(app: Application) extends Miner(app) {
+  override protected def preciseTime: Long = System.currentTimeMillis()
+}
 
 class MinerSpecification extends ActorTestingCommons {
 
@@ -79,7 +84,7 @@ class MinerSpecification extends ActorTestingCommons {
 
   private val genTimeShift = Miner.BlockGenerationTimeShift
 
-  protected override val actorRef = system.actorOf(Props(classOf[Miner], mock[App]))
+  protected override val actorRef = system.actorOf(Props(classOf[MinerMock], mock[App]))
 
   testSafely {
 
@@ -129,7 +134,7 @@ class MinerSpecification extends ActorTestingCommons {
 
             testCoordinator.expectNoMsg(calculatedGenDelay)
             testCoordinator.expectMsg(AddBlock(newBlock, None))
-            testCoordinator.expectNoMsg(calculatedGenDelay +  genTimeShift)
+            testCoordinator.expectNoMsg(calculatedGenDelay + genTimeShift)
           }
 
           "block is NOT generated" in {

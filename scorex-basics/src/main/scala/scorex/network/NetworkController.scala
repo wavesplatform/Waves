@@ -121,13 +121,9 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
         //todo: ban peer
       }
 
-    case SendToNetwork(message, sendingStrategy) =>
+    case stn @ SendToNetwork(_, _) =>
       val delay = if (settings.fuzzingDelay > 0) Random.nextInt(settings.fuzzingDelay) else 0
-      system.scheduler.scheduleOnce(delay.millis) {
-        (peerManager ? PeerManager.FilterPeers(sendingStrategy))
-          .map(_.asInstanceOf[Seq[ConnectedPeer]])
-          .foreach(_.foreach(_.handlerRef ! message))
-      }
+      system.scheduler.scheduleOnce(delay.millis) { peerManager ! stn }
   }
 
   def peerLogic: Receive = {
@@ -139,9 +135,8 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
       connection ! Register(handler, keepOpenOnPeerClosed = false, useResumeWriting = true)
-      val newPeer = ConnectedPeer(remote, handler)
-      peerManager ! PeerManager.Connected(newPeer)
-      newPeer.handlerRef ! handshakeTemplate.copy(time = System.currentTimeMillis() / 1000)
+      peerManager ! PeerManager.Connected(remote, handler)
+      handler ! handshakeTemplate.copy(time = System.currentTimeMillis() / 1000)
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
@@ -152,9 +147,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   def interfaceCalls: Receive = {
     case ShutdownNetwork =>
       log.info("Going to shutdown all connections & unbind port")
-      (peerManager ? PeerManager.FilterPeers(Broadcast))
-        .map(_.asInstanceOf[Seq[ConnectedPeer]])
-        .foreach(_.foreach(_.handlerRef ! PeerConnectionHandler.CloseConnection))
+      peerManager ! ShutdownNetwork
       self ! Unbind
       context stop self
   }
@@ -175,7 +168,6 @@ object NetworkController {
 
   case class RegisterMessagesHandler(specs: Seq[MessageSpec[_]], handler: ActorRef)
 
-  //todo: more stricter solution for messageType than number?
   case class DataFromPeer[V](messageType: Message.MessageCode, data: V, source: ConnectedPeer)
 
   case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)

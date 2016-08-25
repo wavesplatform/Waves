@@ -1,7 +1,5 @@
 package scorex.network
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import org.h2.mvstore.MVStore
@@ -75,8 +73,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   }
 
   private def assertLatestBlockFromNonSyncPeer(): Unit = {
-    val testPeerHandler = TestProbe()
-    val peer = ConnectedPeer(new InetSocketAddress(peerId + 1), testPeerHandler.ref)
+    val peer = stub[ConnectedPeer]
 
     val block = blockMock(lastHistoryBlockId + 3729047)
     actorRef ! DataFromPeer(BlockMessageSpec.messageCode, block, peer)
@@ -84,11 +81,11 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   }
 
   private def assertThatPeerGotBlacklisted(): Unit = {
-    within(reasonableTimeInterval) {
-      peerHandler.expectMsg(PeerConnectionHandler.Blacklist)
-      testCoordinator.expectMsg(SyncFinished.unsuccessfully)
-    }
+    (peer.blacklist _).expects().once()
+    testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
   }
+
+  private def assertPeerNeverGotBlacklisted(): Unit = (peer.blacklist _).expects().never()
 
   private def expectedGetSignaturesSpec(blockIds: Int*): Unit = expectNetworkMessage(GetSignaturesSpec, blockIds.toSeq)
   private def sendBlock(block: Block): Unit = dataFromNetwork(BlockMessageSpec, block)
@@ -142,7 +139,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
       "sending same signatures twice should not lead to blacklisting" in {
         sendSignatures(9, lastHistoryBlockId, 11, 12, 13)
-        peerHandler.expectNoMsg(reasonableTimeInterval)
+        assertPeerNeverGotBlacklisted()
       }
 
       "go to GettingExtensionTail" - {
@@ -152,22 +149,17 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
         val validBlockIds = blockIds(13, 14, 15)
 
         "extension tail from another peer(s)" - {
-          val anotherPeer = TestProbe("another")
-          dataFromNetwork(SignaturesSpec, validBlockIds, ConnectedPeer(new InetSocketAddress(peerId + 2), anotherPeer.ref))
+          dataFromNetwork(SignaturesSpec, validBlockIds, stub[ConnectedPeer])
 
           "should not lead to blacklisting of the peers" in {
-            peerHandler.expectNoMsg(reasonableTimeInterval)
-          }
-
-          "should not lead to any futher actions" in {
-            peerHandler.expectNoMsg(reasonableTimeInterval)
+            assertPeerNeverGotBlacklisted()
           }
         }
 
-        "get idle on timeout in states following GettingExtension" in {
+        "blacklist on timeout in states following GettingExtension" in {
           testCoordinator.expectNoMsg(aBitLessThanTimeout)
 
-          testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
+          assertThatPeerGotBlacklisted()
 
           validateStatus(Idle)
         }
@@ -221,7 +213,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               }
 
               validateStatus(Idle)
-              peerHandler.expectNoMsg(aBitLongerThanTimeout)
+              assertPeerNeverGotBlacklisted()
             }
 
             "entire fork loading" - {
@@ -229,7 +221,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               setloadEntireForkChunk(true)
 
               "fork has two blocks better score" in {
-                setHistoryScoreExpectations(-(blockScore*2 + 1))
+                setHistoryScoreExpectations(-(blockScore * 2 + 1))
 
                 sendBlocks()
 
@@ -264,7 +256,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
                   sendBlock(blockMock(firstSubsequentBlockId))
 
-                  testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
+                  assertThatPeerGotBlacklisted()
                 }
 
                 "happy path" in {

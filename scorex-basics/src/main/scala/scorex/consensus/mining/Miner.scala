@@ -60,10 +60,12 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       Failure(ex)
   }.getOrElse(false)
 
+  protected def preciseTime: Long = NTP.correctedTime()
+
   private def scheduleBlockGeneration(): Unit = {
     val schedule = if (application.settings.tflikeScheduling) {
       val lastBlock = application.history.lastBlock
-      val currentTime = NTP.correctedTime()
+      val currentTime = preciseTime
 
       accounts
         .flatMap(acc => consensusModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))

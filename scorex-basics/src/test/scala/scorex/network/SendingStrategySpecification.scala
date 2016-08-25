@@ -1,59 +1,63 @@
 package scorex.network
 
-import java.net.InetSocketAddress
-
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
 
 import scala.language.{implicitConversions, postfixOps}
 
 class SendingStrategySpecification extends FreeSpec
   with Matchers
+  with MockFactory
   with OneInstancePerTest {
 
-  "SendToChosen should filter (not just return a peer) to avoid non-actual actor usage" in {
-    val address = new InetSocketAddress(1111)
-    val aPeer = ConnectedPeer(address, null)
-    val anActualAlivePeer = ConnectedPeer(address, null)
+  "SendToChosen" in {
+    val nonce: Long = 333
 
-    val chosen = SendToChosen(aPeer).choose(Seq(anActualAlivePeer)).head
+    val aPeer = stub[ConnectedPeer]
+    (aPeer.nonce _).when().returns(nonce)
 
-    chosen shouldEqual aPeer
-    chosen should be theSameInstanceAs anActualAlivePeer
-    chosen should not be theSameInstanceAs(aPeer)
+    val chosen = SendToChosen(aPeer).choose(Seq((nonce, ""))).head
+
+    chosen shouldBe (nonce, "")
   }
 
-  "BroadcastExceptOf should filter out sender" in {
-    val sender = ConnectedPeer(new InetSocketAddress(1111), null)
+  "BroadcastExceptOf" - {
+    def connectedPeer(nonce: Long): ConnectedPeer = {
+      val peer = stub[ConnectedPeer]
+      (peer.nonce _).when().returns(nonce)
+      peer
+    }
 
-    val selectedPeers = BroadcastExceptOf(sender).choose(Seq(sender))
+    def peers(connectPeers: ConnectedPeer*): Seq[(Long, _)] = connectPeers.map(peer => (peer.nonce, null))
+    def toNonces(values: Seq[(Long, _)]): Seq[Long] = values.map(_._1)
 
-    selectedPeers.isEmpty shouldEqual true
-  }
+    val sender = connectedPeer(1111)
+    val peer1 = connectedPeer(2222)
+    val peer2 = connectedPeer(3333)
 
-  "Broadcast should select all peers except given one" in {
-    val sender = ConnectedPeer(new InetSocketAddress(1111), null)
-    val peer1 = ConnectedPeer(new InetSocketAddress(2222), null)
-    val peer2 = ConnectedPeer(new InetSocketAddress(3333), null)
+    "BroadcastExceptOf should filter out sender" in {
+      val selectedPeers = BroadcastExceptOf(sender).choose(peers(sender))
 
-    val selectedPeers = BroadcastExceptOf(sender).choose(Seq(sender, peer1, peer2))
+      selectedPeers.isEmpty shouldEqual true
+    }
 
-    selectedPeers.isEmpty shouldEqual false
-    selectedPeers.contains(peer1) shouldEqual true
-    selectedPeers.contains(peer2) shouldEqual true
-    selectedPeers.contains(sender) shouldEqual false
-  }
+    "Broadcast should select all peers except given one" in {
+      val selected = toNonces(BroadcastExceptOf(sender).choose(peers(sender, peer1, peer2)))
+
+      selected.isEmpty shouldEqual false
+      selected.contains(peer1.nonce) shouldEqual true
+      selected.contains(peer2.nonce) shouldEqual true
+      selected.contains(sender.nonce) shouldEqual false
+    }
 
 
-  "Broadcast should work with None passed" in {
-    val sender = ConnectedPeer(new InetSocketAddress(1111), null)
-    val peer1 = ConnectedPeer(new InetSocketAddress(2222), null)
-    val peer2 = ConnectedPeer(new InetSocketAddress(3333), null)
+    "Broadcast should work with None passed" in {
+      val selected = toNonces(BroadcastExceptOf(null).choose(peers(sender, peer1, peer2)))
 
-    val selectedPeers = BroadcastExceptOf(null).choose(Seq(sender, peer1, peer2))
-
-    selectedPeers.isEmpty shouldEqual false
-    selectedPeers.contains(peer1) shouldEqual true
-    selectedPeers.contains(peer2) shouldEqual true
-    selectedPeers.contains(sender) shouldEqual true
+      selected.isEmpty shouldEqual false
+      selected.contains(peer1.nonce) shouldEqual true
+      selected.contains(peer2.nonce) shouldEqual true
+      selected.contains(sender.nonce) shouldEqual true
+    }
   }
 }
