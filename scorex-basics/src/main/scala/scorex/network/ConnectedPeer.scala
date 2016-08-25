@@ -14,7 +14,7 @@ class InetAddressPeer(nodeNonce: Long, addr: InetSocketAddress, peerManager: Act
   import shapeless.syntax.typeable._
 
   override def blacklist(): Unit = {
-    peerManager ! AddToBlacklist(nodeNonce)
+    peerManager ! AddToBlacklist(nodeNonce, addr)
   }
 
   override def nonce: Long = nodeNonce

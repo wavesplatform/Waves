@@ -120,10 +120,12 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
         log.info(s"Got tail blockIds: $tail")
 
+        val updatedPeersData = peers.copy(active = connectedPeer)
+
         if (tail == overlap) {
-          gotoGettingExtensionTail(GettingExtensionTail, downloadInfo, Seq.empty)(peers)
+          gotoGettingExtensionTail(GettingExtensionTail, downloadInfo, Seq.empty)(updatedPeersData)
         } else if (tail.indexOf(overlap.last) == 0) {
-          gotoGettingExtensionTail(GettingExtensionTail, downloadInfo, tail.tail)(peers)
+          gotoGettingExtensionTail(GettingExtensionTail, downloadInfo, tail.tail)(updatedPeersData)
         } else if (tail.lastOption.exists(downloadInfo.blockIds.contains)) {
           log.warn(s"Tail blockIds have been already recieved - possible msg duplication: $tail")
         } else {

@@ -105,7 +105,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     val chosen = sendingStrategy.choose(peers)
     log.trace(s"${chosen.length} peers have been chosen among ${connectedPeers.size}")
-    chosen.foreach(_._2.asInstanceOf[ActorRef] ! message)
+    chosen.foreach(_._2 ! message)
   }
 
   private def processDataFromNetwork(spec: MessageSpec[_], msgData: Array[Byte], remote: InetSocketAddress): Unit = {
@@ -124,8 +124,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     connectedPeers
       .get(from).flatMap(_.handshake).map(_.nodeNonce)
       .foreach { nonce =>
-        val peersWithTheNonce = nonces(nonce)
-        connectedPeers.retain { case (addr, _) => !peersWithTheNonce.contains(addr) }
+        nonces(nonce).foreach(connectedPeers.remove)
         nonces -= nonce
       }
   }
@@ -163,8 +162,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     }
 
   private def blackListOperations: Receive = {
-    case AddToBlacklist(nodeNonce) =>
-      nonces.getOrElse(nodeNonce, MutableSet.empty).foreach {
+    case AddToBlacklist(nodeNonce, address) =>
+      nonces.getOrElse(nodeNonce, MutableSet(address)).foreach {
         addr =>
           log.info(s"Blacklist peer $addr")
           peerDatabase.blacklist(addr)
@@ -201,7 +200,7 @@ object PeerManager {
 
   case class Disconnected(remote: InetSocketAddress)
 
-  case class AddToBlacklist(nodeNonce: Long)
+  case class AddToBlacklist(nodeNonce: Long, address: InetSocketAddress)
 
   case object GetAllPeers
 

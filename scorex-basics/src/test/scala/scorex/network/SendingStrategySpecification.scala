@@ -16,9 +16,9 @@ class SendingStrategySpecification extends FreeSpec
     val aPeer = stub[ConnectedPeer]
     (aPeer.nonce _).when().returns(nonce)
 
-    val chosen = SendToChosen(aPeer).choose(Seq((nonce, ""))).head
+    val chosen = SendToChosen(aPeer).choose(Seq((nonce, ()))).head
 
-    chosen shouldBe (nonce, "")
+    chosen shouldBe (nonce, ())
   }
 
   "BroadcastExceptOf" - {
@@ -28,20 +28,20 @@ class SendingStrategySpecification extends FreeSpec
       peer
     }
 
-    def peers(connectPeers: ConnectedPeer*): Seq[(Long, _)] = connectPeers.map(peer => (peer.nonce, null))
+    def peers(connectPeers: ConnectedPeer*): Seq[(Long, Unit)] = connectPeers.map(peer => (peer.nonce, ()))
     def toNonces(values: Seq[(Long, _)]): Seq[Long] = values.map(_._1)
 
     val sender = connectedPeer(1111)
     val peer1 = connectedPeer(2222)
     val peer2 = connectedPeer(3333)
 
-    "BroadcastExceptOf should filter out sender" in {
+    "should filter out sender" in {
       val selectedPeers = BroadcastExceptOf(sender).choose(peers(sender))
 
       selectedPeers.isEmpty shouldEqual true
     }
 
-    "Broadcast should select all peers except given one" in {
+    "should select all peers except given one" in {
       val selected = toNonces(BroadcastExceptOf(sender).choose(peers(sender, peer1, peer2)))
 
       selected.isEmpty shouldEqual false
@@ -51,7 +51,7 @@ class SendingStrategySpecification extends FreeSpec
     }
 
 
-    "Broadcast should work with None passed" in {
+    "should work with None passed" in {
       val selected = toNonces(BroadcastExceptOf(null).choose(peers(sender, peer1, peer2)))
 
       selected.isEmpty shouldEqual false

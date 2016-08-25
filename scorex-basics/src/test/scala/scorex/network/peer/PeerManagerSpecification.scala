@@ -58,6 +58,9 @@ class PeerManagerSpecification extends ActorTestingCommons {
     def getConnectedPeers =
       Await.result((actorRef ? GetConnectedPeers).mapTo[Seq[(InetSocketAddress, Handshake)]], testDuration)
 
+    def getBlacklistedPeers =
+      Await.result((actorRef ? GetBlacklistedPeers).mapTo[Map[InetSocketAddress, PeerInfo]], testDuration)
+
     val anAddress = new InetSocketAddress(hostname, knownAddress.getPort + 1)
 
     "peer cycle" - {
@@ -135,14 +138,11 @@ class PeerManagerSpecification extends ActorTestingCommons {
         // workaround for peer database bug
         actorRef ! AddOrUpdatePeer(anAddress, None, None)
 
-        actorRef ! AddToBlacklist(nonce)
+        actorRef ! AddToBlacklist(nonce, new InetSocketAddress(9999))
 
         peerConnectionHandler.expectMsg(CloseConnection)
 
-        val blacklistedPeers =
-          Await.result((actorRef ? GetBlacklistedPeers).mapTo[Map[InetSocketAddress, PeerInfo]], testDuration)
-
-        blacklistedPeers.size shouldBe 1
+        getBlacklistedPeers.size shouldBe 1
       }
     }
 
@@ -168,6 +168,14 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
       peers.size shouldBe 2
       peers.map(_.getPort) should not contain 100
+    }
+
+    "blacklist nonconnected peer" in {
+      getBlacklistedPeers shouldBe empty
+
+      actorRef ! AddToBlacklist(-111, knownAddress)
+
+      getBlacklistedPeers.size shouldBe 1
     }
   }
 }
