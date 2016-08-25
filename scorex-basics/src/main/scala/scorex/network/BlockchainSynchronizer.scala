@@ -229,7 +229,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         val peerData @ Peer(score, retries) = peers(active)
         val updatedRetries = retries + 1
 
-        val updatedPeers = (if (updatedRetries >= application.settings.retriesBeforeBlacklisted) {
+        val updatedPeers = (if (updatedRetries > application.settings.retriesBeforeBlacklisted) {
           if (!activeChanged) blacklistPeer("Timeout exceeded", active)
           peers - active
         } else peers + (active -> peerData.copy(retries = updatedRetries))).filterNot(_._2.score < score)

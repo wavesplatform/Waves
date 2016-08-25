@@ -24,6 +24,13 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     history
   }
 
+  private case object BlacklistAssertion
+  private def setBlacklistExpectations(blacklist: Boolean): Unit = {
+    (peer.blacklist _).when().onCall {
+      _ => if (blacklist) self ! BlacklistAssertion else fail("No blacklisting should be in this case")
+    }
+  }
+
   private val lastHistoryBlockId = 10
   private val testHistory = mockHistory(lastHistoryBlockId)
 
@@ -33,9 +40,9 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   private def setloadEntireForkChunk(value: Boolean) = entireForkLoad expects() returns value anyNumberOfTimes
 
   object TestSettings extends SettingsMock {
-    override lazy val historySynchronizerTimeout: FiniteDuration = 1 second
+    override lazy val historySynchronizerTimeout: FiniteDuration = testDuration * 2
     override lazy val forkMaxLength: Int = lastHistoryBlockId
-    override lazy val retriesBeforeBlacklisted: Int = 1
+    override lazy val retriesBeforeBlacklisted: Int = 0
     override lazy val operationRetries: Int = retriesBeforeBlacklisted + 13930975
     override lazy val pinToInitialPeer: Boolean = true
     override lazy val loadEntireForkChunk: Boolean = entireForkLoad()
@@ -81,11 +88,12 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   }
 
   private def assertThatPeerGotBlacklisted(): Unit = {
-    (peer.blacklist _).expects().once()
+    setBlacklistExpectations(true)
     testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
+    expectMsg(BlacklistAssertion)
   }
 
-  private def assertPeerNeverGotBlacklisted(): Unit = (peer.blacklist _).expects().never()
+  private def assertPeerNeverGotBlacklisted(): Unit = setBlacklistExpectations(false)
 
   private def expectedGetSignaturesSpec(blockIds: Int*): Unit = expectNetworkMessage(GetSignaturesSpec, blockIds.toSeq)
   private def sendBlock(block: Block): Unit = dataFromNetwork(BlockMessageSpec, block)
@@ -138,8 +146,8 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
       expectedGetSignaturesSpec(13, 12)
 
       "sending same signatures twice should not lead to blacklisting" in {
-        sendSignatures(9, lastHistoryBlockId, 11, 12, 13)
         assertPeerNeverGotBlacklisted()
+        sendSignatures(9, lastHistoryBlockId, 11, 12, 13)
       }
 
       "go to GettingExtensionTail" - {
@@ -148,12 +156,9 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
         val validBlockIds = blockIds(13, 14, 15)
 
-        "extension tail from another peer(s)" - {
+        "extension tail from another peer(s) should not lead to the peers blacklisting" in {
+          assertPeerNeverGotBlacklisted()
           dataFromNetwork(SignaturesSpec, validBlockIds, stub[ConnectedPeer])
-
-          "should not lead to blacklisting of the peers" in {
-            assertPeerNeverGotBlacklisted()
-          }
         }
 
         "blacklist on timeout in states following GettingExtension" in {
@@ -203,6 +208,8 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               expectNetworkMessage(GetBlockSpec, id); sendBlock(blockMock(id)) }
 
             def assertThatBlocksLoaded(): Unit = {
+              assertPeerNeverGotBlacklisted()
+
               testCoordinator.expectMsgPF(hint = s"$numberOfBlocks fork blocks") {
                 case SyncFinished(true, Some((lastCommonBlockId, blockIterator, Some(connectedPeer)))) =>
                   connectedPeer shouldBe peer
@@ -213,7 +220,6 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               }
 
               validateStatus(Idle)
-              assertPeerNeverGotBlacklisted()
             }
 
             "entire fork loading" - {
@@ -229,7 +235,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               }
             }
 
-            "partial fork laoding" - {
+            "partial fork loading" - {
 
               setloadEntireForkChunk(false)
 

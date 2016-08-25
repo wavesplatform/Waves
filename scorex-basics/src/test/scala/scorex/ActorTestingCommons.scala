@@ -52,8 +52,7 @@ abstract class ActorTestingCommons extends TestKitBase
 
   protected final implicit def convertTo(s: String): ActorTestingStringWrapper = new ActorTestingStringWrapper(s)
 
-  protected val peerId = 9977
-  protected lazy val peer = mock[ConnectedPeer]
+  protected lazy val peer = stub[ConnectedPeer]
 
   protected val actorRef: ActorRef
 

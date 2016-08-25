@@ -111,7 +111,7 @@ trait Settings extends ScorexLogging {
   lazy val pinToInitialPeer = (settingsJSON \ "pinToInitialPeer").asOpt[Boolean].getOrElse(false)
   lazy val retriesBeforeBlacklisted = (settingsJSON \ "retriesBeforeBlacklisted").asOpt[Int].getOrElse(2)
   lazy val operationRetries = (settingsJSON \ "operationRetries").asOpt[Int].getOrElse(
-    if (pinToInitialPeer) retriesBeforeBlacklisted + 1 else forkResolveQuorumSize)
+    if (pinToInitialPeer) retriesBeforeBlacklisted + 1 else maxConnections)
 
   // Miner settings
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
