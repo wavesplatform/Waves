@@ -31,7 +31,7 @@ class NxtConsensusApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/generatingbalance/{address}")
   @ApiOperation(value = "Generating balance", notes = "Account's generating balance(the same as balance atm)", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def generatingBalance: Route = {
     path("generatingbalance" / Segment) { case address =>
@@ -52,7 +52,7 @@ class NxtConsensusApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/generationsignature/{blockId}")
   @ApiOperation(value = "Generation signature", notes = "Generation signature of a block with specified id", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "string", paramType = "path")
   ))
   def generationSignatureId: Route = {
     path("generationsignature" / Segment) { case encodedSignature =>
@@ -82,7 +82,7 @@ class NxtConsensusApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/basetarget/{blockId}")
   @ApiOperation(value = "Base target", notes = "base target of a block with specified id", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "string", paramType = "path")
   ))
   def baseTargetId: Route = {
     path("basetarget" / Segment) { case encodedSignature =>

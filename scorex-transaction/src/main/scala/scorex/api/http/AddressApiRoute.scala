@@ -34,7 +34,7 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/{address}")
   @ApiOperation(value = "Delete", notes = "Remove the account with address {address} from the wallet", httpMethod = "DELETE")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def deleteAddress: Route = {
     path(Segment) { case address =>
@@ -59,8 +59,8 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/sign/{address}")
   @ApiOperation(value = "Sign", notes = "Sign a message with a private key associated with {address}", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "String"),
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "string"),
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"Base58-encoded\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
@@ -74,8 +74,8 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/signText/{address}")
   @ApiOperation(value = "Sign", notes = "Sign a message with a private key associated with {address}", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "String"),
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "string"),
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"plain text\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
@@ -89,7 +89,7 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/verify/{address}")
   @ApiOperation(value = "Verify", notes = "Check a signature of a message signed by an account", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path"),
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(
       name = "body",
       value = "Json with data",
@@ -108,7 +108,7 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/verifyText/{address}")
   @ApiOperation(value = "Verify text", notes = "Check a signature of a message signed by an account", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path"),
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(
       name = "body",
       value = "Json with data",
@@ -127,7 +127,7 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/balance/{address}")
   @ApiOperation(value = "Balance", notes = "Account's balance", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def balance: Route = {
     path("balance" / Segment) { case address =>
@@ -140,8 +140,8 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/balance/{address}/{confirmations}")
   @ApiOperation(value = "Confirmed balance", notes = "Balance of {address} after {confirmations}", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path"),
-    new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "Int", paramType = "path")
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
   ))
   def confirmationBalance: Route = {
     path("balance" / Segment / IntNumber) { case (address, confirmations) =>
@@ -155,7 +155,7 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/seed/{address}")
   @ApiOperation(value = "Seed", notes = "Export seed value for the {address}", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def seed: Route = {
     path("seed" / Segment) { case address =>
@@ -176,7 +176,7 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/validate/{address}")
   @ApiOperation(value = "Validate", notes = "Check whether address {address} is valid or not", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def validate: Route = {
     path("validate" / Segment) { case address =>
@@ -201,8 +201,8 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   @Path("/seq/{from}/{to}")
   @ApiOperation(value = "Seq", notes = "Get wallet accounts addresses", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "from", value = "Start address", required = true, dataType = "Int", paramType = "path"),
-    new ApiImplicitParam(name = "to", value = "address", required = true, dataType = "Int", paramType = "path")
+    new ApiImplicitParam(name = "from", value = "Start address", required = true, dataType = "integer", paramType = "path"),
+    new ApiImplicitParam(name = "to", value = "address", required = true, dataType = "integer", paramType = "path")
   ))
   def seq: Route = {
     path("seq" / IntNumber / IntNumber) { case (start, end) =>
