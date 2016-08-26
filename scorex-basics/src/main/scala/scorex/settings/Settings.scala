@@ -63,7 +63,7 @@ trait Settings extends ScorexLogging {
       .getOrElse(DefaultBlacklistResidenceTimeMilliseconds)
 
   lazy val peersDataResidenceTime: FiniteDuration =
-    (p2pSettings \ "peersDataResidenceTimeDays").asOpt[Long].map(_.days).getOrElse(3.days)
+    (p2pSettings \ "peersDataResidenceTimeDays").asOpt[Int].getOrElse(1).days
 
   lazy val localOnly = (p2pSettings \ "localOnly").asOpt[Boolean].getOrElse(false)
 
@@ -107,6 +107,8 @@ trait Settings extends ScorexLogging {
   lazy val forkResolveQuorumSize = (settingsJSON \ "forkResolveQuorumSize").asOpt[Int].getOrElse(1)
   lazy val forkFileName = (settingsJSON \ "forkFileName").asOpt[String]
   lazy val loadEntireForkChunk = (settingsJSON \ "loadEntireForkChunk").asOpt[Boolean].getOrElse(true)
+
+  assert(forkMaxLength > 1, "forkMaxLength value should be 2 or more")
 
   // Blockchain download & sync retry settings
   lazy val historySynchronizerTimeout: FiniteDuration = (settingsJSON \ "historySynchronizerTimeout").asOpt[Int]

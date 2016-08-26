@@ -28,6 +28,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
   protected override lazy val networkControllerRef = application.networkController
 
   private lazy val coordinator = application.coordinator
+  private lazy val history = application.history
 
   private lazy val timeout = application.settings.historySynchronizerTimeout
   private lazy val forkMaxLength = application.settings.forkMaxLength
@@ -40,8 +41,11 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
   override def receive: Receive = idle
 
   def idle: Receive = state(Idle) {
-    case GetExtension(lastIds, peerScores) =>
+    case GetExtension(peerScores) =>
       start(GettingExtension) { _ =>
+
+        val lastIds = history.lastBlockIds(application.settings.MaxRollback)
+
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peerScores.keys.toSeq))
 
@@ -55,7 +59,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
         log.info(s"Got blockIds: $blockIds")
 
-        blockIdsToStartDownload(blockIds, application.history) match {
+        blockIdsToStartDownload(blockIds, history) match {
           case None =>
             log.warn(s"Strange blockIds: $blockIds")
             finishUnsuccessfully()
@@ -84,17 +88,17 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     val blockIdsToDownload = downloadInfo.blockIds ++ tail
 
     val noMoreBlockIds = tail.isEmpty
-    if (blockIdsToDownload.size >= forkMaxLength || noMoreBlockIds) {
+    if (blockIdsToDownload.size >= forkMaxLength || noMoreBlockIds || tail.size == 1) {
       val fork = blockIdsToDownload.take(forkMaxLength)
 
-      fork.find(id => application.history.contains(id.blockId)) match {
+      fork.find(id => history.contains(id.blockId)) match {
         case Some(suspiciousBlockId) =>
           blacklistPeer(s"Suspicious block id: $suspiciousBlockId among blocks to be downloaded", activePeer)
           finishUnsuccessfully()
 
         case None =>
           val lastCommonBlockId = downloadInfo.lastCommon.blockId
-          val initialScore = application.history.scoreOf(lastCommonBlockId)
+          val initialScore = history.scoreOf(lastCommonBlockId)
 
           val forkStorage = application.blockStorage.blockSeq
           forkStorage.initialize(fork, initialScore)
@@ -154,7 +158,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         if (forkStorage.addIfNotContained(block)) {
           log.info("Got block: " + block.encodedId)
 
-          val currentScore = application.history.score()
+          val currentScore = history.score()
           val forkScore = forkStorage.cumulativeBlockScore
 
           val author = Some(connectedPeer).filterNot(_ => peers.activeChanged)
@@ -192,7 +196,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
       case t @ TimeoutExceeded(_, _, _, _, _) =>
         if (timeoutData.exists(!_.isCancelled)) handleTimeout(t)
 
-      case GetExtension(_, _) => // ignore if not idle
+      case GetExtension(_) => // ignore if not idle
 
       // the signal to initialize
       case Unit =>
@@ -345,7 +349,7 @@ object BlockchainSynchronizer {
 
   case object GetStatus
 
-  case class GetExtension(lastBlockIds: BlockIds, peerScores: Map[ConnectedPeer, BlockchainScore])
+  case class GetExtension(peerScores: Map[ConnectedPeer, BlockchainScore])
 
   case class InnerId(blockId: BlockId) {
     override def equals(obj: Any): Boolean = {

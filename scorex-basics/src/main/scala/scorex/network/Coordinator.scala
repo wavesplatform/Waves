@@ -50,8 +50,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
         log.debug(s"Quorum to download fork is not reached: ${peers.size} peers but should be $forkResolveQuorumSize")
       } else {
         log.info(s"min networkScore=${peers.minBy(_._2)} > localScore=$localScore")
-        val lastIds = history.lastBlockIds(application.settings.MaxRollback)
-        blockchainSynchronizer ! GetExtension(lastIds, peers.toMap)
+        blockchainSynchronizer ! GetExtension(peers.toMap)
         context become syncing
       }
   }

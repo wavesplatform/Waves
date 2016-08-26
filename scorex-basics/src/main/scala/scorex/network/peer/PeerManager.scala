@@ -14,6 +14,7 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.collection.mutable.{Set => MutableSet}
 import scala.util.Random
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * Must be singleton
@@ -39,6 +40,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private lazy val networkController = application.networkController
 
   private lazy val peerDatabase = new PeerDatabaseImpl(settings, settings.dataDirOpt.map(f => f + "/peers.dat"))
+
+  private val visitPeersInterval = application.settings.peersDataResidenceTime / 10
+  context.system.scheduler.schedule(visitPeersInterval, visitPeersInterval, self, MarkConnectedPeersVisited)
 
   settings.knownPeers.foreach { peerDatabase.mergePeerInfo(_, PeerInfo()) }
 
@@ -142,11 +146,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     connectedPeers.get(from)
       .flatMap(_.handshake).map(_.nodeNonce)
       .foreach { nonce =>
-        nonces(nonce).foreach {
-          peerAddr =>
-            connectedPeers.remove(peerAddr)
-            visit(peerAddr)
-        }
+        nonces(nonce).foreach(connectedPeers.remove)
         nonces -= nonce
       }
   }
@@ -180,13 +180,15 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         }
       }
 
-  private def visit(address: InetSocketAddress) =
+  private def visit(address: InetSocketAddress) = {
     peerDatabase.mergePeerInfo(address, PeerInfo(lastSeen = System.currentTimeMillis()), createIfNotExists = false)
+  }
 
-  private def addOrUpdatePeer(address: InetSocketAddress, nodeNonce: Option[Long], nodeName: Option[String]) =
+  private def addOrUpdatePeer(address: InetSocketAddress, nodeNonce: Option[Long], nodeName: Option[String]) = {
     if (application.settings.acceptExternalPeerData) {
       peerDatabase.mergePeerInfo(address, PeerInfo(nonce = nodeNonce, nodeName = nodeName))
     }
+  }
 
   private def blackListOperations: Receive = {
     case AddToBlacklist(nodeNonce, address) =>
@@ -198,17 +200,21 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       }
   }
 
+  private def handshakedPeers = nonces.values.flatten
+
   override def receive: Receive = ({
     case CheckPeers =>
       if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
         randomPeer().foreach { case (address, _) =>
-          if ( ! (nonces.values.flatten.contains(address) || connectedPeers.keys.contains(address)) ) {
+          if ( ! (handshakedPeers.contains(address) || connectedPeers.keys.contains(address)) ) {
             log.debug(s"Trying connect to random peer $address")
             connectingPeer = Some(address)
             networkController ! NetworkController.ConnectTo(address)
           }
         }
       }
+
+    case MarkConnectedPeersVisited => handshakedPeers.foreach(visit)
 
     case ShutdownNetwork => connectedPeers.values.foreach(_.handlerRef ! CloseConnection)
 
@@ -238,4 +244,6 @@ object PeerManager {
   case object GetConnectedPeers
 
   case class PeerConnection(handlerRef: ActorRef, handshake: Option[Handshake])
+
+  private case object MarkConnectedPeersVisited
 }
