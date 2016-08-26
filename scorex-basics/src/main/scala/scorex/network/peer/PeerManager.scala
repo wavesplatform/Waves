@@ -77,18 +77,20 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     case AddOrUpdatePeer(address, peerNonceOpt, peerNameOpt) =>
       addOrUpdatePeer(address, peerNonceOpt, peerNameOpt)
 
+    case GetConnectedPeers =>
+      sender() ! connectedPeers
+        .filter(_._2.handshake.isDefined)
+        .map { case (k, v) => (k, v.handshake.get) }
+        .toList
+
+    case GetConnections => sender() ! connectedPeers.keys.toSeq
+
     case GetRandomPeers(howMany, excludeSelf) =>
       sender() ! Random.shuffle(peerDatabase.knownPeers(excludeSelf).keys.toSeq).take(howMany)
 
-    case GetConnectedPeers =>
-      val peers = connectedPeers.filter(_._2.handshake.isDefined).map { case (k, v) => (k, v.handshake.get)}.toList
-      sender() ! peers
+    case GetAllPeers => sender() ! peerDatabase.knownPeers(true)
 
-    case GetAllPeers =>
-      sender() ! peerDatabase.knownPeers(true)
-
-    case GetBlacklistedPeers =>
-      sender() ! peerDatabase.blacklisted
+    case GetBlacklistedPeers => sender() ! peerDatabase.blacklisted
   }
 
   private def handleNewConnection(remote: InetSocketAddress,
@@ -149,6 +151,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         nonces(nonce).foreach(connectedPeers.remove)
         nonces -= nonce
       }
+    connectedPeers.remove(from)
   }
 
   private def handleHandshake(address: InetSocketAddress, handshake: Handshake): Unit =
@@ -192,7 +195,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def blackListOperations: Receive = {
     case AddToBlacklist(nodeNonce, address) =>
-      nonces.getOrElse(nodeNonce, MutableSet(address)).foreach {
+      (nonces.getOrElse(nodeNonce, MutableSet.empty) + address).foreach {
         addr =>
           log.info(s"Blacklist peer $addr")
           peerDatabase.blacklist(addr)
@@ -244,6 +247,8 @@ object PeerManager {
   case object GetConnectedPeers
 
   case class PeerConnection(handlerRef: ActorRef, handshake: Option[Handshake])
+
+  case object GetConnections
 
   private case object MarkConnectedPeersVisited
 }

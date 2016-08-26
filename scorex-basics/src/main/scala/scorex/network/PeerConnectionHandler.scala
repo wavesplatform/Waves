@@ -32,7 +32,8 @@ case class PeerConnectionHandler(application: RunnableApplication,
   private var handshakeGot = false
   private var handshakeSent = false
 
-  private val timeout = context.system.scheduler.scheduleOnce(1 minute, self, HandshakeTimeout)
+  private val timeout = context.system.scheduler.scheduleOnce(
+    application.settings.connectionTimeout seconds, self, HandshakeTimeout)
 
   context watch connection
 

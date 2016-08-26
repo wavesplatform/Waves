@@ -60,6 +60,9 @@ class PeerManagerSpecification extends ActorTestingCommons {
     def getBlacklistedPeers =
       Await.result((actorRef ? GetBlacklistedPeers).mapTo[Map[InetSocketAddress, PeerInfo]], testDuration)
 
+    def getActiveConnections =
+      Await.result((actorRef ? GetConnections).mapTo[Seq[InetSocketAddress]], testDuration)
+
     val anAddress = new InetSocketAddress(hostname, knownAddress.getPort + 1)
 
     "peer cycle" - {
@@ -98,6 +101,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
         actorRef ! Disconnected(anAddress)
         getConnectedPeers shouldBe empty
+        getActiveConnections shouldBe empty
       }
 
       "msg from network routing" - {
@@ -145,6 +149,15 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
         getBlacklistedPeers.size shouldBe 1
       }
+    }
+
+    "disconnect during handshake" in {
+      actorRef ! Connected(anAddress, peerConnectionHandler.ref, None)
+      peerConnectionHandler.expectMsgType[Handshake]
+
+      actorRef ! Disconnected(anAddress)
+      getConnectedPeers shouldBe empty
+      getActiveConnections shouldBe empty
     }
 
     "PeerManager returns on GetConnectedPeers list of pairs (InetSocketAddress, Handshake)" in {
