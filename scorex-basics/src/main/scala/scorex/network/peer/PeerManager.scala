@@ -40,10 +40,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private lazy val peerDatabase = new PeerDatabaseImpl(settings, settings.dataDirOpt.map(f => f + "/peers.dat"))
 
-  settings.knownPeers.foreach { address =>
-    val defaultPeerInfo = PeerInfo(System.currentTimeMillis(), None, None)
-    peerDatabase.addOrUpdateKnownPeer(address, defaultPeerInfo)
-  }
+  settings.knownPeers.foreach { peerDatabase.mergePeerInfo(_, PeerInfo()) }
 
   private def peerCycle: Receive = {
     case Connected(remote, handlerRef, ownSocketAddress) =>
@@ -145,7 +142,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     connectedPeers.get(from)
       .flatMap(_.handshake).map(_.nodeNonce)
       .foreach { nonce =>
-        nonces(nonce).foreach(connectedPeers.remove)
+        nonces(nonce).foreach {
+          peerAddr =>
+            connectedPeers.remove(peerAddr)
+            visit(peerAddr)
+        }
         nonces -= nonce
       }
   }
@@ -154,6 +155,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     connectedPeers.get(address).filter(_.handshake.isEmpty)
       .orElse ( { log.error("No peer to validate"); None } )
       .foreach { case c @ PeerConnection(_, _) =>
+
+        visit(address)
 
         val handshakeNonce = handshake.nodeNonce
 
@@ -177,9 +180,12 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         }
       }
 
-  private def addOrUpdatePeer(address: InetSocketAddress, peerNonce: Option[Long], nodeName: Option[String]) =
+  private def visit(address: InetSocketAddress) =
+    peerDatabase.mergePeerInfo(address, PeerInfo(lastSeen = System.currentTimeMillis()), createIfNotExists = false)
+
+  private def addOrUpdatePeer(address: InetSocketAddress, nodeNonce: Option[Long], nodeName: Option[String]) =
     if (application.settings.acceptExternalPeerData) {
-      peerDatabase.addOrUpdateKnownPeer(address, PeerInfo(System.currentTimeMillis(), peerNonce, nodeName))
+      peerDatabase.mergePeerInfo(address, PeerInfo(nonce = nodeNonce, nodeName = nodeName))
     }
 
   private def blackListOperations: Receive = {

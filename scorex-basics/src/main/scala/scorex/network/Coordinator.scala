@@ -63,7 +63,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
       result foreach {
         case (lastCommonBlockId, blocks, from) =>
-          log.info(s"Going to process a fork")
+          log.info(s"Going to process blocks")
           processFork(lastCommonBlockId, blocks, from)
       }
   }
@@ -85,11 +85,11 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     }
   }
 
-  private def processSingleBlock(comingBlock: Block, from: Option[ConnectedPeer]): Unit = {
-    val parentBlockId = comingBlock.referenceField.value
-    val locallyGenerated = from.isEmpty
+  private def processSingleBlock(newBlock: Block, from: Option[ConnectedPeer]): Unit = {
+    val parentBlockId = newBlock.referenceField.value
+    val local = from.isEmpty
 
-    val isBlockToBeAdded = if (history.contains(comingBlock)) {
+    val isBlockToBeAdded = if (history.contains(newBlock)) {
       // we have already got the block - skip
       false
     } else if (history.contains(parentBlockId)) {
@@ -98,11 +98,11 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
       if (!lastBlock.uniqueId.sameElements(parentBlockId)) {
         // someone has happened to be faster and already added a block or blocks after the parent
-        log.debug(s"A child for parent of the block already exists, local=$locallyGenerated: ${comingBlock.json}")
+        log.debug(s"A child for parent of the block already exists, local=$local: ${newBlock.json}")
 
         val cmp = application.consensusModule.blockOrdering
-        if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, comingBlock)) {
-          log.debug(s"The coming block ${comingBlock.json} is better than last ${lastBlock.json}")
+        if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
+          log.debug(s"The coming block ${newBlock.json} is better than last ${lastBlock.json}")
         }
 
         false
@@ -111,16 +111,22 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
     } else {
       // the block either has come too early or, if local, too late (e.g. removeAfter() has come earlier)
-      log.debug(s"Parent of the block is not in the history, local=$locallyGenerated: ${comingBlock.json}")
+      log.debug(s"Parent of the block is not in the history, local=$local: ${newBlock.json}")
       false
     }
 
     if (isBlockToBeAdded) {
-      if (processNewBlock(comingBlock, from, local = locallyGenerated)) {
+      log.info(s"New block(local: $local): ${newBlock.json}")
+      if (processNewBlock(newBlock)) {
         blockGenerator ! GuessABlock(rescheduleImmediately = true)
+        if (local) {
+          networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(newBlock), None), Broadcast)
+        } else {
+          self ! BroadcastCurrentScore
+        }
       } else {
         // TODO: blacklist here
-        log.warn(s"Can't apply single block, local=${from.isEmpty}: ${comingBlock.json}")
+        log.warn(s"Can't apply single block, local=$local: ${newBlock.json}")
       }
     }
   }
@@ -130,29 +136,24 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
     application.blockStorage.removeAfter(lastCommonBlockId)
 
-    blocks.find(!processNewBlock(_, None, local = false)).foreach { failedBlock =>
+    blocks.find(!processNewBlock(_)).foreach { failedBlock =>
       log.warn(s"Can't apply block: ${failedBlock.json}")
       if (history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)) {
         from.foreach(_.blacklist())
       }
     }
 
+    self ! BroadcastCurrentScore
+
     val finalScore = history.score()
     if (finalScore < initialScore) log.warn(s"Final score ($finalScore) is less than initial ($initialScore)")
   }
 
-  private def processNewBlock(block: Block, from: Option[ConnectedPeer], local: Boolean): Boolean = Try {
+  private def processNewBlock(block: Block): Boolean = Try {
     if (block.isValid) {
-      log.info(s"New block(local: $local): ${block.json}")
-
-      if (local) {
-        networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(block), None), Broadcast)
-      } else {
-        self ! BroadcastCurrentScore
-      }
-
       val oldHeight = history.height()
       val oldScore = history.score()
+
       application.blockStorage.appendBlock(block) match {
         case Success(_) =>
           block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
@@ -166,11 +167,10 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
           false
       }
     } else {
-      log.warn(s"Invalid new block(local: $local): ${
-        if (log.logger.isDebugEnabled)
-          block.json
-        else
-          encode(block.uniqueId) + ", parent " + encode(block.referenceField.value)}")
+      log.warn(s"Invalid new block: ${
+        if (log.logger.isDebugEnabled) block.json
+        else encode(block.uniqueId) + ", parent " + encode(block.referenceField.value)}")
+
       false
     }
   }.getOrElse(false)

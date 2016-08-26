@@ -62,6 +62,9 @@ trait Settings extends ScorexLogging {
     (p2pSettings \ "blacklistResidenceTimeMilliseconds").asOpt[Long]
       .getOrElse(DefaultBlacklistResidenceTimeMilliseconds)
 
+  lazy val peersDataResidenceTime: FiniteDuration =
+    (p2pSettings \ "peersDataResidenceTimeDays").asOpt[Long].map(_.days).getOrElse(3.days)
+
   lazy val localOnly = (p2pSettings \ "localOnly").asOpt[Boolean].getOrElse(false)
 
   lazy val knownPeers = Try {

@@ -31,7 +31,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       val anotherPeer = new PeerInfo(System.currentTimeMillis)
       val port: Int = 1234
       val address = new InetSocketAddress(InetAddress.getByAddress(Array[Byte](1, 1, 1, 1)), port)
-      peerDatabase.addOrUpdateKnownPeer(address, anotherPeer)
+      peerDatabase.mergePeerInfo(address, anotherPeer)
       assert(peerDatabase.knownPeers(false).contains(address))
       assert(!peerDatabase.blacklisted.contains(address))
 
@@ -64,9 +64,9 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       val address1 = new InetSocketAddress(InetAddress.getByAddress(Array[Byte](1, 1, 1, 1)), port)
       val address2 = new InetSocketAddress(InetAddress.getByAddress(Array[Byte](2, 2, 2, 2)), port)
       val address3 = new InetSocketAddress(InetAddress.getByAddress(Array[Byte](3, 3, 3, 3)), port)
-      peerDatabase.addOrUpdateKnownPeer(address1, anotherPeer)
-      peerDatabase.addOrUpdateKnownPeer(address2, anotherPeer)
-      peerDatabase.addOrUpdateKnownPeer(address3, anotherPeer)
+      peerDatabase.mergePeerInfo(address1, anotherPeer)
+      peerDatabase.mergePeerInfo(address2, anotherPeer)
+      peerDatabase.mergePeerInfo(address3, anotherPeer)
       assert(!peerDatabase.isBlacklisted(address1))
       assert(!peerDatabase.isBlacklisted(address2))
       assert(!peerDatabase.isBlacklisted(address3))

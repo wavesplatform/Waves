@@ -31,7 +31,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       val anotherPeer = new PeerInfo(System.currentTimeMillis)
       val port: Int = 1234
       val address = new InetSocketAddress(InetAddress.getByName("localhost"), port)
-      peerDatabase.addOrUpdateKnownPeer(address, anotherPeer)
+      peerDatabase.mergePeerInfo(address, anotherPeer)
       assert(peerDatabase.knownPeers(false).contains(address))
       assert(!peerDatabase.blacklisted.contains(address))
 

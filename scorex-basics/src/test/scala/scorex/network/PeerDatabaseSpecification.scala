@@ -32,7 +32,7 @@ class PeerDatabaseSpecification extends PropSpec with PropertyChecks with Genera
   property("peer blacklisting") {
     forAll(hostGen, portGen) { (host: String, port: Int) =>
       val address = new InetSocketAddress(InetAddress.getByName(host), port)
-      db.addOrUpdateKnownPeer(address, pi)
+      db.mergePeerInfo(address, pi)
       db.knownPeers(false).contains(address) shouldBe true
 
       db.blacklist(address)

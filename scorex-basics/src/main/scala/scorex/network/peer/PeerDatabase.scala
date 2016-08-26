@@ -2,9 +2,8 @@ package scorex.network.peer
 
 import java.net.InetSocketAddress
 
-//todo: add optional nonce
 @SerialVersionUID(-8490103514095092419L)
-case class PeerInfo(lastSeen: Long,
+case class PeerInfo(lastSeen: Long = 0L,
                     nonce: Option[Long] = None,
                     nodeName: Option[String] = None,
                     blacklistingTime: Long = 0L) {
@@ -15,7 +14,7 @@ case class PeerInfo(lastSeen: Long,
 }
 
 trait PeerDatabase {
-  def addOrUpdateKnownPeer(peer: InetSocketAddress, peerInfo: PeerInfo): Unit
+  def mergePeerInfo(peer: InetSocketAddress, peerInfo: PeerInfo, createIfNotExists: Boolean = true): Unit
 
   def knownPeers(forSelf: Boolean): Map[InetSocketAddress, PeerInfo]
 

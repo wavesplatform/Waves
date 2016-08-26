@@ -60,7 +60,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
             log.warn(s"Strange blockIds: $blockIds")
             finishUnsuccessfully()
 
-          case Some((_, toDownload)) if toDownload.isEmpty =>
+          case Some((_, tail)) if tail.isEmpty =>
             log.debug(s"All blockIds are already in the local blockchain: $blockIds")
             finish(withEmptyResult)
 

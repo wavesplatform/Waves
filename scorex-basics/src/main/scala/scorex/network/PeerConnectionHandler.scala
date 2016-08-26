@@ -13,6 +13,9 @@ import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.Handshaked
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
 case class PeerConnectionHandler(application: RunnableApplication,
@@ -28,6 +31,8 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
   private var handshakeGot = false
   private var handshakeSent = false
+
+  private val timeout = context.system.scheduler.scheduleOnce(1 minute, self, HandshakeTimeout)
 
   context watch connection
 
@@ -62,8 +67,13 @@ case class PeerConnectionHandler(application: RunnableApplication,
           connection ! Close
       }
 
+    case HandshakeTimeout =>
+      log.warn(s"Handshake timeout for $remote")
+      connection ! Close
+
     case HandshakeCheck =>
       if (handshakeGot && handshakeSent) {
+        timeout.cancel()
         connection ! ResumeReading
         context become workingCycle
       }
@@ -131,6 +141,9 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
   private def state(state: CommunicationState.Value)(logic: Receive): Receive =
     logic orElse processErrors(state.toString) orElse {
+      case HandshakeTimeout =>
+      case HandshakeCheck =>
+
       case nonsense: Any => log.warn(s"Strange input in state $state: $nonsense")
     }
 
@@ -191,7 +204,9 @@ object PeerConnectionHandler {
   }
 
   private case object Ack extends Event
+
   private case object HandshakeCheck
+  private case object HandshakeTimeout
 
   case object CloseConnection
 }
