@@ -37,6 +37,9 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
   private val app = stub[App]
 
+  app.applicationName _ when() returns "test"
+  app.appVersion _ when() returns ApplicationVersion(0, 2, 3)
+
   import app.basicMessagesSpecsRepo._
 
   protected override val actorRef = system.actorOf(Props(classOf[PeerManager], app))
@@ -45,14 +48,10 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
     val peerConnectionHandler = TestProbe("connection-handler")
 
-    def connected(address: InetSocketAddress) = Connected(address, peerConnectionHandler.ref)
-
-    def handshaked(address: InetSocketAddress, noneNonce: Long) =
-      Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", noneNonce, None, 0))
-
     def connect(address: InetSocketAddress, noneNonce: Long): Unit = {
-      actorRef ! connected(address)
-      actorRef ! handshaked(address, noneNonce)
+      actorRef ! Connected(address, peerConnectionHandler.ref, None)
+      peerConnectionHandler.expectMsgType[Handshake]
+      actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", noneNonce, None, 0))
     }
 
     def getConnectedPeers =

@@ -19,11 +19,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.runtime.universe.Type
 
 trait RunnableApplication extends Application with ScorexLogging {
-  val ApplicationNameLimit = 50
-  val applicationName: String
-
-  //redefine it as lazy val
-  def appVersion: ApplicationVersion
 
   //settings
   implicit val settings: Settings

@@ -5,7 +5,6 @@ import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import akka.pattern.ask
 import akka.util.Timeout
 import scorex.app.RunnableApplication
 import scorex.network.message.{Message, MessageSpec}
@@ -76,15 +75,6 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
 
   log.info(s"Declared address: $ownSocketAddress")
 
-  private lazy val handshakeTemplate = Handshake(application.applicationName,
-    application.appVersion,
-    settings.nodeName,
-    application.settings.nodeNonce,
-    ownSocketAddress,
-    0
-  )
-
-
   lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
 
   //bind to listen incoming connections
@@ -135,8 +125,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
       connection ! Register(handler, keepOpenOnPeerClosed = false, useResumeWriting = true)
-      peerManager ! PeerManager.Connected(remote, handler)
-      handler ! handshakeTemplate.copy(time = System.currentTimeMillis() / 1000)
+      peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress)
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)

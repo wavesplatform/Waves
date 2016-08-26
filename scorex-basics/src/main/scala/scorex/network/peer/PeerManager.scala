@@ -6,8 +6,8 @@ import akka.actor.{Actor, ActorRef}
 import scorex.app.Application
 import scorex.network.NetworkController.{SendToNetwork, ShutdownNetwork}
 import scorex.network._
-import scorex.network.message.{Message, MessageSpec}
 import scorex.network.message.MessageHandler.RawNetworkData
+import scorex.network.message.{Message, MessageSpec}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
@@ -24,8 +24,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private implicit val system = context.system
 
-  import PeerManager._
   import PeerConnectionHandler._
+  import PeerManager._
 
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerConnection]()
   private var connectingPeer: Option[InetSocketAddress] = None
@@ -46,22 +46,21 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   }
 
   private def peerCycle: Receive = {
-    case Connected(remote, handlerRef) =>
+    case Connected(remote, handlerRef, ownSocketAddress) =>
       if (peerDatabase.isBlacklisted(remote)) {
         log.info(s"Got incoming connection from blacklisted $remote")
+        handlerRef ! CloseConnection
+      } else if (connectedPeers.size >= settings.maxConnections && connectingPeer != Option(remote)) {
+        log.info(s"Number of connections exceeded ${settings.maxConnections}, disconnect $remote")
+        handlerRef ! CloseConnection
       } else {
-        connectedPeers += remote -> PeerConnection(handlerRef, None)
-        if (connectingPeer.contains(remote)) {
-          log.info(s"Connected to $remote")
-          connectingPeer = None
-        } else {
-          log.info(s"Got incoming connection from $remote")
-        }
+        handleNewConnection(remote, handlerRef, ownSocketAddress)
       }
 
     case Handshaked(address, handshake) =>
       if (peerDatabase.isBlacklisted(address)) {
         log.info(s"Got handshake from blacklisted $address")
+        connectedPeers(address).handlerRef ! CloseConnection
       } else {
         handleHandshake(address, handshake)
       }
@@ -89,6 +88,28 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case GetBlacklistedPeers =>
       sender() ! peerDatabase.blacklisted
+  }
+
+  private def handleNewConnection(remote: InetSocketAddress,
+                                  handlerRef: ActorRef,
+                                  ownSocketAddress: Option[InetSocketAddress]): Unit = {
+    val handshake = Handshake(
+      application.applicationName,
+      application.appVersion,
+      settings.nodeName,
+      application.settings.nodeNonce,
+      ownSocketAddress,
+      System.currentTimeMillis() / 1000)
+
+    handlerRef ! handshake
+
+    connectedPeers += remote -> PeerConnection(handlerRef, None)
+    if (connectingPeer.contains(remote)) {
+      log.info(s"Connected to $remote")
+      connectingPeer = None
+    } else {
+      log.info(s"Got incoming connection from $remote")
+    }
   }
 
   private def randomPeer(): Option[(InetSocketAddress, PeerInfo)] = {
@@ -194,7 +215,7 @@ object PeerManager {
 
   case object CheckPeers
 
-  case class Connected(socketAddress: InetSocketAddress, handlerRef: ActorRef)
+  case class Connected(socketAddress: InetSocketAddress, handlerRef: ActorRef, ownSocketAddress: Option[InetSocketAddress])
 
   case class Handshaked(address: InetSocketAddress, handshake: Handshake)
 
