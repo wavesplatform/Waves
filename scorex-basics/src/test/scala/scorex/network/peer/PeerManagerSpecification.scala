@@ -155,6 +155,8 @@ class PeerManagerSpecification extends ActorTestingCommons {
       actorRef ! Connected(anAddress, peerConnectionHandler.ref, None)
       peerConnectionHandler.expectMsgType[Handshake]
 
+      getActiveConnections should have size 1
+
       actorRef ! Disconnected(anAddress)
       getConnectedPeers shouldBe empty
       getActiveConnections shouldBe empty

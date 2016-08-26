@@ -133,12 +133,17 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   }
 
   private def processDataFromNetwork(spec: MessageSpec[_], msgData: Array[Byte], remote: InetSocketAddress): Unit = {
-    connectedPeers.get(remote).flatMap(_.handshake)
-      .orElse({log.warn(s"No connected peer matches $remote"); None })
-      .foreach { handshakeData =>
+    val endPoint = connectedPeers.get(remote)
+
+    endPoint.flatMap {_.handshake } orElse {
+      log.error(s"No connected peer matches $remote")
+      endPoint.foreach(_.handlerRef ! CloseConnection)
+      None
+    } foreach {
+      handshakeData =>
         val peer = new InetAddressPeer(handshakeData.nodeNonce, remote, self)
         networkController ! Message(spec, Left(msgData), Some(peer))
-      }
+    }
   }
 
   private def disconnect(from: InetSocketAddress): Unit = {
