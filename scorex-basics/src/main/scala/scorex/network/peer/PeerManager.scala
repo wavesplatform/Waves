@@ -154,7 +154,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       .flatMap(_.handshake).map(_.nodeNonce)
       .foreach { nonce =>
         nonces(nonce).foreach(connectedPeers.remove)
-        nonces -= nonce
+        nonces.remove(nonce)
       }
     connectedPeers.remove(from)
   }
@@ -178,6 +178,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
             connectedPeers
               .filter { case (addr, _) => peers.contains(addr) }
               .foreach(_._2.handlerRef ! CloseConnection)
+            nonces.remove(handshakeNonce)
           } else {
 
             if (peers.nonEmpty)
