@@ -173,14 +173,22 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         if (nonces.keys.contains(handshakeNonce)) {
           val peers = nonces(handshakeNonce)
 
-          if (peers.nonEmpty)
-            log.info(s"Peer $address has come with nonce $handshakeNonce corresponding to: ${peers.mkString(",")}")
-          else
-            log.info("Drop connection to self")
+          if (peers.size > 1) {
+            log.warn(s"Connection attempts for nonce $handshakeNonce is more than one")
+            connectedPeers
+              .filter { case (addr, _) => peers.contains(addr) }
+              .foreach(_._2.handlerRef ! CloseConnection)
+          } else {
 
-          updateHandshakedPeer()
-          connectedPeers -= address
-          c.handlerRef ! CloseConnection
+            if (peers.nonEmpty)
+              log.info(s"Peer $address has come with nonce $handshakeNonce corresponding to: ${peers.mkString(",")}")
+            else
+              log.info("Drop connection to self")
+
+            updateHandshakedPeer()
+            connectedPeers -= address
+            c.handlerRef ! CloseConnection
+          }
         } else {
           updateHandshakedPeer()
           handshake.declaredAddress.foreach { addOrUpdatePeer(_, None, None) }
