@@ -75,6 +75,13 @@ class CoordinatorSpecification extends ActorTestingCommons {
 
         getStatus shouldEqual CSyncing
       }
+
+      "no connected peers == no sync" in {
+        testPeerManager.reply(ConnectedPeers(Seq.empty))
+
+        testBlockchainSynchronizer.expectNoMsg(testDuration)
+        getStatus shouldEqual CIdle
+      }
     }
   }
 }
