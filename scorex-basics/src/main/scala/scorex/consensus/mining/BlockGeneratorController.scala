@@ -23,8 +23,8 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
   def idle: Receive = state(Idle) {
     case StartGeneration =>
       log.info("Start block generation")
-      workers.foreach(w => w ! GuessABlock(false))
       context.become(generating)
+      self ! SelfCheck
 
     case SelfCheck =>
       askForConnectedPeers()
@@ -38,8 +38,8 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
   def generating: Receive = state(Generating) {
     case StopGeneration =>
       log.info(s"Stop block generation")
-      workers.foreach(w => w ! Stop)
       context.become(idle)
+      self ! SelfCheck
 
     case SelfCheck =>
       askForConnectedPeers()
