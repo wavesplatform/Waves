@@ -4,8 +4,10 @@
 .ensime_cache/
 scorex.yaml
 
-# scala build folders
+# scala build folders and files
 target
+*.tgz
+*.jar
 
 # dotfiles
 .dockerignore
