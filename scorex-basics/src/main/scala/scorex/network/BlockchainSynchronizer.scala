@@ -198,9 +198,6 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
       case GetExtension(_) => // ignore if not idle
 
-      // the signal to initialize
-      case Unit =>
-
       case nonsense: Any =>
         log.warn(s"Got something strange in ${status.name}: $nonsense")
     }

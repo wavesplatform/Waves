@@ -18,7 +18,7 @@ class ScoreObserver(application: Application) extends ViewSynchronizer with Scor
 
   override val messageSpecs: Seq[MessageSpec[_]] = Seq(ScoreMessageSpec)
 
-  override val networkControllerRef = application.networkController
+  protected lazy override val networkControllerRef = application.networkController
   private val coordinator = application.coordinator
 
   private val scoreTTL = application.settings.scoreTTL
@@ -44,9 +44,6 @@ class ScoreObserver(application: Application) extends ViewSynchronizer with Scor
     case GetScore =>
       candidates = clearOld(candidates)
       sender() ! currentScore
-
-    //the signal to initialize
-    case Unit =>
   }
 
   private def clearOld(candidates: Candidates): Candidates = {

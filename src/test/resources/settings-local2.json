@@ -11,10 +11,8 @@
     "maxConnections": 10,
     "peersDataBroadcastDelay": 900
   },
-  "walletDir": "/tmp/scorex-tests/wallet2",
   "walletPassword": "cookies",
   "walletSeed": "111",
-  "dataDir": "/tmp/scorex-tests/data2",
   "rpcPort": 9086,
   "maxRollback": 100,
   "offlineGeneration": false,

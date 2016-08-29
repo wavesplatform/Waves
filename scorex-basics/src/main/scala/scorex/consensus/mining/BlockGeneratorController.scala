@@ -74,7 +74,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       case m => log.info(s"Unhandled $m in $status")
     }
 
-  private def generationAllowed(peers: Seq[(InetSocketAddress, Handshake)]) =
+  private def generationAllowed(peers: Seq[_]) =
     peers.size >= application.settings.quorum || application.settings.offlineGeneration
 
   private def newWorkers(count: Int): Seq[ActorRef] =  1 to count map { i =>

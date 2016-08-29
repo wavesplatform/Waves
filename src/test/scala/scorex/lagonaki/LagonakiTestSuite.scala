@@ -31,10 +31,6 @@ class LagonakiTestSuite extends Sequential(
 
 ) with BeforeAndAfterAll {
 
-  override protected def beforeAll() = {
-    Runtime.getRuntime.exec("rm -rf /tmp/scorex-tests")
-  }
-
   override protected def afterAll() = {
     applications.foreach(_.stopAll())
   }

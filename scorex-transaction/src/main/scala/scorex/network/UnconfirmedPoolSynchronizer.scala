@@ -21,14 +21,11 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
   extends ViewSynchronizer with ScorexLogging {
 
   override val messageSpecs = Seq(TransactionMessageSpec)
-  override val networkControllerRef = networkController
+  protected override lazy val networkControllerRef = networkController
 
   private val rndBroadcastInterval = settings.utxRebroadcastInterval
 
-  override def preStart: Unit = {
-    super.preStart()
-    context.system.scheduler.schedule(2.second, rndBroadcastInterval, self, BroadcastRandom)
-  }
+  context.system.scheduler.schedule(2.second, rndBroadcastInterval, self, BroadcastRandom)
 
   override def receive: Receive = {
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
