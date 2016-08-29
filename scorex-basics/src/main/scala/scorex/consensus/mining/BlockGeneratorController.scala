@@ -1,8 +1,11 @@
 package scorex.consensus.mining
 
+import java.net.InetSocketAddress
+
 import akka.actor._
 import scorex.app.Application
 import scorex.consensus.mining.BlockGeneratorController._
+import scorex.network.Handshake
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.utils.ScorexLogging
 
@@ -27,10 +30,12 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       self ! SelfCheck
 
     case SelfCheck =>
-      askForConnectedPeers()
       log.info(s"Check miners: $workers vs ${context.children}")
       workers.foreach(w => w ! Stop)
       context.children.foreach(w => w ! Stop)
+      askForConnectedPeers()
+
+    case ConnectedPeers(peers) if generationAllowed(peers) => self ! StartGeneration
 
     case GuessABlock(_) =>
   }
@@ -42,11 +47,13 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       self ! SelfCheck
 
     case SelfCheck =>
-      askForConnectedPeers()
       log.info(s"Check ${workers.size} miners")
       val threads = application.settings.miningThreads
       if (threads - workers.size > 0) workers = workers ++ newWorkers(threads - workers.size)
       workers.foreach { _ ! GuessABlock(false) }
+      askForConnectedPeers()
+
+    case ConnectedPeers(peers) if ! generationAllowed(peers) => self ! StopGeneration
 
     case blockGenerationRequest @ GuessABlock(_) =>
       log.info(s"Enforce miners to generate block: $workers")
@@ -55,13 +62,6 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   private def state(status: Status)(logic: Receive): Receive =
     logic orElse {
-      case ConnectedPeers(peers) =>
-        if (peers.size >= application.settings.quorum || application.settings.offlineGeneration) {
-          self ! StartGeneration
-        } else {
-          self ! StopGeneration
-        }
-
       case Terminated(worker) =>
         log.info(s"Miner terminated $worker")
         workers = workers.filter(w => w != worker)
@@ -73,6 +73,9 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
       case m => log.info(s"Unhandled $m in $status")
     }
+
+  private def generationAllowed(peers: Seq[(InetSocketAddress, Handshake)]) =
+    peers.size >= application.settings.quorum || application.settings.offlineGeneration
 
   private def newWorkers(count: Int): Seq[ActorRef] =  1 to count map { i =>
     context.watch(context.actorOf(Props(classOf[Miner], application), s"Worker-${System.currentTimeMillis()}-$i"))
