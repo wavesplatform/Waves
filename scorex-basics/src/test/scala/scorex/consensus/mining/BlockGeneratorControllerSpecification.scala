@@ -1,6 +1,7 @@
 package scorex.consensus.mining
 
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
+import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.settings.SettingsMock
@@ -11,8 +12,11 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
 
   object TestSettings extends SettingsMock
 
+  val testPeerManager = TestProbe("PeerManager")
+
   trait App extends ApplicationMock {
     override lazy val settings = TestSettings
+    override val peerManager: ActorRef = testPeerManager.ref
   }
 
   override protected val actorRef = system.actorOf(Props(classOf[BlockGeneratorController], stub[App]))
