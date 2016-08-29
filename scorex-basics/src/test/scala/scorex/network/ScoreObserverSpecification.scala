@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
-import scorex.network.ScoreObserver.{ConsideredValue, GetScore, UpdateScore}
+import scorex.network.ScoreObserver.{CurrentScore, GetScore, UpdateScore}
 import scorex.settings.SettingsMock
 import scorex.transaction.History.BlockchainScore
 
@@ -36,10 +36,10 @@ class ScoreObserverSpecification extends ActorTestingCommons {
 
       def peerMock(port: Int): ConnectedPeer = stub[ConnectedPeer]
 
-      def expectScores(values: (ConnectedPeer, BlockchainScore)*): ConsideredValue =
-        testCoordinator.expectMsg(ConsideredValue(values.toSeq))
+      def expectScores(values: (ConnectedPeer, BlockchainScore)*): CurrentScore =
+        testCoordinator.expectMsg(CurrentScore(values.toSeq))
 
-      def updateScore(value: (ConnectedPeer, BlockchainScore)): Unit = actorRef ! UpdateScore(Some(value))
+      def updateScore(value: (ConnectedPeer, BlockchainScore)): Unit = actorRef ! UpdateScore(value._1, value._2)
 
       val peer = stub[ConnectedPeer]
 
@@ -87,5 +87,5 @@ class ScoreObserverSpecification extends ActorTestingCommons {
     }
   }
 
-  private def scores = Await.result((actorRef ? GetScore).mapTo[ConsideredValue], testDuration).scores
+  private def scores = Await.result((actorRef ? GetScore).mapTo[CurrentScore], testDuration).scores
 }

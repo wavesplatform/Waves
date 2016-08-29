@@ -99,16 +99,14 @@ trait Settings extends ScorexLogging {
 
   lazy val offlineGeneration = (settingsJSON \ "offlineGeneration").asOpt[Boolean].getOrElse(false)
 
-  // Blockchain download & sync settings
-  private val DefaultMaxRollback = 100
-  lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(DefaultMaxRollback)
+  lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(100)
   val MaxBlocksChunks = 10
-  lazy val forkMaxLength = (settingsJSON \ "forkMaxLength").asOpt[Int].getOrElse(DefaultMaxRollback + 1)
-  lazy val forkResolveQuorumSize = (settingsJSON \ "forkResolveQuorumSize").asOpt[Int].getOrElse(1)
-  lazy val forkFileName = (settingsJSON \ "forkFileName").asOpt[String]
-  lazy val loadEntireForkChunk = (settingsJSON \ "loadEntireForkChunk").asOpt[Boolean].getOrElse(true)
+  lazy val maxChain = (settingsJSON \ "maxChain").asOpt[Int].getOrElse(MaxRollback + 1)
+  lazy val quorum = (settingsJSON \ "quorum").asOpt[Int].getOrElse(1)
+  lazy val chainFileName = (settingsJSON \ "chainFileName").asOpt[String]
+  lazy val loadEntireChain = (settingsJSON \ "loadEntireChain").asOpt[Boolean].getOrElse(true)
 
-  assert(forkMaxLength > 1, "forkMaxLength value should be 2 or more")
+  assert(maxChain > 1, "maxChain value should be 2 or more")
 
   // Blockchain download & sync retry settings
   lazy val historySynchronizerTimeout: FiniteDuration = (settingsJSON \ "historySynchronizerTimeout").asOpt[Int]

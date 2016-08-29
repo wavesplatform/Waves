@@ -54,7 +54,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     override lazy val retriesBeforeBlacklisted: Int = 0
     override lazy val operationRetries: Int = retriesBeforeBlacklisted + 13930975
     override lazy val pinToInitialPeer: Boolean = true
-    override lazy val loadEntireForkChunk: Boolean = entireForkLoad()
+    override lazy val loadEntireChain: Boolean = entireForkLoad()
   }
 
   private val blockScore = BigInt(100)
@@ -69,7 +69,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     private val testBlockStorage = mock[BlockStorage]
     testBlockStorage.blockSeq _ expects() returns new StoredBlockSeqMock anyNumberOfTimes
 
-    (consensusModule.blockScore(_: Block)).when(*).returns(blockScore)
+    (consensusModule.blockScore _).when(*).returns(blockScore)
 
     override lazy val settings = TestSettings
     override lazy val coordinator: ActorRef = testCoordinator.ref

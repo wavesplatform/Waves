@@ -19,7 +19,7 @@ class CoordinatorSpecification extends ActorTestingCommons {
   val testBlockChainSynchronizer = TestProbe("BlockChainSynchronizer")
 
   object TestSettings extends SettingsMock {
-    override lazy val forkResolveQuorumSize: Int = 2
+    override lazy val quorum: Int = 2
     override lazy val scoreBroadcastDelay: FiniteDuration = 1000 seconds
   }
 

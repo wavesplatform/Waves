@@ -24,7 +24,7 @@ class HistoryReplier(application: Application) extends ViewSynchronizer with Sco
       log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
 
       otherSigs.exists { parent =>
-        val headers = history.lookForward(parent, application.settings.forkMaxLength)
+        val headers = history.lookForward(parent, application.settings.maxChain)
 
         if (headers.nonEmpty) {
           val msg = Message(SignaturesSpec, Right(Seq(parent) ++ headers), None)
