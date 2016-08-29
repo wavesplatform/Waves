@@ -45,9 +45,5 @@ class CoordinatorSpecification extends ActorTestingCommons {
 
       Await.result(future.mapTo[BlockchainSynchronizer.Status], testDuration) should be(GettingBlocks)
     }
-
-    "starts in synced state with blocks generation" in {
-      testblockGenerator.expectMsg(StartGeneration)
-    }
   }
 }

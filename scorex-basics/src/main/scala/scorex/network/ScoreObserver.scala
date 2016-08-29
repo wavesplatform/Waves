@@ -73,5 +73,4 @@ object ScoreObserver {
   private case class ScoreData(score: BlockchainScore, seen: Long)
 
   private type Candidates = Map[ConnectedPeer, ScoreData]
-
 }

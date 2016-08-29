@@ -32,8 +32,6 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
   context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, BroadcastCurrentScore)
 
-  blockGenerator ! StartGeneration
-
   override def receive: Receive = idle
 
   private def idle: Receive = state(CIdle) {
@@ -47,7 +45,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       if (peers.isEmpty) {
         log.trace(s"No peers to sync with, local score: $localScore")
       } else if (peers.size < quorumSize) {
-        log.debug(s"Quorum to download fork is not reached: ${peers.size} peers but should be $quorumSize")
+        log.debug(s"Quorum to download blocks is not reached: ${peers.size} peers but should be $quorumSize")
       } else {
         log.info(s"min networkScore=${peers.minBy(_._2)} > localScore=$localScore")
         blockchainSynchronizer ! GetExtension(peers.toMap)

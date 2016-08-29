@@ -6,53 +6,42 @@ import scorex.consensus.mining.BlockGeneratorController._
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class BlockGeneratorController(application: RunnableApplication) extends Actor with ScorexLogging {
 
-  import Miner._
+  import Miner.{GuessABlock, Stop}
   
   val threads = application.settings.mininigThreads
 
   var workers: Seq[ActorRef] = Seq.empty
 
-  context.system.scheduler.schedule(FailedGenerationDelay, FailedGenerationDelay, self, CheckWorkers)
-
+  context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
 
   override def receive: Receive = idle
 
-  def idle: Receive = {
+  def idle: Receive = state(Idle) {
     case StartGeneration =>
       log.info("Start block generation")
       workers.foreach(w => w ! GuessABlock(false))
       context.become(generating)
 
-    case GetStatus =>
-      sender() ! Idle.name
-
-    case CheckWorkers =>
+    case SelfCheck =>
       log.info(s"Check miners: $workers vs ${context.children}")
       workers.foreach(w => w ! Stop)
       context.children.foreach(w => w ! Stop)
 
-    case StopGeneration =>
-
-    case m => log.warn(s"Unhandled $m in Idle")
+    case GuessABlock(_) =>
   }
 
-  def generating: Receive = {
+  def generating: Receive = state(Generating) {
     case StopGeneration =>
       log.info(s"Stop block generation")
       workers.foreach(w => w ! Stop)
       context.become(idle)
 
-    case Terminated(worker) =>
-      log.info(s"Miner terminated $worker")
-      workers = workers.filter(w => w != worker)
-
-    case GetStatus =>
-      sender() ! Generating.name
-
-    case CheckWorkers =>
+    case SelfCheck =>
       log.info(s"Check ${workers.size} miners")
       if (threads - workers.size > 0) workers = workers ++ newWorkers(threads - workers.size)
       workers.foreach { _ ! GuessABlock(false) }
@@ -60,11 +49,23 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
     case genRequest @ GuessABlock(_) =>
       log.info(s"Enforce miners to generate block: $workers")
       workers.foreach(w => w ! genRequest)
-
-    case m => log.info(s"Unhandled $m in Generating")
   }
 
-  def newWorkers(count: Int): Seq[ActorRef] = (1 to count).map { i =>
+  private def state(status: Status)(logic: Receive): Receive =
+    logic orElse {
+      case Terminated(worker) =>
+        log.info(s"Miner terminated $worker")
+        workers = workers.filter(w => w != worker)
+
+      case GetStatus => sender() ! status.name
+
+      case StartGeneration =>
+      case StopGeneration =>
+
+      case m => log.info(s"Unhandled $m in $status")
+    }
+
+  private def newWorkers(count: Int): Seq[ActorRef] =  1 to count map { i =>
     context.watch(context.actorOf(Props(classOf[Miner], application), s"Worker-${System.currentTimeMillis()}-$i"))
   }
 }
@@ -89,5 +90,7 @@ object BlockGeneratorController {
 
   case object StopGeneration
 
-  case object CheckWorkers
+  private case object SelfCheck
+
+  private val SelfCheckInterval = 5 seconds
 }
