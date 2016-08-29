@@ -17,7 +17,7 @@ class ScoreObserverSpecification extends ActorTestingCommons {
   val testCoordinator = TestProbe("Coordinator")
 
   object TestSettings extends SettingsMock {
-    override val scoreTTL: FiniteDuration = 1 second
+    override lazy val scoreTTL: FiniteDuration = 1 second
   }
 
   trait App extends ApplicationMock {

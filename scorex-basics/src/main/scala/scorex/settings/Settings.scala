@@ -122,9 +122,9 @@ trait Settings extends ScorexLogging {
   lazy val mininigThreads: Int = (settingsJSON \ "mininigThreads").asOpt[Int].getOrElse(DefaultMiningThreads)
   lazy val tflikeScheduling = (settingsJSON \ "tflikeScheduling").asOpt[Boolean].getOrElse(true)
 
-  val scoreTTL: FiniteDuration = 1.minute
   lazy val scoreBroadcastDelay: FiniteDuration = (settingsJSON \ "scoreBroadcastDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(30.seconds)
+  lazy val scoreTTL: FiniteDuration = scoreBroadcastDelay * 5
 
   lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
