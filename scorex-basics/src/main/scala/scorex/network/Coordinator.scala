@@ -10,7 +10,7 @@ import scorex.network.BlockchainSynchronizer.{GetExtension, GetStatus}
 import scorex.network.NetworkController.SendToNetwork
 import scorex.network.ScoreObserver.{CurrentScore, GetScore}
 import scorex.network.message.Message
-import scorex.network.peer.PeerManager.GetConnectedPeers
+import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.ScorexLogging
 
@@ -43,15 +43,15 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
         log.trace(s"No peers to sync with, local score: $localScore")
       } else {
         log.info(s"min networkScore=${betterScorePeers.minBy(_._2)} > localScore=$localScore")
-        application.peerManager ! GetConnectedPeers
+        application.peerManager ! GetConnectedPeersTyped
         context become syncing(betterScorePeers.toMap)
       }
   }
 
   private def syncing(peerScores: Map[ConnectedPeer, BlockchainScore]): Receive = state(CSyncing) {
-    case connectedPeers @ Seq =>
+    case ConnectedPeers(peers) =>
       val quorumSize = application.settings.quorum
-      if (peerScores.size < quorumSize) {
+      if (peers.size < quorumSize) {
         log.debug(s"Quorum to download blocks is not reached: ${peerScores.size} peers but should be $quorumSize")
         context become idle
       } else {

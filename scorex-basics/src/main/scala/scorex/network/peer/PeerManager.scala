@@ -73,15 +73,18 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     case Disconnected(remote) => disconnect(remote)
   }
 
+  private def getConnectedPeers = connectedPeers
+    .filter(_._2.handshake.isDefined)
+    .map { case (k, v) => (k, v.handshake.get) }
+    .toList
+
   private def peerListOperations: Receive = {
     case AddOrUpdatePeer(address, peerNonceOpt, peerNameOpt) =>
       addOrUpdatePeer(address, peerNonceOpt, peerNameOpt)
 
-    case GetConnectedPeers =>
-      sender() ! connectedPeers
-        .filter(_._2.handshake.isDefined)
-        .map { case (k, v) => (k, v.handshake.get) }
-        .toList
+    case GetConnectedPeers => sender() ! getConnectedPeers
+
+    case GetConnectedPeersTyped => sender() ! ConnectedPeers(getConnectedPeers)
 
     case GetConnections => sender() ! connectedPeers.keys.toSeq
 
@@ -259,6 +262,9 @@ object PeerManager {
   case object GetBlacklistedPeers
 
   case object GetConnectedPeers
+
+  case object GetConnectedPeersTyped
+  case class ConnectedPeers(peers: Seq[(InetSocketAddress, Handshake)])
 
   case class PeerConnection(handlerRef: ActorRef, handshake: Option[Handshake])
 
