@@ -1,7 +1,7 @@
 package scorex.consensus.mining
 
 import akka.actor._
-import scorex.app.RunnableApplication
+import scorex.app.Application
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.utils.ScorexLogging
 
@@ -9,15 +9,13 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class BlockGeneratorController(application: RunnableApplication) extends Actor with ScorexLogging {
+class BlockGeneratorController(application: Application) extends Actor with ScorexLogging {
 
   import Miner.{GuessABlock, Stop}
-  
-  val threads = application.settings.mininigThreads
 
-  var workers: Seq[ActorRef] = Seq.empty
+  private var workers: Seq[ActorRef] = Seq.empty
 
-  context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
+  context.system.scheduler.schedule(Duration.Zero, SelfCheckInterval, self, SelfCheck)
 
   override def receive: Receive = idle
 
@@ -43,6 +41,7 @@ class BlockGeneratorController(application: RunnableApplication) extends Actor w
 
     case SelfCheck =>
       log.info(s"Check ${workers.size} miners")
+      val threads = application.settings.miningThreads
       if (threads - workers.size > 0) workers = workers ++ newWorkers(threads - workers.size)
       workers.foreach { _ ! GuessABlock(false) }
 
