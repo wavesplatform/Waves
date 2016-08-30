@@ -61,8 +61,6 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
           context become generating(active = false)
         }
       }
-      startWorkers()
-      self ! StopGeneration
 
     case blockGenerationRequest @ GuessABlock(_) =>
       if (active) {
