@@ -1,11 +1,8 @@
 package scorex.consensus.mining
 
-import java.net.InetSocketAddress
-
 import akka.actor._
 import scorex.app.Application
 import scorex.consensus.mining.BlockGeneratorController._
-import scorex.network.Handshake
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.utils.ScorexLogging
 
@@ -19,57 +16,76 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   private var workers: Seq[ActorRef] = Seq.empty
 
-  context.system.scheduler.schedule(Duration.Zero, SelfCheckInterval, self, SelfCheck)
+  context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
 
   override def receive: Receive = idle
 
   def idle: Receive = state(Idle) {
     case StartGeneration =>
       log.info("Start block generation")
-      context.become(generating)
+      context.become(generating())
       self ! SelfCheck
 
-    case SelfCheck =>
-      log.info(s"Check miners: $workers vs ${context.children}")
-      workers.foreach(w => w ! Stop)
-      context.children.foreach(w => w ! Stop)
-      askForConnectedPeers()
+    case StopGeneration =>
 
-    case ConnectedPeers(peers) if generationAllowed(peers) => self ! StartGeneration
+    case SelfCheck => stopWorkers()
+
+    case ConnectedPeers(_) =>
 
     case GuessABlock(_) =>
   }
 
-  def generating: Receive = state(Generating) {
+  def generating(active: Boolean = true): Receive = state(Generating) {
+    case StartGeneration =>
+      if (active) self ! SelfCheck
+
+    case SelfCheck =>
+      askForConnectedPeers()
+
     case StopGeneration =>
       log.info(s"Stop block generation")
       context.become(idle)
-      self ! SelfCheck
+      stopWorkers()
 
-    case SelfCheck =>
-      log.info(s"Check ${workers.size} miners")
-      val threads = application.settings.miningThreads
-      if (threads - workers.size > 0) workers = workers ++ newWorkers(threads - workers.size)
-      workers.foreach { _ ! GuessABlock(false) }
-      askForConnectedPeers()
-
-    case ConnectedPeers(peers) if ! generationAllowed(peers) => self ! StopGeneration
+    case ConnectedPeers(peers) =>
+      if (generationAllowed(peers)) {
+        log.info(s"Resume block generation")
+        startWorkers()
+        context become generating(active = true)
+      } else {
+        log.info(s"Suspend block generation")
+        stopWorkers()
+        context become generating(active = false)
+      }
+      startWorkers()
+      self ! StopGeneration
 
     case blockGenerationRequest @ GuessABlock(_) =>
-      log.info(s"Enforce miners to generate block: $workers")
-      workers.foreach(w => w ! blockGenerationRequest)
+      if (active) {
+        log.info(s"Enforce miners to generate block: $workers")
+        workers.foreach(_ ! blockGenerationRequest)
+      }
+  }
+
+  private def startWorkers() = {
+    log.info(s"Check ${workers.size} miners")
+    val threads = application.settings.miningThreads
+    if (threads - workers.size > 0) workers = workers ++ newWorkers(threads - workers.size)
+    workers.foreach { _ ! GuessABlock(false) }
+  }
+
+  private def stopWorkers() = {
+    log.info(s"Stop miners: $workers vs ${context.children}")
+    workers.foreach(_ ! Stop)
   }
 
   private def state(status: Status)(logic: Receive): Receive =
     logic orElse {
       case Terminated(worker) =>
         log.info(s"Miner terminated $worker")
-        workers = workers.filter(w => w != worker)
+        workers = workers.filter(_ != worker)
 
       case GetStatus => sender() ! status.name
-
-      case StartGeneration =>
-      case StopGeneration =>
 
       case m => log.info(s"Unhandled $m in $status")
     }
@@ -104,7 +120,7 @@ object BlockGeneratorController {
 
   case object StopGeneration
 
-  private case object SelfCheck
+  private[mining] case object SelfCheck
 
   private val SelfCheckInterval = 5 seconds
 }
