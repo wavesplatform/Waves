@@ -37,7 +37,9 @@ class Miner(application: Application) extends Actor with ScorexLogging {
         scheduleBlockGeneration()
       }
 
-    case Stop => cancel()
+    case Stop =>
+      cancel()
+      context stop self
   }
 
   private def cancel(): Unit = {
