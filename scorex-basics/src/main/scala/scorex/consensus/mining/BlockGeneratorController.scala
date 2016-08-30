@@ -49,13 +49,17 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
     case ConnectedPeers(peers) =>
       if (generationAllowed(peers)) {
-        log.info(s"Resume block generation")
         startWorkers()
-        context become generating(active = true)
+        if (!active) {
+          log.info(s"Resume block generation")
+          context become generating(active = true)
+        }
       } else {
-        log.info(s"Suspend block generation")
         stopWorkers()
-        context become generating(active = false)
+        if (active) {
+          log.info(s"Suspend block generation")
+          context become generating(active = false)
+        }
       }
       startWorkers()
       self ! StopGeneration
