@@ -6,6 +6,7 @@ import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
+import scorex.consensus.mining.BlockGeneratorController.StartGeneration
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetStatus, GettingBlocks}
 import scorex.network.ScoreObserver.CurrentScore
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
@@ -53,6 +54,10 @@ class CoordinatorSpecification extends ActorTestingCommons {
       testBlockchainSynchronizer.reply(GettingBlocks)
 
       Await.result(future.mapTo[BlockchainSynchronizer.Status], testDuration) should be(GettingBlocks)
+    }
+
+    "starts in synced state with blocks generation" in {
+      testblockGenerator.expectMsg(StartGeneration)
     }
 
     "sync" - {

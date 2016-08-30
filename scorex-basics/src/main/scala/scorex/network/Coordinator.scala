@@ -4,6 +4,7 @@ import akka.actor.Actor
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.consensus.mining.BlockGeneratorController.StartGeneration
 import scorex.consensus.mining.Miner.GuessABlock
 import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetStatus}
@@ -30,6 +31,8 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   private lazy val history = application.history
 
   context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, BroadcastCurrentScore)
+
+  application.blockGenerator ! StartGeneration
 
   override def receive: Receive = idle
 
