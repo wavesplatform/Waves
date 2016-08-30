@@ -10,7 +10,11 @@ import scala.language.postfixOps
 
 class BlockGeneratorControllerSpecification extends ActorTestingCommons {
 
-  object TestSettings extends SettingsMock
+  object TestSettings extends SettingsMock {
+    override lazy val miningThreads: Int = 0
+    override lazy val quorum: Int = 1
+    override lazy val offlineGeneration: Boolean = false
+  }
 
   val testPeerManager = TestProbe("PeerManager")
 
