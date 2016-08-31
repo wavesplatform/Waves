@@ -140,9 +140,11 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
       val notInTheHistoryBlockId = lastHistoryBlockId + 1
       val notRequestedBlockFromHistoryBeginning = 1
 
+      assertPeerNeverGotBlacklisted()
+
       sendSignatures(notRequestedBlockFromHistoryBeginning, notInTheHistoryBlockId)
 
-      assertThatPeerGotBlacklisted()
+      testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
     }
 
     "become idle on timeout in GettingExtension" in {

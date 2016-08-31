@@ -68,17 +68,17 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
             log.debug(s"All blockIds are already in the local blockchain: $blockIds")
             finish(withEmptyResult)
 
-          case Some((commonBlockId, tail)) if requestedIds.contains(commonBlockId) =>
-            implicit val peerSet = PeerSet(
-              connectedPeer,
-              if (pinToInitialPeer) peers.filterKeys(_ == connectedPeer) else peers,
-              connectedPeer)
-
-            gotoGettingExtensionTail(GettingExtension, DownloadInfo(commonBlockId), tail)
-
-          case Some((commonBlockId, _)) =>
-            blacklistPeer(s"Block id: $commonBlockId has not been requested", connectedPeer)
-            finishUnsuccessfully()
+          case Some((commonBlockId, tail)) =>
+            if (requestedIds.contains(commonBlockId)) {
+              implicit val peerSet = PeerSet(
+                connectedPeer,
+                if (pinToInitialPeer) peers.filterKeys(_ == connectedPeer) else peers,
+                connectedPeer)
+              gotoGettingExtensionTail(GettingExtension, DownloadInfo(commonBlockId), tail)
+            } else {
+              log.warn(s"Block id: $commonBlockId has not been requested, peer: $connectedPeer")
+              finish(SyncFinished.unsuccessfully)
+            }
         }
     }
 
@@ -133,7 +133,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         } else if (tail.indexOf(overlap.last) == 0) {
           gotoGettingExtensionTail(GettingExtensionTail, downloadInfo, tail.tail)(updatedPeersData)
         } else if (tail.lastOption.exists(downloadInfo.blockIds.contains)) {
-          log.warn(s"Tail blockIds have been already recieved - possible msg duplication: $tail")
+          log.warn(s"Tail blockIds have been already received - possible msg duplication: $tail")
         } else {
           blacklistPeer(s"Tail does not correspond to the overlap $overlap: $tail", connectedPeer)
           finishUnsuccessfully()
@@ -161,7 +161,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
           val currentScore = history.score()
           val forkScore = forkStorage.cumulativeBlockScore
 
-          val author = Some(connectedPeer).filterNot(_ => peers.activeChanged)
+          val author = Some(connectedPeer).filter(_ => ! peers.activeChanged)
 
           val allBlocksAreLoaded = forkStorage.noIdsWithoutBlock
 
@@ -170,14 +170,16 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
               finish(SyncFinished(success = true, Some(lastCommonBlockId, forkStorage.blocksInOrder, author)))
             }
           } else if (allBlocksAreLoaded) {
-            author.foreach {
-              blacklistPeer("All blocks are loaded, but still not enough score", _)
+            if (forkScore == currentScore) {
+              finish(SyncFinished.withEmptyResult)
+            } else {
+              author.foreach {
+                blacklistPeer("All blocks are loaded, but still not enough score", _)
+              }
+              finish(SyncFinished.unsuccessfully)
             }
-            finish(SyncFinished.unsuccessfully)
           }
-
         }
-
     }
   }
 
