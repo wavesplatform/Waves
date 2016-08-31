@@ -23,7 +23,7 @@ class HistoryReplierSpecification extends ActorTestingCommons {
   }
 
   private object TestSettings extends SettingsMock {
-    override lazy val forkMaxLength = 5
+    override lazy val maxChain = 5
   }
 
   private val lastHistoryBlockId = 20
@@ -50,7 +50,7 @@ class HistoryReplierSpecification extends ActorTestingCommons {
     "return block signatures" in {
       val last = 10
       sendSignatures(last, 8) // according to the protocol ids come in reverse order!
-      expectedSignaturesSpec(last to last + TestSettings.forkMaxLength)
+      expectedSignaturesSpec(last to last + TestSettings.maxChain)
     }
 
     "history contains less block signatures than requested" in {

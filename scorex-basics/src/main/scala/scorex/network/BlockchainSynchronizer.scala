@@ -31,10 +31,10 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
   private lazy val history = application.history
 
   private lazy val timeout = application.settings.historySynchronizerTimeout
-  private lazy val forkMaxLength = application.settings.forkMaxLength
+  private lazy val maxChainLength = application.settings.maxChain
   private lazy val operationRetries = application.settings.operationRetries
   private lazy val pinToInitialPeer = application.settings.pinToInitialPeer
-  private lazy val partialBlockLoading = !application.settings.loadEntireForkChunk
+  private lazy val partialBlockLoading = !application.settings.loadEntireChain
 
   private var timeoutData = Option.empty[Cancellable]
 
@@ -88,12 +88,12 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     val blockIdsToDownload = downloadInfo.blockIds ++ tail
 
     val noMoreBlockIds = tail.isEmpty
-    if (blockIdsToDownload.size >= forkMaxLength || noMoreBlockIds || tail.size == 1) {
-      val fork = blockIdsToDownload.take(forkMaxLength)
+    if (blockIdsToDownload.size >= maxChainLength || noMoreBlockIds || tail.size == 1) {
+      val fork = blockIdsToDownload.take(maxChainLength)
 
       fork.find(id => history.contains(id.blockId)) match {
         case Some(suspiciousBlockId) =>
-          blacklistPeer(s"Suspicious block id: $suspiciousBlockId among blocks to be downloaded", activePeer)
+          blacklistPeer(s"Existing block id: $suspiciousBlockId among blocks to be downloaded", activePeer)
           finishUnsuccessfully()
 
         case None =>
@@ -197,9 +197,6 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         if (timeoutData.exists(!_.isCancelled)) handleTimeout(t)
 
       case GetExtension(_) => // ignore if not idle
-
-      // the signal to initialize
-      case Unit =>
 
       case nonsense: Any =>
         log.warn(s"Got something strange in ${status.name}: $nonsense")
@@ -380,6 +377,6 @@ object BlockchainSynchronizer {
   private case class Peer(score: BlockchainScore, retries: Int = 0)
   private type Peers = Map[ConnectedPeer, Peer]
   private case class PeerSet(active: ConnectedPeer, peers: Peers, initiallyActive: ConnectedPeer) {
-    def activeChanged = active != initiallyActive
+    def activeChanged: Boolean = active != initiallyActive
   }
 }

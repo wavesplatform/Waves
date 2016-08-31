@@ -16,7 +16,7 @@ trait ViewSynchronizer extends Actor {
 
   val messageSpecs: Seq[MessageSpec[_]]
 
-  override def preStart: Unit = {
+  override final def preStart: Unit = {
     networkControllerRef ! NetworkController.RegisterMessagesHandler(messageSpecs, self)
   }
 }

@@ -23,17 +23,13 @@ class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronize
   private implicit val timeout = Timeout(5.seconds)
 
   override val messageSpecs = Seq(GetPeersSpec, PeersSpec)
-  override val networkControllerRef = application.networkController
+  protected lazy override val networkControllerRef = application.networkController
 
   private val peerManager = application.peerManager
 
-  override def preStart: Unit = {
-    super.preStart()
-
-    val peersDataBroadcastDelay = application.settings.peersDataBroadcastDelay
-    val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(), None), SendToRandom)
-    context.system.scheduler.schedule(peersDataBroadcastDelay, peersDataBroadcastDelay)(networkControllerRef ! stn)
-  }
+  private val peersDataBroadcastDelay = application.settings.peersDataBroadcastDelay
+  private val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(), None), SendToRandom)
+  context.system.scheduler.schedule(peersDataBroadcastDelay, peersDataBroadcastDelay)(networkControllerRef ! stn)
 
   override def receive: Receive = {
     case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)

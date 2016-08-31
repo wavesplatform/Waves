@@ -9,8 +9,10 @@ import scorex.consensus.mining.Miner.GuessABlock
 import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetStatus}
 import scorex.network.NetworkController.SendToNetwork
-import scorex.network.ScoreObserver.{ConsideredValue, GetScore}
+import scorex.network.ScoreObserver.{CurrentScore, GetScore}
 import scorex.network.message.Message
+import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
+import scorex.transaction.History.BlockchainScore
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -23,42 +25,45 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   import Coordinator._
   import application.basicMessagesSpecsRepo._
 
-  private lazy val scoreObserver = application.scoreObserver
   private lazy val blockchainSynchronizer = application.blockchainSynchronizer
-  private lazy val blockGenerator = application.blockGenerator
   private lazy val networkControllerRef = application.networkController
 
   private lazy val history = application.history
 
-  private val forkResolveQuorumSize = application.settings.forkResolveQuorumSize
-
   context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, BroadcastCurrentScore)
 
-  blockGenerator ! StartGeneration
+  application.blockGenerator ! StartGeneration
 
   override def receive: Receive = idle
 
   private def idle: Receive = state(CIdle) {
-    case ConsideredValue(candidates) =>
+    case CurrentScore(candidates) =>
       val localScore = history.score()
 
-      val peers = candidates.filter(_._2 > localScore)
+      val betterScorePeers = candidates.filter(_._2 > localScore)
 
-      if (peers.isEmpty) {
+      if (betterScorePeers.isEmpty) {
         log.trace(s"No peers to sync with, local score: $localScore")
-      } else if (peers.size < forkResolveQuorumSize) {
-        log.debug(s"Quorum to download fork is not reached: ${peers.size} peers but should be $forkResolveQuorumSize")
       } else {
-        log.info(s"min networkScore=${peers.minBy(_._2)} > localScore=$localScore")
-        blockchainSynchronizer ! GetExtension(peers.toMap)
-        context become syncing
+        log.info(s"min networkScore=${betterScorePeers.minBy(_._2)} > localScore=$localScore")
+        application.peerManager ! GetConnectedPeersTyped
+        context become syncing(betterScorePeers.toMap)
       }
   }
 
-  private def syncing: Receive = state(CSyncing) {
+  private def syncing(peerScores: Map[ConnectedPeer, BlockchainScore]): Receive = state(CSyncing) {
+    case ConnectedPeers(peers) =>
+      val quorumSize = application.settings.quorum
+      if (peers.size < quorumSize) {
+        log.debug(s"Quorum to download blocks is not reached: ${peerScores.size} peers but should be $quorumSize")
+        context become idle
+      } else {
+        blockchainSynchronizer ! GetExtension(peerScores)
+      }
+
     case SyncFinished(_, result) =>
       context become idle
-      scoreObserver ! GetScore
+      application.scoreObserver ! GetScore
 
       result foreach {
         case (lastCommonBlockId, blocks, from) =>
@@ -117,7 +122,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     if (isBlockToBeAdded) {
       log.info(s"New block(local: $local): ${newBlock.json}")
       if (processNewBlock(newBlock)) {
-        blockGenerator ! GuessABlock(rescheduleImmediately = true)
+        application.blockGenerator ! GuessABlock(rescheduleImmediately = true)
         if (local) {
           networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(newBlock), None), Broadcast)
         } else {

@@ -119,7 +119,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   def peerLogic: Receive = {
     case ConnectTo(remote) =>
       log.info(s"Connecting to: $remote")
-      IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout, pullMode = true)
+      IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout)
 
     case c@Connected(remote, local) =>
       val connection = sender()
