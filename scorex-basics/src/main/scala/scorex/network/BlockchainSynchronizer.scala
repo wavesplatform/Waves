@@ -93,7 +93,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
       fork.find(id => history.contains(id.blockId)) match {
         case Some(suspiciousBlockId) =>
-          blacklistPeer(s"Suspicious block id: $suspiciousBlockId among blocks to be downloaded", activePeer)
+          blacklistPeer(s"Existing block id: $suspiciousBlockId among blocks to be downloaded", activePeer)
           finishUnsuccessfully()
 
         case None =>
