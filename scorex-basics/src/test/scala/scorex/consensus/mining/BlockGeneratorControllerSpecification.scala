@@ -42,6 +42,12 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
       assertStatusIs(Idle)
     }
 
+    "when Idle don't check peers number" in {
+      assertStatusIs(Idle)
+      actorRef ! SelfCheck
+      testPeerManager.expectNoMsg(testDuration)
+    }
+
     "StopGeneration command change state to idle from generating" in {
       actorRef ! StartGeneration
       assertStatusIs(Generating)
