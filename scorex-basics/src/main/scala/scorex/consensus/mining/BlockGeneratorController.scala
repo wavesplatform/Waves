@@ -80,7 +80,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
     workers.foreach { _ ! GuessABlock(false) }
   }
 
-  private def stopWorkers() = {
+  private def stopWorkers() = if (workers.nonEmpty) {
     log.info(s"Stop miners: $workers vs ${context.children}")
     workers.foreach(_ ! Stop)
   }
