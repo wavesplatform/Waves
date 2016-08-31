@@ -71,8 +71,9 @@ trait RunnableApplication extends Application with ScorexLogging {
     implicit val materializer = ActorMaterializer()
     Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
 
-    // TODO: in fact, this is an attemption to call Actor.preStart - needs to be replaced!
-    Seq(scoreObserver, blockchainSynchronizer, historyReplier, coordinator) foreach ( _ ! Unit)
+    Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator) foreach {
+      _ => // de-lazyning process :-)
+    }
 
     actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
 

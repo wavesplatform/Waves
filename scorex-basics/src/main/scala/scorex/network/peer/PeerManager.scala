@@ -73,15 +73,18 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     case Disconnected(remote) => disconnect(remote)
   }
 
+  private def getConnectedPeers = connectedPeers
+    .filter(_._2.handshake.isDefined)
+    .map { case (k, v) => (k, v.handshake.get) }
+    .toList
+
   private def peerListOperations: Receive = {
     case AddOrUpdatePeer(address, peerNonceOpt, peerNameOpt) =>
       addOrUpdatePeer(address, peerNonceOpt, peerNameOpt)
 
-    case GetConnectedPeers =>
-      sender() ! connectedPeers
-        .filter(_._2.handshake.isDefined)
-        .map { case (k, v) => (k, v.handshake.get) }
-        .toList
+    case GetConnectedPeers => sender() ! getConnectedPeers
+
+    case GetConnectedPeersTyped => sender() ! ConnectedPeers(getConnectedPeers)
 
     case GetConnections => sender() ! connectedPeers.keys.toSeq
 
@@ -154,7 +157,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       .flatMap(_.handshake).map(_.nodeNonce)
       .foreach { nonce =>
         nonces(nonce).foreach(connectedPeers.remove)
-        nonces -= nonce
+        nonces.remove(nonce)
       }
     connectedPeers.remove(from)
   }
@@ -173,14 +176,23 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         if (nonces.keys.contains(handshakeNonce)) {
           val peers = nonces(handshakeNonce)
 
-          if (peers.nonEmpty)
-            log.info(s"Peer $address has come with nonce $handshakeNonce corresponding to: ${peers.mkString(",")}")
-          else
-            log.info("Drop connection to self")
+          if (peers.size > 1) {
+            log.warn(s"Connection attempts for nonce $handshakeNonce is more than one")
+            connectedPeers
+              .filter { case (addr, _) => peers.contains(addr) }
+              .foreach(_._2.handlerRef ! CloseConnection)
+            nonces.remove(handshakeNonce)
+          } else {
 
-          updateHandshakedPeer()
-          connectedPeers -= address
-          c.handlerRef ! CloseConnection
+            if (peers.nonEmpty)
+              log.info(s"Peer $address has come with nonce $handshakeNonce corresponding to: ${peers.mkString(",")}")
+            else
+              log.info("Drop connection to self")
+
+            updateHandshakedPeer()
+            connectedPeers -= address
+            c.handlerRef ! CloseConnection
+          }
         } else {
           updateHandshakedPeer()
           handshake.declaredAddress.foreach { addOrUpdatePeer(_, None, None) }
@@ -250,6 +262,9 @@ object PeerManager {
   case object GetBlacklistedPeers
 
   case object GetConnectedPeers
+
+  case object GetConnectedPeersTyped
+  case class ConnectedPeers(peers: Seq[(InetSocketAddress, Handshake)])
 
   case class PeerConnection(handlerRef: ActorRef, handshake: Option[Handshake])
 

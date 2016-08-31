@@ -22,7 +22,6 @@ class LagonakiTestSuite extends Sequential(
   , new MessageSpecification
   , new BlockSpecification
   , new WalletSpecification
-  , new BlockGeneratorSpecification
   , new StateTest
   , new StoredStateSpecification
   , new SimpleTransactionModuleSpecification
@@ -31,10 +30,6 @@ class LagonakiTestSuite extends Sequential(
   , new ValidChainGenerationSpecification
 
 ) with BeforeAndAfterAll {
-
-  override protected def beforeAll() = {
-    Runtime.getRuntime.exec("rm -rf /tmp/scorex-tests")
-  }
 
   override protected def afterAll() = {
     applications.foreach(_.stopAll())

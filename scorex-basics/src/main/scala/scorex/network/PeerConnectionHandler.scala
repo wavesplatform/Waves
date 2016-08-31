@@ -37,8 +37,6 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
   context watch connection
 
-  override def preStart: Unit = connection ! ResumeReading
-
   override def postRestart(thr: Throwable): Unit = {
     log.warn(s"Restart because of $thr.getMessage")
     connection ! Close
@@ -59,7 +57,6 @@ case class PeerConnectionHandler(application: RunnableApplication,
         case Success(handshake) =>
           peerManager ! Handshaked(remote, handshake)
           log.info(s"Got a Handshake from $remote")
-          connection ! ResumeReading
           handshakeGot = true
           self ! HandshakeCheck
         case Failure(e) =>
@@ -75,7 +72,6 @@ case class PeerConnectionHandler(application: RunnableApplication,
     case HandshakeCheck =>
       if (handshakeGot && handshakeSent) {
         timeout.cancel()
-        connection ! ResumeReading
         context become workingCycle
       }
   }
@@ -188,8 +184,6 @@ case class PeerConnectionHandler(application: RunnableApplication,
           true
       }
     }
-
-    connection ! ResumeReading
   }
 }
 

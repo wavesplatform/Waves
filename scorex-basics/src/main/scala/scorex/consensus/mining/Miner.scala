@@ -37,7 +37,9 @@ class Miner(application: Application) extends Actor with ScorexLogging {
         scheduleBlockGeneration()
       }
 
-    case Stop => cancel()
+    case Stop =>
+      cancel()
+      context stop self
   }
 
   private def cancel(): Unit = {
@@ -88,8 +90,10 @@ class Miner(application: Application) extends Actor with ScorexLogging {
   }
 
   private def setSchedule(schedule: Seq[FiniteDuration]): Seq[Cancellable] = {
+    val repeatIfNotDeliveredInterval = 10 seconds
     val systemScheduler = context.system.scheduler
-    schedule.map { t => systemScheduler.schedule(t, FailedGenerationDelay, self, GenerateBlock) }
+
+    schedule.map { t => systemScheduler.schedule(t, repeatIfNotDeliveredInterval, self, GenerateBlock) }
   }
 }
 
@@ -102,8 +106,6 @@ object Miner {
   private case object GenerateBlock
 
   private[mining] val BlockGenerationTimeShift = 1 second
-
-  private[mining] val FailedGenerationDelay = 10 seconds
 
   private[mining] val MaxBlockGenerationDelay = 1 hour
 }
