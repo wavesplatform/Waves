@@ -20,7 +20,10 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   override def receive: Receive = idle
 
-  def idle: Receive = state(Idle) {
+  def idle: Receive = state {
+
+    case GetStatus => sender() ! Idle.name
+
     case StartGeneration =>
       log.info("Start block generation")
       context.become(generating())
@@ -35,12 +38,13 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
     case GuessABlock(_) =>
   }
 
-  def generating(active: Boolean = true): Receive = state(Generating) {
-    case StartGeneration =>
-      if (active) self ! SelfCheck
+  def generating(active: Boolean = true): Receive = state {
 
-    case SelfCheck =>
-      askForConnectedPeers()
+    case GetStatus => sender() ! (if (active) Generating else Suspended).name
+
+    case StartGeneration => if (active) self ! SelfCheck
+
+    case SelfCheck => askForConnectedPeers()
 
     case StopGeneration =>
       log.info(s"Stop block generation")
@@ -81,15 +85,13 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
     workers.foreach(_ ! Stop)
   }
 
-  private def state(status: Status)(logic: Receive): Receive =
+  private def state(logic: Receive): Receive =
     logic orElse {
       case Terminated(worker) =>
         log.info(s"Miner terminated $worker")
         workers = workers.filter(_ != worker)
 
-      case GetStatus => sender() ! status.name
-
-      case m => log.info(s"Unhandled $m in $status")
+      case m => log.info(s"Unhandled $m")
     }
 
   private def generationAllowed(peers: Seq[_]) =
@@ -114,6 +116,10 @@ object BlockGeneratorController {
 
   case object Generating extends Status {
     override val name = "generating"
+  }
+
+  case object Suspended extends Status {
+    override val name = "suspended"
   }
 
   case object GetStatus
