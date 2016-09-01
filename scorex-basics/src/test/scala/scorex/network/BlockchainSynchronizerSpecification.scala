@@ -69,7 +69,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     private val testBlockStorage = mock[BlockStorage]
     testBlockStorage.blockSeq _ expects() returns new StoredBlockSeqMock anyNumberOfTimes
 
-    (consensusModule.blockScore _).when(*).returns(blockScore)
+    consensusModule.blockScore _ when * returns blockScore
 
     override lazy val settings = TestSettings
     override lazy val coordinator: ActorRef = testCoordinator.ref

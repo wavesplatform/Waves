@@ -36,7 +36,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
 
   //check own declared address for validity
   if (!settings.localOnly) {
-    settings.declaredAddress.map { myAddress =>
+    settings.declaredAddress.forall { myAddress =>
       Try {
         val uri = new URI("http://" + myAddress)
         val myHost = uri.getHost
@@ -59,7 +59,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
         log.error("Declared address validation failed: ", t)
         false
       }.getOrElse(false)
-    }.getOrElse(true).ensuring(_ == true, "Declared address isn't valid")
+    }.ensuring(_ == true, "Declared address isn't valid")
   }
 
   lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
@@ -76,6 +76,14 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   log.info(s"Declared address: $ownSocketAddress")
 
   lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
+
+  override def postRestart(thr: Throwable): Unit = {
+    log.warn(s"restart because of $thr.getMessage")
+    context stop self
+  }
+
+  // there is not recovery for broken connections
+  override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   //bind to listen incoming connections
   IO(Tcp) ! Bind(self, localAddress)
