@@ -1,0 +1,25 @@
+package scorex.transaction.state.database
+
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
+import scorex.account.PublicKeyAccount
+import scorex.transaction.{GenesisTransaction, Transaction}
+
+class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
+  with Matchers
+  with MockFactory
+  with OneInstancePerTest {
+
+  private def newTx(id: Long) = new GenesisTransaction(new PublicKeyAccount(Array.fill(32)(0: Byte)), id, 4598723454L)
+
+  "do nothing if tx db becomes full" in {
+    val db = new UnconfirmedTransactionsDatabaseImpl(1)
+
+    val validator = mockFunction[Transaction, Boolean]
+
+    validator expects * returns true once()
+
+    db.putIfNew(newTx(1), validator) shouldBe true
+    db.putIfNew(newTx(2), validator) shouldBe false
+  }
+}

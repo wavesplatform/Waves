@@ -154,7 +154,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   override def isValid(tx: Transaction): Boolean = {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     val notExpired = (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
-    notExpired && super.isValid(tx)
+    notExpired && blockStorage.state.isValid(tx)
   }
 
   override def isValid(block: Block): Boolean = {

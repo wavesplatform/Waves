@@ -1,6 +1,5 @@
 package scorex.transaction.state.database
 
-import com.google.common.primitives.Longs
 import scorex.transaction.{Transaction, UnconfirmedTransactionsStorage}
 import scorex.utils.ScorexLogging
 
@@ -9,20 +8,26 @@ import scala.collection.concurrent.TrieMap
 
 class UnconfirmedTransactionsDatabaseImpl(val sizeLimit: Int = 1000) extends UnconfirmedTransactionsStorage with ScorexLogging {
 
-  val transactions = TrieMap[Long, Transaction]()
+  private type TxKey = scorex.network.BlockchainSynchronizer.InnerId
 
-  //using Long instead of Array[Byte] just for performance improvement
-  private def key(signature: Array[Byte]): Long =
-    Longs.fromByteArray(signature.take(8))
+  private val transactions = TrieMap[TxKey, Transaction]()
 
-  private def key(tx: Transaction): Long = key(tx.signature)
+  private def key(signature: Array[Byte]): TxKey = new TxKey(signature)
 
-  override def putIfNew(tx: Transaction): Boolean = if (transactions.size < sizeLimit) {
-    transactions.putIfAbsent(key(tx), tx).isEmpty
-  } else {
-    log.warn("Transaction pool size limit is reached")
-    false
-  }
+  private def key(tx: Transaction): TxKey = key(tx.signature)
+
+  override def putIfNew(tx: Transaction, txValidator: Transaction => Boolean): Boolean =
+    if (transactions.size < sizeLimit) {
+      if (txValidator(tx)) {
+        transactions.putIfAbsent(key(tx), tx).isEmpty
+      } else {
+        log.error(s"Transaction $tx is not valid")
+        false
+      }
+    } else {
+      log.warn("Transaction pool size limit is reached")
+      false
+    }
 
   override def remove(tx: Transaction): Unit = transactions -= key(tx)
 

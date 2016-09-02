@@ -170,14 +170,9 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
               finish(SyncFinished(success = true, Some(lastCommonBlockId, forkStorage.blocksInOrder, author)))
             }
           } else if (allBlocksAreLoaded) {
-            if (forkScore == currentScore) {
-              finish(SyncFinished.withEmptyResult)
-            } else {
-              author.foreach {
-                blacklistPeer("All blocks are loaded, but still not enough score", _)
-              }
-              finish(SyncFinished.unsuccessfully)
-            }
+            // blacklisting in case of lesser score can be false-positive due to race condition
+            log.warn(s"All blocks are loaded, but still not enough score, peer: $author")
+            finish(SyncFinished.unsuccessfully)
           }
         }
     }

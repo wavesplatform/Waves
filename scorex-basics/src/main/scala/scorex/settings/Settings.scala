@@ -83,7 +83,7 @@ trait Settings extends ScorexLogging {
   lazy val port = (p2pSettings \ "port").asOpt[Int].getOrElse(DefaultPort)
   lazy val declaredAddress = (p2pSettings \ "myAddress").asOpt[String]
   lazy val fuzzingDelay = (p2pSettings \ "fuzzingDelay").asOpt[Int].getOrElse(0)
-  lazy val outboundBufferSize = (p2pSettings \ "outboundBufferSizeMb").asOpt[Int].getOrElse(200) * 1024 * 1024
+  lazy val outboundBufferSize = (p2pSettings \ "outboundBufferSizeMb").asOpt[Int].getOrElse(15) * 1024 * 1024
   lazy val minEphemeralPortNumber = (p2pSettings \ "minEphemeralPortNumber").asOpt[Int].getOrElse(32768)
   lazy val acceptExternalPeerData = (p2pSettings \ "acceptExternalPeerData").asOpt[Boolean].getOrElse(true)
   lazy val peersDataBroadcastDelay = (p2pSettings \ "peersDataBroadcastDelay").asOpt[Long]

@@ -255,9 +255,11 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               "fork has lower score" in {
                 setHistoryScoreExpectations(1)
 
+                assertPeerNeverGotBlacklisted()
+
                 sendBlocks()
 
-                assertThatPeerGotBlacklisted()
+                testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
 
                 validateStatus(Idle)
               }
