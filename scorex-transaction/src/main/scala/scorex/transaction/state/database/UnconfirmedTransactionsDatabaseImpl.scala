@@ -4,11 +4,12 @@ import scorex.transaction.{Transaction, UnconfirmedTransactionsStorage}
 import scorex.utils.ScorexLogging
 
 import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
 
 
 class UnconfirmedTransactionsDatabaseImpl(val sizeLimit: Int = 1000) extends UnconfirmedTransactionsStorage with ScorexLogging {
 
-  private type TxKey = scorex.network.BlockchainSynchronizer.InnerId
+  private type TxKey = mutable.WrappedArray.ofByte
 
   private val transactions = TrieMap[TxKey, Transaction]()
 
@@ -18,8 +19,12 @@ class UnconfirmedTransactionsDatabaseImpl(val sizeLimit: Int = 1000) extends Unc
 
   override def putIfNew(tx: Transaction, txValidator: Transaction => Boolean): Boolean =
     if (transactions.size < sizeLimit) {
-      if (txValidator(tx)) {
-        transactions.putIfAbsent(key(tx), tx).isEmpty
+      val txKey = key(tx)
+      if (transactions.contains(txKey)) {
+        false
+      } else if (txValidator(tx)) {
+        transactions.update(txKey, tx)
+        true
       } else {
         log.error(s"Transaction $tx is not valid")
         false

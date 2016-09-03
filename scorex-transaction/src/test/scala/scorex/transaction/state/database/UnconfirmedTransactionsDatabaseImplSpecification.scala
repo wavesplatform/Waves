@@ -12,14 +12,25 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
 
   private def newTx(id: Long) = new GenesisTransaction(new PublicKeyAccount(Array.fill(32)(0: Byte)), id, 4598723454L)
 
-  "do nothing if tx db becomes full" in {
+  "utx database" - {
+
     val db = new UnconfirmedTransactionsDatabaseImpl(1)
 
     val validator = mockFunction[Transaction, Boolean]
 
-    validator expects * returns true once()
+    "do nothing if tx db becomes full" in {
 
-    db.putIfNew(newTx(1), validator) shouldBe true
-    db.putIfNew(newTx(2), validator) shouldBe false
+      validator expects * returns true once()
+
+      db.putIfNew(newTx(1), validator) shouldBe true
+      db.putIfNew(newTx(2), validator) shouldBe false
+    }
+
+    "does not call validator if same tx comes again" in {
+      validator expects * returns true once()
+
+      db.putIfNew(newTx(1), validator) shouldBe true
+      db.putIfNew(newTx(1), validator) shouldBe false
+    }
   }
 }
