@@ -2,7 +2,7 @@ package scorex.network.peer
 
 import java.net.InetSocketAddress
 
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
@@ -149,6 +149,38 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
         getBlacklistedPeers.size shouldBe 1
       }
+    }
+
+    "connect to self is forbidden" in {
+      connect(new InetSocketAddress("localhost", 45980), TestSettings.nodeNonce)
+      peerConnectionHandler.expectMsg(CloseConnection)
+      getActiveConnections shouldBe empty
+    }
+
+    "many TCP clients with same nonce" in {
+
+      val theNonce = 8865
+
+      def connect(id: Int): TestProbe = {
+        val address = new InetSocketAddress(id)
+        val handler = TestProbe("connection-handler-" + id)
+        actorRef ! Connected(address, handler.ref, None)
+        handler.expectMsgType[Handshake]
+        actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", theNonce, None, 0))
+        handler
+      }
+
+      val h1 = connect(1)
+      getConnectedPeers should have size 1
+
+      val h2 = connect(2)
+      h2.expectMsg(CloseConnection)
+      getConnectedPeers should have size 1
+
+      val h3 = connect(3)
+
+      h1.expectMsg(CloseConnection)
+      h3.expectMsg(CloseConnection)
     }
 
     "disconnect during handshake" in {

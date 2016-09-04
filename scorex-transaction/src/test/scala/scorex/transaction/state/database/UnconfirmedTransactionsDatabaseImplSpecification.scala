@@ -14,11 +14,11 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
 
   "utx database" - {
 
-    val db = new UnconfirmedTransactionsDatabaseImpl(1)
-
     val validator = mockFunction[Transaction, Boolean]
 
     "do nothing if tx db becomes full" in {
+
+      val db = new UnconfirmedTransactionsDatabaseImpl(1)
 
       validator expects * returns true once()
 
@@ -27,6 +27,9 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
     }
 
     "does not call validator if same tx comes again" in {
+
+      val db = new UnconfirmedTransactionsDatabaseImpl
+
       validator expects * returns true once()
 
       db.putIfNew(newTx(1), validator) shouldBe true
