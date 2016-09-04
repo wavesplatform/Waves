@@ -134,14 +134,16 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   }
 
   private def processDataFromNetwork(spec: MessageSpec[_], msgData: Array[Byte], remote: InetSocketAddress): Unit = {
-    val endPoint = connectedPeers.get(remote)
+    connectedPeers.get(remote) match {
+      case None =>
+        log.error(s"nw msg from unknown $remote")
+        sender() ! CloseConnection
 
-    endPoint.flatMap {_.handshake } orElse {
-      log.error(s"No connected peer matches $remote")
-      endPoint.foreach(_.handlerRef ! CloseConnection)
-      None
-    } foreach {
-      handshakeData =>
+      case Some(PeerConnection(_, None)) =>
+        log.error(s"No connected peer matches $remote")
+        sender() ! CloseConnection
+
+      case Some(PeerConnection(_, Some(handshakeData))) =>
         val peer = new InetAddressPeer(handshakeData.nodeNonce, remote, self)
         networkController ! Message(spec, Left(msgData), Some(peer))
     }
@@ -160,10 +162,12 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   }
 
   private def handleHandshake(address: InetSocketAddress, handshake: Handshake): Unit =
-    connectedPeers.get(address).filter(_.handshake.isEmpty)
-      .orElse ( { log.error("No peer to validate"); None } )
-      .foreach { case c @ PeerConnection(_, _) =>
+    connectedPeers.get(address) match {
+      case None | Some(PeerConnection(_, Some(_))) =>
+        log.error("No peer matching handshake")
+        sender() ! CloseConnection
 
+      case Some(connection @ PeerConnection(_, None)) =>
         visit(address)
 
         val handshakeNonce = handshake.nodeNonce
@@ -183,16 +187,16 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
                 log.info("Drop connection to self")
 
               nonces.put(handshakeNonce, address)
-              connectedPeers -= address
-              c.handlerRef ! CloseConnection
+              connectedPeers.remove(address)
+              connection.handlerRef ! CloseConnection
             }
 
           case None =>
             nonces.put(handshakeNonce, address)
             handshake.declaredAddress.foreach { addOrUpdatePeer(_, None, None) }
-            connectedPeers += address -> c.copy(handshake = Some(handshake))
+            connectedPeers += address -> connection.copy(handshake = Some(handshake))
         }
-      }
+    }
 
   private def visit(address: InetSocketAddress) = {
     peerDatabase.mergePeerInfo(address, PeerInfo(lastSeen = System.currentTimeMillis()), createIfNotExists = false)
