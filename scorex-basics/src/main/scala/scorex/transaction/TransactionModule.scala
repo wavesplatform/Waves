@@ -17,9 +17,9 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
   /**
     * Returns all unconfirmed transactions
     */
-  def unconfirmedTxs() : Seq[Transaction] = utxStorage.all()
+  def unconfirmedTxs: Seq[Transaction]
 
-  def putUnconfirmedIfNew(tx: Transaction): Boolean = utxStorage.putIfNew(tx, isValid)
+  def putUnconfirmedIfNew(tx: Transaction): Boolean
 
   def packUnconfirmed(): TransactionBlockData
 

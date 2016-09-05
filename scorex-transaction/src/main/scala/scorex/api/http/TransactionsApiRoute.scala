@@ -96,7 +96,7 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
   def unconfirmed: Route = {
     path("unconfirmed") {
       getJsonRoute {
-        val json = JsArray(application.transactionModule.utxStorage.all().map(_.json))
+        val json = JsArray(application.transactionModule.unconfirmedTxs.map(_.json))
         JsonResponse(json, StatusCodes.OK)
       }
     }

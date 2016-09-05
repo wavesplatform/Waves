@@ -35,7 +35,7 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
       }
 
     case BroadcastRandom =>
-      val txs = transactionModule.unconfirmedTxs()
+      val txs = transactionModule.unconfirmedTxs
       if (txs.nonEmpty) {
         val rndTx = txs.toList(scala.util.Random.nextInt(txs.size))
         broadcast(rndTx)

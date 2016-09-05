@@ -72,7 +72,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
     }
 
     "broadcast one tx periodically" in {
-     (transactionModule.unconfirmedTxs: () => Seq[Transaction]).expects().returning(Seq(tx))
+     (transactionModule.unconfirmedTxs _).expects().returning(Seq(tx))
 
       val actorRef = createPoolSynchronizer(1 second)
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
