@@ -55,7 +55,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     case ConnectedPeers(peers) =>
       val quorumSize = application.settings.quorum
       if (peers.size < quorumSize) {
-        log.debug(s"Quorum to download blocks is not reached: ${peerScores.size} peers but should be $quorumSize")
+        log.debug(s"Quorum to download blocks is not reached: ${peers.size} peers but should be $quorumSize")
         context become idle
       } else {
         blockchainSynchronizer ! GetExtension(peerScores)
