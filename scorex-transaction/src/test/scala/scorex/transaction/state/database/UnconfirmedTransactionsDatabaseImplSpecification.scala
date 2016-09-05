@@ -35,5 +35,17 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
       db.putIfNew(newTx(1), validator) shouldBe true
       db.putIfNew(newTx(1), validator) shouldBe false
     }
+
+    "validator returns false" in {
+
+      val db = new UnconfirmedTransactionsDatabaseImpl
+
+      validator expects * returns false
+
+      db.all() shouldBe empty
+
+      db.putIfNew(newTx(1), validator) shouldBe false
+      db.all() shouldBe empty
+    }
   }
 }
