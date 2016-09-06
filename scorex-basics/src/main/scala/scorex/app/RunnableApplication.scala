@@ -59,9 +59,6 @@ trait RunnableApplication extends Application with ScorexLogging {
   lazy val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
-  lazy val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
-
-
   def run() {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
@@ -69,6 +66,8 @@ trait RunnableApplication extends Application with ScorexLogging {
     checkGenesis()
 
     implicit val materializer = ActorMaterializer()
+
+    val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
     Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
 
     Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator) foreach {

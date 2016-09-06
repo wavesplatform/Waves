@@ -23,6 +23,9 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
       validator expects * returns true once()
 
       db.putIfNew(newTx(1), validator) shouldBe true
+
+      db.all() should have size 1
+
       db.putIfNew(newTx(2), validator) shouldBe false
     }
 

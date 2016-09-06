@@ -88,7 +88,18 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
 
   override def packUnconfirmed(): StoredInBlock = synchronized {
     clearIncorrectTransactions()
-    utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock)
+
+    val txs = utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock)
+    val valid = blockStorage.state.validate(txs)
+
+    if (valid.size != txs.size) {
+      log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
+    }
+
+    if (!blockStorage.state.isValid(valid, None)) {
+      log.error("Transactions validation error, PLEASE CONTACT DEVELOPERS")
+      Seq.empty
+    } else valid
   }
 
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = synchronized {
@@ -97,17 +108,16 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       case None =>
     })
 
-    clearIncorrectTransactions()
+    clearIncorrectTransactions() // todo makes sence to remove expired only at this point
   }
 
   /**
     * Removes too old or invalid transactions from UnconfirmedTransactionsPool
     */
   def clearIncorrectTransactions(): Unit = {
-    val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-
+    val currentTime = NTP.correctedTime()
     val txs = utxStorage.all()
-    val notExpired = txs.filter { tx => (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed }
+    val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeForUnconfirmed }
     val valid = blockStorage.state.validate(notExpired)
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
