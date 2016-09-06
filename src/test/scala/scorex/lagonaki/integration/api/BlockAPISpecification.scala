@@ -15,10 +15,19 @@ class BlockAPISpecification extends FunSuite with TestLock with Matchers with Tr
   val history = application.blockStorage.history
   val genesis = history.genesis
 
-  while (history.height() < 3) {
-    application.blockStorage.appendBlock(genValidBlock())
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+
+    stopGeneration(applications)
+
+    while (history.height() < 3) {
+      application.blockStorage.appendBlock(genValidBlock())
+    }
+
+    startGeneration(applications)
   }
-  val last = history.lastBlock
+
+  def last = history.lastBlock
 
   test("GET /blocks/at/{height} API route") {
     val response = GET.request(s"/blocks/at/1")

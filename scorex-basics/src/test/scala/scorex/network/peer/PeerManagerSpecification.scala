@@ -29,6 +29,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
     override lazy val dataDirOpt: Option[String] = None
     override lazy val knownPeers: Seq[InetSocketAddress] = Seq(knownAddress)
     override lazy val nodeNonce: Long = 123456789
+    override lazy val maxConnections: Int = 10
   }
 
   trait App extends ApplicationMock {

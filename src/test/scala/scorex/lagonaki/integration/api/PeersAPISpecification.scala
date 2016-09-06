@@ -9,10 +9,10 @@ class PeersAPISpecification extends FunSuite with TestLock with Matchers {
 
   test("/peers/connected API route") {
     val connected = GET.request("/peers/connected")
-    val peersNumber = (connected \\ "address").toList.size // todo temporary test fix
-    (connected \\ "declaredAddress").toList.size shouldBe peersNumber
-    (connected \\ "peerName").toList.size shouldBe peersNumber
-    (connected \\ "peerNonce").toList.size shouldBe peersNumber
+    (connected \\ "address").toList.size should be >= 1
+    (connected \\ "declaredAddress").toList.size should be >= 1
+    (connected \\ "peerName").toList.size should be >= 1
+    (connected \\ "peerNonce").toList.size should be >= 1
   }
 
   test("/peers/all API route") {
@@ -25,7 +25,7 @@ class PeersAPISpecification extends FunSuite with TestLock with Matchers {
 
   test("/peers/blacklisted API route") {
     val blacklisted = GET.request("/peers/blacklisted")
-    blacklisted.asOpt[Seq[String]].isDefined shouldBe true
+    blacklisted.as[Seq[String]] shouldBe empty
   }
 
   test("/peers/connect API route") {

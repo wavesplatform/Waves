@@ -1,23 +1,17 @@
 package scorex.lagonaki.integration
 
-import akka.pattern.ask
-import akka.util.Timeout
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PublicKeyAccount
-import scorex.consensus.mining.BlockGeneratorController._
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
 import scorex.transaction.BalanceSheet
 import scorex.utils.{ScorexLogging, untilTimeout}
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class ValidChainGenerationSpecification extends FunSuite with TestLock with Matchers with ScorexLogging
 with TransactionTestingCommons {
 
   import TestingCommons._
-
-  implicit val timeout = Timeout(1.second)
 
   implicit override lazy val transactionModule = application.transactionModule
   implicit override lazy val consensusModule = application.consensusModule
@@ -67,7 +61,7 @@ with TransactionTestingCommons {
     waitGenerationOfBlocks(1)
 
     val block = untilTimeout(3.minute) {
-      stopGeneration()
+      stopGenerationForAllPeers()
       transactionModule.clearIncorrectTransactions()
       val toGen = transactionModule.utxStorage.sizeLimit - transactionModule.utxStorage.all().size
       (0 until toGen) foreach (i => genValidTransaction())
@@ -79,7 +73,7 @@ with TransactionTestingCommons {
     block.isValid shouldBe true
     block.transactions.nonEmpty shouldBe true
 
-    startGeneration()
+    startGenerationForAllPeers()
 
   }
 
@@ -100,7 +94,7 @@ with TransactionTestingCommons {
       (incl, h)
     }
 
-    stopGeneration()
+    stopGenerationForAllPeers()
     cleanTransactionPool()
 
     incl.foreach(tx => transactionModule.utxStorage.putIfNew(tx))
@@ -108,7 +102,7 @@ with TransactionTestingCommons {
     val tx = genValidTransaction(randomAmnt = false)
     transactionModule.utxStorage.all().size shouldBe incl.size + 1
 
-    applications.foreach(_.blockGenerator ! StartGeneration)
+    startGeneration(applications)
 
     waitGenerationOfBlocks(2)
 
@@ -124,7 +118,7 @@ with TransactionTestingCommons {
     val recepient = new PublicKeyAccount(Array.empty)
     val (trans, valid) = untilTimeout(5.seconds) {
       cleanTransactionPool()
-      stopGeneration()
+      stopGenerationForAllPeers()
       accounts.map(a => state.asInstanceOf[BalanceSheet].balance(a)).exists(_ > 2) shouldBe true
       val trans = accounts.flatMap { a =>
         val senderBalance = state.asInstanceOf[BalanceSheet].balance(a)
@@ -147,7 +141,7 @@ with TransactionTestingCommons {
     accounts.foreach(a => state.asInstanceOf[BalanceSheet].balance(a) should be >= 0L)
     trans.exists(tx => state.included(tx).isDefined) shouldBe true // Some of transactions should be included in state
     trans.forall(tx => state.included(tx).isDefined) shouldBe false // But some should not
-    startGeneration()
+    startGenerationForAllPeers()
   }
 
   ignore("Rollback state") {
@@ -170,7 +164,7 @@ with TransactionTestingCommons {
       waitGenerationOfBlocks(0)
 
       if (peers.forall(p => p.history.contains(last))) {
-        stopGeneration()
+        stopGenerationForAllPeers()
         peers.foreach { p =>
           p.transactionModule.blockStorage.removeAfter(last.uniqueId)
         }
@@ -179,7 +173,7 @@ with TransactionTestingCommons {
           p.history.lastBlock.encodedId shouldBe last.encodedId
         }
         state.hash shouldBe st1
-        startGeneration()
+        startGenerationForAllPeers()
       } else {
         require(i > 0, "History should contain last block at least sometimes")
         log.warn("History do not contains last block")
@@ -189,18 +183,13 @@ with TransactionTestingCommons {
     rollback()
   }
 
-  def startGeneration(): Unit = {
-    peers.foreach(_.blockGenerator ! StartGeneration)
+  private def startGenerationForAllPeers() = {
+    log.info("Stop generation for all peers")
+    startGeneration(peers)
   }
 
-  def stopGeneration(): Unit = {
+  private def stopGenerationForAllPeers() = {
     log.info("Stop generation for all peers")
-    peers.foreach(_.blockGenerator ! StopGeneration)
-    untilTimeout(5.seconds) {
-      peers.foreach { p =>
-        Await.result(p.blockGenerator ? GetStatus, timeout.duration) shouldBe Idle.name
-      }
-    }
-
+    stopGeneration(peers)
   }
 }
