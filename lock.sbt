@@ -39,9 +39,9 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe.play" % "play-functional_2.11" % "2.4.8",
   "com.typesafe.play" % "play-iteratees_2.11" % "2.4.8",
   "com.typesafe.play" % "play-json_2.11" % "2.4.8",
-  "com.wavesplatform" % "scorex-basics_2.11" % "1.3.5-SNAPSHOT",
-  "com.wavesplatform" % "scorex-consensus_2.11" % "1.3.5-SNAPSHOT",
-  "com.wavesplatform" % "scorex-transaction_2.11" % "1.3.5-SNAPSHOT",
+  "com.wavesplatform" % "scorex-basics_2.11" % "1.3.5",
+  "com.wavesplatform" % "scorex-consensus_2.11" % "1.3.5",
+  "com.wavesplatform" % "scorex-transaction_2.11" % "1.3.5",
   "commons-net" % "commons-net" % "3.5",
   "io.netty" % "netty" % "3.10.0.Final",
   "io.spray" % "spray-json_2.11" % "1.3.2",
@@ -79,4 +79,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.12"
 )
-// LIBRARY_DEPENDENCIES_HASH 82d5a53af12aeca724cd9499ed46b52c713e4c6a
+// LIBRARY_DEPENDENCIES_HASH b5f3f16e55555056fdce27ac146f8b8ab31e591e
