@@ -86,20 +86,17 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     utxStorage.putIfNew(tx, isValid)
   }
 
-  override def packUnconfirmed(): StoredInBlock = synchronized {
+  override def packUnconfirmed(heightOpt: Option[Int]): StoredInBlock = synchronized {
     clearIncorrectTransactions()
 
     val txs = utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock)
-    val valid = blockStorage.state.validate(txs)
+    val valid = blockStorage.state.validate(txs, heightOpt)
 
     if (valid.size != txs.size) {
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
     }
 
-    if (!blockStorage.state.isValid(valid, None)) {
-      log.error("Transactions validation error, PLEASE CONTACT DEVELOPERS")
-      Seq.empty
-    } else valid
+    valid
   }
 
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = synchronized {

@@ -21,7 +21,7 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   def putUnconfirmedIfNew(tx: Transaction): Boolean
 
-  def packUnconfirmed(): TransactionBlockData
+  def packUnconfirmed(heightOpt: Option[Int] = None): TransactionBlockData
 
   def clearFromUnconfirmed(data: TransactionBlockData): Unit
 

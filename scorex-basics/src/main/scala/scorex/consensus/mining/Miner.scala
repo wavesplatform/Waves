@@ -56,11 +56,10 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       application.coordinator ! AddBlock(bestBlock, None)
       true
     } else false
-  }.recoverWith {
-    case ex =>
-      log.error(s"Failed to generate new block: ${ex.getMessage}")
-      Failure(ex)
-  }.getOrElse(false)
+  } recoverWith { case e =>
+      log.warn(s"Failed to generate new block: ${e.getMessage}")
+      Failure(e)
+  } getOrElse false
 
   protected def preciseTime: Long = NTP.correctedTime()
 
@@ -81,7 +80,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       log.info(s"Next block generation will start in $blockGenerationDelay")
       setSchedule(Seq(blockGenerationDelay))
     } else {
-      val firstN = 7
+      val firstN = 3
       log.info(s"Block generation schedule: ${schedule.take(firstN).mkString(", ")}...")
       setSchedule(schedule)
     }

@@ -4,8 +4,7 @@ import akka.actor.Actor
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.consensus.mining.BlockGeneratorController.StartGeneration
-import scorex.consensus.mining.Miner.GuessABlock
+import scorex.consensus.mining.BlockGeneratorController.{LastBlockChanged, StartGeneration}
 import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetStatus}
 import scorex.network.NetworkController.SendToNetwork
@@ -122,7 +121,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     if (isBlockToBeAdded) {
       log.info(s"New block(local: $local): ${newBlock.json}")
       if (processNewBlock(newBlock)) {
-        application.blockGenerator ! GuessABlock(rescheduleImmediately = true)
+        application.blockGenerator ! LastBlockChanged
         if (local) {
           networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(newBlock), None), Broadcast)
         } else {
@@ -136,8 +135,6 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   }
 
   private def processFork(lastCommonBlockId: BlockId, blocks: Iterator[Block], from: Option[ConnectedPeer]): Unit = {
-    val initialScore = history.score()
-
     application.blockStorage.removeAfter(lastCommonBlockId)
 
     blocks.find(!processNewBlock(_)).foreach { failedBlock =>
@@ -148,9 +145,6 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     }
 
     self ! BroadcastCurrentScore
-
-    val finalScore = history.score()
-    if (finalScore < initialScore) log.warn(s"Final score ($finalScore) is less than initial ($initialScore)")
   }
 
   private def processNewBlock(block: Block): Boolean = Try {
@@ -165,19 +159,22 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
             s"""Block ${block.encodedId} appended:
             (height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})""")
           true
-        case Failure(e) =>
-          e.printStackTrace()
-          log.warn(s"failed to append block: $e")
-          false
+        case Failure(e) => throw e
       }
     } else {
-      log.warn(s"Invalid new block: ${
-        if (log.logger.isDebugEnabled) block.json
-        else encode(block.uniqueId) + ", parent " + encode(block.referenceField.value)}")
-
+      log.warn(s"Invalid new block: ${str(block)}")
       false
     }
-  }.getOrElse(false)
+  } recoverWith { case e =>
+    e.printStackTrace()
+    log.warn(s"Failed to append new block ${str(block)}: $e")
+    Failure(e)
+  } getOrElse false
+
+  private def str(block: Block) = {
+    if (log.logger.isDebugEnabled) block.json
+    else encode(block.uniqueId) + ", parent " + encode(block.referenceField.value)
+  }
 }
 
 object Coordinator {

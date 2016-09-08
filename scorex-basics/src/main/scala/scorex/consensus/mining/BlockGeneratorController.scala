@@ -2,7 +2,6 @@ package scorex.consensus.mining
 
 import akka.actor._
 import scorex.app.Application
-import scorex.consensus.mining.BlockGeneratorController._
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.utils.ScorexLogging
 
@@ -13,10 +12,13 @@ import scala.language.postfixOps
 class BlockGeneratorController(application: Application) extends Actor with ScorexLogging {
 
   import Miner.{GuessABlock, Stop}
+  import BlockGeneratorController._
 
   private var workers: Seq[ActorRef] = Seq.empty
 
   context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
+
+  override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   override def receive: Receive = idle
 
@@ -35,7 +37,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
     case ConnectedPeers(_) =>
 
-    case GuessABlock(_) =>
+    case LastBlockChanged =>
   }
 
   def generating(active: Boolean = true): Receive = state {
@@ -66,10 +68,10 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
         }
       }
 
-    case blockGenerationRequest @ GuessABlock(_) =>
+    case LastBlockChanged =>
       if (active) {
         log.info(s"Enforce miners to generate block: $workers")
-        workers.foreach(_ ! blockGenerationRequest)
+        workers.foreach { _ ! GuessABlock(rescheduleImmediately = true) }
       }
   }
 
@@ -127,6 +129,8 @@ object BlockGeneratorController {
   case object StartGeneration
 
   case object StopGeneration
+
+  case object LastBlockChanged
 
   private[mining] case object SelfCheck
 
