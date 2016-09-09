@@ -125,7 +125,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
           self ! BroadcastCurrentScore
         }
       } else {
-        // TODO: blacklist here
+        from.foreach(_.blacklist())
         log.warn(s"Can't apply single block, local=$local: ${newBlock.json}")
       }
     }
