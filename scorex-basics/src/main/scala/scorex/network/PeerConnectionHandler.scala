@@ -36,6 +36,8 @@ case class PeerConnectionHandler(application: RunnableApplication,
   private val timeout = context.system.scheduler.scheduleOnce(
     application.settings.connectionTimeout seconds, self, HandshakeTimeout)
 
+  connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
+
   context watch connection
 
   override def postStop(): Unit = {

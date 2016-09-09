@@ -132,7 +132,6 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
     case c@Connected(remote, local) =>
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
-      connection ! Register(handler, keepOpenOnPeerClosed = false, useResumeWriting = true)
       peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress)
 
     case CommandFailed(c: Connect) =>
