@@ -37,15 +37,10 @@ class Miner(application: Application) extends Actor with ScorexLogging {
         scheduleBlockGeneration()
       }
 
-    case Stop =>
-      cancel()
-      context stop self
+    case Stop => context stop self
   }
 
-  private def cancel(): Unit = {
-    currentState.toSeq.flatten.foreach(_.cancel())
-    currentState = None
-  }
+  override def postStop(): Unit = { cancel() }
 
   private def tryToGenerateABlock(): Boolean = Try {
     log.info("Trying to generate a new block")
@@ -86,6 +81,11 @@ class Miner(application: Application) extends Actor with ScorexLogging {
     }
 
     currentState = Some(tasks)
+  }
+
+  private def cancel(): Unit = {
+    currentState.toSeq.flatten.foreach(_.cancel())
+    currentState = None
   }
 
   private def setSchedule(schedule: Seq[FiniteDuration]): Seq[Cancellable] = {

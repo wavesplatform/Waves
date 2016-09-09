@@ -82,9 +82,6 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       case BroadcastCurrentScore =>
         val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
-
-      // the signal to initialize
-      case Unit =>
     }
   }
 
@@ -105,7 +102,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
         val cmp = application.consensusModule.blockOrdering
         if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
-          log.debug(s"The coming block ${newBlock.json} is better than last ${lastBlock.json}")
+          log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
         }
 
         false

@@ -30,7 +30,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   private implicit val timeout = Timeout(5.seconds)
 
   private lazy val settings = application.settings
-  private lazy val peerManager = application.peerManager
+  private val peerManager = application.peerManager
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 

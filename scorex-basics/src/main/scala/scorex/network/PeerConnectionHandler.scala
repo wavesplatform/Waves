@@ -45,7 +45,10 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
   override def receive: Receive = state(CommunicationState.AwaitingHandshake) {
     case h: Handshake =>
-      connection ! Write(ByteString(h.bytes))
+      connection ! Write(ByteString(h.bytes), Ack)
+      log.debug(s"Handshake msg has been sent to $remote")
+
+    case Ack =>
       log.info(s"Handshake sent to $remote")
       handshakeSent = true
       self ! HandshakeCheck
@@ -58,7 +61,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
           handshakeGot = true
           self ! HandshakeCheck
         case Failure(e) =>
-          log.warn(s"Error during parsing a handshake from $remote", e)
+          log.warn(s"Error during parsing a handshake from $remote: ${e.getMessage}")
           context stop self
       }
 

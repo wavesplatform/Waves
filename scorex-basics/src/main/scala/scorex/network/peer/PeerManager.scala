@@ -37,7 +37,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private lazy val settings = application.settings
   private lazy val networkController = application.networkController
 
-  private lazy val peerDatabase = new PeerDatabaseImpl(settings, settings.dataDirOpt.map(f => f + "/peers.dat"))
+  private val peerDatabase = new PeerDatabaseImpl(settings, settings.dataDirOpt.map(f => f + "/peers.dat"))
 
   private val visitPeersInterval = application.settings.peersDataResidenceTime / 10
   context.system.scheduler.schedule(visitPeersInterval, visitPeersInterval, self, MarkConnectedPeersVisited)

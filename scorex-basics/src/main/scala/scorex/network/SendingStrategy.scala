@@ -3,8 +3,6 @@ package scorex.network
 import scala.util.Random
 
 trait SendingStrategy {
-  type ConnectedPeers = Seq[(Long, _)]
-
   def choose[T](connectedPeers: Seq[(Long, T)]): Seq[(Long, T)]
 }
 

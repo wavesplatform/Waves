@@ -118,9 +118,13 @@ class MinerSpecification extends ActorTestingCommons {
         setExpectations(1, Some(calculatedGenDelay))
 
         "stop" in {
+          setBlockGenExpectations(Seq(newBlock), maybe = true)
+
           actorRef ! GuessABlock(false)
           Thread sleep genTimeShift.toMillis
+
           actorRef ! Stop
+
           testCoordinator.expectNoMsg(calculatedGenDelay + genTimeShift)
         }
 
