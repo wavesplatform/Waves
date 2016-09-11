@@ -46,8 +46,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def peerCycle: Receive = {
     case Connected(remote, handlerRef, ownSocketAddress) =>
-      if (peerDatabase.isBlacklisted(remote)) {
-        log.info(s"Got incoming connection from blacklisted $remote")
+      if (isBlacklisted(remote)) {
+        log.warn(s"Got incoming connection from blacklisted $remote")
         handlerRef ! CloseConnection
       } else if (connectedPeers.size >= settings.maxConnections && connectingPeer != Option(remote)) {
         log.info(s"Number of connections exceeded ${settings.maxConnections}, disconnect $remote")
@@ -57,9 +57,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       }
 
     case Handshaked(address, handshake) =>
-      if (peerDatabase.isBlacklisted(address)) {
-        log.info(s"Got handshake from blacklisted $address")
-        connectedPeers(address).handlerRef ! CloseConnection
+      if (isBlacklisted(address)) {
+        log.warn(s"Got handshake from blacklisted $address")
+        connectedPeers.get(address).foreach(_.handlerRef ! CloseConnection)
       } else {
         handleHandshake(address, handshake)
       }
@@ -70,6 +70,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case Disconnected(remote) => disconnect(remote)
   }
+
+  private def isBlacklisted(address: InetSocketAddress): Boolean =
+    peerDatabase.blacklistedPeers.contains(address.getHostName)
 
   private def getConnectedPeers = connectedPeers
     .filter(_._2.handshake.isDefined)
@@ -87,11 +90,13 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     case GetConnections => sender() ! connectedPeers.keys.toSeq
 
     case GetRandomPeers(howMany, excludeSelf) =>
-      sender() ! Random.shuffle(peerDatabase.knownPeers(excludeSelf).keys.toSeq).take(howMany)
+      val dbPeers = peerDatabase.knownPeers(excludeSelf).keySet
+      val intersection = connectedPeers.keySet.intersect(dbPeers)
+      sender() ! Random.shuffle(intersection.toSeq).take(howMany)
 
     case GetAllPeers => sender() ! peerDatabase.knownPeers(true)
 
-    case GetBlacklistedPeers => sender() ! peerDatabase.blacklisted
+    case GetBlacklistedPeers => sender() ! peerDatabase.blacklistedPeers
   }
 
   private def handleNewConnection(remote: InetSocketAddress,
@@ -118,8 +123,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def randomPeer(): Option[(InetSocketAddress, PeerInfo)] = {
     val peers = peerDatabase.knownPeers(true).toSeq
-    if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size)))
-    else None
+    if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size))) else None
   }
 
   private def sendDataToNetwork(message: Message[_], sendingStrategy: SendingStrategy): Unit = {
@@ -213,7 +217,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       (nonces.get(nodeNonce) + address).foreach {
         addr =>
           log.info(s"Blacklist peer $addr")
-          peerDatabase.blacklist(addr)
+          peerDatabase.blacklistPeer(addr)
           connectedPeers.get(addr).foreach(_.handlerRef ! CloseConnection)
       }
   }

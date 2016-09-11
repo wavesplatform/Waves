@@ -139,7 +139,7 @@ trait Settings extends ScorexLogging {
   lazy val genesisTimestamp: Long = (settingsJSON \ "genesisTimestamp").asOpt[Long].getOrElse(DefaultGenesisTimestamp)
 
   //NETWORK
-  private val DefaultMaxConnections = 20
+  private val DefaultMaxConnections = 30
   private val DefaultConnectionTimeout = 60
   private val DefaultBindAddress = "127.0.0.1"
 

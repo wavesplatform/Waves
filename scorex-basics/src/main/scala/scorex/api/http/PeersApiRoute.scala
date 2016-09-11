@@ -114,9 +114,9 @@ case class PeersApiRoute(application: RunnableApplication)(implicit val context:
   def blacklistedPeers: Route = path("blacklisted") {
     getJsonRoute {
       (application.peerManager ? PeerManager.GetBlacklistedPeers)
-        .mapTo[Map[InetSocketAddress, PeerInfo]]
+        .mapTo[Set[String]]
         .map { peers =>
-          JsonResponse(JsArray(peers.map(i => JsString(i._1.getHostName + ":" + i._1.getPort)).toSeq), StatusCodes.OK)
+          JsonResponse(JsArray(peers.map(JsString).toSeq), StatusCodes.OK)
         }
     }
   }
