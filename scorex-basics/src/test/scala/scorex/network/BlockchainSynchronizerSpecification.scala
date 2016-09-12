@@ -84,7 +84,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   private def reasonableTimeInterval = (TestSettings.historySynchronizerTimeout.toMillis / 2) millis
 
   private def validateStatus(status: Status): Unit = {
-    actorRef ! GetStatus
+    actorRef ! GetSyncStatus
     expectMsg(status)
   }
 

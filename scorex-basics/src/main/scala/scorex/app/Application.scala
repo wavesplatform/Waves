@@ -42,3 +42,8 @@ trait Application {
 
   val wallet: Wallet
 }
+
+object Application {
+  case object GetBlockGenerationStatus
+  case object GetStatus
+}

@@ -182,11 +182,9 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     //combine specific logic with common for all the states
 
     ignoreFor(stopFilter) orElse logic orElse {
-      case GetStatus =>
-        sender() ! status
+      case GetSyncStatus => sender() ! status
 
-      case BlockFromPeer(block, peer) =>
-        coordinator ! AddBlock(block, Some(peer))
+      case BlockFromPeer(block, peer) => coordinator ! AddBlock(block, Some(peer))
 
       case SignaturesFromPeer(_, _) =>
 
@@ -341,7 +339,7 @@ object BlockchainSynchronizer {
     override val name = "idle"
   }
 
-  case object GetStatus
+  case object GetSyncStatus
 
   case class GetExtension(peerScores: Map[ConnectedPeer, BlockchainScore])
 

@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
+import scorex.app.Application.GetBlockGenerationStatus
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.SettingsMock
@@ -32,7 +33,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
   override protected val actorRef = system.actorOf(Props(classOf[BlockGeneratorController], stub[App]))
 
   private def assertStatusIs(status: BlockGeneratorController.Status) = {
-    actorRef ! GetStatus
+    actorRef ! GetBlockGenerationStatus
     expectMsg(status.name)
   }
 

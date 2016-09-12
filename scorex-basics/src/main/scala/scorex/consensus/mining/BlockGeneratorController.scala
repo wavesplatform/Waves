@@ -11,8 +11,9 @@ import scala.language.postfixOps
 
 class BlockGeneratorController(application: Application) extends Actor with ScorexLogging {
 
-  import Miner.{GuessABlock, Stop}
+  import Application.GetBlockGenerationStatus
   import BlockGeneratorController._
+  import Miner.{GuessABlock, Stop}
 
   private var workers: Seq[ActorRef] = Seq.empty
 
@@ -24,7 +25,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   def idle: Receive = state {
 
-    case GetStatus => sender() ! Idle.name
+    case GetBlockGenerationStatus => sender() ! Idle.name
 
     case StartGeneration =>
       log.info("Start block generation")
@@ -42,7 +43,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   def generating(active: Boolean = true): Receive = state {
 
-    case GetStatus => sender() ! (if (active) Generating else Suspended).name
+    case GetBlockGenerationStatus => sender() ! (if (active) Generating else Suspended).name
 
     case StartGeneration => if (active) self ! SelfCheck
 
@@ -53,20 +54,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       context.become(idle)
       stopWorkers()
 
-    case ConnectedPeers(peers) =>
-      if (generationAllowed(peers)) {
-        startWorkers()
-        if (!active) {
-          log.info(s"Resume block generation")
-          context become generating(active = true)
-        }
-      } else {
-        stopWorkers()
-        if (active) {
-          log.info(s"Suspend block generation")
-          context become generating(active = false)
-        }
-      }
+    case ConnectedPeers(peers) => changeStateAccordingTo(peers.size, active)
 
     case LastBlockChanged =>
       if (active) {
@@ -74,6 +62,21 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
         workers.foreach { _ ! GuessABlock(rescheduleImmediately = true) }
       }
   }
+
+  private def changeStateAccordingTo(peersNumber: Int, active: Boolean): Unit =
+    if (peersNumber >= application.settings.quorum || application.settings.offlineGeneration) {
+      startWorkers()
+      if (!active) {
+        log.info(s"Resume block generation")
+        context become generating(active = true)
+      }
+    } else {
+      stopWorkers()
+      if (active) {
+        log.info(s"Suspend block generation")
+        context become generating(active = false)
+      }
+    }
 
   private def startWorkers() = {
     log.info(s"Check ${workers.size} miners")
@@ -95,9 +98,6 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
       case m => log.info(s"Unhandled $m")
     }
-
-  private def generationAllowed(peers: Seq[_]) =
-    peers.size >= application.settings.quorum || application.settings.offlineGeneration
 
   private def newWorkers(count: Int): Seq[ActorRef] =  1 to count map { i =>
     context.watch(context.actorOf(Props(classOf[Miner], application), s"Worker-${System.currentTimeMillis()}-$i"))
@@ -123,8 +123,6 @@ object BlockGeneratorController {
   case object Suspended extends Status {
     override val name = "suspended"
   }
-
-  case object GetStatus
 
   case object StartGeneration
 

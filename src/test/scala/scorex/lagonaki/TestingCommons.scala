@@ -8,7 +8,8 @@ import com.ning.http.client.Response
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.api.http.ApiKeyNotValid
-import scorex.consensus.mining.BlockGeneratorController.{GetStatus, Idle, StartGeneration, StopGeneration}
+import scorex.app.Application.GetBlockGenerationStatus
+import scorex.consensus.mining.BlockGeneratorController.{Idle, StartGeneration, StopGeneration}
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.TransactionSettings
 import scorex.utils._
@@ -73,7 +74,7 @@ object TestingCommons {
     nodes.foreach(_.blockGenerator ! StopGeneration)
     untilTimeout(5.seconds) {
       nodes.foreach { p =>
-        require(Await.result(p.blockGenerator ? GetStatus, timeout.duration) == Idle.name)
+        require(Await.result(p.blockGenerator ? GetBlockGenerationStatus, timeout.duration) == Idle.name)
       }
     }
   }

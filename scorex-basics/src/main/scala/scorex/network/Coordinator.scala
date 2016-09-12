@@ -1,12 +1,15 @@
 package scorex.network
 
 import akka.actor.Actor
+import akka.pattern.{ask, pipe}
+import akka.util.Timeout
 import scorex.app.Application
+import scorex.app.Application.GetStatus
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.mining.BlockGeneratorController.{LastBlockChanged, StartGeneration}
 import scorex.crypto.encode.Base58.encode
-import scorex.network.BlockchainSynchronizer.{GetExtension, GetStatus}
+import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus, Status}
 import scorex.network.NetworkController.SendToNetwork
 import scorex.network.ScoreObserver.{CurrentScore, GetScore}
 import scorex.network.message.Message
@@ -16,6 +19,7 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
 
@@ -75,7 +79,15 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     logic orElse {
       case GetCoordinatorStatus => sender() ! status
 
-      case request @ GetStatus => blockchainSynchronizer forward request
+      case GetStatus =>
+        implicit val timeout = Timeout(5 seconds)
+        (blockchainSynchronizer ? GetSyncStatus).mapTo[Status]
+          .map { syncStatus =>
+            if (syncStatus == BlockchainSynchronizer.Idle && status == CIdle)
+              CIdle.name
+            else
+              s"${status.name} (${syncStatus.name})" }
+          .pipeTo(sender())
 
       case AddBlock(block, from) => processSingleBlock(block, from)
 

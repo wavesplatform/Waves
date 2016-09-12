@@ -6,8 +6,9 @@ import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
+import scorex.app.Application.GetStatus
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
-import scorex.network.BlockchainSynchronizer.{GetExtension, GetStatus, GettingBlocks}
+import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus}
 import scorex.network.ScoreObserver.CurrentScore
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.SettingsMock
@@ -44,16 +45,23 @@ class CoordinatorSpecification extends ActorTestingCommons {
 
   private def getStatus = Await.result((actorRef ? GetCoordinatorStatus).mapTo[CoordinatorStatus], testDuration)
 
+  private def withSyncStatus(syncStatus: BlockchainSynchronizer.Status): String = {
+    val future = actorRef ? GetStatus
+
+    testBlockchainSynchronizer.expectMsg(GetSyncStatus)
+    testBlockchainSynchronizer.reply(syncStatus)
+
+    Await.result(future.mapTo[String], testDuration)
+  }
+
   testSafely {
+    "status" in {
+      withSyncStatus(BlockchainSynchronizer.Idle) shouldBe CIdle.name
 
-    "returns its status" in {
-
-      val future = actorRef ? GetStatus
-
-      testBlockchainSynchronizer.expectMsg(GetStatus)
-      testBlockchainSynchronizer.reply(GettingBlocks)
-
-      Await.result(future.mapTo[BlockchainSynchronizer.Status], testDuration) should be(GettingBlocks)
+      val syncStatus = BlockchainSynchronizer.GettingBlocks
+      val status = withSyncStatus(syncStatus)
+      status should include (CIdle.name)
+      status should include (syncStatus.name)
     }
 
     "starts in synced state with blocks generation" in {
@@ -61,7 +69,6 @@ class CoordinatorSpecification extends ActorTestingCommons {
     }
 
     "sync" - {
-
       getStatus shouldEqual CIdle
 
       val connectedPeer = stub[ConnectedPeer]
@@ -78,7 +85,13 @@ class CoordinatorSpecification extends ActorTestingCommons {
 
         testBlockchainSynchronizer.expectMsg(GetExtension(Map(connectedPeer -> score)))
 
-        getStatus shouldEqual CSyncing
+        val expectedStatus = CSyncing
+        getStatus shouldEqual expectedStatus
+
+        val syncStatus = BlockchainSynchronizer.GettingExtension
+        val status = withSyncStatus(syncStatus)
+        status should include (expectedStatus.name)
+        status should include (syncStatus.name)
       }
 
       "no connected peers == no sync" in {

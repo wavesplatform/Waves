@@ -89,8 +89,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case GetConnections => sender() ! connectedPeers.keys.toSeq
 
-    case GetRandomPeers(howMany, excludeSelf) =>
-      val dbPeers = peerDatabase.knownPeers(excludeSelf).keySet
+    case GetRandomPeersToBroadcast(howMany) =>
+      val dbPeers = peerDatabase.knownPeers(excludeSelf = true).keySet
       val intersection = dbPeers.intersect(handshakedPeers)
       sender() ! Random.shuffle(intersection.toSeq).take(howMany)
 
@@ -219,8 +219,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def randomPeer: Option[InetSocketAddress] = {
     val knownPeers = peerDatabase.knownPeers(true).keySet
-    val candidates = knownPeers.diff(handshakedPeers.union(connectedPeers.keySet)).toSeq
-    if (candidates.nonEmpty) Some(candidates(Random.nextInt(candidates.size))) else None
+    val candidates = knownPeers.diff(handshakedPeers.union(connectedPeers.keySet))
+    if (candidates.nonEmpty) Some(candidates.toSeq(Random.nextInt(candidates.size))) else None
   }
 
   private def handshakedPeers = nonces.values.toSet
@@ -258,7 +258,7 @@ object PeerManager {
 
   case object GetAllPeers
 
-  case class GetRandomPeers(howMany: Int, excludeSelf: Boolean = true)
+  case class GetRandomPeersToBroadcast(howMany: Int)
 
   case object GetBlacklistedPeers
 

@@ -252,7 +252,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
       connect(new InetSocketAddress(56099), 56099)
 
-      val peers = Await.result((actorRef ? GetRandomPeers(3)).mapTo[Seq[InetSocketAddress]], testDuration)
+      val peers = Await.result((actorRef ? GetRandomPeersToBroadcast(3)).mapTo[Seq[InetSocketAddress]], testDuration)
 
       peers should have size 1
       peers.head shouldBe addr
