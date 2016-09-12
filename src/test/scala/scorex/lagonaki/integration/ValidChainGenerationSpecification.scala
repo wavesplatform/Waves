@@ -1,11 +1,15 @@
 package scorex.lagonaki.integration
 
+import akka.pattern.ask
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PublicKeyAccount
+import scorex.lagonaki.server.LagonakiApplication
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
+import scorex.network.peer.PeerManager.GetBlacklistedPeers
 import scorex.transaction.BalanceSheet
 import scorex.utils.{ScorexLogging, untilTimeout}
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class ValidChainGenerationSpecification extends FunSuite with TestLock with Matchers with ScorexLogging
@@ -37,6 +41,11 @@ with TransactionTestingCommons {
     transactionModule.utxStorage.all().size shouldBe 0
   }
 
+  private def blacklistedPeersFor(app: LagonakiApplication) =
+    Await.result((app.peerManager ? GetBlacklistedPeers).mapTo[Set[String]], timeout.duration)
+
+  private def checkBlacklists() = applications.foreach { app => assert(blacklistedPeersFor(app).isEmpty)}
+
   test("generate 13 blocks and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(acc => app.consensusModule.generatingBalance(acc)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
@@ -45,10 +54,11 @@ with TransactionTestingCommons {
     waitGenerationOfBlocks(13)
 
     val last = peers.head.blockStorage.history.lastBlock
-    untilTimeout(5.minutes, 10.seconds) {
+    untilTimeout(5.minutes, 10.seconds, { checkBlacklists() }) {
       peers.head.blockStorage.history.contains(last) shouldBe true
     }
   }
+
 
   ignore("Generate block with plenty of transactions") {
     applications.tail.foreach { app =>
@@ -74,9 +84,7 @@ with TransactionTestingCommons {
     block.transactions.nonEmpty shouldBe true
 
     startGenerationForAllPeers()
-
   }
-
 
   ignore("Don't include same transactions twice") {
     //Wait until all peers contain transactions

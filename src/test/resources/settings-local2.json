@@ -2,6 +2,7 @@
   "p2p": {
     "nodeName": "Node2",
     "localOnly": true,
+    "myAddress": "127.0.0.1",
     "bindAddress": "127.0.0.1",
     "upnp": false,
     "upnpGatewayTimeout": 7000,

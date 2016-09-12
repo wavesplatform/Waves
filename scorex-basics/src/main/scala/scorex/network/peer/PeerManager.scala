@@ -91,7 +91,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case GetRandomPeers(howMany, excludeSelf) =>
       val dbPeers = peerDatabase.knownPeers(excludeSelf).keySet
-      val intersection = connectedPeers.keySet.intersect(dbPeers)
+      val intersection = dbPeers.intersect(handshakedPeers)
       sender() ! Random.shuffle(intersection.toSeq).take(howMany)
 
     case GetAllPeers => sender() ! peerDatabase.knownPeers(true)
@@ -119,11 +119,6 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     } else {
       log.info(s"Got incoming connection from $remote")
     }
-  }
-
-  private def randomPeer(): Option[(InetSocketAddress, PeerInfo)] = {
-    val peers = peerDatabase.knownPeers(true).toSeq
-    if (peers.nonEmpty) Some(peers(Random.nextInt(peers.size))) else None
   }
 
   private def sendDataToNetwork(message: Message[_], sendingStrategy: SendingStrategy): Unit = {
@@ -222,17 +217,21 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       }
   }
 
+  private def randomPeer: Option[InetSocketAddress] = {
+    val knownPeers = peerDatabase.knownPeers(true).keySet
+    val candidates = knownPeers.diff(handshakedPeers.union(connectedPeers.keySet)).toSeq
+    if (candidates.nonEmpty) Some(candidates(Random.nextInt(candidates.size))) else None
+  }
+
   private def handshakedPeers = nonces.values.toSet
 
   override def receive: Receive = ({
     case CheckPeers =>
       if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
-        randomPeer().foreach { case (address, _) =>
-          if ( ! (handshakedPeers.contains(address) || connectedPeers.keys.contains(address)) ) {
-            log.debug(s"Trying connect to random peer $address")
-            connectingPeer = Some(address)
-            networkController ! NetworkController.ConnectTo(address)
-          }
+        randomPeer.foreach { address =>
+          log.debug(s"Trying connect to random peer $address")
+          connectingPeer = Some(address)
+          networkController ! NetworkController.ConnectTo(address)
         }
       }
 
