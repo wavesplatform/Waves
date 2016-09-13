@@ -95,6 +95,8 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       case BroadcastCurrentScore =>
         val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
+
+      case ConnectedPeers(_) =>
     }
   }
 
