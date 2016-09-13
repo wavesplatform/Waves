@@ -113,8 +113,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   }
 
 
-  override def balanceWithConfirmations(account: Account, confirmations: Int): Long =
-    balance(account, Some(Math.max(1, stateHeight - confirmations)))
+  override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
+    balance(account, Some(Math.max(1, heightOpt.getOrElse(stateHeight) - confirmations)))
 
   private def balanceByAddress(address: String, atHeight: Option[Int] = None): Long = {
     Option(lastStates.get(address)) match {

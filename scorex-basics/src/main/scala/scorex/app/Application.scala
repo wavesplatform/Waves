@@ -16,10 +16,9 @@ trait Application {
   implicit val consensusModule: ConsensusModule[_]
   implicit val transactionModule: TransactionModule[_]
 
-  def applicationName: String
+  val applicationName: String
 
-  //redefine it as lazy val
-  def appVersion: ApplicationVersion
+  val appVersion: ApplicationVersion
 
   val basicMessagesSpecsRepo: BasicMessagesRepo
 
@@ -42,4 +41,9 @@ trait Application {
   val settings: Settings
 
   val wallet: Wallet
+}
+
+object Application {
+  case object GetBlockGenerationStatus
+  case object GetStatus
 }

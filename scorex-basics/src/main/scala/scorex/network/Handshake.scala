@@ -62,6 +62,8 @@ object Handshake extends ScorexLogging with Deser[Handshake] {
     val nonce = Longs.fromByteArray(bytes.slice(position, position + 8))
     position += 8
 
+    log.trace(s"Incoming handshake: $an $av $nodeName $nonce")
+
     val fas = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
 

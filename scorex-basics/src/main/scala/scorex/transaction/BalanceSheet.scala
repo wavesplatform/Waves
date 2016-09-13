@@ -8,7 +8,7 @@ trait BalanceSheet {
 
   /**
    *
-   * @return Minimum balance from current block to balance confirmation blocks ago
+   * @return Minimum balance from block at height "<code>heightOpt</code>" to "<code>confirmation</code>" blocks ago
    */
-  def balanceWithConfirmations(account: Account, confirmations: Int): Long
+  def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
 }

@@ -9,7 +9,6 @@ import scorex.transaction.{LagonakiTransaction, Transaction, TransactionModule, 
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 
 
 /**
@@ -21,30 +20,26 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
   extends ViewSynchronizer with ScorexLogging {
 
   override val messageSpecs = Seq(TransactionMessageSpec)
-  override val networkControllerRef = networkController
+  protected override lazy val networkControllerRef = networkController
 
   private val rndBroadcastInterval = settings.utxRebroadcastInterval
 
-  override def preStart: Unit = {
-    super.preStart()
-    context.system.scheduler.schedule(2.second, rndBroadcastInterval, self, BroadcastRandom)
-  }
+  context.system.scheduler.schedule(rndBroadcastInterval, rndBroadcastInterval, self, BroadcastRandom)
 
   override def receive: Receive = {
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
-      (tx, transactionModule.isValid(tx)) match {
-        case (ltx: LagonakiTransaction, true) => if (transactionModule.putUnconfirmedIfNew(ltx)) broadcastExceptOf(ltx, remote)
-        case (atx, false) => log.error(s"Transaction $atx is not valid")
+      tx match {
+        case ltx: LagonakiTransaction => if (transactionModule.putUnconfirmedIfNew(ltx)) broadcastExceptOf(ltx, remote)
         case m => log.error(s"Got unexpected transaction: $m")
       }
-    case BroadcastRandom => {
-      val txs = transactionModule.unconfirmedTxs()
-      if (!txs.isEmpty) {
+
+    case BroadcastRandom =>
+      val txs = transactionModule.unconfirmedTxs
+      if (txs.nonEmpty) {
         val rndTx = txs.toList(scala.util.Random.nextInt(txs.size))
         broadcast(rndTx)
       }
-    }
   }
 
   /**

@@ -80,38 +80,48 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   override def transactions(block: Block): StoredInBlock =
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
-  override def packUnconfirmed(): StoredInBlock = {
-    clearIncorrectTransactions()
-    utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock)
+  override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
+
+  override def putUnconfirmedIfNew(tx: Transaction): Boolean = synchronized {
+    utxStorage.putIfNew(tx, isValid)
   }
 
-  //todo: check: clear unconfirmed txs on receiving a block
-  override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
+  override def packUnconfirmed(heightOpt: Option[Int]): StoredInBlock = synchronized {
+    clearIncorrectTransactions()
+
+    val txs = utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock)
+    val valid = blockStorage.state.validate(txs, heightOpt)
+
+    if (valid.size != txs.size) {
+      log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
+    }
+
+    valid
+  }
+
+  override def clearFromUnconfirmed(data: StoredInBlock): Unit = synchronized {
     data.foreach(tx => utxStorage.getBySignature(tx.signature) match {
       case Some(unconfirmedTx) => utxStorage.remove(unconfirmedTx)
       case None =>
     })
 
-    clearIncorrectTransactions()
+    clearIncorrectTransactions() // todo makes sence to remove expired only at this point
   }
 
   /**
     * Removes too old or invalid transactions from UnconfirmedTransactionsPool
     */
   def clearIncorrectTransactions(): Unit = {
-    val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-
+    val currentTime = NTP.correctedTime()
     val txs = utxStorage.all()
-    val notExpired = txs.filter { tx =>
-      (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
-    }
+    val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeForUnconfirmed }
     val valid = blockStorage.state.validate(notExpired)
     // remove non valid or expired from storage
-    txs.diff(valid).foreach(tx => utxStorage.remove(tx))
+    txs.diff(valid).foreach(utxStorage.remove)
   }
 
   override def onNewOffchainTransaction(transaction: Transaction): Unit =
-    if (utxStorage.putIfNew(transaction)) {
+    if (putUnconfirmedIfNew(transaction)) {
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(transaction), None)
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
@@ -154,13 +164,15 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   override def isValid(tx: Transaction): Boolean = {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     val notExpired = (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
-    notExpired && super.isValid(tx)
+    notExpired && blockStorage.state.isValid(tx)
   }
 
   override def isValid(block: Block): Boolean = {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-    lazy val txsAreNew = block.transactions.forall(tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff)
+    lazy val txsAreNew = block.transactions.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
     lazy val blockIsValid = blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
+    if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
+    if (!blockIsValid) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs")
     txsAreNew && blockIsValid
   }
 }

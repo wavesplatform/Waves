@@ -1,20 +1,25 @@
 package scorex.network
 
 import akka.actor.Actor
+import akka.pattern.{ask, pipe}
+import akka.util.Timeout
 import scorex.app.Application
+import scorex.app.Application.GetStatus
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.consensus.mining.BlockGeneratorController.StartGeneration
-import scorex.consensus.mining.Miner.GuessABlock
+import scorex.consensus.mining.BlockGeneratorController.{LastBlockChanged, StartGeneration}
 import scorex.crypto.encode.Base58.encode
-import scorex.network.BlockchainSynchronizer.{GetExtension, GetStatus}
+import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus, Status}
 import scorex.network.NetworkController.SendToNetwork
-import scorex.network.ScoreObserver.{ConsideredValue, GetScore}
+import scorex.network.ScoreObserver.{CurrentScore, GetScore}
 import scorex.network.message.Message
+import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
+import scorex.transaction.History.BlockchainScore
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
 
@@ -23,42 +28,45 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
   import Coordinator._
   import application.basicMessagesSpecsRepo._
 
-  private lazy val scoreObserver = application.scoreObserver
   private lazy val blockchainSynchronizer = application.blockchainSynchronizer
-  private lazy val blockGenerator = application.blockGenerator
   private lazy val networkControllerRef = application.networkController
 
   private lazy val history = application.history
 
-  private val forkResolveQuorumSize = application.settings.forkResolveQuorumSize
-
   context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, BroadcastCurrentScore)
 
-  blockGenerator ! StartGeneration
+  application.blockGenerator ! StartGeneration
 
   override def receive: Receive = idle
 
   private def idle: Receive = state(CIdle) {
-    case ConsideredValue(candidates) =>
+    case CurrentScore(candidates) =>
       val localScore = history.score()
 
-      val peers = candidates.filter(_._2 > localScore)
+      val betterScorePeers = candidates.filter(_._2 > localScore)
 
-      if (peers.isEmpty) {
+      if (betterScorePeers.isEmpty) {
         log.trace(s"No peers to sync with, local score: $localScore")
-      } else if (peers.size < forkResolveQuorumSize) {
-        log.debug(s"Quorum to download fork is not reached: ${peers.size} peers but should be $forkResolveQuorumSize")
       } else {
-        log.info(s"min networkScore=${peers.minBy(_._2)} > localScore=$localScore")
-        blockchainSynchronizer ! GetExtension(peers.toMap)
-        context become syncing
+        log.info(s"min networkScore=${betterScorePeers.minBy(_._2)} > localScore=$localScore")
+        application.peerManager ! GetConnectedPeersTyped
+        context become syncing(betterScorePeers.toMap)
       }
   }
 
-  private def syncing: Receive = state(CSyncing) {
+  private def syncing(peerScores: Map[ConnectedPeer, BlockchainScore]): Receive = state(CSyncing) {
+    case ConnectedPeers(peers) =>
+      val quorumSize = application.settings.quorum
+      if (peers.size < quorumSize) {
+        log.debug(s"Quorum to download blocks is not reached: ${peers.size} peers but should be $quorumSize")
+        context become idle
+      } else {
+        blockchainSynchronizer ! GetExtension(peerScores)
+      }
+
     case SyncFinished(_, result) =>
       context become idle
-      scoreObserver ! GetScore
+      application.scoreObserver ! GetScore
 
       result foreach {
         case (lastCommonBlockId, blocks, from) =>
@@ -71,16 +79,21 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     logic orElse {
       case GetCoordinatorStatus => sender() ! status
 
-      case request @ GetStatus => blockchainSynchronizer forward request
+      case GetStatus =>
+        implicit val timeout = Timeout(5 seconds)
+        (blockchainSynchronizer ? GetSyncStatus).mapTo[Status]
+          .map { syncStatus =>
+            if (syncStatus == BlockchainSynchronizer.Idle && status == CIdle)
+              CIdle.name
+            else
+              s"${status.name} (${syncStatus.name})" }
+          .pipeTo(sender())
 
       case AddBlock(block, from) => processSingleBlock(block, from)
 
       case BroadcastCurrentScore =>
         val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
-
-      // the signal to initialize
-      case Unit =>
     }
   }
 
@@ -101,7 +114,7 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
         val cmp = application.consensusModule.blockOrdering
         if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
-          log.debug(s"The coming block ${newBlock.json} is better than last ${lastBlock.json}")
+          log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
         }
 
         false
@@ -117,22 +130,20 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     if (isBlockToBeAdded) {
       log.info(s"New block(local: $local): ${newBlock.json}")
       if (processNewBlock(newBlock)) {
-        blockGenerator ! GuessABlock(rescheduleImmediately = true)
+        application.blockGenerator ! LastBlockChanged
         if (local) {
           networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(newBlock), None), Broadcast)
         } else {
           self ! BroadcastCurrentScore
         }
       } else {
-        // TODO: blacklist here
+        from.foreach(_.blacklist())
         log.warn(s"Can't apply single block, local=$local: ${newBlock.json}")
       }
     }
   }
 
   private def processFork(lastCommonBlockId: BlockId, blocks: Iterator[Block], from: Option[ConnectedPeer]): Unit = {
-    val initialScore = history.score()
-
     application.blockStorage.removeAfter(lastCommonBlockId)
 
     blocks.find(!processNewBlock(_)).foreach { failedBlock =>
@@ -143,9 +154,6 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
     }
 
     self ! BroadcastCurrentScore
-
-    val finalScore = history.score()
-    if (finalScore < initialScore) log.warn(s"Final score ($finalScore) is less than initial ($initialScore)")
   }
 
   private def processNewBlock(block: Block): Boolean = Try {
@@ -160,19 +168,22 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
             s"""Block ${block.encodedId} appended:
             (height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})""")
           true
-        case Failure(e) =>
-          e.printStackTrace()
-          log.warn(s"failed to append block: $e")
-          false
+        case Failure(e) => throw e
       }
     } else {
-      log.warn(s"Invalid new block: ${
-        if (log.logger.isDebugEnabled) block.json
-        else encode(block.uniqueId) + ", parent " + encode(block.referenceField.value)}")
-
+      log.warn(s"Invalid new block: ${str(block)}")
       false
     }
-  }.getOrElse(false)
+  } recoverWith { case e =>
+    e.printStackTrace()
+    log.warn(s"Failed to append new block ${str(block)}: $e")
+    Failure(e)
+  } getOrElse false
+
+  private def str(block: Block) = {
+    if (log.logger.isDebugEnabled) block.json
+    else encode(block.uniqueId) + ", parent " + encode(block.referenceField.value)
+  }
 }
 
 object Coordinator {

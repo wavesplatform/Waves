@@ -132,7 +132,7 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   def balance: Route = {
     path("balance" / Segment) { case address =>
       getJsonRoute {
-        balanceJson(address, 1)
+        balanceJson(address, 0)
       }
     }
   }

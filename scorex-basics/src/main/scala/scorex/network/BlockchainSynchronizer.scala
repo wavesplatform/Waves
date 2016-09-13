@@ -31,10 +31,10 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
   private lazy val history = application.history
 
   private lazy val timeout = application.settings.historySynchronizerTimeout
-  private lazy val forkMaxLength = application.settings.forkMaxLength
+  private lazy val maxChainLength = application.settings.maxChain
   private lazy val operationRetries = application.settings.operationRetries
   private lazy val pinToInitialPeer = application.settings.pinToInitialPeer
-  private lazy val partialBlockLoading = !application.settings.loadEntireForkChunk
+  private lazy val partialBlockLoading = !application.settings.loadEntireChain
 
   private var timeoutData = Option.empty[Cancellable]
 
@@ -68,17 +68,17 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
             log.debug(s"All blockIds are already in the local blockchain: $blockIds")
             finish(withEmptyResult)
 
-          case Some((commonBlockId, tail)) if requestedIds.contains(commonBlockId) =>
-            implicit val peerSet = PeerSet(
-              connectedPeer,
-              if (pinToInitialPeer) peers.filterKeys(_ == connectedPeer) else peers,
-              connectedPeer)
-
-            gotoGettingExtensionTail(GettingExtension, DownloadInfo(commonBlockId), tail)
-
-          case Some((commonBlockId, _)) =>
-            blacklistPeer(s"Block id: $commonBlockId has not been requested", connectedPeer)
-            finishUnsuccessfully()
+          case Some((commonBlockId, tail)) =>
+            if (requestedIds.contains(commonBlockId)) {
+              implicit val peerSet = PeerSet(
+                connectedPeer,
+                if (pinToInitialPeer) peers.filterKeys(_ == connectedPeer) else peers,
+                connectedPeer)
+              gotoGettingExtensionTail(GettingExtension, DownloadInfo(commonBlockId), tail)
+            } else {
+              log.warn(s"Block id: $commonBlockId has not been requested, peer: $connectedPeer")
+              finish(SyncFinished.unsuccessfully)
+            }
         }
     }
 
@@ -88,12 +88,12 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     val blockIdsToDownload = downloadInfo.blockIds ++ tail
 
     val noMoreBlockIds = tail.isEmpty
-    if (blockIdsToDownload.size >= forkMaxLength || noMoreBlockIds || tail.size == 1) {
-      val fork = blockIdsToDownload.take(forkMaxLength)
+    if (blockIdsToDownload.size >= maxChainLength || noMoreBlockIds || tail.size == 1) {
+      val fork = blockIdsToDownload.take(maxChainLength)
 
       fork.find(id => history.contains(id.blockId)) match {
         case Some(suspiciousBlockId) =>
-          blacklistPeer(s"Suspicious block id: $suspiciousBlockId among blocks to be downloaded", activePeer)
+          blacklistPeer(s"Existing block id: $suspiciousBlockId among blocks to be downloaded", activePeer)
           finishUnsuccessfully()
 
         case None =>
@@ -133,7 +133,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         } else if (tail.indexOf(overlap.last) == 0) {
           gotoGettingExtensionTail(GettingExtensionTail, downloadInfo, tail.tail)(updatedPeersData)
         } else if (tail.lastOption.exists(downloadInfo.blockIds.contains)) {
-          log.warn(s"Tail blockIds have been already recieved - possible msg duplication: $tail")
+          log.warn(s"Tail blockIds have been already received - possible msg duplication: $tail")
         } else {
           blacklistPeer(s"Tail does not correspond to the overlap $overlap: $tail", connectedPeer)
           finishUnsuccessfully()
@@ -161,7 +161,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
           val currentScore = history.score()
           val forkScore = forkStorage.cumulativeBlockScore
 
-          val author = Some(connectedPeer).filterNot(_ => peers.activeChanged)
+          val author = Some(connectedPeer).filter(_ => ! peers.activeChanged)
 
           val allBlocksAreLoaded = forkStorage.noIdsWithoutBlock
 
@@ -170,14 +170,11 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
               finish(SyncFinished(success = true, Some(lastCommonBlockId, forkStorage.blocksInOrder, author)))
             }
           } else if (allBlocksAreLoaded) {
-            author.foreach {
-              blacklistPeer("All blocks are loaded, but still not enough score", _)
-            }
+            // blacklisting in case of lesser score can be false-positive due to race condition
+            log.warn(s"All blocks are loaded, but still not enough score, peer: $author")
             finish(SyncFinished.unsuccessfully)
           }
-
         }
-
     }
   }
 
@@ -185,11 +182,9 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     //combine specific logic with common for all the states
 
     ignoreFor(stopFilter) orElse logic orElse {
-      case GetStatus =>
-        sender() ! status
+      case GetSyncStatus => sender() ! status
 
-      case BlockFromPeer(block, peer) =>
-        coordinator ! AddBlock(block, Some(peer))
+      case BlockFromPeer(block, peer) => coordinator ! AddBlock(block, Some(peer))
 
       case SignaturesFromPeer(_, _) =>
 
@@ -197,9 +192,6 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         if (timeoutData.exists(!_.isCancelled)) handleTimeout(t)
 
       case GetExtension(_) => // ignore if not idle
-
-      // the signal to initialize
-      case Unit =>
 
       case nonsense: Any =>
         log.warn(s"Got something strange in ${status.name}: $nonsense")
@@ -347,7 +339,7 @@ object BlockchainSynchronizer {
     override val name = "idle"
   }
 
-  case object GetStatus
+  case object GetSyncStatus
 
   case class GetExtension(peerScores: Map[ConnectedPeer, BlockchainScore])
 
@@ -380,6 +372,6 @@ object BlockchainSynchronizer {
   private case class Peer(score: BlockchainScore, retries: Int = 0)
   private type Peers = Map[ConnectedPeer, Peer]
   private case class PeerSet(active: ConnectedPeer, peers: Peers, initiallyActive: ConnectedPeer) {
-    def activeChanged = active != initiallyActive
+    def activeChanged: Boolean = active != initiallyActive
   }
 }

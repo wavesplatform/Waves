@@ -37,13 +37,10 @@ class Miner(application: Application) extends Actor with ScorexLogging {
         scheduleBlockGeneration()
       }
 
-    case Stop => cancel()
+    case Stop => context stop self
   }
 
-  private def cancel(): Unit = {
-    currentState.toSeq.flatten.foreach(_.cancel())
-    currentState = None
-  }
+  override def postStop(): Unit = { cancel() }
 
   private def tryToGenerateABlock(): Boolean = Try {
     log.info("Trying to generate a new block")
@@ -54,11 +51,10 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       application.coordinator ! AddBlock(bestBlock, None)
       true
     } else false
-  }.recoverWith {
-    case ex =>
-      log.error(s"Failed to generate new block: ${ex.getMessage}")
-      Failure(ex)
-  }.getOrElse(false)
+  } recoverWith { case e =>
+      log.warn(s"Failed to generate new block: ${e.getMessage}")
+      Failure(e)
+  } getOrElse false
 
   protected def preciseTime: Long = NTP.correctedTime()
 
@@ -79,7 +75,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       log.info(s"Next block generation will start in $blockGenerationDelay")
       setSchedule(Seq(blockGenerationDelay))
     } else {
-      val firstN = 7
+      val firstN = 3
       log.info(s"Block generation schedule: ${schedule.take(firstN).mkString(", ")}...")
       setSchedule(schedule)
     }
@@ -87,9 +83,16 @@ class Miner(application: Application) extends Actor with ScorexLogging {
     currentState = Some(tasks)
   }
 
+  private def cancel(): Unit = {
+    currentState.toSeq.flatten.foreach(_.cancel())
+    currentState = None
+  }
+
   private def setSchedule(schedule: Seq[FiniteDuration]): Seq[Cancellable] = {
+    val repeatIfNotDeliveredInterval = 10 seconds
     val systemScheduler = context.system.scheduler
-    schedule.map { t => systemScheduler.schedule(t, FailedGenerationDelay, self, GenerateBlock) }
+
+    schedule.map { t => systemScheduler.schedule(t, repeatIfNotDeliveredInterval, self, GenerateBlock) }
   }
 }
 
@@ -102,8 +105,6 @@ object Miner {
   private case object GenerateBlock
 
   private[mining] val BlockGenerationTimeShift = 1 second
-
-  private[mining] val FailedGenerationDelay = 10 seconds
 
   private[mining] val MaxBlockGenerationDelay = 1 hour
 }

@@ -12,9 +12,11 @@ import scorex.network.PeerConnectionHandler.CloseConnection
 import scorex.network._
 import scorex.network.message.Message
 import scorex.network.message.MessageHandler.RawNetworkData
+import scorex.network.peer.PeerManager.Connected
 import scorex.settings.SettingsMock
 
 import scala.concurrent.Await
+import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.postfixOps
 import scala.util.Left
 
@@ -29,22 +31,26 @@ class PeerManagerSpecification extends ActorTestingCommons {
     override lazy val dataDirOpt: Option[String] = None
     override lazy val knownPeers: Seq[InetSocketAddress] = Seq(knownAddress)
     override lazy val nodeNonce: Long = 123456789
+    override lazy val maxConnections: Int = 10
+    override lazy val peersDataResidenceTime: FiniteDuration = 100 seconds
+    override lazy val blacklistResidenceTimeMilliseconds: Long = 1000
   }
 
   trait App extends ApplicationMock {
     override lazy val settings = TestSettings
+    override val applicationName: String = "test"
+    override val appVersion: ApplicationVersion = ApplicationVersion(7, 7, 7)
   }
 
   private val app = stub[App]
-
-  app.applicationName _ when() returns "test"
-  app.appVersion _ when() returns ApplicationVersion(0, 2, 3)
 
   import app.basicMessagesSpecsRepo._
 
   protected override val actorRef = system.actorOf(Props(classOf[PeerManager], app))
 
   testSafely {
+
+    val nonce = 777
 
     val peerConnectionHandler = TestProbe("connection-handler")
 
@@ -58,16 +64,46 @@ class PeerManagerSpecification extends ActorTestingCommons {
       Await.result((actorRef ? GetConnectedPeers).mapTo[Seq[(InetSocketAddress, Handshake)]], testDuration)
 
     def getBlacklistedPeers =
-      Await.result((actorRef ? GetBlacklistedPeers).mapTo[Map[InetSocketAddress, PeerInfo]], testDuration)
+      Await.result((actorRef ? GetBlacklistedPeers).mapTo[Set[String]], testDuration)
 
     def getActiveConnections =
       Await.result((actorRef ? GetConnections).mapTo[Seq[InetSocketAddress]], testDuration)
 
     val anAddress = new InetSocketAddress(hostname, knownAddress.getPort + 1)
 
-    "peer cycle" - {
-      val nonce = 777
+    "blacklisting" in {
+      actorRef ! CheckPeers
+      networkController.expectMsg(NetworkController.ConnectTo(knownAddress))
+      connect(knownAddress, nonce)
 
+      actorRef ! AddToBlacklist(nonce, knownAddress)
+      peerConnectionHandler.expectMsg(CloseConnection)
+
+      actorRef ! Disconnected(knownAddress)
+      getActiveConnections shouldBe empty
+
+      val t = (TestSettings.blacklistResidenceTimeMilliseconds / 2) millis
+
+      actorRef ! CheckPeers
+
+      networkController.expectNoMsg(t)
+
+      val anotherAddress = new InetSocketAddress(knownAddress.getHostName, knownAddress.getPort + 1)
+      val anotherPeerHandler = TestProbe("connection-handler-2")
+
+      actorRef ! Connected(anotherAddress, anotherPeerHandler.ref, null)
+
+      anotherPeerHandler.expectMsg(CloseConnection)
+      anotherPeerHandler.expectNoMsg(t)
+
+      actorRef ! CheckPeers
+      networkController.expectMsg(NetworkController.ConnectTo(knownAddress))
+
+      actorRef ! Connected(anotherAddress, anotherPeerHandler.ref, null)
+      anotherPeerHandler.expectMsgType[Handshake]
+    }
+
+    "peer cycle" - {
       connect(anAddress, nonce)
 
       val connectedPeers = getConnectedPeers
@@ -139,16 +175,46 @@ class PeerManagerSpecification extends ActorTestingCommons {
         peerConnectionHandler.expectMsg(msg)
       }
 
-      "blacklisting" in {
-        // workaround for peer database bug
-        actorRef ! AddOrUpdatePeer(anAddress, None, None)
+      "add to blacklist" in {
+        actorRef ! AddToBlacklist(nonce, anAddress)
 
-        actorRef ! AddToBlacklist(nonce, new InetSocketAddress(9999))
+        getBlacklistedPeers should have size 1
 
-        peerConnectionHandler.expectMsg(CloseConnection)
+        actorRef ! AddToBlacklist(nonce + 1, new InetSocketAddress(anAddress.getHostName, anAddress.getPort + 1))
 
-        getBlacklistedPeers.size shouldBe 1
+        getBlacklistedPeers should have size 1
+        getBlacklistedPeers should contain (anAddress.getHostName)
       }
+    }
+
+    "connect to self is forbidden" in {
+      connect(new InetSocketAddress("localhost", 45980), TestSettings.nodeNonce)
+      peerConnectionHandler.expectMsg(CloseConnection)
+      getActiveConnections shouldBe empty
+    }
+
+    "many TCP clients with same nonce" in {
+
+      def connect(id: Int): TestProbe = {
+        val address = new InetSocketAddress(id)
+        val handler = TestProbe("connection-handler-" + id)
+        actorRef ! Connected(address, handler.ref, None)
+        handler.expectMsgType[Handshake]
+        actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
+        handler
+      }
+
+      val h1 = connect(1)
+      getConnectedPeers should have size 1
+
+      val h2 = connect(2)
+      h2.expectMsg(CloseConnection)
+      getConnectedPeers should have size 1
+
+      val h3 = connect(3)
+
+      h1.expectMsg(CloseConnection)
+      h3.expectMsg(CloseConnection)
     }
 
     "disconnect during handshake" in {
@@ -177,13 +243,19 @@ class PeerManagerSpecification extends ActorTestingCommons {
     }
 
     "get random peers" in {
+      actorRef ! AddOrUpdatePeer(new InetSocketAddress(99), None, None)
       actorRef ! AddOrUpdatePeer(new InetSocketAddress(100), Some(TestSettings.nodeNonce), None)
-      actorRef ! AddOrUpdatePeer(new InetSocketAddress(101), Some(1), None)
 
-      val peers = Await.result((actorRef ? GetRandomPeers(3)).mapTo[Seq[InetSocketAddress]], testDuration)
+      val addr = new InetSocketAddress(101)
+      actorRef ! AddOrUpdatePeer(addr, None, None)
+      connect(addr, 11)
 
-      peers.size shouldBe 2
-      peers.map(_.getPort) should not contain 100
+      connect(new InetSocketAddress(56099), 56099)
+
+      val peers = Await.result((actorRef ? GetRandomPeersToBroadcast(3)).mapTo[Seq[InetSocketAddress]], testDuration)
+
+      peers should have size 1
+      peers.head shouldBe addr
     }
 
     "blacklist nonconnected peer" in {

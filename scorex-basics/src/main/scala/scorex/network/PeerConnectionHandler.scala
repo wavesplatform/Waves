@@ -2,7 +2,7 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorRef, SupervisorStrategy}
+import akka.actor.{Actor, ActorRef, Terminated}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
@@ -21,6 +21,7 @@ import scala.util.{Failure, Success}
 case class PeerConnectionHandler(application: RunnableApplication,
                                  connection: ActorRef,
                                  remote: InetSocketAddress) extends Actor with Buffering with ScorexLogging {
+
   import PeerConnectionHandler._
 
   private lazy val peerManager = application.peerManager
@@ -35,21 +36,22 @@ case class PeerConnectionHandler(application: RunnableApplication,
   private val timeout = context.system.scheduler.scheduleOnce(
     application.settings.connectionTimeout seconds, self, HandshakeTimeout)
 
+  connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
+
   context watch connection
 
-  override def preStart: Unit = connection ! ResumeReading
-
-  override def postRestart(thr: Throwable): Unit = {
-    log.warn(s"Restart because of $thr.getMessage")
-    connection ! Close
+  override def postStop(): Unit = {
+    log.debug(s"Disconnected from $remote")
+    peerManager ! PeerManager.Disconnected(remote)
+    timeout.cancel()
   }
-
-  // there is not recovery for broken connections
-  override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   override def receive: Receive = state(CommunicationState.AwaitingHandshake) {
     case h: Handshake =>
-      connection ! Write(ByteString(h.bytes))
+      connection ! Write(ByteString(h.bytes), Ack)
+      log.debug(s"Handshake msg has been sent to $remote")
+
+    case Ack =>
       log.info(s"Handshake sent to $remote")
       handshakeSent = true
       self ! HandshakeCheck
@@ -59,32 +61,30 @@ case class PeerConnectionHandler(application: RunnableApplication,
         case Success(handshake) =>
           peerManager ! Handshaked(remote, handshake)
           log.info(s"Got a Handshake from $remote")
-          connection ! ResumeReading
           handshakeGot = true
           self ! HandshakeCheck
         case Failure(e) =>
-          log.warn(s"Error during parsing a handshake from $remote", e)
-          //todo: blacklist?
-          connection ! Close
+          log.warn(s"Error during parsing a handshake from $remote: ${e.getMessage}")
+          context stop self
       }
 
     case HandshakeTimeout =>
       log.warn(s"Handshake timeout for $remote")
-      connection ! Close
+      context stop self
 
     case HandshakeCheck =>
       if (handshakeGot && handshakeSent) {
         timeout.cancel()
-        connection ! ResumeReading
         context become workingCycle
       }
   }
 
   private def buffer(data: ByteString) = {
-    outboundBuffer :+= data
-    if (outboundBuffer.map(_.size).sum > outboundBufferSize) {
+    if (outboundBuffer.map(_.size).sum + outboundBuffer.size < outboundBufferSize) {
+      outboundBuffer :+= data
+    } else {
       log.warn(s"Drop connection to $remote : outbound buffer overrun")
-      connection ! Close
+      context stop self
     }
   }
 
@@ -155,14 +155,17 @@ case class PeerConnectionHandler(application: RunnableApplication,
       context become workingCycleWaitingWritingResumed
 
     case cc: ConnectionClosed =>
-      peerManager ! PeerManager.Disconnected(remote)
       val reason = if (cc.isErrorClosed) cc.getErrorCause else if (cc.isPeerClosed) "by remote" else s"${cc.isConfirmed} - ${cc.isAborted}"
       log.info(s"Connection closed to $remote: $reason in state $stateName")
       context stop self
 
+    case Terminated(terminatedActor) if terminatedActor == connection =>
+      log.info(s"Connection to $remote terminated")
+      context stop self
+
     case CloseConnection =>
-      log.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
-      connection ! Close
+      log.info(s"Enforced to close communication with: " + remote + s" in state $stateName")
+      context stop self
 
     case CommandFailed(cmd: Tcp.Command) =>
       log.warn("Failed to execute command : " + cmd + s" in state $stateName")
@@ -182,14 +185,10 @@ case class PeerConnectionHandler(application: RunnableApplication,
           false
 
         case Failure(e) =>
-          log.warn(s"Corrupted data from: " + remote, e)
-          //  connection ! Close
-          //  context stop self
+          log.error(s"Corrupted data from: " + remote, e)
           true
       }
     }
-
-    connection ! ResumeReading
   }
 }
 

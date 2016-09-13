@@ -113,7 +113,7 @@ class NxtConsensusApiRoute(application: RunnableApplication)(implicit val contex
   def algo: Route = {
     path("algo") {
       getJsonRoute {
-        JsonResponse(Json.obj("consensusAlgo" -> "nxt"), StatusCodes.OK)
+        JsonResponse(Json.obj("consensusAlgo" -> "proof-of-stake (PoS)"), StatusCodes.OK)
       }
     }
   }

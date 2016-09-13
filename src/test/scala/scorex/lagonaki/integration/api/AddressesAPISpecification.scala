@@ -10,11 +10,15 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
 
   import TestingCommons._
 
-  val wallet = application.wallet
-  if (wallet.privateKeyAccounts().size < 10) wallet.generateNewAccounts(10)
-  val account = accounts.head
-  val address = account.address
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
 
+    if (wallet.privateKeyAccounts().size < 10) wallet.generateNewAccounts(10)
+  }
+
+  def wallet = application.wallet
+  def account = accounts.head
+  def address = account.address
 
   test("/addresses/seq/{from}/{to} API route") {
     val responsed = GET.request("/addresses/seq/1/4").as[List[String]]
@@ -48,7 +52,7 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
   test("/addresses/balance/{address} API route") {
     val response = GET.request(s"/addresses/balance/$address")
     (response \ "address").as[String] shouldBe address
-    (response \ "confirmations").as[Int] shouldBe 1
+    (response \ "confirmations").as[Int] shouldBe 0
     (response \ "balance").as[Long] should be >= 0L
   }
 

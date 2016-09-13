@@ -54,7 +54,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     override lazy val retriesBeforeBlacklisted: Int = 0
     override lazy val operationRetries: Int = retriesBeforeBlacklisted + 13930975
     override lazy val pinToInitialPeer: Boolean = true
-    override lazy val loadEntireForkChunk: Boolean = entireForkLoad()
+    override lazy val loadEntireChain: Boolean = entireForkLoad()
   }
 
   private val blockScore = BigInt(100)
@@ -69,7 +69,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     private val testBlockStorage = mock[BlockStorage]
     testBlockStorage.blockSeq _ expects() returns new StoredBlockSeqMock anyNumberOfTimes
 
-    (consensusModule.blockScore(_: Block)).when(*).returns(blockScore)
+    consensusModule.blockScore _ when * returns blockScore
 
     override lazy val settings = TestSettings
     override lazy val coordinator: ActorRef = testCoordinator.ref
@@ -84,7 +84,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   private def reasonableTimeInterval = (TestSettings.historySynchronizerTimeout.toMillis / 2) millis
 
   private def validateStatus(status: Status): Unit = {
-    actorRef ! GetStatus
+    actorRef ! GetSyncStatus
     expectMsg(status)
   }
 
@@ -140,9 +140,11 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
       val notInTheHistoryBlockId = lastHistoryBlockId + 1
       val notRequestedBlockFromHistoryBeginning = 1
 
+      assertPeerNeverGotBlacklisted()
+
       sendSignatures(notRequestedBlockFromHistoryBeginning, notInTheHistoryBlockId)
 
-      assertThatPeerGotBlacklisted()
+      testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
     }
 
     "become idle on timeout in GettingExtension" in {
@@ -253,9 +255,11 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               "fork has lower score" in {
                 setHistoryScoreExpectations(1)
 
+                assertPeerNeverGotBlacklisted()
+
                 sendBlocks()
 
-                assertThatPeerGotBlacklisted()
+                testCoordinator.expectMsg(reasonableTimeInterval, SyncFinished.unsuccessfully)
 
                 validateStatus(Idle)
               }

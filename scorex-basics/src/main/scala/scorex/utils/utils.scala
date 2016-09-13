@@ -11,15 +11,18 @@ package object utils {
 
   @tailrec
   final def untilTimeout[T](timeout: FiniteDuration,
-                            delay: FiniteDuration = 100.milliseconds)(fn: => T): T = {
+                            delay: FiniteDuration = 100.milliseconds,
+                            onFailure: => Unit = {})(fn: => T): T = {
     Try {
       fn
     } match {
       case Success(x) => x
       case _ if timeout > delay =>
         Thread.sleep(delay.toMillis)
-        untilTimeout(timeout - delay, delay)(fn)
-      case Failure(e) => throw e
+        untilTimeout(timeout - delay, delay, onFailure)(fn)
+      case Failure(e) =>
+        onFailure
+        throw e
     }
   }
 

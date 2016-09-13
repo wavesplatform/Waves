@@ -25,7 +25,7 @@ class PeersAPISpecification extends FunSuite with TestLock with Matchers {
 
   test("/peers/blacklisted API route") {
     val blacklisted = GET.request("/peers/blacklisted")
-    blacklisted.asOpt[Seq[String]].isDefined shouldBe true
+    blacklisted.as[Seq[String]] shouldBe empty
   }
 
   test("/peers/connect API route") {
