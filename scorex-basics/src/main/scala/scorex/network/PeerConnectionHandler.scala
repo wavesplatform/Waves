@@ -43,6 +43,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
   override def postStop(): Unit = {
     log.debug(s"Disconnected from $remote")
     peerManager ! PeerManager.Disconnected(remote)
+    timeout.cancel()
   }
 
   override def receive: Receive = state(CommunicationState.AwaitingHandshake) {
