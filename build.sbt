@@ -12,7 +12,7 @@ scalaVersion := "2.11.8"
 
 resolvers += "SonaType" at "https://oss.sonatype.org/content/groups/public"
 
-val modulesVersion = "1.3.5-SNAPSHOT"
+val modulesVersion = "1.3.6-SNAPSHOT"
 
 libraryDependencies ++= Seq(
   "com.wavesplatform" %% "scorex-basics" % modulesVersion,

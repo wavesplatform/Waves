@@ -1,4 +1,4 @@
-# Waves [![Build Status](https://travis-ci.org/wavesplatform/Waves.svg?branch=master)](https://travis-ci.org/wavesplatform/Waves)
+# Waves [![Build Status](https://travis-ci.org/wavesplatform/Waves.svg?branch=master)](https://travis-ci.org/wavesplatform/Waves) [![](https://images.microbadger.com/badges/version/wavesplatform/waves-testnet.svg)](http://microbadger.com/images/wavesplatform/waves-testnet "Testnet Node Docker image")
 
 
 [How to configure Waves node](https://github.com/wavesplatform/Waves/wiki/How-to-configure-Waves-node)
@@ -61,5 +61,4 @@ For now it is only possible to create deb package.
 Compile code by typing `sbt recompile`
 
 Run a node with `java -jar target/scala-2.11/waves.jar settings.json` command
-
 

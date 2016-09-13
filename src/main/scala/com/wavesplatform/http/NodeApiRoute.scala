@@ -6,14 +6,13 @@ import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import com.wavesplatform.settings.Constants
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions, JsonResponse}
+import scorex.app.Application.{GetBlockGenerationStatus, GetStatus}
 import scorex.app.RunnableApplication
-import scorex.consensus.mining.BlockGeneratorController._
-import scorex.network.BlockchainSynchronizer
 import scorex.utils.ScorexLogging
-import com.wavesplatform.settings.Constants
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -55,11 +54,11 @@ case class NodeApiRoute(application: RunnableApplication)(implicit val context: 
   }
 
   @Path("/status")
-  @ApiOperation(value = "Status", notes = "Get status of the running core(Offline/Syncing/Generating)", httpMethod = "GET")
+  @ApiOperation(value = "Status", notes = "Get status of the running core", httpMethod = "GET")
   def status: Route = path("status") {
     getJsonRoute {
-      def bgf = (application.blockGenerator ? GetStatus).map(_.toString)
-      def hsf = (application.coordinator ? BlockchainSynchronizer.GetStatus).mapTo[BlockchainSynchronizer.Status].map(_.name)
+      def bgf = (application.blockGenerator ? GetBlockGenerationStatus).map(_.toString)
+      def hsf = (application.coordinator ? GetStatus).map(_.toString)
 
       Future.sequence(Seq(bgf, hsf)).map { statusesSeq =>
         val json = Json.obj(
