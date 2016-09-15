@@ -82,7 +82,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     val trans = block.transactions
     trans.foreach(t => if (included(t).isDefined) throw new Error(s"Transaction $t is already in state"))
     val fees: Map[Account, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
-      .map(m => m._1 ->(AccState(balance(m._1) + m._2), List(FeesStateChange(m._2))))
+      .map(m => m._1 -> (AccState(balance(m._1) + m._2), List(FeesStateChange(m._2))))
 
     val newBalances: Map[Account, (AccState, Reason)] = calcNewBalances(trans, fees)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
@@ -164,7 +164,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   @tailrec
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)
-    val txs = trans.filter(t => included(t).isEmpty && isValid(t, height))
+    val transactionsByTimestamp = trans.sortBy(_.timestamp)
+    val txs = transactionsByTimestamp.filter(t => included(t).isEmpty && isValid(t, height))
     val nb = calcNewBalances(txs, Map.empty)
     val negativeBalances: Map[Account, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
     val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
@@ -185,12 +186,19 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   private def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.signatureValid && tx.validate == ValidationResult.ValidateOke && this.included(tx, Some(height)).isEmpty
+      tx.signatureValid && tx.validate == ValidationResult.ValidateOke &&
+        this.included(tx, Some(height)).isEmpty && isTimestampCorrect(tx)
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>
       log.error(s"Wrong kind of tx: $otx")
       false
+  }
+
+  private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
+    val transactions = accountTransactions(tx.sender)
+    val senderTransactions = transactions.filter(_.creator.isDefined).filter(_.creator.get.address == tx.sender.address)
+    if (senderTransactions.nonEmpty) senderTransactions.last.timestamp < tx.timestamp else true
   }
 
   //for debugging purposes only
