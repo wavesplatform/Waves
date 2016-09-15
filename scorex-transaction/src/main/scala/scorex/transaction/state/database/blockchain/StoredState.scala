@@ -155,6 +155,26 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     }
   }
 
+  def lastAccountLagonakiTransaction(account: Account): Option[LagonakiTransaction] = {
+    def loop(h: Int, address: Address): Option[LagonakiTransaction] = {
+      val changes = accountChanges(address)
+      Option(changes.get(h)) match {
+        case Some(row) =>
+          val accountTransactions = row.reason.filter(_.isInstanceOf[LagonakiTransaction])
+            .map(_.asInstanceOf[LagonakiTransaction])
+            .filter(_.creator.isDefined).filter(_.creator.get.address == address)
+          if (accountTransactions.nonEmpty) Some(accountTransactions.sortBy(-_.timestamp).head)
+          else loop(row.lastRowHeight, address)
+        case _ => None
+      }
+    }
+
+    Option(lastStates.get(account.address)) match {
+      case Some(height) => loop(height, account.address)
+      case None => None
+    }
+  }
+
   override def included(signature: Array[Byte], heightOpt: Option[Int]): Option[Int] =
     Option(includedTx.get(signature)).filter(_ < heightOpt.getOrElse(Int.MaxValue))
 
@@ -196,9 +216,10 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   }
 
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
-    val transactions = accountTransactions(tx.sender)
-    val senderTransactions = transactions.filter(_.creator.isDefined).filter(_.creator.get.address == tx.sender.address)
-    if (senderTransactions.nonEmpty) senderTransactions.last.timestamp < tx.timestamp else true
+    lastAccountLagonakiTransaction(tx.sender) match {
+      case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
+      case None => true
+    }
   }
 
   //for debugging purposes only
