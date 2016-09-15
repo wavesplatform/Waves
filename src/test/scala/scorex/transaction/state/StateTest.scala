@@ -83,7 +83,7 @@ object StateTestSpec extends Commands {
       val forgedTransaction = new PaymentTransaction(transaction.sender, transaction.recipient, transaction.amount,
         transaction.fee, transaction.timestamp, forgeSignature(transaction.signature))
 
-      transactions :+ (forgedTransaction -> true) // forged transaction should be detected as already included in state
+      transactions :+ (forgedTransaction -> true) // forged transaction should be detected as already included in the state
     } else {
       (0 until MaxTransactions - i).map(j => (createTransaction(), false))
     }
@@ -166,7 +166,7 @@ object StateTestSpec extends Commands {
     def preCondition(state: State): Boolean = true
 
     override def postCondition(state: State, result: Try[Result]): Prop = {
-      txs.filter(_._2 == false).map(_._1) == result.get
+      txs.filter(_._2 == false).map(_._1).diff(result.get).isEmpty
     }
   }
 
