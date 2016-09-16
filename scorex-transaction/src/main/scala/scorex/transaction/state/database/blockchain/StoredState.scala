@@ -184,12 +184,17 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   @tailrec
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)
-    val transactionsByTimestamp = trans.sortBy(_.timestamp)
-    val txs = transactionsByTimestamp.filter(t => included(t).isEmpty && isValid(t, height))
-    val nb = calcNewBalances(txs, Map.empty)
+
+    val txs = trans.filter(t => included(t).isEmpty && isValid(t, height))
+
+    val invalidByTimestamp = invalidateTransactionsByTimestamp(txs)
+
+    val validByTimestampTransactions: Seq[Transaction] = excludeTransactions(txs, invalidByTimestamp)
+
+    val nb = calcNewBalances(validByTimestampTransactions, Map.empty)
     val negativeBalances: Map[Account, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
     val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
-      val accTransactions = trans.filter(_.isInstanceOf[PaymentTransaction]).map(_.asInstanceOf[PaymentTransaction])
+      val accTransactions = validByTimestampTransactions.filter(_.isInstanceOf[PaymentTransaction]).map(_.asInstanceOf[PaymentTransaction])
         .filter(_.sender.address == b._1.address)
       var sumBalance = b._2._1.balance
       accTransactions.sortBy(-_.amount).takeWhile { t =>
@@ -198,11 +203,43 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
         prevSum < 0
       }
     }
-    val validTransactions = txs.filter(t => !toRemove.exists(tr => tr.signature sameElements t.signature))
+    val validTransactions = excludeTransactions(validByTimestampTransactions, toRemove)
+
     if (validTransactions.size == txs.size) txs
     else if (validTransactions.nonEmpty) validate(validTransactions, heightOpt)
     else validTransactions
   }
+
+  private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
+    transactions.filter(t1 => !exclude.exists(t2 => t2.signature sameElements t1.signature))
+
+  private def invalidateTransactionsByTimestamp(transactions: Seq[Transaction]): Seq[Transaction] = {
+    val paymentTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
+      .map(_.asInstanceOf[PaymentTransaction])
+
+    val initialSelection: Map[String, (List[Transaction], Long)] = Map(paymentTransactions.map { payment =>
+      val address = payment.sender.address
+      val stateTimestamp = lastAccountLagonakiTransaction(payment.sender) match {
+        case Some(lastTransaction) => lastTransaction.timestamp
+        case _ => 0
+      }
+      address -> (List[Transaction](), stateTimestamp)
+    }: _*)
+
+    val orderedTransaction = paymentTransactions.sortBy(_.timestamp)
+    val selection: Map[String, (List[Transaction], Long)] = orderedTransaction.foldLeft(initialSelection) { (s, t) =>
+      val address = t.sender.address
+      val tuple = s(address)
+      if (t.timestamp > tuple._2) {
+        s.updated(address, (tuple._1, t.timestamp))
+      } else {
+        s.updated(address, (tuple._1 :+ t, tuple._2))
+      }
+    }
+
+    selection.foldLeft(List[Transaction]()) { (l, s) => l ++ s._2._1 }
+  }
+
 
   private def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
@@ -215,10 +252,16 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       false
   }
 
+  val TimestampCheckHeight = 130865
+
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
-    lastAccountLagonakiTransaction(tx.sender) match {
-      case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
-      case None => true
+    if (stateHeight < TimestampCheckHeight)
+      true
+    else {
+      lastAccountLagonakiTransaction(tx.sender) match {
+        case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
+        case None => true
+      }
     }
   }
 

@@ -1,19 +1,16 @@
 package scorex.lagonaki.integration
 
 import org.scalatest._
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount, Account}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.lagonaki.mocks.BlockMock
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
 import scorex.transaction.state.database.state.AccState
-import scorex.transaction.{BalanceSheet, FeesStateChange}
-import scorex.utils.ScorexLogging
-import scorex.utils._
-
-import scala.util.Random
+import scorex.transaction.{BalanceSheet, FeesStateChange, PaymentTransaction}
+import scorex.utils.{ScorexLogging, _}
 
 //TODO: Should be independed
 class StoredStateSpecification extends FunSuite with TestLock with Matchers with ScorexLogging
-with TransactionTestingCommons with PrivateMethodTester with OptionValues {
+  with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   import TestingCommons._
 
@@ -58,8 +55,6 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     state.balanceWithConfirmations(rec, 2) shouldBe 2L
     state.balanceWithConfirmations(rec, 4) shouldBe 2L
     state.balanceWithConfirmations(rec, 5) shouldBe 0L
-
-
   }
 
   test("private methods") {
@@ -68,11 +63,10 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     val applyMethod = PrivateMethod[Unit]('applyChanges)
     state.balance(testAcc) shouldBe 0
     val tx = transactionModule.createPayment(acc, testAcc, 1, 1)
-    state invokePrivate applyMethod(Map(testAdd ->(AccState(2L), Seq(FeesStateChange(1L), tx))))
+    state invokePrivate applyMethod(Map(testAdd -> (AccState(2L), Seq(FeesStateChange(1L), tx))))
     state.balance(testAcc) shouldBe 2
     state.included(tx).value shouldBe state.stateHeight
-    state invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq(tx))))
-
+    state invokePrivate applyMethod(Map(testAdd -> (AccState(0L), Seq(tx))))
   }
 
   test("validate single transaction") {
@@ -95,6 +89,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   test("validate plenty of transactions") {
     val trans = (1 to transactionModule.utxStorage.sizeLimit).map { i =>
+      Thread.sleep(1)
       genValidTransaction()
     }
     profile(state.validate(trans)) should be < 1000L
@@ -108,7 +103,6 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
     val newTx = genValidTransaction()
     state.included(newTx).isDefined shouldBe false
-
   }
 
   test("last transaction of account one block behind") {
@@ -149,6 +143,23 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     val result2 = state.lastAccountLagonakiTransaction(recipient)
     result2.isDefined shouldBe true
     result2.get shouldBe tx4
+  }
+
+  test("invalidate transaction with forged signature in sequence") {
+    val amount = state.asInstanceOf[BalanceSheet].balance(acc) / 1000
+    val transactions: Seq[PaymentTransaction] = (1 until 100).map { i =>
+      Thread.sleep(1)
+      PaymentTransaction(acc, recipient, amount, i, System.currentTimeMillis())
+    }
+    val transaction = transactions.head
+    val forgedSignature = forgeSignature(transaction.signature)
+    val forgetTransaction = PaymentTransaction(new PublicKeyAccount(transaction.sender.publicKey), transaction.recipient, transaction.amount,
+      transaction.fee, transaction.timestamp, forgedSignature)
+
+    val transactionsToValidate = transactions :+ forgetTransaction
+    val validTransactions = state.validate(transactionsToValidate)
+
+    validTransactions.size should be(transactionsToValidate.size - 1)
   }
 
 }
