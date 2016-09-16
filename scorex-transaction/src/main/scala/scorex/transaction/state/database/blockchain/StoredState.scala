@@ -252,10 +252,10 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       false
   }
 
-  val TimestampCheckHeight = 130865
+  val TimestampToCheck = 1474035253835L
 
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
-    if (stateHeight < TimestampCheckHeight)
+    if (tx.timestamp < TimestampToCheck)
       true
     else {
       lastAccountLagonakiTransaction(tx.sender) match {
