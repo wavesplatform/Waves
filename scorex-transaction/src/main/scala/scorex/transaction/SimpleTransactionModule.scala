@@ -133,10 +133,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     }
   }
 
+  private var txTime: Long = 0
   def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
-    val time = NTP.correctedTime()
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
-    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
+    txTime = Math.max(NTP.correctedTime(), txTime + 1)
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, txTime)
+    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, txTime, sig)
     if (isValid(payment)) onNewOffchainTransaction(payment)
     payment
   }

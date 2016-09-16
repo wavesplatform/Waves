@@ -109,7 +109,6 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   test("validate plenty of transactions") {
     val trans = (1 to transactionModule.utxStorage.sizeLimit).map { i =>
-      Thread.sleep(1)
       genValidTransaction()
     }
     profile(state.validate(trans)) should be < 1000L
