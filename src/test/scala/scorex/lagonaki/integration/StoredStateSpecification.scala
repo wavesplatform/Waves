@@ -142,16 +142,12 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   test("last transaction of account few blocks behind") {
     val amount = state.asInstanceOf[BalanceSheet].balance(acc) / 1000
     val tx1 = transactionModule.createPayment(acc, recipient, amount, 1)
-    Thread.sleep(3)
     val tx2 = transactionModule.createPayment(acc, recipient, amount, 2)
-    Thread.sleep(3)
-    val block1 = new BlockMock(Seq(tx1, tx2))
+    val block1 = new BlockMock(Seq(tx2, tx1))
     state.processBlock(block1)
 
     val tx3 = transactionModule.createPayment(recipient, acc, amount / 2, 3)
-    Thread.sleep(3)
     val tx4 = transactionModule.createPayment(recipient, acc, amount / 2, 4)
-    Thread.sleep(3)
     val block2 = new BlockMock(Seq(tx3, tx4))
     state.processBlock(block2)
 

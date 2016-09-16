@@ -162,7 +162,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
           val accountTransactions = row.reason.filter(_.isInstanceOf[LagonakiTransaction])
             .map(_.asInstanceOf[LagonakiTransaction])
             .filter(_.creator.isDefined).filter(_.creator.get.address == address)
-          if (accountTransactions.nonEmpty) Some(accountTransactions.sortBy(-_.timestamp).head)
+          if (accountTransactions.nonEmpty) Some(accountTransactions.maxBy(_.timestamp))
           else loop(row.lastRowHeight, address)
         case _ => None
       }
