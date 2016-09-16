@@ -80,7 +80,6 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   override def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactions
-    trans.foreach(t => if (included(t).isDefined) throw new Error(s"Transaction $t is already in state"))
     val fees: Map[Account, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
       .map(m => m._1 ->(AccState(balance(m._1) + m._2), List(FeesStateChange(m._2))))
 
@@ -247,8 +246,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   private def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.signatureValid && tx.validate == ValidationResult.ValidateOke &&
-        this.included(tx, Some(height)).isEmpty && isTimestampCorrect(tx)
+      tx.signatureValid && tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>
