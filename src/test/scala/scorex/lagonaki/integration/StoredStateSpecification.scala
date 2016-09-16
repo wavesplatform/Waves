@@ -10,7 +10,7 @@ import scorex.utils.{ScorexLogging, _}
 
 //TODO: Should be independed
 class StoredStateSpecification extends FunSuite with TestLock with Matchers with ScorexLogging
-  with TransactionTestingCommons with PrivateMethodTester with OptionValues {
+with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   import TestingCommons._
 
@@ -21,6 +21,26 @@ class StoredStateSpecification extends FunSuite with TestLock with Matchers with
   val acc = accounts.head
   val recipient = application.wallet.privateKeyAccounts().last
   require(acc.address != recipient.address)
+
+  test("invalidate transaction with forged signature in sequence") {
+    val amount = state.asInstanceOf[BalanceSheet].balance(acc) / 1000
+    val ts = System.currentTimeMillis()
+    val transactions: Seq[PaymentTransaction] = (1 until 100).map { i =>
+      PaymentTransaction(acc, recipient, amount, i, ts + i)
+    }
+    val txToForge = transactions.head
+    val forgedSignature = forgeSignature(txToForge.signature)
+    val forgedTransaction = PaymentTransaction(new PublicKeyAccount(txToForge.sender.publicKey), txToForge.recipient,
+      txToForge.amount, txToForge.fee, txToForge.timestamp, forgedSignature)
+
+    val transactionsToValidate = transactions :+ forgedTransaction
+    val validTransactions = state.validate(transactionsToValidate)
+
+    validTransactions.count(tx => (tx.signature sameElements txToForge.signature) ||
+      (tx.signature sameElements forgedTransaction.signature)) shouldBe 1
+    validTransactions.size should be(transactionsToValidate.size - 1)
+  }
+
 
   test("balance confirmations") {
     val rec = new PrivateKeyAccount(randomBytes())
@@ -63,10 +83,10 @@ class StoredStateSpecification extends FunSuite with TestLock with Matchers with
     val applyMethod = PrivateMethod[Unit]('applyChanges)
     state.balance(testAcc) shouldBe 0
     val tx = transactionModule.createPayment(acc, testAcc, 1, 1)
-    state invokePrivate applyMethod(Map(testAdd -> (AccState(2L), Seq(FeesStateChange(1L), tx))))
+    state invokePrivate applyMethod(Map(testAdd ->(AccState(2L), Seq(FeesStateChange(1L), tx))))
     state.balance(testAcc) shouldBe 2
     state.included(tx).value shouldBe state.stateHeight
-    state invokePrivate applyMethod(Map(testAdd -> (AccState(0L), Seq(tx))))
+    state invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq(tx))))
   }
 
   test("validate single transaction") {
@@ -143,23 +163,6 @@ class StoredStateSpecification extends FunSuite with TestLock with Matchers with
     val result2 = state.lastAccountLagonakiTransaction(recipient)
     result2.isDefined shouldBe true
     result2.get shouldBe tx4
-  }
-
-  test("invalidate transaction with forged signature in sequence") {
-    val amount = state.asInstanceOf[BalanceSheet].balance(acc) / 1000
-    val transactions: Seq[PaymentTransaction] = (1 until 100).map { i =>
-      Thread.sleep(1)
-      PaymentTransaction(acc, recipient, amount, i, System.currentTimeMillis())
-    }
-    val transaction = transactions.head
-    val forgedSignature = forgeSignature(transaction.signature)
-    val forgetTransaction = PaymentTransaction(new PublicKeyAccount(transaction.sender.publicKey), transaction.recipient, transaction.amount,
-      transaction.fee, transaction.timestamp, forgedSignature)
-
-    val transactionsToValidate = transactions :+ forgetTransaction
-    val validTransactions = state.validate(transactionsToValidate)
-
-    validTransactions.size should be(transactionsToValidate.size - 1)
   }
 
 }
