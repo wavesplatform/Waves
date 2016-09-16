@@ -52,8 +52,6 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   override def validate: ValidationResult.Value =
     if (!Account.isValid(recipient)) {
       ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
-//    } else if (recipient.address == sender.address) {
-//      ValidationResult.OneselfTransaction
     } else if (amount <= 0) {
       ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {

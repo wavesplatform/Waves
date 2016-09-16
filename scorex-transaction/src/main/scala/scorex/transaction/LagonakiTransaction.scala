@@ -81,7 +81,6 @@ object LagonakiTransaction extends Deser[LagonakiTransaction] {
     val NegativeAmount = Value(3)
     val InsufficientFee = Value(4)
     val NoBalance = Value(5)
-    val OneselfTransaction = Value(6)
   }
 
   //TYPES
