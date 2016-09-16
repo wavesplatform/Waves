@@ -82,7 +82,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     val trans = block.transactions
     trans.foreach(t => if (included(t).isDefined) throw new Error(s"Transaction $t is already in state"))
     val fees: Map[Account, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
-      .map(m => m._1 -> (AccState(balance(m._1) + m._2), List(FeesStateChange(m._2))))
+      .map(m => m._1 ->(AccState(balance(m._1) + m._2), List(FeesStateChange(m._2))))
 
     val newBalances: Map[Account, (AccState, Reason)] = calcNewBalances(trans, fees)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
@@ -181,7 +181,6 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   /**
     * Returns sequence of valid transactions
     */
-  @tailrec
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)
 
@@ -189,25 +188,29 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
     val invalidByTimestamp = invalidateTransactionsByTimestamp(txs)
 
-    val validByTimestampTransactions: Seq[Transaction] = excludeTransactions(txs, invalidByTimestamp)
+    val validByTimestampTransactions = excludeTransactions(txs, invalidByTimestamp)
 
-    val nb = calcNewBalances(validByTimestampTransactions, Map.empty)
-    val negativeBalances: Map[Account, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
-    val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
-      val accTransactions = validByTimestampTransactions.filter(_.isInstanceOf[PaymentTransaction]).map(_.asInstanceOf[PaymentTransaction])
-        .filter(_.sender.address == b._1.address)
-      var sumBalance = b._2._1.balance
-      accTransactions.sortBy(-_.amount).takeWhile { t =>
-        val prevSum = sumBalance
-        sumBalance = sumBalance + t.amount + t.fee
-        prevSum < 0
+    @tailrec
+    def validateBalances(transactions: Seq[Transaction]): Seq[Transaction] = {
+      val nb = calcNewBalances(transactions, Map.empty)
+      val negativeBalances: Map[Account, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
+      val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
+        val accTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
+          .map(_.asInstanceOf[PaymentTransaction]).filter(_.sender.address == b._1.address)
+        var sumBalance = b._2._1.balance
+        accTransactions.sortBy(-_.amount).takeWhile { t =>
+          val prevSum = sumBalance
+          sumBalance = sumBalance + t.amount + t.fee
+          prevSum < 0
+        }
       }
-    }
-    val validTransactions = excludeTransactions(validByTimestampTransactions, toRemove)
+      val validTransactions = excludeTransactions(transactions, toRemove)
 
-    if (validTransactions.size == txs.size) txs
-    else if (validTransactions.nonEmpty) validate(validTransactions, heightOpt)
-    else validTransactions
+      if (validTransactions.size == transactions.size) transactions
+      else if (validTransactions.nonEmpty) validateBalances(validTransactions)
+      else validTransactions
+    }
+    validateBalances(validByTimestampTransactions)
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
@@ -223,7 +226,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
         case Some(lastTransaction) => lastTransaction.timestamp
         case _ => 0
       }
-      address -> (List[Transaction](), stateTimestamp)
+      address ->(List[Transaction](), stateTimestamp)
     }: _*)
 
     val orderedTransaction = paymentTransactions.sortBy(_.timestamp)
