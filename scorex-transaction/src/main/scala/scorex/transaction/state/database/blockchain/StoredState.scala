@@ -184,9 +184,10 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)
 
-    val txs = trans.filter(t => included(t).isEmpty && isValid(t, height))
+    val txs = trans.filter(t => isValid(t, height))
 
-    val invalidByTimestamp = invalidateTransactionsByTimestamp(txs)
+    val invalidByTimestamp = if (txs.exists(_.timestamp > TimestampToCheck)) invalidateTransactionsByTimestamp(txs)
+    else Seq()
 
     val validByTimestampTransactions = excludeTransactions(txs, invalidByTimestamp)
 
