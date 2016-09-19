@@ -82,19 +82,20 @@ object TestingCommons {
   def peerUrl(a: LagonakiApplication = application): String =
     "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
 
-//  def postRequest(us: String,
-//                  params: Map[String, String] = Map.empty,
-//                  body: String = "",
-//                  headers: Map[String, String] = Map("api_key" -> "test"),
-//                  peer: String = peerUrl(application)): JsValue = {
-//    val request = Http(url(peer + us).POST << params <:< headers << body)
-//    val response = Await.result(request, 5.seconds)
-//    Json.parse(response.getResponseBody)
-//  }
+  def forgeSignature(signature: Array[Byte]): Array[Byte] = {
+    val modifier: BigInt = BigInt("7237005577332262213973186563042994240857116359379907606001950938285454250989")
+    signature.take(32) ++ (BigInt(signature.takeRight(32).reverse) + modifier).toByteArray.reverse
+  }
 
-
-//  @deprecated("Replace with GET.request", "1.2.6")
-//  def getRequest(us: String, peer: String = peerUrl(application)): JsValue = GET.request(us = us, peer = peer)
+  def postRequest(us: String,
+                  params: Map[String, String] = Map.empty,
+                  body: String = "",
+                  headers: Map[String, String] = Map("api_key" -> "test"),
+                  peer: String = peerUrl(application)): JsValue = {
+    val request = Http(url(peer + us).POST << params <:< headers << body)
+    val response = Await.result(request, 5.seconds)
+    Json.parse(response.getResponseBody)
+  }
 
   sealed trait RequestType {
     def incorrectApiKeyTest(path: String): Unit = {

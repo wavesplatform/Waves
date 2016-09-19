@@ -37,9 +37,9 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
 
   application.blockGenerator ! StartGeneration
 
-  override def receive: Receive = idle
+  override def receive: Receive = idle()
 
-  private def idle: Receive = state(CIdle) {
+  private def idle(peerScores: Map[ConnectedPeer, BlockchainScore] = Map.empty): Receive = state(CIdle) {
     case CurrentScore(candidates) =>
       val localScore = history.score()
 
@@ -50,22 +50,23 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       } else {
         log.info(s"min networkScore=${betterScorePeers.minBy(_._2)} > localScore=$localScore")
         application.peerManager ! GetConnectedPeersTyped
-        context become syncing(betterScorePeers.toMap)
+        context become idle(betterScorePeers.toMap)
       }
-  }
 
-  private def syncing(peerScores: Map[ConnectedPeer, BlockchainScore]): Receive = state(CSyncing) {
     case ConnectedPeers(peers) =>
       val quorumSize = application.settings.quorum
       if (peers.size < quorumSize) {
         log.debug(s"Quorum to download blocks is not reached: ${peers.size} peers but should be $quorumSize")
-        context become idle
-      } else {
+        context become idle()
+      } else if (peerScores.nonEmpty) {
         blockchainSynchronizer ! GetExtension(peerScores)
+        context become syncing
       }
+  }
 
+  private def syncing: Receive = state(CSyncing) {
     case SyncFinished(_, result) =>
-      context become idle
+      context become idle()
       application.scoreObserver ! GetScore
 
       result foreach {
@@ -94,6 +95,8 @@ class Coordinator(application: Application) extends Actor with ScorexLogging {
       case BroadcastCurrentScore =>
         val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
+
+      case ConnectedPeers(_) =>
     }
   }
 
