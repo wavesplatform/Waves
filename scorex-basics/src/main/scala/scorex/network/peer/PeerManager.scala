@@ -135,7 +135,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private def processDataFromNetwork(spec: MessageSpec[_], msgData: Array[Byte], remote: InetSocketAddress): Unit = {
     connectedPeers.get(remote) match {
       case None =>
-        log.error(s"nw msg from unknown $remote")
+        log.error(s"New message from unknown $remote")
         sender() ! CloseConnection
 
       case Some(PeerConnection(_, None)) =>

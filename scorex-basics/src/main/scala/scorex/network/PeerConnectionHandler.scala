@@ -185,7 +185,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
           false
 
         case Failure(e) =>
-          log.error(s"Corrupted data from: " + remote, e)
+          log.error(s"Can't parse message from " + remote + " : " + e.getMessage)
           true
       }
     }
