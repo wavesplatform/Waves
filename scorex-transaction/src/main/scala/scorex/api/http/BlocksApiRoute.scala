@@ -16,6 +16,8 @@ import scorex.transaction.BlockChain
 case class BlocksApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
+  val MaxBlocksPerRequest = 100
+
   val settings = application.settings
   private val history = application.history
 
@@ -34,8 +36,10 @@ case class BlocksApiRoute(application: Application)(implicit val context: ActorR
   def address: Route = {
     path("address" / Segment / IntNumber / IntNumber) { case (address, start, end) =>
       getJsonRoute {
-        val json = JsArray(history.generatedBy(new Account(address), start, end).map(_.json))
-        JsonResponse(json, StatusCodes.OK)
+        if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
+          val json = JsArray(history.generatedBy(new Account(address), start, end).map(_.json))
+          JsonResponse(json, StatusCodes.OK)
+        } else TooBigArrayAllocation.response
       }
     }
   }
@@ -143,12 +147,14 @@ case class BlocksApiRoute(application: Application)(implicit val context: ActorR
       getJsonRoute {
         history match {
           case blockchain: BlockChain =>
-            val json = JsArray(
-              (start to end).map { height =>
-                blockchain.blockAt(height).map(_.json + ("height" -> Json.toJson(height)))
-                  .getOrElse(Json.obj("error" -> s"No block at height $height"))
-              })
-            JsonResponse(json, StatusCodes.OK)
+            if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
+              val json = JsArray(
+                (start to end).map { height =>
+                  blockchain.blockAt(height).map(_.json + ("height" -> Json.toJson(height)))
+                    .getOrElse(Json.obj("error" -> s"No block at height $height"))
+                })
+              JsonResponse(json, StatusCodes.OK)
+            } else TooBigArrayAllocation.response
           case _ =>
             JsonResponse(
               Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain"),
@@ -187,7 +193,7 @@ case class BlocksApiRoute(application: Application)(implicit val context: ActorR
   def signature: Route = {
     path("signature" / Segment) { encodedSignature =>
       getJsonRoute {
-        withBlock(history, encodedSignature){ block =>
+        withBlock(history, encodedSignature) { block =>
           val height = history.heightOf(block.uniqueId).map(Json.toJson(_))
             .getOrElse(JsNull)
           block.json + ("height" -> height)
