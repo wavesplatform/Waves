@@ -20,6 +20,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
   private lazy val ownNonce = settings.nodeNonce
   private lazy val blacklistResidenceTimeMilliseconds = settings.blacklistResidenceTimeMilliseconds
   private lazy val peersDataResidenceTime = settings.peersDataResidenceTime
+  private lazy val maxSize = settings.maxConnections * 10
 
   def mergePeerInfo(address: InetSocketAddress, peerInfo: PeerInfo, createIfNotExists: Boolean): Unit =
     Option(peersPersistence.get(address)).map {
@@ -30,7 +31,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
           peerInfo.nodeName.orElse(dbPeerInfo.nodeName),
           dbPeerInfo.creationTime)
     } orElse {
-      if (createIfNotExists) {
+      if (createIfNotExists && peersPersistence.size() < maxSize) {
         val t = currentTime
         Some(peerInfo.copy(lastSeen = t, creationTime = t))
       } else None
