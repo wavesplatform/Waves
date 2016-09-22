@@ -47,7 +47,7 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "length", value = "Seed length ", required = true, dataType = "long", paramType = "path")
   ))
-  @ApiResponse(code = 200, message = "Json with peer list or error")
+  @ApiResponse(code = 200, message = "Json with error message")
   def length: Route = path("seed" / IntNumber) { case length =>
     getJsonRoute {
       if (length <= MaxSeedSize) seed(length)
