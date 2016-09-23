@@ -19,6 +19,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
                                    override val signature: Array[Byte]) extends Transaction with BytesSerializable {
 
   import LagonakiTransaction._
+  override val id: Array[Byte] = signature
 
   lazy val deadline = timestamp + 24.hours.toMillis
 

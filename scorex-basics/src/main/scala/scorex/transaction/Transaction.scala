@@ -13,4 +13,6 @@ trait Transaction extends StateChangeReason with JsonSerializable {
 
   val timestamp: Long
 
+  val id: Array[Byte]
+
 }

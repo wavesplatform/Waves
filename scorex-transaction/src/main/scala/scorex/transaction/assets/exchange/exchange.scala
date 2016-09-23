@@ -1,4 +1,4 @@
-package scorex.transaction
+package scorex.transaction.assets
 
 package object exchange {
 

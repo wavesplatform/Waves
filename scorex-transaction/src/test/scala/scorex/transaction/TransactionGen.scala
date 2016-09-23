@@ -3,7 +3,8 @@ package scorex.transaction
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.exchange.{Order, OrderMatch}
+import scorex.transaction.assets.Issue
+import scorex.transaction.assets.exchange.{Order, OrderMatch}
 import scorex.utils.NTP
 
 import scala.util.Random
@@ -12,6 +13,10 @@ trait TransactionGen {
 
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray)
   val bytes64gen: Gen[Array[Byte]] = Gen.listOfN(64, Arbitrary.arbitrary[Byte]).map(_.toArray)
+
+  def genBoundedBytes(minSize: Int, maxSize: Int): Gen[Array[Byte]] = {
+    Gen.choose(minSize, maxSize) flatMap { sz => Gen.listOfN(sz, Arbitrary.arbitrary[Byte]).map(_.toArray) }
+  }
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue)
@@ -34,6 +39,20 @@ trait TransactionGen {
     maxtTime: Long <- Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
     matcherFee: Long <- positiveLongGen
   } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
+
+  val issueGenerator: Gen[Issue] = for {
+    sender: PrivateKeyAccount <- accountGen
+    assetIdOpt: Option[Array[Byte]] <- Gen.option(bytes64gen)
+    assetName <- genBoundedBytes(Issue.MinAssetNameLength, Issue.MaxAssetNameLength)
+    description <- genBoundedBytes(0, Issue.MaxDescriptionLength)
+    quantity <- positiveLongGen
+    decimals <- Gen.choose(0: Byte, 8: Byte)
+    reissuable <- Arbitrary.arbitrary[Boolean]
+    fee <- positiveLongGen
+    timestamp <- positiveLongGen
+    signature <- bytes64gen
+  } yield Issue(sender, assetIdOpt, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
+
 
   val invalidOrderGenerator: Gen[Order] = for {
     sender: PrivateKeyAccount <- accountGen

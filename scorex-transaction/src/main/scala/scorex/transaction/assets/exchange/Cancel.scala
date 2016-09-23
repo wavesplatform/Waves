@@ -1,4 +1,4 @@
-package scorex.transaction.exchange
+package scorex.transaction.assets.exchange
 
 import scorex.account.PublicKeyAccount
 

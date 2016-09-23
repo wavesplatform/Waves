@@ -1,5 +1,7 @@
 package scorex.serialization
 
+import com.google.common.primitives.Ints
+
 import scala.util.Try
 
 /**
@@ -8,5 +10,10 @@ import scala.util.Try
 trait Deser[T] {
 
   def parseBytes(bytes: Array[Byte]): Try[T]
+
+  protected def parseArraySize(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
+    val length = Ints.fromByteArray(bytes.slice(position, position + 4))
+    (bytes.slice(position + 4, position + 4 + length), position + 4 + length)
+  }
 
 }

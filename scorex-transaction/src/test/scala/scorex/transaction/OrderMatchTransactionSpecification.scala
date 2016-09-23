@@ -4,7 +4,7 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.exchange._
+import scorex.transaction.assets.exchange._
 import scorex.utils._
 
 class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {

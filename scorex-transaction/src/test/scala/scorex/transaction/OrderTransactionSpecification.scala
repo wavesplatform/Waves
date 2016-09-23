@@ -3,7 +3,7 @@ package scorex.transaction
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PublicKeyAccount
-import scorex.transaction.exchange.Order
+import scorex.transaction.assets.exchange.Order
 import scorex.utils.NTP
 
 class OrderTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {

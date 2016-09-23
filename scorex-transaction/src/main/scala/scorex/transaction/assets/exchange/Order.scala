@@ -1,4 +1,4 @@
-package scorex.transaction.exchange
+package scorex.transaction.assets.exchange
 
 import com.google.common.primitives.Longs
 import play.api.libs.json.{JsObject, Json}
@@ -6,7 +6,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
-import scorex.utils.{ByteArray, NTP}
+import scorex.utils.ByteArray
 
 import scala.util.Try
 
