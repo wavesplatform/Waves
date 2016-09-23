@@ -48,13 +48,14 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   private def setStateHeight(height: Int): Unit = heightMap.put(HeightKey, height)
 
-  private def applyChanges(ch: Map[Address, (AccState, Reason)]): Unit = synchronized {
+  private def applyChanges(ch: Map[AssetAcc, (AccState, Reason)]): Unit = synchronized {
     setStateHeight(stateHeight + 1)
     val h = stateHeight
     ch.foreach { ch =>
+      require(ch._1.assetId.isEmpty)
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1)).getOrElse(0))
-      accountChanges(ch._1).put(h, change)
-      lastStates.put(ch._1, h)
+      accountChanges(ch._1.key).put(h, change)
+      lastStates.put(ch._1.key, h)
       ch._2._2.foreach(t => includedTx.put(t.signature, h))
     }
   }
@@ -80,28 +81,29 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   override def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactions
-    val fees: Map[Account, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
-      .map(m => m._1 ->(AccState(balance(m._1) + m._2), List(FeesStateChange(m._2))))
+    val fees: Map[AssetAcc, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
+      .map(m => m._1 ->(AccState(assetBalance(m._1) + m._2), List(FeesStateChange(m._2))))
 
-    val newBalances: Map[Account, (AccState, Reason)] = calcNewBalances(trans, fees)
+    val newBalances: Map[AssetAcc, (AccState, Reason)] = calcNewBalances(trans, fees)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
-    applyChanges(newBalances.map(a => a._1.address -> a._2))
+    applyChanges(newBalances)
     log.trace(s"New state height is $stateHeight, hash: $hash, totalBalance: $totalBalance")
 
     this
   }
 
-  private def calcNewBalances(trans: Seq[Transaction], fees: Map[Account, (AccState, Reason)]):
-  Map[Account, (AccState, Reason)] = {
-    val newBalances: Map[Account, (AccState, Reason)] = trans.foldLeft(fees) { case (changes, atx) =>
+
+  private def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reason)]):
+  Map[AssetAcc, (AccState, Reason)] = {
+    val newBalances: Map[AssetAcc, (AccState, Reason)] = trans.foldLeft(fees) { case (changes, atx) =>
       atx match {
-        case tx: LagonakiTransaction =>
+        case tx: Transaction =>
           tx.balanceChanges().foldLeft(changes) { case (iChanges, bc) =>
             //update balances sheet
-            val acc = bc.acc
-            val currentChange: (AccState, Reason) = iChanges.getOrElse(acc, (AccState(balance(acc)), List.empty))
-            iChanges.updated(acc, (AccState(currentChange._1.balance + bc.delta), tx +: currentChange._2))
+            val account = bc.assetAcc.account
+            val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(balance(account)), List.empty))
+            iChanges.updated(bc.assetAcc, (AccState(currentChange._1.balance + bc.delta), tx +: currentChange._2))
           }
 
         case m =>
@@ -111,18 +113,26 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     newBalances
   }
 
+  override def balance(account: Account, atHeight: Option[Int] = None): Long =
+    assetBalance(AssetAcc(account, None), atHeight)
+
+  def assetBalance(account: AssetAcc, atHeight: Option[Int] = None): Long = {
+    balanceByKey(account.key, atHeight)
+    balanceByKey(account.account.address, atHeight)
+  }
+
 
   override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
     balance(account, Some(Math.max(1, heightOpt.getOrElse(stateHeight) - confirmations)))
 
-  private def balanceByAddress(address: String, atHeight: Option[Int] = None): Long = {
-    Option(lastStates.get(address)) match {
+  private def balanceByKey(key: String, atHeight: Option[Int] = None): Long = {
+    Option(lastStates.get(key)) match {
       case Some(h) if h > 0 =>
         val requiredHeight = atHeight.getOrElse(stateHeight)
         require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
         def loop(hh: Int, min: Long = Long.MaxValue): Long = {
-          val row = accountChanges(address).get(hh)
-          require(Option(row).isDefined, s"accountChanges($address).get($hh) is null. lastStates.get(address)=$h")
+          val row = accountChanges(key).get(hh)
+          require(Option(row).isDefined, s"accountChanges($key).get($hh) is null. lastStates.get(address)=$h")
           if (hh <= requiredHeight) Math.min(row.state.balance, min)
           else if (row.lastRowHeight == 0) 0L
           else loop(row.lastRowHeight, Math.min(row.state.balance, min))
@@ -132,10 +142,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     }
   }
 
-  override def balance(account: Account, atHeight: Option[Int] = None): Long =
-    balanceByAddress(account.address, atHeight)
-
-  def totalBalance: Long = lastStates.keySet().toList.map(address => balanceByAddress(address)).sum
+  def totalBalance: Long = lastStates.keySet().toList.map(address => balanceByKey(address)).sum
 
   override def accountTransactions(account: Account): Array[LagonakiTransaction] = {
     Option(lastStates.get(account.address)) match {
@@ -193,10 +200,10 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     @tailrec
     def validateBalances(transactions: Seq[Transaction]): Seq[Transaction] = {
       val nb = calcNewBalances(transactions, Map.empty)
-      val negativeBalances: Map[Account, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
+      val negativeBalances: Map[AssetAcc, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
       val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
         val accTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
-          .map(_.asInstanceOf[PaymentTransaction]).filter(_.sender.address == b._1.address)
+          .map(_.asInstanceOf[PaymentTransaction]).filter(_.sender.address == b._1.account.address)
         var sumBalance = b._2._1.balance
         accTransactions.sortBy(-_.amount).takeWhile { t =>
           val prevSum = sumBalance
@@ -269,7 +276,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   //for debugging purposes only
   def toJson(heightOpt: Option[Int] = None): JsObject = {
-    val ls = lastStates.keySet().map(add => add -> balanceByAddress(add, heightOpt))
+    val ls = lastStates.keySet().map(add => add -> balanceByKey(add, heightOpt))
       .filter(b => b._2 != 0).toList.sortBy(_._1)
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }

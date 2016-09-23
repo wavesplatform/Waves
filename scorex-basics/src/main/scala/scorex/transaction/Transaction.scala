@@ -19,4 +19,4 @@ trait Transaction extends StateChangeReason with JsonSerializable {
 
 }
 
-case class BalanceChange(acc: Account, assetId: Option[Array[Byte]], delta: Long)
+case class BalanceChange(assetAcc: AssetAcc, delta: Long)

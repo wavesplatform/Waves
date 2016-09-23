@@ -1,13 +1,13 @@
 package scorex.transaction.assets
 
 import com.google.common.primitives.Longs
-import play.api.libs.json.{Json, JsObject}
+import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.Deser
-import scorex.transaction.{BalanceChange, Transaction}
+import scorex.transaction.{AssetAcc, BalanceChange, Transaction}
 
 import scala.util.Try
 
@@ -53,7 +53,7 @@ case class Issue(sender: PublicKeyAccount,
     "signature" -> Base58.encode(signature)
   )
 
-  override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(sender, Some(assetId), quantity))
+  override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(sender, Some(assetId)), quantity))
 
   override def bytes: Array[Byte] = signature ++ toSign
 }

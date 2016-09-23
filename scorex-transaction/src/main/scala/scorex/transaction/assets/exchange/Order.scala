@@ -6,6 +6,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
+import scorex.transaction.AssetId
 import scorex.utils.ByteArray
 
 import scala.util.Try

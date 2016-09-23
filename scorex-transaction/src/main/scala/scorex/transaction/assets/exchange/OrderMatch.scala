@@ -6,7 +6,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser}
-import scorex.transaction.{BalanceChange, Transaction}
+import scorex.transaction.{AssetAcc, BalanceChange, Transaction}
 
 import scala.util.Try
 
@@ -69,9 +69,9 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
 
   override def balanceChanges(): Seq[BalanceChange] = {
 
-    val matcherChange = Seq((order1.matcher, (WavesAssetId, matcherFee - fee)))
-    val o1feeChange = Seq(BalanceChange(order1.sender, None, order1.matcherFee * amount / order1.amount))
-    val o2feeChange = Seq(BalanceChange(order2.sender, None, order2.matcherFee * amount / order2.amount))
+    val matcherChange = Seq(BalanceChange(AssetAcc(order1.matcher, None), matcherFee - fee))
+    val o1feeChange = Seq(BalanceChange(AssetAcc(order1.sender, None), order1.matcherFee * amount / order1.amount))
+    val o2feeChange = Seq(BalanceChange(AssetAcc(order2.sender, None), order2.matcherFee * amount / order2.amount))
 
     val exchange = if (order1.priceAssetId sameElements order1.spendAssetId) {
       Seq(
@@ -88,7 +88,8 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
         (order2.sender, (order1.receiveAssetId, +amount * price / PriceConstant))
       )
     }
-    o1feeChange ++ o2feeChange ++ (matcherChange ++ exchange).map(c => BalanceChange(c._1, Some(c._2._1), c._2._2))
+    o1feeChange ++ o2feeChange ++ matcherChange ++
+      exchange.map(c => BalanceChange(AssetAcc(c._1, Some(c._2._1)), c._2._2))
   }
 }
 
