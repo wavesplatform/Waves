@@ -142,6 +142,7 @@ trait Settings extends ScorexLogging {
   private val DefaultMaxConnections = 30
   private val DefaultConnectionTimeout = 60
   private val DefaultBindAddress = "127.0.0.1"
+  lazy val AllowedConnectionsFromOneIPAddress = 5
 
   //API
   lazy val corsAllowed = (settingsJSON \ "cors").asOpt[Boolean].getOrElse(false)
