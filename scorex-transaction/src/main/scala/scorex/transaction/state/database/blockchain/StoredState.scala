@@ -53,7 +53,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     val h = stateHeight
     ch.foreach { ch =>
       require(ch._1.assetId.isEmpty)
-      val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1)).getOrElse(0))
+      val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1.key)).getOrElse(0))
       accountChanges(ch._1.key).put(h, change)
       lastStates.put(ch._1.key, h)
       ch._2._2.foreach(t => includedTx.put(t.signature, h))
