@@ -19,11 +19,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.runtime.universe.Type
 
 trait RunnableApplication extends Application with ScorexLogging {
-  val ApplicationNameLimit = 50
-  val applicationName: String
-
-  //redefine it as lazy val
-  def appVersion: ApplicationVersion
 
   //settings
   implicit val settings: Settings
@@ -64,9 +59,6 @@ trait RunnableApplication extends Application with ScorexLogging {
   lazy val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
-  lazy val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
-
-
   def run() {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
@@ -74,10 +66,13 @@ trait RunnableApplication extends Application with ScorexLogging {
     checkGenesis()
 
     implicit val materializer = ActorMaterializer()
+
+    val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
     Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
 
-    // TODO: in fact, this is an attemption to call Actor.preStart - needs to be replaced!
-    Seq(scoreObserver, blockchainSynchronizer, historyReplier, coordinator) foreach ( _ ! Unit)
+    Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator) foreach {
+      _ => // de-lazyning process :-)
+    }
 
     actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
 

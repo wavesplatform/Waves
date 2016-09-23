@@ -40,6 +40,7 @@ with Matchers {
       PaymentTransaction(sender, recipient, amount, fee, time + 1, sig).signatureValid should be(false)
       PaymentTransaction(sender, recipient, amount + 1, fee, time + 1, sig).signatureValid should be(false)
       PaymentTransaction(recipient, sender, amount + 1, fee, time + 1, sig).signatureValid should be(false)
+      PaymentTransaction(recipient, sender, amount, fee, time, (sig.toList :+ 1.toByte).toArray).signatureValid should be(false)
     }
   }
 

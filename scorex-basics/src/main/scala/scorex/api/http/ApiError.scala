@@ -18,7 +18,6 @@ case object Unknown extends ApiError {
   override val message = "Error is unknown"
 }
 
-
 case object WrongJson extends ApiError {
   override val id = 1
   override val code = StatusCodes.BadRequest
@@ -31,6 +30,13 @@ case object ApiKeyNotValid extends ApiError {
   override val code = StatusCodes.Forbidden
   override val message: String = "Provided API key is not correct"
 }
+
+case object TooBigArrayAllocation extends ApiError {
+  override val id: Int = 10
+  override val message: String = "Too big sequences requested"
+  override val code: StatusCode = StatusCodes.BadRequest
+}
+
 
 //VALIDATION
 case object InvalidSignature extends ApiError {
@@ -99,3 +105,4 @@ case object BlockNotExists extends ApiError {
   override val code = StatusCodes.NotFound
   override val message: String = "block does not exist"
 }
+

@@ -4,6 +4,7 @@ import akka.actor.Props
 import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.network.Coordinator.AddBlock
@@ -13,6 +14,10 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
+
+class MinerMock(app: Application) extends Miner(app) {
+  override protected def preciseTime: Long = System.currentTimeMillis()
+}
 
 class MinerSpecification extends ActorTestingCommons {
 
@@ -79,7 +84,7 @@ class MinerSpecification extends ActorTestingCommons {
 
   private val genTimeShift = Miner.BlockGenerationTimeShift
 
-  protected override val actorRef = system.actorOf(Props(classOf[Miner], mock[App]))
+  protected override val actorRef = system.actorOf(Props(classOf[MinerMock], mock[App]))
 
   testSafely {
 
@@ -96,7 +101,7 @@ class MinerSpecification extends ActorTestingCommons {
           setBlockGenExpectations(Seq(newBlock))
         }
 
-        actorRef ! GuessABlock
+        actorRef ! GuessABlock(false)
 
         testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay * 2)
         testCoordinator.expectMsg(AddBlock(newBlock, None))
@@ -113,9 +118,13 @@ class MinerSpecification extends ActorTestingCommons {
         setExpectations(1, Some(calculatedGenDelay))
 
         "stop" in {
-          actorRef ! GuessABlock
+          setBlockGenExpectations(Seq(newBlock), maybe = true)
+
+          actorRef ! GuessABlock(false)
           Thread sleep genTimeShift.toMillis
+
           actorRef ! Stop
+
           testCoordinator.expectNoMsg(calculatedGenDelay + genTimeShift)
         }
 
@@ -125,11 +134,11 @@ class MinerSpecification extends ActorTestingCommons {
 
             setBlockGenExpectations(Seq(newBlock))
 
-            actorRef ! GuessABlock
+            actorRef ! GuessABlock(false)
 
             testCoordinator.expectNoMsg(calculatedGenDelay)
             testCoordinator.expectMsg(AddBlock(newBlock, None))
-            testCoordinator.expectNoMsg(calculatedGenDelay +  genTimeShift)
+            testCoordinator.expectNoMsg(calculatedGenDelay + genTimeShift)
           }
 
           "block is NOT generated" in {
@@ -140,10 +149,29 @@ class MinerSpecification extends ActorTestingCommons {
             setBlockGenExpectations(Seq.empty, maybe = true)
             setExpectations(1, Some(calculatedGenDelay), maybe = true)
 
-            actorRef ! GuessABlock
+            actorRef ! GuessABlock(false)
             testCoordinator.expectNoMsg(calculatedGenDelay + genTimeShift * 2)
           }
         }
+      }
+
+      "reschedule" in {
+
+        val veryLongDelay = calculatedGenDelay * 100
+
+        setExpectations(1, Some(veryLongDelay))
+
+        actorRef ! GuessABlock(false)
+
+        val shortDelay = calculatedGenDelay / 2
+
+        setExpectations(1, Some(shortDelay))
+
+        setBlockGenExpectations(Seq(newBlock))
+
+        actorRef ! GuessABlock(rescheduleImmediately = true)
+
+        testCoordinator.expectMsg(shortDelay + calculatedGenDelay, AddBlock(newBlock, None))
       }
 
       "broken schedule should fallback to default" - {
@@ -152,7 +180,7 @@ class MinerSpecification extends ActorTestingCommons {
           setExpectations(1, Some(timePoint).map(_ millis))
           setBlockGenExpectations(Seq(newBlock))
 
-          actorRef ! GuessABlock
+          actorRef ! GuessABlock(false)
 
           testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
           testCoordinator.expectMsg(AddBlock(newBlock, None))

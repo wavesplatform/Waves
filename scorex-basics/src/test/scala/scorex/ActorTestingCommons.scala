@@ -1,7 +1,5 @@
 package scorex
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
@@ -25,7 +23,7 @@ abstract class ActorTestingCommons extends TestKitBase
   with ImplicitSender
   with PathMockFactory {
 
-  protected implicit val testTimeout = Timeout(500 milliseconds)
+  protected implicit val testTimeout = Timeout(1000 milliseconds)
   protected val testDuration = testTimeout.duration
 
   implicit final lazy val system = ActorSystem(getClass.getSimpleName)
@@ -54,9 +52,7 @@ abstract class ActorTestingCommons extends TestKitBase
 
   protected final implicit def convertTo(s: String): ActorTestingStringWrapper = new ActorTestingStringWrapper(s)
 
-  protected val peerId = 9977
-  protected lazy val peerHandler = TestProbe("PeerHandler")
-  protected lazy val peer = ConnectedPeer(new InetSocketAddress(peerId), peerHandler.ref)
+  protected lazy val peer = stub[ConnectedPeer]
 
   protected val actorRef: ActorRef
 
@@ -103,8 +99,8 @@ abstract class ActorTestingCommons extends TestKitBase
     }
 
   trait ApplicationMock extends Application {
-    implicit val transactionModule = mock[TransactionModule[Unit]]
-    implicit val consensusModule = mock[ConsensusModule[Unit]]
+    implicit val transactionModule = stub[TransactionModule[Unit]]
+    implicit val consensusModule = stub[ConsensusModule[Unit]]
     final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock
   }

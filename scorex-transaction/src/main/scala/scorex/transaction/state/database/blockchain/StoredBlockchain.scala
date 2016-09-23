@@ -22,6 +22,8 @@ class StoredBlockchain(db: MVStore)
                        transactionModule: TransactionModule[_])
   extends BlockChain with ScorexLogging {
 
+  require(consensusModule != null)
+
   case class BlockchainPersistence(database: MVStore) {
     val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks")
     val signatures: MVMap[Int, BlockId] = database.openMap("signatures")
@@ -30,7 +32,7 @@ class StoredBlockchain(db: MVStore)
     private var blocksCacheSize: Int = 0
     private val blocksCache: TrieMap[Int, Option[Block]] = TrieMap.empty
 
-    //TOOD remove when no blockchains without signaturesReverse remains
+    //TODO: remove when no blockchains without signaturesReverse remains
     if (signaturesReverse.size() != signatures.size()) {
       signaturesReverse.clear()
       signatures.keySet().foreach(k => signaturesReverse.put(signatures.get(k), k))
@@ -39,7 +41,7 @@ class StoredBlockchain(db: MVStore)
 
     val scoreMap: MVMap[Int, BigInt] = database.openMap("score")
 
-    //if there are some uncommited changes from last run, discard'em
+    //if there are some uncommitted changes from last run, discard'em
     if (signatures.size() > 0) database.rollback()
 
     def writeBlock(height: Int, block: Block): Try[Unit] = Try {
@@ -89,7 +91,7 @@ class StoredBlockchain(db: MVStore)
         val h = height() + 1
         blockStorage.writeBlock(h, block) match {
           case Success(_) => Seq(block)
-          case Failure(t) => throw new Error("Error while storing blockchain a change: " + t)
+          case Failure(e) => throw new Error("Error while storing blockchain a change: " + e, e)
         }
       } else {
         throw new Error(s"Appending block ${block.json} which parent is not last block in blockchain")

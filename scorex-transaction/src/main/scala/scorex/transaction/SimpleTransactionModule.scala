@@ -3,7 +3,7 @@ package scorex.transaction
 import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.app.RunnableApplication
+import scorex.app.Application
 import scorex.block.{Block, BlockField}
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
@@ -37,7 +37,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 }
 
 
-class SimpleTransactionModule(implicit val settings: TransactionSettings with Settings, application: RunnableApplication)
+class SimpleTransactionModule(implicit val settings: TransactionSettings with Settings, application: Application)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
 
   import SimpleTransactionModule._
@@ -80,36 +80,48 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   override def transactions(block: Block): StoredInBlock =
     block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
-  override def packUnconfirmed(): StoredInBlock = {
-    clearIncorrectTransactions()
-    blockStorage.state.validate(utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock))
+  override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
+
+  override def putUnconfirmedIfNew(tx: Transaction): Boolean = synchronized {
+    utxStorage.putIfNew(tx, isValid)
   }
 
-  //todo: check: clear unconfirmed txs on receiving a block
-  override def clearFromUnconfirmed(data: StoredInBlock): Unit = {
+  override def packUnconfirmed(heightOpt: Option[Int]): StoredInBlock = synchronized {
+    clearIncorrectTransactions()
+
+    val txs = utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock)
+    val valid = blockStorage.state.validate(txs, heightOpt)
+
+    if (valid.size != txs.size) {
+      log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
+    }
+
+    valid
+  }
+
+  override def clearFromUnconfirmed(data: StoredInBlock): Unit = synchronized {
     data.foreach(tx => utxStorage.getBySignature(tx.signature) match {
       case Some(unconfirmedTx) => utxStorage.remove(unconfirmedTx)
       case None =>
     })
 
-    clearIncorrectTransactions()
+    clearIncorrectTransactions() // todo makes sence to remove expired only at this point
   }
 
-  //Romove too old or invalid transactions from  UnconfirmedTransactionsPool
+  /**
+    * Removes too old or invalid transactions from UnconfirmedTransactionsPool
+    */
   def clearIncorrectTransactions(): Unit = {
-    val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-
+    val currentTime = NTP.correctedTime()
     val txs = utxStorage.all()
-    val notTooOld = txs.filter { tx =>
-      if ((lastBlockTs - tx.timestamp).millis > MaxTimeForUnconfirmed) utxStorage.remove(tx)
-      (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
-    }
-
-    notTooOld.diff(blockStorage.state.validate(txs)).foreach(tx => utxStorage.remove(tx))
+    val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeForUnconfirmed }
+    val valid = blockStorage.state.validate(notExpired)
+    // remove non valid or expired from storage
+    txs.diff(valid).foreach(utxStorage.remove)
   }
 
   override def onNewOffchainTransaction(transaction: Transaction): Unit =
-    if (utxStorage.putIfNew(transaction)) {
+    if (putUnconfirmedIfNew(transaction)) {
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(transaction), None)
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
@@ -121,10 +133,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     }
   }
 
+  private var txTime: Long = 0
   def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
-    val time = NTP.correctedTime()
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
-    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
+    txTime = Math.max(NTP.correctedTime(), txTime + 1)
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, txTime)
+    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, txTime, sig)
     if (isValid(payment)) onNewOffchainTransaction(payment)
     payment
   }
@@ -147,10 +160,20 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     TransactionsBlockField(txs)
   }
 
+  /** Check whether tx is valid on current state and not expired yet
+    */
+  override def isValid(tx: Transaction): Boolean = {
+    val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
+    val notExpired = (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
+    notExpired && blockStorage.state.isValid(tx)
+  }
+
   override def isValid(block: Block): Boolean = {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-    lazy val txsAreNew = block.transactions.forall(tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff)
+    lazy val txsAreNew = block.transactions.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
     lazy val blockIsValid = blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
+    if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
+    if (!blockIsValid) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs")
     txsAreNew && blockIsValid
   }
 }

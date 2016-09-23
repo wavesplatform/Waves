@@ -1,7 +1,6 @@
 package scorex.network.peer
 
 import java.net.InetSocketAddress
-import java.util
 
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.settings.Settings
@@ -10,78 +9,68 @@ import scala.collection.JavaConversions._
 
 class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends PeerDatabase {
 
-  val database = filename match {
+  private val database = filename match {
     case Some(file) => new MVStore.Builder().fileName(file).compress().open()
     case None => new MVStore.Builder().open()
   }
 
   private val peersPersistence: MVMap[InetSocketAddress, PeerInfo] = database.openMap("peers")
+  private val blacklist: MVMap[HostName, Long] = database.openMap("blacklist")
 
   private lazy val ownNonce = settings.nodeNonce
   private lazy val blacklistResidenceTimeMilliseconds = settings.blacklistResidenceTimeMilliseconds
+  private lazy val peersDataResidenceTime = settings.peersDataResidenceTime
 
-  def addOrUpdateKnownPeer(address: InetSocketAddress, peerInfo: PeerInfo): Unit = {
-    val updatedPeerInfo = Option(peersPersistence.get(address)).map { case dbPeerInfo =>
-      val nonceOpt = peerInfo.nonce.orElse(dbPeerInfo.nonce)
-      val nodeNameOpt = peerInfo.nodeName.orElse(dbPeerInfo.nodeName)
-      PeerInfo(peerInfo.lastSeen, nonceOpt, nodeNameOpt, dbPeerInfo.blacklistingTime)
-    }.getOrElse(peerInfo)
-    peersPersistence.put(address, updatedPeerInfo)
+  def mergePeerInfo(address: InetSocketAddress, peerInfo: PeerInfo, createIfNotExists: Boolean): Unit =
+    Option(peersPersistence.get(address)).map {
+      dbPeerInfo =>
+        PeerInfo(
+          if (peerInfo.lastSeen != PeerInfo.TBD) peerInfo.lastSeen else dbPeerInfo.lastSeen,
+          peerInfo.nonce.orElse(dbPeerInfo.nonce),
+          peerInfo.nodeName.orElse(dbPeerInfo.nodeName),
+          dbPeerInfo.creationTime)
+    } orElse {
+      if (createIfNotExists) {
+        val t = currentTime
+        Some(peerInfo.copy(lastSeen = t, creationTime = t))
+      } else None
+    } foreach {
+      updatedPeerInfo =>
+        peersPersistence.put(address, updatedPeerInfo)
+        database.commit()
+    }
+
+  def blacklistPeer(address: InetSocketAddress): Unit = {
+    blacklist.update(address.getHostName, currentTime)
     database.commit()
   }
 
-  /**
-    * Mark peer with address as blacklisted
-    */
-  def blacklist(address: InetSocketAddress): Unit = {
-    Option(peersPersistence.get(address)) match {
-      case Some(peer) => {
-        peersPersistence.put(address, peer.blacklist)
-        database.commit()
-      }
-      case _ =>
-    }
-  }
-
-  def unBlacklist(address: InetSocketAddress): Unit = {
-    Option(peersPersistence.get(address)) match {
-      case Some(peer) => {
-        peersPersistence.put(address, peer.unBlacklist)
-        database.commit()
-      }
-      case _ =>
-    }
-  }
-
-  def isBlacklisted(address: InetSocketAddress): Boolean = {
-    Option(peersPersistence.get(address)) match {
-      case Some(peer) => {
-        val current = System.currentTimeMillis
-        if (peer.blacklistingTime <= current - blacklistResidenceTimeMilliseconds) {
-          peersPersistence.put(address, peer.unBlacklist)
-          database.commit()
-          false
-        } else true
-      }
-      case None => false
-    }
-  }
-
-  /**
-    * Returns all known peers which not blacklisted
-    */
   def knownPeers(excludeSelf: Boolean): Map[InetSocketAddress, PeerInfo] =
-    (excludeSelf match {
-      case true => knownPeers(false).filter(_._2.nonce.getOrElse(-1) != ownNonce)
-      case false => notBlacklisted
-    }).toMap
+    if (excludeSelf) {
+      knownPeers(false).filterNot(_._2.nonce.contains(ownNonce))
+    } else {
+      val blacklist = blacklistedPeers
+      withoutObsoleteRecords(peersPersistence, (peerData: PeerInfo) => peerData.lastSeen, peersDataResidenceTime.toMillis)
+        .toMap.filterKeys(address => !blacklist.contains(address.getHostName))
+    }
 
-  def blacklisted: Map[InetSocketAddress, PeerInfo] = peersPersistence.keys
-    .flatMap(k => Option(peersPersistence.get(k)).map(v => k -> v))
-    .filter(p => p._2.isBlacklisted).toMap
+  def blacklistedPeers: Set[HostName] =
+    withoutObsoleteRecords(blacklist, { t: Long => t }, blacklistResidenceTimeMilliseconds).keySet().toSet
 
-  private def notBlacklisted = peersPersistence.keys
-    .flatMap(k => Option(peersPersistence.get(k)).map(v => k -> v))
-    .filter(p => !p._2.isBlacklisted)
+  private def withoutObsoleteRecords[K, T](map: MVMap[K, T], tsExtractor: T => Long, residenceTimeInMillis: Long) = {
+    val t = currentTime
 
+    val obsoletePeers = map.toArray
+      .filter { case (_, value) => tsExtractor(value) <= t - residenceTimeInMillis }
+      .map(_._1)
+
+    if (obsoletePeers.nonEmpty) {
+      obsoletePeers.foreach(map.remove)
+      database.commit()
+    }
+
+    map
+  }
+
+  private def currentTime = System.currentTimeMillis()
 }

@@ -39,7 +39,10 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     require((blockTime - NTP.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
 
-    val parent = transactionModule.blockStorage.history.parent(block).get
+    val history = transactionModule.blockStorage.history
+
+    val parent = history.parent(block).get
+    val parentHeight = history.heightOf(parent.uniqueId).get
 
     val prevBlockData = consensusBlockData(parent)
     val blockData = consensusBlockData(block)
@@ -58,22 +61,23 @@ with OneGeneratorConsensusModule with ScorexLogging {
       s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
 
     //check hit < target
-    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, generatingBalance(generator))
+    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, generatingBalance(generator, Some(parentHeight)))
 
-  }.recoverWith { case t =>
+  } recoverWith { case t =>
     log.error("Error while checking a block", t)
     Failure(t)
-  }.getOrElse(false)
-
+  } getOrElse false
 
   override def generateNextBlock[TT](account: PrivateKeyAccount)
                                     (implicit tm: TransactionModule[TT]): Option[Block] = {
 
-    val balance = generatingBalance(account)
-
     val history = tm.blockStorage.history
 
     val lastBlock = history.lastBlock
+
+    val height = history.heightOf(lastBlock).get
+    val balance = generatingBalance(account, Some(height))
+
     val lastBlockKernelData = consensusBlockData(lastBlock)
 
     val lastBlockTime = lastBlock.timestampField.value
@@ -89,7 +93,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
       s"account:  $account " +
       s"account balance: $balance " +
       s"last block id: ${lastBlock.encodedId}, " +
-      s"height: ${history.heightOf(lastBlock)}, " +
+      s"height: $height, " +
       s"last block target: ${lastBlockKernelData.baseTarget}"
     )
 
@@ -102,7 +106,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
         override val baseTarget: Long = btg
       }
 
-      val unconfirmed = tm.packUnconfirmed()
+      val unconfirmed = tm.packUnconfirmed(Some(height))
       log.debug(s"Build block with ${unconfirmed.asInstanceOf[Seq[Transaction]].size} transactions")
       log.debug(s"Block time interval is $eta seconds ")
 
@@ -116,35 +120,34 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
   }
 
-  override def nextBlockGenerationTime[TT](lastBlock: Block, account: PublicKeyAccount)
-                                          (implicit tm: TransactionModule[TT]): Option[Long] = {
-    val balance = generatingBalance(account)
+  override def nextBlockGenerationTime(block: Block, account: PublicKeyAccount)
+                                      (implicit tm: TransactionModule[_]): Option[Long] = {
+    val history = tm.blockStorage.history
 
-    if (balance == 0) None else {
-      val cData = consensusBlockData(lastBlock)
-      val hit = calcHit(cData, account)
-      val t = cData.baseTarget
+    history.heightOf(block.uniqueId)
+      .map(height => (height, generatingBalance(account, Some(height)))).filter(_._2 > 0)
+      .flatMap { case (height, balance) =>
+        val cData = consensusBlockData(block)
+        val hit = calcHit(cData, account)
+        val t = cData.baseTarget
 
-      val history = tm.blockStorage.history
+        val result =
+          Some((hit * 1000) / (BigInt(t) * balance) + block.timestampField.value)
+            .filter(_ > 0).filter(_ < Long.MaxValue)
+            .map(_.toLong)
 
-      val result =
-        Some((hit * 1000) / (BigInt(t) * balance) + lastBlock.timestampField.value)
-          .filter(_ > 0).filter(_ < Long.MaxValue)
-          .map(_.toLong)
+        log.debug({
+          val currentTime = NTP.correctedTime()
+          s"Next block gen time: $result " +
+            s"in ${result.map(t => (t - currentTime) / 1000)} seconds, " +
+            s"hit: $hit, target: $t, " +
+            s"account:  $account, account balance: $balance " +
+            s"last block id: ${block.encodedId}, " +
+            s"height: $height"
+        })
 
-      val currentTime =  NTP.correctedTime()
-
-      log.debug(s"Next block gen time: $result " +
-        s"in ${result.map(t => (t - currentTime) / 1000)} seconds, " +
-        s"hit: $hit, target: $t, " +
-        s"account:  $account " +
-        s"account balance: $balance " +
-        s"last block id: ${lastBlock.encodedId}, " +
-        s"height: ${history.heightOf(lastBlock)}"
-      )
-
-      result
-    }
+        result
+      }
   }
 
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =

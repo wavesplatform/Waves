@@ -1,13 +1,15 @@
 package scorex.lagonaki
 
-import java.util.concurrent.Semaphore
 import java.util.concurrent.locks.ReentrantLock
 
+import akka.pattern.ask
+import akka.util.Timeout
 import com.ning.http.client.Response
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.api.http.ApiKeyNotValid
-import scorex.lagonaki.TestingCommons._
+import scorex.app.Application.GetBlockGenerationStatus
+import scorex.consensus.mining.BlockGeneratorController.{Idle, StartGeneration, StopGeneration}
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.TransactionSettings
 import scorex.utils._
@@ -39,6 +41,8 @@ trait TestingCommons {
 
 object TestingCommons {
 
+  implicit val timeout = Timeout(1.second)
+
   val lock = new ReentrantLock(true)
 
   lazy val applications = {
@@ -62,22 +66,36 @@ object TestingCommons {
 
   lazy val application = applications.head
 
+  def startGeneration(nodes: Seq[LagonakiApplication]): Unit = {
+    nodes.foreach(_.blockGenerator ! StartGeneration)
+  }
+
+  def stopGeneration(nodes: Seq[LagonakiApplication]): Unit = {
+    nodes.foreach(_.blockGenerator ! StopGeneration)
+    untilTimeout(5.seconds) {
+      nodes.foreach { p =>
+        require(Await.result(p.blockGenerator ? GetBlockGenerationStatus, timeout.duration) == Idle.name)
+      }
+    }
+  }
+
   def peerUrl(a: LagonakiApplication = application): String =
     "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
 
-//  def postRequest(us: String,
-//                  params: Map[String, String] = Map.empty,
-//                  body: String = "",
-//                  headers: Map[String, String] = Map("api_key" -> "test"),
-//                  peer: String = peerUrl(application)): JsValue = {
-//    val request = Http(url(peer + us).POST << params <:< headers << body)
-//    val response = Await.result(request, 5.seconds)
-//    Json.parse(response.getResponseBody)
-//  }
+  def forgeSignature(signature: Array[Byte]): Array[Byte] = {
+    val modifier: BigInt = BigInt("7237005577332262213973186563042994240857116359379907606001950938285454250989")
+    signature.take(32) ++ (BigInt(signature.takeRight(32).reverse) + modifier).toByteArray.reverse
+  }
 
-
-//  @deprecated("Replace with GET.request", "1.2.6")
-//  def getRequest(us: String, peer: String = peerUrl(application)): JsValue = GET.request(us = us, peer = peer)
+  def postRequest(us: String,
+                  params: Map[String, String] = Map.empty,
+                  body: String = "",
+                  headers: Map[String, String] = Map("api_key" -> "test"),
+                  peer: String = peerUrl(application)): JsValue = {
+    val request = Http(url(peer + us).POST << params <:< headers << body)
+    val response = Await.result(request, 5.seconds)
+    Json.parse(response.getResponseBody)
+  }
 
   sealed trait RequestType {
     def incorrectApiKeyTest(path: String): Unit = {

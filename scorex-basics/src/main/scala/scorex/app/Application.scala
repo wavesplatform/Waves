@@ -16,6 +16,10 @@ trait Application {
   implicit val consensusModule: ConsensusModule[_]
   implicit val transactionModule: TransactionModule[_]
 
+  val applicationName: String
+
+  val appVersion: ApplicationVersion
+
   val basicMessagesSpecsRepo: BasicMessagesRepo
 
   val history: History
@@ -37,4 +41,9 @@ trait Application {
   val settings: Settings
 
   val wallet: Wallet
+}
+
+object Application {
+  case object GetBlockGenerationStatus
+  case object GetStatus
 }

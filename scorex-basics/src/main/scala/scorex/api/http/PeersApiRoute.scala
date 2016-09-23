@@ -21,6 +21,7 @@ import scala.util.Try
 @Api(value = "/peers", description = "Get info about peers", position = 2)
 case class PeersApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute {
+  val MaxPeersInResponse = 1000
 
   val settings = application.settings
 
@@ -40,7 +41,7 @@ case class PeersApiRoute(application: RunnableApplication)(implicit val context:
         .mapTo[Map[InetSocketAddress, PeerInfo]]
         .map { peers =>
           JsonResponse(
-            JsArray(peers.map { case (address, peerInfo) =>
+            JsArray(peers.take(MaxPeersInResponse).map { case (address, peerInfo) =>
               Json.obj(
                 "address" -> address.toString,
                 "nodeName" -> (peerInfo.nodeName.getOrElse("N/A"): String),
@@ -64,7 +65,7 @@ case class PeersApiRoute(application: RunnableApplication)(implicit val context:
       (application.peerManager ? PeerManager.GetConnectedPeers)
         .mapTo[List[(InetSocketAddress, Handshake)]]
         .map { connectedPeers =>
-          val peerData = JsArray(connectedPeers.map { peer =>
+          val peerData = JsArray(connectedPeers.take(MaxPeersInResponse).map { peer =>
             Json.obj(
               "address" -> peer._1.toString,
               "declaredAddress" -> (peer._2.declaredAddress.map(_.toString).getOrElse("N/A"): String),
@@ -114,9 +115,9 @@ case class PeersApiRoute(application: RunnableApplication)(implicit val context:
   def blacklistedPeers: Route = path("blacklisted") {
     getJsonRoute {
       (application.peerManager ? PeerManager.GetBlacklistedPeers)
-        .mapTo[Map[InetSocketAddress, PeerInfo]]
+        .mapTo[Set[String]]
         .map { peers =>
-          JsonResponse(JsArray(peers.map(i => JsString(i._1.getHostName + ":" + i._1.getPort)).toSeq), StatusCodes.OK)
+          JsonResponse(JsArray(peers.take(MaxPeersInResponse).map(JsString).toSeq), StatusCodes.OK)
         }
     }
   }

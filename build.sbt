@@ -11,6 +11,7 @@ def subModule(id: String): Project = Project(id = id, base = file(s"scorex-$id")
 lazy val basics = subModule("basics")
   .settings(commonSettings: _*)
   .settings(
+    scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128"),
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
   )
 
@@ -19,6 +20,7 @@ lazy val transaction = subModule("transaction")
   .dependsOn(basics)
   .settings(commonSettings: _*)
   .settings(
+    scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128"),
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
   )
 
@@ -27,6 +29,7 @@ lazy val consensus = subModule("consensus")
   .dependsOn(basics)
   .settings(commonSettings: _*)
   .settings(
+    scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128"),
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
   )
 
@@ -35,6 +38,7 @@ lazy val root = Project(id = "scorex", base = file("."))
   .dependsOn(basics % "compile->compile;test->test", transaction, consensus)
   .settings(commonSettings: _*)
   .settings(
+    scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128"),
     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
   )
 
@@ -52,10 +56,10 @@ libraryDependencies ++=
     Dependencies.testKit ++
     Dependencies.logging
 
-scalacOptions ++= Seq("-feature", "-deprecation")
+scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
 
 javaOptions ++= Seq(
-  "-server"
+  "-server", "-Xmx1G"
 )
 
 testOptions in Test += Tests.Argument("-oD", "-u", "target/test-reports")

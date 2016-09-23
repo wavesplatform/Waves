@@ -2,6 +2,7 @@
   "p2p": {
     "nodeName": "Node2",
     "localOnly": true,
+    "myAddress": "127.0.0.1",
     "bindAddress": "127.0.0.1",
     "upnp": false,
     "upnpGatewayTimeout": 7000,
@@ -11,10 +12,8 @@
     "maxConnections": 10,
     "peersDataBroadcastDelay": 900
   },
-  "walletDir": "/tmp/scorex-tests/wallet2",
   "walletPassword": "cookies",
   "walletSeed": "111",
-  "dataDir": "/tmp/scorex-tests/data2",
   "rpcPort": 9086,
   "maxRollback": 100,
   "offlineGeneration": false,

@@ -43,7 +43,7 @@ object Handshake extends ScorexLogging with Deser[Handshake] {
   def parseBytes(bytes: Array[Byte]): Try[Handshake] = Try {
     var position = 0
     val appNameSize = bytes.head
-    require(appNameSize > 0)
+    require(appNameSize > 0, s"Invalid Application name length in handshake: $appNameSize")
 
     position += 1
 
@@ -61,6 +61,8 @@ object Handshake extends ScorexLogging with Deser[Handshake] {
 
     val nonce = Longs.fromByteArray(bytes.slice(position, position + 8))
     position += 8
+
+    log.trace(s"Incoming handshake: $an $av $nodeName $nonce")
 
     val fas = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4

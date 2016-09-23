@@ -4,12 +4,12 @@ import java.nio.ByteBuffer
 
 import org.scalatest.FunSuite
 import scorex.block.Block
-import scorex.consensus.nxt.NxtLikeConsensusModule
 import scorex.crypto.EllipticCurveImpl.SignatureLength
 import scorex.lagonaki.TestingCommons
-import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler}
-import scorex.transaction.{History, SimpleTransactionModule}
-import shapeless.syntax.typeable._
+import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler, MessageSpec}
+import scorex.transaction.History
+
+import scala.util.Try
 
 class MessageSpecification extends FunSuite with TestingCommons {
 
@@ -19,12 +19,15 @@ class MessageSpecification extends FunSuite with TestingCommons {
   private lazy val repo = new BasicMessagesRepo()
   private lazy val handler = new MessageHandler(repo.specs)
 
+  private def toMessage(v: Try[(MessageSpec[_], Array[Byte])]) =
+    v.map { case (spec, bytes) => Message(spec, Left(bytes), None) }
+
   test("ScoreMessage roundtrip 1") {
     val s1 = BigInt(Long.MaxValue) * 1000000000L
 
     val msg = Message(repo.ScoreMessageSpec, Right(s1), None)
 
-    handler.parseBytes(ByteBuffer.wrap(msg.bytes), None).get.data.get match {
+    toMessage(handler.parseBytes(ByteBuffer.wrap(msg.bytes))).get.data.get match {
       case scoreRestored: History.BlockchainScore =>
         assert(s1 == scoreRestored)
 
@@ -39,7 +42,7 @@ class MessageSpecification extends FunSuite with TestingCommons {
     val s1: Block.BlockId = e2 +: Array.fill(SignatureLength - 1)(e1)
 
     val msg = Message(repo.GetSignaturesSpec, Right(Seq(s1)), None)
-    val ss = handler.parseBytes(ByteBuffer.wrap(msg.bytes), None).get.data.get.asInstanceOf[Seq[Block.BlockId]]
+    val ss = toMessage(handler.parseBytes(ByteBuffer.wrap(msg.bytes))).get.data.get.asInstanceOf[Seq[Block.BlockId]]
     assert(ss.head.sameElements(s1))
   }
 
@@ -50,7 +53,7 @@ class MessageSpecification extends FunSuite with TestingCommons {
     val s2 = e1 +: Array.fill(SignatureLength - 1)(e2)
 
     val msg = Message(repo.SignaturesSpec, Right(Seq(s1, s2)), None)
-    val ss = handler.parseBytes(ByteBuffer.wrap(msg.bytes), None).get.data.get.asInstanceOf[Seq[Block.BlockId]]
+    val ss = toMessage(handler.parseBytes(ByteBuffer.wrap(msg.bytes))).get.data.get.asInstanceOf[Seq[Block.BlockId]]
     assert(ss.head.sameElements(s1))
     assert(ss.tail.head.sameElements(s2))
   }

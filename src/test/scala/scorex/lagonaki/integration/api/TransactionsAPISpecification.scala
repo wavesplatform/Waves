@@ -8,14 +8,19 @@ import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.GenesisTransaction
 import scorex.lagonaki.integration.TestLock
 
-class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with TestLock {
+class TransactionsAPISpecification extends FunSuite with TestLock with Matchers with TransactionTestingCommons {
 
   import scorex.lagonaki.TestingCommons._
 
-  if (application.wallet.privateKeyAccounts().size < 10) application.wallet.generateNewAccounts(10)
-  val addresses = accounts.map(_.address)
-  val account = accounts.head
-  val address = account.address
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+
+    if (application.wallet.privateKeyAccounts().size < 10) application.wallet.generateNewAccounts(10)
+  }
+
+  def addresses = accounts.map(_.address)
+//  def account = accounts.head
+//  def address = account.address
 
   test("/transactions/unconfirmed API route") {
     (1 to 20) foreach (i => genValidTransaction())

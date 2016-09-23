@@ -39,10 +39,10 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
 
   def generateNextBlocks[TransactionalBlockData](accounts: Seq[PrivateKeyAccount])
                            (implicit transactionModule: TransactionModule[TransactionalBlockData]): Seq[Block] =
-    accounts.flatMap(acc => generateNextBlock(acc))
+    accounts.flatMap(generateNextBlock(_))
 
-  def nextBlockGenerationTime[TransactionalBlockData](lastBlock: Block, account: PublicKeyAccount)
-                                 (implicit transactionModule: TransactionModule[TransactionalBlockData]): Option[Long]
+  def nextBlockGenerationTime(lastBlock: Block, account: PublicKeyAccount)
+                             (implicit transactionModule: TransactionModule[_]): Option[Long]
 
   def consensusBlockData(block: Block): ConsensusBlockData
 }

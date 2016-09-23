@@ -5,7 +5,6 @@ import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import akka.pattern.ask
 import akka.util.Timeout
 import scorex.app.RunnableApplication
 import scorex.network.message.{Message, MessageSpec}
@@ -31,13 +30,13 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   private implicit val timeout = Timeout(5.seconds)
 
   private lazy val settings = application.settings
-  private lazy val peerManager = application.peerManager
+  private val peerManager = application.peerManager
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
   //check own declared address for validity
   if (!settings.localOnly) {
-    settings.declaredAddress.map { myAddress =>
+    settings.declaredAddress.forall { myAddress =>
       Try {
         val uri = new URI("http://" + myAddress)
         val myHost = uri.getHost
@@ -60,7 +59,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
         log.error("Declared address validation failed: ", t)
         false
       }.getOrElse(false)
-    }.getOrElse(true).ensuring(_ == true, "Declared address isn't valid")
+    }.ensuring(_ == true, "Declared address isn't valid")
   }
 
   lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
@@ -76,16 +75,15 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
 
   log.info(s"Declared address: $ownSocketAddress")
 
-  private lazy val handshakeTemplate = Handshake(application.applicationName,
-    application.appVersion,
-    settings.nodeName,
-    application.settings.nodeNonce,
-    ownSocketAddress,
-    0
-  )
-
-
   lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
+
+  override def postRestart(thr: Throwable): Unit = {
+    log.warn(s"restart because of $thr.getMessage")
+    context stop self
+  }
+
+  // there is not recovery for broken connections
+  override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   //bind to listen incoming connections
   IO(Tcp) ! Bind(self, localAddress)
@@ -121,27 +119,20 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
         //todo: ban peer
       }
 
-    case SendToNetwork(message, sendingStrategy) =>
+    case stn @ SendToNetwork(_, _) =>
       val delay = if (settings.fuzzingDelay > 0) Random.nextInt(settings.fuzzingDelay) else 0
-      system.scheduler.scheduleOnce(delay.millis) {
-        (peerManager ? PeerManager.FilterPeers(sendingStrategy))
-          .map(_.asInstanceOf[Seq[ConnectedPeer]])
-          .foreach(_.foreach(_.handlerRef ! message))
-      }
+      system.scheduler.scheduleOnce(delay.millis) { peerManager ! stn }
   }
 
   def peerLogic: Receive = {
     case ConnectTo(remote) =>
       log.info(s"Connecting to: $remote")
-      IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout, pullMode = true)
+      IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout)
 
     case c@Connected(remote, local) =>
       val connection = sender()
       val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
-      connection ! Register(handler, keepOpenOnPeerClosed = false, useResumeWriting = true)
-      val newPeer = ConnectedPeer(remote, handler)
-      peerManager ! PeerManager.Connected(newPeer)
-      newPeer.handlerRef ! handshakeTemplate.copy(time = System.currentTimeMillis() / 1000)
+      peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress)
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
@@ -152,9 +143,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   def interfaceCalls: Receive = {
     case ShutdownNetwork =>
       log.info("Going to shutdown all connections & unbind port")
-      (peerManager ? PeerManager.FilterPeers(Broadcast))
-        .map(_.asInstanceOf[Seq[ConnectedPeer]])
-        .foreach(_.foreach(_.handlerRef ! PeerConnectionHandler.CloseConnection))
+      peerManager ! ShutdownNetwork
       self ! Unbind
       context stop self
   }
@@ -175,7 +164,6 @@ object NetworkController {
 
   case class RegisterMessagesHandler(specs: Seq[MessageSpec[_]], handler: ActorRef)
 
-  //todo: more stricter solution for messageType than number?
   case class DataFromPeer[V](messageType: Message.MessageCode, data: V, source: ConnectedPeer)
 
   case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)

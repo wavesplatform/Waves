@@ -62,6 +62,9 @@ trait Settings extends ScorexLogging {
     (p2pSettings \ "blacklistResidenceTimeMilliseconds").asOpt[Long]
       .getOrElse(DefaultBlacklistResidenceTimeMilliseconds)
 
+  lazy val peersDataResidenceTime: FiniteDuration =
+    (p2pSettings \ "peersDataResidenceTimeDays").asOpt[Int].getOrElse(1).days
+
   lazy val localOnly = (p2pSettings \ "localOnly").asOpt[Boolean].getOrElse(false)
 
   lazy val knownPeers = Try {
@@ -80,7 +83,9 @@ trait Settings extends ScorexLogging {
   lazy val port = (p2pSettings \ "port").asOpt[Int].getOrElse(DefaultPort)
   lazy val declaredAddress = (p2pSettings \ "myAddress").asOpt[String]
   lazy val fuzzingDelay = (p2pSettings \ "fuzzingDelay").asOpt[Int].getOrElse(0)
+  lazy val outboundBufferSize = (p2pSettings \ "outboundBufferSizeMb").asOpt[Int].getOrElse(15) * 1024 * 1024
   lazy val minEphemeralPortNumber = (p2pSettings \ "minEphemeralPortNumber").asOpt[Int].getOrElse(32768)
+  lazy val acceptExternalPeerData = (p2pSettings \ "acceptExternalPeerData").asOpt[Boolean].getOrElse(true)
   lazy val peersDataBroadcastDelay = (p2pSettings \ "peersDataBroadcastDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(30.seconds)
 
@@ -94,35 +99,32 @@ trait Settings extends ScorexLogging {
 
   lazy val offlineGeneration = (settingsJSON \ "offlineGeneration").asOpt[Boolean].getOrElse(false)
 
-  // Blockchain download & sync settings
-  private val DefaultMaxRollback = 100
-  lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(DefaultMaxRollback)
+  lazy val MaxRollback = (settingsJSON \ "maxRollback").asOpt[Int].getOrElse(100)
   val MaxBlocksChunks = 10
-  lazy val forkMaxLength = (settingsJSON \ "forkMaxLength").asOpt[Int].getOrElse(DefaultMaxRollback + 1)
-  lazy val forkResolveQuorumSize = (settingsJSON \ "forkResolveQuorumSize").asOpt[Int].getOrElse(1)
-  lazy val forkFileName = (settingsJSON \ "forkFileName").asOpt[String]
-  lazy val minForkChunkSize = (settingsJSON \ "minForkChunkSize").asOpt[Int].getOrElse(1)
-  lazy val loadEntireForkChunk = (settingsJSON \ "loadEntireForkChunk").asOpt[Boolean].getOrElse(true)
+  lazy val maxChain = (settingsJSON \ "maxChain").asOpt[Int].getOrElse(MaxRollback + 1)
+  lazy val quorum = (settingsJSON \ "quorum").asOpt[Int].getOrElse(1)
+  lazy val chainFileName = (settingsJSON \ "chainFileName").asOpt[String]
+  lazy val loadEntireChain = (settingsJSON \ "loadEntireChain").asOpt[Boolean].getOrElse(true)
+
+  assert(maxChain > 1, "maxChain value should be 2 or more")
 
   // Blockchain download & sync retry settings
   lazy val historySynchronizerTimeout: FiniteDuration = (settingsJSON \ "historySynchronizerTimeout").asOpt[Int]
     .map(x => x.seconds).getOrElse(DefaultHistorySynchronizerTimeout)
-  lazy val pinToInitialPeer = (settingsJSON \ "pinToInitialPeer").asOpt[Boolean].getOrElse(true)
+  lazy val pinToInitialPeer = (settingsJSON \ "pinToInitialPeer").asOpt[Boolean].getOrElse(false)
   lazy val retriesBeforeBlacklisted = (settingsJSON \ "retriesBeforeBlacklisted").asOpt[Int].getOrElse(2)
   lazy val operationRetries = (settingsJSON \ "operationRetries").asOpt[Int].getOrElse(
-    if (pinToInitialPeer) retriesBeforeBlacklisted + 1 else forkResolveQuorumSize)
+    if (pinToInitialPeer) retriesBeforeBlacklisted + 1 else maxConnections)
 
   // Miner settings
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)
-  lazy val mininigThreads: Int = (settingsJSON \ "mininigThreads").asOpt[Int].getOrElse(DefaultMiningThreads)
+  lazy val miningThreads: Int = (settingsJSON \ "mininigThreads").asOpt[Int].getOrElse(DefaultMiningThreads)
   lazy val tflikeScheduling = (settingsJSON \ "tflikeScheduling").asOpt[Boolean].getOrElse(true)
 
-  lazy val maxPeersToBroadcastBlock = (settingsJSON \ "maxPeersToBroadcastBlock").asOpt[Int].getOrElse(1)
-
-  val scoreTTL: FiniteDuration = 1.minute
   lazy val scoreBroadcastDelay: FiniteDuration = (settingsJSON \ "scoreBroadcastDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(30.seconds)
+  lazy val scoreTTL: FiniteDuration = scoreBroadcastDelay * 3
 
   lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
     .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
@@ -137,7 +139,7 @@ trait Settings extends ScorexLogging {
   lazy val genesisTimestamp: Long = (settingsJSON \ "genesisTimestamp").asOpt[Long].getOrElse(DefaultGenesisTimestamp)
 
   //NETWORK
-  private val DefaultMaxConnections = 20
+  private val DefaultMaxConnections = 30
   private val DefaultConnectionTimeout = 60
   private val DefaultBindAddress = "127.0.0.1"
 

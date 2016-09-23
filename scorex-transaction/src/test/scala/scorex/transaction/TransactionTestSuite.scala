@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import org.scalatest.Suites
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImplSpecification
 
 class TransactionTestSuite extends Suites(
   new OrderMatchTransactionSpecification,
@@ -9,5 +10,6 @@ class TransactionTestSuite extends Suites(
   new StoredStateUnitTests,
   new RowSpecification,
   new GenesisTransactionSpecification,
-  new UnconfirmedPoolSynchronizerSpecification
+  new UnconfirmedPoolSynchronizerSpecification,
+  new UnconfirmedTransactionsDatabaseImplSpecification
 )

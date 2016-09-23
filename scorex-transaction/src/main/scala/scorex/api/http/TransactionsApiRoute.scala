@@ -19,6 +19,8 @@ import scala.util.{Success, Try}
 @Api(value = "/transactions", description = "Information about transactions")
 case class TransactionsApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
+  val MaxTransactionsPerRequest = 1000
+
   val settings = application.settings
 
   private val state: LagonakiState = application.blockStorage.state
@@ -38,11 +40,13 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
   def adressLimit: Route = {
     path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
       getJsonRoute {
-        val account = new Account(address)
-        val txJsons = state.accountTransactions(account)
-          .takeRight(limit)
-          .map(_.json)
-        JsonResponse(Json.arr(txJsons), StatusCodes.OK)
+        if (limit <= MaxTransactionsPerRequest) {
+          val account = new Account(address)
+          val txJsons = state.accountTransactions(account)
+            .takeRight(limit)
+            .map(_.json)
+          JsonResponse(Json.arr(txJsons), StatusCodes.OK)
+        } else TooBigArrayAllocation.response
       }
     }
   }
@@ -96,7 +100,7 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
   def unconfirmed: Route = {
     path("unconfirmed") {
       getJsonRoute {
-        val json = JsArray(application.transactionModule.utxStorage.all().map(_.json))
+        val json = JsArray(application.transactionModule.unconfirmedTxs.map(_.json))
         JsonResponse(json, StatusCodes.OK)
       }
     }

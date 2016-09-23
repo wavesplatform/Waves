@@ -19,6 +19,8 @@ import scala.util.{Failure, Success, Try}
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
 case class AddressApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
+  val MaxAddressesPerRequest = 1000
+
   val settings = application.settings
 
   private val wallet = application.wallet
@@ -132,7 +134,7 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   def balance: Route = {
     path("balance" / Segment) { case address =>
       getJsonRoute {
-        balanceJson(address, 1)
+        balanceJson(address, 0)
       }
     }
   }
@@ -207,11 +209,13 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   def seq: Route = {
     path("seq" / IntNumber / IntNumber) { case (start, end) =>
       getJsonRoute {
-        val json = JsArray(
-          wallet.privateKeyAccounts().map(a => JsString(a.address)).slice(start, end)
-        )
+        if (start >= 0 && end >= 0 && start - end < MaxAddressesPerRequest) {
+          val json = JsArray(
+            wallet.privateKeyAccounts().map(a => JsString(a.address)).slice(start, end)
+          )
 
-        JsonResponse(json, StatusCodes.OK)
+          JsonResponse(json, StatusCodes.OK)
+        } else TooBigArrayAllocation.response
       }
     }
   }
@@ -300,11 +304,11 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
                   }
                 }
             }
-          case Failure(_) => WrongJson.response
+            case Failure(_) => WrongJson.response
+          }
         }
       }
     }
   }
-}
 
 }

@@ -33,7 +33,7 @@ trait BlockStorage extends ScorexLogging {
             db.commit()
         }
       }
-    }.recoverWith { case e =>
+    } recoverWith { case e =>
       log.error("Failed to append block:", e)
       Failure(e)
     }

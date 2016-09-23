@@ -7,8 +7,6 @@ import scorex.transaction.History
 import scorex.transaction.History._
 import scorex.utils.ScorexLogging
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 //todo: break a connection if no score message from remote for some time?
@@ -20,43 +18,32 @@ class ScoreObserver(application: Application) extends ViewSynchronizer with Scor
 
   override val messageSpecs: Seq[MessageSpec[_]] = Seq(ScoreMessageSpec)
 
-  override val networkControllerRef = application.networkController
+  protected lazy override val networkControllerRef = application.networkController
   private val coordinator = application.coordinator
 
   private val scoreTTL = application.settings.scoreTTL
 
-  private case class PeerData(score: BlockchainScore, seen: Long)
-  private type Candidates = Map[ConnectedPeer, PeerData]
-
   private var candidates: Candidates = Map.empty
 
-  context.system.scheduler.schedule(5.seconds, 5.seconds, self, UpdateScore(None))
-
   override def receive: Receive = {
-    //todo: check sender
     case DataFromPeer(msgId, score: History.BlockchainScore, connectedPeer) if msgId == ScoreMessageSpec.messageCode =>
-      self ! UpdateScore(Some(connectedPeer -> score))
+      self ! UpdateScore(connectedPeer, score)
 
-    case UpdateScore(scoreToAdd) =>
+    case UpdateScore(peer, updatedScore) =>
       val oldMaxScore = maxScore(candidates)
       candidates = clearOld(candidates)
 
-      scoreToAdd.foreach { case (connectedPeer, value) =>
-        candidates = candidates + (connectedPeer -> PeerData(value, System.currentTimeMillis()))
-      }
+      candidates += peer -> ScoreData(updatedScore, System.currentTimeMillis())
 
       val newMaxScore = maxScore(candidates)
 
       if (newMaxScore > oldMaxScore) {
-        coordinator ! consideredValue
+        coordinator ! currentScore
       }
 
     case GetScore =>
       candidates = clearOld(candidates)
-      sender() ! consideredValue
-
-    //the signal to initialize
-    case Unit =>
+      sender() ! currentScore
   }
 
   private def clearOld(candidates: Candidates): Candidates = {
@@ -67,17 +54,20 @@ class ScoreObserver(application: Application) extends ViewSynchronizer with Scor
   private def maxScore(candidates: Candidates): BlockchainScore =
     if (candidates.isEmpty) 0 else candidates.values.map(_.score).max
 
-  private def consideredValue: ConsideredValue = {
-    ConsideredValue(candidates.map { case (peer, data) => (peer, data.score) } toSeq)
+  private def currentScore: CurrentScore = {
+    CurrentScore(candidates.map { case (peer, data) => (peer, data.score) } toSeq)
   }
 }
 
 object ScoreObserver {
 
-  case class UpdateScore(scoreToAdd: Option[(ConnectedPeer, BlockchainScore)])
+  case class UpdateScore(peer: ConnectedPeer, score: BlockchainScore)
 
   case object GetScore
 
-  case class ConsideredValue(scores: Seq[(ConnectedPeer, BlockchainScore)])
+  case class CurrentScore(scores: Seq[(ConnectedPeer, BlockchainScore)])
 
+  private case class ScoreData(score: BlockchainScore, seen: Long)
+
+  private type Candidates = Map[ConnectedPeer, ScoreData]
 }

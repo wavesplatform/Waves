@@ -13,6 +13,7 @@ import scorex.network.{NetworkController, _}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("UnconfirmedPoolSynchronizerSpecification"))
   with ImplicitSender with WordSpecLike with Matchers with MockFactory
@@ -23,44 +24,57 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
     TestKit.shutdownActorSystem(system)
   }
 
-  private object MyTxSettings extends TransactionSettings {
-    override val settingsJSON: JsObject = Json.obj()
-    override lazy val utxRebroadcastInterval = 1.seconds
-  }
-
   "An UnconfirmedPoolSynchronizer actor" must {
+
+    val transactionModule = mock[TransactionModule[StoredInBlock]]
+
+    def createPoolSynchronizer(broadcastInterval: FiniteDuration) = {
+      val settings = new TransactionSettings {
+        override val settingsJSON: JsObject = Json.obj()
+        override lazy val utxRebroadcastInterval = broadcastInterval
+      }
+
+      TestActorRef(new UnconfirmedPoolSynchronizer(transactionModule, settings, testActor))
+    }
 
     val defaultRecipient = new PublicKeyAccount(Array.fill(32)(0: Byte))
     val tx = new GenesisTransaction(defaultRecipient, 149857264546L, 4598723454L)
 
     "broadcast new transaction to network" in {
 
-      val transactionModule = mock[TransactionModule[StoredInBlock]]
-      inSequence{
-        (transactionModule.isValid(_:Transaction)) expects(*) returning(true)
-        (transactionModule.putUnconfirmedIfNew(_:Transaction)) expects(*) returning(true)
-      }
+      (transactionModule.isValid(_:Transaction)) expects * never()
+      transactionModule.putUnconfirmedIfNew _ expects * returns true
 
-      // do
-      val settings = new TransactionSettings {
-        override val settingsJSON: JsObject = Json.obj()
-        override lazy val utxRebroadcastInterval = 100.seconds
-      }
-      val actorRef = TestActorRef(new UnconfirmedPoolSynchronizer(transactionModule, settings, testActor))
-      actorRef ! DataFromPeer(TransactionMessageSpec.messageCode, tx, ConnectedPeer(null, null))
+      val actorRef = createPoolSynchronizer(100 seconds)
+      val sender = stub[ConnectedPeer]
+      actorRef ! DataFromPeer(TransactionMessageSpec.messageCode, tx, sender)
 
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(tx), None)
       expectMsg(NetworkController.RegisterMessagesHandler(Seq(spec), actorRef))
-      expectMsg(NetworkController.SendToNetwork(ntwMsg, Broadcast))
+      expectMsg(NetworkController.SendToNetwork(ntwMsg, BroadcastExceptOf(sender)))
+      actorRef.stop()
+    }
+
+    "not broadcast tx if it has been skipped" in {
+
+      transactionModule.putUnconfirmedIfNew _ expects * returns false
+
+      val actorRef = createPoolSynchronizer(100 seconds)
+      val sender = stub[ConnectedPeer]
+      actorRef ! DataFromPeer(TransactionMessageSpec.messageCode, tx, sender)
+
+      val spec = TransactionalMessagesRepo.TransactionMessageSpec
+      val ntwMsg = Message(spec, Right(tx), None)
+      expectMsg(NetworkController.RegisterMessagesHandler(Seq(spec), actorRef))
+      expectNoMsg()
       actorRef.stop()
     }
 
     "broadcast one tx periodically" in {
-      val transactionModule = mock[TransactionModule[StoredInBlock]]
-     (transactionModule.unconfirmedTxs: () => Seq[Transaction]).expects().returning(Seq(tx))
+     (transactionModule.unconfirmedTxs _).expects().returning(Seq(tx))
 
-      val actorRef = TestActorRef(new UnconfirmedPoolSynchronizer(transactionModule, MyTxSettings, testActor))
+      val actorRef = createPoolSynchronizer(1 second)
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(tx), None)
       expectMsg(NetworkController.RegisterMessagesHandler(Seq(spec), actorRef))
