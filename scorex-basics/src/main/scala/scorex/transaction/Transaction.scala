@@ -15,4 +15,8 @@ trait Transaction extends StateChangeReason with JsonSerializable {
 
   val id: Array[Byte]
 
+  def balanceChanges(): Seq[BalanceChange]
+
 }
+
+case class BalanceChange(acc: Account, assetId: Option[Array[Byte]], delta: Long)

@@ -19,6 +19,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
                                    override val signature: Array[Byte]) extends Transaction with BytesSerializable {
 
   import LagonakiTransaction._
+
   override val id: Array[Byte] = signature
 
   lazy val deadline = timestamp + 24.hours.toMillis
@@ -44,8 +45,6 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
   def validate: ValidationResult.Value
 
   def involvedAmount(account: Account): Long
-
-  def balanceChanges(): Seq[(Account, Long)]
 
   override def equals(other: Any): Boolean = other match {
     case tx: LagonakiTransaction => signature.sameElements(tx.signature)

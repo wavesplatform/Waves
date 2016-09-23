@@ -2,12 +2,11 @@ package scorex.transaction.assets.exchange
 
 import com.google.common.primitives.{Ints, Longs}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.Account
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser}
-import scorex.transaction.Transaction
+import scorex.transaction.{BalanceChange, Transaction}
 
 import scala.util.Try
 
@@ -41,10 +40,8 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
       (order1Total <= order1.amount) && (order2Total <= order2.amount)
     }
     lazy val matcherFeeIsValid: Boolean = {
-      //TODO Matcher takes all his fee on his first match and takes nothing after that
-      val o1maxFee = if (order1Transactions.isEmpty) order1.matcherFee else 0
-      val o2maxFee = if (order2Transactions.isEmpty) order2.matcherFee else 0
-      matcherFee == (o1maxFee + o2maxFee)
+      //matcher takes part of fee = part of matched order
+      matcherFee == (order1.matcherFee * amount / order1.amount + order2.matcherFee * amount / order2.amount)
     }
     lazy val matcherSignatureIsValid: Boolean =
       EllipticCurveImpl.verify(signature, toSign, order1.matcher.publicKey)
@@ -70,17 +67,11 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
     "signature" -> Base58.encode(signature)
   )
 
-  def balanceChanges(previousMatches: Seq[OrderMatch]): Seq[(Account, (AssetId, Long))] = {
-    lazy val order1FirstMatch = !previousMatches.exists { om =>
-      (om.order1.signature sameElements order1.signature) || (om.order2.signature sameElements order1.signature)
-    }
-    lazy val order2FirstMatch = !previousMatches.exists { om =>
-      (om.order1.signature sameElements order2.signature) || (om.order2.signature sameElements order2.signature)
-    }
+  override def balanceChanges(): Seq[BalanceChange] = {
 
     val matcherChange = Seq((order1.matcher, (WavesAssetId, matcherFee - fee)))
-    val o1feeChange = if (order1FirstMatch) Seq((order1.sender, (WavesAssetId, -order1.matcherFee))) else Seq()
-    val o2feeChange = if (order2FirstMatch) Seq((order2.sender, (WavesAssetId, -order2.matcherFee))) else Seq()
+    val o1feeChange = Seq(BalanceChange(order1.sender, None, order1.matcherFee * amount / order1.amount))
+    val o2feeChange = Seq(BalanceChange(order2.sender, None, order2.matcherFee * amount / order2.amount))
 
     val exchange = if (order1.priceAssetId sameElements order1.spendAssetId) {
       Seq(
@@ -97,7 +88,7 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
         (order2.sender, (order1.receiveAssetId, +amount * price / PriceConstant))
       )
     }
-    o1feeChange ++ o2feeChange ++ matcherChange ++ exchange
+    o1feeChange ++ o2feeChange ++ (matcherChange ++ exchange).map(c => BalanceChange(c._1, Some(c._2._1), c._2._2))
   }
 }
 

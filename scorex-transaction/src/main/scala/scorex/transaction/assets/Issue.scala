@@ -6,7 +6,7 @@ import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.Deser
-import scorex.transaction.Transaction
+import scorex.transaction.{BalanceChange, Transaction}
 
 import scala.util.Try
 
@@ -26,7 +26,7 @@ case class Issue(sender: PublicKeyAccount,
   require(description.length <= MaxDescriptionLength)
   require(name.length <= MaxAssetNameLength && name.length >= MinAssetNameLength)
   require(decimals >= 0 && decimals <= MaxDecimals)
-  require(fee > 0)
+  require(fee >= MinFee)
   require(quantity > 0)
 
 
@@ -40,6 +40,8 @@ case class Issue(sender: PublicKeyAccount,
 
   override def json: JsObject = ???
 
+  override def balanceChanges(): Seq[BalanceChange] = ???
+
   override def bytes: Array[Byte] = signature ++ toSign
 }
 
@@ -47,6 +49,7 @@ object Issue extends Deser[Issue] {
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength = 16
   val MinAssetNameLength = 4
+  val MinFee = 100000000
   val MaxDecimals = 8
 
   override def parseBytes(bytes: Array[Byte]): Try[Issue] = Try {

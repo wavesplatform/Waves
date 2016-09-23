@@ -61,7 +61,7 @@ case class GenesisTransaction(override val recipient: Account,
 
   override def involvedAmount(account: Account): Long = if (recipient.address.equals(account.address)) amount else 0
 
-  override def balanceChanges(): Seq[(Account, Long)] = Seq((recipient, amount))
+  override def balanceChanges(): Seq[BalanceChange] = Seq(BalanceChange(recipient, None, amount))
 }
 
 

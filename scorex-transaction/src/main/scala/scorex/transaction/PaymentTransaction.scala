@@ -71,8 +71,8 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     } else 0
   }
 
-  override def balanceChanges(): Seq[(Account, Long)] =
-    Seq((sender, -amount - fee), (recipient, amount))
+  override def balanceChanges(): Seq[BalanceChange] =
+    Seq(BalanceChange(sender, None, -amount - fee), BalanceChange(recipient, None, amount))
 }
 
 object PaymentTransaction extends Deser[PaymentTransaction] {
