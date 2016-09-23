@@ -2,7 +2,7 @@ package scorex.transaction.assets
 
 import com.google.common.primitives.Longs
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.PublicKeyAccount
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
@@ -11,18 +11,18 @@ import scorex.transaction.{AssetAcc, BalanceChange, Transaction}
 
 import scala.util.Try
 
-case class Issue(sender: PublicKeyAccount,
-                 assetIdOpt: Option[Array[Byte]],
-                 name: Array[Byte],
-                 description: Array[Byte],
-                 quantity: Long,
-                 decimals: Byte,
-                 reissuable: Boolean,
-                 fee: Long,
-                 timestamp: Long,
-                 signature: Array[Byte]) extends Transaction {
+case class IssueTransaction(sender: PublicKeyAccount,
+                            assetIdOpt: Option[Array[Byte]],
+                            name: Array[Byte],
+                            description: Array[Byte],
+                            quantity: Long,
+                            decimals: Byte,
+                            reissuable: Boolean,
+                            fee: Long,
+                            timestamp: Long,
+                            signature: Array[Byte]) extends Transaction {
 
-  import Issue._
+  import IssueTransaction._
 
   require(description.length <= MaxDescriptionLength)
   require(name.length <= MaxAssetNameLength && name.length >= MinAssetNameLength)
@@ -58,14 +58,14 @@ case class Issue(sender: PublicKeyAccount,
   override def bytes: Array[Byte] = signature ++ toSign
 }
 
-object Issue extends Deser[Issue] {
+object IssueTransaction extends Deser[IssueTransaction] {
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength = 16
   val MinAssetNameLength = 4
   val MinFee = 100000000
   val MaxDecimals = 8
 
-  override def parseBytes(bytes: Array[Byte]): Try[Issue] = Try {
+  override def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {
     import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
     val sender = new PublicKeyAccount(bytes.slice(SignatureLength, SignatureLength + KeyLength))
@@ -80,6 +80,21 @@ object Issue extends Deser[Issue] {
     val reissuable = bytes.slice(quantityStart + 9, quantityStart + 10).head == (1: Byte)
     val fee = Longs.fromByteArray(bytes.slice(quantityStart + 10, quantityStart + 18))
     val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 18, quantityStart + 26))
-    Issue(sender, assetIdOpt, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
+    IssueTransaction(sender, assetIdOpt, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
+  }
+
+  def create(sender: PrivateKeyAccount,
+             assetIdOpt: Option[Array[Byte]],
+             name: Array[Byte],
+             description: Array[Byte],
+             quantity: Long,
+             decimals: Byte,
+             reissuable: Boolean,
+             fee: Long,
+             timestamp: Long): IssueTransaction = {
+    val unsigned =
+      IssueTransaction(sender, assetIdOpt, name, description, quantity, decimals, reissuable, fee, timestamp, null)
+    val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
+    unsigned.copy(signature = sig)
   }
 }

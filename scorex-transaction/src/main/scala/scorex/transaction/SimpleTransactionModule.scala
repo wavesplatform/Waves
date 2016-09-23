@@ -9,8 +9,9 @@ import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
-import scorex.transaction.state.wallet.Payment
+import scorex.transaction.state.wallet.{IssueRequest, Payment}
 import scorex.utils._
 import scorex.wallet.Wallet
 
@@ -133,11 +134,18 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     }
   }
 
+  def issueAsset(issue: IssueRequest, wallet: Wallet): Option[IssueTransaction] = {
+    val time = getTimestamp
+    ???
+  }
+
   private var txTime: Long = 0
+  private def getTimestamp:Long = synchronized(Math.max(NTP.correctedTime(), txTime + 1))
+
   def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
-    txTime = Math.max(NTP.correctedTime(), txTime + 1)
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, txTime)
-    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, txTime, sig)
+    val time = getTimestamp
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
+    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
     if (isValid(payment)) onNewOffchainTransaction(payment)
     payment
   }

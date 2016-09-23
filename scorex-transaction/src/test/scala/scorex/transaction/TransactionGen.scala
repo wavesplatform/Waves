@@ -3,7 +3,7 @@ package scorex.transaction
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.assets.Issue
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
 import scorex.utils.NTP
 
@@ -40,18 +40,18 @@ trait TransactionGen {
     matcherFee: Long <- positiveLongGen
   } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
 
-  val issueGenerator: Gen[Issue] = for {
+  val issueGenerator: Gen[IssueTransaction] = for {
     sender: PrivateKeyAccount <- accountGen
     assetIdOpt: Option[Array[Byte]] <- Gen.option(bytes64gen)
-    assetName <- genBoundedBytes(Issue.MinAssetNameLength, Issue.MaxAssetNameLength)
-    description <- genBoundedBytes(0, Issue.MaxDescriptionLength)
+    assetName <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+    description <- genBoundedBytes(0, IssueTransaction.MaxDescriptionLength)
     quantity <- positiveLongGen
     decimals <- Gen.choose(0: Byte, 8: Byte)
     reissuable <- Arbitrary.arbitrary[Boolean]
     fee <- positiveLongGen
     timestamp <- positiveLongGen
     signature <- bytes64gen
-  } yield Issue(sender, assetIdOpt, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
+  } yield IssueTransaction(sender, assetIdOpt, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
 
 
   val invalidOrderGenerator: Gen[Order] = for {
