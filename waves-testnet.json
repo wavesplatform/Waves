@@ -13,7 +13,7 @@
   "walletPassword": "mycookies",
   "dataDir": "/tmp/scorex/waves/data",
   "rpcPort": 6869,
-  "rpcAddress": "0.0.0.0",
+  "rpcAddress": "127.0.0.1",
   "rpcAllowed": [],
   "blockGenerationDelay": 15000,
   "historySynchronizerTimeout": 15,

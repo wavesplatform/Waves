@@ -18,7 +18,7 @@ class NodeAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll
 
   test("/node/status API route") {
     val status = getRequest("/node/status")
-    List("generating", "syncing") should contain((status \ "blockGeneratorStatus").as[String])
+    List("generating", "suspended") should contain((status \ "blockGeneratorStatus").as[String])
     List("synced", "syncing", "idle") should contain((status \ "historySynchronizationStatus").as[String])
   }
 
