@@ -1,6 +1,7 @@
 package scorex.lagonaki.integration.api
 
 import org.scalatest.{FunSuite, Matchers}
+import scorex.api.http.TooBigArrayAllocation
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 import scorex.lagonaki.integration.TestLock
@@ -30,7 +31,11 @@ class UtilsAPISpecification extends FunSuite with TestLock with Matchers {
   }
 
   test("/utils/seed/{length} API route") {
-    val length = Random.nextInt(4096)
+    val length = Random.nextInt(1024)
     Base58.decode((GET.request(s"/utils/seed/$length") \ "seed").as[String]).get.length shouldBe length
+  }
+
+  test("/utils/seed/{length} API route limits argument to 1024") {
+    (GET.request(s"/utils/seed/1025") \ "error").as[Int] shouldBe TooBigArrayAllocation.id
   }
 }

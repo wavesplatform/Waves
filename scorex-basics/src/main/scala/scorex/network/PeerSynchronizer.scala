@@ -21,6 +21,7 @@ class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronize
   import application.basicMessagesSpecsRepo._
 
   private implicit val timeout = Timeout(5.seconds)
+  private val maxPeersToBroadcast = 3
 
   override val messageSpecs = Seq(GetPeersSpec, PeersSpec)
   protected lazy override val networkControllerRef = application.networkController
@@ -28,21 +29,22 @@ class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronize
   private val peerManager = application.peerManager
 
   private val peersDataBroadcastDelay = application.settings.peersDataBroadcastDelay
-  private val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(), None), SendToRandom)
+  private val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(()), None), SendToRandom)
   context.system.scheduler.schedule(peersDataBroadcastDelay, peersDataBroadcastDelay)(networkControllerRef ! stn)
 
   override def receive: Receive = {
     case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)
       if msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
 
-      peers
-        .filter(_.getPort < application.settings.minEphemeralPortNumber)
-        .foreach(isa => peerManager ! PeerManager.AddOrUpdatePeer(isa, None, None))
+      if (peers.size <= maxPeersToBroadcast) {
+        peers
+          .filter(_.getPort < application.settings.minEphemeralPortNumber)
+          .foreach(isa => peerManager ! PeerManager.AddOrUpdatePeer(isa, None, None))
+      }
 
     case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
 
-      //todo: externalize the number, check on receiving
-      (peerManager ? GetRandomPeersToBroadcast(3))
+      (peerManager ? GetRandomPeersToBroadcast(maxPeersToBroadcast))
         .mapTo[Seq[InetSocketAddress]]
         .filter(_.nonEmpty)
         .foreach { peers =>

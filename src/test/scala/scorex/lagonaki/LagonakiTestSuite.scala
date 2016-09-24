@@ -20,6 +20,7 @@ class LagonakiTestSuite extends Sequential(
 
   //unit tests
   , new MessageSpecification
+  , new MessageHandlerSpec
   , new BlockSpecification
   , new WalletSpecification
   , new StateTest

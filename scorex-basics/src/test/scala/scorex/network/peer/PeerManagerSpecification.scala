@@ -183,7 +183,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
         actorRef ! AddToBlacklist(nonce + 1, new InetSocketAddress(anAddress.getHostName, anAddress.getPort + 1))
 
         getBlacklistedPeers should have size 1
-        getBlacklistedPeers should contain (anAddress.getHostName)
+        getBlacklistedPeers should contain(anAddress.getHostName)
       }
     }
 
@@ -216,6 +216,36 @@ class PeerManagerSpecification extends ActorTestingCommons {
       h1.expectMsg(CloseConnection)
       h3.expectMsg(CloseConnection)
     }
+
+    "many TCP clients from the same IP address" in {
+
+      def connect1(id: Int): TestProbe = {
+        val address = new InetSocketAddress(id)
+        val handler = TestProbe("connection-handler-" + id)
+        actorRef ! Connected(address, handler.ref, None)
+        handler.expectMsgType[Handshake]
+        actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", id, None, 0))
+        handler
+      }
+
+      def connect2(id: Int): TestProbe = {
+        val address = new InetSocketAddress(id)
+        val handler = TestProbe("connection-handler-" + id)
+        actorRef ! Connected(address, handler.ref, None)
+        handler
+      }
+
+      (1 to 5).foreach { i =>
+        connect1(i)
+        getConnectedPeers should have size i
+      }
+
+      (1 to 3).foreach { i =>
+        val h = connect2(i + 5)
+        getConnectedPeers should have size 5
+      }
+    }
+
 
     "disconnect during handshake" in {
       actorRef ! Connected(anAddress, peerConnectionHandler.ref, None)

@@ -17,7 +17,8 @@ import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 case class UtilsApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute {
   val settings = application.settings
-  val SeedSize = 32
+  val MaxSeedSize = 1024
+  val DefaultSeedSize = 32
 
   private def seed(length: Int): JsonResponse = {
     val seed = new Array[Byte](length)
@@ -37,7 +38,7 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   ))
   def seedRoute: Route = path("seed") {
     getJsonRoute {
-      seed(SeedSize)
+      seed(DefaultSeedSize)
     }
   }
 
@@ -46,10 +47,11 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "length", value = "Seed length ", required = true, dataType = "integer", paramType = "path")
   ))
-  @ApiResponse(code = 200, message = "Json with peer list or error")
+  @ApiResponse(code = 200, message = "Json with error message")
   def length: Route = path("seed" / IntNumber) { case length =>
     getJsonRoute {
-      seed(length)
+      if (length <= MaxSeedSize) seed(length)
+      else TooBigArrayAllocation.response
     }
   }
 

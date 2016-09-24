@@ -44,4 +44,6 @@ object Message {
   val MagicLength = MAGIC.length
 
   val ChecksumLength = 4
+  val LengthFieldLength = 4
+  val MessageCodeLength = 1
 }
