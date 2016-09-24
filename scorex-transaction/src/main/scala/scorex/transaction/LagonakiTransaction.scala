@@ -14,12 +14,13 @@ import scala.util.{Failure, Try}
 abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
                                    val recipient: Account,
                                    val amount: Long,
-                                   override val fee: Long,
+                                   val fee: Long,
                                    override val timestamp: Long,
                                    override val signature: Array[Byte]) extends Transaction with BytesSerializable {
 
   import LagonakiTransaction._
 
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val id: Array[Byte] = signature
 
   lazy val deadline = timestamp + 24.hours.toMillis

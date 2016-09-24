@@ -7,9 +7,8 @@ import scorex.serialization.JsonSerializable
 /**
   * A transaction is an atomic state modifier
   */
-
 trait Transaction extends StateChangeReason with JsonSerializable {
-  val fee: Long
+  val assetFee: (Option[AssetId], Long)
 
   val timestamp: Long
 

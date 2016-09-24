@@ -7,7 +7,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.Deser
-import scorex.transaction.{AssetAcc, BalanceChange, Transaction}
+import scorex.transaction.{AssetId, AssetAcc, BalanceChange, Transaction}
 
 import scala.util.Try
 
@@ -31,6 +31,7 @@ case class IssueTransaction(sender: PublicKeyAccount,
   require(quantity > 0)
 
 
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
   lazy val assetId = assetIdOpt.getOrElse(id)
 
   lazy val toSign: Array[Byte] = sender.publicKey ++ assetIdOpt.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte)) ++

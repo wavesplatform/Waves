@@ -90,7 +90,9 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   override def packUnconfirmed(heightOpt: Option[Int]): StoredInBlock = synchronized {
     clearIncorrectTransactions()
 
-    val txs = utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock)
+    //TODO sort by real value of fee?
+    val txs = utxStorage.all().sortBy(t => if (t.assetFee._1.isDefined) 0 else -t.assetFee._2)
+      .take(MaxTransactionsPerBlock)
     val valid = blockStorage.state.validate(txs, heightOpt)
 
     if (valid.size != txs.size) {
@@ -140,7 +142,8 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   }
 
   private var txTime: Long = 0
-  private def getTimestamp:Long = synchronized(Math.max(NTP.correctedTime(), txTime + 1))
+
+  private def getTimestamp: Long = synchronized(Math.max(NTP.correctedTime(), txTime + 1))
 
   def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
     val time = getTimestamp

@@ -6,7 +6,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser}
-import scorex.transaction.{AssetAcc, BalanceChange, Transaction}
+import scorex.transaction.{AssetId, AssetAcc, BalanceChange, Transaction}
 
 import scala.util.Try
 
@@ -17,6 +17,8 @@ case class OrderMatch(order1: Order, order2: Order, price: Long, amount: Long, m
                       timestamp: Long, signature: Array[Byte]) extends Transaction with BytesSerializable {
 
   override val id: Array[Byte] = FastCryptographicHash(toSign)
+
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   def isValid(previousMatches: Seq[OrderMatch]): Boolean = {
     lazy val order1Transactions = previousMatches.filter { om =>
