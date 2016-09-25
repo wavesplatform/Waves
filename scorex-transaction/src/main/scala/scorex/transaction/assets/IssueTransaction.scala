@@ -5,7 +5,6 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction.TransactionType
 import scorex.transaction._
@@ -35,6 +34,7 @@ case class IssueTransaction(sender: PublicKeyAccount,
     Longs.toByteArray(fee), Longs.toByteArray(timestamp))
 
   override lazy val json: JsObject = Json.obj(
+    "type" -> transactionType.id,
     "id" -> Base58.encode(id),
     "sender" -> sender.address,
     "assetId" -> Base58.encode(assetId),
@@ -53,7 +53,7 @@ case class IssueTransaction(sender: PublicKeyAccount,
     Seq(BalanceChange(AssetAcc(sender, Some(assetId)), quantity),
       BalanceChange(AssetAcc(sender, assetFee._1), -assetFee._2))
 
-  override def bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
+  override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
   lazy val isValid: Boolean = {
     description.length <= MaxDescriptionLength && name.length <= MaxAssetNameLength && decimals >= 0 &&
@@ -78,10 +78,7 @@ object IssueTransaction extends Deser[IssueTransaction] {
     import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
     val sender = new PublicKeyAccount(bytes.slice(SignatureLength, SignatureLength + KeyLength))
-    val assetIsDefined = bytes.slice(SignatureLength + KeyLength, SignatureLength + KeyLength + 1).head == (1: Byte)
-    val assetIdOpt = if (!assetIsDefined) None
-    else Some(bytes.slice(SignatureLength + KeyLength + 1, 2 * SignatureLength + KeyLength + 1))
-    val nameStart = if (!assetIsDefined) SignatureLength + KeyLength + 1 else 2 * SignatureLength + KeyLength + 1
+    val (assetIdOpt, nameStart) = parseOption(bytes, SignatureLength + KeyLength, SignatureLength)
     val (assetName, descriptionStart) = parseArraySize(bytes, nameStart)
     val (description, quantityStart) = parseArraySize(bytes, descriptionStart)
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))

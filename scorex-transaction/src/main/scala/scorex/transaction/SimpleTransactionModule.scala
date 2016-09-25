@@ -10,9 +10,9 @@ import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
-import scorex.transaction.state.wallet.{IssueRequest, Payment}
+import scorex.transaction.state.wallet.{IssueRequest, Payment, TransferRequest}
 import scorex.utils._
 import scorex.wallet.Wallet
 
@@ -137,8 +137,24 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     }
   }
 
+  def transferAsset(request: TransferRequest, wallet: Wallet): Option[TransferTransaction] = Try {
+    val sender = wallet.privateKeyAccount(request.sender).get
+
+    val transfer: TransferTransaction = TransferTransaction.create(request.assetIdOpt.map(s => Base58.decode(s).get),
+      sender: PrivateKeyAccount,
+      new Account(request.recipient),
+      request.amount,
+      getTimestamp,
+      request.feeAsset.map(s => Base58.decode(s).get),
+      request.feeAmount,
+      Base58.decode(request.attachment).get)
+
+    if (isValid(transfer)) onNewOffchainTransaction(transfer)
+    else log.warn("Invalid transfer transaction generated: " + transfer.json)
+    transfer
+  }.toOption
+
   def issueAsset(request: IssueRequest, wallet: Wallet): Option[IssueTransaction] = Try {
-    val timestamp = getTimestamp
     val sender = wallet.privateKeyAccount(request.sender).get
     val issue = IssueTransaction.create(sender,
       request.assetIdOpt.map(s => Base58.decode(s).get),
@@ -147,10 +163,10 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       request.quantity,
       request.decimals,
       request.reissuable,
-      request.fee: Long,
-      timestamp: Long)
+      request.fee,
+      getTimestamp)
     if (isValid(issue)) onNewOffchainTransaction(issue)
-    else log.warn("Nonvalid issue transaction generated:")
+    else log.warn("Invalid issue transaction generated: " + issue.json)
     issue
   }.toOption
 

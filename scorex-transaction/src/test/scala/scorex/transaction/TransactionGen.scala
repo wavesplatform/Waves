@@ -3,11 +3,9 @@ package scorex.transaction
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
+import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.utils.NTP
-
-import scala.util.Random
 
 trait TransactionGen {
 
@@ -26,8 +24,19 @@ trait TransactionGen {
     fee: Long <- positiveLongGen
     timestamp: Long <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
-    recepient: PrivateKeyAccount <- accountGen
-  } yield PaymentTransaction(sender, recepient, amount, fee, timestamp)
+    recipient: PrivateKeyAccount <- accountGen
+  } yield PaymentTransaction(sender, recipient, amount, fee, timestamp)
+
+  val transferGenerator: Gen[TransferTransaction] = for {
+    amount: Long <- Gen.choose(0, Long.MaxValue)
+    feeAmount: Long <- positiveLongGen
+    assetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
+    feeAssetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
+    timestamp: Long <- positiveLongGen
+    sender: PrivateKeyAccount <- accountGen
+    attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
+    recipient: PrivateKeyAccount <- accountGen
+  } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment)
 
   val orderGenerator: Gen[Order] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -49,9 +58,8 @@ trait TransactionGen {
     reissuable <- Arbitrary.arbitrary[Boolean]
     fee <- positiveLongGen
     timestamp <- positiveLongGen
-    signature <- bytes64gen
   } yield {
-    val issue = IssueTransaction(sender, None, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
+    val issue = IssueTransaction.create(sender, None, assetName, description, quantity, decimals, reissuable, fee, timestamp)
     val reissue = IssueTransaction.create(sender, Some(issue.assetId), assetName, description, quantity, decimals, reissuable, fee, timestamp)
     (issue, reissue)
   }

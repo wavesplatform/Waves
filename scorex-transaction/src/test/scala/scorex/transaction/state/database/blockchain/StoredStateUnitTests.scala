@@ -8,7 +8,7 @@ import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.Account
 import scorex.transaction._
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
 
 import scala.util.Random
@@ -28,6 +28,37 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
   val applyChanges = PrivateMethod[Unit]('applyChanges)
   val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
+
+
+  property("Transfer asset") {
+    forAll(transferGenerator) { tx: TransferTransaction =>
+      val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
+      val senderFeeAcc = AssetAcc(tx.sender, tx.feeAsset)
+      val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
+
+      val senderAmountBalance = state.assetBalance(senderAmountAcc)
+      val senderFeeBalance = state.assetBalance(senderFeeAcc)
+      val recipientAmountBalance = state.assetBalance(recipientAmountAcc)
+
+      state.applyChanges(state.calcNewBalances(Seq(tx), Map()))
+
+      val newSenderAmountBalance = state.assetBalance(senderAmountAcc)
+      val newSenderFeeBalance = state.assetBalance(senderFeeAcc)
+      val newRecipientAmountBalance = state.assetBalance(recipientAmountAcc)
+
+      newRecipientAmountBalance shouldBe (recipientAmountBalance + tx.amount)
+
+      if(tx.sameAssetForFee) {
+        newSenderAmountBalance shouldBe newSenderFeeBalance
+        newSenderAmountBalance shouldBe (senderAmountBalance - tx.amount - tx.feeAmount)
+      } else {
+        newSenderAmountBalance shouldBe senderAmountBalance - tx.amount
+        newSenderFeeBalance shouldBe senderFeeBalance - tx.feeAmount
+      }
+
+    }
+  }
+
 
   property("Reissue asset") {
     forAll(issueReissueGenerator) { pair =>

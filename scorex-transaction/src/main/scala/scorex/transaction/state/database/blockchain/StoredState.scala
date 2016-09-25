@@ -6,7 +6,7 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.{TransferTransaction, IssueTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.ScorexLogging
 
@@ -261,6 +261,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
       tx.signatureValid && tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
+    case tx: TransferTransaction =>
+      tx.signatureValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: IssueTransaction =>
       val reissueValid: Boolean = tx.assetIdOpt.map { assetId =>
         val initialIssue: Option[IssueTransaction] = Option(issueTxs.get(assetId))

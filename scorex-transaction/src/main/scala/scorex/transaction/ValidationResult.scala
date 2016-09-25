@@ -8,4 +8,5 @@ object ValidationResult extends Enumeration {
   val NegativeAmount = Value(3)
   val InsufficientFee = Value(4)
   val NoBalance = Value(5)
+  val TooBigArray = Value(6)
 }

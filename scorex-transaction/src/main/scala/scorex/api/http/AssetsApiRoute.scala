@@ -11,9 +11,9 @@ import scorex.account.Account
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
 import scorex.transaction.{SimpleTransactionModule, AssetAcc}
-import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.{TransferTransaction, IssueTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.wallet.IssueRequest
+import scorex.transaction.state.wallet.{TransferRequest, IssueRequest}
 
 import scala.util.{Success, Try}
 
@@ -32,7 +32,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ issue
+      balance ~ issue ~ transfer
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -45,6 +45,47 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
     path("balance" / Segment / Segment) { case (address, assetId) =>
       getJsonRoute {
         balanceJson(address, assetId)
+      }
+    }
+  }
+
+  @Path("/transfer")
+  @ApiOperation(value = "Transfer asset",
+    notes = "Transfer asset to new address",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.transaction.state.wallet.TransferRequest",
+      defaultValue = "\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAsset\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
+    )
+  ))
+  def transfer: Route =  path("transfer") {
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          walletNotExists(wallet).getOrElse {
+            Try(Json.parse(body)).map { js =>
+              js.validate[TransferRequest] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).response
+                case JsSuccess(request: TransferRequest, _) =>
+                  val txOpt: Option[TransferTransaction] = transactionModule.transferAsset(request, wallet)
+                  txOpt match {
+                    case Some(tx) =>
+                      JsonResponse(tx.json, StatusCodes.OK)
+                    case None =>
+                      WrongJson.response
+                  }
+              }
+            }.getOrElse(WrongJson.response)
+          }
+        }
       }
     }
   }
@@ -62,7 +103,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
       required = true,
       paramType = "body",
       dataType = "scorex.transaction.state.wallet.IssueRequest",
-      defaultValue = "{\"sender\":\"string\",\"assetIdOpt\":\"Option[String]\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":6,\"reissuable\":false,\"fee\":100000000}"
+      defaultValue = "{\"sender\":\"string\",\"assetIdOpt\":\"Option[String]\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
     )
   ))
   def issue: Route =  path("issue") {

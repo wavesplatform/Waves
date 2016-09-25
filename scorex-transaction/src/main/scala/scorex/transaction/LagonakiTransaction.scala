@@ -44,6 +44,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
 
   protected def jsonBase() = {
     Json.obj("type" -> transactionType.id,
+      "id" -> Base58.encode(id),
       "fee" -> fee,
       "timestamp" -> timestamp,
       "signature" -> Base58.encode(this.signature)
