@@ -5,6 +5,7 @@ import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
+import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.Settings
@@ -136,14 +137,29 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     }
   }
 
-  def issueAsset(issue: IssueRequest, wallet: Wallet): Option[IssueTransaction] = {
-    val time = getTimestamp
-    ???
-  }
+  def issueAsset(request: IssueRequest, wallet: Wallet): Option[IssueTransaction] = Try {
+    val timestamp = getTimestamp
+    val sender = wallet.privateKeyAccount(request.sender).get
+    val issue = IssueTransaction.create(sender,
+      request.assetIdOpt.map(s => Base58.decode(s).get),
+      Base58.decode(request.name).get,
+      Base58.decode(request.description).get,
+      request.quantity,
+      request.decimals,
+      request.reissuable,
+      request.fee: Long,
+      timestamp: Long)
+    if (isValid(issue)) onNewOffchainTransaction(issue)
+    else log.warn("Nonvalid issue transaction generated:")
+    issue
+  }.toOption
 
   private var txTime: Long = 0
 
-  private def getTimestamp: Long = synchronized(Math.max(NTP.correctedTime(), txTime + 1))
+  private def getTimestamp: Long = synchronized {
+    txTime = Math.max(NTP.correctedTime(), txTime + 1)
+    txTime
+  }
 
   def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
     val time = getTimestamp

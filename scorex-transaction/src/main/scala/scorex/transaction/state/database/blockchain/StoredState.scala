@@ -256,6 +256,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     case tx: PaymentTransaction =>
       tx.signatureValid && tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
     case tx: IssueTransaction =>
+      //TODO check that there is no such asset in state
       tx.isValid && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0

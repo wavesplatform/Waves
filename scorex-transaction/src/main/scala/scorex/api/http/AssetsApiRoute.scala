@@ -32,7 +32,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
 
   override lazy val route =
     pathPrefix("assets") {
-      balance
+      balance ~ issue
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -50,8 +50,22 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
   }
 
   @Path("/issue")
-  @ApiOperation(value = "Issue", notes = "Issue new asset", httpMethod = "POST")
-  def issue: Route = {
+  @ApiOperation(value = "Issue asset",
+    notes = "Issue new asset (or reissue the old one)",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.transaction.state.wallet.IssueRequest",
+      defaultValue = "{\"sender\":\"string\",\"assetIdOpt\":\"Option[String]\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":6,\"reissuable\":false,\"fee\":100000000}"
+    )
+  ))
+  def issue: Route =  path("issue") {
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
