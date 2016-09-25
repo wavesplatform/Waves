@@ -16,7 +16,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
                                    val fee: Long,
                                    override val timestamp: Long,
                                    val signature: Array[Byte])
-  extends TypedTransaction with BytesSerializable {
+  extends TypedTransaction {
 
   import LagonakiTransaction._
 

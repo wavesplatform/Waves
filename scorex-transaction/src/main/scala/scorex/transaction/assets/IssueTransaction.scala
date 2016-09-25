@@ -21,7 +21,7 @@ case class IssueTransaction(sender: PublicKeyAccount,
                             reissuable: Boolean,
                             fee: Long,
                             timestamp: Long,
-                            signature: Array[Byte]) extends TypedTransaction {
+                            signature: Array[Byte]) extends SignedTransaction {
 
   import IssueTransaction._
 
@@ -33,8 +33,6 @@ case class IssueTransaction(sender: PublicKeyAccount,
     assetIdOpt.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte)), arrayWithSize(name), arrayWithSize(description),
     Longs.toByteArray(quantity), Array(decimals), if (reissuable) Array(1: Byte) else Array(0: Byte),
     Longs.toByteArray(fee), Longs.toByteArray(timestamp))
-
-  override val id: Array[Byte] = FastCryptographicHash(toSign)
 
   override lazy val json: JsObject = Json.obj(
     "id" -> Base58.encode(id),
@@ -58,9 +56,8 @@ case class IssueTransaction(sender: PublicKeyAccount,
   override def bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
   lazy val isValid: Boolean = {
-    description.length <= MaxDescriptionLength && name.length <= MaxAssetNameLength &&
-      name.length >= MinAssetNameLength && decimals >= 0 && decimals <= MaxDecimals && fee >= MinFee && quantity > 0 &&
-      EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
+    description.length <= MaxDescriptionLength && name.length <= MaxAssetNameLength && decimals >= 0 &&
+      decimals <= MaxDecimals && name.length >= MinAssetNameLength && fee >= MinFee && quantity > 0 && signatureValid
   }
 
 }
