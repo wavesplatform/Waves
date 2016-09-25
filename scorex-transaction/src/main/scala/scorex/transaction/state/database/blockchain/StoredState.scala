@@ -7,6 +7,7 @@ import scorex.block.Block
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.state.database.state._
 import scorex.utils.ScorexLogging
 
@@ -181,8 +182,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     }
   }
 
-  override def included(signature: Array[Byte], heightOpt: Option[Int]): Option[Int] =
-    Option(includedTx.get(signature)).filter(_ < heightOpt.getOrElse(Int.MaxValue))
+  override def included(id: Array[Byte], heightOpt: Option[Int]): Option[Int] =
+    Option(includedTx.get(id)).filter(_ < heightOpt.getOrElse(Int.MaxValue))
 
   /**
     * Returns sequence of valid transactions
@@ -254,6 +255,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   private def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
       tx.signatureValid && tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
+    case tx: IssueTransaction =>
+      tx.isValid && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>
