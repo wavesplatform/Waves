@@ -7,5 +7,5 @@ import scorex.serialization.BytesSerializable
   */
 trait StateChangeReason extends BytesSerializable {
 
-  val signature: Array[Byte]
+  val id: Array[Byte]
 }

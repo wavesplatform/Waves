@@ -15,7 +15,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
                                    val amount: Long,
                                    val fee: Long,
                                    override val timestamp: Long,
-                                   override val signature: Array[Byte])
+                                   val signature: Array[Byte])
   extends TypedTransaction with BytesSerializable {
 
   import LagonakiTransaction._
@@ -41,13 +41,6 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
   def validate: ValidationResult.Value
 
   def involvedAmount(account: Account): Long
-
-  override def equals(other: Any): Boolean = other match {
-    case tx: LagonakiTransaction => signature.sameElements(tx.signature)
-    case _ => false
-  }
-
-  override def hashCode(): Int = Ints.fromByteArray(signature)
 
   protected def jsonBase() = {
     Json.obj("type" -> transactionType.id,

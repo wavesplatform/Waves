@@ -36,8 +36,8 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     val transactionsToValidate = transactions :+ forgedTransaction
     val validTransactions = state.validate(transactionsToValidate)
 
-    validTransactions.count(tx => (tx.signature sameElements txToForge.signature) ||
-      (tx.signature sameElements forgedTransaction.signature)) shouldBe 1
+    validTransactions.count(tx => (tx.id sameElements txToForge.signature) ||
+      (tx.id sameElements forgedTransaction.signature)) shouldBe 1
     validTransactions.size should be(transactionsToValidate.size - 1)
   }
 

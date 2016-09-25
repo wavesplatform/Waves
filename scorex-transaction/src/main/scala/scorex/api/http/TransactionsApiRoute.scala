@@ -80,7 +80,7 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
               case Some(h) =>
                 Try {
                   val block = application.blockStorage.history.asInstanceOf[StoredBlockchain].blockAt(h).get
-                  val tx = block.transactions.filter(_.signature sameElements sig).head
+                  val tx = block.transactions.filter(_.id sameElements sig).head
                   val json = tx.json + ("height" -> Json.toJson(h))
                   JsonResponse(json, StatusCodes.OK)
                 }.getOrElse(JsonResponse(Json.obj("status" -> "error", "details" -> "Internal error"),

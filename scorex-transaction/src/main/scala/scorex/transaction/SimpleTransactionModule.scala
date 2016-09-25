@@ -104,7 +104,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   }
 
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = synchronized {
-    data.foreach(tx => utxStorage.getBySignature(tx.signature) match {
+    data.foreach(tx => utxStorage.getBySignature(tx.id) match {
       case Some(unconfirmedTx) => utxStorage.remove(unconfirmedTx)
       case None =>
     })

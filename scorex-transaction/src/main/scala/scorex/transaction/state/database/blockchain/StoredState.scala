@@ -55,7 +55,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1.key)).getOrElse(0))
       accountChanges(ch._1.key).put(h, change)
       lastStates.put(ch._1.key, h)
-      ch._2._2.foreach(t => includedTx.put(t.signature, h))
+      ch._2._2.foreach(t => includedTx.put(t.id, h))
     }
   }
 
@@ -65,7 +65,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       if (currentHeight > rollbackTo) {
         val dataMap = accountChanges(key)
         val changes = dataMap.remove(currentHeight)
-        changes.reason.foreach(t => includedTx.remove(t.signature))
+        changes.reason.foreach(t => includedTx.remove(t.id))
         val prevHeight = changes.lastRowHeight
         lastStates.put(key, prevHeight)
         deleteNewer(key)
@@ -219,7 +219,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
-    transactions.filter(t1 => !exclude.exists(t2 => t2.signature sameElements t1.signature))
+    transactions.filter(t1 => !exclude.exists(t2 => t2.id sameElements t1.id))
 
   private def invalidateTransactionsByTimestamp(transactions: Seq[Transaction]): Seq[Transaction] = {
     val paymentTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
