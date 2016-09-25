@@ -28,6 +28,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   val DataKey = "dataset"
   val LastStates = "lastStates"
   val IncludedTx = "includedTx"
+  //todo put all transactions in the same map
+  val IssueTxs = "IssueTxs"
 
   if (db.getStoreVersion > 0) db.rollback()
 
@@ -39,6 +41,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     * Transaction Signature -> Block height Map
     */
   private val includedTx: MVMap[Array[Byte], Int] = db.openMap(IncludedTx)
+
+  private val issueTxs: MVMap[Array[Byte], Array[Byte]] = db.openMap(IssueTxs)
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey)
 
@@ -55,7 +59,12 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1.key)).getOrElse(0))
       accountChanges(ch._1.key).put(h, change)
       lastStates.put(ch._1.key, h)
-      ch._2._2.foreach(t => includedTx.put(t.id, h))
+      ch._2._2.foreach { tx =>
+        if (tx.isInstanceOf[IssueTransaction]) {
+          issueTxs.put(tx.id, tx.bytes)
+        }
+        includedTx.put(tx.id, h)
+      }
     }
   }
 
@@ -249,12 +258,16 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   }
 
 
-  private def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
+  private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
       tx.signatureValid && tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
     case tx: IssueTransaction =>
-      //TODO check that there is no such asset in state
-      tx.isValid && included(tx.id, None).isEmpty
+      val reissueValid: Boolean = tx.assetIdOpt.map { assetId =>
+        val initialIssue: Option[IssueTransaction] = Option(issueTxs.get(assetId))
+          .flatMap(b => IssueTransaction.parseBytes(b).toOption)
+        initialIssue.exists(old => old.reissuable && old.sender.address == tx.sender.address)
+      }.getOrElse(true)
+      reissueValid && tx.isValid && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>

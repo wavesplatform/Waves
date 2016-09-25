@@ -29,6 +29,18 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   val applyChanges = PrivateMethod[Unit]('applyChanges)
   val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
 
+  property("Reissue asset") {
+    forAll(issueReissueGenerator) { pair =>
+      val issueTx: IssueTransaction = pair._1
+      val reissueTx: IssueTransaction = pair._2
+      val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
+
+      state.applyChanges(state.calcNewBalances(Seq(issueTx), Map()))
+
+      state.isValid(reissueTx, Int.MaxValue) shouldBe issueTx.reissuable
+    }
+  }
+
   property("Issue asset") {
     forAll(issueGenerator) { issueTx: IssueTransaction =>
       val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
