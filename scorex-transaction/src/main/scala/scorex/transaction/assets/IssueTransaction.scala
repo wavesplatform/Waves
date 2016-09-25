@@ -1,13 +1,14 @@
 package scorex.transaction.assets
 
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.Deser
-import scorex.transaction.{AssetId, AssetAcc, BalanceChange, Transaction}
+import scorex.transaction.TypedTransaction.TransactionType
+import scorex.transaction._
 
 import scala.util.Try
 
@@ -20,23 +21,19 @@ case class IssueTransaction(sender: PublicKeyAccount,
                             reissuable: Boolean,
                             fee: Long,
                             timestamp: Long,
-                            signature: Array[Byte]) extends Transaction {
+                            signature: Array[Byte]) extends TypedTransaction {
 
   import IssueTransaction._
 
-  require(description.length <= MaxDescriptionLength)
-  require(name.length <= MaxAssetNameLength && name.length >= MinAssetNameLength)
-  require(decimals >= 0 && decimals <= MaxDecimals)
-  require(fee >= MinFee)
-  require(quantity > 0)
-
+  override val transactionType: TransactionType.Value = TransactionType.IssueTransaction
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   lazy val assetId = assetIdOpt.getOrElse(id)
 
-  lazy val toSign: Array[Byte] = sender.publicKey ++ assetIdOpt.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte)) ++
-    arrayWithSize(name) ++ arrayWithSize(description) ++ Longs.toByteArray(quantity) ++ Array(decimals) ++
-    (if (reissuable) Array(1: Byte) else Array(0: Byte)) ++ Longs.toByteArray(fee) ++ Longs.toByteArray(timestamp)
+  lazy val toSign: Array[Byte] = Bytes.concat(sender.publicKey,
+    assetIdOpt.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte)), arrayWithSize(name), arrayWithSize(description),
+    Longs.toByteArray(quantity), Array(decimals), if (reissuable) Array(1: Byte) else Array(0: Byte),
+    Longs.toByteArray(fee), Longs.toByteArray(timestamp))
 
   override val id: Array[Byte] = FastCryptographicHash(toSign)
 
@@ -56,7 +53,14 @@ case class IssueTransaction(sender: PublicKeyAccount,
 
   override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(sender, Some(assetId)), quantity))
 
-  override def bytes: Array[Byte] = signature ++ toSign
+  override def bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
+
+  lazy val isValid: Boolean = {
+    description.length <= MaxDescriptionLength && name.length <= MaxAssetNameLength &&
+      name.length >= MinAssetNameLength && decimals >= 0 && decimals <= MaxDecimals && fee >= MinFee && quantity > 0 &&
+      EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
+  }
+
 }
 
 object IssueTransaction extends Deser[IssueTransaction] {
@@ -67,6 +71,11 @@ object IssueTransaction extends Deser[IssueTransaction] {
   val MaxDecimals = 8
 
   override def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {
+    require(bytes.head == TransactionType.IssueTransaction.id)
+    parseTail(bytes.tail).get
+  }
+
+  def parseTail(bytes: Array[Byte]): Try[IssueTransaction] = Try {
     import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
     val sender = new PublicKeyAccount(bytes.slice(SignatureLength, SignatureLength + KeyLength))

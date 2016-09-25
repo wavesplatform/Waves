@@ -64,11 +64,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       case false =>
         val txData = bytes.tail
         val txCount = bytes.head // so 255 txs max
-        formBlockData((1 to txCount).foldLeft((0: Int, Seq[LagonakiTransaction]())) { case ((pos, txs), _) =>
+        formBlockData((1 to txCount).foldLeft((0: Int, Seq[TypedTransaction]())) { case ((pos, txs), _) =>
           val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
           val transactionLength = Ints.fromByteArray(transactionLengthBytes)
           val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
-          val transaction = LagonakiTransaction.parseBytes(transactionBytes).get
+          val transaction = TypedTransaction.parseBytes(transactionBytes).get
 
           (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
         }._2)

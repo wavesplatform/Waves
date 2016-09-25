@@ -9,10 +9,18 @@ import scorex.utils.NTP
 
 class IssueTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
-  property("Issue transaction serialization roundtrip") {
+  property("Issue serialization roundtrip") {
     forAll(issueGenerator) { issue: IssueTransaction =>
-      val recovered = Order.parseBytes(issue.bytes).get
+      val recovered = IssueTransaction.parseBytes(issue.bytes).get
       recovered.bytes shouldEqual issue.bytes
     }
   }
+
+  property("Issue serialization from TypedTransaction") {
+    forAll(issueGenerator) { issue: IssueTransaction =>
+      val recovered = TypedTransaction.parseBytes(issue.bytes).get
+      recovered.bytes shouldEqual issue.bytes
+    }
+  }
+
 }

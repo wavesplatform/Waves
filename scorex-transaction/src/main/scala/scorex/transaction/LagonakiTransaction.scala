@@ -4,11 +4,10 @@ import com.google.common.primitives.Ints
 import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.crypto.encode.Base58
-import scorex.serialization.{BytesSerializable, Deser}
-import scorex.transaction.LagonakiTransaction.TransactionType
+import scorex.serialization.BytesSerializable
+import scorex.transaction.TypedTransaction.TransactionType
 
 import scala.concurrent.duration._
-import scala.util.{Failure, Try}
 
 
 abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
@@ -16,7 +15,8 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
                                    val amount: Long,
                                    val fee: Long,
                                    override val timestamp: Long,
-                                   override val signature: Array[Byte]) extends Transaction with BytesSerializable {
+                                   override val signature: Array[Byte])
+  extends TypedTransaction with BytesSerializable {
 
   import LagonakiTransaction._
 
@@ -25,12 +25,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
 
   lazy val deadline = timestamp + 24.hours.toMillis
 
-  lazy val feePerByte = fee / dataLength.toDouble
   lazy val hasMinimumFee = fee >= MinimumFee
-  lazy val hasMinimumFeePerByte = {
-    val minFeePerByte = 1.0 / MaxBytesPerToken
-    feePerByte >= minFeePerByte
-  }
 
   val TypeId = transactionType.id
 
@@ -63,7 +58,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
   }
 }
 
-object LagonakiTransaction extends Deser[LagonakiTransaction] {
+object LagonakiTransaction {
 
   val MaxBytesPerToken = 512
 
@@ -84,21 +79,5 @@ object LagonakiTransaction extends Deser[LagonakiTransaction] {
     val NoBalance = Value(5)
   }
 
-  //TYPES
-  object TransactionType extends Enumeration {
-    val GenesisTransaction = Value(1)
-    val PaymentTransaction = Value(2)
-  }
-
-  def parseBytes(data: Array[Byte]): Try[LagonakiTransaction] =
-    data.head match {
-      case txType: Byte if txType == TransactionType.GenesisTransaction.id =>
-        GenesisTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.PaymentTransaction.id =>
-        PaymentTransaction.parseTail(data.tail)
-
-      case txType => Failure(new Exception(s"Invalid transaction type: $txType"))
-    }
 
 }

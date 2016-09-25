@@ -6,7 +6,7 @@ import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.serialization.Deser
-import scorex.transaction.LagonakiTransaction.TransactionType
+import scorex.transaction.TypedTransaction.TransactionType
 
 import scala.util.{Failure, Try}
 

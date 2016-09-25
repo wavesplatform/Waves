@@ -8,7 +8,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.LagonakiTransaction.TransactionType
+import scorex.transaction.TypedTransaction.TransactionType
 
 import scala.util.{Failure, Try}
 

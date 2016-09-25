@@ -6,7 +6,7 @@ import com.google.common.primitives.{Ints, Longs}
 import org.h2.mvstore.WriteBuffer
 import org.h2.mvstore.`type`.DataType
 import scorex.serialization.BytesSerializable
-import scorex.transaction.{FeesStateChange, LagonakiTransaction, StateChangeReason}
+import scorex.transaction.{FeesStateChange, StateChangeReason, TypedTransaction}
 
 @SerialVersionUID(-3499112732510272830L)
 case class Row(state: AccState, reason: Reason, lastRowHeight: Int) extends DataType with BytesSerializable {
@@ -59,7 +59,7 @@ object Row {
       val tx = new Array[Byte](txSize)
       b.get(tx)
       if (txSize == 8) FeesStateChange(Longs.fromByteArray(tx))
-      else LagonakiTransaction.parseBytes(tx).get //todo: .get w/out catching
+      else TypedTransaction.parseBytes(tx).get //todo: .get w/out catching
     }
     Row(AccState(accBalance), reason.toList, lrh)
   }
