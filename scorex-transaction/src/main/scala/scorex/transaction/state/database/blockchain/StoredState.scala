@@ -5,7 +5,6 @@ import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.LagonakiTransaction.ValidationResult
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.state.database.state._
