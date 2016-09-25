@@ -73,7 +73,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
             Try(Json.parse(body)).map { js =>
               js.validate[IssueRequest] match {
                 case err: JsError =>
-                  WrongJson.response
+                  WrongTransactionJson(err).response
                 case JsSuccess(issue: IssueRequest, _) =>
                   val txOpt: Option[IssueTransaction] = transactionModule.issueAsset(issue, wallet)
                   txOpt match {

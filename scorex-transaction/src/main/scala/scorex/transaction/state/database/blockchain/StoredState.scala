@@ -48,11 +48,10 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   private def setStateHeight(height: Int): Unit = heightMap.put(HeightKey, height)
 
-  private def applyChanges(ch: Map[AssetAcc, (AccState, Reason)]): Unit = synchronized {
+  private[blockchain] def applyChanges(ch: Map[AssetAcc, (AccState, Reason)]): Unit = synchronized {
     setStateHeight(stateHeight + 1)
     val h = stateHeight
     ch.foreach { ch =>
-      require(ch._1.assetId.isEmpty)
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1.key)).getOrElse(0))
       accountChanges(ch._1.key).put(h, change)
       lastStates.put(ch._1.key, h)
@@ -94,15 +93,14 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   }
 
 
-  private def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reason)]):
+  private[blockchain] def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reason)]):
   Map[AssetAcc, (AccState, Reason)] = {
     val newBalances: Map[AssetAcc, (AccState, Reason)] = trans.foldLeft(fees) { case (changes, atx) =>
       atx match {
         case tx: Transaction =>
           tx.balanceChanges().foldLeft(changes) { case (iChanges, bc) =>
             //update balances sheet
-            val account = bc.assetAcc.account
-            val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(balance(account)), List.empty))
+            val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
             iChanges.updated(bc.assetAcc, (AccState(currentChange._1.balance + bc.delta), tx +: currentChange._2))
           }
 
@@ -118,7 +116,6 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   def assetBalance(account: AssetAcc, atHeight: Option[Int] = None): Long = {
     balanceByKey(account.key, atHeight)
-    balanceByKey(account.account.address, atHeight)
   }
 
 
@@ -138,7 +135,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
           else loop(row.lastRowHeight, Math.min(row.state.balance, min))
         }
         loop(h)
-      case _ => 0L
+      case _ =>
+        0L
     }
   }
 

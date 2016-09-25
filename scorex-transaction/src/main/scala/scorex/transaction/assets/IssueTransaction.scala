@@ -27,7 +27,6 @@ case class IssueTransaction(sender: PublicKeyAccount,
 
   override val transactionType: TransactionType.Value = TransactionType.IssueTransaction
 
-  override val assetFee: (Option[AssetId], Long) = (None, fee)
   lazy val assetId = assetIdOpt.getOrElse(id)
 
   lazy val toSign: Array[Byte] = Bytes.concat(sender.publicKey,
@@ -51,7 +50,10 @@ case class IssueTransaction(sender: PublicKeyAccount,
     "signature" -> Base58.encode(signature)
   )
 
-  override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(sender, Some(assetId)), quantity))
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override lazy val balanceChanges: Seq[BalanceChange] =
+    Seq(BalanceChange(AssetAcc(sender, Some(assetId)), quantity),
+      BalanceChange(AssetAcc(sender, assetFee._1), -assetFee._2))
 
   override def bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
