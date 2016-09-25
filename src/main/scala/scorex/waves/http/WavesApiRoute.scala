@@ -5,15 +5,15 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.WavesSettings
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
 import scorex.api.http.{NegativeFee, NoBalance, _}
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
-import scorex.transaction.LagonakiTransaction.ValidationResult
+import scorex.transaction.ValidationResult
 import scorex.transaction.state.wallet.Payment
-import com.wavesplatform.settings.WavesSettings
 import scorex.wallet.Wallet
 import scorex.waves.transaction.{ExternalPayment, SignedPayment, WavesTransactionModule}
 
@@ -56,37 +56,37 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def payment: Route = path("payment") {
-      entity(as[String]) { body =>
-        withAuth {
-          postJsonRoute {
-            walletNotExists(wallet).getOrElse {
-              Try(Json.parse(body)).map { js =>
-                js.validate[Payment] match {
-                  case err: JsError =>
-                    WrongTransactionJson(err).response
-                  case JsSuccess(payment: Payment, _) =>
-                    val txOpt = transactionModule.createPayment(payment, wallet)
-                    txOpt match {
-                      case Some(tx) =>
-                        tx.validate match {
-                          case ValidationResult.ValidateOke =>
-                            val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
-                              Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
-                            JsonResponse(Json.toJson(signed), StatusCodes.OK)
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          walletNotExists(wallet).getOrElse {
+            Try(Json.parse(body)).map { js =>
+              js.validate[Payment] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).response
+                case JsSuccess(payment: Payment, _) =>
+                  val txOpt = transactionModule.createPayment(payment, wallet)
+                  txOpt match {
+                    case Some(tx) =>
+                      tx.validate match {
+                        case ValidationResult.ValidateOke =>
+                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
+                            Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
+                          JsonResponse(Json.toJson(signed), StatusCodes.OK)
 
-                          case ValidationResult.InvalidAddress => InvalidAddress.response
-                          case ValidationResult.NegativeAmount => NegativeAmount.response
-                          case ValidationResult.InsufficientFee => InsufficientFee.response
-                          case ValidationResult.NoBalance => NoBalance.response
-                        }
-                      case None => InvalidSender.response
-                    }
-                }
-              }.getOrElse(WrongJson.response)
-            }
+                        case ValidationResult.InvalidAddress => InvalidAddress.response
+                        case ValidationResult.NegativeAmount => NegativeAmount.response
+                        case ValidationResult.InsufficientFee => InsufficientFee.response
+                        case ValidationResult.NoBalance => NoBalance.response
+                      }
+                    case None => InvalidSender.response
+                  }
+              }
+            }.getOrElse(WrongJson.response)
           }
         }
       }
+    }
   }
 
   // TODO: Should be moved to Scorex
@@ -108,37 +108,37 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def signPayment: Route = path("payment" / "signature") {
-      entity(as[String]) { body =>
-        withAuth {
-          postJsonRoute {
-            walletNotExists(wallet).getOrElse {
-              Try(Json.parse(body)).map { js =>
-                js.validate[Payment] match {
-                  case err: JsError =>
-                    WrongTransactionJson(err).response
-                  case JsSuccess(payment: Payment, _) =>
-                    val txOpt = transactionModule.signPayment(payment, wallet)
-                    txOpt match {
-                      case Some(tx) =>
-                        tx.validate match {
-                          case ValidationResult.ValidateOke =>
-                            val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
-                              Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
-                            JsonResponse(Json.toJson(signed), StatusCodes.OK)
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          walletNotExists(wallet).getOrElse {
+            Try(Json.parse(body)).map { js =>
+              js.validate[Payment] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).response
+                case JsSuccess(payment: Payment, _) =>
+                  val txOpt = transactionModule.signPayment(payment, wallet)
+                  txOpt match {
+                    case Some(tx) =>
+                      tx.validate match {
+                        case ValidationResult.ValidateOke =>
+                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
+                            Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
+                          JsonResponse(Json.toJson(signed), StatusCodes.OK)
 
-                          case ValidationResult.InvalidAddress => InvalidAddress.response
-                          case ValidationResult.NegativeAmount => NegativeAmount.response
-                          case ValidationResult.InsufficientFee => InsufficientFee.response
-                          case ValidationResult.NoBalance => NoBalance.response
-                        }
-                      case None => InvalidSender.response
-                    }
-                }
-              }.getOrElse(WrongJson.response)
-            }
+                        case ValidationResult.InvalidAddress => InvalidAddress.response
+                        case ValidationResult.NegativeAmount => NegativeAmount.response
+                        case ValidationResult.InsufficientFee => InsufficientFee.response
+                        case ValidationResult.NoBalance => NoBalance.response
+                      }
+                    case None => InvalidSender.response
+                  }
+              }
+            }.getOrElse(WrongJson.response)
           }
         }
       }
+    }
   }
 
   @Path("/create-signed-payment")
