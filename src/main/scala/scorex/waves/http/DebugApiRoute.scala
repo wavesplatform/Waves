@@ -33,7 +33,7 @@ case class DebugApiRoute(application: RunnableApplication)(implicit val context:
       name = "howMany",
       value = "How many last blocks to take",
       required = true,
-      dataType = "String",
+      dataType = "string",
       paramType = "path")
   ))
   def blocks: Route = {
@@ -65,7 +65,7 @@ case class DebugApiRoute(application: RunnableApplication)(implicit val context:
   @Path("/state/{height}")
   @ApiOperation(value = "State at block", notes = "Get state at specified height", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "Int", paramType = "path")
+    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateAt: Route = {
     path("state" / IntNumber) { case height =>
