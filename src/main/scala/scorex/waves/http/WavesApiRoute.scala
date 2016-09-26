@@ -198,7 +198,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
 
   @Path("/address")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "publicKey", value = "Public key as a plain string", required = true, paramType = "body", dataType = "String")
+    new ApiImplicitParam(name = "publicKey", value = "Public key as a plain string", required = true, paramType = "body", dataType = "string")
   ))
   @ApiOperation(value = "Generate", notes = "Generate a address from public key", httpMethod = "POST")
   def address: Route = path("address") {
