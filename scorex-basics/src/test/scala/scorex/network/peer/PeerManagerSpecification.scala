@@ -1,6 +1,6 @@
 package scorex.network.peer
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.Props
 import akka.pattern.ask
@@ -54,7 +54,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
     val peerConnectionHandler = TestProbe("connection-handler")
 
     def connect(address: InetSocketAddress, noneNonce: Long): Unit = {
-      actorRef ! Connected(address, peerConnectionHandler.ref, None)
+      actorRef ! Connected(address, peerConnectionHandler.ref, None, true)
       peerConnectionHandler.expectMsgType[Handshake]
       actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", noneNonce, None, 0))
     }
@@ -90,7 +90,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       val anotherAddress = new InetSocketAddress(knownAddress.getHostName, knownAddress.getPort + 1)
       val anotherPeerHandler = TestProbe("connection-handler-2")
 
-      actorRef ! Connected(anotherAddress, anotherPeerHandler.ref, null)
+      actorRef ! Connected(anotherAddress, anotherPeerHandler.ref, null, inbound = true)
 
       anotherPeerHandler.expectMsg(CloseConnection)
       anotherPeerHandler.expectNoMsg(t)
@@ -98,7 +98,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       actorRef ! CheckPeers
       networkController.expectMsg(NetworkController.ConnectTo(knownAddress))
 
-      actorRef ! Connected(anotherAddress, anotherPeerHandler.ref, null)
+      actorRef ! Connected(anotherAddress, anotherPeerHandler.ref, null, inbound = true)
       anotherPeerHandler.expectMsgType[Handshake]
     }
 
@@ -197,7 +197,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       def connect(id: Int): TestProbe = {
         val address = new InetSocketAddress(id)
         val handler = TestProbe("connection-handler-" + id)
-        actorRef ! Connected(address, handler.ref, None)
+        actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler.expectMsgType[Handshake]
         actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
         handler
@@ -221,7 +221,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       def connectNormal(id: Int): TestProbe = {
         val address = new InetSocketAddress(id)
         val handler = TestProbe("connection-handler-" + id)
-        actorRef ! Connected(address, handler.ref, None)
+        actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler.expectMsgType[Handshake]
         actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", id, None, 0))
         handler
@@ -230,7 +230,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       def connectOverLimit(id: Int): TestProbe = {
         val address = new InetSocketAddress(id)
         val handler = TestProbe("connection-handler-" + id)
-        actorRef ! Connected(address, handler.ref, None)
+        actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler
       }
 
@@ -251,7 +251,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
 
     "disconnect during handshake" in {
-      actorRef ! Connected(anAddress, peerConnectionHandler.ref, None)
+      actorRef ! Connected(anAddress, peerConnectionHandler.ref, None, inbound = true)
       peerConnectionHandler.expectMsgType[Handshake]
 
       getActiveConnections should have size 1
@@ -297,6 +297,27 @@ class PeerManagerSpecification extends ActorTestingCommons {
       actorRef ! AddToBlacklist(-111, knownAddress)
 
       getBlacklistedPeers.size shouldBe 1
+    }
+
+    "inbound connection limit exceeded but can make outbound connections" in {
+      def connect(id: Int, inbound: Boolean): TestProbe = {
+        val address = new InetSocketAddress(InetAddress.getByName(s"127.0.0.$id"), id)
+        val handler = TestProbe("connection-handler-" + id)
+        actorRef ! Connected(address, handler.ref, None, inbound)
+
+        handler
+      }
+
+      (1 to TestSettings.maxConnections).foreach { i =>
+        val h = connect(i, true)
+        h.expectMsgType[Handshake]
+      }
+      (1 to TestSettings.maxConnections).foreach { i =>
+        val h1 = connect(i, true)
+        val h2 = connect(100 + i, false)
+        h1.expectMsg(CloseConnection)
+        h2.expectMsgType[Handshake]
+      }
     }
   }
 }

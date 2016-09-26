@@ -47,15 +47,18 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   }
 
   private def peerCycle: Receive = {
-    case Connected(remote, handlerRef, ownSocketAddress) =>
+    case Connected(remote, handlerRef, ownSocketAddress, inbound) =>
+
+      val connectionsCount = connectedPeers.count(_._2.inbound == inbound)
+
       if (isBlacklisted(remote)) {
         log.warn(s"Got incoming connection from blacklisted $remote")
         handlerRef ! CloseConnection
-      } else if (connectedPeers.size >= settings.maxConnections && connectingPeer != Option(remote)) {
+      } else if (connectionsCount >= settings.maxConnections && connectingPeer != Option(remote)) {
         log.info(s"Number of connections exceeded ${settings.maxConnections}, disconnect $remote")
         handlerRef ! CloseConnection
       } else {
-        handleNewConnection(remote, handlerRef, ownSocketAddress)
+        handleNewConnection(remote, handlerRef, ownSocketAddress, inbound)
       }
 
     case Handshaked(address, handshake) =>
@@ -103,7 +106,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def handleNewConnection(remote: InetSocketAddress,
                                   handlerRef: ActorRef,
-                                  ownSocketAddress: Option[InetSocketAddress]): Unit = {
+                                  ownSocketAddress: Option[InetSocketAddress],
+                                  inbound: Boolean): Unit = {
 
     val connectionFromIp = connectedPeers.keys.foldLeft(0) { (c, k) =>
       if (k.getAddress.equals(remote.getAddress)) c + 1 else c
@@ -120,7 +124,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
       handlerRef ! handshake
 
-      connectedPeers += remote -> PeerConnection(handlerRef, None)
+      connectedPeers += remote -> PeerConnection(handlerRef, None, inbound)
       if (connectingPeer.contains(remote)) {
         log.info(s"Connected to $remote")
         connectingPeer = None
@@ -150,11 +154,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         log.error(s"New message from unknown $remote")
         sender() ! CloseConnection
 
-      case Some(PeerConnection(_, None)) =>
+      case Some(PeerConnection(_, None, _)) =>
         log.error(s"No connected peer matches $remote")
         sender() ! CloseConnection
 
-      case Some(PeerConnection(_, Some(handshakeData))) =>
+      case Some(PeerConnection(_, Some(handshakeData), _)) =>
         val peer = new InetAddressPeer(handshakeData.nodeNonce, remote, self)
         networkController ! Message(spec, Left(msgData), Some(peer))
     }
@@ -176,11 +180,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def handleHandshake(address: InetSocketAddress, handshake: Handshake): Unit =
     connectedPeers.get(address) match {
-      case None | Some(PeerConnection(_, Some(_))) =>
+      case None | Some(PeerConnection(_, Some(_), _)) =>
         log.error("No peer matching handshake")
         sender() ! CloseConnection
 
-      case Some(connection@PeerConnection(_, None)) =>
+      case Some(connection@PeerConnection(_, None, inbound)) =>
         visit(address)
 
         val handshakeNonce = handshake.nodeNonce
@@ -266,7 +270,8 @@ object PeerManager {
 
   case object CheckPeers
 
-  case class Connected(socketAddress: InetSocketAddress, handlerRef: ActorRef, ownSocketAddress: Option[InetSocketAddress])
+  case class Connected(socketAddress: InetSocketAddress, handlerRef: ActorRef,
+                       ownSocketAddress: Option[InetSocketAddress], inbound: Boolean)
 
   case class Handshaked(address: InetSocketAddress, handshake: Handshake)
 
@@ -286,7 +291,7 @@ object PeerManager {
 
   case class ConnectedPeers(peers: Seq[(InetSocketAddress, Handshake)])
 
-  case class PeerConnection(handlerRef: ActorRef, handshake: Option[Handshake])
+  case class PeerConnection(handlerRef: ActorRef, handshake: Option[Handshake], inbound: Boolean)
 
   case object GetConnections
 
