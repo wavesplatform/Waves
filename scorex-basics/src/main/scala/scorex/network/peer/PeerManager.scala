@@ -1,6 +1,6 @@
 package scorex.network.peer
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorRef}
 import com.google.common.collect.HashMultimap
@@ -104,7 +104,10 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private def handleNewConnection(remote: InetSocketAddress,
                                   handlerRef: ActorRef,
                                   ownSocketAddress: Option[InetSocketAddress]): Unit = {
-    val connectionFromIp = connectedPeers.keySet.count(_.getAddress != remote.getAddress)
+
+    val connectionFromIp = connectedPeers.keys.foldLeft(0) { (c, k) =>
+      if (k.getAddress.equals(remote.getAddress)) c + 1 else c
+    }
 
     if (settings.AllowedConnectionsFromOneIPAddress > connectionFromIp) {
       val handshake = Handshake(
@@ -124,8 +127,10 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       } else {
         log.info(s"Got incoming connection from $remote")
       }
-    } else
+    } else {
       log.warn(s"Attempt to establish new connection from already connected IP address $remote")
+      handlerRef ! CloseConnection
+    }
   }
 
   private def sendDataToNetwork(message: Message[_], sendingStrategy: SendingStrategy): Unit = {

@@ -12,7 +12,6 @@ import scorex.network.PeerConnectionHandler.CloseConnection
 import scorex.network._
 import scorex.network.message.Message
 import scorex.network.message.MessageHandler.RawNetworkData
-import scorex.network.peer.PeerManager.Connected
 import scorex.settings.SettingsMock
 
 import scala.concurrent.Await
@@ -219,7 +218,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
     "many TCP clients from the same IP address" in {
 
-      def connect1(id: Int): TestProbe = {
+      def connectNormal(id: Int): TestProbe = {
         val address = new InetSocketAddress(id)
         val handler = TestProbe("connection-handler-" + id)
         actorRef ! Connected(address, handler.ref, None)
@@ -228,20 +227,24 @@ class PeerManagerSpecification extends ActorTestingCommons {
         handler
       }
 
-      def connect2(id: Int): TestProbe = {
+      def connectOverLimit(id: Int): TestProbe = {
         val address = new InetSocketAddress(id)
         val handler = TestProbe("connection-handler-" + id)
         actorRef ! Connected(address, handler.ref, None)
         handler
       }
 
+      val handlers: scala.collection.mutable.ListBuffer[TestProbe] = scala.collection.mutable.ListBuffer.empty[TestProbe]
+
       (1 to 5).foreach { i =>
-        connect1(i)
+        handlers += connectNormal(i)
         getConnectedPeers should have size i
       }
 
       (1 to 3).foreach { i =>
-        val h = connect2(i + 5)
+        val h = connectOverLimit(i + 5)
+        h.expectMsg(CloseConnection)
+        handlers += h
         getConnectedPeers should have size 5
       }
     }
