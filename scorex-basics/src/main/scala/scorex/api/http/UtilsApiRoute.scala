@@ -45,7 +45,7 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   @Path("/seed/{length}")
   @ApiOperation(value = "Seed of specified length", notes = "Generate random seed of specified length", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "length", value = "Seed length ", required = true, dataType = "long", paramType = "path")
+    new ApiImplicitParam(name = "length", value = "Seed length ", required = true, dataType = "integer", paramType = "path")
   ))
   @ApiResponse(code = 200, message = "Json with error message")
   def length: Route = path("seed" / IntNumber) { case length =>
@@ -58,7 +58,7 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   @Path("/hash/secure")
   @ApiOperation(value = "Hash", notes = "Return FastCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "String")
+    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "string")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
@@ -79,7 +79,7 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   @Path("/hash/fast")
   @ApiOperation(value = "Hash", notes = "Return  SecureCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "String")
+    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "string")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
