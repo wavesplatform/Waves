@@ -59,6 +59,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.javassist" % "javassist" % "3.18.2-GA",
   "org.joda" % "joda-convert" % "1.7",
   "org.mapdb" % "mapdb" % "2.0-beta13",
+  "org.mockito" % "mockito-all" % "1.10.19",
   "org.reactivestreams" % "reactive-streams" % "1.0.0",
   "org.reflections" % "reflections" % "0.9.10",
   "org.scala-lang.modules" % "scala-java8-compat_2.11" % "0.7.0",
@@ -78,4 +79,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.12"
 )
-// LIBRARY_DEPENDENCIES_HASH c9f5a13d0011c65c57b98007063eca8cd9dcc55b
+// LIBRARY_DEPENDENCIES_HASH 5abf8a28f80b2260288f4a610b6a7d305e606c97
