@@ -31,7 +31,7 @@ case class QoraConsensusApiRoute(application: RunnableApplication)
   @Path("/generatingbalance/{blockId}")
   @ApiOperation(value = "Generating balance", notes = "Generating balance of a block with given id", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "blockId", value = "Block id", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "blockId", value = "Block id", required = true, dataType = "string", paramType = "path")
   ))
   def generating: Route = {
     path("generatingbalance" / Segment) { case encodedSignature =>
@@ -59,7 +59,7 @@ case class QoraConsensusApiRoute(application: RunnableApplication)
   @Path("/time/{balance}")
   @ApiOperation(value = "Balance time", notes = "estimated time before next block with given generating balance", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "balance", value = "Generating balance", required = true, dataType = "Long", paramType = "path")
+    new ApiImplicitParam(name = "balance", value = "Generating balance", required = true, dataType = "long", paramType = "path")
   ))
   def timeForBalance: Route = {
     path("time" / Segment) { case generatingBalance =>

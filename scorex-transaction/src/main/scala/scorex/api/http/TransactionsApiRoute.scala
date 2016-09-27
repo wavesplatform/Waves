@@ -34,8 +34,8 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
   @Path("/address/{address}/limit/{limit}")
   @ApiOperation(value = "Address", notes = "Get list of transactions where specified address has been involved", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "String", paramType = "path"),
-    new ApiImplicitParam(name = "limit", value = "Specified number of records to be returned", required = true, dataType = "Long", paramType = "path")
+    new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "limit", value = "Specified number of records to be returned", required = true, dataType = "integer", paramType = "path")
   ))
   def adressLimit: Route = {
     path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
@@ -54,7 +54,7 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
   @Path("/address/{address}")
   @ApiOperation(value = "Address", notes = "Get list of transactions where specified address has been involved", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path")
   ))
   def address: Route = {
     path("address" / Segment) { case address =>
@@ -69,7 +69,7 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
   @Path("/info/{signature}")
   @ApiOperation(value = "Info", notes = "Get transaction info", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "signature", value = "transaction signature ", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "signature", value = "transaction signature ", required = true, dataType = "string", paramType = "path")
   ))
   def info: Route = {
     path("info" / Segment) { case encoded =>

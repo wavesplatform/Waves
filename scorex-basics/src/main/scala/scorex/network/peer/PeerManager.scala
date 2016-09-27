@@ -42,18 +42,23 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private val visitPeersInterval = application.settings.peersDataResidenceTime / 10
   context.system.scheduler.schedule(visitPeersInterval, visitPeersInterval, self, MarkConnectedPeersVisited)
 
-  settings.knownPeers.foreach { peerDatabase.mergePeerInfo(_, PeerInfo()) }
+  settings.knownPeers.foreach {
+    peerDatabase.mergePeerInfo(_, PeerInfo())
+  }
 
   private def peerCycle: Receive = {
-    case Connected(remote, handlerRef, ownSocketAddress) =>
+    case Connected(remote, handlerRef, ownSocketAddress, inbound) =>
+
+      val connectionsCount = connectedPeers.count(_._2.inbound == inbound)
+
       if (isBlacklisted(remote)) {
         log.warn(s"Got incoming connection from blacklisted $remote")
         handlerRef ! CloseConnection
-      } else if (connectedPeers.size >= settings.maxConnections && connectingPeer != Option(remote)) {
+      } else if (connectionsCount >= settings.maxConnections && connectingPeer != Option(remote)) {
         log.info(s"Number of connections exceeded ${settings.maxConnections}, disconnect $remote")
         handlerRef ! CloseConnection
       } else {
-        handleNewConnection(remote, handlerRef, ownSocketAddress)
+        handleNewConnection(remote, handlerRef, ownSocketAddress, inbound)
       }
 
     case Handshaked(address, handshake) =>
@@ -101,23 +106,34 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def handleNewConnection(remote: InetSocketAddress,
                                   handlerRef: ActorRef,
-                                  ownSocketAddress: Option[InetSocketAddress]): Unit = {
-    val handshake = Handshake(
-      application.applicationName,
-      application.appVersion,
-      settings.nodeName,
-      application.settings.nodeNonce,
-      ownSocketAddress,
-      System.currentTimeMillis() / 1000)
+                                  ownSocketAddress: Option[InetSocketAddress],
+                                  inbound: Boolean): Unit = {
 
-    handlerRef ! handshake
+    val connectionFromIp = connectedPeers.keys.foldLeft(0) { (c, k) =>
+      if (k.getAddress.equals(remote.getAddress)) c + 1 else c
+    }
 
-    connectedPeers += remote -> PeerConnection(handlerRef, None)
-    if (connectingPeer.contains(remote)) {
-      log.info(s"Connected to $remote")
-      connectingPeer = None
+    if (settings.AllowedConnectionsFromOneIPAddress > connectionFromIp) {
+      val handshake = Handshake(
+        application.applicationName,
+        application.appVersion,
+        settings.nodeName,
+        application.settings.nodeNonce,
+        ownSocketAddress,
+        System.currentTimeMillis() / 1000)
+
+      handlerRef ! handshake
+
+      connectedPeers += remote -> PeerConnection(handlerRef, None, inbound)
+      if (connectingPeer.contains(remote)) {
+        log.info(s"Connected to $remote")
+        connectingPeer = None
+      } else {
+        log.info(s"Got incoming connection from $remote")
+      }
     } else {
-      log.info(s"Got incoming connection from $remote")
+      log.warn(s"Attempt to establish new connection from already connected IP address $remote")
+      handlerRef ! CloseConnection
     }
   }
 
@@ -138,11 +154,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         log.error(s"New message from unknown $remote")
         sender() ! CloseConnection
 
-      case Some(PeerConnection(_, None)) =>
+      case Some(PeerConnection(_, None, _)) =>
         log.error(s"No connected peer matches $remote")
         sender() ! CloseConnection
 
-      case Some(PeerConnection(_, Some(handshakeData))) =>
+      case Some(PeerConnection(_, Some(handshakeData), _)) =>
         val peer = new InetAddressPeer(handshakeData.nodeNonce, remote, self)
         networkController ! Message(spec, Left(msgData), Some(peer))
     }
@@ -155,18 +171,20 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     connectedPeers.get(from)
       .flatMap(_.handshake).map(_.nodeNonce)
-      .foreach { nonces.removeAll(_).foreach(connectedPeers.remove) }
+      .foreach {
+        nonces.removeAll(_).foreach(connectedPeers.remove)
+      }
 
     connectedPeers.remove(from)
   }
 
   private def handleHandshake(address: InetSocketAddress, handshake: Handshake): Unit =
     connectedPeers.get(address) match {
-      case None | Some(PeerConnection(_, Some(_))) =>
+      case None | Some(PeerConnection(_, Some(_), _)) =>
         log.error("No peer matching handshake")
         sender() ! CloseConnection
 
-      case Some(connection @ PeerConnection(_, None)) =>
+      case Some(connection@PeerConnection(_, None, inbound)) =>
         visit(address)
 
         val handshakeNonce = handshake.nodeNonce
@@ -177,7 +195,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
             if (peers.size > 1) {
               log.warn(s"Connection attempts for nonce $handshakeNonce is more than one")
               val addresses = peers.toSeq :+ address
-              connectedPeers.filterKeys(addresses.contains).values.foreach { _.handlerRef ! CloseConnection }
+              connectedPeers.filterKeys(addresses.contains).values.foreach {
+                _.handlerRef ! CloseConnection
+              }
             } else {
 
               if (peers.nonEmpty)
@@ -192,7 +212,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
           case None =>
             nonces.put(handshakeNonce, address)
-            handshake.declaredAddress.foreach { addOrUpdatePeer(_, None, None) }
+            handshake.declaredAddress.foreach {
+              addOrUpdatePeer(_, None, None)
+            }
             connectedPeers += address -> connection.copy(handshake = Some(handshake))
         }
     }
@@ -219,7 +241,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private def randomPeer: Option[InetSocketAddress] = {
     val knownPeers = peerDatabase.knownPeers(true).keySet
-    val candidates = knownPeers.diff(handshakedPeers.union(connectedPeers.keySet))
+    val candidates = knownPeers.diff(connectedPeers.keySet.union(handshakedPeers))
     if (candidates.nonEmpty) Some(candidates.toSeq(Random.nextInt(candidates.size))) else None
   }
 
@@ -248,7 +270,8 @@ object PeerManager {
 
   case object CheckPeers
 
-  case class Connected(socketAddress: InetSocketAddress, handlerRef: ActorRef, ownSocketAddress: Option[InetSocketAddress])
+  case class Connected(socketAddress: InetSocketAddress, handlerRef: ActorRef,
+                       ownSocketAddress: Option[InetSocketAddress], inbound: Boolean)
 
   case class Handshaked(address: InetSocketAddress, handshake: Handshake)
 
@@ -265,11 +288,13 @@ object PeerManager {
   case object GetConnectedPeers
 
   case object GetConnectedPeersTyped
+
   case class ConnectedPeers(peers: Seq[(InetSocketAddress, Handshake)])
 
-  case class PeerConnection(handlerRef: ActorRef, handshake: Option[Handshake])
+  case class PeerConnection(handlerRef: ActorRef, handshake: Option[Handshake], inbound: Boolean)
 
   case object GetConnections
 
   private case object MarkConnectedPeersVisited
+
 }

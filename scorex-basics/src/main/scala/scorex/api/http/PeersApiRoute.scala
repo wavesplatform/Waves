@@ -86,7 +86,7 @@ case class PeersApiRoute(application: RunnableApplication)(implicit val context:
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "String",
+      dataType = "string",
       defaultValue = "{\n\t\"host\":\"127.0.0.1\",\n\t\"port\":\"9084\"\n}"
     )
   )) def connect: Route = path("connect") {

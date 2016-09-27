@@ -1,6 +1,6 @@
 package scorex.network.peer
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.Props
 import akka.pattern.ask
@@ -12,7 +12,6 @@ import scorex.network.PeerConnectionHandler.CloseConnection
 import scorex.network._
 import scorex.network.message.Message
 import scorex.network.message.MessageHandler.RawNetworkData
-import scorex.network.peer.PeerManager.Connected
 import scorex.settings.SettingsMock
 
 import scala.concurrent.Await
@@ -55,7 +54,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
     val peerConnectionHandler = TestProbe("connection-handler")
 
     def connect(address: InetSocketAddress, noneNonce: Long): Unit = {
-      actorRef ! Connected(address, peerConnectionHandler.ref, None)
+      actorRef ! Connected(address, peerConnectionHandler.ref, None, true)
       peerConnectionHandler.expectMsgType[Handshake]
       actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", noneNonce, None, 0))
     }
@@ -91,7 +90,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       val anotherAddress = new InetSocketAddress(knownAddress.getHostName, knownAddress.getPort + 1)
       val anotherPeerHandler = TestProbe("connection-handler-2")
 
-      actorRef ! Connected(anotherAddress, anotherPeerHandler.ref, null)
+      actorRef ! Connected(anotherAddress, anotherPeerHandler.ref, null, inbound = true)
 
       anotherPeerHandler.expectMsg(CloseConnection)
       anotherPeerHandler.expectNoMsg(t)
@@ -99,7 +98,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       actorRef ! CheckPeers
       networkController.expectMsg(NetworkController.ConnectTo(knownAddress))
 
-      actorRef ! Connected(anotherAddress, anotherPeerHandler.ref, null)
+      actorRef ! Connected(anotherAddress, anotherPeerHandler.ref, null, inbound = true)
       anotherPeerHandler.expectMsgType[Handshake]
     }
 
@@ -183,7 +182,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
         actorRef ! AddToBlacklist(nonce + 1, new InetSocketAddress(anAddress.getHostName, anAddress.getPort + 1))
 
         getBlacklistedPeers should have size 1
-        getBlacklistedPeers should contain (anAddress.getHostName)
+        getBlacklistedPeers should contain(anAddress.getHostName)
       }
     }
 
@@ -198,7 +197,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       def connect(id: Int): TestProbe = {
         val address = new InetSocketAddress(id)
         val handler = TestProbe("connection-handler-" + id)
-        actorRef ! Connected(address, handler.ref, None)
+        actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler.expectMsgType[Handshake]
         actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
         handler
@@ -217,8 +216,42 @@ class PeerManagerSpecification extends ActorTestingCommons {
       h3.expectMsg(CloseConnection)
     }
 
+    "many TCP clients from the same IP address" in {
+
+      def connectNormal(id: Int): TestProbe = {
+        val address = new InetSocketAddress(id)
+        val handler = TestProbe("connection-handler-" + id)
+        actorRef ! Connected(address, handler.ref, None, inbound = true)
+        handler.expectMsgType[Handshake]
+        actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", id, None, 0))
+        handler
+      }
+
+      def connectOverLimit(id: Int): TestProbe = {
+        val address = new InetSocketAddress(id)
+        val handler = TestProbe("connection-handler-" + id)
+        actorRef ! Connected(address, handler.ref, None, inbound = true)
+        handler
+      }
+
+      val handlers: scala.collection.mutable.ListBuffer[TestProbe] = scala.collection.mutable.ListBuffer.empty[TestProbe]
+
+      (1 to 5).foreach { i =>
+        handlers += connectNormal(i)
+        getConnectedPeers should have size i
+      }
+
+      (1 to 3).foreach { i =>
+        val h = connectOverLimit(i + 5)
+        h.expectMsg(CloseConnection)
+        handlers += h
+        getConnectedPeers should have size 5
+      }
+    }
+
+
     "disconnect during handshake" in {
-      actorRef ! Connected(anAddress, peerConnectionHandler.ref, None)
+      actorRef ! Connected(anAddress, peerConnectionHandler.ref, None, inbound = true)
       peerConnectionHandler.expectMsgType[Handshake]
 
       getActiveConnections should have size 1
@@ -264,6 +297,27 @@ class PeerManagerSpecification extends ActorTestingCommons {
       actorRef ! AddToBlacklist(-111, knownAddress)
 
       getBlacklistedPeers.size shouldBe 1
+    }
+
+    "inbound connection limit exceeded but can make outbound connections" in {
+      def connect(id: Int, inbound: Boolean): TestProbe = {
+        val address = new InetSocketAddress(InetAddress.getByName(s"127.0.0.$id"), id)
+        val handler = TestProbe("connection-handler-" + id)
+        actorRef ! Connected(address, handler.ref, None, inbound)
+
+        handler
+      }
+
+      (1 to TestSettings.maxConnections).foreach { i =>
+        val h = connect(i, true)
+        h.expectMsgType[Handshake]
+      }
+      (1 to TestSettings.maxConnections).foreach { i =>
+        val h1 = connect(i, true)
+        val h2 = connect(100 + i, false)
+        h1.expectMsg(CloseConnection)
+        h2.expectMsgType[Handshake]
+      }
     }
   }
 }

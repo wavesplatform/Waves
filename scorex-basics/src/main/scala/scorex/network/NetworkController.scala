@@ -18,21 +18,32 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
 
 /**
- * Control all network interaction
- * must be singleton
- */
+  * Control all network interaction
+  * must be singleton
+  */
 class NetworkController(application: RunnableApplication) extends Actor with ScorexLogging {
 
   import NetworkController._
 
-  private implicit val system = context.system
+  lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
 
-  private implicit val timeout = Timeout(5.seconds)
+  lazy val externalSocketAddress = settings.declaredAddress
+    .flatMap(s => Try(InetAddress.getByName(s)).toOption)
+    .orElse {
+      if (settings.upnpEnabled) application.upnp.externalAddress else None
+    }.map(ia => new InetSocketAddress(ia, application.settings.port))
+
+  //an address to send to peers
+  lazy val ownSocketAddress = externalSocketAddress
+
+  lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
 
   private lazy val settings = application.settings
-  private val peerManager = application.peerManager
 
-  private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
+  // there is not recovery for broken connections
+  override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
+
+  private implicit val system = context.system
 
   //check own declared address for validity
   if (!settings.localOnly) {
@@ -61,43 +72,19 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
       }.getOrElse(false)
     }.ensuring(_ == true, "Declared address isn't valid")
   }
-
-  lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
-
-  lazy val externalSocketAddress = settings.declaredAddress
-    .flatMap(s => Try(InetAddress.getByName(s)).toOption)
-    .orElse {
-      if (settings.upnpEnabled) application.upnp.externalAddress else None
-    }.map(ia => new InetSocketAddress(ia, application.settings.port))
-
-  //an address to send to peers
-  lazy val ownSocketAddress = externalSocketAddress
+  private implicit val timeout = Timeout(5.seconds)
+  private val peerManager = application.peerManager
 
   log.info(s"Declared address: $ownSocketAddress")
-
-  lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
+  private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
+  private val listener = context.actorOf(Props(classOf[NetworkListener], self, localAddress), "network-listener")
 
   override def postRestart(thr: Throwable): Unit = {
     log.warn(s"restart because of $thr.getMessage")
     context stop self
   }
 
-  // there is not recovery for broken connections
-  override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
-
-  //bind to listen incoming connections
-  IO(Tcp) ! Bind(self, localAddress)
-
-  private def bindingLogic: Receive = {
-    case b@Bound(localAddr) =>
-      log.info("Successfully bound to the port " + settings.port)
-      context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! PeerManager.CheckPeers)
-
-    case CommandFailed(_: Bind) =>
-      log.error("Network port " + settings.port + " already in use!")
-      context stop self
-      application.stopAll()
-  }
+  listener ! NetworkListener.StartListen
 
   def businessLogic: Receive = {
     //a message coming in from another peer
@@ -119,9 +106,11 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
         //todo: ban peer
       }
 
-    case stn @ SendToNetwork(_, _) =>
+    case stn@SendToNetwork(_, _) =>
       val delay = if (settings.fuzzingDelay > 0) Random.nextInt(settings.fuzzingDelay) else 0
-      system.scheduler.scheduleOnce(delay.millis) { peerManager ! stn }
+      system.scheduler.scheduleOnce(delay.millis) {
+        peerManager ! stn
+      }
   }
 
   def peerLogic: Receive = {
@@ -129,10 +118,9 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
       log.info(s"Connecting to: $remote")
       IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout)
 
-    case c@Connected(remote, local) =>
+    case Connected(remote, local) =>
       val connection = sender()
-      val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
-      peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress)
+      createPeerHandler(connection, remote, inbound = false)
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
@@ -144,7 +132,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
     case ShutdownNetwork =>
       log.info("Going to shutdown all connections & unbind port")
       peerManager ! ShutdownNetwork
-      self ! Unbind
+      listener ! NetworkListener.StopListen
       context stop self
   }
 
@@ -158,6 +146,26 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
     case nonsense: Any =>
       log.warn(s"NetworkController: got something strange $nonsense")
   }
+
+  private def bindingLogic: Receive = {
+    case ListeningStarted =>
+      log.info("Successfully started listening")
+      context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! PeerManager.CheckPeers)
+      log.debug("Outbound connections scheduler started")
+
+    case ListeningFailed =>
+      log.error("Failed to start listening!")
+      context stop self
+      application.stopAll()
+
+    case InboundConnection(connection, remote) =>
+      createPeerHandler(connection, remote, inbound = true)
+  }
+
+  private def createPeerHandler(connection: ActorRef, remote: InetSocketAddress, inbound: Boolean): Unit = {
+    val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
+    peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress, inbound)
+  }
 }
 
 object NetworkController {
@@ -168,8 +176,14 @@ object NetworkController {
 
   case class SendToNetwork(message: Message[_], sendingStrategy: SendingStrategy)
 
+  case class ConnectTo(address: InetSocketAddress)
+
+  case class InboundConnection(connection: ActorRef, remote: InetSocketAddress)
+
   case object ShutdownNetwork
 
-  case class ConnectTo(address: InetSocketAddress)
+  case object ListeningStarted
+
+  case object ListeningFailed
 
 }
