@@ -12,6 +12,7 @@ import scorex.transaction.TypedTransaction.TransactionType
 
 import scala.util.{Failure, Try}
 
+@deprecated("Use TransferTransaction")
 @SerialVersionUID(-4989881425715590828L)
 case class PaymentTransaction(sender: PublicKeyAccount,
                               override val recipient: Account,

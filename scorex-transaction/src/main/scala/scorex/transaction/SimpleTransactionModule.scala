@@ -131,6 +131,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
     }
 
+  @deprecated("Use transferAsset()")
   def createPayment(payment: Payment, wallet: Wallet): Option[PaymentTransaction] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
