@@ -2,23 +2,27 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+
 import akka.pattern.ask
 import akka.util.Timeout
-import scorex.app.RunnableApplication
+
+import scorex.app.Application
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
+import scorex.network.PeerSynchronizer.RequestDataFromPeer
 import scorex.network.message.Message
 import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.GetRandomPeersToBroadcast
 import scorex.utils.ScorexLogging
 import shapeless.syntax.typeable._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 
-
-class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronizer with ScorexLogging {
+class PeerSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   import application.basicMessagesSpecsRepo._
+
+  def scheduler = context.system.scheduler
 
   private implicit val timeout = Timeout(5.seconds)
   private val maxPeersToBroadcast = 3
@@ -30,11 +34,19 @@ class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronize
 
   private val peersDataBroadcastDelay = application.settings.peersDataBroadcastDelay
   private val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(()), None), SendToRandom)
-  context.system.scheduler.schedule(peersDataBroadcastDelay, peersDataBroadcastDelay)(networkControllerRef ! stn)
+
+  private var hasRequested = false
+
+  scheduler.schedule(peersDataBroadcastDelay, peersDataBroadcastDelay)(self ! RequestDataFromPeer)
 
   override def receive: Receive = {
+    case RequestDataFromPeer =>
+      hasRequested = true
+      networkControllerRef ! stn
+
     case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)
-      if msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
+      if hasRequested && msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
+      hasRequested = false
 
       if (peers.size <= maxPeersToBroadcast) {
         peers
@@ -54,4 +66,10 @@ class PeerSynchronizer(application: RunnableApplication) extends ViewSynchronize
 
     case nonsense: Any => log.warn(s"PeerSynchronizer: got something strange $nonsense")
   }
+}
+
+object PeerSynchronizer {
+
+  case object RequestDataFromPeer
+
 }
