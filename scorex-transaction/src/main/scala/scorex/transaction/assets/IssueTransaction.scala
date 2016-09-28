@@ -78,7 +78,7 @@ object IssueTransaction extends Deser[IssueTransaction] {
     import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
     val sender = new PublicKeyAccount(bytes.slice(SignatureLength, SignatureLength + KeyLength))
-    val (assetIdOpt, nameStart) = parseOption(bytes, SignatureLength + KeyLength, SignatureLength)
+    val (assetIdOpt, nameStart) = parseOption(bytes, SignatureLength + KeyLength, AssetIdLength)
     val (assetName, descriptionStart) = parseArraySize(bytes, nameStart)
     val (description, quantityStart) = parseArraySize(bytes, descriptionStart)
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
