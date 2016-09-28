@@ -15,13 +15,11 @@ object PeerInfo {
 
 trait PeerDatabase {
 
-  type HostName = String
-
   def mergePeerInfo(peer: InetSocketAddress, peerInfo: PeerInfo, createIfNotExists: Boolean = true): Unit
 
   def knownPeers(forSelf: Boolean): Map[InetSocketAddress, PeerInfo]
 
-  def blacklistedPeers: Set[HostName]
+  def blacklistedPeers: Set[String]
 
   def blacklistPeer(peer: InetSocketAddress): Unit
 }

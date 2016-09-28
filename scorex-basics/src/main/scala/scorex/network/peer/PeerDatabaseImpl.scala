@@ -15,7 +15,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
   }
 
   private val peersPersistence: MVMap[InetSocketAddress, PeerInfo] = database.openMap("peers")
-  private val blacklist: MVMap[HostName, Long] = database.openMap("blacklist")
+  private val blacklist: MVMap[String, Long] = database.openMap("blacklist")
 
   private lazy val ownNonce = settings.nodeNonce
   private lazy val blacklistResidenceTimeMilliseconds = settings.blacklistResidenceTimeMilliseconds
@@ -55,7 +55,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
         .toMap.filterKeys(address => !blacklist.contains(address.getHostName))
     }
 
-  def blacklistedPeers: Set[HostName] =
+  def blacklistedPeers: Set[String] =
     withoutObsoleteRecords(blacklist, { t: Long => t }, blacklistResidenceTimeMilliseconds).keySet().toSet
 
   private def withoutObsoleteRecords[K, T](map: MVMap[K, T], tsExtractor: T => Long, residenceTimeInMillis: Long) = {

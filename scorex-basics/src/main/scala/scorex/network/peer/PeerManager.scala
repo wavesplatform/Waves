@@ -46,6 +46,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     peerDatabase.mergePeerInfo(_, PeerInfo())
   }
 
+  private val blacklistListeners: scala.collection.mutable.Set[ActorRef] = scala.collection.mutable.Set.empty[ActorRef]
+
   private def peerCycle: Receive = {
     case Connected(remote, handlerRef, ownSocketAddress, inbound) =>
 
@@ -229,13 +231,24 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     }
   }
 
-  private def blackListOperations: Receive = {
+  private def blacklistOperations: Receive = {
+    case RegisterBlacklistListener(listener) =>
+      blacklistListeners += listener
+      listener ! ExistedBlacklist(peerDatabase.blacklistedPeers.toSeq)
+
+    case UnregisterBlacklistListener(listener) =>
+      blacklistListeners -= listener
+
     case AddToBlacklist(nodeNonce, address) =>
       (nonces.get(nodeNonce) + address).foreach {
         addr =>
           log.info(s"Blacklist peer $addr")
           peerDatabase.blacklistPeer(addr)
           connectedPeers.get(addr).foreach(_.handlerRef ! CloseConnection)
+
+          blacklistListeners.foreach { listener =>
+            listener ! BlackListUpdated(addr.getHostName)
+          }
       }
   }
 
@@ -261,7 +274,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case ShutdownNetwork => connectedPeers.values.foreach(_.handlerRef ! CloseConnection)
 
-  }: Receive) orElse blackListOperations orElse peerListOperations orElse peerCycle
+  }: Receive) orElse blacklistOperations orElse peerListOperations orElse peerCycle
+
 }
 
 object PeerManager {
@@ -296,5 +310,13 @@ object PeerManager {
   case object GetConnections
 
   private case object MarkConnectedPeersVisited
+
+  case class BlackListUpdated(host: String)
+
+  case class RegisterBlacklistListener(listener: ActorRef)
+
+  case class UnregisterBlacklistListener(listener: ActorRef)
+
+  case class ExistedBlacklist(hosts: Seq[String])
 
 }

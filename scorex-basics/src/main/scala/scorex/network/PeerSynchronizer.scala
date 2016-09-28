@@ -2,12 +2,12 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
+import akka.actor.Scheduler
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-
 import akka.pattern.ask
 import akka.util.Timeout
-
 import scorex.app.Application
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.PeerSynchronizer.RequestDataFromPeer
@@ -22,7 +22,7 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
 
   import application.basicMessagesSpecsRepo._
 
-  def scheduler = context.system.scheduler
+  def scheduler: Scheduler = context.system.scheduler
 
   private implicit val timeout = Timeout(5.seconds)
   private val maxPeersToBroadcast = 3
@@ -36,6 +36,7 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
   private val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(()), None), SendToRandom)
 
   private var hasRequested = false
+  private var unrequestedPacketsCount = 0
 
   scheduler.schedule(peersDataBroadcastDelay, peersDataBroadcastDelay)(self ! RequestDataFromPeer)
 
@@ -54,8 +55,15 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
           .foreach(isa => peerManager ! PeerManager.AddOrUpdatePeer(isa, None, None))
       }
 
-    case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
+    case DataFromPeer(msgId, _, remote)
+      if !hasRequested && msgId == PeersSpec.messageCode =>
+      unrequestedPacketsCount = unrequestedPacketsCount + 1
+      if (unrequestedPacketsCount >= application.settings.UnrequestedPacketsThreshold) {
+        log.warn(s"Received too many data without requesting it from $remote")
+        remote.blacklist()
+      }
 
+    case DataFromPeer(msgId, _, remote) if msgId == GetPeersSpec.messageCode =>
       (peerManager ? GetRandomPeersToBroadcast(maxPeersToBroadcast))
         .mapTo[Seq[InetSocketAddress]]
         .filter(_.nonEmpty)

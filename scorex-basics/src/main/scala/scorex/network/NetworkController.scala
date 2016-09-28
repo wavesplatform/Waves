@@ -77,14 +77,13 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
 
   log.info(s"Declared address: $ownSocketAddress")
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
-  private val listener = context.actorOf(Props(classOf[NetworkListener], self, localAddress), "network-listener")
+  private val listener = context.actorOf(Props(classOf[NetworkListener], self, peerManager, localAddress),
+    "network-listener")
 
   override def postRestart(thr: Throwable): Unit = {
     log.warn(s"restart because of $thr.getMessage")
     context stop self
   }
-
-  listener ! NetworkListener.StartListen
 
   def businessLogic: Receive = {
     //a message coming in from another peer
@@ -148,6 +147,9 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   }
 
   private def bindingLogic: Receive = {
+    case ReadyToListen =>
+      listener ! NetworkListener.StartListen
+
     case ListeningStarted =>
       log.info("Successfully started listening")
       context.system.scheduler.schedule(600.millis, 5.seconds)(peerManager ! PeerManager.CheckPeers)
@@ -185,5 +187,7 @@ object NetworkController {
   case object ListeningStarted
 
   case object ListeningFailed
+
+  case object ReadyToListen
 
 }
