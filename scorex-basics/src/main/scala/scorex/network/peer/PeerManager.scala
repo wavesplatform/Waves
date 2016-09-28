@@ -15,6 +15,7 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
+import scala.concurrent.duration._
 
 /**
   * Must be singleton
@@ -41,6 +42,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
   private val visitPeersInterval = application.settings.peersDataResidenceTime / 10
   context.system.scheduler.schedule(visitPeersInterval, visitPeersInterval, self, MarkConnectedPeersVisited)
+
+  val blacklistResendInterval = settings.blacklistResidenceTimeMilliseconds.milliseconds / 10
+  context.system.scheduler.schedule(blacklistResendInterval, blacklistResendInterval, self, BlacklistResendRequired)
 
   settings.knownPeers.foreach {
     peerDatabase.mergePeerInfo(_, PeerInfo())
@@ -239,6 +243,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     case UnregisterBlacklistListener(listener) =>
       blacklistListeners -= listener
 
+    case BlacklistResendRequired =>
+      blacklistListeners.foreach { listener =>
+        listener ! ExistedBlacklist(peerDatabase.blacklistedPeers.toSeq)
+      }
+
     case AddToBlacklist(nodeNonce, address) =>
       (nonces.get(nodeNonce) + address).foreach {
         addr =>
@@ -318,5 +327,7 @@ object PeerManager {
   case class UnregisterBlacklistListener(listener: ActorRef)
 
   case class ExistedBlacklist(hosts: Seq[String])
+
+  case object BlacklistResendRequired
 
 }

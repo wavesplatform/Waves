@@ -37,6 +37,11 @@ class NetworkListener(networkController: ActorRef, peerManager: ActorRef, bindAd
   }
 
   private def working: Receive = {
+    case PeerManager.ExistedBlacklist(hosts) =>
+      log.debug(s"Set blacklist to ${hosts.mkString(",")}")
+      blocked.clear()
+      blocked ++= hosts
+
     case PeerManager.BlackListUpdated(host) =>
       log.info(s"Blocking host: $host")
       blocked += host

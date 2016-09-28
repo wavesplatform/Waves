@@ -22,5 +22,7 @@ class BasicsTestSuite extends Suites(
   new PeerManagerSpecification,
   new CoordinatorSpecification,
   new PeerDatabaseImplSpecification,
-  new BlockGeneratorControllerSpecification
+  new BlockGeneratorControllerSpecification,
+  new NetworkListenerSpecification,
+  new PeerSynchronizerSpecification
 )
