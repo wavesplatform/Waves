@@ -3,9 +3,6 @@ package scorex.network
 import java.net.InetSocketAddress
 
 import akka.actor.Scheduler
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import akka.pattern.ask
 import akka.util.Timeout
 import scorex.app.Application
@@ -17,26 +14,25 @@ import scorex.network.peer.PeerManager.GetRandomPeersToBroadcast
 import scorex.utils.ScorexLogging
 import shapeless.syntax.typeable._
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+
 
 class PeerSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   import application.basicMessagesSpecsRepo._
 
-  def scheduler: Scheduler = context.system.scheduler
-
+  protected lazy override val networkControllerRef = application.networkController
+  override val messageSpecs = Seq(GetPeersSpec, PeersSpec)
   private implicit val timeout = Timeout(5.seconds)
   private val maxPeersToBroadcast = 3
-
-  override val messageSpecs = Seq(GetPeersSpec, PeersSpec)
-  protected lazy override val networkControllerRef = application.networkController
-
   private val peerManager = application.peerManager
-
   private val peersDataBroadcastDelay = application.settings.peersDataBroadcastDelay
   private val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(()), None), SendToRandom)
-
   private var hasRequested = false
   private var unrequestedPacketsCount = 0
+
+  def scheduler: Scheduler = context.system.scheduler
 
   scheduler.schedule(peersDataBroadcastDelay, peersDataBroadcastDelay)(self ! RequestDataFromPeer)
 
@@ -52,7 +48,7 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
       if (peers.size <= maxPeersToBroadcast) {
         peers
           .filter(_.getPort < application.settings.minEphemeralPortNumber)
-          .foreach(isa => peerManager ! PeerManager.AddOrUpdatePeer(isa, None, None))
+          .foreach(isa => peerManager ! PeerManager.AddPeer(isa))
       }
 
     case DataFromPeer(msgId, _, remote)

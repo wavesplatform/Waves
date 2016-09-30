@@ -54,9 +54,9 @@ class PeerManagerSpecification extends ActorTestingCommons {
     val peerConnectionHandler = TestProbe("connection-handler")
 
     def connect(address: InetSocketAddress, noneNonce: Long): Unit = {
-      actorRef ! Connected(address, peerConnectionHandler.ref, None, true)
+      actorRef ! Connected(address, peerConnectionHandler.ref, None, inbound = true)
       peerConnectionHandler.expectMsgType[Handshake]
-      actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", noneNonce, None, 0))
+      actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", noneNonce, Some(address), 0))
     }
 
     def getConnectedPeers =
@@ -118,25 +118,24 @@ class PeerManagerSpecification extends ActorTestingCommons {
         getConnectedPeers shouldBe empty
       }
 
-      "double connect" in {
-
+      "second connection from the same address is not possible" in {
         actorRef ! CheckPeers
 
         networkController.expectMsg(NetworkController.ConnectTo(knownAddress))
 
         connect(knownAddress, nonce)
 
-        getConnectedPeers.size shouldBe 1
+        getConnectedPeers.size shouldBe 2
 
         actorRef ! CheckPeers
 
         networkController.expectNoMsg(testDuration)
 
-        getConnectedPeers.size shouldBe 1
+        getConnectedPeers.size shouldBe 2
 
         actorRef ! Disconnected(anAddress)
-        getConnectedPeers shouldBe empty
-        getActiveConnections shouldBe empty
+        getConnectedPeers.head._1 shouldBe knownAddress
+        getActiveConnections.head shouldBe knownAddress
       }
 
       "msg from network routing" - {
@@ -193,7 +192,6 @@ class PeerManagerSpecification extends ActorTestingCommons {
     }
 
     "many TCP clients with same nonce" in {
-
       def connect(id: Int): TestProbe = {
         val address = new InetSocketAddress(id)
         val handler = TestProbe("connection-handler-" + id)
@@ -204,16 +202,16 @@ class PeerManagerSpecification extends ActorTestingCommons {
       }
 
       val h1 = connect(1)
+      h1.expectNoMsg()
       getConnectedPeers should have size 1
 
       val h2 = connect(2)
-      h2.expectMsg(CloseConnection)
-      getConnectedPeers should have size 1
+      h2.expectNoMsg()
+      getConnectedPeers should have size 2
 
       val h3 = connect(3)
-
-      h1.expectMsg(CloseConnection)
-      h3.expectMsg(CloseConnection)
+      h3.expectNoMsg()
+      getConnectedPeers should have size 3
     }
 
     "many TCP clients from the same IP address" in {
@@ -276,19 +274,20 @@ class PeerManagerSpecification extends ActorTestingCommons {
     }
 
     "get random peers" in {
-      actorRef ! AddOrUpdatePeer(new InetSocketAddress(99), None, None)
-      actorRef ! AddOrUpdatePeer(new InetSocketAddress(100), Some(TestSettings.nodeNonce), None)
+      actorRef ! AddPeer(new InetSocketAddress(99))
+      actorRef ! AddPeer(new InetSocketAddress(100))
 
-      val addr = new InetSocketAddress(101)
-      actorRef ! AddOrUpdatePeer(addr, None, None)
-      connect(addr, 11)
+      val address1 = new InetSocketAddress(101)
+      actorRef ! AddPeer(address1)
+      connect(address1, 11)
 
-      connect(new InetSocketAddress(56099), 56099)
+      val address2 = new InetSocketAddress(56099)
+      connect(address2, 56099)
 
       val peers = Await.result((actorRef ? GetRandomPeersToBroadcast(3)).mapTo[Seq[InetSocketAddress]], testDuration)
 
-      peers should have size 1
-      peers.head shouldBe addr
+      peers should have size 2
+      peers should contain allOf(address1, address2)
     }
 
     "blacklist nonconnected peer" in {
@@ -314,8 +313,8 @@ class PeerManagerSpecification extends ActorTestingCommons {
       }
       (1 to TestSettings.maxConnections).foreach { i =>
         val h1 = connect(i, true)
-        val h2 = connect(100 + i, false)
         h1.expectMsg(CloseConnection)
+        val h2 = connect(100 + i, false)
         h2.expectMsgType[Handshake]
       }
     }

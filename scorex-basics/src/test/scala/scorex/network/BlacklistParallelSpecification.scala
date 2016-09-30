@@ -1,10 +1,10 @@
 package scorex.network
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 
 import org.scalatest.{FeatureSpec, GivenWhenThen, ParallelTestExecution}
 import play.api.libs.json.{JsObject, Json}
-import scorex.network.peer.{PeerDatabaseImpl, PeerInfo}
+import scorex.network.peer.PeerDatabaseImpl
 import scorex.settings.Settings
 
 class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with ParallelTestExecution {
@@ -23,63 +23,61 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
 
     val peerDatabase = new PeerDatabaseImpl(TestSettings, None)
 
+    val host1 = "1.1.1.1"
+    val host2 = "2.2.2.2"
+    val host3 = "3.3.3.3"
+    val address1 = new InetSocketAddress(host1, 1)
+    val address2 = new InetSocketAddress(host2, 2)
+    val address3 = new InetSocketAddress(host3, 2)
+
     def isBlacklisted(address: InetSocketAddress): Boolean =
-      peerDatabase.blacklistedPeers.contains(address.getHostName)
+      peerDatabase.getBlacklist.contains(address.getHostName)
 
     scenario("Peer blacklist another peer") {
 
       Given("Peer database is empty")
-
-      assert(peerDatabase.knownPeers(false).isEmpty)
-      assert(peerDatabase.blacklistedPeers.isEmpty)
+      assert(peerDatabase.getKnownPeers.isEmpty)
+      assert(peerDatabase.getBlacklist.isEmpty)
 
       When("Peer adds another peer to knownPeers")
-      val anotherPeer = PeerInfo(System.currentTimeMillis)
-      val port = 1234
-      val address = new InetSocketAddress(InetAddress.getByAddress(Array[Byte](1, 1, 1, 1)), port)
-      peerDatabase.mergePeerInfo(address, anotherPeer)
-      assert(peerDatabase.knownPeers(false).contains(address))
-      assert(!peerDatabase.blacklistedPeers.contains(address.getHostName))
+      peerDatabase.addPeer(address1, Some(0), None)
+      assert(peerDatabase.getKnownPeers.contains(address1))
+      assert(!peerDatabase.getBlacklist.contains(host1))
 
       And("Peer blacklists another peer")
-      peerDatabase.blacklistPeer(address)
-      assert(isBlacklisted(address))
-      assert(peerDatabase.blacklistedPeers.contains(address.getHostName))
-      assert(!peerDatabase.knownPeers(false).contains(address))
+      peerDatabase.blacklistHost(host1)
+      assert(isBlacklisted(address1))
+      assert(peerDatabase.getBlacklist.contains(host1))
+      assert(!peerDatabase.getKnownPeers.contains(address1))
 
       And("Peer waits for some time")
       Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds)
 
       Then("Another peer disappear from blacklist")
-      assert(!isBlacklisted(address))
+      assert(!isBlacklisted(address1))
 
       And("Another peer became knownPeer")
-      assert(peerDatabase.knownPeers(false).contains(address))
+      assert(peerDatabase.getKnownPeers.contains(address1))
     }
 
     scenario("Peer blacklist few peers") {
 
       Given("Peer database is empty")
-      assert(peerDatabase.knownPeers(false).isEmpty)
-      assert(peerDatabase.blacklistedPeers.isEmpty)
+      assert(peerDatabase.getKnownPeers.isEmpty)
+      assert(peerDatabase.getBlacklist.isEmpty)
 
       When("Peer adds other peers")
-      val anotherPeer = PeerInfo(System.currentTimeMillis)
-      val port = 1234
-      val address1 = new InetSocketAddress(InetAddress.getByAddress(Array[Byte](1, 1, 1, 1)), port)
-      val address2 = new InetSocketAddress(InetAddress.getByAddress(Array[Byte](2, 2, 2, 2)), port)
-      val address3 = new InetSocketAddress(InetAddress.getByAddress(Array[Byte](3, 3, 3, 3)), port)
-      peerDatabase.mergePeerInfo(address1, anotherPeer)
-      peerDatabase.mergePeerInfo(address2, anotherPeer)
-      peerDatabase.mergePeerInfo(address3, anotherPeer)
+      peerDatabase.addPeer(address1, Some(0), None)
+      peerDatabase.addPeer(address2, Some(1), None)
+      peerDatabase.addPeer(address3, Some(2), None)
       assert(!isBlacklisted(address1))
       assert(!isBlacklisted(address2))
       assert(!isBlacklisted(address3))
 
       And("Peer blacklists other peers")
-      peerDatabase.blacklistPeer(address1)
-      peerDatabase.blacklistPeer(address2)
-      peerDatabase.blacklistPeer(address3)
+      peerDatabase.blacklistHost(address1.getHostName)
+      peerDatabase.blacklistHost(address2.getHostName)
+      peerDatabase.blacklistHost(address3.getHostName)
       assert(isBlacklisted(address1))
       assert(isBlacklisted(address2))
       assert(isBlacklisted(address3))
@@ -88,7 +86,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds / 2)
 
       And("Adds one peer to blacklist one more time")
-      peerDatabase.blacklistPeer(address2)
+      peerDatabase.blacklistHost(address2.getHostName)
 
       And("Waits another half of period")
       Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds / 2)

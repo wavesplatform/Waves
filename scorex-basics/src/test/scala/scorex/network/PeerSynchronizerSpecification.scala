@@ -2,12 +2,8 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.duration.{FiniteDuration, _}
-import scala.language.postfixOps
-
 import akka.actor.{ActorRef, Props, Scheduler}
 import akka.testkit.TestProbe
-
 import org.scalatest.mock.MockitoSugar
 import scorex.ActorTestingCommons
 import scorex.app.{Application, ApplicationVersion}
@@ -15,6 +11,9 @@ import scorex.network.NetworkController.DataFromPeer
 import scorex.network.PeerSynchronizer.RequestDataFromPeer
 import scorex.network.peer.PeerManager
 import scorex.settings.SettingsMock
+
+import scala.concurrent.duration.{FiniteDuration, _}
+import scala.language.postfixOps
 
 class TestPeerSynchronizer(app: Application) extends PeerSynchronizer(app) {
   override def scheduler: Scheduler = MockitoSugar.mock[Scheduler]
@@ -53,7 +52,7 @@ class PeerSynchronizerSpecification extends ActorTestingCommons
 
         actorRef ! RequestDataFromPeer
         actorRef ! DataFromPeer(PeersSpec.messageCode, Seq(new InetSocketAddress(1)), peer)
-        testPeerManager.expectMsgType[PeerManager.AddOrUpdatePeer]
+        testPeerManager.expectMsgType[PeerManager.AddPeer]
       }
 
       "reject DataFromPeer without request it" in {

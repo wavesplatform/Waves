@@ -4,10 +4,15 @@ import java.net.InetSocketAddress
 
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.settings.Settings
+import scorex.utils.CircularBuffer
 
 import scala.collection.JavaConversions._
+import scala.util.Random
 
 class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends PeerDatabase {
+
+  private lazy val blacklistResidenceTimeMilliseconds = settings.blacklistResidenceTimeMilliseconds
+  private lazy val peersDataResidenceTime = settings.peersDataResidenceTime
 
   private val database = filename match {
     case Some(file) => new MVStore.Builder().fileName(file).compress().open()
@@ -16,54 +21,70 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
 
   private val peersPersistence: MVMap[InetSocketAddress, PeerInfo] = database.openMap("peers")
   private val blacklist: MVMap[String, Long] = database.openMap("blacklist")
+  private val unverifiedPeers = new CircularBuffer[InetSocketAddress](settings.MaxUnverifiedPeers)
 
-  private lazy val ownNonce = settings.nodeNonce
-  private lazy val blacklistResidenceTimeMilliseconds = settings.blacklistResidenceTimeMilliseconds
-  private lazy val peersDataResidenceTime = settings.peersDataResidenceTime
-  private lazy val maxSize = settings.maxConnections * 10
+  override def addPeer(socketAddress: InetSocketAddress, nonce: Option[Long], nodeName: Option[String]): Unit = {
+    if (nonce.isDefined) {
+      unverifiedPeers.remove(socketAddress)
+      peersPersistence.put(socketAddress, PeerInfo(System.currentTimeMillis(), nonce.get, nodeName.getOrElse("N/A")))
+      database.commit()
+    } else if (!getKnownPeers.contains(socketAddress)) unverifiedPeers += socketAddress
+  }
 
-  def mergePeerInfo(address: InetSocketAddress, peerInfo: PeerInfo, createIfNotExists: Boolean): Unit =
-    Option(peersPersistence.get(address)).map {
-      dbPeerInfo =>
-        PeerInfo(
-          if (peerInfo.lastSeen != PeerInfo.TBD) peerInfo.lastSeen else dbPeerInfo.lastSeen,
-          peerInfo.nonce.orElse(dbPeerInfo.nonce),
-          peerInfo.nodeName.orElse(dbPeerInfo.nodeName),
-          dbPeerInfo.creationTime)
-    } orElse {
-      if (createIfNotExists && peersPersistence.size() < maxSize) {
-        val t = currentTime
-        Some(peerInfo.copy(lastSeen = t, creationTime = t))
-      } else None
-    } foreach {
-      updatedPeerInfo =>
-        peersPersistence.put(address, updatedPeerInfo)
-        database.commit()
+  override def removePeer(socketAddress: InetSocketAddress): Unit = {
+    unverifiedPeers.remove(socketAddress)
+    if (peersPersistence.contains(socketAddress)) {
+      peersPersistence.remove(socketAddress)
+      database.commit()
     }
+  }
 
-  def blacklistPeer(address: InetSocketAddress): Unit = {
-    blacklist.update(address.getHostName, currentTime)
+  override def touch(socketAddress: InetSocketAddress): Unit = {
+    Option(peersPersistence.get(socketAddress)).map {
+      dbPeerInfo => dbPeerInfo.copy(timestamp = System.currentTimeMillis())
+    } foreach { updated =>
+      peersPersistence.put(socketAddress, updated)
+      database.commit()
+    }
+  }
+
+  override def blacklistHost(host: String): Unit = {
+    unverifiedPeers.drop(_.getHostName == host)
+    blacklist.update(host, System.currentTimeMillis())
     database.commit()
   }
 
-  def knownPeers(excludeSelf: Boolean): Map[InetSocketAddress, PeerInfo] =
-    if (excludeSelf) {
-      knownPeers(false).filterNot(_._2.nonce.contains(ownNonce))
-    } else {
-      val blacklist = blacklistedPeers
-      withoutObsoleteRecords(peersPersistence, (peerData: PeerInfo) => peerData.lastSeen, peersDataResidenceTime.toMillis)
-        .toMap.filterKeys(address => !blacklist.contains(address.getHostName))
-    }
+  override def getKnownPeers: Map[InetSocketAddress, PeerInfo] = {
+    withoutObsoleteRecords(peersPersistence, (peerData: PeerInfo) => peerData.timestamp, peersDataResidenceTime.toMillis)
+      .toMap.filterKeys(address => !getBlacklist.contains(address.getHostName))
+  }
 
-  def blacklistedPeers: Set[String] =
+  override def getBlacklist: Set[String] =
     withoutObsoleteRecords(blacklist, { t: Long => t }, blacklistResidenceTimeMilliseconds).keySet().toSet
 
-  private def withoutObsoleteRecords[K, T](map: MVMap[K, T], tsExtractor: T => Long, residenceTimeInMillis: Long) = {
-    val t = currentTime
+  override def getRandomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = {
+    val unverifiedCandidate = if (unverifiedPeers.nonEmpty)
+      Some(unverifiedPeers(Random.nextInt(unverifiedPeers.size())))
+    else None
+
+    val verifiedCandidates = getKnownPeers.keySet.diff(excluded)
+    val verifiedCandidate = if (verifiedCandidates.nonEmpty)
+      Some(verifiedCandidates.toSeq(Random.nextInt(verifiedCandidates.size)))
+    else None
+
+    if (unverifiedCandidate.isEmpty) verifiedCandidate
+    else if (verifiedCandidate.isEmpty) unverifiedCandidate
+    else if (Random.nextBoolean()) verifiedCandidate
+    else unverifiedCandidate
+  }
+
+  private def withoutObsoleteRecords[K, T](map: MVMap[K, T], timestamp: T => Long, residenceTimeInMillis: Long) = {
+    val t = System.currentTimeMillis()
 
     val obsoletePeers = map.toArray
-      .filter { case (_, value) => tsExtractor(value) <= t - residenceTimeInMillis }
-      .map(_._1)
+      .filter { case (_, value) =>
+        timestamp(value) <= System.currentTimeMillis() - residenceTimeInMillis
+      }.map(_._1)
 
     if (obsoletePeers.nonEmpty) {
       obsoletePeers.foreach(map.remove)
@@ -72,6 +93,4 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
 
     map
   }
-
-  private def currentTime = System.currentTimeMillis()
 }

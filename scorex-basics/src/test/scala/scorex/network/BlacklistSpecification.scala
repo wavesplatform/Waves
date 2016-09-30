@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import org.scalatest.{FeatureSpec, GivenWhenThen}
 import play.api.libs.json.{JsObject, Json}
-import scorex.network.peer.{PeerDatabaseImpl, PeerInfo}
+import scorex.network.peer.PeerDatabaseImpl
 import scorex.settings.Settings
 
 class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
@@ -24,21 +24,21 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
 
       Given("Peer database is empty")
       val peerDatabase = new PeerDatabaseImpl(TestSettings, None)
-      def isBlacklisted(address: InetSocketAddress) = peerDatabase.blacklistedPeers.contains(address.getHostName)
+      def isBlacklisted(address: InetSocketAddress) = peerDatabase.getBlacklist.contains(address.getHostName)
 
-      assert(peerDatabase.knownPeers(false).isEmpty)
-      assert(peerDatabase.blacklistedPeers.isEmpty)
+      assert(peerDatabase.getKnownPeers.isEmpty)
+      assert(peerDatabase.getBlacklist.isEmpty)
 
       When("Peer adds another peer to knownPeers")
       val address = new InetSocketAddress(InetAddress.getByName("localhost"), 1234)
-      peerDatabase.mergePeerInfo(address, PeerInfo(System.currentTimeMillis))
-      assert(peerDatabase.knownPeers(false).contains(address))
+      peerDatabase.addPeer(address, Some(0), None)
+      assert(peerDatabase.getKnownPeers.contains(address))
       assert(!isBlacklisted(address))
 
       And("Peer blacklists another peer")
-      peerDatabase.blacklistPeer(address)
+      peerDatabase.blacklistHost(address.getHostName)
       assert(isBlacklisted(address))
-      assert(!peerDatabase.knownPeers(false).contains(address))
+      assert(!peerDatabase.getKnownPeers.contains(address))
 
       And("Peer waits for some time")
       Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds)
@@ -47,7 +47,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       assert(!isBlacklisted(address))
 
       And("Another peer became known")
-      assert(peerDatabase.knownPeers(false).contains(address))
+      assert(peerDatabase.getKnownPeers.contains(address))
     }
   }
 }

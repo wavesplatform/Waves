@@ -44,9 +44,9 @@ case class PeersApiRoute(application: RunnableApplication)(implicit val context:
             JsArray(peers.take(MaxPeersInResponse).map { case (address, peerInfo) =>
               Json.obj(
                 "address" -> address.toString,
-                "nodeName" -> (peerInfo.nodeName.getOrElse("N/A"): String),
-                "nodeNonce" -> (peerInfo.nonce.map(_.toString).getOrElse("N/A"): String),
-                "lastSeen" -> peerInfo.lastSeen
+                "nodeName" -> peerInfo.nodeName,
+                "nodeNonce" -> peerInfo.nonce.toString,
+                "lastSeen" -> peerInfo.timestamp
               )
             }.toList),
             StatusCodes.OK

@@ -1,26 +1,25 @@
 package scorex.network.peer
 
 import java.net.InetSocketAddress
-import PeerInfo.TBD
 
-@SerialVersionUID(-8490103514095092419L)
-case class PeerInfo(lastSeen: Long = TBD,
-                    nonce: Option[Long] = None,
-                    nodeName: Option[String] = None,
-                    creationTime: Long = TBD)
-
-object PeerInfo {
-  val TBD = -1L
-}
+@SerialVersionUID(-8490103514095092420L)
+case class PeerInfo(timestamp: Long, nonce: Long, nodeName: String = "")
 
 trait PeerDatabase {
 
-  def mergePeerInfo(peer: InetSocketAddress, peerInfo: PeerInfo, createIfNotExists: Boolean = true): Unit
+  def addPeer(socketAddress: InetSocketAddress, nonce: Option[Long], name: Option[String])
 
-  def knownPeers(forSelf: Boolean): Map[InetSocketAddress, PeerInfo]
+  def removePeer(socketAddress: InetSocketAddress)
 
-  def blacklistedPeers: Set[String]
+  def touch(socketAddress: InetSocketAddress)
 
-  def blacklistPeer(peer: InetSocketAddress): Unit
+  def blacklistHost(host: String)
+
+  def getKnownPeers: Map[InetSocketAddress, PeerInfo]
+
+  def getBlacklist: Set[String]
+
+  def getRandomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
+
 }
 

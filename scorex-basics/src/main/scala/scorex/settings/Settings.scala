@@ -88,6 +88,7 @@ trait Settings extends ScorexLogging {
   lazy val acceptExternalPeerData = (p2pSettings \ "acceptExternalPeerData").asOpt[Boolean].getOrElse(true)
   lazy val peersDataBroadcastDelay = (p2pSettings \ "peersDataBroadcastDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(30.seconds)
+  lazy val MaxUnverifiedPeers = (p2pSettings \ "maxUnverifiedPeers").asOpt[Int].getOrElse(1000)
 
 
   //p2p settings assertions
@@ -142,7 +143,7 @@ trait Settings extends ScorexLogging {
   private val DefaultMaxConnections = 30
   private val DefaultConnectionTimeout = 60
   private val DefaultBindAddress = "127.0.0.1"
-  lazy val AllowedConnectionsFromOneIPAddress = 5
+  lazy val AllowedConnectionsFromOneHost = 5
   lazy val UnrequestedPacketsThreshold = 100
 
 

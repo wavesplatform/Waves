@@ -6,6 +6,7 @@ import scorex.consensus.mining.{BlockGeneratorControllerSpecification, MinerSpec
 import scorex.crypto.SigningFunctionsSpecification
 import scorex.network._
 import scorex.network.peer.{PeerDatabaseImplSpecification, PeerManagerSpecification}
+import scorex.utils.CircularBufferSpecification
 
 class BasicsTestSuite extends Suites(
   new MinerSpecification,
@@ -24,5 +25,6 @@ class BasicsTestSuite extends Suites(
   new PeerDatabaseImplSpecification,
   new BlockGeneratorControllerSpecification,
   new NetworkListenerSpecification,
-  new PeerSynchronizerSpecification
+  new PeerSynchronizerSpecification,
+  new CircularBufferSpecification
 )
