@@ -200,9 +200,12 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
           peerDatabase.removePeer(address)
           connection.handlerRef ! CloseConnection
         } else {
-          handshake.declaredAddress.foreach {
-            peerDatabase.addPeer(_, Some(handshake.nodeNonce), Some(handshake.nodeName))
-          }
+          log.debug(s"declared: ${handshake.declaredAddress.getOrElse("not-defined")}, address: $address")
+          if (handshake.declaredAddress.isDefined)
+            peerDatabase.addPeer(address, Some(handshake.nodeNonce), Some(handshake.nodeName))
+          else
+            peerDatabase.removePeer(address)
+
           connectedPeers += address -> connection.copy(handshake = Some(handshake))
         }
     }
