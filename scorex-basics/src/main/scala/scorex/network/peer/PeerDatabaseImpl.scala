@@ -72,10 +72,14 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
       Some(verifiedCandidates.toSeq(Random.nextInt(verifiedCandidates.size)))
     else None
 
-    if (unverifiedCandidate.isEmpty) verifiedCandidate
+    val result = if (unverifiedCandidate.isEmpty) verifiedCandidate
     else if (verifiedCandidate.isEmpty) unverifiedCandidate
     else if (Random.nextBoolean()) verifiedCandidate
     else unverifiedCandidate
+
+    if (result.isDefined) unverifiedPeers.remove(result.get)
+
+    result
   }
 
   private def withoutObsoleteRecords[K, T](map: MVMap[K, T], timestamp: T => Long, residenceTimeInMillis: Long) = {
