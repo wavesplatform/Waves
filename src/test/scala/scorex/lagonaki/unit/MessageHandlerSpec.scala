@@ -28,7 +28,7 @@ class MessageHandlerSpec extends FunSuite with TestingCommons {
   }
 
   test("parseBytes work for GetPeers message") {
-    val msg = Message(repo.GetPeersSpec, Right(), None).bytes
+    val msg = Message(repo.GetPeersSpec, Right(()), None).bytes
     val result = handler.parseBytes(ByteBuffer.wrap(msg))
     assert(result.isSuccess)
   }

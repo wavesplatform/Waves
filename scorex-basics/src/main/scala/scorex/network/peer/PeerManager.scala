@@ -103,7 +103,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case GetConnectedPeers => sender() ! getConnectedPeersWithHandshake
 
-    case GetConnectedPeersTyped => sender() ! ConnectedPeers(getConnectedPeersWithHandshake)
+    case GetConnectedPeersTyped =>
+      val peers = getConnectedPeersWithHandshake map {
+        case (addr, h) => new InetAddressPeer(h.nodeNonce, addr, self)
+      }
+      sender() ! ConnectedPeers(peers.toSet)
 
     case GetConnections => sender() ! connectedPeers.keys.toSeq
 
@@ -256,7 +260,7 @@ object PeerManager {
 
   case class GetRandomPeersToBroadcast(howMany: Int)
 
-  case class ConnectedPeers(peers: Seq[(InetSocketAddress, Handshake)])
+  case class ConnectedPeers(peers: Set[ConnectedPeer])
 
   case class PeerConnection(handlerRef: ActorRef, handshake: Option[Handshake], inbound: Boolean)
 

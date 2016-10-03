@@ -1,12 +1,11 @@
 package scorex.consensus.mining
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
 import scorex.app.Application.GetBlockGenerationStatus
 import scorex.consensus.mining.BlockGeneratorController._
+import scorex.network.ConnectedPeer
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.SettingsMock
 
@@ -74,12 +73,12 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
         setOfflineGeneration(false)
 
         "gen allowed" in {
-          testPeerManager.reply(ConnectedPeers(Seq((new InetSocketAddress(687), null))))
+          testPeerManager.reply(ConnectedPeers(Set(stub[ConnectedPeer])))
           assertStatusIs(Generating)
         }
 
         "gen suspended" in {
-          testPeerManager.reply(ConnectedPeers(Seq.empty))
+          testPeerManager.reply(ConnectedPeers(Set.empty))
           assertStatusIs(Suspended)
         }
       }
@@ -89,7 +88,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
         setOfflineGeneration(true)
 
         "gen allowed even if no peers" in {
-          testPeerManager.reply(ConnectedPeers(Seq.empty))
+          testPeerManager.reply(ConnectedPeers(Set.empty))
           assertStatusIs(Generating)
         }
       }

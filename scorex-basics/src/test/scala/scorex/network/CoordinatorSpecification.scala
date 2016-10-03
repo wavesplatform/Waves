@@ -1,7 +1,5 @@
 package scorex.network
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
@@ -81,7 +79,7 @@ class CoordinatorSpecification extends ActorTestingCommons {
       testPeerManager.expectMsg(GetConnectedPeersTyped)
 
       "with connected peers sync should begin" in {
-        testPeerManager.reply(ConnectedPeers(Seq((new InetSocketAddress(687), null))))
+        testPeerManager.reply(ConnectedPeers(Set(connectedPeer)))
 
         testBlockchainSynchronizer.expectMsg(GetExtension(Map(connectedPeer -> score)))
 
@@ -94,8 +92,15 @@ class CoordinatorSpecification extends ActorTestingCommons {
         status should include (syncStatus.name)
       }
 
-      "no connected peers == no sync" in {
-        testPeerManager.reply(ConnectedPeers(Seq.empty))
+      "no connected peers => no sync" in {
+        testPeerManager.reply(ConnectedPeers(Set.empty))
+
+        testBlockchainSynchronizer.expectNoMsg(testDuration)
+        getStatus shouldEqual CIdle
+      }
+
+      "connected peers don't match score peers => no sync" in {
+        testPeerManager.reply(ConnectedPeers(Set(stub[ConnectedPeer])))
 
         testBlockchainSynchronizer.expectNoMsg(testDuration)
         getStatus shouldEqual CIdle
