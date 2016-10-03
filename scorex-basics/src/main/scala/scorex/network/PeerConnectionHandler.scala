@@ -49,12 +49,12 @@ case class PeerConnectionHandler(application: RunnableApplication,
   override def receive: Receive = state(CommunicationState.AwaitingHandshake) {
     case h: Handshake =>
       connection ! Write(ByteString(h.bytes), Ack)
-      log.debug(s"Handshake msg has been sent to $remote")
+      log.debug(s"Handshake message has been sent to $remote")
 
     case Ack =>
       log.info(s"Handshake sent to $remote")
       handshakeSent = true
-      self ! HandshakeCheck
+      checkHandshake()
 
     case Received(data) =>
       Handshake.parseBytes(data.toArray) match {
@@ -62,7 +62,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
           peerManager ! Handshaked(remote, handshake)
           log.info(s"Got a Handshake from $remote")
           handshakeGot = true
-          self ! HandshakeCheck
+          checkHandshake()
         case Failure(e) =>
           log.warn(s"Error during parsing a handshake from $remote: ${e.getMessage}")
           context stop self
@@ -71,12 +71,16 @@ case class PeerConnectionHandler(application: RunnableApplication,
     case HandshakeTimeout =>
       log.warn(s"Handshake timeout for $remote")
       context stop self
+  }
 
-    case HandshakeCheck =>
-      if (handshakeGot && handshakeSent) {
-        timeout.cancel()
-        context become workingCycle
-      }
+  /**
+    * Checks that we've sent and received handshakes. If so switch context to working cycle
+    */
+  private def checkHandshake() = {
+    if (handshakeGot && handshakeSent) {
+      timeout.cancel()
+      context become workingCycle
+    }
   }
 
   private def buffer(data: ByteString) = {
@@ -143,7 +147,6 @@ case class PeerConnectionHandler(application: RunnableApplication,
   private def state(state: CommunicationState.Value)(logic: Receive): Receive =
     logic orElse processErrors(state.toString) orElse {
       case HandshakeTimeout =>
-      case HandshakeCheck =>
 
       case nonsense: Any => log.warn(s"Strange input in state $state: $nonsense")
     }
@@ -205,7 +208,6 @@ object PeerConnectionHandler {
 
   private case object Ack extends Event
 
-  private case object HandshakeCheck
   private case object HandshakeTimeout
 
   case object CloseConnection
