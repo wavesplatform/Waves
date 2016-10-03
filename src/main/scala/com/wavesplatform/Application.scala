@@ -1,7 +1,6 @@
 package com.wavesplatform
 
-import akka.actor.Props
-
+import akka.actor.{ActorSystem, Props}
 import com.wavesplatform.consensus.WavesConsensusModule
 import com.wavesplatform.http.NodeApiRoute
 import scorex.account.AddressScheme
@@ -13,17 +12,17 @@ import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, ScorexApiRoute, WavesApiRoute}
 import com.wavesplatform.settings._
 import scorex.waves.transaction.WavesTransactionModule
-
 import scala.reflect.runtime.universe._
+import com.wavesplatform.actor.RootActorSystem
 
-class Application(appSettings: WavesSettings) extends {
-  override implicit val settings = appSettings
+class Application(as: ActorSystem, appSettings: WavesSettings) extends {
+  override val settings = appSettings
   override val applicationName = "waves"
   override val appVersion = {
     val parts = Constants.VersionString.split("\\.")
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
   }
-
+  override val actorSystem = as
 } with scorex.app.RunnableApplication {
 
   override implicit lazy val consensusModule = new WavesConsensusModule()
@@ -73,30 +72,32 @@ class Application(appSettings: WavesSettings) extends {
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings, networkController))
 }
 
-object Application extends App with ScorexLogging {
-  //TODO: gagarin55-change to info cuz default log level is info
-  log.debug("Starting with args: {} ", args)
+object Application extends ScorexLogging {
+  def main(args: Array[String]): Unit =
+    RootActorSystem.start("wavesplatform") { actorSystem =>
+      //TODO: gagarin55-change to info cuz default log level is info
+      log.debug("Starting with args: {} ", args)
+      val filename = args.headOption.getOrElse("settings.json")
+      val settings = new WavesSettings(filename)
 
-  private val filename = args.headOption.getOrElse("settings.json")
-  private val settings = new WavesSettings(filename)
+      configureLogging(settings)
 
-  configureLogging(settings)
+      // Initialize global var with actual address scheme
+      AddressScheme.current = settings.chainParams.addressScheme
 
-  // Initialize global var with actual address scheme
-  AddressScheme.current = settings.chainParams.addressScheme
+      log.info(s"${Constants.AgentName} Blockchain Id: ${settings.chainParams.addressScheme.chainId}")
 
-  log.info(s"${Constants.AgentName} Blockchain Id: ${settings.chainParams.addressScheme.chainId}")
+      val application = new Application(actorSystem, settings)
+      application.run()
 
-  val application = new Application(settings)
-  application.run()
-
-  if (application.wallet.privateKeyAccounts().isEmpty)
-    application.wallet.generateNewAccounts(1)
+      if (application.wallet.privateKeyAccounts().isEmpty)
+        application.wallet.generateNewAccounts(1)
+    }
 
   /**
     * Configure logback logging level according to settings
     */
-  def configureLogging(settings: WavesSettings) = {
+  private def configureLogging(settings: WavesSettings) = {
     import ch.qos.logback.classic.LoggerContext
     import org.slf4j._
     import ch.qos.logback.classic.Level
@@ -110,7 +111,7 @@ object Application extends App with ScorexLogging {
       case "warn" => rootLogger.setLevel(Level.WARN)
       case "trace" => rootLogger.setLevel(Level.TRACE)
       case _ =>
-        log.warn(s"Unknown loggingLevel = ${settings.loggingLevel}. Going to set INFO level")
+        log.warn(s"Unknown loggingLevel = ${settings.loggingLevel }. Going to set INFO level")
         rootLogger.setLevel(Level.INFO)
     }
   }
