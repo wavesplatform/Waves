@@ -33,6 +33,6 @@ class LagonakiTestSuite extends Sequential(
 ) with BeforeAndAfterAll {
 
   override protected def afterAll() = {
-    applications.foreach(_.stopAll())
+    applications.foreach(_.shutdown())
   }
 }

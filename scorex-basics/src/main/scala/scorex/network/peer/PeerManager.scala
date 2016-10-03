@@ -1,19 +1,20 @@
 package scorex.network.peer
 
 import java.net.InetSocketAddress
-
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, Status}
+import akka.pattern._
 import scorex.app.Application
 import scorex.network.NetworkController.{SendToNetwork, ShutdownNetwork}
 import scorex.network._
 import scorex.network.message.MessageHandler.RawNetworkData
 import scorex.network.message.{Message, MessageSpec}
 import scorex.utils.ScorexLogging
-
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
+import akka.util.Timeout
 
 /**
   * Must be singleton
@@ -55,7 +56,10 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case MarkConnectedPeersVisited => handshakedPeers.foreach(peerDatabase.touch)
 
-    case ShutdownNetwork => connectedPeers.values.foreach(_.handlerRef ! CloseConnection)
+    case ShutdownNetwork =>
+      val s = sender()
+      implicit val askTimeout = Timeout(10 seconds)
+      Future.sequence(connectedPeers.values.map(_.handlerRef ? CloseConnection)).map(_ => Status.Success()).pipeTo(s)
 
   }: Receive) orElse blacklistOperations orElse peerListOperations orElse peerCycle
 
@@ -86,7 +90,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case SendToNetwork(message, sendingStrategy) => sendDataToNetwork(message, sendingStrategy)
 
-    case Disconnected(remote) => disconnect(remote)
+    case Disconnected(remote) =>
+      disconnect(remote)
+      sender() ! Status.Success
   }
 
   private def isBlacklisted(address: InetSocketAddress): Boolean =
