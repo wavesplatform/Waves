@@ -9,4 +9,6 @@ object ValidationResult extends Enumeration {
   val InsufficientFee = Value(4)
   val NoBalance = Value(5)
   val TooBigArray = Value(6)
+  val InvalidSignature = Value(7)
+  val InvalidName = Value(8)
 }

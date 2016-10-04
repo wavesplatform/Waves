@@ -5,8 +5,6 @@ import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImplSpec
 import scorex.transaction.state.database.blockchain.StoredStateUnitTests
 
 class TransactionTestSuite extends Suites(
-  new OrderMatchTransactionSpecification,
-  new OrderTransactionSpecification,
   new TransactionSpecification,
   new StoredStateUnitTests,
   new RowSpecification,

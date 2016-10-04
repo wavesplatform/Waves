@@ -264,12 +264,12 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     case tx: TransferTransaction =>
       tx.signatureValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: IssueTransaction =>
-      val reissueValid: Boolean = tx.assetIdOpt.map { assetId =>
+      val reissueValid: Boolean = tx.assetIdOpt.forall { assetId =>
         val initialIssue: Option[IssueTransaction] = Option(issueTxs.get(assetId))
           .flatMap(b => IssueTransaction.parseBytes(b).toOption)
         initialIssue.exists(old => old.reissuable && old.sender.address == tx.sender.address)
-      }.getOrElse(true)
-      reissueValid && tx.isValid && included(tx.id, None).isEmpty
+      }
+      reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>

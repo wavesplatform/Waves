@@ -10,10 +10,10 @@ import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
-import scorex.transaction.{SimpleTransactionModule, AssetAcc}
-import scorex.transaction.assets.{TransferTransaction, IssueTransaction}
+import scorex.transaction.{AssetAcc, SimpleTransactionModule, ValidationResult}
+import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.wallet.{TransferRequest, IssueRequest}
+import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 
 import scala.util.{Success, Try}
 
@@ -119,7 +119,28 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
                   val txOpt: Option[IssueTransaction] = transactionModule.issueAsset(issue, wallet)
                   txOpt match {
                     case Some(tx) =>
-                      JsonResponse(tx.json, StatusCodes.OK)
+                      tx.validate match {
+                        case ValidationResult.ValidateOke =>
+                          JsonResponse(tx.json, StatusCodes.OK)
+
+                        case ValidationResult.InvalidAddress =>
+                          InvalidAddress.response
+
+                        case ValidationResult.NegativeAmount =>
+                          InvalidAmount.response
+
+                        case ValidationResult.InsufficientFee =>
+                          InsufficientFee.response
+
+                        case ValidationResult.InvalidName =>
+                          InvalidName.response
+
+                        case ValidationResult.InvalidSignature =>
+                          InvalidSignature.response
+
+                        case ValidationResult.TooBigArray =>
+                          TooBigArrayAllocation.response
+                      }
                     case None =>
                       WrongJson.response
                   }

@@ -16,7 +16,7 @@ object TransferRequest {
     (JsPath \ "assetIdOpt").writeNullable[String] and
       (JsPath \ "feeAsset").writeNullable[String] and
       (JsPath \ "amount").write[Long] and
-      (JsPath \ "fee").write[Long] and
+      (JsPath \ "feeAmount").write[Long] and
       (JsPath \ "sender").write[String] and
       (JsPath \ "attachment").write[String] and
       (JsPath \ "recipient").write[String]
@@ -26,7 +26,7 @@ object TransferRequest {
     (JsPath \ "assetIdOpt").readNullable[String] and
       (JsPath \ "feeAsset").readNullable[String] and
       (JsPath \ "amount").read[Long] and
-      (JsPath \ "fee").read[Long] and
+      (JsPath \ "feeAmount").read[Long] and
       (JsPath \ "sender").read[String] and
       (JsPath \ "attachment").read[String] and
       (JsPath \ "recipient").read[String]

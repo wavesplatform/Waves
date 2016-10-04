@@ -2,7 +2,7 @@ package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
@@ -55,10 +55,22 @@ case class IssueTransaction(sender: PublicKeyAccount,
 
   override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
-  lazy val isValid: Boolean = {
-    description.length <= MaxDescriptionLength && name.length <= MaxAssetNameLength && decimals >= 0 &&
-      decimals <= MaxDecimals && name.length >= MinAssetNameLength && fee >= MinFee && quantity > 0 && signatureValid
-  }
+  def validate: ValidationResult.Value =
+    if (!Account.isValid(sender)) {
+      ValidationResult.InvalidAddress
+    } else if (quantity <= 0) {
+      ValidationResult.NegativeAmount
+    } else if (fee < MinFee) {
+      ValidationResult.InsufficientFee
+    } else if (description.length > MaxDescriptionLength) {
+      ValidationResult.TooBigArray
+    } else if (name.length < MinAssetNameLength || name.length > MaxAssetNameLength) {
+      ValidationResult.InvalidName
+    } else if (decimals < 0 || decimals > MaxDecimals) {
+      ValidationResult.TooBigArray
+    } else if (!signatureValid) {
+      ValidationResult.InvalidSignature
+    } else ValidationResult.ValidateOke
 
 }
 

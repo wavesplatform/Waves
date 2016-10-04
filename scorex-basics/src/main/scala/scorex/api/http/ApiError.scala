@@ -99,6 +99,12 @@ case object InvalidMessage extends ApiError {
   override val message = "invalid message"
 }
 
+case object InvalidName extends ApiError {
+  override val id: Int = 111
+  override val message: String = "invalid name"
+  override val code: StatusCode = StatusCodes.BadRequest
+}
+
 //BLOCKS
 case object BlockNotExists extends ApiError {
   override val id: Int = 301
