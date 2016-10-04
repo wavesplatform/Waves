@@ -16,13 +16,13 @@ import scala.reflect.runtime.universe._
 import com.wavesplatform.actor.RootActorSystem
 
 class Application(as: ActorSystem, appSettings: WavesSettings) extends {
-  override val settings = appSettings
+  override implicit val settings = appSettings
   override val applicationName = "waves"
   override val appVersion = {
     val parts = Constants.VersionString.split("\\.")
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
   }
-  override val actorSystem = as
+  override implicit val actorSystem = as
 } with scorex.app.RunnableApplication {
 
   override implicit lazy val consensusModule = new WavesConsensusModule()
