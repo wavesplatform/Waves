@@ -238,7 +238,10 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     case Suspect(address) =>
       val count = suspects.getOrElse(address, 0)
       suspects.put(address, count + 1)
-      if (count >= settings.blacklistThreshold) addPeerToBlacklist(address)
+      if (count >= settings.blacklistThreshold) {
+        suspects.remove(address)
+        addPeerToBlacklist(address)
+      }
   }
 
   private def addPeerToBlacklist(address: InetSocketAddress): Unit = {

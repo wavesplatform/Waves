@@ -333,5 +333,24 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
       getBlacklistedPeers.size shouldBe 1
     }
+
+    "blacklisted peer should be removed from suspected" in {
+      getBlacklistedPeers shouldBe empty
+
+      actorRef ! Suspect(knownAddress)
+      actorRef ! Suspect(knownAddress)
+      actorRef ! Suspect(knownAddress)
+      getBlacklistedPeers.size shouldBe 1
+
+      Thread sleep 1100
+
+      getBlacklistedPeers shouldBe empty
+      actorRef ! Suspect(knownAddress)
+      getBlacklistedPeers shouldBe empty
+      actorRef ! Suspect(knownAddress)
+      getBlacklistedPeers shouldBe empty
+      actorRef ! Suspect(knownAddress)
+      getBlacklistedPeers.size shouldBe 1
+    }
   }
 }
