@@ -30,7 +30,8 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
       tx match {
-        case ltx: LagonakiTransaction => if (transactionModule.putUnconfirmedIfNew(ltx)) broadcastExceptOf(ltx, remote)
+        case ltx: LagonakiTransaction =>
+          if (transactionModule.putUnconfirmedIfNew(ltx)) broadcastExceptOf(ltx, remote) else remote.suspect()
         case m => log.error(s"Got unexpected transaction: $m")
       }
 
@@ -45,7 +46,7 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
   /**
     * Broadcast unconfirmed tx to other connected peers
     */
-  private def broadcast(tx: Transaction) : Unit = {
+  private def broadcast(tx: Transaction): Unit = {
     val spec = TransactionalMessagesRepo.TransactionMessageSpec
     val ntwMsg = Message(spec, Right(tx), None)
     networkControllerRef ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
@@ -61,5 +62,7 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
 }
 
 object UnconfirmedPoolSynchronizer {
+
   case object BroadcastRandom
+
 }

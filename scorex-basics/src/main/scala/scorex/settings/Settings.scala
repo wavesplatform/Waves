@@ -106,6 +106,7 @@ trait Settings extends ScorexLogging {
   lazy val quorum = (settingsJSON \ "quorum").asOpt[Int].getOrElse(1)
   lazy val chainFileName = (settingsJSON \ "chainFileName").asOpt[String]
   lazy val loadEntireChain = (settingsJSON \ "loadEntireChain").asOpt[Boolean].getOrElse(true)
+  lazy val blacklistThreshold = (settingsJSON \ "blacklistThreshold").asOpt[Int].getOrElse(50)
 
   assert(maxChain > 1, "maxChain value should be 2 or more")
 

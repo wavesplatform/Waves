@@ -33,6 +33,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
     override lazy val maxConnections: Int = 10
     override lazy val peersDataResidenceTime: FiniteDuration = 100 seconds
     override lazy val blacklistResidenceTimeMilliseconds: Long = 1000
+    override lazy val blacklistThreshold = 2
   }
 
   trait App extends ApplicationMock {
@@ -75,7 +76,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       networkController.expectMsg(NetworkController.ConnectTo(knownAddress))
       connect(knownAddress, nonce)
 
-      actorRef ! AddToBlacklist(nonce, knownAddress)
+      actorRef ! AddToBlacklist(knownAddress)
       peerConnectionHandler.expectMsg(CloseConnection)
 
       actorRef ! Disconnected(knownAddress)
@@ -174,11 +175,11 @@ class PeerManagerSpecification extends ActorTestingCommons {
       }
 
       "add to blacklist" in {
-        actorRef ! AddToBlacklist(nonce, anAddress)
+        actorRef ! AddToBlacklist(anAddress)
 
         getBlacklistedPeers should have size 1
 
-        actorRef ! AddToBlacklist(nonce + 1, new InetSocketAddress(anAddress.getHostName, anAddress.getPort + 1))
+        actorRef ! AddToBlacklist(new InetSocketAddress(anAddress.getHostName, anAddress.getPort + 1))
 
         getBlacklistedPeers should have size 1
         getBlacklistedPeers should contain(anAddress.getHostName)
@@ -293,7 +294,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
     "blacklist nonconnected peer" in {
       getBlacklistedPeers shouldBe empty
 
-      actorRef ! AddToBlacklist(-111, knownAddress)
+      actorRef ! AddToBlacklist(knownAddress)
 
       getBlacklistedPeers.size shouldBe 1
     }
@@ -317,6 +318,20 @@ class PeerManagerSpecification extends ActorTestingCommons {
         val h2 = connect(100 + i, false)
         h2.expectMsgType[Handshake]
       }
+    }
+
+    "blacklist suspected peer" in {
+      getBlacklistedPeers shouldBe empty
+
+      actorRef ! Suspect(knownAddress)
+      getBlacklistedPeers shouldBe empty
+
+      actorRef ! Suspect(knownAddress)
+      getBlacklistedPeers shouldBe empty
+
+      actorRef ! Suspect(knownAddress)
+
+      getBlacklistedPeers.size shouldBe 1
     }
   }
 }

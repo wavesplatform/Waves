@@ -31,6 +31,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   val blacklistResendInterval = settings.blacklistResidenceTimeMilliseconds.milliseconds / 10
   private implicit val system = context.system
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerConnection]()
+  private val suspects = mutable.Map.empty[InetSocketAddress, Int]
   private val peerDatabase: PeerDatabase = new PeerDatabaseImpl(settings, settings.dataDirOpt.map(f => f + "/peers.dat"))
 
   private val visitPeersInterval = application.settings.peersDataResidenceTime / 10
@@ -231,14 +232,23 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         listener ! ExistedBlacklist(peerDatabase.getBlacklist.toSeq)
       }
 
-    case AddToBlacklist(nodeNonce, address) =>
-      log.info(s"Blacklist peer $address")
-      peerDatabase.blacklistHost(address.getHostName)
-      connectedPeers.remove(address).foreach(_.handlerRef ! CloseConnection)
+    case AddToBlacklist(address) =>
+      addPeerToBlacklist(address)
 
-      blacklistListeners.foreach { listener =>
-        listener ! BlackListUpdated(address.getHostName)
-      }
+    case Suspect(address) =>
+      val count = suspects.getOrElse(address, 0)
+      suspects.put(address, count + 1)
+      if (count >= settings.blacklistThreshold) addPeerToBlacklist(address)
+  }
+
+  private def addPeerToBlacklist(address: InetSocketAddress): Unit = {
+    log.info(s"Blacklist peer $address")
+    peerDatabase.blacklistHost(address.getHostName)
+    connectedPeers.remove(address).foreach(_.handlerRef ! CloseConnection)
+
+    blacklistListeners.foreach { listener =>
+      listener ! BlackListUpdated(address.getHostName)
+    }
   }
 
   private def handshakedPeers = connectedPeers.filter(_._2.handshake.isDefined).keySet
@@ -256,7 +266,7 @@ object PeerManager {
 
   case class Disconnected(remote: InetSocketAddress)
 
-  case class AddToBlacklist(nodeNonce: Long, address: InetSocketAddress)
+  case class AddToBlacklist(address: InetSocketAddress)
 
   case class GetRandomPeersToBroadcast(howMany: Int)
 
@@ -287,5 +297,7 @@ object PeerManager {
   private case object MarkConnectedPeersVisited
 
   case object BlacklistResendRequired
+
+  case class Suspect(address: InetSocketAddress)
 
 }
