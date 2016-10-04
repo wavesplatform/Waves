@@ -1,8 +1,8 @@
 package scorex.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
-
 import akka.actor._
+import akka.pattern._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import akka.util.Timeout
@@ -10,10 +10,10 @@ import scorex.app.RunnableApplication
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager
 import scorex.utils.ScorexLogging
-
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
 
@@ -130,8 +130,9 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   def interfaceCalls: Receive = {
     case ShutdownNetwork =>
       log.info("Going to shutdown all connections & unbind port")
-      peerManager ! ShutdownNetwork
+      val s = sender()
       listener ! NetworkListener.StopListen
+      (peerManager ? ShutdownNetwork).map(_ => Status.Success).pipeTo(s)
       context stop self
   }
 
@@ -157,8 +158,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
 
     case ListeningFailed =>
       log.error("Failed to start listening!")
-      context stop self
-      application.stopAll()
+      throw new IllegalStateException("Failed to start listening!")
 
     case InboundConnection(connection, remote) =>
       createPeerHandler(connection, remote, inbound = true)

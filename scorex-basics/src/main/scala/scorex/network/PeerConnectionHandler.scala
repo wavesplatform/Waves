@@ -1,8 +1,7 @@
 package scorex.network
 
 import java.net.InetSocketAddress
-
-import akka.actor.{Actor, ActorRef, Terminated}
+import akka.actor.{Actor, ActorRef, Status, Terminated}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
@@ -12,7 +11,6 @@ import scorex.network.message.MessageHandler.RawNetworkData
 import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.Handshaked
 import scorex.utils.ScorexLogging
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -168,6 +166,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
     case CloseConnection =>
       log.info(s"Enforced to close communication with: " + remote + s" in state $stateName")
+      sender() ! Status.Success()
       context stop self
 
     case CommandFailed(cmd: Tcp.Command) =>

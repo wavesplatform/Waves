@@ -1,19 +1,20 @@
 package scorex.lagonaki.server
 
-import akka.actor.Props
+import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
 import scorex.api.http._
-import scorex.app.{RunnableApplication, ApplicationVersion}
+import scorex.app.{ApplicationVersion, RunnableApplication}
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.lagonaki.mocks.ConsensusMock
 import scorex.network._
 import scorex.transaction._
-
 import scala.reflect.runtime.universe._
 
 class LagonakiApplication(val settingsFilename: String) extends RunnableApplication {
 
   override val applicationName = "lagonaki"
+
+  override protected implicit val actorSystem: ActorSystem = ActorSystem("lagonaki")
 
   private val appConf = ConfigFactory.load().getConfig("app")
 
