@@ -4,6 +4,7 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
+import scorex.transaction.assets.IssueTransaction
 
 
 class TransactionSpecification extends PropSpec
@@ -112,7 +113,7 @@ with Matchers {
         val sender = new PrivateKeyAccount(senderSeed)
         val recipient = new PrivateKeyAccount(recipientSeed)
         val tx = PaymentTransaction(sender, recipient, amount, fee, time)
-        val txAfter = LagonakiTransaction.parseBytes(tx.bytes).get
+        val txAfter = TypedTransaction.parseBytes(tx.bytes).get.asInstanceOf[LagonakiTransaction]
 
         txAfter.getClass.shouldBe(tx.getClass)
 
@@ -126,4 +127,5 @@ with Matchers {
         txAfter.signatureValid shouldEqual true
     }
   }
+
 }
