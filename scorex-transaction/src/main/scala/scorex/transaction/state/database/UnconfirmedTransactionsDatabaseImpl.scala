@@ -13,9 +13,9 @@ class UnconfirmedTransactionsDatabaseImpl(val sizeLimit: Int = 1000) extends Unc
 
   private val transactions = TrieMap[TxKey, Transaction]()
 
-  private def key(signature: Array[Byte]): TxKey = new TxKey(signature)
+  private def key(id: Array[Byte]): TxKey = new TxKey(id)
 
-  private def key(tx: Transaction): TxKey = key(tx.signature)
+  private def key(tx: Transaction): TxKey = key(tx.id)
 
   override def putIfNew(tx: Transaction, txValidator: Transaction => Boolean): Boolean =
     if (transactions.size < sizeLimit) {

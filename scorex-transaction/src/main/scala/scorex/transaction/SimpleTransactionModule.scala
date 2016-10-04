@@ -5,12 +5,14 @@ import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
+import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
+import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
-import scorex.transaction.state.wallet.Payment
+import scorex.transaction.state.wallet.{IssueRequest, Payment, TransferRequest}
 import scorex.utils._
 import scorex.wallet.Wallet
 
@@ -63,11 +65,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       case false =>
         val txData = bytes.tail
         val txCount = bytes.head // so 255 txs max
-        formBlockData((1 to txCount).foldLeft((0: Int, Seq[LagonakiTransaction]())) { case ((pos, txs), _) =>
+        formBlockData((1 to txCount).foldLeft((0: Int, Seq[TypedTransaction]())) { case ((pos, txs), _) =>
           val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
           val transactionLength = Ints.fromByteArray(transactionLengthBytes)
           val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
-          val transaction = LagonakiTransaction.parseBytes(transactionBytes).get
+          val transaction = TypedTransaction.parseBytes(transactionBytes).get
 
           (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
         }._2)
@@ -89,7 +91,9 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   override def packUnconfirmed(heightOpt: Option[Int]): StoredInBlock = synchronized {
     clearIncorrectTransactions()
 
-    val txs = utxStorage.all().sortBy(-_.fee).take(MaxTransactionsPerBlock)
+    //TODO sort by real value of fee?
+    val txs = utxStorage.all().sortBy(t => if (t.assetFee._1.isDefined) 0 else -t.assetFee._2)
+      .take(MaxTransactionsPerBlock)
     val valid = blockStorage.state.validate(txs, heightOpt)
 
     if (valid.size != txs.size) {
@@ -100,7 +104,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   }
 
   override def clearFromUnconfirmed(data: StoredInBlock): Unit = synchronized {
-    data.foreach(tx => utxStorage.getBySignature(tx.signature) match {
+    data.foreach(tx => utxStorage.getBySignature(tx.id) match {
       case Some(unconfirmedTx) => utxStorage.remove(unconfirmedTx)
       case None =>
     })
@@ -127,17 +131,57 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
     }
 
+  @deprecated("Use transferAsset()")
   def createPayment(payment: Payment, wallet: Wallet): Option[PaymentTransaction] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
     }
   }
 
+  def transferAsset(request: TransferRequest, wallet: Wallet): Option[TransferTransaction] = Try {
+    val sender = wallet.privateKeyAccount(request.sender).get
+
+    val transfer: TransferTransaction = TransferTransaction.create(request.assetIdOpt.map(s => Base58.decode(s).get),
+      sender: PrivateKeyAccount,
+      new Account(request.recipient),
+      request.amount,
+      getTimestamp,
+      request.feeAsset.map(s => Base58.decode(s).get),
+      request.feeAmount,
+      Base58.decode(request.attachment).get)
+
+    if (isValid(transfer)) onNewOffchainTransaction(transfer)
+    else log.warn("Invalid transfer transaction generated: " + transfer.json)
+    transfer
+  }.toOption
+
+  def issueAsset(request: IssueRequest, wallet: Wallet): Option[IssueTransaction] = Try {
+    val sender = wallet.privateKeyAccount(request.sender).get
+    val issue = IssueTransaction.create(sender,
+      request.assetIdOpt.map(s => Base58.decode(s).get),
+      Base58.decode(request.name).get,
+      Base58.decode(request.description).get,
+      request.quantity,
+      request.decimals,
+      request.reissuable,
+      request.fee,
+      getTimestamp)
+    if (isValid(issue)) onNewOffchainTransaction(issue)
+    else log.warn("Invalid issue transaction generated: " + issue.json)
+    issue
+  }.toOption
+
   private var txTime: Long = 0
-  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
+
+  private def getTimestamp: Long = synchronized {
     txTime = Math.max(NTP.correctedTime(), txTime + 1)
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, txTime)
-    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, txTime, sig)
+    txTime
+  }
+
+  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
+    val time = getTimestamp
+    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
+    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
     if (isValid(payment)) onNewOffchainTransaction(payment)
     payment
   }

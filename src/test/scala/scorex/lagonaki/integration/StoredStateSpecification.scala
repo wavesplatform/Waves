@@ -5,7 +5,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.lagonaki.mocks.BlockMock
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
 import scorex.transaction.state.database.state.AccState
-import scorex.transaction.{BalanceSheet, FeesStateChange, PaymentTransaction}
+import scorex.transaction.{AssetAcc, BalanceSheet, FeesStateChange, PaymentTransaction}
 import scorex.utils.{ScorexLogging, _}
 
 //TODO: Should be independed
@@ -36,8 +36,8 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     val transactionsToValidate = transactions :+ forgedTransaction
     val validTransactions = state.validate(transactionsToValidate)
 
-    validTransactions.count(tx => (tx.signature sameElements txToForge.signature) ||
-      (tx.signature sameElements forgedTransaction.signature)) shouldBe 1
+    validTransactions.count(tx => (tx.id sameElements txToForge.signature) ||
+      (tx.id sameElements forgedTransaction.signature)) shouldBe 1
     validTransactions.size should be(transactionsToValidate.size - 1)
   }
 
@@ -83,10 +83,10 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     val applyMethod = PrivateMethod[Unit]('applyChanges)
     state.balance(testAcc) shouldBe 0
     val tx = transactionModule.createPayment(acc, testAcc, 1, 1)
-    state invokePrivate applyMethod(Map(testAdd ->(AccState(2L), Seq(FeesStateChange(1L), tx))))
+    state invokePrivate applyMethod(Map(AssetAcc(testAcc, None) ->(AccState(2L), Seq(FeesStateChange(1L), tx))))
     state.balance(testAcc) shouldBe 2
     state.included(tx).value shouldBe state.stateHeight
-    state invokePrivate applyMethod(Map(testAdd ->(AccState(0L), Seq(tx))))
+    state invokePrivate applyMethod(Map(AssetAcc(testAcc, None) ->(AccState(0L), Seq(tx))))
   }
 
   test("validate single transaction") {

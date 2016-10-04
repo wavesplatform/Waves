@@ -5,7 +5,7 @@ import scorex.network.NetworkController.DataFromPeer
 import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
 import scorex.network.UnconfirmedPoolSynchronizer.BroadcastRandom
 import scorex.network.message.Message
-import scorex.transaction.{LagonakiTransaction, Transaction, TransactionModule, TransactionSettings}
+import scorex.transaction._
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -30,8 +30,7 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
       tx match {
-        case ltx: LagonakiTransaction =>
-          if (transactionModule.putUnconfirmedIfNew(ltx)) broadcastExceptOf(ltx, remote) else remote.suspect()
+        case ltx: TypedTransaction => if (transactionModule.putUnconfirmedIfNew(ltx)) broadcastExceptOf(ltx, remote)
         case m => log.error(s"Got unexpected transaction: $m")
       }
 
