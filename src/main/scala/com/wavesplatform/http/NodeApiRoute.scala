@@ -47,7 +47,7 @@ case class NodeApiRoute(application: RunnableApplication)(implicit val context: 
     withAuth {
       postJsonRoute {
         log.info("Request to stop application")
-        Future(application.stopAll())
+        application.shutdown()
         JsonResponse(Json.obj("stopped" -> true), StatusCodes.OK)
       }
     }

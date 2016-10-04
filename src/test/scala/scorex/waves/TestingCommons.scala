@@ -1,7 +1,6 @@
 package scorex.waves
 
 import java.util.concurrent.atomic.AtomicInteger
-
 import com.ning.http.client.Response
 import com.wavesplatform.{Application, TestNetParams}
 import dispatch.{Http, url}
@@ -10,10 +9,10 @@ import scorex.account.AddressScheme
 import scorex.transaction.TransactionSettings
 import scorex.utils._
 import com.wavesplatform.settings.WavesSettings
-
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import akka.actor.ActorSystem
 
 trait TestingCommons {
 
@@ -27,7 +26,7 @@ object TestingCommons {
   AddressScheme.current = TestNetParams.addressScheme
   lazy val applications = {
     val apps = List(
-      new Application(new WavesSettings("settings-test.json") {
+      new Application(ActorSystem("test"), new WavesSettings("settings-test.json") {
         override lazy val chainParams = TestNetParams
       })
     )
@@ -55,7 +54,7 @@ object TestingCommons {
   def stop(): Unit = {
     if (counter.decrementAndGet == 0) {
       Http.shutdown()
-      application.stopAll()
+      application.shutdown()
     }
   }
 
