@@ -46,6 +46,7 @@ class Application(appSettings: WavesSettings) extends {
     AddressApiRoute(this),
     DebugApiRoute(this),
     WavesApiRoute(this),
+    AssetsApiRoute(this),
     NodeApiRoute(this)
   )
 
@@ -61,6 +62,7 @@ class Application(appSettings: WavesSettings) extends {
     typeOf[AddressApiRoute],
     typeOf[DebugApiRoute],
     typeOf[WavesApiRoute],
+    typeOf[AssetsApiRoute],
     typeOf[NodeApiRoute]
   )
 

@@ -1,18 +1,17 @@
 package scorex.waves.transaction
 
 import com.wavesplatform.ChainParameters
+import com.wavesplatform.settings.WavesSettings
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.RunnableApplication
 import scorex.block.BlockField
 import scorex.crypto.encode.Base58
 import scorex.settings.Settings
-import scorex.transaction.LagonakiTransaction.ValidationResult
-import scorex.transaction.LagonakiTransaction.ValidationResult.ValidationResult
-import scorex.transaction._
+import scorex.transaction.ValidationResult.ValidationResult
+import scorex.transaction.{ValidationResult, _}
 import scorex.transaction.state.wallet.Payment
 import scorex.utils.NTP
 import scorex.wallet.Wallet
-import com.wavesplatform.settings.WavesSettings
 
 /**
   * Waves Transaction Module
@@ -87,7 +86,7 @@ class WavesTransactionModule(implicit override val settings: TransactionSettings
             Right(tx)
           } else Left(ValidationResult.NoBalance)
         }
-        case error: ValidationResult => Left(error)
+        case error: ValidationResult.ValidationResult => Left(error)
       }
     }
   }
