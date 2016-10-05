@@ -8,10 +8,11 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.LagonakiTransaction.TransactionType
+import scorex.transaction.TypedTransaction.TransactionType
 
 import scala.util.{Failure, Try}
 
+@deprecated("Use TransferTransaction")
 @SerialVersionUID(-4989881425715590828L)
 case class PaymentTransaction(sender: PublicKeyAccount,
                               override val recipient: Account,
@@ -71,8 +72,8 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     } else 0
   }
 
-  override def balanceChanges(): Seq[(Account, Long)] =
-    Seq((sender, -amount - fee), (recipient, amount))
+  override def balanceChanges(): Seq[BalanceChange] =
+    Seq(BalanceChange(AssetAcc(sender, None), -amount - fee), BalanceChange(AssetAcc(recipient, None), amount))
 }
 
 object PaymentTransaction extends Deser[PaymentTransaction] {

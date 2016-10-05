@@ -2,7 +2,7 @@ package scorex.consensus
 
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockProcessingModule}
-import scorex.transaction.TransactionModule
+import scorex.transaction.{AssetAcc, TransactionModule}
 
 
 trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[ConsensusBlockData] {
@@ -13,7 +13,7 @@ trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[Consensu
     * Fees could go to a single miner(forger) usually, but can go to many parties, e.g. see
     * Meni Rosenfeld's Proof-of-Activity proposal http://eprint.iacr.org/2014/452.pdf
     */
-  def feesDistribution(block: Block): Map[Account, Long]
+  def feesDistribution(block: Block): Map[AssetAcc, Long]
 
   /**
     * Get block producers(miners/forgers). Usually one miner produces a block, but in some proposals not

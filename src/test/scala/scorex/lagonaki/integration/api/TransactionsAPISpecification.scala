@@ -5,6 +5,7 @@ import play.api.libs.json.JsValue
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
+import scorex.transaction.GenesisTransaction
 import scorex.lagonaki.integration.TestLock
 
 class TransactionsAPISpecification extends FunSuite with TestLock with Matchers with TransactionTestingCommons {
@@ -44,7 +45,7 @@ class TransactionsAPISpecification extends FunSuite with TestLock with Matchers 
   }
 
   test("/transactions/info/{signature} API route") {
-    val genesisTx = Block.genesis().transactions.head
+    val genesisTx = Block.genesis().transactions.head.asInstanceOf[GenesisTransaction]
     val tr = GET.request(s"/transactions/info/${Base58.encode(genesisTx.signature)}")
     (tr \ "signature").as[String] shouldBe Base58.encode(genesisTx.signature)
     (tr \ "type").as[Int] shouldBe 1

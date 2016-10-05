@@ -18,7 +18,7 @@ trait State {
 
   def included(signature: Array[Byte], heightOpt: Option[Int]): Option[Int]
 
-  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = included(tx.signature, heightOpt)
+  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = included(tx.id, heightOpt)
 
   private[transaction] def rollbackTo(height: Int): State
 }

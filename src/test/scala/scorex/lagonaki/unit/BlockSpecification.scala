@@ -5,14 +5,14 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
 import scorex.consensus.qora.{QoraLikeConsensusBlockData, QoraLikeConsensusModule}
+import scorex.crypto.EllipticCurveImpl
 import scorex.lagonaki.TestingCommons
 import scorex.transaction._
+import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
 
 class BlockSpecification extends FunSuite with Matchers with TestingCommons {
-
-  import TestingCommons._
 
   test("Nxt block with txs bytes/parse roundtrip") {
     implicit val consensusModule = new NxtLikeConsensusModule()
@@ -24,10 +24,15 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
     val bt = Random.nextLong()
     val gs = Array.fill(NxtLikeConsensusModule.GeneratorSignatureLength)(Random.nextInt(100).toByte)
 
-    val sender = new PrivateKeyAccount(reference.dropRight(2))
-    val tx: Transaction = PaymentTransaction(sender, gen, 5, 1000, System.currentTimeMillis() - 5000)
 
-    val tbd = Seq(tx)
+    val ts = System.currentTimeMillis() - 5000
+    val sender = new PrivateKeyAccount(reference.dropRight(2))
+    val tx: Transaction = PaymentTransaction(sender, gen, 5, 1000, ts)
+    val tr: TransferTransaction = TransferTransaction.create(None, sender, gen, 5, ts + 1, None, 2, Array())
+    val assetId = Some(Array.fill(EllipticCurveImpl.SignatureLength)(Random.nextInt(100).toByte))
+    val tr2: TransferTransaction = TransferTransaction.create(assetId, sender, gen, 5, ts + 2, None, 2, Array())
+
+    val tbd = Seq(tx, tr, tr2)
     val cbd = new NxtLikeConsensusBlockData {
       override val generationSignature: Array[Byte] = gs
       override val baseTarget: Long = bt
