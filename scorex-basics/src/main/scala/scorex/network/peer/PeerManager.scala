@@ -41,7 +41,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   context.system.scheduler.schedule(blacklistResendInterval, blacklistResendInterval, self, BlacklistResendRequired)
 
   settings.knownPeers.foreach {
-    peerDatabase.addPeer(_, None, None)
+    peerDatabase.addPeer(_, Some(0), None)
   }
   private var connectingPeer: Option[InetSocketAddress] = None
 
@@ -93,7 +93,6 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case Disconnected(remote) =>
       disconnect(remote)
-      sender() ! Status.Success
   }
 
   private def isBlacklisted(address: InetSocketAddress): Boolean =
