@@ -6,10 +6,9 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
-import scorex.transaction.assets.{TransferTransaction, IssueTransaction}
+import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
-import scorex.utils.ScorexLogging
-
+import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.util.Try
@@ -33,18 +32,18 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   if (db.getStoreVersion > 0) db.rollback()
 
-  private def accountChanges(key: Address): MVMap[Int, Row] = db.openMap(key.toString)
+  private def accountChanges(key: Address): MVMap[Int, Row] = db.openMap(key.toString, new LogMVMapBuilder[Int, Row])
 
-  private val lastStates: MVMap[Address, Int] = db.openMap(LastStates)
+  private val lastStates: MVMap[Address, Int] = db.openMap(LastStates, new LogMVMapBuilder[Address, Int])
 
   /**
     * Transaction Signature -> Block height Map
     */
-  private val includedTx: MVMap[Array[Byte], Int] = db.openMap(IncludedTx)
+  private val includedTx: MVMap[Array[Byte], Int] = db.openMap(IncludedTx, new LogMVMapBuilder[Array[Byte], Int])
 
-  private val issueTxs: MVMap[Array[Byte], Array[Byte]] = db.openMap(IssueTxs)
+  private val issueTxs: MVMap[Array[Byte], Array[Byte]] = db.openMap(IssueTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
-  private val heightMap: MVMap[String, Int] = db.openMap(HeightKey)
+  private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
   if (Option(heightMap.get(HeightKey)).isEmpty) heightMap.put(HeightKey, 0)
 

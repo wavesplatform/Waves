@@ -1,17 +1,14 @@
 package scorex.wallet
 
 import java.io.File
-
 import com.google.common.primitives.{Bytes, Ints}
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
-import scorex.utils.ScorexLogging
-
+import scorex.utils.{LogMVMapBuilder, ScorexLogging, randomBytes}
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
-import scorex.utils.randomBytes
 
 //todo: add accs txs?
 class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Array[Byte]]) extends ScorexLogging {
@@ -27,9 +24,9 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
     case None => new MVStore.Builder().open()
   }
 
-  private val accountsPersistence: MVMap[Int, Array[Byte]] = database.openMap("privkeys")
-  private val seedPersistence: MVMap[String, Array[Byte]] = database.openMap("seed")
-  private val noncePersistence: MVMap[String, Int] = database.openMap("nonce")
+  private val accountsPersistence: MVMap[Int, Array[Byte]] = database.openMap("privkeys", new LogMVMapBuilder[Int, Array[Byte]])
+  private val seedPersistence: MVMap[String, Array[Byte]] = database.openMap("seed", new LogMVMapBuilder[String, Array[Byte]])
+  private val noncePersistence: MVMap[String, Int] = database.openMap("nonce", new LogMVMapBuilder[String, Int])
 
   if (Option(seedPersistence.get("seed")).isEmpty) {
     val seed = seedOpt.getOrElse {

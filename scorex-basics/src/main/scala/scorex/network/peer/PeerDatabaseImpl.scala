@@ -1,11 +1,9 @@
 package scorex.network.peer
 
 import java.net.InetSocketAddress
-
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.settings.Settings
-import scorex.utils.CircularBuffer
-
+import scorex.utils.{CircularBuffer, LogMVMapBuilder}
 import scala.collection.JavaConversions._
 import scala.util.Random
 
@@ -19,8 +17,8 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
     case None => new MVStore.Builder().open()
   }
 
-  private val peersPersistence: MVMap[InetSocketAddress, PeerInfo] = database.openMap("peers")
-  private val blacklist: MVMap[String, Long] = database.openMap("blacklist")
+  private val peersPersistence: MVMap[InetSocketAddress, PeerInfo] = database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, PeerInfo])
+  private val blacklist: MVMap[String, Long] = database.openMap("blacklist", new LogMVMapBuilder[String, Long])
   private val unverifiedPeers = new CircularBuffer[InetSocketAddress](settings.MaxUnverifiedPeers)
 
   override def addPeer(socketAddress: InetSocketAddress, nonce: Option[Long], nodeName: Option[String]): Unit = {
