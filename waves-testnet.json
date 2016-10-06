@@ -23,5 +23,5 @@
   "offlineGeneration": false,
   "apiKeyHash":"",
   "testnet": true,
-  "loggingLevel": "info"
+  "loggingLevel": "debug"
 }
