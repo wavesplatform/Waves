@@ -8,10 +8,10 @@ import scorex.consensus.ConsensusModule
 import scorex.transaction.BlockStorage._
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.{BlockChain, TransactionModule}
-import scorex.utils.ScorexLogging
-
+import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 import scala.collection.JavaConversions._
 import scala.collection.concurrent.TrieMap
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -25,9 +25,9 @@ class StoredBlockchain(db: MVStore)
   require(consensusModule != null)
 
   case class BlockchainPersistence(database: MVStore) {
-    val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks")
-    val signatures: MVMap[Int, BlockId] = database.openMap("signatures")
-    val signaturesReverse: MVMap[BlockId, Int] = database.openMap("signaturesReverse")
+    val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]])
+    val signatures: MVMap[Int, BlockId] = database.openMap("signatures", new LogMVMapBuilder[Int, BlockId])
+    val signaturesReverse: MVMap[BlockId, Int] = database.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int])
     private val BlocksCacheSizeLimit: Int = 1000
     private var blocksCacheSize: Int = 0
     private val blocksCache: TrieMap[Int, Option[Block]] = TrieMap.empty
@@ -39,7 +39,7 @@ class StoredBlockchain(db: MVStore)
       database.commit()
     }
 
-    val scoreMap: MVMap[Int, BigInt] = database.openMap("score")
+    val scoreMap: MVMap[Int, BigInt] = database.openMap("score", new LogMVMapBuilder[Int, BigInt])
 
     //if there are some uncommitted changes from last run, discard'em
     if (signatures.size() > 0) database.rollback()
@@ -53,14 +53,18 @@ class StoredBlockchain(db: MVStore)
     }
 
     def readBlock(height: Int): Option[Block] = {
-      if(blocksCacheSize > BlocksCacheSizeLimit) {
+      if (blocksCacheSize > BlocksCacheSizeLimit) {
         blocksCacheSize = 0
         blocksCache.clear()
       } else {
         blocksCacheSize = blocksCacheSize + 1
       }
       blocksCache.getOrElseUpdate(height,
-        Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).toOption))
+        Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).recoverWith {
+          case t: Throwable =>
+            log.error("Block.parseBytes error", t)
+            Failure(t)
+        }.toOption))
     }
 
     def deleteBlock(height: Int): Unit = {
@@ -79,7 +83,6 @@ class StoredBlockchain(db: MVStore)
     def score(): BlockchainScore = if (height() > 0) scoreMap.get(height()) else 0
 
     def score(id: BlockId): BlockchainScore = heightOf(id).map(scoreMap.get(_)).getOrElse(0)
-
   }
 
   private val blockStorage: BlockchainPersistence = BlockchainPersistence(db)
@@ -99,7 +102,6 @@ class StoredBlockchain(db: MVStore)
     }
   }
 
-
   override private[transaction] def discardBlock(): BlockChain = synchronized {
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
@@ -112,7 +114,8 @@ class StoredBlockchain(db: MVStore)
   }
 
   override def lastBlockIds(howMany: Int): Seq[BlockId] =
-    (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(blockStorage.signatures.get(i))).reverse
+    (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(blockStorage.signatures.get(i)))
+      .reverse
 
   override def contains(signature: Array[Byte]): Boolean = blockStorage.contains(signature)
 
@@ -138,6 +141,6 @@ class StoredBlockchain(db: MVStore)
 
   override def toString: String = ((1 to height()) map { h =>
     val bl = blockAt(h).get
-    s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
+    s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString }"
   }).mkString("\n")
 }

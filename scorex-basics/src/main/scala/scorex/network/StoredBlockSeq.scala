@@ -7,15 +7,14 @@ import scorex.consensus.ConsensusModule
 import scorex.network.BlockchainSynchronizer.{InnerId, InnerIds}
 import scorex.transaction.History._
 import scorex.transaction.TransactionModule
-import scorex.utils.ScorexLogging
-
+import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 import scala.collection.mutable
 
 class StoredBlockSeq(db: MVStore)
                     (implicit consensusModule: ConsensusModule[_], transactionModule: TransactionModule[_])
   extends BlockSeq with ScorexLogging {
 
-  private val blocks: MVMap[BlockId, Array[Byte]] = db.openMap("forkBlocks")
+  private val blocks: MVMap[BlockId, Array[Byte]] = db.openMap("forkBlocks", new LogMVMapBuilder[BlockId, Array[Byte]])
 
   private var blockIds = mutable.LinkedHashSet.empty[InnerId]
   private var score: BlockchainScore = _
