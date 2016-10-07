@@ -29,6 +29,7 @@ trait BlockStorage extends ScorexLogging {
           case Failure(e) =>
             log.error("Failed to apply block to state", e)
             db.rollback()
+            throw e
           case Success(m) =>
             db.commit()
         }
