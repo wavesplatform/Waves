@@ -97,7 +97,7 @@ class StoredBlockchain(db: MVStore)
           case Failure(e) => throw new Error("Error while storing blockchain a change: " + e, e)
         }
       } else {
-        throw new Error(s"Appending block ${block.json } which parent is not last block in blockchain")
+        throw new Error(s"Appending block ${block.json} which parent is not last block in blockchain")
       }
     }
   }
@@ -141,6 +141,6 @@ class StoredBlockchain(db: MVStore)
 
   override def toString: String = ((1 to height()) map { h =>
     val bl = blockAt(h).get
-    s"$h -- ${bl.uniqueId.mkString } -- ${bl.referenceField.value.mkString }"
+    s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString }"
   }).mkString("\n")
 }
