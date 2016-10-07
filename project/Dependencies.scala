@@ -18,7 +18,8 @@ object Dependencies {
   )
 
   lazy val akka = Seq(
-    "com.typesafe.akka" %% "akka-actor" % "2.+"
+    "com.typesafe.akka" %% "akka-actor" % "2.+",
+    "com.typesafe.akka" %% "akka-slf4j" % "2.+"
   )
 
   lazy val p2p = Seq(
