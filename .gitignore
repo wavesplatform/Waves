@@ -19,3 +19,6 @@ Dockerfile
 
 # non-submodules code
 src/main
+
+# temporary files
+lock.sbt
