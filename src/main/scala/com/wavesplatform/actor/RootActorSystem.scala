@@ -11,8 +11,9 @@ object RootActorSystem extends ScorexLogging {
 
   final class EscalatingStrategy extends SupervisorStrategyConfigurator {
     override def create(): SupervisorStrategy = AllForOneStrategy(loggingEnabled = false) {
-      case _: Throwable =>
+      case t: Throwable =>
         failed = true
+        log.error("Root actor got exception, escalate", t)
         SupervisorStrategy.Escalate
     }
   }
