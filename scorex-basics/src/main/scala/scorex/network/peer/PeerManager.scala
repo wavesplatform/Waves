@@ -1,20 +1,22 @@
 package scorex.network.peer
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, Status}
 import akka.pattern._
+import akka.util.Timeout
 import scorex.app.Application
 import scorex.network.NetworkController.{SendToNetwork, ShutdownNetwork}
 import scorex.network._
 import scorex.network.message.MessageHandler.RawNetworkData
 import scorex.network.message.{Message, MessageSpec}
 import scorex.utils.ScorexLogging
+
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
-import akka.util.Timeout
 
 /**
   * Must be singleton
@@ -192,6 +194,12 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     connectedPeers.remove(from)
   }
 
+  private def peerNonces(): Set[(InetAddress, Long)] = {
+    connectedPeers.filter(_._2.handshake.isDefined).map {
+      case (k, v) => (k.getAddress, v.handshake.get.nodeNonce)
+    }.toSet
+  }
+
   private def handleHandshake(address: InetSocketAddress, handshake: Handshake): Unit =
     connectedPeers.get(address) match {
       case None =>
@@ -208,6 +216,10 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
           log.info("Drop connection to self")
           connectedPeers.remove(address)
           peerDatabase.removePeer(address)
+          connection.handlerRef ! CloseConnection
+        } else if (peerNonces().contains((address.getAddress, handshake.nodeNonce))) {
+          log.info("Drop connection to already connected peer with the same ip and nonce")
+          connectedPeers.remove(address)
           connection.handlerRef ! CloseConnection
         } else {
           val declaredAddressOption = handshake.declaredAddress
@@ -290,6 +302,8 @@ object PeerManager {
 
   case class ExistedBlacklist(hosts: Seq[String])
 
+  case class Suspect(address: InetSocketAddress)
+
   case object CheckPeers
 
   case object GetAllPeers
@@ -305,7 +319,5 @@ object PeerManager {
   private case object MarkConnectedPeersVisited
 
   case object BlacklistResendRequired
-
-  case class Suspect(address: InetSocketAddress)
 
 }

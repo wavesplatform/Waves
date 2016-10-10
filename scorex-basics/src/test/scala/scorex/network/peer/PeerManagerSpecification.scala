@@ -119,22 +119,21 @@ class PeerManagerSpecification extends ActorTestingCommons {
         getConnectedPeers shouldBe empty
       }
 
-      "second connection from the same address is not possible" in {
+      "second connection from the same address is possible from another port" in {
         actorRef ! CheckPeers
-
         networkController.expectMsg(NetworkController.ConnectTo(knownAddress))
-
         connect(knownAddress, nonce)
-
-        getConnectedPeers.size shouldBe 2
-
-        actorRef ! CheckPeers
-
-        networkController.expectNoMsg(testDuration)
-
-        getConnectedPeers.size shouldBe 2
+        peerConnectionHandler.expectMsg(PeerConnectionHandler.CloseConnection)
+        getConnectedPeers.size shouldBe 1
 
         actorRef ! Disconnected(anAddress)
+        getConnectedPeers.size shouldBe 0
+
+        actorRef ! CheckPeers
+        networkController.expectMsgType[NetworkController.ConnectTo]
+        connect(knownAddress, nonce)
+        getConnectedPeers.size shouldBe 1
+
         getConnectedPeers.head._1 shouldBe knownAddress
         getActiveConnections.head shouldBe knownAddress
       }
@@ -192,9 +191,9 @@ class PeerManagerSpecification extends ActorTestingCommons {
       getActiveConnections shouldBe empty
     }
 
-    "many TCP clients with same nonce" in {
+    "many TCP clients with same nonce from different host should connect" in {
       def connect(id: Int): TestProbe = {
-        val address = new InetSocketAddress(id)
+        val address = new InetSocketAddress(s"$id.$id.$id.$id", id)
         val handler = TestProbe("connection-handler-" + id)
         actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler.expectMsgType[Handshake]
@@ -351,6 +350,24 @@ class PeerManagerSpecification extends ActorTestingCommons {
       getBlacklistedPeers shouldBe empty
       actorRef ! Suspect(knownAddress)
       getBlacklistedPeers.size shouldBe 1
+    }
+
+    "don't allow more than one connection to the same ip-nonce pair" in {
+      def connect(ip: InetAddress, port: Int, nonce: Long): TestProbe = {
+        val address = new InetSocketAddress(ip, port)
+        val handler = TestProbe()
+        actorRef ! Connected(address, handler.ref, None, inbound = true)
+        handler.expectMsgType[Handshake]
+        actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
+        handler
+      }
+
+      val ip = InetAddress.getByName("localhost")
+      val h1 = connect(ip, 1, 1)
+      getConnectedPeers should have size 1
+      val h2 = connect(ip, 2, 1)
+      getConnectedPeers should have size 1
+      h2.expectMsg(CloseConnection)
     }
   }
 }
