@@ -26,9 +26,11 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
     case GetBlockGenerationStatus => sender() ! Idle.name
 
     case StartGeneration =>
-      log.info("Start block generation")
-      context.become(generating())
-      self ! SelfCheck
+      if (ifShouldGenerateNow) {
+        log.info("Start block generation")
+        context.become(generating())
+        self ! SelfCheck
+      }
 
     case StopGeneration =>
 
@@ -73,28 +75,40 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
   private def isLastBlockTsInAllowedToGenerationInterval: Boolean = {
     val lastBlockTimestamp = application.history.lastBlock.timestampField.value
     val currentTime = NTP.correctedTime()
-    val doNotGenerateUntilLastBlockTs = currentTime - application.settings.allowedGenerationTimeFromLastBlockInterval.toMillis
+    val doNotGenerateUntilLastBlockTs = currentTime - application.settings.allowedGenerationTimeFromLastBlockInterval
+      .toMillis
     lastBlockTimestamp >= doNotGenerateUntilLastBlockTs
   }
 
   private def isLastBlockIsGenesis: Boolean = application.history.height() == 1
 
-  private def changeStateAccordingTo(peersNumber: Int, active: Boolean): Unit =
+  private def changeStateAccordingTo(peersNumber: Int, active: Boolean): Unit = {
+    def suspendGeneration(): Unit = {
+      log.info(s"Suspend block generation")
+      context become generating(active = false)
+    }
+    def resumeGeneration(): Unit = {
+      log.info(s"Resume block generation")
+      context become generating(active = true)
+    }
     if (peersNumber >= application.settings.quorum || application.settings.offlineGeneration) {
-      startMiner()
-      if (!active) {
-        log.info(s"Resume block generation")
-        context become generating(active = true)
+      if (ifShouldGenerateNow) {
+        startMiner()
+        if (!active) {
+          resumeGeneration()
+        }
+      } else {
+        suspendGeneration()
       }
     } else {
       stopMiner()
       if (active) {
-        log.info(s"Suspend block generation")
-        context become generating(active = false)
+        suspendGeneration()
       }
     }
+  }
 
-  private def startMiner() = {
+  private def startMiner() = if (miner.isEmpty) {
     log.info(s"Check miner")
     miner = Some(createMiner)
     miner.foreach { _ ! GuessABlock(false) }
@@ -148,7 +162,7 @@ object BlockGeneratorController {
 
   private[mining] case object SelfCheck
 
-  private[mining] case object GetBlockGenerationStatus
+  case object GetBlockGenerationStatus
 
   private val SelfCheckInterval = 5 seconds
 }

@@ -8,11 +8,11 @@ import com.ning.http.client.Response
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.api.http.ApiKeyNotValid
-import scorex.app.Application.GetBlockGenerationStatus
 import scorex.consensus.mining.BlockGeneratorController.{Idle, StartGeneration, StopGeneration}
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.transaction.TransactionSettings
 import scorex.utils._
+import scorex.consensus.mining.BlockGeneratorController.GetBlockGenerationStatus
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
