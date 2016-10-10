@@ -32,6 +32,7 @@ class BlockAPISpecification extends FunSuite with TestLock with Matchers with Tr
   test("GET /blocks/at/{height} API route") {
     val response = GET.request(s"/blocks/at/1")
     checkGenesis(response)
+    (response \ "height").as[Int] shouldBe 1
   }
 
   test("GET /blocks/seq/{from}/{to} API route") {
@@ -77,7 +78,9 @@ class BlockAPISpecification extends FunSuite with TestLock with Matchers with Tr
   }
 
   test("GET /blocks/first API route") {
-    checkGenesis(GET.request(s"/blocks/first"))
+    val response = GET.request(s"/blocks/first")
+    checkGenesis(response)
+    (response \ "height").as[Int] shouldBe 1
   }
 
   test("GET /blocks/address/{address}/{from}/{to} API route") {
