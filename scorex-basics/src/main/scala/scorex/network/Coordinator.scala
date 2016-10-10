@@ -4,7 +4,6 @@ import akka.actor.Actor
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import scorex.app.Application
-import scorex.app.Application.GetStatus
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.mining.BlockGeneratorController.{LastBlockChanged, StartGeneration}
