@@ -3,7 +3,6 @@ package scorex.consensus.mining
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
-import scorex.app.Application.GetBlockGenerationStatus
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.network.ConnectedPeer
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
@@ -17,7 +16,6 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
   def setOfflineGeneration(value: Boolean) = offlineGen when() returns value
 
   object TestSettings extends SettingsMock {
-    override lazy val miningThreads: Int = 0
     override lazy val quorum: Int = 1
     override lazy val offlineGeneration: Boolean = offlineGen()
   }

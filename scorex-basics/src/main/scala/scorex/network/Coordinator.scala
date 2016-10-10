@@ -216,4 +216,6 @@ object Coordinator {
   }
 
   private case object BroadcastCurrentScore
+
+  private[network] case object GetStatus
 }

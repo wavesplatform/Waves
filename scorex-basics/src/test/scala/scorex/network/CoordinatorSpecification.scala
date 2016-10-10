@@ -4,7 +4,6 @@ import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
 import scorex.ActorTestingCommons
-import scorex.app.Application.GetStatus
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus}
 import scorex.network.ScoreObserver.CurrentScore

@@ -10,7 +10,6 @@ import scala.language.postfixOps
 
 class BlockGeneratorController(application: Application) extends Actor with ScorexLogging {
 
-  import Application.GetBlockGenerationStatus
   import BlockGeneratorController._
   import Miner.{GuessABlock, Stop}
 
@@ -148,6 +147,8 @@ object BlockGeneratorController {
   case object LastBlockChanged
 
   private[mining] case object SelfCheck
+
+  private[mining] case object GetBlockGenerationStatus
 
   private val SelfCheckInterval = 5 seconds
 }
