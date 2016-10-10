@@ -20,6 +20,3 @@ scorex-*.log
 
 # local settings
 localsettings.json
-
-# temporary files
-lock.sbt
