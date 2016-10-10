@@ -28,13 +28,14 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe" % "config" % "1.3.0",
   "com.typesafe" % "ssl-config-akka_2.11" % "0.2.1",
   "com.typesafe" % "ssl-config-core_2.11" % "0.2.1",
-  "com.typesafe.akka" % "akka-actor_2.11" % "2.4.10",
-  "com.typesafe.akka" % "akka-http-core_2.11" % "2.4.10",
-  "com.typesafe.akka" % "akka-http-experimental_2.11" % "2.4.10",
+  "com.typesafe.akka" % "akka-actor_2.11" % "2.4.11",
+  "com.typesafe.akka" % "akka-http-core_2.11" % "2.4.11",
+  "com.typesafe.akka" % "akka-http-experimental_2.11" % "2.4.11",
   "com.typesafe.akka" % "akka-http-spray-json-experimental_2.11" % "2.4.8",
-  "com.typesafe.akka" % "akka-parsing_2.11" % "2.4.10",
-  "com.typesafe.akka" % "akka-stream_2.11" % "2.4.10",
-  "com.typesafe.akka" % "akka-testkit_2.11" % "2.4.10",
+  "com.typesafe.akka" % "akka-parsing_2.11" % "2.4.11",
+  "com.typesafe.akka" % "akka-slf4j_2.11" % "2.4.11",
+  "com.typesafe.akka" % "akka-stream_2.11" % "2.4.11",
+  "com.typesafe.akka" % "akka-testkit_2.11" % "2.4.11",
   "com.typesafe.play" % "play-datacommons_2.11" % "2.4.8",
   "com.typesafe.play" % "play-functional_2.11" % "2.4.8",
   "com.typesafe.play" % "play-iteratees_2.11" % "2.4.8",
@@ -79,4 +80,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.12"
 )
-// LIBRARY_DEPENDENCIES_HASH 0331063585513aab896f658987b2bbed03192bc0
+// LIBRARY_DEPENDENCIES_HASH 13c97eee6efe04fbbaacb70ebf62e2017e6143b5
