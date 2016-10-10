@@ -140,12 +140,16 @@ trait Settings extends ScorexLogging {
 
   lazy val genesisTimestamp: Long = (settingsJSON \ "genesisTimestamp").asOpt[Long].getOrElse(DefaultGenesisTimestamp)
 
+  lazy val allowedGenerationTimeFromLastBlockInterval = (settingsJSON \ "allowedGenerationTimeFromLastBlockInterval").asOpt[Long]
+    .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultAllowedGenerationTimeFromLastBlockInterval)
+
   //NETWORK
   private val DefaultMaxConnections = 30
   private val DefaultConnectionTimeout = 60
   private val DefaultBindAddress = "127.0.0.1"
   lazy val AllowedConnectionsFromOneHost = 5
   lazy val UnrequestedPacketsThreshold = 100
+  private val DefaultAllowedGenerationTimeFromLastBlockInterval: FiniteDuration = 60.minutes
 
 
   //API
