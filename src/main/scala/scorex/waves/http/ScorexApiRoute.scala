@@ -10,7 +10,8 @@ import com.wavesplatform.settings.Constants
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions, JsonResponse}
-import scorex.app.Application.{GetBlockGenerationStatus, GetStatus}
+import scorex.network.Coordinator.GetStatus
+import scorex.consensus.mining.BlockGeneratorController.GetBlockGenerationStatus
 import scorex.app.RunnableApplication
 import scorex.utils.ScorexLogging
 
