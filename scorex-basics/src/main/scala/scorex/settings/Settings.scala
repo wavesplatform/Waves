@@ -121,7 +121,7 @@ trait Settings extends ScorexLogging {
   // Miner settings
   lazy val blockGenerationDelay: FiniteDuration = (settingsJSON \ "blockGenerationDelay").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultBlockGenerationDelay)
-  lazy val miningThreads: Int = (settingsJSON \ "mininigThreads").asOpt[Int].getOrElse(DefaultMiningThreads)
+
   lazy val tflikeScheduling = (settingsJSON \ "tflikeScheduling").asOpt[Boolean].getOrElse(true)
 
   lazy val scoreBroadcastDelay: FiniteDuration = (settingsJSON \ "scoreBroadcastDelay").asOpt[Long]

@@ -58,16 +58,8 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
   protected def preciseTime: Long = NTP.correctedTime()
 
-  private def isLastBlockTsInAllowedToGenerationInterval: Boolean = {
-    val lastBlockTimestamp = application.history.lastBlock.timestampField.value
-    val currentTime = preciseTime
-    val doNotGenerateUntilLastBlockTs = currentTime - application.settings.allowedGenerationTimeFromLastBlockInterval.toMillis
-    lastBlockTimestamp >= doNotGenerateUntilLastBlockTs
-  }
-
-
   private def scheduleBlockGeneration(): Unit = {
-    val schedule = if (application.settings.tflikeScheduling && isLastBlockTsInAllowedToGenerationInterval) {
+    val schedule = if (application.settings.tflikeScheduling) {
       val lastBlock = application.history.lastBlock
       val currentTime = preciseTime
 
