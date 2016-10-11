@@ -8,7 +8,6 @@ import scala.util.Try
 
 
 case class IssueRequest(sender: String,
-                        assetIdOpt: Option[String],
                         name: String,
                         description: String,
                         quantity: Long,
@@ -20,7 +19,6 @@ case class IssueRequest(sender: String,
 object IssueRequest {
   implicit val issueWrites: Writes[IssueRequest] = (
     (JsPath \ "sender").write[String] and
-      (JsPath \ "assetIdOpt").writeNullable[String] and
       (JsPath \ "name").write[String] and
       (JsPath \ "description").write[String] and
       (JsPath \ "quantity").write[Long] and
@@ -32,7 +30,6 @@ object IssueRequest {
 
   implicit val paymentReads: Reads[IssueRequest] = (
     (JsPath \ "sender").read[String] and
-      (JsPath \ "assetIdOpt").readNullable[String] and
       (JsPath \ "name").read[String] and
       (JsPath \ "description").read[String] and
       (JsPath \ "quantity").read[Long] and

@@ -103,7 +103,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
       required = true,
       paramType = "body",
       dataType = "scorex.transaction.state.wallet.IssueRequest",
-      defaultValue = "{\"sender\":\"string\",\"assetIdOpt\":\"Option[String]\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
+      defaultValue = "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
     )
   ))
   def issue: Route =  path("issue") {

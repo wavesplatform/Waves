@@ -158,7 +158,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   def issueAsset(request: IssueRequest, wallet: Wallet): Option[IssueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
     val issue = IssueTransaction.create(sender,
-      request.assetIdOpt.map(s => Base58.decode(s).get),
+      None,
       Base58.decode(request.name).get,
       Base58.decode(request.description).get,
       request.quantity,
