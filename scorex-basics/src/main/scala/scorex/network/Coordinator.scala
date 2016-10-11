@@ -25,7 +25,8 @@ import scala.util.{Failure, Success, Try}
 class Coordinator(application: Application) extends Actor with ScorexLogging {
 
   import Coordinator._
-  import application.basicMessagesSpecsRepo._
+  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
+  import basicMessagesSpecsRepo._
 
   private lazy val blockchainSynchronizer = application.blockchainSynchronizer
   private lazy val networkControllerRef = application.networkController

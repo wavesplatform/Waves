@@ -14,7 +14,8 @@ import scala.language.postfixOps
 class ScoreObserver(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   import ScoreObserver._
-  import application.basicMessagesSpecsRepo._
+  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
+  import basicMessagesSpecsRepo._
 
   override val messageSpecs: Seq[MessageSpec[_]] = Seq(ScoreMessageSpec)
 

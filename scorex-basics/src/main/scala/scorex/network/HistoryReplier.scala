@@ -8,7 +8,8 @@ import scorex.utils.ScorexLogging
 
 class HistoryReplier(application: Application) extends ViewSynchronizer with ScorexLogging {
 
-  import application.basicMessagesSpecsRepo._
+  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
+  import basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq(GetSignaturesSpec, GetBlockSpec)
   protected override lazy val networkControllerRef = application.networkController

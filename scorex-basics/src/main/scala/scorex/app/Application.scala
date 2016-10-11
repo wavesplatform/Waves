@@ -13,32 +13,32 @@ import scorex.wallet.Wallet
 trait Application {
 
   //modules
-  implicit val consensusModule: ConsensusModule[_]
-  implicit val transactionModule: TransactionModule[_]
+  implicit def consensusModule: ConsensusModule[_]
+  implicit def transactionModule: TransactionModule[_]
 
-  val applicationName: String
+  def applicationName: String
 
-  val appVersion: ApplicationVersion
+  def appVersion: ApplicationVersion
 
-  val basicMessagesSpecsRepo: BasicMessagesRepo
+  def basicMessagesSpecsRepo: BasicMessagesRepo
 
-  val history: History
+  def history: History
 
-  val blockStorage: BlockStorage
+  def blockStorage: BlockStorage
 
-  val peerManager: ActorRef
+  def peerManager: ActorRef
 
-  val networkController: ActorRef
+  def networkController: ActorRef
 
-  val coordinator: ActorRef
+  def coordinator: ActorRef
 
-  val blockGenerator: ActorRef
+  def blockGenerator: ActorRef
 
-  val blockchainSynchronizer: ActorRef
+  def blockchainSynchronizer: ActorRef
 
-  val scoreObserver: ActorRef
+  def scoreObserver: ActorRef
 
-  val settings: Settings
+  def settings: Settings
 
-  val wallet: Wallet
+  def wallet: Wallet
 }

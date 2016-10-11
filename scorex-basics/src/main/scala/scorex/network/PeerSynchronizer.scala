@@ -20,7 +20,8 @@ import scala.concurrent.duration._
 
 class PeerSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
 
-  import application.basicMessagesSpecsRepo._
+  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
+  import basicMessagesSpecsRepo._
 
   protected lazy override val networkControllerRef = application.networkController
   override val messageSpecs = Seq(GetPeersSpec, PeersSpec)
