@@ -8,7 +8,7 @@ import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.Account
 import scorex.transaction._
-import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
+import scorex.transaction.assets.{ReissueTransaction, IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
 
 import scala.util.Random
@@ -63,7 +63,7 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   property("Reissue asset") {
     forAll(issueReissueGenerator) { pair =>
       val issueTx: IssueTransaction = pair._1
-      val reissueTx: IssueTransaction = pair._2
+      val reissueTx: ReissueTransaction = pair._2
       val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
       state.applyChanges(state.calcNewBalances(Seq(issueTx), Map()))
