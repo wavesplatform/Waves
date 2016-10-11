@@ -65,7 +65,7 @@ case class TransferTransaction(assetId: Option[AssetId],
     "assetId" -> assetId.map(Base58.encode),
     "amount" -> amount,
     "feeAsset" -> feeAsset.map(Base58.encode),
-    "feeAmount" -> feeAmount,
+    "fee" -> feeAmount,
     "timestamp" -> timestamp,
     "attachment" -> Base58.encode(attachment),
     "signature" -> Base58.encode(signature)
