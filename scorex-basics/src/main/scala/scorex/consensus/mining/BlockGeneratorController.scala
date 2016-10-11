@@ -23,18 +23,17 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   def idle: Receive = state {
 
-    case GetBlockGenerationStatus => sender() ! Idle.name
+    case GetBlockGenerationStatus =>
+      sender() ! Idle.name
 
     case StartGeneration =>
-      if (ifShouldGenerateNow) {
-        log.info("Start block generation")
-        context.become(generating())
-        self ! SelfCheck
-      }
+      startGeneratingIfShould()
 
     case StopGeneration =>
 
-    case SelfCheck => stopMiner()
+    case SelfCheck =>
+      stopMiner()
+      startGeneratingIfShould()
 
     case ConnectedPeers(_) =>
 
@@ -44,9 +43,11 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   def generating(active: Boolean = true): Receive = state {
 
-    case GetBlockGenerationStatus => sender() ! (if (active) Generating else Suspended).name
+    case GetBlockGenerationStatus =>
+      sender() ! (if (active) Generating else Suspended).name
 
-    case StartGeneration => if (active) self ! SelfCheck
+    case StartGeneration =>
+      if (active) self ! SelfCheck
 
     case SelfCheck => askForConnectedPeers()
 
@@ -55,7 +56,8 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       context.become(idle)
       stopMiner()
 
-    case ConnectedPeers(peers) => changeStateAccordingTo(peers.size, active)
+    case ConnectedPeers(peers) =>
+      changeStateAccordingTo(peers.size, active)
 
     case LastBlockChanged =>
       if (active) {
@@ -66,6 +68,14 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
           self ! StopGeneration
         }
       }
+  }
+
+  private def startGeneratingIfShould() = {
+    if (ifShouldGenerateNow) {
+      log.info("Start block generation")
+      context.become(generating())
+      self ! SelfCheck
+    }
   }
 
   private def ifShouldGenerateNow: Boolean = isLastBlockTsInAllowedToGenerationInterval || isLastBlockIsGenesis
