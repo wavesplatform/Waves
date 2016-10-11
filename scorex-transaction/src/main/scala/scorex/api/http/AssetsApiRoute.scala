@@ -19,7 +19,7 @@ import scala.util.{Success, Try}
 
 
 @Path("/assets")
-@Api(value = "/assets/", description = "Info about assets")
+@Api(value = "/assets/")
 case class AssetsApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
   val MaxAddressesPerRequest = 1000

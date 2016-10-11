@@ -120,7 +120,7 @@ case class BlocksApiRoute(application: Application)(implicit val context: ActorR
         history match {
           case blockchain: BlockChain => {
             blockchain.blockAt(height).map(_.json) match {
-              case Some(json) => JsonResponse(json, StatusCodes.OK)
+              case Some(json) => JsonResponse(json + ("height" -> Json.toJson(height)), StatusCodes.OK)
               case None => {
                 val json = Json.obj("status" -> "error", "details" -> "No block for this height")
                 JsonResponse(json, StatusCodes.NotFound)
@@ -180,7 +180,7 @@ case class BlocksApiRoute(application: Application)(implicit val context: ActorR
   def first: Route = {
     path("first") {
       getJsonRoute {
-        JsonResponse(history.genesis.json, StatusCodes.OK)
+        JsonResponse(history.genesis.json + ("height" -> Json.toJson(1)), StatusCodes.OK)
       }
     }
   }
