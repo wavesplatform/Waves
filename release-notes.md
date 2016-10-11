@@ -1,3 +1,7 @@
+**0.3.1**
+
+* HTTP API /scorex removed. Use /node instead.
+
 **0.2.2**
 
 * Switch network by "testnet" in settings. Default value is true."

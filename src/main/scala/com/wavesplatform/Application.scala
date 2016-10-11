@@ -9,7 +9,7 @@ import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.utils.ScorexLogging
-import scorex.waves.http.{DebugApiRoute, ScorexApiRoute, WavesApiRoute}
+import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import com.wavesplatform.settings._
 import scorex.waves.transaction.WavesTransactionModule
 import scala.reflect.runtime.universe._
@@ -39,7 +39,6 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     consensusApiRoute,
     WalletApiRoute(this),
     PaymentApiRoute(this),
-    ScorexApiRoute(this),
     UtilsApiRoute(this),
     PeersApiRoute(this),
     AddressApiRoute(this),
@@ -55,7 +54,6 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     typeOf[NxtConsensusApiRoute],
     typeOf[WalletApiRoute],
     typeOf[PaymentApiRoute],
-    typeOf[ScorexApiRoute],
     typeOf[UtilsApiRoute],
     typeOf[PeersApiRoute],
     typeOf[AddressApiRoute],
