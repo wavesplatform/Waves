@@ -29,17 +29,21 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
   trait App extends ApplicationMock {
     override lazy val settings = TestSettings
     override val peerManager: ActorRef = testPeerManager.ref
+    @volatile
+    var history: History = _
+    private[BlockGeneratorControllerSpecification] def setHistory(history: History) = this.history = history
   }
 
-
-  val stubHistory = stub[History]
   val stubApp = stub[App]
-  (stubApp.history _).when().returns(stubHistory)
   setDefaultLastBlock()
 
-  private def setDefaultLastBlock() = setLastBlock(blockMock(1))
-  private def setLastBlock(block: Block) {
-    (stubHistory.lastBlock _).when().returns(block)
+  private def setDefaultLastBlock(): Unit = setLastBlock(blockMock(2))
+  private def setLastBlock(block: Block): Unit = stubApp.setHistory(historyWithLastBlock(block))
+  private def historyWithLastBlock(block: Block): History = {
+    val stubHistory = stub[History]
+    (stubHistory.lastBlock _).when().returns(block).anyNumberOfTimes()
+    (stubHistory.height _).when().returns(block.uniqueId.head).anyNumberOfTimes()
+    stubHistory
   }
 
   override protected val actorRef = system.actorOf(Props(classOf[BlockGeneratorController], stubApp))
@@ -97,7 +101,8 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "StartGeneration command do not change state to generation when should't generate" in {
-      setLastBlock(blockMock(2, System.currentTimeMillis() - 11.minutes.toMillis))
+      setLastBlock(blockMock(2, 0))
+      assertStatusIs(Idle)
       actorRef ! StartGeneration
       assertStatusIs(Idle)
       setDefaultLastBlock()
