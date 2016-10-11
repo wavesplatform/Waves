@@ -76,9 +76,22 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
       assertStatusIs(Idle)
     }
 
-    "StartGeneration command change state to generation when should generate" in {
+    "StartGeneration command change state to generation when should generate because of genesis block" in {
       setLastBlock(blockMock(1, System.currentTimeMillis() - 11.minutes.toMillis))
+      assertStatusIs(Idle)
       actorRef ! StartGeneration
+      assertStatusIs(Generating)
+      actorRef ! StopGeneration
+      assertStatusIs(Idle)
+      setDefaultLastBlock()
+    }
+
+    "StartGeneration command change state to generation when should generate because of last block time" in {
+      setLastBlock(blockMock(5, System.currentTimeMillis() - 9.minutes.toMillis))
+      assertStatusIs(Idle)
+      actorRef ! StartGeneration
+      assertStatusIs(Generating)
+      actorRef ! StopGeneration
       assertStatusIs(Idle)
       setDefaultLastBlock()
     }
