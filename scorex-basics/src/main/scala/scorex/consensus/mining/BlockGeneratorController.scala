@@ -15,7 +15,9 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   private var miner: Option[ActorRef] = None
 
-  context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
+  override def preStart(): Unit = {
+    context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
+  }
 
   override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 

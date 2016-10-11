@@ -34,7 +34,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     private[BlockGeneratorControllerSpecification] def setHistory(history: History) = this.history = history
   }
 
-  val stubApp = stub[App]
+  val stubApp: App = stub[App]
   setDefaultLastBlock()
 
   private def setDefaultLastBlock(): Unit = setLastBlock(blockMock(2))
@@ -46,7 +46,11 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     stubHistory
   }
 
-  override protected val actorRef = system.actorOf(Props(classOf[BlockGeneratorController], stubApp))
+  private class TestBlockGeneratorController(app: App) extends BlockGeneratorController(app) {
+    override def preStart(): Unit = {}
+  }
+
+  override protected val actorRef = system.actorOf(Props(new TestBlockGeneratorController(stubApp)))
 
   private def assertStatusIs(status: BlockGeneratorController.Status) = {
     actorRef ! GetBlockGenerationStatus
@@ -60,9 +64,11 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "when Idle don't check peers number" in {
+      setLastBlock(blockMock(2, 0))
       assertStatusIs(Idle)
       actorRef ! SelfCheck
       testPeerManager.expectNoMsg(testDuration)
+      setDefaultLastBlock()
     }
 
     "StopGeneration command change state to idle from generating" in {
@@ -73,11 +79,13 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "StopGeneration command don't change state from idle" in {
+      setLastBlock(blockMock(2, 0))
       actorRef ! StartGeneration
       actorRef ! StopGeneration
       assertStatusIs(Idle)
       actorRef ! StopGeneration
       assertStatusIs(Idle)
+      setDefaultLastBlock()
     }
 
     "StartGeneration command change state to generation when should generate because of genesis block" in {
