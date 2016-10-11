@@ -39,9 +39,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
     case ConnectedPeers(_) =>
 
     case LastBlockChanged =>
-      if (ifShouldGenerateNow) {
-        self ! StartGeneration
-      }
+      self ! StartGeneration
   }
 
   def generating(active: Boolean = true): Receive = state {
