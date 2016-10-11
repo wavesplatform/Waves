@@ -6,9 +6,10 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
-import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueReissueI, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
+
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.util.Try
@@ -27,8 +28,9 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   val DataKey = "dataset"
   val LastStates = "lastStates"
   val IncludedTx = "includedTx"
-  //todo put all transactions in the same map
-  val IssueTxs = "IssueTxs"
+  //todo put all transactions in the same map and use links to it
+  val AllTxs = "IssueTxs"
+  val ReissueIndex = "reissuableFlag"
 
   if (db.getStoreVersion > 0) db.rollback()
 
@@ -41,7 +43,17 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     */
   private val includedTx: MVMap[Array[Byte], Int] = db.openMap(IncludedTx, new LogMVMapBuilder[Array[Byte], Int])
 
-  private val issueTxs: MVMap[Array[Byte], Array[Byte]] = db.openMap(IssueTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
+  /**
+    * Transaction Signature -> serialized transaction
+    */
+  private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
+    db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
+
+  /**
+    * Transaction Signature -> serialized transaction
+    */
+  private val reissubleIndex: MVMap[Array[Byte], Boolean] =
+    db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
@@ -58,11 +70,13 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1.key)).getOrElse(0))
       accountChanges(ch._1.key).put(h, change)
       lastStates.put(ch._1.key, h)
-      ch._2._2.foreach { tx =>
-        if (tx.isInstanceOf[IssueTransaction]) {
-          issueTxs.put(tx.id, tx.bytes)
-        }
-        includedTx.put(tx.id, h)
+      ch._2._2.foreach {
+        case tx: IssueReissueI =>
+          transactionsMap.put(tx.id, tx.bytes)
+          reissubleIndex.put(tx.assetId, tx.reissuable)
+          includedTx.put(tx.id, h)
+        case tx =>
+          includedTx.put(tx.id, h)
       }
     }
   }
@@ -264,10 +278,14 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       tx.signatureValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: IssueTransaction =>
       val reissueValid: Boolean = tx.assetIdOpt.forall { assetId =>
-        val initialIssue: Option[IssueTransaction] = Option(issueTxs.get(assetId))
+        lazy val initialIssue: Option[IssueTransaction] = Option(transactionsMap.get(assetId))
           .flatMap(b => IssueTransaction.parseBytes(b).toOption)
-        initialIssue.exists(old => old.reissuable && old.sender.address == tx.sender.address)
+        tx.timestamp < ReissueTimestamp && initialIssue.exists(old => old.reissuable &&
+          old.sender.address == tx.sender.address)
       }
+      reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+    case tx: ReissueTransaction =>
+      val reissueValid: Boolean = Option(reissubleIndex.get(tx.assetId)).getOrElse(false)
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
@@ -277,6 +295,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   }
 
   val TimestampToCheck = 1474273462000L
+  //Before this timestamp we reissue transactions with Issue transaction
+  val ReissueTimestamp = 1476459220000L
 
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
     if (tx.timestamp < TimestampToCheck)
