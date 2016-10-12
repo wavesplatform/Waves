@@ -35,23 +35,29 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
     val recipient = new PrivateKeyAccount("recipient account".getBytes)
 
-    forAll(positiveLongGen) { balance: Long =>
-      val assetAcc = AssetAcc(testAcc, None)
+    forAll(positiveLongGen, positiveLongGen) { (balance: Long, fee: Long) =>
+      whenever(balance > fee) {
+        val assetAcc = AssetAcc(testAcc, None)
 
-      //set some balance
-      val genes = GenesisTransaction(testAcc, balance, 0)
-      state.applyChanges(state.calcNewBalances(Seq(genes), Map()))
-      state.assetBalance(assetAcc) shouldBe balance
+        //set some balance
+        val genes = GenesisTransaction(testAcc, balance, 0)
+        state.applyChanges(state.calcNewBalances(Seq(genes), Map()))
+        state.assetBalance(assetAcc) shouldBe balance
 
-      //transfer asset
-      val tx = TransferTransaction.create(None, testAcc, recipient, balance, System.currentTimeMillis(),
-        None, 1, Array())
-      state.isValid(tx) shouldBe false
+        //valid transfer
+        val tx = TransferTransaction.create(None, testAcc, recipient, balance - fee, System.currentTimeMillis(),
+          None, fee, Array())
+        state.isValid(tx) shouldBe true
 
-      state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq(tx))))
+        //transfer asset
+        val invalidtx = TransferTransaction.create(None, testAcc, recipient, balance, System.currentTimeMillis(),
+          None, fee, Array())
+        state.isValid(invalidtx) shouldBe false
 
+        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq(tx))))
+
+      }
     }
-
   }
 
   property("Transfer asset") {
