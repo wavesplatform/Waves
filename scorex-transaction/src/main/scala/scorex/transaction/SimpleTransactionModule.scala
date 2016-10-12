@@ -10,9 +10,9 @@ import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
-import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
+import scorex.transaction.assets.{ReissueTransaction, IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
-import scorex.transaction.state.wallet.{IssueRequest, Payment, TransferRequest}
+import scorex.transaction.state.wallet.{ReissueRequest, IssueRequest, Payment, TransferRequest}
 import scorex.utils._
 import scorex.wallet.Wallet
 
@@ -169,6 +169,19 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     if (isValid(issue)) onNewOffchainTransaction(issue)
     else log.warn("Invalid issue transaction generated: " + issue.json)
     issue
+  }.toOption
+
+  def reissueAsset(request: ReissueRequest, wallet: Wallet): Option[ReissueTransaction] = Try {
+    val sender = wallet.privateKeyAccount(request.sender).get
+    val reissue = ReissueTransaction.create(sender,
+      Base58.decode(request.assetId).get,
+      request.quantity,
+      request.reissuable,
+      request.fee,
+      getTimestamp)
+    if (isValid(reissue)) onNewOffchainTransaction(reissue)
+    else log.warn("Invalid issue transaction generated: " + reissue.json)
+    reissue
   }.toOption
 
   private var txTime: Long = 0

@@ -11,9 +11,9 @@ import scorex.account.Account
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
 import scorex.transaction.{AssetAcc, SimpleTransactionModule, ValidationResult}
-import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
+import scorex.transaction.assets.{ReissueTransaction, IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
+import scorex.transaction.state.wallet.{ReissueRequest, IssueRequest, TransferRequest}
 
 import scala.util.{Success, Try}
 
@@ -32,7 +32,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ issue ~ transfer
+      balance ~ issue ~ reissue ~ transfer
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -151,6 +151,64 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
       }
     }
   }
+
+  @Path("/reissue")
+  @ApiOperation(value = "Issue asset",
+    notes = "Reissue asset (or reissue the old one)",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.transaction.state.wallet.ReissueRequest",
+      defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100000,\"reissuable\":false,\"fee\":1}"
+    )
+  ))
+  def reissue: Route =  path("reissue") {
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          walletNotExists(wallet).getOrElse {
+            Try(Json.parse(body)).map { js =>
+              js.validate[ReissueRequest] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).response
+                case JsSuccess(issue: ReissueRequest, _) =>
+                  val txOpt: Option[ReissueTransaction] = transactionModule.reissueAsset(issue, wallet)
+                  txOpt match {
+                    case Some(tx) =>
+                      tx.validate match {
+                        case ValidationResult.ValidateOke =>
+                          JsonResponse(tx.json, StatusCodes.OK)
+
+                        case ValidationResult.InvalidAddress =>
+                          InvalidAddress.response
+
+                        case ValidationResult.NegativeAmount =>
+                          InvalidAmount.response
+
+                        case ValidationResult.InsufficientFee =>
+                          InsufficientFee.response
+
+                        case ValidationResult.InvalidSignature =>
+                          InvalidSignature.response
+                      }
+                    case None =>
+                      WrongJson.response
+                  }
+              }
+            }.getOrElse(WrongJson.response)
+          }
+        }
+      }
+    }
+  }
+
+
 
   private def balanceJson(address: String, assetIdStr: String): JsonResponse = {
     val account = new Account(address)
