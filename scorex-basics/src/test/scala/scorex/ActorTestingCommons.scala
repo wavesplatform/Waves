@@ -6,14 +6,13 @@ import akka.util.Timeout
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Matchers
 import scorex.app.Application
-import scorex.block.Block
+import scorex.block.{Block, LongBlockField}
 import scorex.block.Block._
 import scorex.consensus.ConsensusModule
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
 import scorex.transaction.TransactionModule
-
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 
@@ -63,12 +62,13 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids:_*)
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
-  protected def blockMock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
+  protected def blockMock[Id](id: Id, ts: Long = System.currentTimeMillis())(implicit conv: Id => BlockId): Block = {
     trait BlockMock extends Block {
       override type ConsensusDataType = Unit
       override type TransactionDataType = Unit
 
       override val uniqueId: BlockId = id
+      override val timestampField: LongBlockField = LongBlockField("timestamp", ts)
     }
     mock[BlockMock]
   }

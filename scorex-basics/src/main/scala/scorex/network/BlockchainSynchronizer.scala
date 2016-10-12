@@ -21,7 +21,8 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
   import BlockchainSynchronizer._
   import Coordinator.SyncFinished._
-  import application.basicMessagesSpecsRepo._
+  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
+  import basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq(SignaturesSpec, BlockMessageSpec)
 

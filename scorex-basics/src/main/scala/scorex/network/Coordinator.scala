@@ -4,7 +4,6 @@ import akka.actor.Actor
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import scorex.app.Application
-import scorex.app.Application.GetStatus
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.mining.BlockGeneratorController.{LastBlockChanged, StartGeneration}
@@ -26,7 +25,8 @@ import scala.util.{Failure, Success, Try}
 class Coordinator(application: Application) extends Actor with ScorexLogging {
 
   import Coordinator._
-  import application.basicMessagesSpecsRepo._
+  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
+  import basicMessagesSpecsRepo._
 
   private lazy val blockchainSynchronizer = application.blockchainSynchronizer
   private lazy val networkControllerRef = application.networkController
@@ -216,4 +216,6 @@ object Coordinator {
   }
 
   private case object BroadcastCurrentScore
+
+  case object GetStatus
 }
