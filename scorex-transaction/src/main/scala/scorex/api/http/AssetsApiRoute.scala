@@ -10,12 +10,12 @@ import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
-import scorex.transaction.{AssetAcc, SimpleTransactionModule, ValidationResult}
-import scorex.transaction.assets.{ReissueTransaction, IssueTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.wallet.{ReissueRequest, IssueRequest, TransferRequest}
+import scorex.transaction.state.wallet.{IssueRequest, ReissueRequest, TransferRequest}
+import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, ValidationResult}
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 
 @Path("/assets")
@@ -65,7 +65,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
       defaultValue = "\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAsset\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
     )
   ))
-  def transfer: Route =  path("transfer") {
+  def transfer: Route = path("transfer") {
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
@@ -75,11 +75,13 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
                 case err: JsError =>
                   WrongTransactionJson(err).response
                 case JsSuccess(request: TransferRequest, _) =>
-                  val txOpt: Option[TransferTransaction] = transactionModule.transferAsset(request, wallet)
+                  val txOpt: Try[TransferTransaction] = transactionModule.transferAsset(request, wallet)
                   txOpt match {
-                    case Some(tx) =>
+                    case Success(tx) =>
                       JsonResponse(tx.json, StatusCodes.OK)
-                    case None =>
+                    case Failure(e: StateCheckFailed) =>
+                      StateCheckFailed.response
+                    case _ =>
                       WrongJson.response
                   }
               }
@@ -106,7 +108,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
       defaultValue = "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
     )
   ))
-  def issue: Route =  path("issue") {
+  def issue: Route = path("issue") {
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
@@ -116,9 +118,9 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
                 case err: JsError =>
                   WrongTransactionJson(err).response
                 case JsSuccess(issue: IssueRequest, _) =>
-                  val txOpt: Option[IssueTransaction] = transactionModule.issueAsset(issue, wallet)
+                  val txOpt: Try[IssueTransaction] = transactionModule.issueAsset(issue, wallet)
                   txOpt match {
-                    case Some(tx) =>
+                    case Success(tx) =>
                       tx.validate match {
                         case ValidationResult.ValidateOke =>
                           JsonResponse(tx.json, StatusCodes.OK)
@@ -141,7 +143,9 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
                         case ValidationResult.TooBigArray =>
                           TooBigArrayAllocation.response
                       }
-                    case None =>
+                    case Failure(e: StateCheckFailed) =>
+                      StateCheckFailed.response
+                    case _ =>
                       WrongJson.response
                   }
               }
@@ -168,7 +172,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
       defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100000,\"reissuable\":false,\"fee\":1}"
     )
   ))
-  def reissue: Route =  path("reissue") {
+  def reissue: Route = path("reissue") {
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
@@ -178,9 +182,9 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
                 case err: JsError =>
                   WrongTransactionJson(err).response
                 case JsSuccess(issue: ReissueRequest, _) =>
-                  val txOpt: Option[ReissueTransaction] = transactionModule.reissueAsset(issue, wallet)
+                  val txOpt: Try[ReissueTransaction] = transactionModule.reissueAsset(issue, wallet)
                   txOpt match {
-                    case Some(tx) =>
+                    case Success(tx) =>
                       tx.validate match {
                         case ValidationResult.ValidateOke =>
                           JsonResponse(tx.json, StatusCodes.OK)
@@ -197,7 +201,9 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
                         case ValidationResult.InvalidSignature =>
                           InvalidSignature.response
                       }
-                    case None =>
+                    case Failure(e: StateCheckFailed) =>
+                      StateCheckFailed.response
+                    case _ =>
                       WrongJson.response
                   }
               }
@@ -207,7 +213,6 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
       }
     }
   }
-
 
 
   private def balanceJson(address: String, assetIdStr: String): JsonResponse = {
