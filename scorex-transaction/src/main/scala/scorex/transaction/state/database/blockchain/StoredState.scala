@@ -222,12 +222,11 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       val nb = calcNewBalances(transactions, Map.empty)
       val negativeBalances: Map[AssetAcc, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
       val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
-        val accTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
-          .map(_.asInstanceOf[PaymentTransaction]).filter(_.sender.address == b._1.account.address)
+        val accAssetTransactions = transactions.filter(_.balanceChanges().exists(_.assetAcc == b._1))
         var sumBalance = b._2._1.balance
-        accTransactions.sortBy(-_.amount).takeWhile { t =>
+        accAssetTransactions.sortBy(-_.balanceChanges().filter(_.assetAcc == b._1).map(_.delta).sum).takeWhile { t =>
           val prevSum = sumBalance
-          sumBalance = sumBalance + t.amount + t.fee
+          sumBalance = sumBalance + t.balanceChanges().filter(_.assetAcc == b._1).map(_.delta).sum
           prevSum < 0
         }
       }
