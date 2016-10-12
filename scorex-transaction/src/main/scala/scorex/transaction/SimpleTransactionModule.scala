@@ -138,7 +138,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     }
   }
 
-  def transferAsset(request: TransferRequest, wallet: Wallet): Option[TransferTransaction] = Try {
+  def transferAsset(request: TransferRequest, wallet: Wallet): Try[TransferTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
 
     val transfer: TransferTransaction = TransferTransaction.create(request.assetIdOpt.map(s => Base58.decode(s).get),
@@ -151,11 +151,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       Base58.decode(request.attachment).get)
 
     if (isValid(transfer)) onNewOffchainTransaction(transfer)
-    else log.warn("Invalid transfer transaction generated: " + transfer.json)
+    else throw new StateCheckFailed("Invalid transfer transaction generated: " + transfer.json)
     transfer
-  }.toOption
+  }
 
-  def issueAsset(request: IssueRequest, wallet: Wallet): Option[IssueTransaction] = Try {
+  def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
     val issue = IssueTransaction.create(sender,
       None,
@@ -167,11 +167,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       request.fee,
       getTimestamp)
     if (isValid(issue)) onNewOffchainTransaction(issue)
-    else log.warn("Invalid issue transaction generated: " + issue.json)
+    else throw new StateCheckFailed("Invalid issue transaction generated: " + issue.json)
     issue
-  }.toOption
+  }
 
-  def reissueAsset(request: ReissueRequest, wallet: Wallet): Option[ReissueTransaction] = Try {
+  def reissueAsset(request: ReissueRequest, wallet: Wallet): Try[ReissueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
     val reissue = ReissueTransaction.create(sender,
       Base58.decode(request.assetId).get,
@@ -180,9 +180,11 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       request.fee,
       getTimestamp)
     if (isValid(reissue)) onNewOffchainTransaction(reissue)
-    else log.warn("Invalid issue transaction generated: " + reissue.json)
+    else throw new StateCheckFailed("Invalid reissue transaction generated: " + reissue.json)
     reissue
-  }.toOption
+  }
+
+
 
   private var txTime: Long = 0
 

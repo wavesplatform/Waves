@@ -11,4 +11,5 @@ object ValidationResult extends Enumeration {
   val TooBigArray = Value(6)
   val InvalidSignature = Value(7)
   val InvalidName = Value(8)
+  val StateCheckFailed = Value(9)
 }
