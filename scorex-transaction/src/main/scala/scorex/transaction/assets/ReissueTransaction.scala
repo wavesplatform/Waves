@@ -19,8 +19,6 @@ case class ReissueTransaction(sender: PublicKeyAccount,
                               timestamp: Long,
                               signature: Array[Byte]) extends IssueReissueI {
 
-  import IssueTransaction._
-
   override val transactionType: TransactionType.Value = TransactionType.ReissueTransaction
 
   lazy val toSign: Array[Byte] = Bytes.concat(sender.publicKey, assetId, Longs.toByteArray(quantity),
@@ -50,7 +48,7 @@ case class ReissueTransaction(sender: PublicKeyAccount,
       ValidationResult.InvalidAddress
     } else if (quantity <= 0) {
       ValidationResult.NegativeAmount
-    } else if (fee < MinFee) {
+    } else if (fee <= 0) {
       ValidationResult.InsufficientFee
     } else if (!signatureValid) {
       ValidationResult.InvalidSignature
