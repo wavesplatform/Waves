@@ -273,9 +273,9 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.signatureValid && tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
+      tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
     case tx: TransferTransaction =>
-      tx.signatureValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: IssueTransaction =>
       val reissueValid: Boolean = tx.assetIdOpt.forall { assetId =>
         lazy val initialIssue: Option[IssueTransaction] = Option(transactionsMap.get(assetId))
@@ -285,7 +285,12 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: ReissueTransaction =>
-      val reissueValid: Boolean = Option(reissubleIndex.get(tx.assetId)).getOrElse(false)
+      val reissueValid: Boolean = {
+        lazy val sameSender = Option(transactionsMap.get(tx.assetId))
+          .flatMap(b => IssueTransaction.parseBytes(b).toOption).exists(_.sender.address == tx.sender.address)
+        lazy val reissuable = Option(reissubleIndex.get(tx.assetId)).getOrElse(false)
+        sameSender && reissuable
+      }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0

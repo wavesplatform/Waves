@@ -152,7 +152,6 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
     }
   }
 
-
   private def balanceJson(address: String, assetIdStr: String): JsonResponse = {
     val account = new Account(address)
     Base58.decode(assetIdStr) match {

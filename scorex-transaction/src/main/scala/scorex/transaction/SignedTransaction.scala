@@ -9,7 +9,7 @@ trait SignedTransaction extends TypedTransaction {
 
   val signature: Array[Byte]
   val sender: PublicKeyAccount
-  lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
+  protected lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
   override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
 
 }
