@@ -7,9 +7,10 @@ import scorex.consensus.{ConsensusModule, OneGeneratorConsensusModule, PoSConsen
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
-
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
 import scala.util.{Failure, Try}
+import scorex.crypto.encode.Base58
 
 
 class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
@@ -33,16 +34,21 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
   private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
-  override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = Try {
-
+  override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = try {
     val blockTime = block.timestampField.value
 
     require((blockTime - NTP.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
 
     val history = transactionModule.blockStorage.history
 
-    val parent = history.parent(block).get
-    val parentHeight = history.heightOf(parent.uniqueId).get
+    val parentOpt = history.parent(block)
+    require(parentOpt.isDefined, s"Can't find parent block with id '${Base58.encode(block.referenceField.value)}' of block " +
+      s"'${Base58.encode(block.uniqueId)}'")
+
+    val parent = parentOpt.get
+    val parentHeightOpt = history.heightOf(parent.uniqueId)
+    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${Base58.encode(block.referenceField.value)}' height")
+    val parentHeight = parentHeightOpt.get
 
     val prevBlockData = consensusBlockData(parent)
     val blockData = consensusBlockData(block)
@@ -61,12 +67,16 @@ with OneGeneratorConsensusModule with ScorexLogging {
       s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
 
     //check hit < target
-    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, generatingBalance(generator, Some(parentHeight)))
-
-  } recoverWith { case t =>
-    log.error("Error while checking a block", t)
-    Failure(t)
-  } getOrElse false
+    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, generatingBalance(generator, Some(
+      parentHeight)))
+  } catch {
+    case e: IllegalArgumentException =>
+      log.error("Error while checking a block", e)
+      false
+    case NonFatal(t) =>
+      log.error("Fatal error while checking a block", t)
+      throw t
+  }
 
   override def generateNextBlock[TT](account: PrivateKeyAccount)
                                     (implicit tm: TransactionModule[TT]): Option[Block] = {
@@ -117,7 +127,6 @@ with OneGeneratorConsensusModule with ScorexLogging {
         unconfirmed,
         account))
     } else None
-
   }
 
   override def nextBlockGenerationTime(block: Block, account: PublicKeyAccount)
@@ -225,7 +234,6 @@ with OneGeneratorConsensusModule with ScorexLogging {
     case m => throw new AssertionError(s"Only NxtLikeConsensusBlockData is available, $m given")
   }
 }
-
 
 object NxtLikeConsensusModule {
   val BaseTargetLength = 8
