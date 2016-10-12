@@ -226,7 +226,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
         var sumBalance = b._2._1.balance
         accAssetTransactions.sortBy(-_.balanceChanges().filter(_.assetAcc == b._1).map(_.delta).sum).takeWhile { t =>
           val prevSum = sumBalance
-          sumBalance = sumBalance + t.balanceChanges().filter(_.assetAcc == b._1).map(_.delta).sum
+          sumBalance = sumBalance - t.balanceChanges().filter(_.assetAcc == b._1).map(_.delta).sum
           prevSum < 0
         }
       }
