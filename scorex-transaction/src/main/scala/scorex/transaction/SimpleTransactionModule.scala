@@ -15,9 +15,9 @@ import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransacti
 import scorex.transaction.state.wallet.{IssueRequest, Payment, TransferRequest}
 import scorex.utils._
 import scorex.wallet.Wallet
-
 import scala.concurrent.duration._
 import scala.util.Try
+import scala.util.control.NonFatal
 
 @SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -206,10 +206,17 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
 
   /** Check whether tx is valid on current state and not expired yet
     */
-  override def isValid(tx: Transaction): Boolean = {
+  override def isValid(tx: Transaction): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     val notExpired = (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
     notExpired && blockStorage.state.isValid(tx)
+  } catch {
+    case e: UnsupportedOperationException =>
+      log.debug(s"DB can't find last block because of unexpected modification")
+      false
+    case NonFatal(t) =>
+      log.error(s"Unexpected error during validation", t)
+      throw t
   }
 
   override def isValid(block: Block): Boolean = {
