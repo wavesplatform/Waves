@@ -60,8 +60,8 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
     path("address" / Segment) { case address =>
       getJsonRoute {
         val account = new Account(address)
-        val txJsons = state.accountTransactions(account).map(_.json)
-        JsonResponse(Json.arr(txJsons), StatusCodes.OK)
+        val txsJson = state.accountTransactions(account).map(_.json)
+        JsonResponse(Json.arr(txsJson), StatusCodes.OK)
       }
     }
   }

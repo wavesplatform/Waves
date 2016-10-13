@@ -6,7 +6,7 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
-import scorex.transaction.assets.{IssueReissueI, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{AssetIssuance, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
@@ -63,15 +63,15 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   private def setStateHeight(height: Int): Unit = heightMap.put(HeightKey, height)
 
-  private[blockchain] def applyChanges(ch: Map[AssetAcc, (AccState, Reason)]): Unit = synchronized {
+  private[blockchain] def applyChanges(changes: Map[AssetAcc, (AccState, Reason)]): Unit = synchronized {
     setStateHeight(stateHeight + 1)
     val h = stateHeight
-    ch.foreach { ch =>
+    changes.foreach { ch =>
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1.key)).getOrElse(0))
       accountChanges(ch._1.key).put(h, change)
       lastStates.put(ch._1.key, h)
       ch._2._2.foreach {
-        case tx: IssueReissueI =>
+        case tx: AssetIssuance =>
           transactionsMap.put(tx.id, tx.bytes)
           reissubleIndex.put(tx.assetId, tx.reissuable)
           includedTx.put(tx.id, h)

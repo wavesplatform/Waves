@@ -80,10 +80,10 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
       if (tx.sameAssetForFee) {
         newSenderAmountBalance shouldBe newSenderFeeBalance
-        newSenderAmountBalance shouldBe (senderAmountBalance - tx.amount - tx.feeAmount)
+        newSenderAmountBalance shouldBe (senderAmountBalance - tx.amount - tx.fee)
       } else {
         newSenderAmountBalance shouldBe senderAmountBalance - tx.amount
-        newSenderFeeBalance shouldBe senderFeeBalance - tx.feeAmount
+        newSenderFeeBalance shouldBe senderFeeBalance - tx.fee
       }
 
     }
