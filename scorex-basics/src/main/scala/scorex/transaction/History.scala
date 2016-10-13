@@ -28,6 +28,8 @@ trait History {
     */
   def height(): Int
 
+  def blockAt(height: Int): Option[Block]
+
   /**
     * Quality score of a best chain, e.g. cumulative difficulty in case of Bitcoin / Nxt
     * @return

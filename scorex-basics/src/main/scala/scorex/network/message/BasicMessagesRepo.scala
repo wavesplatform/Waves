@@ -9,6 +9,7 @@ import scorex.consensus.ConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.singing.SigningFunctions
 import scorex.crypto.singing.SigningFunctions.Signature
+import scorex.network.{BlockCheckpoint, Checkpoint}
 import scorex.network.message.Message._
 import scorex.transaction.{History, TransactionModule}
 
@@ -75,10 +76,10 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
 
       assert(bytes.length == DataLength + (length * SignatureLength), "Data does not match length")
 
-      (0 to length - 1).map { i =>
+      (0 until length).map { i =>
         val position = DataLength + (i * SignatureLength)
         bytes.slice(position, position + SignatureLength)
-      }.toSeq
+      }
     }
 
     override def serializeData(signatures: Seq[Signature]): Array[Byte] = {
@@ -139,6 +140,37 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
     }
   }
 
+  object CheckpointMessageSpec extends MessageSpec[Checkpoint] {
+    override val messageCode: MessageCode = 100: Byte
+
+    override val messageName: String = "Checkpoint message"
+
+    override def serializeData(checkpoint: Checkpoint): Array[Byte] =
+      Bytes.concat(checkpoint.toSign, checkpoint.signature)
+
+    override def deserializeData(bytes: Array[Byte]): Try[Checkpoint] = Try {
+      val lengthBytes = util.Arrays.copyOfRange(bytes, 0, Ints.BYTES)
+      val length = Ints.fromByteArray(lengthBytes)
+
+      require(length <= Checkpoint.MaxCheckpoints)
+
+      val HeightLength = Ints.BYTES
+      val SignatureLength = EllipticCurveImpl.SignatureLength
+
+      val items = (0 until length).map { i =>
+        val position = lengthBytes.length + (i * (HeightLength + SignatureLength))
+        val heightBytes = util.Arrays.copyOfRange(bytes, position, position + HeightLength)
+        val height = Ints.fromByteArray(heightBytes)
+        val blockSignature = util.Arrays.copyOfRange(bytes, position + HeightLength, position + HeightLength + SignatureLength)
+        BlockCheckpoint(height, blockSignature)
+      }
+
+      val signature = bytes.takeRight(SignatureLength)
+
+      Checkpoint(items, signature)
+    }
+  }
+
   val specs = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
-    GetBlockSpec, BlockMessageSpec, ScoreMessageSpec)
+    GetBlockSpec, BlockMessageSpec, ScoreMessageSpec, CheckpointMessageSpec)
 }

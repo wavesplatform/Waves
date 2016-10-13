@@ -2,12 +2,9 @@ package scorex.transaction
 
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.transaction.History.BlockchainScore
 import scorex.utils.ScorexLogging
 
 trait BlockChain extends History with ScorexLogging {
-
-  def blockAt(height: Int): Option[Block]
 
   def genesisBlock: Option[Block] = blockAt(1)
 

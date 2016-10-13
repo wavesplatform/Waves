@@ -143,6 +143,10 @@ trait Settings extends ScorexLogging {
   lazy val allowedGenerationTimeFromLastBlockInterval = (settingsJSON \ "allowedGenerationTimeFromLastBlockInterval").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultAllowedGenerationTimeFromLastBlockInterval)
 
+  lazy val checkpointSettings = settingsJSON \ "checkpoints"
+  lazy val checkpointPrivateKey = (checkpointSettings \ "privateKey").asOpt[String].flatMap(Base58.decode(_).toOption)
+  lazy val checkpointPublicKey = (checkpointSettings \ "publicKey").asOpt[String].flatMap(Base58.decode(_).toOption)
+
   //NETWORK
   private val DefaultMaxConnections = 30
   private val DefaultConnectionTimeout = 60
