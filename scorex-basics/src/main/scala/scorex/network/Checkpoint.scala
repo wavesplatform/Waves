@@ -8,7 +8,7 @@ import scala.collection.immutable.Stream
 case class BlockCheckpoint(height: Int, signature: Array[Byte])
 
 case class Checkpoint(items: Seq[BlockCheckpoint], signature: Array[Byte]) {
-  lazy val toSign = {
+  def toSign: Array[Byte] = {
     val length = items.size
     val lengthBytes = Ints.toByteArray(length)
 
