@@ -31,6 +31,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
   override lazy val json: JsObject = jsonBase() ++ Json.obj(
     "sender" -> sender.address,
+    "senderPublicKey" -> Base58.encode(sender.publicKey),
     "recipient" -> recipient.address,
     "amount" -> amount
   )
