@@ -102,8 +102,8 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
         val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
 
-      case DataFromPeer(msgId, checkpoint: Checkpoint@unchecked, remote)
-        if msgId == CheckpointMessageSpec.messageCode => handleCheckpoint(checkpoint, remote)
+      case DataFromPeer(msgId, checkpoint: Checkpoint@unchecked, remote) if msgId == CheckpointMessageSpec.messageCode =>
+        handleCheckpoint(checkpoint, remote)
 
       case ConnectedPeers(_) =>
     }
@@ -114,7 +114,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       application.settings.checkpointPublicKey foreach {
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
-            currentCheckpoint = Some(checkpoint)
+            setCurrentChechpoint(checkpoint)
             networkControllerRef ! SendToNetwork(Message(CheckpointMessageSpec, Right(checkpoint), None), BroadcastExceptOf(from))
             makeBlockchainCompliantWith(checkpoint)
           } else {
@@ -122,6 +122,8 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
           }
       }
     }
+
+  private def setCurrentChechpoint(checkpoint: Checkpoint) = { currentCheckpoint = Some(checkpoint) }
 
   private def makeBlockchainCompliantWith(checkpoint: Checkpoint): Unit = {
     val existingItems = checkpoint.items.filter {
@@ -257,6 +259,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
         val historyPoints = Checkpoint.historyPoints(history.height(), application.settings.MaxRollback)
         val items = historyPoints.map(h => BlockCheckpoint(h, history.blockAt(h).get.signerDataField.value.signature))
         val checkpoint = Checkpoint(items, Array()).signedBy(privateKey)
+        setCurrentChechpoint(checkpoint)
         networkControllerRef ! SendToNetwork(Message(CheckpointMessageSpec, Right(checkpoint), None), Broadcast)
       }
   }
