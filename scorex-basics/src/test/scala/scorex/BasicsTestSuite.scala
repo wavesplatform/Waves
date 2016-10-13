@@ -28,5 +28,6 @@ class BasicsTestSuite extends Suites(
   new NetworkListenerSpecification,
   new PeerSynchronizerSpecification,
   new CircularBufferSpecification,
-  new BlockStorageSpecification
+  new BlockStorageSpecification,
+  new CheckpointSpecification
 )

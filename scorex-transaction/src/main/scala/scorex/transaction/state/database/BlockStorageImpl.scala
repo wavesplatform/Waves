@@ -4,7 +4,7 @@ import org.h2.mvstore.MVStore
 import scorex.consensus.ConsensusModule
 import scorex.network.StoredBlockSeq
 import scorex.settings.Settings
-import scorex.transaction.state.database.blockchain.{StoredBlockTree, StoredBlockchain, StoredState}
+import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 import scorex.transaction._
 
 class BlockStorageImpl(settings: TransactionSettings with Settings)
@@ -27,8 +27,6 @@ class BlockStorageImpl(settings: TransactionSettings with Settings)
   override val history: History = settings.history match {
     case s: String if s.equalsIgnoreCase("blockchain") =>
       new StoredBlockchain(db)(consensusModule, transactionModule)
-    case s: String if s.equalsIgnoreCase("blocktree") =>
-      new StoredBlockTree(settings.dataDirOpt, settings.MaxRollback)(consensusModule, transactionModule)
     case s =>
       log.error(s"Unknown history storage: $s. Use StoredBlockchain...")
       new StoredBlockchain(db)(consensusModule, transactionModule)
