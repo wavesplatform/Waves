@@ -37,7 +37,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   )
 
   override lazy val bytes: Array[Byte] = {
-    val typeBytes = Array(TypeId.toByte)
+    val typeBytes = Array(transactionType.id.toByte)
 
     val timestampBytes = Longs.toByteArray(timestamp)
     val amountBytes = Longs.toByteArray(amount)
@@ -77,6 +77,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
 
   override def balanceChanges(): Seq[BalanceChange] =
     Seq(BalanceChange(AssetAcc(sender, None), -amount - fee), BalanceChange(AssetAcc(recipient, None), amount))
+
 }
 
 object PaymentTransaction extends Deser[PaymentTransaction] {

@@ -18,29 +18,29 @@ case class TransferTransaction(assetId: Option[AssetId],
                                amount: Long,
                                timestamp: Long,
                                feeAsset: Option[AssetId],
-                               feeAmount: Long,
+                               fee: Long,
                                attachment: Array[Byte],
                                signature: Array[Byte]) extends SignedTransaction {
   override val transactionType: TransactionType.Value = TransactionType.TransferTransaction
 
   override def balanceChanges(): Seq[BalanceChange] = {
     val recipientCh = BalanceChange(AssetAcc(recipient, assetId), amount)
-    val senderCh = if (sameAssetForFee) Seq(BalanceChange(AssetAcc(sender, assetId), -amount - feeAmount))
-    else Seq(BalanceChange(AssetAcc(sender, assetId), -amount), BalanceChange(AssetAcc(sender, feeAsset), -feeAmount))
+    val senderCh = if (sameAssetForFee) Seq(BalanceChange(AssetAcc(sender, assetId), -amount - fee))
+    else Seq(BalanceChange(AssetAcc(sender, assetId), -amount), BalanceChange(AssetAcc(sender, feeAsset), -fee))
 
     recipientCh +: senderCh
   }
 
   lazy val sameAssetForFee: Boolean = feeAsset.map(fa => assetId.exists(_ sameElements fa)).getOrElse(assetId.isEmpty)
 
-  override val assetFee: (Option[AssetId], Long) = (feeAsset, feeAmount)
+  override val assetFee: (Option[AssetId], Long) = (feeAsset, fee)
 
   lazy val toSign: Array[Byte] = {
     val timestampBytes = Longs.toByteArray(timestamp)
     val amountAssetBytes = assetId.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
     val amountBytes = Longs.toByteArray(amount)
     val feeAssetBytes = feeAsset.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
-    val feeBytes = Longs.toByteArray(feeAmount)
+    val feeBytes = Longs.toByteArray(fee)
 
     Bytes.concat(sender.publicKey, amountAssetBytes, feeAssetBytes, timestampBytes, amountBytes, feeBytes,
       recipient.bytes, arrayWithSize(attachment))
@@ -52,7 +52,7 @@ case class TransferTransaction(assetId: Option[AssetId],
     ValidationResult.TooBigArray
   } else if (amount <= 0) {
     ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
-  } else if (feeAmount <= 0) {
+  } else if (fee <= 0) {
     ValidationResult.InsufficientFee //CHECK IF FEE IS POSITIVE
   } else if (!signatureValid) {
     ValidationResult.InvalidSignature
@@ -67,7 +67,7 @@ case class TransferTransaction(assetId: Option[AssetId],
     "assetId" -> assetId.map(Base58.encode),
     "amount" -> amount,
     "feeAsset" -> feeAsset.map(Base58.encode),
-    "fee" -> feeAmount,
+    "fee" -> fee,
     "timestamp" -> timestamp,
     "attachment" -> Base58.encode(attachment),
     "signature" -> Base58.encode(signature)

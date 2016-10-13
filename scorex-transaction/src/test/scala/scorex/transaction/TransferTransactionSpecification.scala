@@ -16,7 +16,7 @@ class TransferTransactionSpecification extends PropSpec with PropertyChecks with
       recovered.feeAsset.map(_ sameElements transfer.feeAsset.get).getOrElse(transfer.feeAsset.isEmpty) shouldBe true
       recovered.timestamp shouldEqual transfer.timestamp
       recovered.amount shouldEqual transfer.amount
-      recovered.feeAmount shouldEqual transfer.feeAmount
+      recovered.fee shouldEqual transfer.fee
       recovered.recipient.address shouldEqual transfer.recipient.address
 
       recovered.bytes shouldEqual transfer.bytes
@@ -42,7 +42,7 @@ class TransferTransactionSpecification extends PropSpec with PropertyChecks with
     recovered.amount shouldBe amount
     recovered.timestamp shouldBe timestamp
     Base58.encode(recovered.feeAsset.get) shouldEqual "51TkL91ARXU2kBqck2W2GQ8PUuh18hNqW2MEQ9vtjw3N"
-    recovered.feeAmount shouldEqual feeAmount
+    recovered.fee shouldEqual feeAmount
     Base58.encode(recovered.attachment) shouldBe "2ARHupfAZnhTiikJk3o3mFSGUotf"
     Base58.encode(recovered.signature) shouldBe "4s3BuXSF6Fuxh1mUW9pKr1xx9GxhJ3yNsxqtaAejEW39wFBZMkrfy39aJo2JJDfYwu1x11x4tUa9RQPPA1FyGgc7"
     Base58.encode(recovered.id) shouldEqual "6gfZsDyUepu9aDGPtv1nsy4pzWTebZupNv9iduVrLkdD"

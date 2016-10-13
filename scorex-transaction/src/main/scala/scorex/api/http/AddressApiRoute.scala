@@ -278,6 +278,8 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
   }
 
 
+
+
   private def verifyPath(address: String, decode: Boolean) = {
     entity(as[String]) { jsText =>
       withAuth {
@@ -292,16 +294,7 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
                 } else {
                   //DECODE SIGNATURE
                   val msg: Try[Array[Byte]] = if (decode) Base58.decode(m.message) else Success(m.message.getBytes)
-                  (msg, Base58.decode(m.signature), Base58.decode(m.publickey)) match {
-                    case (Failure(_), _, _) => InvalidMessage.response
-                    case (_, Failure(_), _) => InvalidSignature.response
-                    case (_, _, Failure(_)) => InvalidPublicKey.response
-                    case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-                      val account = new PublicKeyAccount(pubKeyBytes)
-                      val isValid = account.address == address &&
-                        EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
-                      JsonResponse(Json.obj("valid" -> isValid), StatusCodes.OK)
-                  }
+                  verifySigned(msg, m.signature, m.publickey, address)
                 }
             }
             case Failure(_) => WrongJson.response
@@ -311,4 +304,15 @@ case class AddressApiRoute(application: RunnableApplication)(implicit val contex
     }
   }
 
+  private def verifySigned(msg: Try[Array[Byte]], signature : String, publicKey : String, address: String) = {
+    (msg, Base58.decode(signature), Base58.decode(publicKey)) match {
+      case (Failure(_), _, _) => InvalidMessage.response
+      case (_, Failure(_), _) => InvalidSignature.response
+      case (_, _, Failure(_)) => InvalidPublicKey.response
+      case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
+        val account = new PublicKeyAccount(pubKeyBytes)
+        val isValid = account.address == address && EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
+        JsonResponse(Json.obj("valid" -> isValid), StatusCodes.OK)
+    }
+  }
 }
