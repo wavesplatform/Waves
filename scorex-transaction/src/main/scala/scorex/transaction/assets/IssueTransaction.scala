@@ -20,13 +20,13 @@ case class IssueTransaction(sender: PublicKeyAccount,
                             reissuable: Boolean,
                             fee: Long,
                             timestamp: Long,
-                            signature: Array[Byte]) extends SignedTransaction {
+                            signature: Array[Byte]) extends IssueReissueI {
 
   import IssueTransaction._
 
   override val transactionType: TransactionType.Value = TransactionType.IssueTransaction
 
-  lazy val assetId = assetIdOpt.getOrElse(id)
+  override lazy val assetId = assetIdOpt.getOrElse(id)
 
   lazy val toSign: Array[Byte] = Bytes.concat(sender.publicKey,
     assetIdOpt.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte)), arrayWithSize(name), arrayWithSize(description),

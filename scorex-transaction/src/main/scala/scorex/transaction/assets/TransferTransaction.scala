@@ -54,6 +54,8 @@ case class TransferTransaction(assetId: Option[AssetId],
     ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
   } else if (feeAmount <= 0) {
     ValidationResult.InsufficientFee //CHECK IF FEE IS POSITIVE
+  } else if (!signatureValid) {
+    ValidationResult.InvalidSignature
   } else ValidationResult.ValidateOke
 
 

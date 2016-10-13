@@ -4,7 +4,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
-import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
+import scorex.transaction.assets.{ReissueTransaction, IssueTransaction, TransferTransaction}
 import scorex.utils.NTP
 
 trait TransactionGen {
@@ -49,7 +49,7 @@ trait TransactionGen {
     matcherFee: Long <- positiveLongGen
   } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
 
-  val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction)] = for {
+  val issueReissueGenerator: Gen[(IssueTransaction, ReissueTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
     assetName <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
     description <- genBoundedBytes(0, IssueTransaction.MaxDescriptionLength)
@@ -60,11 +60,12 @@ trait TransactionGen {
     timestamp <- positiveLongGen
   } yield {
     val issue = IssueTransaction.create(sender, None, assetName, description, quantity, decimals, reissuable, fee, timestamp)
-    val reissue = IssueTransaction.create(sender, Some(issue.assetId), assetName, description, quantity, decimals, reissuable, fee, timestamp)
+    val reissue = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable, fee, timestamp)
     (issue, reissue)
   }
 
   val issueGenerator: Gen[IssueTransaction] = issueReissueGenerator.map(_._1)
+  val reissueGenerator: Gen[ReissueTransaction] = issueReissueGenerator.map(_._2)
 
   val invalidOrderGenerator: Gen[Order] = for {
     sender: PrivateKeyAccount <- accountGen

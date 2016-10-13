@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import scorex.serialization.Deser
-import scorex.transaction.assets.{TransferTransaction, IssueTransaction}
+import scorex.transaction.assets.{ReissueTransaction, TransferTransaction, IssueTransaction}
 
 import scala.util.{Failure, Try}
 
@@ -20,6 +20,7 @@ object TypedTransaction extends Deser[TypedTransaction] {
     val PaymentTransaction = Value(2)
     val IssueTransaction = Value(3)
     val TransferTransaction = Value(4)
+    val ReissueTransaction = Value(5)
   }
 
   def parseBytes(data: Array[Byte]): Try[TypedTransaction] =
@@ -35,6 +36,9 @@ object TypedTransaction extends Deser[TypedTransaction] {
 
       case txType: Byte if txType == TransactionType.TransferTransaction.id =>
         TransferTransaction.parseTail(data.tail)
+
+      case txType: Byte if txType == TransactionType.ReissueTransaction.id =>
+        ReissueTransaction.parseTail(data.tail)
 
       case txType => Failure(new Exception(s"Invalid transaction type: $txType"))
     }

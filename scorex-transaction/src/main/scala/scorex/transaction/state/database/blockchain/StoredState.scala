@@ -6,9 +6,10 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
-import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueReissueI, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
+
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.util.Try
@@ -27,8 +28,9 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   val DataKey = "dataset"
   val LastStates = "lastStates"
   val IncludedTx = "includedTx"
-  //todo put all transactions in the same map
-  val IssueTxs = "IssueTxs"
+  //todo put all transactions in the same map and use links to it
+  val AllTxs = "IssueTxs"
+  val ReissueIndex = "reissuableFlag"
 
   if (db.getStoreVersion > 0) db.rollback()
 
@@ -41,7 +43,17 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     */
   private val includedTx: MVMap[Array[Byte], Int] = db.openMap(IncludedTx, new LogMVMapBuilder[Array[Byte], Int])
 
-  private val issueTxs: MVMap[Array[Byte], Array[Byte]] = db.openMap(IssueTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
+  /**
+    * Transaction Signature -> serialized transaction
+    */
+  private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
+    db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
+
+  /**
+    * Transaction Signature -> serialized transaction
+    */
+  private val reissubleIndex: MVMap[Array[Byte], Boolean] =
+    db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
@@ -58,11 +70,13 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1.key)).getOrElse(0))
       accountChanges(ch._1.key).put(h, change)
       lastStates.put(ch._1.key, h)
-      ch._2._2.foreach { tx =>
-        if (tx.isInstanceOf[IssueTransaction]) {
-          issueTxs.put(tx.id, tx.bytes)
-        }
-        includedTx.put(tx.id, h)
+      ch._2._2.foreach {
+        case tx: IssueReissueI =>
+          transactionsMap.put(tx.id, tx.bytes)
+          reissubleIndex.put(tx.assetId, tx.reissuable)
+          includedTx.put(tx.id, h)
+        case tx =>
+          includedTx.put(tx.id, h)
       }
     }
   }
@@ -208,12 +222,11 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       val nb = calcNewBalances(transactions, Map.empty)
       val negativeBalances: Map[AssetAcc, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
       val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
-        val accTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
-          .map(_.asInstanceOf[PaymentTransaction]).filter(_.sender.address == b._1.account.address)
+        val accAssetTransactions = transactions.filter(_.balanceChanges().exists(_.assetAcc == b._1))
         var sumBalance = b._2._1.balance
-        accTransactions.sortBy(-_.amount).takeWhile { t =>
+        accAssetTransactions.sortBy(-_.balanceChanges().filter(_.assetAcc == b._1).map(_.delta).sum).takeWhile { t =>
           val prevSum = sumBalance
-          sumBalance = sumBalance + t.amount + t.fee
+          sumBalance = sumBalance - t.balanceChanges().filter(_.assetAcc == b._1).map(_.delta).sum
           prevSum < 0
         }
       }
@@ -259,14 +272,23 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.signatureValid && tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
+      tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
     case tx: TransferTransaction =>
-      tx.signatureValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: IssueTransaction =>
       val reissueValid: Boolean = tx.assetIdOpt.forall { assetId =>
-        val initialIssue: Option[IssueTransaction] = Option(issueTxs.get(assetId))
+        lazy val initialIssue: Option[IssueTransaction] = Option(transactionsMap.get(assetId))
           .flatMap(b => IssueTransaction.parseBytes(b).toOption)
-        initialIssue.exists(old => old.reissuable && old.sender.address == tx.sender.address)
+        tx.timestamp < ReissueTimestamp && initialIssue.exists(old => old.reissuable &&
+          old.sender.address == tx.sender.address)
+      }
+      reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+    case tx: ReissueTransaction =>
+      val reissueValid: Boolean = {
+        lazy val sameSender = Option(transactionsMap.get(tx.assetId))
+          .flatMap(b => IssueTransaction.parseBytes(b).toOption).exists(_.sender.address == tx.sender.address)
+        lazy val reissuable = Option(reissubleIndex.get(tx.assetId)).getOrElse(false)
+        sameSender && reissuable
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
@@ -277,6 +299,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   }
 
   val TimestampToCheck = 1474273462000L
+  //Before this timestamp we reissue transactions with Issue transaction
+  val ReissueTimestamp = 1476459220000L
 
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
     if (tx.timestamp < TimestampToCheck)
