@@ -1,10 +1,11 @@
 package scorex.transaction
 
+import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.PublicKeyAccount
-import scorex.transaction.assets.exchange.Order
-import scorex.utils.NTP
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import scorex.utils.{ByteArray, NTP}
 
 class OrderTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -67,6 +68,27 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
       order.copy(maxTimestamp = order.maxTimestamp + 1).isValid(NTP.correctedTime()) shouldBe false
       order.copy(matcherFee = order.matcherFee + 1).isValid(NTP.correctedTime()) shouldBe false
       order.copy(signature = bytes ++ bytes).isValid(NTP.correctedTime()) shouldBe false
+    }
+  }
+
+  property("Buy and Sell orders") {
+    forAll(accountGen, accountGen, assetPairGen, positiveLongGen, positiveLongGen, maxTimeGen) {
+      (sender: PrivateKeyAccount, matcher: PrivateKeyAccount, pair: AssetPair,
+       price: Long, amount: Long, maxTime: Long) =>
+        val buy = Order.buy(sender, matcher, pair, price, amount, maxTime, price)
+        buy.orderType shouldBe OrderType.BUY
+
+        val sell = Order.sell(sender, matcher, pair, price, amount, maxTime, price)
+        sell.orderType shouldBe OrderType.SELL
+    }
+  }
+
+  property("AssetPair test") {
+    forAll(bytes32gen, bytes32gen) { (assetA: Array[Byte], assetB: Array[Byte]) =>
+      whenever(!(assetA sameElements assetB)) {
+        val pair = AssetPair(assetA, assetB)
+        ByteArray.compare(pair.first, pair.second) should be < 0
+      }
     }
   }
 

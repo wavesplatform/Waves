@@ -36,17 +36,9 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   import Order._
 
-  /**
-    * In what assets is price
-    */
-  def priceAssetId: AssetId = if (ByteArray.compare(spendAssetId, receiveAssetId) > 0) receiveAssetId
-  else spendAssetId
+  def assetPair: AssetPair = AssetPair(spendAssetId, receiveAssetId)
 
-  def assetPair: AssetPair = if (ByteArray.compare(spendAssetId, receiveAssetId) > 0)
-    AssetPair(receiveAssetId, spendAssetId)
-  else AssetPair(spendAssetId, receiveAssetId)
-
-  def orderType: OrderType = if (spendAssetId sameElements assetPair.asset1) OrderType.SELL else OrderType.BUY
+  def orderType: OrderType = if (spendAssetId sameElements assetPair.first) OrderType.SELL else OrderType.BUY
 
   def isValid(atTime: Long): Boolean = {
     amount > 0 && price > 0 && maxTimestamp - atTime <= MaxLiveTime && atTime <= maxTimestamp &&
@@ -100,6 +92,20 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 object Order extends Deser[Order] {
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
   private val AssetIdLength = 32
+
+  def buy(sender: PrivateKeyAccount, matcher: PublicKeyAccount, pair: AssetPair,
+          price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {
+    val unsigned = Order(sender, matcher, pair.second, pair.first, price, amount, maxTime, matcherFee, Array())
+    val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
+    unsigned.copy(signature = sig)
+  }
+
+  def sell(sender: PrivateKeyAccount, matcher: PublicKeyAccount, pair: AssetPair,
+          price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {
+    val unsigned = Order(sender, matcher, pair.first, pair.second, price, amount, maxTime, matcherFee, Array())
+    val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
+    unsigned.copy(signature = sig)
+  }
 
   def apply(sender: PrivateKeyAccount, matcher: PublicKeyAccount, spendAssetID: Array[Byte],
             receiveAssetID: Array[Byte], price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {
