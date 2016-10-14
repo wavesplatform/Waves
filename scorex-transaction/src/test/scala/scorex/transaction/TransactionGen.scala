@@ -3,8 +3,8 @@ package scorex.transaction
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
-import scorex.transaction.assets.{ReissueTransaction, IssueTransaction, TransferTransaction}
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderMatch}
+import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.utils.NTP
 
 trait TransactionGen {
@@ -18,6 +18,13 @@ trait TransactionGen {
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue)
+
+  val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
+
+  val assetPairGen: Gen[AssetPair] = for {
+    a: AssetId <- bytes32gen
+    b: AssetId <- bytes32gen
+  } yield AssetPair(a, b)
 
   val paymentGenerator: Gen[PaymentTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
@@ -38,6 +45,8 @@ trait TransactionGen {
     recipient: PrivateKeyAccount <- accountGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment)
 
+  val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
+
   val orderGenerator: Gen[Order] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
@@ -45,7 +54,7 @@ trait TransactionGen {
     receiveAssetID: Array[Byte] <- bytes32gen
     price: Long <- positiveLongGen
     amount: Long <- positiveLongGen
-    maxtTime: Long <- Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
+    maxtTime: Long <- maxTimeGen
     matcherFee: Long <- positiveLongGen
   } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
 
@@ -88,7 +97,7 @@ trait TransactionGen {
     amount1: Long <- positiveLongGen
     amount2: Long <- positiveLongGen
     matchedAmount: Long <- Gen.choose(1L, Math.min(amount1, amount2))
-    maxtTime: Long <- Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
+    maxtTime: Long <- maxTimeGen
     timestamp: Long <- positiveLongGen
     matcherFee: Long <- positiveLongGen
     fee: Long <- positiveLongGen
