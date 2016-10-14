@@ -82,12 +82,16 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   private def ifShouldGenerateNow: Boolean = isLastBlockTsInAllowedToGenerationInterval || isLastBlockIsGenesis
 
-  private def isLastBlockTsInAllowedToGenerationInterval: Boolean = {
+  private def isLastBlockTsInAllowedToGenerationInterval: Boolean = try {
     val lastBlockTimestamp = application.history.lastBlock.timestampField.value
     val currentTime = NTP.correctedTime()
     val doNotGenerateUntilLastBlockTs = currentTime - application.settings.allowedGenerationTimeFromLastBlockInterval
       .toMillis
     lastBlockTimestamp >= doNotGenerateUntilLastBlockTs
+  } catch {
+    case e: UnsupportedOperationException =>
+      log.debug(s"DB can't find last block because of unexpected modification")
+      false
   }
 
   private def isLastBlockIsGenesis: Boolean = application.history.height() == 1
