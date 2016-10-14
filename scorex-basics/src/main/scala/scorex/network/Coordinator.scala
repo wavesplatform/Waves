@@ -151,30 +151,36 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     val parentBlockId = newBlock.referenceField.value
     val local = from.isEmpty
 
-    val isBlockToBeAdded = if (history.contains(newBlock)) {
-      // we have already got the block - skip
-      false
-    } else if (history.contains(parentBlockId)) {
-
-      val lastBlock = history.lastBlock
-
-      if (!lastBlock.uniqueId.sameElements(parentBlockId)) {
-        // someone has happened to be faster and already added a block or blocks after the parent
-        log.debug(s"A child for parent of the block already exists, local=$local: ${newBlock.json}")
-
-        val cmp = application.consensusModule.blockOrdering
-        if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
-          log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
-        }
-
+    val isBlockToBeAdded = try {
+      if (history.contains(newBlock)) {
+        // we have already got the block - skip
         false
+      } else if (history.contains(parentBlockId)) {
 
-      } else true
+        val lastBlock = history.lastBlock
 
-    } else {
-      // the block either has come too early or, if local, too late (e.g. removeAfter() has come earlier)
-      log.debug(s"Parent of the block is not in the history, local=$local: ${newBlock.json}")
-      false
+        if (!lastBlock.uniqueId.sameElements(parentBlockId)) {
+          // someone has happened to be faster and already added a block or blocks after the parent
+          log.debug(s"A child for parent of the block already exists, local=$local: ${newBlock.json}")
+
+          val cmp = application.consensusModule.blockOrdering
+          if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
+            log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
+          }
+
+          false
+
+        } else true
+
+      } else {
+        // the block either has come too early or, if local, too late (e.g. removeAfter() has come earlier)
+        log.debug(s"Parent of the block is not in the history, local=$local: ${newBlock.json}")
+        false
+      }
+    } catch {
+      case e: UnsupportedOperationException =>
+        log.debug(s"DB can't find last block because of unexpected modification")
+        false
     }
 
     if (isBlockToBeAdded) {
@@ -198,7 +204,13 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
     blocks.find(!processNewBlock(_)).foreach { failedBlock =>
       log.warn(s"Can't apply block: ${failedBlock.json}")
-      if (history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)) {
+      if (try {
+        history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)
+      } catch {
+        case e: UnsupportedOperationException =>
+          log.debug(s"DB can't find last block because of unexpected modification")
+          false
+      }) {
         from.foreach(_.blacklist())
       }
     }

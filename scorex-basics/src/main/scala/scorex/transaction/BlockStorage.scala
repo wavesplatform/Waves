@@ -41,7 +41,7 @@ trait BlockStorage extends ScorexLogging {
   }
 
   //Should be used for linear blockchain only
-  def removeAfter(blockId: BlockId): Unit = {
+  def removeAfter(blockId: BlockId): Unit = try {
     history match {
       case h: BlockChain => h.heightOf(blockId) match {
         case Some(height) =>
@@ -53,6 +53,10 @@ trait BlockStorage extends ScorexLogging {
       case _ =>
         // Not available for other option than linear blockchain
     }
+  } catch {
+    case e: UnsupportedOperationException =>
+      log.debug(s"DB can't find last block because of unexpected modification")
+      None
   }
 
   protected[this] val db: MVStore
