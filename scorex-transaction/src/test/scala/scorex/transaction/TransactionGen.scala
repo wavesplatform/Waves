@@ -1,9 +1,12 @@
 package scorex.transaction
 
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalatest.Matchers._
+import org.scalatest.enablers.Containing
+import org.scalatest.matchers.{BeMatcher, MatchResult}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderMatch}
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderMatch, Validation}
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.utils.NTP
 
@@ -87,27 +90,59 @@ trait TransactionGen {
     matcherFee: Long <- Arbitrary.arbitrary[Long]
   } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
 
-  val orderMatchGenerator: Gen[OrderMatch] = for {
+  val orderMatchGenerator: Gen[(OrderMatch, PrivateKeyAccount)] = for {
     sender1: PrivateKeyAccount <- accountGen
     sender2: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
+    assetPair <- assetPairGen
     spendAssetID: Array[Byte] <- bytes32gen
     receiveAssetID: Array[Byte] <- bytes32gen
-    price: Long <- positiveLongGen
-    amount1: Long <- positiveLongGen
-    amount2: Long <- positiveLongGen
-    matchedAmount: Long <- Gen.choose(1L, Math.min(amount1, amount2))
+    price: Long <- maxWavesAnountGen
+    amount1: Long <- maxWavesAnountGen
+    amount2: Long <- maxWavesAnountGen
+    matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2)/2, Math.min(amount1, amount2))
     maxtTime: Long <- maxTimeGen
-    timestamp: Long <- positiveLongGen
-    matcherFee: Long <- positiveLongGen
-    fee: Long <- positiveLongGen
+    matcherFee: Long <- maxWavesAnountGen
   } yield {
-    val o1 = Order(sender1, matcher, spendAssetID, receiveAssetID, price, amount1, maxtTime, matcherFee)
-    val o2 = Order(sender2, matcher, receiveAssetID, spendAssetID, price, amount2, maxtTime, matcherFee)
-    val unsigned = OrderMatch(o1, o2, price, matchedAmount, matcherFee * 2, fee, timestamp, Array())
+    val o1 = Order.buy(sender1, matcher, assetPair, price, amount1, maxtTime, matcherFee)
+    val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, maxtTime, matcherFee)
+    val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
+    val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
+    val unsigned = OrderMatch(o1, o2, price, matchedAmount,
+      buyFee, sellFee, (buyFee + sellFee) / 2, maxtTime - 100, Array())
     val sig = EllipticCurveImpl.sign(matcher, unsigned.toSign)
-    OrderMatch(o1, o2, price, matchedAmount, matcherFee * 2, fee, timestamp, sig)
+    (unsigned.copy(signature = sig), matcher)
   }
 
+  implicit val orderMatchArb: Arbitrary[(OrderMatch, PrivateKeyAccount)] = Arbitrary { orderMatchGenerator }
+  implicit val privateKeyAccArb: Arbitrary[PrivateKeyAccount] = Arbitrary { accountGen }
+
+  def validOrderMatch = orderMatchGenerator.sample.get
+
+  /**
+    * Implicit to support <code>Containing</code> nature of <code>Validation</code>.
+    */
+  implicit val containingNatureOfValidation: Containing[Validation] =
+    new Containing[Validation] {
+      def contains(v: Validation, ele: Any): Boolean =
+        !v.status && v.labels.contains(ele.toString)
+      def containsOneOf(v: Validation, elements: scala.collection.Seq[Any]): Boolean = {
+        !v.status && elements.map(_.toString).map(v.labels.contains).reduce(_ || _)
+      }
+      def containsNoneOf(v: Validation, elements: scala.collection.Seq[Any]): Boolean = {
+        v.status || elements.map(_.toString).map(v.labels.contains).reduce(!_ && !_)
+      }
+  }
+
+  class ValidationMatcher extends BeMatcher[Validation] {
+    def apply(left: Validation): MatchResult =
+      MatchResult(
+        left.status,
+        left.toString + " was invalid",
+        left.toString + " was invalid"
+      )
+  }
+  val valid = new ValidationMatcher
+  val invalid = not (valid)
 
 }
