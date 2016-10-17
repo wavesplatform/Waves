@@ -41,38 +41,6 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     h should be(state.hash)
   }
 
-
-  property("Transaction seq Long overflow") {
-    val TxN: Int = 12
-    val InitialBalance: Long = Long.MaxValue / 8
-    state.applyChanges(Map(testAssetAcc ->(AccState(InitialBalance), List(FeesStateChange(InitialBalance)))))
-    state.balance(testAcc) shouldBe InitialBalance
-
-    val transfers = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
-    transfers.foreach(tx => state.isValid(tx) shouldBe true)
-
-    state.isValid(transfers) shouldBe false
-
-    state.applyChanges(Map(testAssetAcc ->(AccState(0L), List())))
-  }
-
-  property("Amount + fee Long overflow") {
-    val InitialBalance: Long = 100
-    state.applyChanges(Map(testAssetAcc ->(AccState(InitialBalance), List(FeesStateChange(InitialBalance)))))
-    state.balance(testAcc) shouldBe InitialBalance
-
-    val transferTx = genTransfer(Long.MaxValue, Long.MaxValue)
-    (-transferTx.fee - transferTx.amount) should be > 0L
-    state.isValid(transferTx) shouldBe false
-
-    val paymentTx = genTransfer(Long.MaxValue, Long.MaxValue)
-    (-paymentTx.fee - paymentTx.amount) should be > 0L
-    state.isValid(paymentTx) shouldBe false
-
-    state.applyChanges(Map(testAssetAcc ->(AccState(0L), List())))
-
-  }
-
   property("Validate transfer with too big amount") {
     val recipient = new PrivateKeyAccount("recipient account".getBytes)
 
@@ -127,19 +95,8 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
           newSenderAmountBalance shouldBe senderAmountBalance - tx.amount
           newSenderFeeBalance shouldBe senderFeeBalance - tx.fee
         }
+
       }
-    }
-  }
-
-  property("Old style reissue asset") {
-    forAll(issueReissueGenerator) { pair =>
-      val issueTx: IssueTransaction = pair._1
-      val issueTx2: IssueTransaction = pair._2
-      val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
-
-      state.applyChanges(state.calcNewBalances(Seq(issueTx), Map()))
-
-      state.isValid(issueTx2, Int.MaxValue) shouldBe false
     }
   }
 
@@ -186,7 +143,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     withRollbackTest {
       forAll(issueReissueGenerator) { pair =>
         val issueTx: IssueTransaction = pair._1
-        val reissueTx: ReissueTransaction = pair._3
+        val reissueTx: ReissueTransaction = pair._2
         val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map()))
@@ -253,11 +210,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
                                                     balance: Long) =>
         state.balance(testAcc) shouldBe 0
         state.assetBalance(testAssetAcc) shouldBe 0
-        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
         state.balance(testAcc) shouldBe balance
         state.assetBalance(testAssetAcc) shouldBe balance
         state.included(tx).value shouldBe state.stateHeight
-        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq(tx))))
       }
     }
   }
