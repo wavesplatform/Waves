@@ -17,8 +17,10 @@ class BlockStorageImpl(settings: TransactionSettings with Settings)
 
   def createMVStore(fileName: Option[String]): MVStore = {
     settings.dataDirOpt.flatMap(dir => fileName.map(dir + '/' + _)) match {
-      case Some(pathToDataFile) => new MVStore.Builder().fileName(pathToDataFile).compress().open()
-      case None => new MVStore.Builder().open()
+      case Some(pathToDataFile) =>
+        new MVStore.Builder().fileName(pathToDataFile).autoCommitDisabled().compress().open()
+      case None =>
+        new MVStore.Builder().open()
     }
   }
 
