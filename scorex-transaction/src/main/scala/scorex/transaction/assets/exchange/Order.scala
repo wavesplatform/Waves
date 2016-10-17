@@ -13,6 +13,7 @@ import scala.util.Try
 import io.swagger.annotations.ApiModelProperty
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.assets.exchange.OrderType.OrderType
+import Validation.BooleanOperators
 
 object OrderType extends Enumeration {
   type OrderType = Value
@@ -40,9 +41,12 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   def orderType: OrderType = if (spendAssetId sameElements assetPair.first) OrderType.SELL else OrderType.BUY
 
-  def isValid(atTime: Long): Boolean = {
-    amount > 0 && price > 0 && maxTimestamp - atTime <= MaxLiveTime && atTime <= maxTimestamp &&
-      EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
+  def isValid(atTime: Long): Validation = {
+    (amount > 0) :| "amount should be > 0" &&
+      (price > 0) :| "price should be > 0" &&
+      (maxTimestamp - atTime <= MaxLiveTime) :| "maxTimestamp should be earlier than 30 days" &&
+      (atTime <= maxTimestamp) :| "maxTimestamp should be > currentTime" &&
+      EllipticCurveImpl.verify(signature, toSign, sender.publicKey) :| "signature should be valid"
   }
 
   @ApiModelProperty(hidden = true)
