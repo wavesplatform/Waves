@@ -220,10 +220,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
+
   property("Reissue asset") {
     forAll(issueReissueGenerator) { pair =>
       val issueTx: IssueTransaction = pair._1
-      val issueTx2: IssueTransaction = pair._2
+      val reissueTx: ReissueTransaction = pair._2
       val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
       state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
