@@ -31,7 +31,6 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   val applyChanges = PrivateMethod[Unit]('applyChanges)
   val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
 
-
   property("Validate transfer with too big amount") {
 
     val recipient = new PrivateKeyAccount("recipient account".getBytes)
@@ -86,7 +85,18 @@ with PrivateMethodTester with OptionValues with TransactionGen {
         newSenderAmountBalance shouldBe senderAmountBalance - tx.amount
         newSenderFeeBalance shouldBe senderFeeBalance - tx.fee
       }
+    }
+  }
 
+  property("Old style reissue asset") {
+    forAll(issueReissueGenerator) { pair =>
+      val issueTx: IssueTransaction = pair._1
+      val issueTx2: IssueTransaction = pair._2
+      val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
+
+      state.applyChanges(state.calcNewBalances(Seq(issueTx), Map()))
+
+      state.isValid(issueTx2, Int.MaxValue) shouldBe false
     }
   }
 
@@ -128,10 +138,11 @@ with PrivateMethodTester with OptionValues with TransactionGen {
     }
   }
 
+
   property("Reissue asset") {
     forAll(issueReissueGenerator) { pair =>
       val issueTx: IssueTransaction = pair._1
-      val reissueTx: ReissueTransaction = pair._2
+      val reissueTx: ReissueTransaction = pair._3
       val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
       state.applyChanges(state.calcNewBalances(Seq(issueTx), Map()))
