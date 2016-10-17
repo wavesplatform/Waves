@@ -144,9 +144,6 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
           newSenderAmountBalance shouldBe senderAmountBalance - tx.amount
           newSenderFeeBalance shouldBe senderFeeBalance - tx.fee
         }
-      }
-    }
-  }
 
   property("Transfer asset without balance should fails") {
     withRollbackTest {
@@ -331,11 +328,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       withRollbackTest {
         state.balance(testAcc) shouldBe 0
         state.assetBalance(testAssetAcc) shouldBe 0
-        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
         state.balance(testAcc) shouldBe balance
         state.assetBalance(testAssetAcc) shouldBe balance
         state.included(tx).value shouldBe state.stateHeight
-        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq(tx))))
       }
     }
   }
