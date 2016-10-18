@@ -139,7 +139,7 @@ trait TransactionGen {
       MatchResult(
         left.status,
         left.toString + " was invalid",
-        left.toString + " was invalid"
+        left.toString + " was valid"
       )
   }
   val valid = new ValidationMatcher
