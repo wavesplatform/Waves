@@ -10,14 +10,16 @@ import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
-import scorex.transaction.assets.{ReissueTransaction, IssueTransaction, TransferTransaction}
+import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
-import scorex.transaction.state.wallet.{ReissueRequest, IssueRequest, Payment, TransferRequest}
+import scorex.transaction.state.wallet.{IssueRequest, Payment, ReissueRequest, TransferRequest}
 import scorex.utils._
 import scorex.wallet.Wallet
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
+
+import scorex.transaction.assets.exchange.{Order, OrderMatch}
 
 @SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -199,6 +201,15 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
     if (isValid(payment)) onNewOffchainTransaction(payment)
     payment
+  }
+
+  def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
+                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, wallet: Wallet): Try[OrderMatch] = Try {
+    val matcher = wallet.privateKeyAccount(buyOrder.matcher.address).get
+    val om = OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp)
+    if (isValid(om)) onNewOffchainTransaction(om)
+    else throw new StateCheckFailed("Invalid ordermatch transaction  generated: " + om.json)
+    om
   }
 
   override def genesisData: BlockField[StoredInBlock] = {

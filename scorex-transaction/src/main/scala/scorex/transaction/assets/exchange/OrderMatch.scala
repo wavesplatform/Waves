@@ -4,10 +4,12 @@ import scala.util.Try
 
 import com.google.common.primitives.{Ints, Longs}
 import play.api.libs.json.{JsObject, Json}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser}
+import scorex.transaction.TypedTransaction.TransactionType
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.BooleanOperators
 
@@ -17,11 +19,15 @@ import scorex.transaction.assets.exchange.Validation.BooleanOperators
   */
 case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
                       sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte])
-  extends Transaction with BytesSerializable {
+  extends SignedTransaction with BytesSerializable {
 
-  override val id: Array[Byte] = FastCryptographicHash(toSign)
+  override val transactionType: TransactionType.Value = TransactionType.OrderMatchTransaction
+
+  override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
+
+  override val sender: PublicKeyAccount = buyOrder.matcher
 
   def isValid(previousMatches: Seq[OrderMatch]): Validation =  {
     lazy val buyTransactions = previousMatches.filter { om =>
@@ -55,9 +61,6 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
       feeTotal <= BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
     }
 
-    lazy val matcherSignatureIsValid: Boolean =
-      EllipticCurveImpl.verify(signature, toSign, buyOrder.matcher.publicKey)
-
     (fee > 0) :| "fee should be > 0" &&
       (amount > 0) :| "amount should be > 0" &&
       (price > 0) :| "price should be > 0" &&
@@ -72,7 +75,7 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
       (fee < buyMatcherFee + sellMatcherFee) :| "fee should be < buyMatcherFee + sellMatcherFee" &&
       isFeeValid(buyFeeTotal, buyTotal, buyOrder.matcherFee, buyOrder.amount) :| "buyMatcherFee should be valid" &&
       isFeeValid(sellFeeTotal, sellTotal, sellOrder.matcherFee, sellOrder.amount) :| "sellMatcherFee should be valid" &&
-      matcherSignatureIsValid :|  "matcherSignatureIsValid should be valid"
+      signatureValid :|  "matcherSignatureIsValid should be valid"
   }
 
   lazy val toSign: Array[Byte] = Ints.toByteArray(buyOrder.bytes.length) ++ Ints.toByteArray(sellOrder.bytes.length) ++
@@ -97,17 +100,17 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
   override def balanceChanges(): Seq[BalanceChange] = {
 
     val matcherChange = Seq(BalanceChange(AssetAcc(buyOrder.matcher, None), buyMatcherFee + sellMatcherFee - fee))
-    val o1feeChange = Seq(BalanceChange(AssetAcc(buyOrder.sender, None), buyOrder.matcherFee * amount / buyOrder.amount))
-    val o2feeChange = Seq(BalanceChange(AssetAcc(sellOrder.sender, None), sellOrder.matcherFee * amount / sellOrder.amount))
+    val buyFeeChange = Seq(BalanceChange(AssetAcc(buyOrder.sender, None), -buyMatcherFee))
+    val sellFeeChange = Seq(BalanceChange(AssetAcc(sellOrder.sender, None), -sellMatcherFee))
 
     val exchange = Seq(
-      (buyOrder.sender, (buyOrder.spendAssetId, -amount * price / PriceConstant)),
-      (buyOrder.sender, (buyOrder.receiveAssetId, amount)),
-      (sellOrder.sender, (sellOrder.spendAssetId, -amount * price / PriceConstant)),
-      (sellOrder.sender, (sellOrder.receiveAssetId, amount))
+      (buyOrder.sender, (buyOrder.spendAssetId, -amount)),
+      (buyOrder.sender, (buyOrder.receiveAssetId, (BigInt(amount) * Order.PriceConstant / price).longValue())),
+      (sellOrder.sender, (sellOrder.receiveAssetId, amount)),
+      (sellOrder.sender, (sellOrder.spendAssetId, (-BigInt(amount) * Order.PriceConstant / price).longValue()))
     )
 
-    o1feeChange ++ o2feeChange ++ matcherChange ++
+    buyFeeChange ++ sellFeeChange ++ matcherChange ++
       exchange.map(c => BalanceChange(AssetAcc(c._1, Some(c._2._1)), c._2._2))
   }
 }
@@ -127,5 +130,12 @@ object OrderMatch extends Deser[OrderMatch] {
     val timestamp = Longs.fromByteArray(bytes.slice(s + 40, s + 48))
     val signature = bytes.slice(s + 48, bytes.length)
     OrderMatch(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
+  }
+
+  def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
+             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): OrderMatch = {
+    val unsigned = OrderMatch(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, Array())
+    val sig = EllipticCurveImpl.sign(matcher, unsigned.toSign)
+    unsigned.copy(signature = sig)
   }
 }

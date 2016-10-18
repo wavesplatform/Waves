@@ -160,4 +160,11 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     result2.get shouldBe tx4
   }
 
+  test("valid order match transaction with fully executed orders") {
+    application.wallet.privateKeyAccounts().map(AssetAcc(_, None)).map(state.assetBalance(_)).foreach(println)
+    val wavesBal = state.assetBalance(AssetAcc(acc, None))
+    val bal2 = state.assetBalance(AssetAcc(new Account("3MbWTyn6Tg7zL6XbdN8TLcFMfhWX77hKcmc"), None))
+    val bal3 = state.assetBalance(AssetAcc(new Account("3Mn3UAtrpGY3cwiqLYf973q29oDR2LpnMYv"), None))
+    wavesBal should be > 0L
+  }
 }
