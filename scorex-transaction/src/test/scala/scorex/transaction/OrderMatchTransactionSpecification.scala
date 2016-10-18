@@ -9,28 +9,13 @@ import scorex.utils._
 
 class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
-  /*
     property("OrderMatch transaction serialization roundtrip") {
-      forAll(orderMatchGenerator) { om: OrderMatch =>
+      forAll {x: (OrderMatch, PrivateKeyAccount) =>
+        val (om, matcher) = x
         val recovered = Order.parseBytes(om.bytes).get
         recovered.bytes shouldEqual om.bytes
       }
     }
-
-    property("OrderMatch generator should generate valid orders") {
-      forAll(orderMatchGenerator) { om: OrderMatch =>
-        om.isValid(Seq()) shouldBe true
-      }
-    }
-
-    property("OrderMatch validation") {
-      forAll(orderMatchGenerator) { om: OrderMatch =>
-        om.isValid(Seq()) shouldBe true
-        om.isValid(Seq(om)) shouldBe false
-        //TODO incorrect price/matcherFee/matcherSignature/NonMatched orders/ amount with partial match
-      }
-    }
-  */
 
   property("OrderMatch balance changes") {
     forAll(accountGen, accountGen, accountGen, assetPairGen) {
@@ -138,6 +123,7 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
     forAll {x: (OrderMatch, PrivateKeyAccount) =>
       val (om, matcher) = x
       om.isValid(Seq()) shouldBe valid
+      om.isValid(Seq(om)) shouldBe not(valid)
 
       signed(om.copy(amount = -1), matcher).isValid(Seq()) should contain ("amount should be > 0")
 
