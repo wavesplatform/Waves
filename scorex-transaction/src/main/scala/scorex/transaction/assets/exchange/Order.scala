@@ -95,7 +95,9 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
 object Order extends Deser[Order] {
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
+  val PriceConstant = 100000000
   private val AssetIdLength = 32
+
 
   def buy(sender: PrivateKeyAccount, matcher: PublicKeyAccount, pair: AssetPair,
           price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {

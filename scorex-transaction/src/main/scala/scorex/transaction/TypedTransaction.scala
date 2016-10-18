@@ -21,6 +21,7 @@ object TypedTransaction extends Deser[TypedTransaction] {
     val IssueTransaction = Value(3)
     val TransferTransaction = Value(4)
     val ReissueTransaction = Value(5)
+    val OrderMatchTransaction = Value(6)
   }
 
   def parseBytes(data: Array[Byte]): Try[TypedTransaction] =

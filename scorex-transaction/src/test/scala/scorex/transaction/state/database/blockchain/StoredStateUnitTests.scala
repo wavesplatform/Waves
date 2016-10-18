@@ -17,6 +17,8 @@ import scorex.utils.ScorexLogging
 import scala.util.Random
 import scala.util.control.NonFatal
 
+import scorex.transaction.assets.exchange.{Order, OrderMatch}
+
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging {
 
@@ -180,6 +182,45 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Old style reissue asset") {
+  def getBalances(a: AssetAcc*): Seq[Long] = {
+    a.map(state.assetBalance(_))
+  }
+
+  property("Order matching") {
+    forAll { x: (OrderMatch, PrivateKeyAccount) =>
+      val (om, matcher) = x
+
+      val pair = om.buyOrder.assetPair
+      val buyer = om.buyOrder.sender
+      val seller = om.sellOrder.sender
+
+      val buyerAcc1 = AssetAcc(buyer, Some(pair.first))
+      val buyerAcc2 = AssetAcc(buyer, Some(pair.second))
+      val sellerAcc1 = AssetAcc(seller, Some(pair.first))
+      val sellerAcc2 = AssetAcc(seller, Some(pair.second))
+      val buyerFeeAcc = AssetAcc(buyer, None)
+      val sellerFeeAcc = AssetAcc(seller, None)
+      val matcherFeeAcc =  AssetAcc(om.buyOrder.matcher, None)
+
+      val Seq(buyerBal1, buyerBal2, sellerBal1, sellerBal2, buyerFeeBal, sellerFeeBal, matcherFeeBal) =
+        getBalances(buyerAcc1, buyerAcc2, sellerAcc1, sellerAcc2, buyerFeeAcc, sellerFeeAcc, matcherFeeAcc)
+
+      state.applyChanges(state.calcNewBalances(Seq(om), Map()))
+
+      val Seq(newBuyerBal1, newBuyerBal2, newSellerBal1, newSellerBal2, newBuyerFeeBal, newSellerFeeBal, newMatcherFeeBal) =
+        getBalances(buyerAcc1, buyerAcc2, sellerAcc1, sellerAcc2, buyerFeeAcc, sellerFeeAcc, matcherFeeAcc)
+
+      newBuyerBal1 should be (buyerBal1 + BigInt(om.amount)*Order.PriceConstant/om.price)
+      newBuyerBal2 should be (buyerBal2 - om.amount)
+      newSellerBal1 should be (sellerBal1 - BigInt(om.amount)*Order.PriceConstant/om.price)
+      newSellerBal2 should be (sellerBal2 + om.amount)
+      newBuyerFeeBal should be (buyerFeeBal - om.buyMatcherFee)
+      newSellerFeeBal should be (sellerFeeBal - om.sellMatcherFee)
+      newMatcherFeeBal should be (matcherFeeBal + om.buyMatcherFee + om.sellMatcherFee - om.fee)
+    }
+  }
+
+  property("Reissue asset") {
     forAll(issueReissueGenerator) { pair =>
       val issueTx: IssueTransaction = pair._1
       val issueTx2: IssueTransaction = pair._2
