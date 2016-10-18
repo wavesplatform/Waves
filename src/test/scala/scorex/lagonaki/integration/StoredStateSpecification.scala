@@ -1,10 +1,13 @@
 package scorex.lagonaki.integration
 
+import scala.util.{Failure, Random}
 import org.scalatest._
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
 import scorex.transaction.state.database.state.AccState
+import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, BalanceSheet, FeesStateChange, PaymentTransaction}
 import scorex.utils.{ScorexLogging, _}
 
@@ -23,7 +26,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   require(acc.address != recipient.address)
 
   test("invalidate transaction with forged signature in sequence") {
-    val amount = state.asInstanceOf[BalanceSheet].balance(acc) / 1000
+    val amount = state.balance(acc) / 1000
     val ts = System.currentTimeMillis()
     val transactions: Seq[PaymentTransaction] = (1 until 100).map { i =>
       PaymentTransaction(acc, recipient, amount, i, ts + i)
@@ -44,7 +47,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   test("balance confirmations") {
     val rec = new PrivateKeyAccount(randomBytes())
-    val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc)
+    val senderBalance = state.balance(acc)
     state.balance(rec) shouldBe 0L
     senderBalance should be > 100L
 
@@ -90,7 +93,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   }
 
   test("validate single transaction") {
-    val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc)
+    val senderBalance = state.balance(acc)
     senderBalance should be > 0L
     val nonValid = transactionModule.createPayment(acc, recipient, senderBalance, 1)
     state.isValid(nonValid) shouldBe false
@@ -100,17 +103,39 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   }
 
   test("double spending") {
-    val senderBalance = state.asInstanceOf[BalanceSheet].balance(acc)
+    val senderBalance = state.balance(acc)
     val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recipient, senderBalance / 2, 1))
     doubleSpending.foreach(t => state.isValid(t) shouldBe true)
     state.isValid(doubleSpending) shouldBe false
     state.validate(doubleSpending).size shouldBe 1
+    state.processBlock(new BlockMock(doubleSpending)) should be('failure)
+  }
+
+  test("many transactions") {
+    val senderBalance = state.balance(acc)
+
+    val receipements = Seq(
+      new PrivateKeyAccount(Array(34.toByte, 1.toByte)),
+      new PrivateKeyAccount(Array(1.toByte, 23.toByte))
+    )
+
+    val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), application.wallet).get
+    state.processBlock(new BlockMock(Seq(issueAssetTx))) should be('success)
+    val assetId = Some(Base58.encode(issueAssetTx.assetId))
+
+    val txs = receipements.flatMap(r => Seq.fill(10)(transactionModule.transferAsset(TransferRequest(assetId, None, 10, 1, acc.address, "123", r.address), application.wallet).get))
+
+    val shuffledTxs = Random.shuffle(txs)
+
+    state.processBlock(new BlockMock(shuffledTxs)) should be('success)
+
+    receipements.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be (100))
+
+    state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be (999800)
   }
 
   test("validate plenty of transactions") {
-    val trans = (1 to transactionModule.utxStorage.sizeLimit).map { i =>
-      genValidTransaction()
-    }
+    val trans = Seq.fill(transactionModule.utxStorage.sizeLimit)(genValidTransaction())
     profile(state.validate(trans)) should be < 1000L
     state.validate(trans).size should be <= trans.size
   }
@@ -125,7 +150,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   }
 
   test("last transaction of account one block behind") {
-    val amount = state.asInstanceOf[BalanceSheet].balance(acc) / 1000
+    val amount = state.balance(acc) / 1000
     val tx1 = transactionModule.createPayment(acc, recipient, amount, 1)
     state.isValid(tx1) shouldBe true
     val tx2 = transactionModule.createPayment(acc, recipient, amount, 2)
@@ -140,7 +165,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   }
 
   test("last transaction of account few blocks behind") {
-    val amount = state.asInstanceOf[BalanceSheet].balance(acc) / 1000
+    val amount = state.balance(acc) / 1000
     val tx1 = transactionModule.createPayment(acc, recipient, amount, 1)
     val tx2 = transactionModule.createPayment(acc, recipient, amount, 2)
     val block1 = new BlockMock(Seq(tx2, tx1))
