@@ -127,7 +127,10 @@ class StoredState(val db: MVStore) extends LagonakiState with ScorexLogging with
           tx.balanceChanges().foldLeft(changes) { case (iChanges, bc) =>
             //update balances sheet
             val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
-            iChanges.updated(bc.assetAcc, (AccState(currentChange._1.balance + bc.delta), tx +: currentChange._2))
+            val newBalance = if (currentChange._1.balance == Long.MinValue) Long.MinValue
+            else Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
+
+            iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
           }
 
         case m =>
