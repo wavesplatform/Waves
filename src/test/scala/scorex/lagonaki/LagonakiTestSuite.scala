@@ -2,7 +2,7 @@ package scorex.lagonaki
 
 import org.scalatest.{BeforeAndAfterAll, Sequential}
 import scorex.lagonaki.TestingCommons._
-import scorex.lagonaki.integration._
+import scorex.lagonaki.integration.ValidChainGenerationSpecification
 import scorex.lagonaki.integration.api._
 import scorex.lagonaki.unit._
 import scorex.transaction.state.StateTest
@@ -24,11 +24,12 @@ class LagonakiTestSuite extends Sequential(
   , new BlockSpecification
   , new WalletSpecification
   , new StateTest
-  , new StoredStateSpecification
   , new SimpleTransactionModuleSpecification
+
 
   //integration tests - slow!
   , new ValidChainGenerationSpecification
+  , new StoredStateSpecification
 
 ) with BeforeAndAfterAll {
 
