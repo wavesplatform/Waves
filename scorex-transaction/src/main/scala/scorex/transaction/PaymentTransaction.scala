@@ -58,6 +58,8 @@ case class PaymentTransaction(sender: PublicKeyAccount,
       ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
       ValidationResult.InsufficientFee //CHECK IF FEE IS POSITIVE
+    } else if (Try(Math.addExact(amount, fee)).isFailure) {
+      ValidationResult.OverflowError // CHECK THAT fee+amount won't overflow Long
     } else if (!signatureValid) {
       ValidationResult.InvalidSignature
     } else ValidationResult.ValidateOke
