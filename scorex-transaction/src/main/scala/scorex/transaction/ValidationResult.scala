@@ -12,4 +12,5 @@ object ValidationResult extends Enumeration {
   val InvalidSignature = Value(7)
   val InvalidName = Value(8)
   val StateCheckFailed = Value(9)
+  val OverflowError = Value(10)
 }

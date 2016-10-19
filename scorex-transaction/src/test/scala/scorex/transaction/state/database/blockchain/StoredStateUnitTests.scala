@@ -12,7 +12,7 @@ import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, Transfer
 import scorex.transaction.state.database.state._
 import scorex.utils.NTP
 
-import scala.util.Random
+import scala.util.{Try, Random}
 
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
 

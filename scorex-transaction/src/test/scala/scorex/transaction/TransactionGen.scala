@@ -20,7 +20,7 @@ trait TransactionGen {
   }
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
-  val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue)
+  val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
 
   val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
 
