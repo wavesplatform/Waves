@@ -17,7 +17,7 @@ import scala.util.Random
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
 
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
-with PrivateMethodTester with OptionValues with TransactionGen {
+  with PrivateMethodTester with OptionValues with TransactionGen {
 
   val folder = "/tmp/scorex/test/"
   new File(folder).mkdirs()
@@ -95,7 +95,8 @@ with PrivateMethodTester with OptionValues with TransactionGen {
           None, fee, Array())
         state.isValid(invalidtx) shouldBe false
 
-        state.applyChanges(Map(testAssetAcc ->(AccState(0L), List(tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))))
+
       }
     }
   }
@@ -119,12 +120,13 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
         newRecipientAmountBalance shouldBe (recipientAmountBalance + tx.amount)
 
-      if (tx.sameAssetForFee) {
-        newSenderAmountBalance shouldBe newSenderFeeBalance
-        newSenderAmountBalance shouldBe (senderAmountBalance - tx.amount - tx.fee)
-      } else {
-        newSenderAmountBalance shouldBe senderAmountBalance - tx.amount
-        newSenderFeeBalance shouldBe senderFeeBalance - tx.fee
+        if (tx.sameAssetForFee) {
+          newSenderAmountBalance shouldBe newSenderFeeBalance
+          newSenderAmountBalance shouldBe (senderAmountBalance - tx.amount - tx.fee)
+        } else {
+          newSenderAmountBalance shouldBe senderAmountBalance - tx.amount
+          newSenderFeeBalance shouldBe senderFeeBalance - tx.fee
+        }
       }
     }
   }
@@ -184,7 +186,7 @@ with PrivateMethodTester with OptionValues with TransactionGen {
     withRollbackTest {
       forAll(issueReissueGenerator) { pair =>
         val issueTx: IssueTransaction = pair._1
-        val reissueTx: ReissueTransaction = pair._2
+        val reissueTx: ReissueTransaction = pair._3
         val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map()))
@@ -251,24 +253,24 @@ with PrivateMethodTester with OptionValues with TransactionGen {
                                                     balance: Long) =>
         state.balance(testAcc) shouldBe 0
         state.assetBalance(testAssetAcc) shouldBe 0
-        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
         state.balance(testAcc) shouldBe balance
         state.assetBalance(testAssetAcc) shouldBe balance
         state.included(tx).value shouldBe state.stateHeight
-        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq(tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))))
       }
     }
   }
 
   property("Reopen state") {
     val balance = 1234L
-    state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(balance), Seq(FeesStateChange(balance)))))
+    state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance)))))
     state.balance(testAcc) shouldBe balance
     db.close()
 
     val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open())
     state2.balance(testAcc) shouldBe balance
-    state2 invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq())))
+    state2 invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq())))
   }
 
   private var txTime: Long = 0
