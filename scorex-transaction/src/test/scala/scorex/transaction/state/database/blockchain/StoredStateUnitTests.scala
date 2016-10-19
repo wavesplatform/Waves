@@ -6,10 +6,12 @@ import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import scorex.account.PrivateKeyAccount
+import scorex.account.{Account, PrivateKeyAccount}
 import scorex.transaction._
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
+import scorex.utils.NTP
+
 import scala.util.Random
 
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
@@ -31,8 +33,40 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   val applyChanges = PrivateMethod[Unit]('applyChanges)
   val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
 
-  property("Validate transfer with too big amount") {
 
+  property("Transaction seq Long overflow") {
+    val TxN: Int = 12
+    val InitialBalance: Long = Long.MaxValue / 8
+    state.applyChanges(Map(testAssetAcc ->(AccState(InitialBalance), List(FeesStateChange(InitialBalance)))))
+    state.balance(testAcc) shouldBe InitialBalance
+
+    val transfers = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
+    transfers.foreach(tx => state.isValid(tx) shouldBe true)
+    state.calcNewBalances(transfers, Map()).foreach(_._2._1.balance should be > 0L)
+
+    state.isValid(transfers) shouldBe false
+
+    state.applyChanges(Map(testAssetAcc ->(AccState(0L), List())))
+  }
+
+  property("Amount + fee Long overflow") {
+    val InitialBalance: Long = 100
+    state.applyChanges(Map(testAssetAcc ->(AccState(InitialBalance), List(FeesStateChange(InitialBalance)))))
+    state.balance(testAcc) shouldBe InitialBalance
+
+    val transferTx = genTransfer(Long.MaxValue, Long.MaxValue)
+    (-transferTx.fee - transferTx.amount) should be > 0L
+    state.isValid(transferTx) shouldBe false
+
+    val paymentTx = genTransfer(Long.MaxValue, Long.MaxValue)
+    (-paymentTx.fee - paymentTx.amount) should be > 0L
+    state.isValid(paymentTx) shouldBe false
+
+    state.applyChanges(Map(testAssetAcc ->(AccState(0L), List())))
+
+  }
+
+  property("Validate transfer with too big amount") {
     val recipient = new PrivateKeyAccount("recipient account".getBytes)
 
     forAll(positiveLongGen, positiveLongGen) { (balance: Long, fee: Long) =>
@@ -41,7 +75,7 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
         //set some balance
         val genes = GenesisTransaction(testAcc, balance, 0)
-        state.applyChanges(state.calcNewBalances(Seq(genes), Map()))
+        state.applyChanges(Map(testAssetAcc ->(AccState(genes.amount), List(genes))))
         state.assetBalance(assetAcc) shouldBe balance
 
         //valid transfer
@@ -54,8 +88,7 @@ with PrivateMethodTester with OptionValues with TransactionGen {
           None, fee, Array())
         state.isValid(invalidtx) shouldBe false
 
-        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq(tx))))
-
+        state.applyChanges(Map(testAssetAcc ->(AccState(0L), List(tx))))
       }
     }
   }
@@ -203,11 +236,11 @@ with PrivateMethodTester with OptionValues with TransactionGen {
                                                   balance: Long) =>
       state.balance(testAcc) shouldBe 0
       state.assetBalance(testAssetAcc) shouldBe 0
-      state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
+      state.applyChanges(Map(testAssetAcc ->(AccState(balance), List(FeesStateChange(balance), tx, tx))))
       state.balance(testAcc) shouldBe balance
       state.assetBalance(testAssetAcc) shouldBe balance
       state.included(tx).value shouldBe state.stateHeight
-      state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq(tx))))
+      state.applyChanges(Map(testAssetAcc ->(AccState(0L), List(tx))))
     }
   }
 
@@ -220,6 +253,25 @@ with PrivateMethodTester with OptionValues with TransactionGen {
     val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open())
     state2.balance(testAcc) shouldBe balance
     state2 invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq())))
+  }
+
+  private var txTime: Long = 0
+
+  private def getTimestamp: Long = synchronized {
+    txTime = Math.max(NTP.correctedTime(), txTime + 1)
+    txTime
+  }
+
+  def genTransfer(amount: Long, fee: Long): TransferTransaction = {
+    val recipient = new PrivateKeyAccount(scorex.utils.randomBytes())
+    TransferTransaction.create(None, testAcc, recipient: Account, amount, getTimestamp, None, fee, Array())
+  }
+
+  def genPayment(amount: Long, fee: Long): PaymentTransaction = {
+    val recipient = new PrivateKeyAccount(scorex.utils.randomBytes())
+    val time = getTimestamp
+    val sig = PaymentTransaction.generateSignature(testAcc, recipient, amount, fee, time)
+    new PaymentTransaction(testAcc, recipient, amount, fee, time, sig)
   }
 
 }
