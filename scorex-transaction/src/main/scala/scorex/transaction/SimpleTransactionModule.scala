@@ -234,13 +234,20 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
       throw t
   }
 
-  override def isValid(block: Block): Boolean = {
+  override def isValid(block: Block): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     lazy val txsAreNew = block.transactions.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
     lazy val blockIsValid = blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (!blockIsValid) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs")
     txsAreNew && blockIsValid
+  } catch {
+    case e: UnsupportedOperationException =>
+      log.debug(s"DB can't find last block because of unexpected modification")
+      false
+    case NonFatal(t) =>
+      log.error(s"Unexpected error during validation", t)
+      throw t
   }
 }
 

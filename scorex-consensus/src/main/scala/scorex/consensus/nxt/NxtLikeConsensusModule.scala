@@ -79,7 +79,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
   }
 
   override def generateNextBlock[TT](account: PrivateKeyAccount)
-                                    (implicit tm: TransactionModule[TT]): Option[Block] = {
+                                    (implicit tm: TransactionModule[TT]): Option[Block] = try {
 
     val history = tm.blockStorage.history
 
@@ -127,6 +127,10 @@ with OneGeneratorConsensusModule with ScorexLogging {
         unconfirmed,
         account))
     } else None
+  } catch {
+    case e: UnsupportedOperationException =>
+      log.debug(s"DB can't find last block because of unexpected modification")
+      None
   }
 
   override def nextBlockGenerationTime(block: Block, account: PublicKeyAccount)
