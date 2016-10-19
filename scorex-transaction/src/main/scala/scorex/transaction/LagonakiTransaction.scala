@@ -27,7 +27,7 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
 
   lazy val hasMinimumFee = fee >= MinimumFee
 
-  val TypeId = transactionType.id
+  //val TypeId = transactionType.id
 
   //PARSE/CONVERT
   val dataLength: Int

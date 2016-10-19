@@ -6,7 +6,7 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
-import scorex.transaction.assets.{IssueReissueI, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{AssetIssuance, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
@@ -44,7 +44,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   private val includedTx: MVMap[Array[Byte], Int] = db.openMap(IncludedTx, new LogMVMapBuilder[Array[Byte], Int])
 
   /**
-    * Transaction Signature -> serialized transaction
+    * Transaction ID -> serialized transaction
     */
   private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
     db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
@@ -52,7 +52,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   /**
     * Transaction Signature -> serialized transaction
     */
-  private val reissubleIndex: MVMap[Array[Byte], Boolean] =
+  private val reissuableIndex: MVMap[Array[Byte], Boolean] =
     db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
@@ -63,17 +63,17 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   private def setStateHeight(height: Int): Unit = heightMap.put(HeightKey, height)
 
-  private[blockchain] def applyChanges(ch: Map[AssetAcc, (AccState, Reason)]): Unit = synchronized {
+  private[blockchain] def applyChanges(changes: Map[AssetAcc, (AccState, Reason)]): Unit = synchronized {
     setStateHeight(stateHeight + 1)
     val h = stateHeight
-    ch.foreach { ch =>
+    changes.foreach { ch =>
       val change = Row(ch._2._1, ch._2._2, Option(lastStates.get(ch._1.key)).getOrElse(0))
       accountChanges(ch._1.key).put(h, change)
       lastStates.put(ch._1.key, h)
       ch._2._2.foreach {
-        case tx: IssueReissueI =>
+        case tx: AssetIssuance =>
           transactionsMap.put(tx.id, tx.bytes)
-          reissubleIndex.put(tx.assetId, tx.reissuable)
+          reissuableIndex.put(tx.assetId, tx.reissuable)
           includedTx.put(tx.id, h)
         case tx =>
           includedTx.put(tx.id, h)
@@ -164,15 +164,15 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   def totalBalance: Long = lastStates.keySet().toList.map(address => balanceByKey(address)).sum
 
-  override def accountTransactions(account: Account): Array[LagonakiTransaction] = {
+  override def accountTransactions(account: Account): Array[Transaction] = {
     Option(lastStates.get(account.address)) match {
       case Some(accHeight) =>
         val m = accountChanges(account.address)
-        def loop(h: Int, acc: Array[LagonakiTransaction]): Array[LagonakiTransaction] = Option(m.get(h)) match {
+        def loop(h: Int, acc: Array[Transaction]): Array[Transaction] = Option(m.get(h)) match {
           case Some(heightChangesBytes) =>
             val heightChanges = heightChangesBytes
-            val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[LagonakiTransaction])
-              .map(_.asInstanceOf[LagonakiTransaction])
+            val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[Transaction])
+              .map(_.asInstanceOf[Transaction])
             loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
           case None => acc
         }
@@ -287,7 +287,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       val reissueValid: Boolean = {
         lazy val sameSender = Option(transactionsMap.get(tx.assetId))
           .flatMap(b => IssueTransaction.parseBytes(b).toOption).exists(_.sender.address == tx.sender.address)
-        lazy val reissuable = Option(reissubleIndex.get(tx.assetId)).getOrElse(false)
+        lazy val reissuable = Option(reissuableIndex.get(tx.assetId)).getOrElse(false)
         sameSender && reissuable
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty

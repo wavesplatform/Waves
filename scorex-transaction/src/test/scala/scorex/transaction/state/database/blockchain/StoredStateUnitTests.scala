@@ -79,10 +79,10 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
       if (tx.sameAssetForFee) {
         newSenderAmountBalance shouldBe newSenderFeeBalance
-        newSenderAmountBalance shouldBe (senderAmountBalance - tx.amount - tx.feeAmount)
+        newSenderAmountBalance shouldBe (senderAmountBalance - tx.amount - tx.fee)
       } else {
         newSenderAmountBalance shouldBe senderAmountBalance - tx.amount
-        newSenderFeeBalance shouldBe senderFeeBalance - tx.feeAmount
+        newSenderFeeBalance shouldBe senderFeeBalance - tx.fee
       }
     }
   }
@@ -130,6 +130,31 @@ with PrivateMethodTester with OptionValues with TransactionGen {
       state.applyChanges(newBalances)
       state.assetBalance(assetAcc) shouldBe issueTx.quantity
       state.assetBalance(networkAcc) shouldBe (genes.amount - issueTx.fee)
+    }
+  }
+
+  property("accountTransactions returns IssueTransactions") {
+    forAll(issueGenerator) { issueTx: IssueTransaction =>
+      val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
+      val networkAcc = AssetAcc(issueTx.sender, None)
+      //set some balance
+      val genes = GenesisTransaction(issueTx.sender, issueTx.fee + Random.nextInt, issueTx.timestamp - 1)
+      state.applyChanges(state.calcNewBalances(Seq(genes), Map()))
+      //issue asset
+      val newBalances = state.calcNewBalances(Seq(issueTx), Map())
+      state.applyChanges(newBalances)
+      state.accountTransactions(issueTx.sender).count(_.isInstanceOf[IssueTransaction]) shouldBe 1
+    }
+  }
+
+  property("accountTransactions returns TransferTransactions if fee in base token") {
+    forAll(transferGenerator) { t: TransferTransaction =>
+      val tx = t.copy(feeAsset = None)
+      val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
+      val senderFeeAcc = AssetAcc(tx.sender, tx.feeAsset)
+      val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
+      state.applyChanges(state.calcNewBalances(Seq(tx), Map()))
+      state.accountTransactions(tx.sender).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
     }
   }
 

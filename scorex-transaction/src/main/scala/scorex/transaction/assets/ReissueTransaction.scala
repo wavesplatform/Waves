@@ -17,7 +17,7 @@ case class ReissueTransaction(sender: PublicKeyAccount,
                               reissuable: Boolean,
                               fee: Long,
                               timestamp: Long,
-                              signature: Array[Byte]) extends IssueReissueI {
+                              signature: Array[Byte]) extends AssetIssuance {
 
   override val transactionType: TransactionType.Value = TransactionType.ReissueTransaction
 
@@ -28,6 +28,7 @@ case class ReissueTransaction(sender: PublicKeyAccount,
     "type" -> transactionType.id,
     "id" -> Base58.encode(id),
     "sender" -> sender.address,
+    "senderPublicKey" -> Base58.encode(sender.publicKey),
     "assetId" -> Base58.encode(assetId),
     "quantity" -> quantity,
     "reissuable" -> reissuable,
