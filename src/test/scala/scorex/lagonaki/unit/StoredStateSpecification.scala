@@ -28,7 +28,7 @@ class StoredStateSpecification extends FunSuite with Matchers {
   val state = new StoredState(db)
   state.processBlock(new BlockMock(Seq(GenesisTransaction(accounts.head, 100000000000L, 0))))
 
-  private def issueAsset(request: IssueRequest, wallet: Wallet): IssueTransaction = {
+  private def createIssueAssetTx(request: IssueRequest, wallet: Wallet): IssueTransaction = {
     val sender = wallet.privateKeyAccount(request.sender).get
     IssueTransaction.create(sender,
       None,
@@ -41,7 +41,7 @@ class StoredStateSpecification extends FunSuite with Matchers {
       System.currentTimeMillis())
   }
 
-  def transferAsset(request: TransferRequest, wallet: Wallet): TransferTransaction = {
+  private def createTransferAssetTx(request: TransferRequest, wallet: Wallet): TransferTransaction = {
     val sender = wallet.privateKeyAccount(request.sender).get
     TransferTransaction.create(request.assetIdOpt.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
@@ -53,30 +53,50 @@ class StoredStateSpecification extends FunSuite with Matchers {
       Base58.decode(request.attachment).get)
   }
 
-  test("many transactions") {
+  test("many transfer asset transactions") {
     val acc = accounts.head
-    val senderBalance = state.balance(acc)
+    val startWavesBalance = state.balance(acc)
 
-    val receipements = Seq(
+    val recipients = Seq(
       new PrivateKeyAccount(Array(34.toByte, 1.toByte)),
       new PrivateKeyAccount(Array(1.toByte, 23.toByte))
     )
 
-    val issueAssetTx = issueAsset(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), wallet)
+    val issueAssetTx = createIssueAssetTx(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), wallet)
     state.processBlock(new BlockMock(Seq(issueAssetTx))) should be('success)
     val assetId = Some(Base58.encode(issueAssetTx.assetId))
 
-    val txs = receipements.flatMap(r => Seq.fill(10) {
+    val txs = recipients.flatMap(r => Seq.fill(10) {
       Thread.sleep(1)
-      transferAsset(TransferRequest(assetId, None, 10, 1 , acc.address, "123", r.address), wallet)
+      createTransferAssetTx(TransferRequest(assetId, None, 10, 1, acc.address, "123", r.address), wallet)
     })
 
-    val shuffledTxs = Random.shuffle(txs)
+    state.processBlock(new BlockMock(Random.shuffle(txs))) should be('success)
 
-    state.processBlock(new BlockMock(shuffledTxs)) should be('success)
-
-    receipements.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be (100))
+    recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be (100))
 
     state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be (999800)
+    state.balance(acc) should be (startWavesBalance - 100000000 - 20)
+  }
+
+  test("many transfer waves transactions") {
+    val acc = accounts.head
+    val startWavesBalance = state.balance(acc)
+
+    val recipients = Seq(
+      new PrivateKeyAccount(Array(37.toByte, 1.toByte)),
+      new PrivateKeyAccount(Array(8.toByte, 23.toByte))
+    )
+
+    val txs = recipients.flatMap(r => Seq.fill(10) {
+      Thread.sleep(1)
+      createTransferAssetTx(TransferRequest(None, None, 10, 1, acc.address, "123", r.address), wallet)
+    })
+
+    state.processBlock(new BlockMock(Random.shuffle(txs))) should be('success)
+
+    recipients.foreach(r => state.assetBalance(AssetAcc(r, None)) should be (100))
+
+    state.balance(acc) should be (startWavesBalance - 200 - 20)
   }
 }
