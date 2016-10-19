@@ -233,7 +233,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   private var txTime: Long = 0
 
   private def getTimestamp: Long = synchronized {
-    txTime = Math.max(NTP.correctedTime(), txTime + 1)
+    txTime = Math.max(System.currentTimeMillis(), txTime + 1)
     txTime
   }
 
