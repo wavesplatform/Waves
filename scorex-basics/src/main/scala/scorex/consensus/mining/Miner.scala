@@ -58,7 +58,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
   protected def preciseTime: Long = NTP.correctedTime()
 
-  private def scheduleBlockGeneration(): Unit = {
+  private def scheduleBlockGeneration(): Unit = try {
     val schedule = if (application.settings.tflikeScheduling) {
       val lastBlock = application.history.lastBlock
       val currentTime = preciseTime
@@ -81,6 +81,9 @@ class Miner(application: Application) extends Actor with ScorexLogging {
     }
 
     currentState = Some(tasks)
+  } catch {
+    case e: UnsupportedOperationException =>
+      log.debug(s"DB can't find last block because of unexpected modification")
   }
 
   private def cancel(): Unit = {

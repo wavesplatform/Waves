@@ -9,5 +9,11 @@ case class AssetAcc(account: Account, assetId: Option[AssetId]) {
     case None => account.address
     case Some(id) => account.address + Base58.encode(id)
   }
+
+  override def hashCode(): Int = key.hashCode
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case a: AssetAcc => key.equals(a.key)
+    case _ => false
+  }
 }
 
