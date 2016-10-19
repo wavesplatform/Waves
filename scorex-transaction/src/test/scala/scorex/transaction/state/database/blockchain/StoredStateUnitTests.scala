@@ -12,7 +12,7 @@ import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, Transfer
 import scorex.transaction.state.database.state._
 import scorex.utils.NTP
 
-import scala.util.{Try, Random}
+import scala.util.Random
 
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
 with PrivateMethodTester with OptionValues with TransactionGen {
@@ -40,7 +40,6 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
     val transfers = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
     transfers.foreach(tx => state.isValid(tx) shouldBe true)
-    state.calcNewBalances(transfers, Map()).foreach(_._2._1.balance should be > 0L)
 
     state.isValid(transfers) shouldBe false
 
