@@ -1,19 +1,20 @@
 package scorex.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
+
 import akka.actor._
-import akka.pattern._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
+import akka.pattern._
 import akka.util.Timeout
 import scorex.app.RunnableApplication
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager
 import scorex.utils.ScorexLogging
+
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
 
@@ -70,8 +71,9 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
         log.error("Declared address validation failed: ", t)
         false
       }.getOrElse(false)
-    }.ensuring(_ == true, "Declared address isn't valid")
+    }
   }
+
   private implicit val timeout = Timeout(5.seconds)
   private val peerManager = application.peerManager
 
