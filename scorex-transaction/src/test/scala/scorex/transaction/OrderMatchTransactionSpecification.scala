@@ -12,7 +12,9 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
     property("OrderMatch transaction serialization roundtrip") {
       forAll {x: (OrderMatch, PrivateKeyAccount) =>
         val (om, matcher) = x
-        val recovered = Order.parseBytes(om.bytes).get
+        val recovered = OrderMatch.parseBytes(om.bytes).get
+        om.id shouldBe recovered.id
+        om.buyOrder.id shouldBe recovered.buyOrder.id
         recovered.bytes shouldEqual om.bytes
       }
     }
@@ -33,20 +35,20 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
 
       val unsigned = OrderMatch(buy, sell, sellPrice, buyAmount, mf1, 1, 1, maxtTime - Order.MaxLiveTime, Array())
 
-      signed(unsigned, matcher).isValid(Seq()) shouldBe valid
-      signed(unsigned.copy(price = sellPrice + 1), matcher).isValid(Seq()) shouldBe valid
-      signed(unsigned.copy(price = buyPrice), matcher).isValid(Seq()) shouldBe valid
-      signed(unsigned.copy(amount = buyAmount + 1), matcher).isValid(Seq()) should contain ("amount should be valid")
-      signed(unsigned.copy(amount = buyAmount - 1, buyMatcherFee = 0, sellMatcherFee = 0), matcher).isValid(Seq()) should
+      signed(unsigned, matcher).isValid(Set()) shouldBe valid
+      signed(unsigned.copy(price = sellPrice + 1), matcher).isValid(Set()) shouldBe valid
+      signed(unsigned.copy(price = buyPrice), matcher).isValid(Set()) shouldBe valid
+      signed(unsigned.copy(amount = buyAmount + 1), matcher).isValid(Set()) should contain ("amount should be valid")
+      signed(unsigned.copy(amount = buyAmount - 1, buyMatcherFee = 0, sellMatcherFee = 0), matcher).isValid(Set()) should
         contain ("fee should be < buyMatcherFee + sellMatcherFee")
-      signed(unsigned.copy(buyMatcherFee = mf1 + 1), matcher).isValid(Seq()) should contain ("buyMatcherFee should be valid")
-      signed(unsigned.copy(sellMatcherFee = mf2 + 1), matcher).isValid(Seq()) should contain ("sellMatcherFee should be valid")
-      signed(unsigned.copy(fee = 0), matcher).isValid(Seq()) should contain ("fee should be > 0")
-      signed(unsigned.copy(fee = -1), matcher).isValid(Seq()) should contain ("fee should be > 0")
-      signed(unsigned.copy(fee = 4), matcher).isValid(Seq()) should contain ("fee should be < buyMatcherFee + sellMatcherFee")
-      signed(unsigned.copy(timestamp = maxtTime + 1), matcher).isValid(Seq())should contain ("buyOrder maxTimestamp should be > currentTime")
-      signed(unsigned.copy(timestamp = maxtTime), matcher).isValid(Seq())  shouldBe valid
-      signed(unsigned.copy(timestamp = maxtTime - 1), matcher).isValid(Seq())  shouldBe valid
+      signed(unsigned.copy(buyMatcherFee = mf1 + 1), matcher).isValid(Set()) should contain ("buyMatcherFee should be valid")
+      signed(unsigned.copy(sellMatcherFee = mf2 + 1), matcher).isValid(Set()) should contain ("sellMatcherFee should be valid")
+      signed(unsigned.copy(fee = 0), matcher).isValid(Set()) should contain ("fee should be > 0")
+      signed(unsigned.copy(fee = -1), matcher).isValid(Set()) should contain ("fee should be > 0")
+      signed(unsigned.copy(fee = 4), matcher).isValid(Set()) should contain ("fee should be < buyMatcherFee + sellMatcherFee")
+      signed(unsigned.copy(timestamp = maxtTime + 1), matcher).isValid(Set())should contain ("buyOrder maxTimestamp should be > currentTime")
+      signed(unsigned.copy(timestamp = maxtTime), matcher).isValid(Set())  shouldBe valid
+      signed(unsigned.copy(timestamp = maxtTime - 1), matcher).isValid(Set())  shouldBe valid
     }
   }
 
@@ -70,13 +72,13 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
         val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, maxtTime, mf2)
 
         val unsigned = OrderMatch(buy, sell, buyPrice, buyAmount, mf1, mf2*2/3, 1, maxtTime - Order.MaxLiveTime, Array())
-        signed(unsigned, matcher).isValid(Seq()) shouldBe valid
-        signed(unsigned.copy(price = sellPrice), matcher).isValid(Seq()) shouldBe valid
-        signed(unsigned.copy(price = sellPrice + 1), matcher).isValid(Seq()) shouldBe valid
-        signed(unsigned.copy(price = (buyPrice + sellPrice)/2), matcher).isValid(Seq()) shouldBe valid
-        signed(unsigned.copy(price = buyPrice + 1), matcher).isValid(Seq()) should contain ("price should be valid")
-        signed(unsigned.copy(price = buyPrice + 1), matcher).isValid(Seq()) should contain ("price should be valid")
-        signed(unsigned.copy(price = sellPrice - 1), matcher).isValid(Seq()) should contain ("price should be valid")
+        signed(unsigned, matcher).isValid(Set()) shouldBe valid
+        signed(unsigned.copy(price = sellPrice), matcher).isValid(Set()) shouldBe valid
+        signed(unsigned.copy(price = sellPrice + 1), matcher).isValid(Set()) shouldBe valid
+        signed(unsigned.copy(price = (buyPrice + sellPrice)/2), matcher).isValid(Set()) shouldBe valid
+        signed(unsigned.copy(price = buyPrice + 1), matcher).isValid(Set()) should contain ("price should be valid")
+        signed(unsigned.copy(price = buyPrice + 1), matcher).isValid(Set()) should contain ("price should be valid")
+        signed(unsigned.copy(price = sellPrice - 1), matcher).isValid(Set()) should contain ("price should be valid")
     }
   }
 
@@ -102,19 +104,19 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
           val buy2 = Order.buy(sender1, matcher, pair, buyPrice, sellAmount - buyAmount, curTime, mf3)
 
           val om1 = OrderMatch(buy1, sell, buyPrice, buyAmount, mf1, mf2 * buyAmount / sellAmount, 1, curTime, Array())
-          signed(om1, matcher).isValid(Seq()) shouldBe valid
+          signed(om1, matcher).isValid(Set()) shouldBe valid
 
           val om1Invalid = OrderMatch(buy1, sell, buyPrice, buyAmount, mf1, mf2, 1, curTime, Array())
-          signed(om1Invalid, matcher).isValid(Seq()) should contain ("sellMatcherFee should be valid")
+          signed(om1Invalid, matcher).isValid(Set()) should contain ("sellMatcherFee should be valid")
 
           val om2 = OrderMatch(buy2, sell, buyPrice, sellAmount - om1.amount,
             mf3, mf2 - mf2 * buyAmount / sellAmount, 1, curTime, Array())
-          signed(om2, matcher).isValid(Seq(om1)) shouldBe valid
+          signed(om2, matcher).isValid(Set(om1)) shouldBe valid
 
           // we should spent all fee
           val om2Invalid = OrderMatch(buy2, sell, buyPrice, sellAmount - om1.amount,
             mf3, (mf2 - mf2 * buyAmount / sellAmount) + 1, 1, curTime, Array())
-          signed(om2Invalid, matcher).isValid(Seq(om1)) should contain ("sellMatcherFee should be valid")
+          signed(om2Invalid, matcher).isValid(Set(om1)) should contain ("sellMatcherFee should be valid")
         }
     }
   }
@@ -122,15 +124,15 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
   property("OrderMatch with Validations") {
     forAll {x: (OrderMatch, PrivateKeyAccount) =>
       val (om, matcher) = x
-      om.isValid(Seq()) shouldBe valid
-      om.isValid(Seq(om)) shouldBe not(valid)
+      om.isValid(Set()) shouldBe valid
+      om.isValid(Set(om)) shouldBe not(valid)
 
-      signed(om.copy(amount = -1), matcher).isValid(Seq()) should contain ("amount should be > 0")
+      signed(om.copy(amount = -1), matcher).isValid(Set()) should contain ("amount should be > 0")
 
       val wrongMatcherFee = om.copy(buyMatcherFee = om.buyOrder.matcherFee + 1)
-      signed(wrongMatcherFee, matcher).isValid(Seq()) should contain ("buyMatcherFee should be valid")
+      signed(wrongMatcherFee, matcher).isValid(Set()) should contain ("buyMatcherFee should be valid")
 
-      signed(om.copy(amount = 1), matcher).isValid(Seq()) should contain ("buyMatcherFee should be valid")
+      signed(om.copy(amount = 1), matcher).isValid(Set()) should contain ("buyMatcherFee should be valid")
 
     }
   }

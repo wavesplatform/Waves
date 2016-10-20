@@ -29,7 +29,7 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
 
   override val sender: PublicKeyAccount = buyOrder.matcher
 
-  def isValid(previousMatches: Seq[OrderMatch]): Validation =  {
+  def isValid(previousMatches: Set[OrderMatch]): Validation =  {
     lazy val buyTransactions = previousMatches.filter { om =>
       om.buyOrder.id sameElements buyOrder.id
     }
@@ -104,10 +104,10 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
     val sellFeeChange = Seq(BalanceChange(AssetAcc(sellOrder.sender, None), -sellMatcherFee))
 
     val exchange = Seq(
-      (buyOrder.sender, (buyOrder.spendAssetId, -amount)),
-      (buyOrder.sender, (buyOrder.receiveAssetId, (BigInt(amount) * Order.PriceConstant / price).longValue())),
-      (sellOrder.sender, (sellOrder.receiveAssetId, amount)),
-      (sellOrder.sender, (sellOrder.spendAssetId, (-BigInt(amount) * Order.PriceConstant / price).longValue()))
+      (buyOrder.sender, (buyOrder.spendAssetId, -(BigInt(amount) * Order.PriceConstant / price).longValue())),
+      (buyOrder.sender, (buyOrder.receiveAssetId, amount)),
+      (sellOrder.sender, (sellOrder.receiveAssetId, (BigInt(amount) * Order.PriceConstant / price).longValue())),
+      (sellOrder.sender, (sellOrder.spendAssetId, -amount))
     )
 
     buyFeeChange ++ sellFeeChange ++ matcherChange ++
@@ -135,6 +135,16 @@ object OrderMatch extends Deser[OrderMatch] {
   def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
              buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): OrderMatch = {
     val unsigned = OrderMatch(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, Array())
+    val sig = EllipticCurveImpl.sign(matcher, unsigned.toSign)
+    unsigned.copy(signature = sig)
+  }
+
+  def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
+             fee: Long, timestamp: Long): OrderMatch = {
+    val buyMatcherFee = BigInt(buyOrder.matcherFee) * amount / buyOrder.amount
+    val sellMatcherFee = BigInt(sellOrder.matcherFee) * amount / sellOrder.amount
+    val unsigned = OrderMatch(buyOrder, sellOrder, price, amount, buyMatcherFee.toLong,
+      sellMatcherFee.toLong, fee, timestamp, Array())
     val sig = EllipticCurveImpl.sign(matcher, unsigned.toSign)
     unsigned.copy(signature = sig)
   }

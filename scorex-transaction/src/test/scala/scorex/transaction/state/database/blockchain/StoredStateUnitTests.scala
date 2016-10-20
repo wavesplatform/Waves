@@ -118,10 +118,10 @@ with PrivateMethodTester with OptionValues with TransactionGen {
       val Seq(newBuyerBal1, newBuyerBal2, newSellerBal1, newSellerBal2, newBuyerFeeBal, newSellerFeeBal, newMatcherFeeBal) =
         getBalances(buyerAcc1, buyerAcc2, sellerAcc1, sellerAcc2, buyerFeeAcc, sellerFeeAcc, matcherFeeAcc)
 
-      newBuyerBal1 should be (buyerBal1 + BigInt(om.amount)*Order.PriceConstant/om.price)
-      newBuyerBal2 should be (buyerBal2 - om.amount)
-      newSellerBal1 should be (sellerBal1 - BigInt(om.amount)*Order.PriceConstant/om.price)
-      newSellerBal2 should be (sellerBal2 + om.amount)
+      newBuyerBal1 should be (buyerBal1 + om.amount)
+      newBuyerBal2 should be (buyerBal2 - BigInt(om.amount)*Order.PriceConstant/om.price)
+      newSellerBal1 should be (sellerBal1 - om.amount)
+      newSellerBal2 should be (sellerBal2 + BigInt(om.amount)*Order.PriceConstant/om.price)
       newBuyerFeeBal should be (buyerFeeBal - om.buyMatcherFee)
       newSellerFeeBal should be (sellerFeeBal - om.sellMatcherFee)
       newMatcherFeeBal should be (matcherFeeBal + om.buyMatcherFee + om.sellMatcherFee - om.fee)

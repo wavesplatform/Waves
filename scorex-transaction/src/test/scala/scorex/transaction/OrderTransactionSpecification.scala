@@ -1,6 +1,5 @@
 package scorex.transaction
 
-import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
@@ -13,12 +12,22 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
     forAll(orderGenerator) { order: Order =>
       val recovered = Order.parseBytes(order.bytes).get
       recovered.bytes shouldEqual order.bytes
+      recovered.id shouldBe order.id
+      recovered.sender shouldBe order.sender
+      recovered.matcher shouldBe order.matcher
+      recovered.spendAssetId shouldBe order.spendAssetId
+      recovered.receiveAssetId shouldBe order.receiveAssetId
+      recovered.price shouldBe order.price
+      recovered.amount shouldBe order.amount
+      recovered.maxTimestamp shouldBe order.maxTimestamp
+      recovered.matcherFee shouldBe order.matcherFee
+      recovered.signature shouldBe order.signature
     }
   }
 
   property("Order generator should generate valid orders") {
     forAll(orderGenerator) { order: Order =>
-      order.isValid(NTP.correctedTime()) shouldBe true
+      order.isValid(NTP.correctedTime()) shouldBe valid
     }
   }
 
@@ -27,7 +36,7 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
       val isValid = order.isValid(NTP.correctedTime())
       val time = NTP.correctedTime()
       whenever(order.maxTimestamp < time || order.maxTimestamp > time + Order.MaxLiveTime) {
-        isValid shouldBe false
+        isValid shouldBe not(valid)
       }
     }
   }
@@ -35,7 +44,7 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
   property("Order amount validation") {
     forAll(invalidOrderGenerator) { order: Order =>
       whenever(order.amount <= 0) {
-        order.isValid(NTP.correctedTime()) shouldBe false
+        order.isValid(NTP.correctedTime()) shouldBe not(valid)
       }
     }
   }
@@ -43,7 +52,7 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
   property("Order matcherFee validation") {
     forAll(invalidOrderGenerator) { order: Order =>
       whenever(order.matcherFee <= 0) {
-        order.isValid(NTP.correctedTime()) shouldBe false
+        order.isValid(NTP.correctedTime()) shouldBe not(valid)
       }
     }
   }
@@ -51,23 +60,23 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
   property("Order price validation") {
     forAll(invalidOrderGenerator) { order: Order =>
       whenever(order.price <= 0) {
-        order.isValid(NTP.correctedTime()) shouldBe false
+        order.isValid(NTP.correctedTime()) shouldBe not(valid)
       }
     }
   }
 
   property("Order signature validation") {
     forAll(orderGenerator, bytes32gen) { (order: Order, bytes: Array[Byte]) =>
-      order.isValid(NTP.correctedTime()) shouldBe true
-      order.copy(sender = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) shouldBe false
-      order.copy(matcher = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) shouldBe false
-      order.copy(spendAssetId = Array(0: Byte) ++ order.spendAssetId).isValid(NTP.correctedTime()) shouldBe false
-      order.copy(receiveAssetId = Array(0: Byte) ++ order.receiveAssetId).isValid(NTP.correctedTime()) shouldBe false
-      order.copy(price = order.price + 1).isValid(NTP.correctedTime()) shouldBe false
-      order.copy(amount = order.amount + 1).isValid(NTP.correctedTime()) shouldBe false
-      order.copy(maxTimestamp = order.maxTimestamp + 1).isValid(NTP.correctedTime()) shouldBe false
-      order.copy(matcherFee = order.matcherFee + 1).isValid(NTP.correctedTime()) shouldBe false
-      order.copy(signature = bytes ++ bytes).isValid(NTP.correctedTime()) shouldBe false
+      order.isValid(NTP.correctedTime()) shouldBe valid
+      order.copy(sender = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain ("signature should be valid")
+      order.copy(matcher = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain ("signature should be valid")
+      order.copy(spendAssetId = Array(0: Byte) ++ order.spendAssetId).isValid(NTP.correctedTime()) should contain ("signature should be valid")
+      order.copy(receiveAssetId = Array(0: Byte) ++ order.receiveAssetId).isValid(NTP.correctedTime()) should contain ("signature should be valid")
+      order.copy(price = order.price + 1).isValid(NTP.correctedTime()) should contain ("signature should be valid")
+      order.copy(amount = order.amount + 1).isValid(NTP.correctedTime()) should contain ("signature should be valid")
+      order.copy(maxTimestamp = order.maxTimestamp + 1).isValid(NTP.correctedTime()) should contain ("signature should be valid")
+      order.copy(matcherFee = order.matcherFee + 1).isValid(NTP.correctedTime()) should contain ("signature should be valid")
+      order.copy(signature = bytes ++ bytes).isValid(NTP.correctedTime()) should contain ("signature should be valid")
     }
   }
 
