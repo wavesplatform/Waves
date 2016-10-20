@@ -1,6 +1,7 @@
 package scorex.lagonaki.unit
 
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import scala.util.Random
 import org.h2.mvstore.MVStore
 import org.scalatest.{FunSuite, Matchers}
@@ -38,16 +39,17 @@ class StoredStateSpecification extends FunSuite with Matchers {
       request.decimals,
       request.reissuable,
       request.fee,
-      System.currentTimeMillis())
+      i.incrementAndGet())
   }
 
+  private val i = new AtomicInteger
   private def createTransferAssetTx(request: TransferRequest, wallet: Wallet): TransferTransaction = {
     val sender = wallet.privateKeyAccount(request.sender).get
     TransferTransaction.create(request.assetIdOpt.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
       new Account(request.recipient),
       request.amount,
-      System.currentTimeMillis(),
+      i.incrementAndGet(),
       request.feeAsset.map(s => Base58.decode(s).get),
       request.feeAmount,
       Base58.decode(request.attachment).get)
@@ -67,7 +69,6 @@ class StoredStateSpecification extends FunSuite with Matchers {
     val assetId = Some(Base58.encode(issueAssetTx.assetId))
 
     val txs = recipients.flatMap(r => Seq.fill(10) {
-      Thread.sleep(1)
       createTransferAssetTx(TransferRequest(assetId, None, 10, 1, acc.address, "123", r.address), wallet)
     })
 
@@ -77,6 +78,9 @@ class StoredStateSpecification extends FunSuite with Matchers {
 
     state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be (999800)
     state.balance(acc) should be (startWavesBalance - 100000000 - 20)
+
+    state.hash should be(1530886777)
+    state.toString should be("{\"3MbrMHBEWi1tV1KU1qKeKghmue1BdQx6yKPH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":999800,\"3MbrMHBEWi1tV1KU1qKeKghmue1BdQx6yKP\":99899999980,\"3MWjwMyzVQ9vxFAfyCy63QvUKXGbF7HgauSH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":100,\"3MYVwzAQ9Q19KHd6BhjTfbGEk6AYajnjvaoH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":100,\"3Mc2PfwgwZ6txN2rhi6DzYfJRLQ88xRLx5p\":100000020}")
   }
 
   test("many transfer waves transactions") {
