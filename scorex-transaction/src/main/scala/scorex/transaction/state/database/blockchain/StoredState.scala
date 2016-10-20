@@ -27,7 +27,8 @@ import scorex.transaction.assets.exchange.OrderMatch
   *
   * Use apply method of StoredState object to create new instance
   */
-class StoredState(db: MVStore, settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging {
+class StoredState(db: MVStore, settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging
+  with OrderMatchStoredState {
 
 
   val HeightKey = "height"
@@ -37,7 +38,6 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
   //todo put all transactions in the same map and use links to it
   val AllTxs = "IssueTxs"
   val ReissueIndex = "reissuableFlag"
-  val OrderMatchTx = "OrderMatchTx"
 
   if (db.getStoreVersion > 0) db.rollback()
 
@@ -61,12 +61,6 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     */
   private val reissuableIndex: MVMap[Array[Byte], Boolean] =
     db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
-
-  /**
-    * Order id -> serialized OrderMatch transactions
-    */
-  private val orderMatchTx: MVMap[Array[Byte], Seq[Array[Byte]]] =
-    db.openMap(OrderMatchTx, new LogMVMapBuilder[Array[Byte], Seq[Array[Byte]]])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
@@ -123,8 +117,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
           reissuableIndex.put(tx.assetId, tx.reissuable)
           includedTx.put(tx.id, h)
         case om: OrderMatch =>
-          orderMatchTx.putIfAbsent(om.id, Seq())
-          orderMatchTx.get(om.id)
+          putOrderMatch(om)
           includedTx.put(om.id, h)
         case tx =>
           includedTx.put(tx.id, h)
@@ -349,10 +342,6 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     }
 
     selection.foldLeft(List[Transaction]()) { (l, s) => l ++ s._2._1 }
-  }
-
-  def findPrevOrderMatchTxs(om: OrderMatch): Seq[OrderMatch] = {
-    Seq()
   }
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {

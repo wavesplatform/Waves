@@ -1,12 +1,12 @@
 package scorex.transaction.assets.exchange
 
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
-import scorex.transaction.AssetId
+import scorex.transaction._
 import scorex.utils.{ByteArray, NTP}
 import scala.util.Try
 
@@ -14,6 +14,7 @@ import io.swagger.annotations.ApiModelProperty
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.assets.exchange.OrderType.OrderType
 import Validation.BooleanOperators
+import scorex.transaction.assets.TransferTransaction
 
 object OrderType extends Enumeration {
   type OrderType = Value
@@ -27,8 +28,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
                  @ApiModelProperty(dataType = "java.lang.String", example = "") matcher: PublicKeyAccount,
                  @ApiModelProperty(dataType = "java.lang.String") spendAssetId: AssetId,
                  @ApiModelProperty(dataType = "java.lang.String") receiveAssetId: AssetId,
-                 price: Long,
-                 amount: Long,
+                 @ApiModelProperty("Price for AssetPair.second in AssetPair.first * 10^8") price: Long,
+                 @ApiModelProperty("Amount in AssetPair.first") amount: Long,
                  maxTimestamp: Long,
                  @ApiModelProperty(example = "1000") matcherFee: Long,
                  @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
@@ -39,7 +40,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   def assetPair: AssetPair = AssetPair(spendAssetId, receiveAssetId)
 
-  def orderType: OrderType = if (spendAssetId sameElements assetPair.first) OrderType.SELL else OrderType.BUY
+  def orderType: OrderType = if (receiveAssetId sameElements assetPair.first) OrderType.BUY else OrderType.SELL
 
   def isValid(atTime: Long): Validation = {
     (amount > 0) :| "amount should be > 0" &&
@@ -95,7 +96,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
 object Order extends Deser[Order] {
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
-  val PriceConstant = 100000000
+  val PriceConstant = 100000000L
   private val AssetIdLength = 32
 
 
@@ -121,16 +122,17 @@ object Order extends Deser[Order] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
-    val sender = new PublicKeyAccount(bytes.slice(0, Account.AddressLength))
-    val matcher = new PublicKeyAccount(bytes.slice(Account.AddressLength, 2 * Account.AddressLength))
-    val spend = bytes.slice(2 * Account.AddressLength, 2 * Account.AddressLength + AssetIdLength)
-    val receive = bytes.slice(2 * Account.AddressLength + AssetIdLength, 2 * Account.AddressLength + 2 * AssetIdLength)
-    val longsStart = 2 * Account.AddressLength + 2 * AssetIdLength
-    val price = Longs.fromByteArray(bytes.slice(longsStart, longsStart + 8))
-    val amount = Longs.fromByteArray(bytes.slice(longsStart + 8, longsStart + 16))
-    val maxTimestamp = Longs.fromByteArray(bytes.slice(longsStart + 16, longsStart + 24))
-    val matcherFee = Longs.fromByteArray(bytes.slice(longsStart + 24, longsStart + 32))
-    val signature = bytes.slice(longsStart + 32, bytes.length)
-    Order(sender, matcher, spend, receive, price, amount, maxTimestamp, matcherFee, signature)
+    import EllipticCurveImpl._
+    var from = 0
+    val sender = new PublicKeyAccount(bytes.slice(from, from + KeyLength)); from += KeyLength
+    val matcher = new PublicKeyAccount(bytes.slice(from, from + KeyLength)); from += KeyLength
+    val spendAssetId = bytes.slice(from, from + AssetIdLength); from += AssetIdLength
+    val receiveAssetId = bytes.slice(from, from + AssetIdLength); from += AssetIdLength
+    val price = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength)); from += 8
+    val amount = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength)); from += 8
+    val maxTimestamp = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength)); from += 8
+    val matcherFee = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength)); from += 8
+    val signature = bytes.slice(from, from + SignatureLength); from += SignatureLength
+    Order(sender, matcher, spendAssetId, receiveAssetId, price, amount, maxTimestamp, matcherFee, signature)
   }
 }

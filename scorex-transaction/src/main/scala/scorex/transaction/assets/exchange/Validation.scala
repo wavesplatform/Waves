@@ -8,11 +8,13 @@ case class Validation(
 
   def messages(): String = labels.mkString(", ")
 
-  def &&(r: Validation) = (this.status, r.status) match {
-    case (false,_) => this
-    case (_,false) => r
-    case (true, true) => Validation(true)
-  }
+  def &&(r: => Validation): Validation =
+    if (!this.status) {
+      this
+    } else {
+      if (!r.status) r
+      else Validation(true)
+    }
 
   private def mergeRes(x: Validation, y: Validation, st: Boolean) =
     Validation(
