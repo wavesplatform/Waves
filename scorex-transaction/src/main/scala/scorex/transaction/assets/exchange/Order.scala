@@ -45,6 +45,9 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
   def isValid(atTime: Long): Validation = {
     (amount > 0) :| "amount should be > 0" &&
       (price > 0) :| "price should be > 0" &&
+      (price < MaxAmount) :| "price too large" &&
+      (amount < MaxAmount) :| "amount too large" &&
+      (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (maxTimestamp - atTime <= MaxLiveTime) :| "maxTimestamp should be earlier than 30 days" &&
       (atTime <= maxTimestamp) :| "maxTimestamp should be > currentTime" &&
       EllipticCurveImpl.verify(signature, toSign, sender.publicKey) :| "signature should be valid"
@@ -97,6 +100,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 object Order extends Deser[Order] {
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
   val PriceConstant = 100000000L
+  val MaxAmount = PriceConstant*PriceConstant
   private val AssetIdLength = 32
 
 
@@ -134,5 +138,11 @@ object Order extends Deser[Order] {
     val matcherFee = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength)); from += 8
     val signature = bytes.slice(from, from + SignatureLength); from += SignatureLength
     Order(sender, matcher, spendAssetId, receiveAssetId, price, amount, maxTimestamp, matcherFee, signature)
+  }
+
+  def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
+    require(unsigned.sender == sender)
+    val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
+    unsigned.copy(signature = sig)
   }
 }

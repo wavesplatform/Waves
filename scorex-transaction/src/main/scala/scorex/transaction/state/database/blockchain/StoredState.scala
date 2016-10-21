@@ -77,7 +77,7 @@ class StoredState(val db: MVStore) extends LagonakiState with ScorexLogging with
           reissuableIndex.put(tx.assetId, tx.reissuable)
           includedTx.put(tx.id, h)
         case om: OrderMatch =>
-          putOrderMatch(om)
+          putOrderMatch(om, h)
           includedTx.put(om.id, h)
         case tx =>
           includedTx.put(tx.id, h)
@@ -100,6 +100,7 @@ class StoredState(val db: MVStore) extends LagonakiState with ScorexLogging with
     lastStates.keySet().foreach { key =>
       deleteNewer(key)
     }
+    rollbackOrderMatchTo(rollbackTo)
     setStateHeight(rollbackTo)
     this
   }
@@ -298,7 +299,9 @@ class StoredState(val db: MVStore) extends LagonakiState with ScorexLogging with
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: OrderMatch =>
-      tx.isValid(findPrevOrderMatchTxs(tx)) && included(tx.id, None).isEmpty
+      val valid = tx.isValid(findPrevOrderMatchTxs(tx))
+      println(valid)
+      valid && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>

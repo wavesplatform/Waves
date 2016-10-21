@@ -55,10 +55,10 @@ trait TransactionGen {
     matcher: PrivateKeyAccount <- accountGen
     spendAssetID: Array[Byte] <- bytes32gen
     receiveAssetID: Array[Byte] <- bytes32gen
-    price: Long <- positiveLongGen
-    amount: Long <- positiveLongGen
+    price: Long <- maxWavesAnountGen
+    amount: Long <- maxWavesAnountGen
     maxtTime: Long <- maxTimeGen
-    matcherFee: Long <- positiveLongGen
+    matcherFee: Long <- maxWavesAnountGen
   } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
 
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction)] = for {

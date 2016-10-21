@@ -86,36 +86,34 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
   property("OrderMatch matcher fee for 2 steps partially executed orders") {
     forAll(maxWavesAnountGen, maxWavesAnountGen, maxWavesAnountGen, maxWavesAnountGen, maxWavesAnountGen) {
       (buyAmount: Long, sellAmount: Long, mf1: Long, mf2: Long, mf3: Long) =>
-        whenever (buyAmount < sellAmount) {
+        whenever (buyAmount < sellAmount && BigInt(mf2) * buyAmount / sellAmount > 0) {
           val pair = assetPairGen.sample.get
           val sender1 = accountGen.sample.get
           val sender2 = accountGen.sample.get
           val matcher = accountGen.sample.get
           val curTime = NTP.correctedTime()
 
-          val buyPrice = 100
-          val sellPrice = 90
-          val mf1 = 10L
-          val mf2 = 10L
-          val mf3 = 5L
+          val buyPrice = sellAmount
+          val sellPrice = buyAmount
 
           val buy1 = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, curTime, mf1)
           val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, curTime, mf2)
-          val buy2 = Order.buy(sender1, matcher, pair, buyPrice, sellAmount - buyAmount, curTime, mf3)
 
-          val om1 = OrderMatch(buy1, sell, buyPrice, buyAmount, mf1, mf2 * buyAmount / sellAmount, 1, curTime, Array())
+          val om1 = OrderMatch(buy1, sell, buyPrice, buyAmount, mf1,
+            (BigInt(mf2) * buyAmount / BigInt(sellAmount)).toLong, 1, curTime, Array())
           signed(om1, matcher).isValid(Set()) shouldBe valid
 
           val om1Invalid = OrderMatch(buy1, sell, buyPrice, buyAmount, mf1, mf2, 1, curTime, Array())
           signed(om1Invalid, matcher).isValid(Set()) should contain ("sellMatcherFee should be valid")
 
+          val buy2 = Order.buy(sender1, matcher, pair, buyPrice, sellAmount - buyAmount, curTime, mf3)
           val om2 = OrderMatch(buy2, sell, buyPrice, sellAmount - om1.amount,
-            mf3, mf2 - mf2 * buyAmount / sellAmount, 1, curTime, Array())
+            mf3, mf2 - (BigInt(mf2) * buyAmount / sellAmount).toLong, 1, curTime, Array())
           signed(om2, matcher).isValid(Set(om1)) shouldBe valid
 
           // we should spent all fee
           val om2Invalid = OrderMatch(buy2, sell, buyPrice, sellAmount - om1.amount,
-            mf3, (mf2 - mf2 * buyAmount / sellAmount) + 1, 1, curTime, Array())
+            mf3, (mf2 - (BigInt(mf2) * buyAmount / sellAmount).toLong) + 1, 1, curTime, Array())
           signed(om2Invalid, matcher).isValid(Set(om1)) should contain ("sellMatcherFee should be valid")
         }
     }
