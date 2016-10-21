@@ -11,7 +11,3 @@ object AddressScheme {
 object DefaultAddressScheme extends AddressScheme {
   val chainId: Byte = 'S'.toByte
 }
-
-object TestnetAddressScheme extends AddressScheme {
-  val chainId: Byte = 'T'.toByte
-}

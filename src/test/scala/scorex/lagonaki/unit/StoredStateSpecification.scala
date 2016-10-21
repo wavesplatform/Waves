@@ -6,7 +6,7 @@ import scala.util.Random
 import org.h2.mvstore.MVStore
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}
-import scorex.account.{Account, AddressScheme, PrivateKeyAccount, PublicKeyAccount, TestnetAddressScheme}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
@@ -16,8 +16,6 @@ import scorex.transaction.{AssetAcc, GenesisTransaction}
 import scorex.wallet.Wallet
 
 class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPropertyChecks {
-
-  AddressScheme.current = TestnetAddressScheme
 
   val folder = "/tmp/scorex/test/"
   new File(folder).mkdirs()
@@ -82,9 +80,8 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
     state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
     state.balance(acc) should be(startWavesBalance - 100000000 - 20)
 
-    state.hash should be(2045694418)
-    state.toString should be(
-      "{\"3MwqYyGhS7BcC74EGj9nz5PWXifoXRAkcSCH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":100,\"3N1BxGHXoRCMMpkc6rjyeAq3hGWSaBA9GCp\":99899999980,\"3N1Mzf3zEGHMqBTznjWZK2naCxuP5Zxu7i3\":100000020,\"3N1BxGHXoRCMMpkc6rjyeAq3hGWSaBA9GCpH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":999800,\"3Mv5YM6Hn7LPq4bp4EPRMu3k79mrBkLvU9mH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":100}")
+    state.hash should be(1530886777)
+    state.toString should be("{\"3MbrMHBEWi1tV1KU1qKeKghmue1BdQx6yKPH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":999800,\"3MbrMHBEWi1tV1KU1qKeKghmue1BdQx6yKP\":99899999980,\"3MWjwMyzVQ9vxFAfyCy63QvUKXGbF7HgauSH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":100,\"3MYVwzAQ9Q19KHd6BhjTfbGEk6AYajnjvaoH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":100,\"3Mc2PfwgwZ6txN2rhi6DzYfJRLQ88xRLx5p\":100000020}")
   }
 
   test("many transfer waves transactions") {
