@@ -37,8 +37,8 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
       om.sellOrder.id sameElements sellOrder.id
     }
 
-    lazy val buyTotal = buyTransactions.map(_.amount).sum + amount
-    lazy val sellTotal = sellTransactions.map(_.amount).sum + amount
+    lazy val buyTotal = buyTransactions.foldLeft(0L)(_ + _.amount) + amount
+    lazy val sellTotal = sellTransactions.foldLeft(0L)(_ + _.amount) + amount
 
     lazy val buyFeeTotal = buyTransactions.map(_.buyMatcherFee).sum + buyMatcherFee
     lazy val sellFeeTotal = sellTransactions.map(_.sellMatcherFee).sum + sellMatcherFee
@@ -54,16 +54,24 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     lazy val amountIsValid: Boolean = {
-      (buyTotal <= buyOrder.amount) && (sellTotal <= sellOrder.amount)
+      val b = buyTotal <= buyOrder.amount
+      val s = sellTotal <= sellOrder.amount
+      b && s
     }
 
-    def isFeeValid(feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long): Boolean = {
-      feeTotal <= BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
+    def isFeeValid(fee: Long, feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long): Boolean = {
+      fee > 0 &&
+        feeTotal <= BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
     }
 
     (fee > 0) :| "fee should be > 0" &&
       (amount > 0) :| "amount should be > 0" &&
       (price > 0) :| "price should be > 0" &&
+      (price < Order.MaxAmount) :| "price too large" &&
+      (amount < Order.MaxAmount) :| "amount too large" &&
+      (sellMatcherFee < Order.MaxAmount) :| "sellMatcherFee too large" &&
+      (buyMatcherFee < Order.MaxAmount) :| "buyMatcherFee too large" &&
+      (fee < Order.MaxAmount) :| "fee too large" &&
       (buyOrder.orderType == OrderType.BUY) :| "buyOrder should has OrderType.BUY" &&
       (sellOrder.orderType == OrderType.SELL) :| "sellOrder should has OrderType.SELL" &&
       isSameMatchers :| "order should have same Matchers" &&
@@ -73,8 +81,10 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
       priceIsValid :| "price should be valid" &&
       amountIsValid :| "amount should be valid" &&
       (fee < buyMatcherFee + sellMatcherFee) :| "fee should be < buyMatcherFee + sellMatcherFee" &&
-      isFeeValid(buyFeeTotal, buyTotal, buyOrder.matcherFee, buyOrder.amount) :| "buyMatcherFee should be valid" &&
-      isFeeValid(sellFeeTotal, sellTotal, sellOrder.matcherFee, sellOrder.amount) :| "sellMatcherFee should be valid" &&
+      isFeeValid(buyMatcherFee, buyFeeTotal, buyTotal, buyOrder.matcherFee, buyOrder.amount) :|
+        "buyMatcherFee should be valid" &&
+      isFeeValid(sellMatcherFee, sellFeeTotal, sellTotal, sellOrder.matcherFee, sellOrder.amount) :|
+        "sellMatcherFee should be valid" &&
       signatureValid :|  "matcherSignatureIsValid should be valid"
   }
 
