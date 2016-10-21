@@ -17,5 +17,9 @@
   "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
-  "offlineGeneration": true
+  "offlineGeneration": true,
+  "matcher": {
+    "address": "127.0.0.1",
+    "port": 6870
+  }
 }
