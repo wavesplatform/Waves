@@ -45,6 +45,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   import SimpleTransactionModule._
 
   val networkController = application.networkController
+  private val feeCalculator = new FeeCalculator(settings)
 
   val TransactionSizeLength = 4
   val InitialBalance = 60000000000L
@@ -85,7 +86,9 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 
   override def putUnconfirmedIfNew(tx: Transaction): Boolean = synchronized {
-    utxStorage.putIfNew(tx, isValid)
+    if(feeCalculator.enoughFee(tx)){
+      utxStorage.putIfNew(tx, isValid)
+    } else false
   }
 
   override def packUnconfirmed(heightOpt: Option[Int]): StoredInBlock = synchronized {
