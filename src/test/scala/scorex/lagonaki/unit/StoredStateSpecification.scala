@@ -4,18 +4,20 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import scala.util.Random
 import org.h2.mvstore.MVStore
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.{Account, AddressScheme, PrivateKeyAccount, PublicKeyAccount, TestnetAddressScheme}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
-import scorex.transaction.{AssetAcc, GenesisTransaction}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
+import scorex.transaction.{AssetAcc, GenesisTransaction}
 import scorex.wallet.Wallet
 
-class StoredStateSpecification extends FunSuite with Matchers {
+class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPropertyChecks {
 
+  AddressScheme.current = TestnetAddressScheme
 
   val folder = "/tmp/scorex/test/"
   new File(folder).mkdirs()
@@ -64,7 +66,8 @@ class StoredStateSpecification extends FunSuite with Matchers {
       new PrivateKeyAccount(Array(1.toByte, 23.toByte))
     )
 
-    val issueAssetTx = createIssueAssetTx(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), wallet)
+    val issueAssetTx = createIssueAssetTx(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false,
+      100000000), wallet)
     state.processBlock(new BlockMock(Seq(issueAssetTx))) should be('success)
     val assetId = Some(Base58.encode(issueAssetTx.assetId))
 
@@ -74,13 +77,14 @@ class StoredStateSpecification extends FunSuite with Matchers {
 
     state.processBlock(new BlockMock(Random.shuffle(txs))) should be('success)
 
-    recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be (100))
+    recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be(100))
 
-    state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be (999800)
-    state.balance(acc) should be (startWavesBalance - 100000000 - 20)
+    state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
+    state.balance(acc) should be(startWavesBalance - 100000000 - 20)
 
-    state.hash should be(1530886777)
-    state.toString should be("{\"3MbrMHBEWi1tV1KU1qKeKghmue1BdQx6yKPH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":999800,\"3MbrMHBEWi1tV1KU1qKeKghmue1BdQx6yKP\":99899999980,\"3MWjwMyzVQ9vxFAfyCy63QvUKXGbF7HgauSH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":100,\"3MYVwzAQ9Q19KHd6BhjTfbGEk6AYajnjvaoH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":100,\"3Mc2PfwgwZ6txN2rhi6DzYfJRLQ88xRLx5p\":100000020}")
+    state.hash should be(2045694418)
+    state.toString should be(
+      "{\"3MwqYyGhS7BcC74EGj9nz5PWXifoXRAkcSCH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":100,\"3N1BxGHXoRCMMpkc6rjyeAq3hGWSaBA9GCp\":99899999980,\"3N1Mzf3zEGHMqBTznjWZK2naCxuP5Zxu7i3\":100000020,\"3N1BxGHXoRCMMpkc6rjyeAq3hGWSaBA9GCpH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":999800,\"3Mv5YM6Hn7LPq4bp4EPRMu3k79mrBkLvU9mH8AyhWWLAi53WCW79yVhwy43CZE8YJTKk7bzoWrckskW\":100}")
   }
 
   test("many transfer waves transactions") {
@@ -99,8 +103,34 @@ class StoredStateSpecification extends FunSuite with Matchers {
 
     state.processBlock(new BlockMock(Random.shuffle(txs))) should be('success)
 
-    recipients.foreach(r => state.assetBalance(AssetAcc(r, None)) should be (100))
+    recipients.foreach(r => state.assetBalance(AssetAcc(r, None)) should be(100))
 
-    state.balance(acc) should be (startWavesBalance - 200 - 20)
+    state.balance(acc) should be(startWavesBalance - 200 - 20)
+  }
+
+  test("issues and many transfer assets with fee transactions") {
+    val sender = accounts.head
+    val feeGetter = accounts.last
+    val blahBlahBase58 = Base58.encode("1234567890".getBytes)
+
+    val wavesTransferForAssets = createIssueAssetTx(IssueRequest(sender.address, blahBlahBase58,
+      blahBlahBase58, 20000, 0, reissuable = false, 1000000000L), wallet)
+
+    val assetId = wavesTransferForAssets.id
+    val assetIdString = Base58.encode(wavesTransferForAssets.id)
+    state.processBlock(new BlockMock(Seq(wavesTransferForAssets), new PublicKeyAccount(feeGetter.publicKey))) should be(
+      'success)
+
+    val txs = Seq.fill(10) {
+      createTransferAssetTx(TransferRequest(Some(assetIdString), Some(assetIdString),
+        1000, 1000, sender.address, blahBlahBase58, sender.address), wallet)
+    }
+    state.processBlock(new BlockMock(txs, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
+
+    val senderAssetBalance = state.assetBalance(AssetAcc(new Account(sender.address), Some(assetId)))
+    senderAssetBalance shouldBe 10000
+    val feeGetterAssetBalace = state.assetBalance(AssetAcc(new PublicKeyAccount(accounts.last.publicKey), Some(
+      assetId)))
+    feeGetterAssetBalace shouldBe 10000
   }
 }
