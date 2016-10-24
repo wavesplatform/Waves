@@ -12,8 +12,8 @@ import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.ValidationResult.ValidationResult
+import scorex.transaction.assets.exchange.{Order, OrderMatch}
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet.{IssueRequest, Payment, ReissueRequest, TransferRequest}
