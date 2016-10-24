@@ -19,8 +19,6 @@ class TransactionsAPISpecification extends FunSuite with TestLock with Matchers 
   }
 
   def addresses = accounts.map(_.address)
-//  def account = accounts.head
-//  def address = account.address
 
   test("/transactions/unconfirmed API route") {
     (1 to 20) foreach (i => genValidTransaction())
