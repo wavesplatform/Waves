@@ -123,6 +123,8 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
     buyFeeChange ++ sellFeeChange ++ matcherChange ++
       exchange.map(c => BalanceChange(AssetAcc(c._1, Some(c._2._1)), c._2._2))
   }
+
+  override def validate: ValidationResult.Value = ???
 }
 
 object OrderMatch extends Deser[OrderMatch] {
