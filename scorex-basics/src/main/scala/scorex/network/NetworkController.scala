@@ -28,14 +28,10 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
 
   lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
 
-  lazy val externalSocketAddress = settings.declaredAddress
-    .flatMap(s => Try(InetAddress.getByName(s)).toOption)
+  lazy val ownSocketAddress = getDeclaredHost.flatMap(host => Try(InetAddress.getByName(host)).toOption)
     .orElse {
       if (settings.upnpEnabled) application.upnp.externalAddress else None
-    }.map(ia => new InetSocketAddress(ia, application.settings.port))
-
-  //an address to send to peers
-  lazy val ownSocketAddress = externalSocketAddress
+    }.map(inetAddress => new InetSocketAddress(inetAddress, getDeclaredPort.getOrElse(application.settings.port)))
 
   lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
 
@@ -46,25 +42,29 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
 
   private implicit val system = context.system
 
+  private implicit val timeout = Timeout(5.seconds)
+
+  private val peerManager = application.peerManager
+
+  private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
+
   //check own declared address for validity
   if (!settings.localOnly) {
-    settings.declaredAddress.forall { myAddress =>
+    getDeclaredHost.forall { myHost =>
       Try {
-        val uri = new URI("http://" + myAddress)
-        val myHost = uri.getHost
-        val myAddrs = InetAddress.getAllByName(myHost)
+        val myAddress = InetAddress.getAllByName(myHost)
 
-        NetworkInterface.getNetworkInterfaces.exists { intf =>
-          intf.getInterfaceAddresses.exists { intfAddr =>
-            val extAddr = intfAddr.getAddress
-            myAddrs.contains(extAddr)
+        NetworkInterface.getNetworkInterfaces.exists { networkInterface =>
+          networkInterface.getInterfaceAddresses.exists { interfaceAddress =>
+            val externalAddress = interfaceAddress.getAddress
+            myAddress.contains(externalAddress)
           }
         } match {
           case true => true
           case false =>
             if (settings.upnpEnabled) {
-              val extAddr = application.upnp.externalAddress
-              myAddrs.contains(extAddr)
+              val externalAddress = application.upnp.externalAddress
+              myAddress.contains(externalAddress)
             } else false
         }
       }.recover { case t: Throwable =>
@@ -74,11 +74,6 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
     }
   }
 
-  private implicit val timeout = Timeout(5.seconds)
-  private val peerManager = application.peerManager
-
-  log.info(s"Declared address: $ownSocketAddress")
-  private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
   private val listener = context.actorOf(Props(classOf[NetworkListener], self, peerManager, localAddress),
     "network-listener")
 
@@ -86,6 +81,8 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
     log.warn(s"restart because of $thr.getMessage")
     context stop self
   }
+
+  log.info(s"Declared address: $ownSocketAddress")
 
   def businessLogic: Receive = {
     //a message coming in from another peer
@@ -148,6 +145,13 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
     case nonsense: Any =>
       log.warn(s"NetworkController: got something strange $nonsense")
   }
+
+  private def getDeclaredUri: Option[URI] =
+    settings.declaredAddress.map(declaredAddress => new URI(s"http://$declaredAddress"))
+
+  private def getDeclaredHost: Option[String] = getDeclaredUri.map(_.getHost)
+
+  private def getDeclaredPort: Option[Int] = getDeclaredUri.map(_.getPort).filterNot(_ == -1)
 
   private def bindingLogic: Receive = {
     case ReadyToListen =>
