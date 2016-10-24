@@ -3,6 +3,8 @@ package scorex.api.http
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import play.api.libs.json.Json
 
+case class ApiErrorResponse(error: Int, message: String)
+
 trait ApiError {
   val id: Int
   val message: String

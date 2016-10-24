@@ -14,7 +14,7 @@ case class ReissueRequest(sender: String,
                         fee: Long)
 
 object ReissueRequest {
-  implicit val issueWrites: Writes[ReissueRequest] = (
+  implicit val reissueWrites: Writes[ReissueRequest] = (
     (JsPath \ "sender").write[String] and
     (JsPath \ "assetId").write[String] and
       (JsPath \ "quantity").write[Long] and
@@ -23,7 +23,7 @@ object ReissueRequest {
     ) (unlift(ReissueRequest.unapply))
 
 
-  implicit val paymentReads: Reads[ReissueRequest] = (
+  implicit val reissueReads: Reads[ReissueRequest] = (
     (JsPath \ "sender").read[String] and
       (JsPath \ "assetId").read[String] and
       (JsPath \ "quantity").read[Long] and

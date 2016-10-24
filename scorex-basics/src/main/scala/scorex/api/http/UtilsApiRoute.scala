@@ -66,11 +66,9 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   def hashFast: Route = {
     path("hash" / "secure") {
       entity(as[String]) { message =>
-        withAuth {
-          postJsonRoute {
-            val json = Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
-            JsonResponse(json, StatusCodes.OK)
-          }
+        postJsonRoute {
+          val json = Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
+          JsonResponse(json, StatusCodes.OK)
         }
       }
     }
@@ -87,11 +85,9 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   def hashSecure: Route = {
     path("hash" / "fast") {
       entity(as[String]) { message =>
-        withAuth {
-          postJsonRoute {
-            val json = Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message)))
-            JsonResponse(json, StatusCodes.OK)
-          }
+        postJsonRoute {
+          val json = Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message)))
+          JsonResponse(json, StatusCodes.OK)
         }
       }
     }

@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
-import scorex.app.RunnableApplication
+import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
@@ -17,10 +17,9 @@ import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, 
 
 import scala.util.{Failure, Success, Try}
 
-
 @Path("/assets")
-@Api(value = "/assets/")
-case class AssetsApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
+@Api(value = "assets")
+case class AssetsApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
   val MaxAddressesPerRequest = 1000
 
@@ -38,8 +37,8 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
   @Path("/balance/{address}/{assetId}")
   @ApiOperation(value = "Balance", notes = "Account's balance", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "String", paramType = "path"),
-    new ApiImplicitParam(name = "assetId", value = "Asset id", required = true, dataType = "String", paramType = "path")
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
   ))
   def balance: Route = {
     path("balance" / Segment / Segment) { case (address, assetId) =>
@@ -93,8 +92,8 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
   }
 
   @Path("/issue")
-  @ApiOperation(value = "Issue asset",
-    notes = "Issue new asset (or reissue the old one)",
+  @ApiOperation(value = "Issue Asset",
+    notes = "Issue new Asset",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
@@ -124,24 +123,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
                       tx.validate match {
                         case ValidationResult.ValidateOke =>
                           JsonResponse(tx.json, StatusCodes.OK)
-
-                        case ValidationResult.InvalidAddress =>
-                          InvalidAddress.response
-
-                        case ValidationResult.NegativeAmount =>
-                          InvalidAmount.response
-
-                        case ValidationResult.InsufficientFee =>
-                          InsufficientFee.response
-
-                        case ValidationResult.InvalidName =>
-                          InvalidName.response
-
-                        case ValidationResult.InvalidSignature =>
-                          InvalidSignature.response
-
-                        case ValidationResult.TooBigArray =>
-                          TooBigArrayAllocation.response
+                        case error => jsonResponse(error)
                       }
                     case Failure(e: StateCheckFailed) =>
                       StateCheckFailed.response
@@ -157,8 +139,8 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
   }
 
   @Path("/reissue")
-  @ApiOperation(value = "Issue asset",
-    notes = "Reissue asset (or reissue the old one)",
+  @ApiOperation(value = "Issue Asset",
+    notes = "Reissue Asset",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
@@ -188,18 +170,7 @@ case class AssetsApiRoute(application: RunnableApplication)(implicit val context
                       tx.validate match {
                         case ValidationResult.ValidateOke =>
                           JsonResponse(tx.json, StatusCodes.OK)
-
-                        case ValidationResult.InvalidAddress =>
-                          InvalidAddress.response
-
-                        case ValidationResult.NegativeAmount =>
-                          InvalidAmount.response
-
-                        case ValidationResult.InsufficientFee =>
-                          InsufficientFee.response
-
-                        case ValidationResult.InvalidSignature =>
-                          InvalidSignature.response
+                        case error => jsonResponse(error)
                       }
                     case Failure(e: StateCheckFailed) =>
                       StateCheckFailed.response

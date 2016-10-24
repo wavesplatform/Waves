@@ -28,7 +28,7 @@ object IssueRequest {
     ) (unlift(IssueRequest.unapply))
 
 
-  implicit val paymentReads: Reads[IssueRequest] = (
+  implicit val issueReads: Reads[IssueRequest] = (
     (JsPath \ "sender").read[String] and
       (JsPath \ "name").read[String] and
       (JsPath \ "description").read[String] and

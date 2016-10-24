@@ -11,10 +11,13 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.ValidationResult.ValidationResult
+import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet.{IssueRequest, Payment, ReissueRequest, TransferRequest}
 import scorex.utils._
 import scorex.wallet.Wallet
+
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -171,6 +174,20 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
     if (isValid(issue)) onNewOffchainTransaction(issue)
     else throw new StateCheckFailed("Invalid issue transaction generated: " + issue.json)
     issue
+  }
+
+  /**
+    * Validate transaction according to the State and send it to network
+    */
+  def broadcastTransaction(tx: SignedTransaction): ValidationResult = {
+    tx.validate match {
+      case ValidationResult.ValidateOke =>
+        if (isValid(tx)) {
+          onNewOffchainTransaction(tx)
+          ValidationResult.ValidateOke
+        } else ValidationResult.StateCheckFailed
+      case error: ValidationResult => error
+    }
   }
 
   def reissueAsset(request: ReissueRequest, wallet: Wallet): Try[ReissueTransaction] = Try {
