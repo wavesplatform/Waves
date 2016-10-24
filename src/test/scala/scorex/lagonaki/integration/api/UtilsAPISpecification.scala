@@ -12,16 +12,16 @@ class UtilsAPISpecification extends FunSuite with TestLock with Matchers {
 
   import scorex.lagonaki.TestingCommons._
 
-  test("/utils/hash/secure API route") {
+  test("/utils/hash/secure API route does't require api key") {
     val msg = "test"
-    val resp = POST.request("/utils/hash/secure", body = msg)
+    val resp = POST.request("/utils/hash/secure", body = msg, headers = Map("api_key" -> "wrong key"))
     (resp \ "message").as[String] shouldBe msg
     (resp \ "hash").as[String] shouldBe Base58.encode(SecureCryptographicHash(msg))
   }
 
-  test("/utils/hash/fast API route") {
+  test("/utils/hash/fast API route does't require api key") {
     val msg = "test"
-    val resp = POST.request("/utils/hash/fast", body = msg)
+    val resp = POST.request("/utils/hash/fast", body = msg, headers = Map("api_key" -> "wrong key"))
     (resp \ "message").as[String] shouldBe msg
     (resp \ "hash").as[String] shouldBe Base58.encode(FastCryptographicHash(msg))
   }

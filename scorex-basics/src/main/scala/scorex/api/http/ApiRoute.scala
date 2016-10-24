@@ -25,7 +25,7 @@ trait ApiRoute extends Directives with CommonApiFunctions {
   lazy val corsAllowed = settings.corsAllowed
   lazy val apiKeyHash = settings.apiKeyHash
 
-  def actorRefFactory: ActorRefFactory = context
+  //def actorRefFactory: ActorRefFactory = context
 
   def getJsonRoute(fn: Future[JsonResponse]): Route =
     jsonRoute(Await.result(fn, timeout.duration), get)

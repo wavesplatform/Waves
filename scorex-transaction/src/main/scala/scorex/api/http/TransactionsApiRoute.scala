@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
 import scorex.account.Account
-import scorex.app.RunnableApplication
+import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.LagonakiState
 import scorex.transaction.state.database.blockchain.StoredBlockchain
@@ -17,7 +17,7 @@ import scala.util.{Success, Try}
 
 @Path("/transactions")
 @Api(value = "/transactions", description = "Information about transactions")
-case class TransactionsApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
+case class TransactionsApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
   val MaxTransactionsPerRequest = 1000
 
@@ -27,7 +27,7 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
 
   override lazy val route =
     pathPrefix("transactions") {
-      unconfirmed ~ address ~ adressLimit ~ info
+      unconfirmed ~ address ~ addressLimit ~ info
     }
 
   //TODO implement general pagination
@@ -37,7 +37,7 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
     new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "limit", value = "Specified number of records to be returned", required = true, dataType = "integer", paramType = "path")
   ))
-  def adressLimit: Route = {
+  def addressLimit: Route = {
     path("address" / Segment / "limit" / IntNumber) { case (address, limit) =>
       getJsonRoute {
         if (limit <= MaxTransactionsPerRequest) {

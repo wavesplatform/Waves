@@ -37,12 +37,12 @@ case class TransferTransaction(assetId: Option[AssetId],
 
   lazy val toSign: Array[Byte] = {
     val timestampBytes = Longs.toByteArray(timestamp)
-    val amountAssetBytes = assetId.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
+    val assetIdBytes = assetId.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
     val amountBytes = Longs.toByteArray(amount)
     val feeAssetBytes = feeAsset.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
     val feeBytes = Longs.toByteArray(fee)
 
-    Bytes.concat(sender.publicKey, amountAssetBytes, feeAssetBytes, timestampBytes, amountBytes, feeBytes,
+    Bytes.concat(sender.publicKey, assetIdBytes, feeAssetBytes, timestampBytes, amountBytes, feeBytes,
       recipient.bytes, arrayWithSize(attachment))
   }
 
