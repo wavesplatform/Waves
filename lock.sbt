@@ -65,14 +65,14 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.reflections" % "reflections" % "0.9.10",
   "org.scala-lang.modules" % "scala-java8-compat_2.11" % "0.7.0",
   "org.scala-lang.modules" % "scala-parser-combinators_2.11" % "1.0.4",
-  "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.5",
+  "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.2",
   "org.scala-sbt" % "test-interface" % "1.0",
   "org.scala-stm" % "scala-stm_2.11" % "0.7",
   "org.scalacheck" % "scalacheck_2.11" % "1.12.5",
-  "org.scalactic" % "scalactic_2.11" % "3.0.1-SNAP1",
+  "org.scalactic" % "scalactic_2.11" % "2.3.0-SNAP2",
   "org.scalamock" % "scalamock-core_2.11" % "3.2.2",
   "org.scalamock" % "scalamock-scalatest-support_2.11" % "3.2.2",
-  "org.scalatest" % "scalatest_2.11" % "3.0.1-SNAP1",
+  "org.scalatest" % "scalatest_2.11" % "2.3.0-SNAP2",
   "org.scoverage" % "scalac-scoverage-plugin_2.11" % "1.1.1",
   "org.scoverage" % "scalac-scoverage-runtime_2.11" % "1.1.1",
   "org.slf4j" % "slf4j-api" % "1.7.20",
@@ -80,4 +80,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.12"
 )
-// LIBRARY_DEPENDENCIES_HASH c8783f0ab5bdf697d349e5ccb686b229e395cd99
+// LIBRARY_DEPENDENCIES_HASH d8360823e14a31a396176de16d9ed659d4187871
