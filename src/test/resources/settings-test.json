@@ -1,4 +1,18 @@
 {
+  "feeMap": {
+    "2": {
+      "Waves": 0
+    },
+    "3": {
+      "Waves": 10000000
+    },
+    "4": {
+      "Waves": 100000
+    },
+    "5": {
+      "Waves": 100000
+    }
+  },
   "p2p": {
     "localOnly": true,
     "bindAddress": "127.0.0.1",
