@@ -19,7 +19,7 @@ object TestNetParams extends ChainParameters {
   val genesisTimestamp = 1460952000000L
   val genesisTxs = {
     val txs = Seq(
-      GenesisTransaction(new Account("3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"), initialBalance - 5 * Constants.UnitsInWave, genesisTimestamp),
+      GenesisTransaction(new Account("3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K"), initialBalance - 5 * Constants.UnitsInWave, genesisTimestamp),
       GenesisTransaction(new Account("3MyTvqfeLWkvjSZ1hwkhQjzipZr7Pk8dyMR"), Constants.UnitsInWave, genesisTimestamp),
       GenesisTransaction(new Account("3MqS3mVY4Yr4HoTdpWiEaq9phwbaoWS2W6A"), Constants.UnitsInWave, genesisTimestamp),
       GenesisTransaction(new Account("3N3CDuzGXB2qP5vb2NvnnDQ68HahNCfYVBg"), Constants.UnitsInWave, genesisTimestamp),

@@ -4,15 +4,15 @@ import java.util.Comparator
 
 import akka.actor.Props
 import akka.persistence.{PersistentActor, RecoveryCompleted}
-
 import com.wavesplatform.matcher.market.MatcherActor.OrderAccepted
 import com.wavesplatform.matcher.market.OrderBookActor._
+import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.ScorexLogging
 
 object OrderBookActor {
   def props(assetPair: AssetPair): Props = Props(new OrderBookActor(assetPair))
-  def name(assetPair: AssetPair): String = s"${assetPair.first}-${assetPair.second}"
+  def name(assetPair: AssetPair): String = Base58.encode(assetPair.first) + "-" + Base58.encode(assetPair.second)
 
   //protocol
   case object GetOrdersRequest

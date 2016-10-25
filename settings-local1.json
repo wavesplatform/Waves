@@ -19,7 +19,8 @@
   "history": "blockchain",
   "offlineGeneration": true,
   "matcher": {
-    "address": "127.0.0.1",
+    "account": "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",
+    "host": "127.0.0.1",
     "port": 6870
   }
 }
