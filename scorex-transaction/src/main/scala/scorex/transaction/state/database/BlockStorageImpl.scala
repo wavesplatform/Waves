@@ -4,8 +4,8 @@ import org.h2.mvstore.MVStore
 import scorex.consensus.ConsensusModule
 import scorex.network.StoredBlockSeq
 import scorex.settings.Settings
-import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 import scorex.transaction._
+import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 
 class BlockStorageImpl(settings: TransactionSettings with Settings)
                       (implicit consensusModule: ConsensusModule[_], transactionModule: TransactionModule[_])
@@ -18,7 +18,7 @@ class BlockStorageImpl(settings: TransactionSettings with Settings)
   def createMVStore(fileName: Option[String]): MVStore = {
     settings.dataDirOpt.flatMap(dir => fileName.map(dir + '/' + _)) match {
       case Some(pathToDataFile) =>
-        new MVStore.Builder().fileName(pathToDataFile).autoCommitDisabled().compress().open()
+        new MVStore.Builder().fileName(pathToDataFile).compress().open()
       case None =>
         new MVStore.Builder().open()
     }
