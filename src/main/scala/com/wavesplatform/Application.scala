@@ -12,8 +12,10 @@ import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import com.wavesplatform.settings._
 import scorex.waves.transaction.WavesTransactionModule
+
 import scala.reflect.runtime.universe._
 import com.wavesplatform.actor.RootActorSystem
+import scorex.api.http.assets.AssetsBroadcastApiRoute
 
 class Application(as: ActorSystem, appSettings: WavesSettings) extends {
   override implicit val settings = appSettings
@@ -45,7 +47,8 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     DebugApiRoute(this),
     WavesApiRoute(this),
     AssetsApiRoute(this),
-    NodeApiRoute(this)
+    NodeApiRoute(this),
+    AssetsBroadcastApiRoute(this)
   )
 
   override lazy val apiTypes = Seq(
@@ -60,7 +63,8 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     typeOf[DebugApiRoute],
     typeOf[WavesApiRoute],
     typeOf[AssetsApiRoute],
-    typeOf[NodeApiRoute]
+    typeOf[NodeApiRoute],
+    typeOf[AssetsBroadcastApiRoute]
   )
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
@@ -75,8 +79,7 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
 object Application extends ScorexLogging {
   def main(args: Array[String]): Unit =
     RootActorSystem.start("wavesplatform") { actorSystem =>
-      //TODO: gagarin55-change to info cuz default log level is info
-      log.debug("Starting with args: {} ", args)
+      log.info("Starting with args: {} ", args)
       val filename = args.headOption.getOrElse("settings.json")
       val settings = new WavesSettings(filename)
 
