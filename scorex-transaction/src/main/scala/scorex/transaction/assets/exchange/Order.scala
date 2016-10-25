@@ -28,10 +28,11 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
                  @ApiModelProperty(dataType = "java.lang.String", example = "") matcher: PublicKeyAccount,
                  @ApiModelProperty(dataType = "java.lang.String") spendAssetId: AssetId,
                  @ApiModelProperty(dataType = "java.lang.String") receiveAssetId: AssetId,
-                 @ApiModelProperty("Price for AssetPair.second in AssetPair.first * 10^8") price: Long,
+                 @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8",
+                   example = "100000000") price: Long,
                  @ApiModelProperty("Amount in AssetPair.first") amount: Long,
                  maxTimestamp: Long,
-                 @ApiModelProperty(example = "1000") matcherFee: Long,
+                 @ApiModelProperty(example = "100000") matcherFee: Long,
                  @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
   extends BytesSerializable
   with JsonSerializable {
@@ -42,6 +43,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   def orderType: OrderType = if (receiveAssetId sameElements assetPair.first) OrderType.BUY else OrderType.SELL
 
+  lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
+
   def isValid(atTime: Long): Validation = {
     (amount > 0) :| "amount should be > 0" &&
       (price > 0) :| "price should be > 0" &&
@@ -50,7 +53,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (maxTimestamp - atTime <= MaxLiveTime) :| "maxTimestamp should be earlier than 30 days" &&
       (atTime <= maxTimestamp) :| "maxTimestamp should be > currentTime" &&
-      EllipticCurveImpl.verify(signature, toSign, sender.publicKey) :| "signature should be valid"
+      signatureValid :| "signature should be valid"
   }
 
   @ApiModelProperty(hidden = true)
@@ -63,10 +66,20 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   override def bytes: Array[Byte] = toSign ++ signature
 
+  def sellAmount(): Long = {
+    if (orderType == OrderType.SELL) amount
+    else (BigInt(amount) * PriceConstant / price).longValue()
+  }
+
+  def buyAmount(): Long = {
+    if (orderType == OrderType.BUY) amount
+    else (BigInt(amount) * PriceConstant / price).longValue()
+  }
+
   override def json: JsObject = Json.obj(
     "id" -> Base58.encode(id),
-    "sender" -> sender.address,
-    "matcher" -> matcher.address,
+    "sender" -> Base58.encode(sender.publicKey),
+    "matcher" -> Base58.encode(matcher.publicKey),
     "spendAssetId" -> Base58.encode(spendAssetId),
     "receiveAssetId" -> Base58.encode(receiveAssetId),
     "price" -> price,

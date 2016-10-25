@@ -22,9 +22,9 @@ case class Validation(
       labels = x.labels ++ y.labels
     )
 
-  def :|(l: String): Validation = copy(labels = labels + l)
+  def :|(l: String): Validation = if (!this.status) copy(labels = labels + l) else this
 
-  def |:(l: String): Validation = copy(labels = labels.map(l + " " + _))
+  def |:(l: String): Validation = if (!this.status) copy(labels = labels.map(l + " " + _)) else this
 
 }
 
@@ -36,4 +36,6 @@ class ExtendedBoolean(b: => Boolean) {
 case object Validation {
   implicit def BooleanOperators(b: => Boolean): ExtendedBoolean = new ExtendedBoolean(b)
   implicit def result2Bolean(x: Validation): Boolean = x.status
+
+  val success = Validation(status = true)
 }

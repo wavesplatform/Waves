@@ -9,7 +9,8 @@ import scorex.utils.{ByteArray, NTP}
 class OrderTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Order transaction serialization roundtrip") {
-    forAll(orderGenerator) { order: Order =>
+    forAll { x: (Order, PrivateKeyAccount) =>
+      val (order, pk) = x
       val recovered = Order.parseBytes(order.bytes).get
       recovered.bytes shouldEqual order.bytes
       recovered.id shouldBe order.id
@@ -26,7 +27,8 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
   }
 
   property("Order generator should generate valid orders") {
-    forAll(orderGenerator) { order: Order =>
+    forAll { x: (Order, PrivateKeyAccount) =>
+      val (order, pk) = x
       order.isValid(NTP.correctedTime()) shouldBe valid
     }
   }
@@ -66,7 +68,8 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
   }
 
   property("Order signature validation") {
-    forAll(orderGenerator, bytes32gen) { (order: Order, bytes: Array[Byte]) =>
+    forAll { (x: (Order, PrivateKeyAccount), bytes: Array[Byte]) =>
+      val (order, pk) = x
       order.isValid(NTP.correctedTime()) shouldBe valid
       order.copy(sender = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain ("signature should be valid")
       order.copy(matcher = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain ("signature should be valid")
