@@ -50,7 +50,7 @@ trait TransactionGen {
 
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
 
-  val orderGenerator: Gen[Order] = for {
+  val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
     spendAssetID: Array[Byte] <- bytes32gen
@@ -59,7 +59,7 @@ trait TransactionGen {
     amount: Long <- maxWavesAnountGen
     maxtTime: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
-  } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
+  } yield (Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee), sender)
 
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -119,6 +119,7 @@ trait TransactionGen {
   }
 
   implicit val orderMatchArb: Arbitrary[(OrderMatch, PrivateKeyAccount)] = Arbitrary { orderMatchGenerator }
+  implicit val orderArb: Arbitrary[(Order, PrivateKeyAccount)] = Arbitrary { orderGenerator }
   implicit val privateKeyAccArb: Arbitrary[PrivateKeyAccount] = Arbitrary { accountGen }
 
   def validOrderMatch = orderMatchGenerator.sample.get
