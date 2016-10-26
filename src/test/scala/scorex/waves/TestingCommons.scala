@@ -28,6 +28,8 @@ object TestingCommons {
     val apps = List(
       new Application(ActorSystem("test"), new WavesSettings("settings-test.json") {
         override lazy val chainParams = TestNetParams
+        override lazy val walletDirOpt = None
+        override lazy val dataDirOpt = None
       })
     )
     apps.foreach(_.run())
