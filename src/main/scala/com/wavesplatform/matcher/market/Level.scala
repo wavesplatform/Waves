@@ -2,6 +2,8 @@ package com.wavesplatform.matcher.market
 
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 
+case class LevelAgg(price: Long, amount: Long)
+
 class Level(val assetPair: AssetPair, val price: Long) {
   var orders = Vector.empty[Order]
 
@@ -35,4 +37,8 @@ class Level(val assetPair: AssetPair, val price: Long) {
   }
 
   def isEmpty: Boolean = orders.isEmpty
+
+  def getAgg: LevelAgg = {
+    LevelAgg(price, orders.foldLeft(0L)((b, o) => b + o.amount))
+  }
 }

@@ -47,4 +47,8 @@ class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) {
     priceOrders.values().flatMap(orders => orders.orders).toSeq
   }
 
+  def take(depth: Int): Seq[LevelAgg] = {
+    priceOrders.take(depth).values.map(_.getAgg).toList
+  }
+
 }

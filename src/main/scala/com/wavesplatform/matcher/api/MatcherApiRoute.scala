@@ -7,6 +7,8 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode, StatusCod
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import com.wavesplatform.matcher.market.MatcherActor.OrderResponse
+import com.wavesplatform.matcher.market.OrderBookActor.{GetOrderBookRequest, GetOrderBookResponse}
+import com.wavesplatform.matcher.model.OrderBookResult
 import scorex.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.settings.WavesSettings
 import io.swagger.annotations._
@@ -14,8 +16,9 @@ import play.api.libs.json._
 import scorex.api.http._
 import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.exchange.{Order, Validation}
+import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
+import scorex.utils.NTP
 import scorex.wallet.Wallet
 
 import scala.concurrent.Future
@@ -44,7 +47,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
 
   override lazy val route =
     pathPrefix("matcher") {
-      place ~ matcherPubKey ~ signOrder ~ balance
+      place ~ matcherPubKey ~ signOrder ~ balance ~ orderBook
     }
 
   @Path("/publicKey")
@@ -70,6 +73,28 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
         val json = wallet.privateKeyAccount(address).map(a => JsString(Base58.encode(a.publicKey))).
           getOrElse(JsString(""))
         JsonResponse(json, StatusCodes.OK)
+      }
+    }
+  }
+
+  @Path("/orderBook/{asset1}/{asset2}")
+  @ApiOperation(value = "Order ", notes = "Account Public Key", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "asset1", value = "AssetId", required = true, dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "asset2", value = "AssetId", required = true, dataType = "string", paramType = "path")
+  ))
+  def orderBook: Route = {
+    path("orderBook" / Segment / Segment) { (a1, a2) =>
+      getJsonRoute {
+        val asset1 = Base58.decode(a1).get
+        val asset2 = Base58.decode(a2).get
+
+        (matcher ? GetOrderBookRequest(AssetPair(asset1, asset2)))
+          .mapTo[GetOrderBookResponse]
+          .map { r =>
+            val resp = OrderBookResult(NTP.correctedTime(), AssetPair(asset1, asset2), r.bids, r.asks)
+            JsonResponse(Json.toJson(resp), StatusCodes.OK)
+          }
       }
     }
   }

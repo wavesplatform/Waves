@@ -1,8 +1,8 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, ActorRef, Props}
-
 import com.wavesplatform.matcher.market.MatcherActor.OrderResponse
+import com.wavesplatform.matcher.market.OrderBookActor.GetOrderBookRequest
 import play.api.libs.json.{JsValue, Json}
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.ScorexLogging
@@ -74,17 +74,20 @@ class MatcherActor extends Actor with ScorexLogging {
   def createOrderBook(pair: AssetPair) =
     context.actorOf(OrderBookActor.props(pair), OrderBookActor.name(pair))
 
-  def createAndForward(order: Order) = {
-    val orderBook = createOrderBook(order.assetPair)
-    forwardOrder(order)(orderBook)
+  def createAndForward(pair: AssetPair, req: Any) = {
+    val orderBook = createOrderBook(pair)
+    forwardReq(req)(orderBook)
   }
 
-  def forwardOrder(order: Order)(orderBook: ActorRef) = orderBook forward order
+  def forwardReq(req: Any)(orderBook: ActorRef) = orderBook forward req
 
   def forwardToOrderBook: Receive = {
     case order: Order =>
       context.child(OrderBookActor.name(order.assetPair))
-        .fold(createAndForward(order))(forwardOrder(order))
+        .fold(createAndForward(order.assetPair, order))(forwardReq(order))
+    case ob: GetOrderBookRequest =>
+      context.child(OrderBookActor.name(ob.pair))
+        .fold(createAndForward(ob.pair, ob))(forwardReq(ob))
   }
 
   override def receive: Receive = forwardToOrderBook

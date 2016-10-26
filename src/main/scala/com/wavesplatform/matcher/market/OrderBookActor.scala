@@ -15,10 +15,13 @@ object OrderBookActor {
   def name(assetPair: AssetPair): String = Base58.encode(assetPair.first) + "-" + Base58.encode(assetPair.second)
 
   //protocol
+  val MaxDepth = 50
   case object GetOrdersRequest
+  case class GetOrderBookRequest(pair: AssetPair, depth: Int = MaxDepth)
   case object GetBidOrdersRequest
   case object GetAskOrdersRequest
   case class GetOrdersResponse(orders: Seq[Order])
+  case class GetOrderBookResponse(bids: Seq[LevelAgg], asks: Seq[LevelAgg])
 
   // events
   sealed trait OrderEvent
@@ -49,6 +52,15 @@ class OrderBookActor(assetPair: AssetPair) extends PersistentActor with ScorexLo
       sender() ! GetOrdersResponse(asks.flattenOrders)
     case GetBidOrdersRequest =>
       sender() ! GetOrdersResponse(bids.flattenOrders)
+    case GetOrderBookRequest(pair, depth) =>
+      getOrderBook(pair, depth)
+  }
+
+  def getOrderBook(pair: AssetPair, depth: Int): Unit = {
+    if (pair == assetPair) {
+      val d = Math.min(depth, MaxDepth)
+      sender() ! GetOrderBookResponse(bids.take(d), asks.take(d))
+    } else sender() ! GetOrderBookResponse(Seq(), Seq())
   }
 
   override def receiveRecover: Receive = {
