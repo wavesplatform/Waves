@@ -1,11 +1,10 @@
 package scorex.transaction.state.database.blockchain
 
 import scala.util.Try
-
 import com.google.common.primitives.Ints
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.exchange.OrderMatch
+import scorex.transaction.assets.exchange.{Order, OrderMatch}
 import scorex.utils.LogMVMapBuilder
 
 trait OrderMatchStoredState {
@@ -43,12 +42,12 @@ trait OrderMatchStoredState {
   }
 
   def findPrevOrderMatchTxs(om: OrderMatch): Set[OrderMatch] = {
-    val id1 = Base58.encode(om.buyOrder.id)
-    val id2 = Base58.encode(om.sellOrder.id)
-    parseTxSeq(Option(orderMatchTx.get(id1)).getOrElse(emptyTxSeq)) ++
-      parseTxSeq(Option(orderMatchTx.get(id2)).getOrElse(emptyTxSeq))
+    findPrevOrderMatchTxs(om.buyOrder) ++ findPrevOrderMatchTxs(om.sellOrder)
   }
 
+  def findPrevOrderMatchTxs(order: Order): Set[OrderMatch] = {
+    parseTxSeq(Option(orderMatchTx.get(Base58.encode(order.id))).getOrElse(emptyTxSeq))
+  }
 
   def rollbackOrderMatchTo(rollbackTo: Int): Unit = {
     //orderMatchTx.keySet().forEach()
