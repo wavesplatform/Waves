@@ -1,18 +1,18 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.matcher.model
 
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 
 case class LevelAgg(price: Long, amount: Long)
 
 class Level(val assetPair: AssetPair, val price: Long) {
-  var orders = Vector.empty[Order]
+  var orders = Vector.empty[OrderItem]
 
-  def += (order: Order) {
-    require(order.price == price && order.assetPair == assetPair)
+  def += (order: OrderItem) {
+    require(order.price == price && order.order.assetPair == assetPair)
     orders = orders :+ order
   }
 
-  def execute(order: Order): (Seq[Order], Long) = {
+  def execute(order: OrderItem): (Seq[OrderItem], Long) = {
     var remainingAmount = order.amount
 
     var (executed, rest) = orders.span { placedOrder =>

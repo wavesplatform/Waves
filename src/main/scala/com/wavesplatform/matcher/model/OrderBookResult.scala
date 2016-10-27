@@ -1,8 +1,6 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.matcher.market.LevelAgg
-import play.api.libs.json.{JsPath, Json, Writes}
-import play.api.libs.functional.syntax._
+import play.api.libs.json.{Json, Writes}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.AssetPair
 

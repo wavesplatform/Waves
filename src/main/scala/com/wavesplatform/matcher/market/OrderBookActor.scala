@@ -6,6 +6,7 @@ import akka.actor.Props
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import com.wavesplatform.matcher.market.MatcherActor.OrderAccepted
 import com.wavesplatform.matcher.market.OrderBookActor._
+import com.wavesplatform.matcher.model.{LevelAgg, OrderBook, OrderItem}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.ScorexLogging
@@ -20,13 +21,13 @@ object OrderBookActor {
   case class GetOrderBookRequest(pair: AssetPair, depth: Int = MaxDepth)
   case object GetBidOrdersRequest
   case object GetAskOrdersRequest
-  case class GetOrdersResponse(orders: Seq[Order])
+  case class GetOrdersResponse(orders: Seq[OrderItem])
   case class GetOrderBookResponse(bids: Seq[LevelAgg], asks: Seq[LevelAgg])
 
   // events
   sealed trait OrderEvent
-  case class OrderAdded(order: Order) extends OrderEvent
-  case class OrderMatched(orders: Seq[Order]) extends OrderEvent
+  case class OrderAdded(order: OrderItem) extends OrderEvent
+  case class OrderMatched(order: Order, items: Seq[OrderItem]) extends OrderEvent
 }
 
 case object BidComparator extends Comparator[Long] {
@@ -69,33 +70,32 @@ class OrderBookActor(assetPair: AssetPair) extends PersistentActor with ScorexLo
   }
 
   def handleAddOrder(order: Order): Unit = {
-    persistAsync(OrderAdded(order)) { evt =>
-      place(order)
+    persistAsync(OrderAdded(OrderItem(order))) { evt =>
+      place(evt.order)
       sender() ! OrderAccepted(order)
     }
   }
 
   private def applyEvent(orderEvent: OrderEvent) = orderEvent match {
     case OrderAdded(order) => place(order)
-    case OrderMatched(orders) =>
   }
 
-  private def putOrder(order: Order): Unit = {
-    order.orderType match {
+  private def putOrder(order: OrderItem): Unit = {
+    order.order.orderType match {
       case OrderType.BUY => bids.add(order)
       case OrderType.SELL => asks.add(order)
     }
   }
 
-  private def place(order: Order) {
-    val (executedOrders, remaining) = order.orderType match {
+  private def place(order: OrderItem) {
+    val (executedOrders, remaining) = order.order.orderType match {
       case OrderType.BUY => asks.execute(order)
       case OrderType.SELL => bids.execute(order)
     }
 
     if (executedOrders.nonEmpty) {
-      log.info(s"${order.orderType} executed: {}", executedOrders)
-      context.system.eventStream.publish(OrderMatched(executedOrders))
+      log.info(s"${order.order.orderType} executed: {}", executedOrders)
+      context.system.eventStream.publish(OrderMatched(order.order, executedOrders))
     }
 
     if (remaining > 0) {

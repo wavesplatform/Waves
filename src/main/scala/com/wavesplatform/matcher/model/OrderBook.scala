@@ -1,11 +1,11 @@
-package com.wavesplatform.matcher.market
+package com.wavesplatform.matcher.model
 
 import java.util
 import java.util.Comparator
 
-import scala.collection.JavaConversions._
-
 import scorex.transaction.assets.exchange.{AssetPair, Order}
+
+import scala.collection.JavaConversions._
 
 class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) {
   private val priceOrders: util.TreeMap[Long, Level] = new util.TreeMap[Long, Level](comparator)
@@ -18,12 +18,12 @@ class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) {
     }
   }
 
-  def add(order: Order) {
+  def add(order: OrderItem) {
     priceOrders.putIfAbsent(order.price, new Level(assetPair, order.price))
     priceOrders.get(order.price) += order
   }
 
-  def execute(order: Order): (Seq[Order], Long) = {
+  def execute(order: OrderItem): (Seq[OrderItem], Long) = {
     getBestOrders match {
       case Some(bestOrders) =>
         if (comparator.compare(bestOrders.price, order.price) <= 0) {
@@ -43,7 +43,7 @@ class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) {
     priceOrders.remove(orders.price)
   }
 
-  def flattenOrders: Seq[Order] = {
+  def flattenOrders: Seq[OrderItem] = {
     priceOrders.values().flatMap(orders => orders.orders).toSeq
   }
 
