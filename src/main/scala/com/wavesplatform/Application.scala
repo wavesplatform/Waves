@@ -19,7 +19,7 @@ import scorex.api.http.assets.AssetsBroadcastApiRoute
 
 class Application(as: ActorSystem, appSettings: WavesSettings) extends {
   override implicit val settings = appSettings
-  override val applicationName = Constants.ApplicationName
+  override val applicationName = "waves"
   override val appVersion = {
     val parts = Constants.VersionString.split("\\.")
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
