@@ -158,4 +158,9 @@ object Order extends Deser[Order] {
     val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
+
+  def sortByType(o1: Order, o2: Order): (Order, Order) = {
+    if (o1.orderType == OrderType.BUY) (o1, o2)
+    else (o2, o1)
+  }
 }
