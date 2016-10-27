@@ -1,7 +1,3 @@
-**0.3.2**
-
-* By default walletDir and dataDir located in $HOME/waves
-
 **0.3.1**
 
 * HTTP API /scorex removed. Use /node instead.
