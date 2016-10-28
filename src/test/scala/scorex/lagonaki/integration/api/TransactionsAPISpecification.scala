@@ -28,12 +28,6 @@ class TransactionsAPISpecification extends FunSuite with TestLock with Matchers 
     (tr \\ "signature").toList.size shouldBe unconfirmed.size
   }
 
-  test("/transactions/address/{address} API route") {
-    addresses.foreach { a =>
-      checkTransactionList(GET.request(s"/transactions/address/$a"))
-    }
-  }
-
   test("/transactions/address/{address}/limit/{limit} API route") {
     addresses.foreach { a =>
       val tr = GET.request(s"/transactions/address/$a/limit/2")
