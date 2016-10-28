@@ -100,6 +100,32 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
+  property("AccountAssetsBalances") {
+    withRollbackTest {
+      forAll(transferGenerator.suchThat(_.assetId.isDefined)) { tx: TransferTransaction =>
+        state.applyChanges(state.calcNewBalances(Seq(tx), Map()))
+
+        val senderBalances = state.getAccountBalance(tx.sender)
+        val receiverBalances = state.getAccountBalance(tx.recipient)
+
+        senderBalances.keySet should contain(tx.assetId.get)
+        receiverBalances.keySet should contain(tx.assetId.get)
+      }
+    }
+  }
+
+  property("Old style reissue asset") {
+    forAll(issueReissueGenerator) { pair =>
+      val issueTx: IssueTransaction = pair._1
+      val issueTx2: IssueTransaction = pair._2
+      val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
+
+      state.applyChanges(state.calcNewBalances(Seq(issueTx), Map()))
+
+      state.isValid(issueTx2, Int.MaxValue) shouldBe false
+    }
+  }
+
   def getBalances(a: AssetAcc*): Seq[Long] = {
     a.map(state.assetBalance(_))
   }
