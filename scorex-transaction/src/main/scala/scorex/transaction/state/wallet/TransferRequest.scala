@@ -12,7 +12,7 @@ case class TransferRequest(assetIdOpt: Option[String],
                            recipient: String)
 
 object TransferRequest {
-  implicit val paymentWrites: Writes[TransferRequest] = (
+  implicit val transferWrites: Writes[TransferRequest] = (
     (JsPath \ "assetIdOpt").writeNullable[String] and
       (JsPath \ "feeAsset").writeNullable[String] and
       (JsPath \ "amount").write[Long] and
@@ -22,7 +22,7 @@ object TransferRequest {
       (JsPath \ "recipient").write[String]
     ) (unlift(TransferRequest.unapply))
 
-  implicit val paymentReads: Reads[TransferRequest] = (
+  implicit val transferReads: Reads[TransferRequest] = (
     (JsPath \ "assetIdOpt").readNullable[String] and
       (JsPath \ "feeAsset").readNullable[String] and
       (JsPath \ "amount").read[Long] and

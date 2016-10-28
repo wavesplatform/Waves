@@ -12,4 +12,5 @@ trait SignedTransaction extends TypedTransaction {
   protected lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
   override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
 
+  def validate: ValidationResult.Value
 }

@@ -34,18 +34,17 @@ trait Settings extends ScorexLogging {
     Json.obj()
   }
 
-  private def directoryEnsuring(dirPath: String): Boolean = {
+  protected def directoryEnsuring(dirPath: String): Boolean = {
     val f = new java.io.File(dirPath)
     f.mkdirs()
     f.exists()
   }
 
-  lazy val dataDirOpt = {
-    val res = (settingsJSON \ "dataDir").asOpt[String]
-    res.foreach(folder => new File(folder).mkdirs())
-    require(res.isEmpty || new File(res.get).exists())
-    res
-  }
+  lazy val dataDirOpt = (settingsJSON \ "dataDir").asOpt[String]
+    .ensuring(pathOpt => pathOpt.forall(directoryEnsuring))
+
+  lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
+    .ensuring(pathOpt => pathOpt.forall(directoryEnsuring))
 
   //p2p
   lazy val DefaultPort = 9084
@@ -128,8 +127,6 @@ trait Settings extends ScorexLogging {
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(30.seconds)
   lazy val scoreTTL: FiniteDuration = scoreBroadcastDelay * 3
 
-  lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
-    .ensuring(pathOpt => pathOpt.map(directoryEnsuring).getOrElse(true))
   lazy val walletPassword = (settingsJSON \ "walletPassword").asOpt[String].getOrElse {
     println("Please type your wallet password")
     scala.io.StdIn.readLine()
