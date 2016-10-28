@@ -128,6 +128,20 @@ with PrivateMethodTester with OptionValues with TransactionGen {
     }
   }
 
+  property("AccountAssetsBalances") {
+    withRollbackTest {
+      forAll(transferGenerator.suchThat(_.assetId.isDefined)) { tx: TransferTransaction =>
+        state.applyChanges(state.calcNewBalances(Seq(tx), Map()))
+
+        val senderBalances = state.getAccountBalance(tx.sender)
+        val receiverBalances = state.getAccountBalance(tx.recipient)
+
+        senderBalances.keySet should contain(tx.assetId.get)
+        receiverBalances.keySet should contain(tx.assetId.get)
+      }
+    }
+  }
+
   property("Old style reissue asset") {
     forAll(issueReissueGenerator) { pair =>
       val issueTx: IssueTransaction = pair._1

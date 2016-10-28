@@ -4,6 +4,7 @@ import org.h2.mvstore.{MVMap, MVStore}
 import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.Account
 import scorex.block.Block
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
 import scorex.transaction.assets.{AssetIssuance, IssueTransaction, ReissueTransaction, TransferTransaction}
@@ -47,13 +48,13 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     * Transaction ID -> serialized transaction
     */
   private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
-    db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
+  db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   /**
     * Transaction Signature -> serialized transaction
     */
   private val reissuableIndex: MVMap[Array[Byte], Boolean] =
-    db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
+  db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
@@ -62,6 +63,40 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   def stateHeight: Int = heightMap.get(HeightKey)
 
   private def setStateHeight(height: Int): Unit = heightMap.put(HeightKey, height)
+
+  private val accountAssetsMap: MVMap[String, Set[String]] = db.openMap("", new LogMVMapBuilder[String, Set[String]])
+
+  private def updateAccountAssets(address: Address, assetId: Option[AssetId]): Unit = {
+    if (assetId.isDefined) {
+      val asset = Base58.encode(assetId.get)
+      val assets = Option(accountAssetsMap.get(address)).getOrElse(Set.empty[String])
+      accountAssetsMap.put(address, assets + asset)
+    }
+  }
+
+  private def getAccountAssets(address: Address): Set[String] =
+    Option(accountAssetsMap.get(address)).getOrElse(Set.empty[String])
+
+  private def isIssuerOfAsset(address: Address, assetId: AssetId): Boolean = {
+    val issueTransaction = Option(transactionsMap.get(assetId)).flatMap(b => IssueTransaction.parseBytes(b).toOption)
+
+    if (issueTransaction.isDefined) issueTransaction.get.sender.address == address else false
+  }
+
+  def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean)] = {
+    val address = account.address
+    getAccountAssets(address).foldLeft(Map.empty[AssetId, (Long, Boolean)]) { (result, asset) =>
+      val assetIdTry = Base58.decode(asset)
+      val balance = balanceByKey(address + asset)
+
+      if (assetIdTry.isSuccess) {
+        val assetId = assetIdTry.get
+        val issued = isIssuerOfAsset(address, assetId)
+
+        result.updated(assetId, (balance, issued))
+      } else result
+    }
+  }
 
   private[blockchain] def applyChanges(changes: Map[AssetAcc, (AccState, Reason)]): Unit = synchronized {
     setStateHeight(stateHeight + 1)
@@ -78,6 +113,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
         case tx =>
           includedTx.put(tx.id, h)
       }
+      updateAccountAssets(ch._1.account.address, ch._1.assetId)
     }
   }
 
@@ -103,7 +139,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   override def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactions
     val fees: Map[AssetAcc, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
-      .map(m => m._1 ->(AccState(assetBalance(m._1) + m._2), List(FeesStateChange(m._2))))
+      .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2), List(FeesStateChange(m._2))))
 
     val newBalances: Map[AssetAcc, (AccState, Reason)] = calcNewBalances(trans, fees)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
@@ -255,7 +291,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
         case Some(lastTransaction) => lastTransaction.timestamp
         case _ => 0
       }
-      address ->(List[Transaction](), stateTimestamp)
+      address -> (List[Transaction](), stateTimestamp)
     }: _*)
 
     val orderedTransaction = paymentTransactions.sortBy(_.timestamp)
