@@ -54,13 +54,13 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     * Transaction ID -> serialized transaction
     */
   private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
-    db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
+  db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   /**
     * Transaction Signature -> reissuable flag
     */
   private val reissuableIndex: MVMap[Array[Byte], Boolean] =
-    db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
+  db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
