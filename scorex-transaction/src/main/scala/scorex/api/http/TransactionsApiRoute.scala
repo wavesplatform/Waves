@@ -27,7 +27,7 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
 
   override lazy val route =
     pathPrefix("transactions") {
-      unconfirmed ~ address ~ adressLimit ~ info
+      unconfirmed ~ adressLimit ~ info
     }
 
   //TODO implement general pagination
@@ -42,26 +42,9 @@ case class TransactionsApiRoute(application: RunnableApplication)(implicit val c
       getJsonRoute {
         if (limit <= MaxTransactionsPerRequest) {
           val account = new Account(address)
-          val txJsons = state.accountTransactions(account)
-            .takeRight(limit)
-            .map(_.json)
+          val txJsons = state.accountTransactions(account, limit).map(_.json)
           JsonResponse(Json.arr(txJsons), StatusCodes.OK)
         } else TooBigArrayAllocation.response
-      }
-    }
-  }
-
-  @Path("/address/{address}")
-  @ApiOperation(value = "Address", notes = "Get list of transactions where specified address has been involved", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path")
-  ))
-  def address: Route = {
-    path("address" / Segment) { case address =>
-      getJsonRoute {
-        val account = new Account(address)
-        val txsJson = state.accountTransactions(account).map(_.json)
-        JsonResponse(Json.arr(txsJson), StatusCodes.OK)
       }
     }
   }
