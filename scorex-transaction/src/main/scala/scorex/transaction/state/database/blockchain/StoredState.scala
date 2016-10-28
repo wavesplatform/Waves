@@ -182,7 +182,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
         loop(accHeight, Seq.empty).distinct
       case None => Seq.empty
     }
-  }
+  }.takeRight(limit)
 
   def lastAccountLagonakiTransaction(account: Account): Option[LagonakiTransaction] = {
     def loop(h: Int, address: Address): Option[LagonakiTransaction] = {
