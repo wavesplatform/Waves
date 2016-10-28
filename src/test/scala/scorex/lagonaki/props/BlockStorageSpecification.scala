@@ -11,7 +11,6 @@ import scorex.utils._
 class BlockStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
 with BlockTestingCommons {
 
-  //  val smallInteger: Gen[Int] = Gen.choose(0, 2)
   val blockGen: Gen[Block] = for {
     gb <- Arbitrary.arbitrary[Long]
     gs <- Arbitrary.arbitrary[Array[Byte]]
@@ -24,11 +23,11 @@ with BlockTestingCommons {
   property("Add correct blocks") {
     forAll(blockGen) { (block: Block) =>
       val prevH = storage.history.height()
-      val prevTx = storage.state.accountTransactions(gen).length
+      val prevTx = storage.state.accountTransactions(gen, Int.MaxValue).length
       storage.state.included(block.transactions.head) shouldBe None
       storage.appendBlock(block).isSuccess shouldBe true
       storage.history.height() shouldBe prevH + 1
-      storage.state.accountTransactions(gen).length shouldBe prevTx + 1
+      storage.state.accountTransactions(gen, Int.MaxValue).length shouldBe prevTx + 1
       storage.state.included(block.transactions.head).get shouldBe storage.history.heightOf(block)
     }
   }
@@ -36,14 +35,14 @@ with BlockTestingCommons {
   property("Don't add incorrect blocks") {
     val wrongBlockId = Some("wrong".getBytes)
     forAll { (gb: Long, gs: Array[Byte], seed: Array[Byte]) =>
-      val prevTx = storage.state.accountTransactions(gen).length
+      val prevTx = storage.state.accountTransactions(gen, Int.MaxValue).length
       val block = genBlock(gb, gs, seed, wrongBlockId)
       val prevH = storage.history.height()
       storage.state.included(block.transactions.head) shouldBe None
       storage.appendBlock(block).isSuccess shouldBe false
       storage.state.included(block.transactions.head) shouldBe None
       storage.history.height() shouldBe prevH
-      storage.state.accountTransactions(gen).length shouldBe prevTx
+      storage.state.accountTransactions(gen, Int.MaxValue).length shouldBe prevTx
     }
   }
 

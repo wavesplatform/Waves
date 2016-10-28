@@ -167,20 +167,20 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
   def totalBalance: Long = lastStates.keySet().toList.map(address => balanceByKey(address)).sum
 
-  override def accountTransactions(account: Account): Array[Transaction] = {
+  override def accountTransactions(account: Account, limit: Int = 50): Seq[Transaction] = {
     Option(lastStates.get(account.address)) match {
       case Some(accHeight) =>
         val m = accountChanges(account.address)
-        def loop(h: Int, acc: Array[Transaction]): Array[Transaction] = Option(m.get(h)) match {
-          case Some(heightChangesBytes) =>
+        def loop(h: Int, acc: Seq[Transaction]): Seq[Transaction] = Option(m.get(h)) match {
+          case Some(heightChangesBytes) if acc.length < limit =>
             val heightChanges = heightChangesBytes
             val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[Transaction])
               .map(_.asInstanceOf[Transaction])
             loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
-          case None => acc
+          case _ => acc
         }
-        loop(accHeight, Array.empty).distinct
-      case None => Array.empty
+        loop(accHeight, Seq.empty).distinct
+      case None => Seq.empty
     }
   }
 
