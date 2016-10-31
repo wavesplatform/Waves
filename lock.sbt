@@ -4,6 +4,7 @@
 dependencyOverrides in ThisBuild ++= Set(
   "ch.qos.logback" % "logback-classic" % "1.1.7",
   "ch.qos.logback" % "logback-core" % "1.1.7",
+  "com.artima.supersafe" % "supersafe_2.11.8" % "1.1.0",
   "com.chuusai" % "shapeless_2.11" % "2.3.2",
   "com.fasterxml.jackson.core" % "jackson-annotations" % "2.5.4",
   "com.fasterxml.jackson.core" % "jackson-core" % "2.5.4",
@@ -80,4 +81,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.12"
 )
-// LIBRARY_DEPENDENCIES_HASH be1071e4317b339984c5c5f1d2a292641b029dd7
+// LIBRARY_DEPENDENCIES_HASH 2398a50af9cf23a7540cf31cdc356d8def9e00c5

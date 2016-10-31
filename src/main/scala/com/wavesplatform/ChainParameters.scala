@@ -3,11 +3,12 @@ package com.wavesplatform
 import scorex.account.{Account, AddressScheme}
 import scorex.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.settings.Constants
+import scorex.settings.WavesHardForkParameters
 
 /**
   * ChainParameters contains the data needed for working with an instantiation of particular chain
   */
-abstract class ChainParameters {
+abstract class ChainParameters extends WavesHardForkParameters {
   val initialBalance: Long
   val genesisTimestamp: Long
   val genesisTxs : Seq[Transaction]
@@ -32,6 +33,10 @@ object TestNetParams extends ChainParameters {
   override val addressScheme: AddressScheme = new AddressScheme {
     override val chainId: Byte = 'T'.toByte
   }
+
+  override def allowTemporaryNegativeUntil: Long = 1477958400
+
+  override def requireSortedTransactionsAfter: Long = 1477958400
 }
 
 object MainNetParams extends ChainParameters {
@@ -52,4 +57,7 @@ object MainNetParams extends ChainParameters {
   override val addressScheme: AddressScheme = new AddressScheme {
     override val chainId: Byte = 'W'.toByte
   }
+  override def allowTemporaryNegativeUntil: Long = 1478736000
+
+  override def requireSortedTransactionsAfter: Long = 1478736000
 }
