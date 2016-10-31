@@ -111,8 +111,6 @@ trait Settings extends ScorexLogging {
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(30.seconds)
   lazy val scoreTTL: FiniteDuration = scoreBroadcastDelay * 3
 
-  lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
-    .ensuring(pathOpt => pathOpt.forall(directoryEnsuring))
   lazy val walletPassword = (settingsJSON \ "walletPassword").asOpt[String].getOrElse {
     println("Please type your wallet password")
     scala.io.StdIn.readLine()
