@@ -11,12 +11,13 @@ import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
+import scorex.settings.{Settings, WavesHardForkParameters}
 
 class BlockSpecification extends FunSuite with Matchers with TestingCommons {
 
   test("Nxt block with txs bytes/parse roundtrip") {
-    implicit val consensusModule = new NxtLikeConsensusModule()
-    implicit val transactionModule = new SimpleTransactionModule()(application.settings, application)
+    implicit val consensusModule = new NxtLikeConsensusModule(WavesHardForkParameters.Disabled)
+    implicit val transactionModule = new SimpleTransactionModule(WavesHardForkParameters.Disabled)(application.settings, application)
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
     val gen = new PrivateKeyAccount(reference)
@@ -51,7 +52,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
 
   test("Qora block with txs bytes/parse roundtrip") {
     implicit val consensusModule = new QoraLikeConsensusModule()
-    implicit val transactionModule = new SimpleTransactionModule()(application.settings, application)
+    implicit val transactionModule = new SimpleTransactionModule(WavesHardForkParameters.Disabled)(application.settings, application)
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
     val gen = new PrivateKeyAccount(reference)

@@ -72,7 +72,6 @@ with Matchers with TransactionGen {
   object MySettings extends TransactionSettings with Settings {
     override lazy val settingsJSON: JsObject = feeMapJson
     override lazy val dataDirOpt: Option[String] = None
-    override val filename: String = ""
     override lazy val knownPeers = Seq.empty[InetSocketAddress]
   }
 }

@@ -6,9 +6,10 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
 import scorex.crypto.encode.Base58
+import scorex.consensus.TransactionsOrdering
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
-import scorex.settings.Settings
+import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.ValidationResult.ValidationResult
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
@@ -41,7 +42,8 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 }
 
 
-class SimpleTransactionModule(implicit val settings: TransactionSettings with Settings, application: Application)
+class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit val settings: TransactionSettings with Settings,
+                              application: Application)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
 
   import SimpleTransactionModule._
@@ -54,7 +56,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
 
   override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl
 
-  override val blockStorage = new BlockStorageImpl(settings)(application.consensusModule, this)
+  override val blockStorage = new BlockStorageImpl(settings, hardForkParams)(application.consensusModule, this)
 
   /**
     * In Lagonaki, transaction-related data is just sequence of transactions. No Merkle-tree root of txs / state etc
@@ -96,9 +98,7 @@ class SimpleTransactionModule(implicit val settings: TransactionSettings with Se
   override def packUnconfirmed(heightOpt: Option[Int]): StoredInBlock = synchronized {
     clearIncorrectTransactions()
 
-    //TODO sort by real value of fee?
-    val txs = utxStorage.all().sortBy(t => if (t.assetFee._1.isDefined) 0 else -t.assetFee._2)
-      .take(MaxTransactionsPerBlock)
+    val txs = utxStorage.all().sorted(TransactionsOrdering).take(MaxTransactionsPerBlock)
     val valid = blockStorage.state.validate(txs, heightOpt)
 
     if (valid.size != txs.size) {

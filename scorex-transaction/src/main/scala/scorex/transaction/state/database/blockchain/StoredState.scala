@@ -14,6 +14,7 @@ import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.util.Try
+import scorex.settings.{Settings, WavesHardForkParameters}
 
 
 /** Store current balances only, and balances changes within effective balance depth.
@@ -22,7 +23,7 @@ import scala.util.Try
   *
   * Use apply method of StoredState object to create new instance
   */
-class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
+class StoredState(db: MVStore, settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging {
 
 
   val HeightKey = "height"
@@ -152,7 +153,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     val fees: Map[AssetAcc, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2), List(FeesStateChange(m._2))))
 
-    val newBalances: Map[AssetAcc, (AccState, Reason)] = calcNewBalances(trans, fees)
+    val newBalances: Map[AssetAcc, (AccState, Reason)] = calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
     applyChanges(newBalances)
@@ -162,7 +163,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   }
 
 
-  private[blockchain] def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reason)]):
+  private[blockchain] def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reason)], allowTemporaryNegative: Boolean):
   Map[AssetAcc, (AccState, Reason)] = {
     val newBalances: Map[AssetAcc, (AccState, Reason)] = trans.foldLeft(fees) { case (changes, atx) =>
       atx match {
@@ -173,11 +174,15 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
             val newBalance = if (currentChange._1.balance == Long.MinValue) Long.MinValue
             else Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
 
+            if (newBalance < 0 && !allowTemporaryNegative) {
+              throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
+            }
+
             iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
           }
 
         case m =>
-          throw new Error("Wrong transaction type in pattern-matching" + m)
+          throw new Error(s"Wrong transaction type in pattern-matching: $m")
       }
     }
     newBalances
@@ -269,7 +274,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
     @tailrec
     def validateBalances(transactions: Seq[Transaction]): Seq[Transaction] = {
-      val nb = calcNewBalances(transactions, Map.empty)
+      val nb = calcNewBalances(transactions, Map.empty, transactions.map(_.timestamp).max < settings.allowTemporaryNegativeUntil)
       val negativeBalances: Map[AssetAcc, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
       val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
         val accAssetTransactions = transactions.filter(_.balanceChanges().exists(_.assetAcc == b._1))

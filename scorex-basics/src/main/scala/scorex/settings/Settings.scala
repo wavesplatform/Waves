@@ -16,23 +16,7 @@ import scala.util.{Random, Try}
 
 trait Settings extends ScorexLogging {
 
-  val filename: String
-
-  //TODO: gagarin55 - remove this initialization away from trait!
-  lazy val settingsJSON: JsObject = Try {
-    val jsonString = scala.io.Source.fromFile(filename).mkString
-    Json.parse(jsonString).as[JsObject]
-  }.recoverWith { case t =>
-    Try {
-      val jsonString = scala.io.Source.fromURL(getClass.getResource(s"/$filename")).mkString
-      Json.parse(jsonString).as[JsObject]
-    }
-  }.getOrElse {
-    log.error(s"Unable to read $filename, closing")
-    //catch error?
-    System.exit(10)
-    Json.obj()
-  }
+  def settingsJSON: JsObject
 
   protected def directoryEnsuring(dirPath: String): Boolean = {
     val f = new java.io.File(dirPath)
@@ -127,6 +111,8 @@ trait Settings extends ScorexLogging {
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(30.seconds)
   lazy val scoreTTL: FiniteDuration = scoreBroadcastDelay * 3
 
+  lazy val walletDirOpt = (settingsJSON \ "walletDir").asOpt[String]
+    .ensuring(pathOpt => pathOpt.forall(directoryEnsuring))
   lazy val walletPassword = (settingsJSON \ "walletPassword").asOpt[String].getOrElse {
     println("Please type your wallet password")
     scala.io.StdIn.readLine()
@@ -165,4 +151,33 @@ trait Settings extends ScorexLogging {
   private val DefaultMiningThreads: Int = 1
 
   private val DefaultGenesisTimestamp: Long = 1460952000000L
+}
+
+object Settings extends ScorexLogging {
+  lazy val empty = new Settings {
+    override def settingsJSON: JsObject = Json.obj()
+  }
+
+  def readSettingsJson(filename: String): JsObject = {
+    Try {
+      val jsonString = scala.io.Source.fromFile(filename).mkString
+      Json.parse(jsonString).as[JsObject]
+    }.recoverWith { case t =>
+      Try {
+        val jsonString = scala.io.Source.fromURL(getClass.getResource(s"/$filename")).mkString
+        Json.parse(jsonString).as[JsObject]
+      }
+    }.getOrElse {
+      log.error(s"Unable to read $filename, closing")
+      //catch error?
+      System.exit(10)
+      Json.obj()
+    }
+  }
+  def apply(filename: String): Settings = {
+    val json = readSettingsJson(filename)
+    new Settings {
+      override def settingsJSON: JsObject = json
+    }
+  }
 }
