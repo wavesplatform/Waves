@@ -12,10 +12,12 @@ import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
+import scorex.utils.NTP
 import scorex.utils.ScorexLogging
 
 import scala.util.Random
 import scala.util.control.NonFatal
+import scorex.settings.{Settings, WavesHardForkParameters}
 
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
 
@@ -144,6 +146,25 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
           newSenderAmountBalance shouldBe senderAmountBalance - tx.amount
           newSenderFeeBalance shouldBe senderFeeBalance - tx.fee
         }
+
+  property("Transfer asset without balance should fails") {
+    withRollbackTest {
+      forAll(transferGenerator) { tx: TransferTransaction =>
+        val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
+        val senderFeeAcc = AssetAcc(tx.sender, tx.feeAsset)
+        val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
+
+        val senderAmountBalance = state.assetBalance(senderAmountAcc)
+        val senderFeeBalance = state.assetBalance(senderFeeAcc)
+        val recipientAmountBalance = state.assetBalance(recipientAmountAcc)
+
+        if (tx.amount > 0 && tx.assetId == tx.assetFee._1 && senderAmountBalance < tx.amount + tx.fee) {
+          an[Error] should be thrownBy
+            state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = false))
+        }
+      }
+    }
+  }
 
   property("Transfer asset without balance should fails") {
     withRollbackTest {
@@ -304,9 +325,9 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       val networkAcc = AssetAcc(issueTx.sender, None)
       //set some balance
       val genes = GenesisTransaction(issueTx.sender, issueTx.fee + Random.nextInt, issueTx.timestamp - 1)
-      state.applyChanges(state.calcNewBalances(Seq(genes), Map()))
+      state.applyChanges(state.calcNewBalances(Seq(genes), Map(), allowTemporaryNegative = true))
       //issue asset
-      val newBalances = state.calcNewBalances(Seq(issueTx), Map())
+      val newBalances = state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true)
       state.applyChanges(newBalances)
       state.accountTransactions(issueTx.sender).count(_.isInstanceOf[IssueTransaction]) shouldBe 1
     }
@@ -318,7 +339,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
       val senderFeeAcc = AssetAcc(tx.sender, tx.feeAsset)
       val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
-      state.applyChanges(state.calcNewBalances(Seq(tx), Map()))
+      state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
       state.accountTransactions(tx.sender).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
     }
   }
