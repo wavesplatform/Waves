@@ -4,20 +4,21 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.Matchers
+import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.app.Application
-import scorex.block.{Block, LongBlockField}
 import scorex.block.Block._
+import scorex.block.{Block, LongBlockField}
 import scorex.consensus.ConsensusModule
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
 import scorex.transaction.TransactionModule
+
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 
 abstract class ActorTestingCommons extends TestKitBase
-  with org.scalatest.path.FreeSpecLike
+  with FreeSpecLike
   with Matchers
   with ImplicitSender
   with PathMockFactory {

@@ -4,7 +4,7 @@ import scorex.account.PublicKeyAccount
 import scorex.block.Block.BlockId
 import scorex.block._
 import scorex.consensus.ConsensusModule
-import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
+import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, NxtLikeConsensusModule}
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.{Transaction, TransactionModule, TransactionsBlockField}
 
@@ -32,6 +32,10 @@ class BlockMock(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyA
     new Error("").printStackTrace()
     throw new Error("Transaction module is not defined in mock block")
   }
-  override lazy val consensusDataField: BlockField[ConsensusDataType] = ???
+  override lazy val consensusDataField: BlockField[ConsensusDataType] = NxtConsensusBlockField(
+    new NxtLikeConsensusBlockData {
+      val generationSignature: Array[Byte] = Array.fill(EllipticCurveImpl.SignatureLength)(0: Byte)
+      val baseTarget = 1L
+    })
 
 }

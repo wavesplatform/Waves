@@ -23,6 +23,8 @@ class CheckpointSpecification extends FreeSpec
     Checkpoint.historyPoints(1000, maxRollback, 3) shouldBe Seq(990, 900)
 
     Checkpoint.historyPoints(h, maxRollback, 2) shouldBe Seq(h - 10, h - 100)
+
+    println(Checkpoint.historyPoints(198500, 100, 100).toList)
   }
 
   "serialization" in {
