@@ -36,6 +36,11 @@ class TransactionsAPISpecification extends FunSuite with TestLock with Matchers 
     }
   }
 
+  test("/transactions/address/{address}/limit/{limit} with invalid limit value") {
+    val response = GET.requestRaw("/transactions/address/1/limit/f")
+    assert(response.getStatusCode == 404)
+  }
+
   test("/transactions/info/{signature} API route") {
     val genesisTx = Block.genesis().transactions.head.asInstanceOf[GenesisTransaction]
     val tr = GET.request(s"/transactions/info/${Base58.encode(genesisTx.signature)}")
