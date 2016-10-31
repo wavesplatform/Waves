@@ -171,7 +171,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   property("AccountAssetsBalances") {
     forAll(transferGenerator.suchThat(_.assetId.isDefined)) { tx: TransferTransaction =>
       withRollbackTest {
-        state.applyChanges(state.calcNewBalances(Seq(tx), Map()))
+        state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
 
         val senderBalances = state.getAccountBalance(tx.sender)
         val receiverBalances = state.getAccountBalance(tx.recipient)
