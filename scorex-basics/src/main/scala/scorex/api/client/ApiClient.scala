@@ -58,9 +58,7 @@ object ApiClient {
 
   def main(args: Array[String]): Unit = {
     val settingsFilename = args.headOption.getOrElse("settings.json")
-    val settings = new Settings {
-      override val filename = settingsFilename
-    }
+    val settings = Settings(settingsFilename)
     val apiClient = new ApiClient(settings)
 
     println("Welcome to the Scorex command-line client...")

@@ -2,13 +2,15 @@ package scorex.lagonaki.unit
 
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
+
 import scala.util.Random
 import org.h2.mvstore.MVStore
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}
-import scorex.account.{Account, AddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
+import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
@@ -26,7 +28,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
   val accounts = wallet.generateNewAccounts(3)
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
-  val state = new StoredState(db)
+  val state = new StoredState(db, WavesHardForkParameters.Disabled)
   state.processBlock(new BlockMock(Seq(GenesisTransaction(accounts.head, 100000000000L, 0))))
 
   private def createIssueAssetTx(request: IssueRequest, wallet: Wallet): IssueTransaction = {
