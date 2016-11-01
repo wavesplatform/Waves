@@ -5,7 +5,6 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction.TransactionType
 import scorex.transaction._
@@ -42,7 +41,7 @@ case class TransferTransaction(assetId: Option[AssetId],
     val feeAssetBytes = feeAsset.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
     val feeBytes = Longs.toByteArray(fee)
 
-    Bytes.concat(sender.publicKey, assetIdBytes, feeAssetBytes, timestampBytes, amountBytes, feeBytes,
+    Bytes.concat(Array(transactionType.id.toByte), sender.publicKey, assetIdBytes, feeAssetBytes, timestampBytes, amountBytes, feeBytes,
       recipient.bytes, arrayWithSize(attachment))
   }
 
@@ -92,8 +91,10 @@ object TransferTransaction extends Deser[TransferTransaction] {
   def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = Try {
     import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
-    val sender = new PublicKeyAccount(bytes.slice(SignatureLength, SignatureLength + KeyLength))
-    val (assetIdOpt, s0) = parseOption(bytes, SignatureLength + KeyLength, AssetIdLength)
+    val txId = bytes(SignatureLength)
+    require(txId == TransactionType.TransferTransaction.id.toByte, s"Signed tx id is not match")
+    val sender = new PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
+    val (assetIdOpt, s0) = parseOption(bytes, SignatureLength + KeyLength + 1, AssetIdLength)
     val (feeAssetOpt, s1) = parseOption(bytes, s0, AssetIdLength)
     val timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
     val amount = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))

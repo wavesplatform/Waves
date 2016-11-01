@@ -13,6 +13,7 @@ import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConversions._
+import scala.util.{Failure, Success, Try}
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -49,13 +50,13 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     * Transaction ID -> serialized transaction
     */
   private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
-  db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
+    db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   /**
     * Transaction Signature -> reissuable flag
     */
   private val reissuableIndex: MVMap[Array[Byte], Boolean] =
-  db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
+    db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
@@ -141,6 +142,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
         deleteNewer(key)
       }
     }
+
     lastStates.keySet().foreach { key =>
       deleteNewer(key)
     }
@@ -199,6 +201,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       case Some(h) if h > 0 =>
         val requiredHeight = atHeight.getOrElse(stateHeight)
         require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
+
         def loop(hh: Int, min: Long = Long.MaxValue): Long = {
           val row = accountChanges(key).get(hh)
           require(Option(row).isDefined, s"accountChanges($key).get($hh) is null. lastStates.get(address)=$h")
@@ -206,6 +209,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
           else if (row.lastRowHeight == 0) 0L
           else loop(row.lastRowHeight, Math.min(row.state.balance, min))
         }
+
         loop(h)
       case _ =>
         0L
@@ -218,6 +222,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     Option(lastStates.get(account.address)) match {
       case Some(accHeight) =>
         val m = accountChanges(account.address)
+
         def loop(h: Int, acc: Seq[Transaction]): Seq[Transaction] = Option(m.get(h)) match {
           case Some(heightChangesBytes) if acc.length < limit =>
             val heightChanges = heightChangesBytes
@@ -226,6 +231,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
             loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
           case _ => acc
         }
+
         loop(accHeight, Seq.empty).distinct
       case None => Seq.empty
     }
@@ -262,8 +268,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
 
     val txs = trans.filter(t => isValid(t, height))
 
-    val invalidByTimestamp = if (txs.exists(_.timestamp > TimestampToCheck)) invalidateTransactionsByTimestamp(txs)
-    else Seq()
+    val invalidByTimestamp = invalidateTransactionsByTimestamp(txs)
 
     val validByTimestampTransactions = excludeTransactions(txs, invalidByTimestamp)
 
@@ -339,18 +344,23 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     case tx: TransferTransaction =>
       tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: IssueTransaction =>
-      val reissueValid: Boolean = tx.assetIdOpt.forall { assetId =>
-        lazy val initialIssue: Option[IssueTransaction] = Option(transactionsMap.get(assetId))
+      val reissueValid: Boolean = {
+        lazy val initialIssue: Option[IssueTransaction] = Option(transactionsMap.get(tx.id))
           .flatMap(b => IssueTransaction.parseBytes(b).toOption)
-        tx.timestamp < ReissueTimestamp && initialIssue.exists(old => old.reissuable &&
-          old.sender.address == tx.sender.address)
+        initialIssue.exists(old => old.reissuable && old.sender.address == tx.sender.address)
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: ReissueTransaction =>
       val reissueValid: Boolean = {
-        lazy val sameSender = Option(transactionsMap.get(tx.assetId))
-          .flatMap(b => IssueTransaction.parseBytes(b).toOption).exists(_.sender.address == tx.sender.address)
-        lazy val reissuable = Option(reissuableIndex.get(tx.assetId)).getOrElse(false)
+        val sameSender = Option(transactionsMap.get(tx.assetId)).exists(b =>
+          IssueTransaction.parseBytes(b) match {
+            case Success(issue) =>
+              issue.sender.address == tx.sender.address
+            case Failure(f) =>
+              log.debug(s"Can't deserialise issue tx", f)
+              false
+          })
+        val reissuable = Option(reissuableIndex.get(tx.assetId)).getOrElse(false)
         sameSender && reissuable
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
@@ -361,18 +371,10 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       false
   }
 
-  val TimestampToCheck = 1474273462000L
-  //Before this timestamp we reissue transactions with Issue transaction
-  val ReissueTimestamp = 1476459220000L
-
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
-    if (tx.timestamp < TimestampToCheck)
-      true
-    else {
-      lastAccountLagonakiTransaction(tx.sender) match {
-        case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
-        case None => true
-      }
+    lastAccountLagonakiTransaction(tx.sender) match {
+      case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
+      case None => true
     }
   }
 

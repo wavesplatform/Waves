@@ -37,13 +37,11 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   )
 
   override lazy val bytes: Array[Byte] = {
-    val typeBytes = Array(transactionType.id.toByte)
-
     val timestampBytes = Longs.toByteArray(timestamp)
     val amountBytes = Longs.toByteArray(amount)
     val feeBytes = Longs.toByteArray(fee)
 
-    Bytes.concat(typeBytes, timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes, signature)
+    Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes, signature)
   }
 
   override lazy val signatureValid: Boolean = {

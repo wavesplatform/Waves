@@ -34,7 +34,6 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
   private def createIssueAssetTx(request: IssueRequest, wallet: Wallet): IssueTransaction = {
     val sender = wallet.privateKeyAccount(request.sender).get
     IssueTransaction.create(sender,
-      None,
       Base58.decode(request.name).get,
       Base58.decode(request.description).get,
       request.quantity,

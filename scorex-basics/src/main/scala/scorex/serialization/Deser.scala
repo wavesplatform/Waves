@@ -1,7 +1,6 @@
 package scorex.serialization
 
-import com.google.common.primitives.Ints
-import scorex.crypto.EllipticCurveImpl._
+import com.google.common.primitives.Shorts
 
 import scala.util.Try
 
@@ -13,8 +12,8 @@ trait Deser[T] {
   def parseBytes(bytes: Array[Byte]): Try[T]
 
   protected def parseArraySize(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
-    val length = Ints.fromByteArray(bytes.slice(position, position + 4))
-    (bytes.slice(position + 4, position + 4 + length), position + 4 + length)
+    val length = Shorts.fromByteArray(bytes.slice(position, position + 2))
+    (bytes.slice(position + 2, position + 2 + length), position + 2 + length)
   }
 
   protected def parseOption(bytes: Array[Byte], position: Int, length: Int): (Option[Array[Byte]], Int) = {
