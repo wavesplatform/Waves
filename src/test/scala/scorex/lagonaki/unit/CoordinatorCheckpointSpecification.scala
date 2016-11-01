@@ -10,7 +10,7 @@ import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
-import scorex.network.Coordinator.AddBlock
+import scorex.network.Coordinator.{AddBlock, ClearCheckpoint}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, Message}
@@ -26,11 +26,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
 
   val pk = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(100).toByte))
 
-  before {
-    println("NEFORE")
-    app.blockStorage.removeAfter(app.history.genesis.uniqueId)
-  }
-
   object TestSettings extends SettingsMock with TransactionSettings {
     var checkpoint: Option[Array[Byte]] = Some(pk.privateKey)
     override lazy val quorum: Int = 1
@@ -38,7 +33,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
     override lazy val MaxRollback: Int = 10
 
     override lazy val checkpointPublicKey: Option[Array[Byte]] = Some(pk.publicKey)
-    override lazy val checkpointPrivateKey: Option[Array[Byte]] = checkpoint
   }
 
   val testblockGenerator = TestProbe("blockGenerator")
@@ -90,27 +84,14 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
     transactionModule.blockStorage.appendBlock(Block.genesis(genesisTimestamp))
   }
 
-
-  "broadcast checkPoint" in {
-    var ref = app.history.genesis.uniqueId
-
-    (2 to TestSettings.MaxBlocksChunks).foreach { i =>
-      val b = createBlock(ref)
-      actorRef ! AddBlock(b, Some(connectedPeer))
-      ref = b.uniqueId
-    }
+  before {
+    app.blockStorage.removeAfter(app.history.genesis.uniqueId)
+    actorRef ! ClearCheckpoint
     networkController.ignoreMsg {
-      case SendToNetwork(m, Broadcast) => m.spec.messageCode != 100
+      case SendToNetwork(m, _) => m.spec == repo.ScoreMessageSpec
       case m => true
     }
-
-    networkController.expectMsgPF() {
-      case SendToNetwork(Message(spec, _, _), Broadcast) => spec should be(repo.CheckpointMessageSpec)
-      case _ => fail("Checkpoint hasn't been sent")
-    }
-
-    networkController.ignoreNoMsg()
-   }
+  }
 
   "rollback if block doesn't match checkPoint" in {
     TestSettings.checkpoint = None
@@ -140,11 +121,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
   "blacklist peer if it sends block that is different from checkPoint" in {
     TestSettings.checkpoint = None
     var ref = app.history.genesis.uniqueId
-
-    networkController.ignoreMsg {
-      case SendToNetwork(m, _) => m.spec.messageCode == 24
-      case m => true
-    }
 
     (2 to 9).foreach { i =>
       val b = createBlock(ref)

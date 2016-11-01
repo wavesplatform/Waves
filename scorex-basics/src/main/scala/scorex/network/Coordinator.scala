@@ -103,22 +103,29 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
         networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
 
       case DataFromPeer(msgId, checkpoint: Checkpoint@unchecked, remote) if msgId == CheckpointMessageSpec.messageCode =>
-        handleCheckpoint(checkpoint, remote)
+        handleCheckpoint(checkpoint, Some(remote))
+
+      case BroadcastCheckpoint(checkpoint) =>
+        handleCheckpoint(checkpoint, None)
 
       case ConnectedPeers(_) =>
+
+      case ClearCheckpoint =>
+        currentCheckpoint = None
     }
   }
 
-  private def handleCheckpoint(checkpoint: Checkpoint, from: ConnectedPeer): Unit =
+  private def handleCheckpoint(checkpoint: Checkpoint, from: Option[ConnectedPeer]): Unit =
     if (currentCheckpoint.forall(c => !(c.signature sameElements checkpoint.signature))) {
       application.settings.checkpointPublicKey foreach {
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
             setCurrentChechpoint(checkpoint)
-            networkControllerRef ! SendToNetwork(Message(CheckpointMessageSpec, Right(checkpoint), None), BroadcastExceptOf(from))
+            networkControllerRef ! SendToNetwork(Message(CheckpointMessageSpec, Right(checkpoint), None),
+              from.map(BroadcastExceptOf).getOrElse(Broadcast))
             makeBlockchainCompliantWith(checkpoint)
           } else {
-            from.blacklist()
+            from.foreach(_.blacklist())
           }
       }
     }
@@ -245,8 +252,6 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
           block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
 
-          broadcastCheckpoint()
-
           true
         case Failure(e) => throw e
       }
@@ -263,17 +268,6 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   private def str(block: Block) = {
     if (log.logger.isDebugEnabled) block.json
     else encode(block.uniqueId) + ", parent " + encode(block.referenceField.value)
-  }
-
-  private def broadcastCheckpoint(): Unit = application.settings.checkpointPrivateKey.foreach {
-    privateKey =>
-      if (history.height() % application.settings.MaxRollback == 0) {
-        val historyPoints = Checkpoint.historyPoints(history.height(), application.settings.MaxRollback)
-        val items = historyPoints.map(h => BlockCheckpoint(h, history.blockAt(h).get.signerDataField.value.signature))
-        val checkpoint = Checkpoint(items, Array()).signedBy(privateKey)
-        setCurrentChechpoint(checkpoint)
-        networkControllerRef ! SendToNetwork(Message(CheckpointMessageSpec, Right(checkpoint), None), Broadcast)
-      }
   }
 }
 
@@ -305,4 +299,8 @@ object Coordinator {
   private case object BroadcastCurrentScore
 
   case object GetStatus
+
+  case class BroadcastCheckpoint(checkpoint: Checkpoint)
+
+  case object ClearCheckpoint
 }

@@ -25,6 +25,7 @@ class LagonakiTestSuite extends Sequential(
   , new WalletSpecification
   , new StateTest
   , new SimpleTransactionModuleSpecification
+  , new CoordinatorCheckpointSpecification
 
 
   //integration tests - slow!

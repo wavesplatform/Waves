@@ -141,7 +141,6 @@ trait Settings extends ScorexLogging {
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultAllowedGenerationTimeFromLastBlockInterval)
 
   lazy val checkpointSettings = settingsJSON \ "checkpoints"
-  lazy val checkpointPrivateKey = (checkpointSettings \ "privateKey").asOpt[String].flatMap(Base58.decode(_).toOption)
   lazy val checkpointPublicKey = (checkpointSettings \ "publicKey").asOpt[String].flatMap(Base58.decode(_).toOption)
 
   //NETWORK
