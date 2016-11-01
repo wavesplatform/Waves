@@ -183,31 +183,6 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     newBalances
   }
 
-  private[blockchain] def filterValidTransactions(trans: Seq[Transaction]):
-  Seq[Transaction] = {
-    trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
-      case ((currentState, validTxs), tx) =>
-      try {
-        val newState = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
-          //update balances sheet
-          val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
-          val newBalance = if (currentChange._1.balance == Long.MinValue) Long.MinValue
-          else Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
-
-          if (newBalance < 0 && tx.timestamp >= settings.allowTemporaryNegativeUntil) {
-            throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
-          }
-
-          iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
-        }
-        (newState, validTxs :+ tx)
-      } catch {
-        case NonFatal(e) =>
-          (currentState, validTxs)
-      }
-    }._2
-  }
-
   override def balance(account: Account, atHeight: Option[Int] = None): Long =
     assetBalance(AssetAcc(account, None), atHeight)
 
@@ -292,7 +267,35 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
 
     val validByTimestampTransactions = excludeTransactions(txs, invalidByTimestamp)
 
-    filterValidTransactions(trans)
+    def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
+      val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
+        case ((currentState, validTxs), tx) =>
+          try {
+            val newState = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
+              //update balances sheet
+              def safeSum(first: Long, second: Long): Long = {
+                try {
+                  Math.addExact(first, second)
+                } catch {
+                  case e: ArithmeticException =>
+                    throw new Error(s"Transaction leads to overflow balance: $first + $second = ${first + second}")
+                }
+              }
+
+              val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
+              val newBalance = safeSum(currentChange._1.balance, bc.delta)
+              iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
+            }
+            (newState, validTxs :+ tx)
+          } catch {
+            case NonFatal(e) =>
+              (currentState, validTxs)
+          }
+      }
+      validTxs
+    }
+
+    filterValidTransactionsByState(validByTimestampTransactions)
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
