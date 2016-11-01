@@ -243,6 +243,8 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         state.isValid(issueTx, Int.MaxValue) shouldBe false
 
+        state.isValid(issueTx, Int.MaxValue) shouldBe false
+
         state.isValid(reissueTx, Int.MaxValue) shouldBe issueTx.reissuable
       }
     }
@@ -328,11 +330,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       withRollbackTest {
         state.balance(testAcc) shouldBe 0
         state.assetBalance(testAssetAcc) shouldBe 0
-        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
         state.balance(testAcc) shouldBe balance
         state.assetBalance(testAssetAcc) shouldBe balance
         state.included(tx).value shouldBe state.stateHeight
-        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq(tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))))
       }
     }
   }
