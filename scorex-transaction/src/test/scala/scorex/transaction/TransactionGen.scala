@@ -68,13 +68,14 @@ trait TransactionGen {
     quantity <- positiveLongGen
     decimals <- Gen.choose(0: Byte, 8: Byte)
     reissuable <- Arbitrary.arbitrary[Boolean]
+    reissuable2 <- Arbitrary.arbitrary[Boolean]
     fee <- positiveLongGen
     timestamp <- positiveLongGen
   } yield {
     val issue = IssueTransaction.create(sender, None, assetName, description, quantity, decimals, reissuable, fee, timestamp)
     val issue2 = IssueTransaction.create(sender, Some(issue.assetId), assetName, description, quantity, decimals,
       reissuable, fee, Math.max(timestamp, 1476459220001L))
-    val reissue = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable, fee, timestamp)
+    val reissue = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable2, fee, timestamp)
     (issue, issue2, reissue)
   }
 

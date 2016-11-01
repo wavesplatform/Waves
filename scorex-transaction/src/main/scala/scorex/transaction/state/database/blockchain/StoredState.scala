@@ -52,7 +52,7 @@ class StoredState(val db: MVStore) extends LagonakiState with ScorexLogging with
   db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   /**
-    * Transaction Signature -> serialized transaction
+    * Transaction Signature -> reissuable flag
     */
   private val reissuableIndex: MVMap[Array[Byte], Boolean] =
   db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
@@ -127,7 +127,18 @@ class StoredState(val db: MVStore) extends LagonakiState with ScorexLogging with
       if (currentHeight > rollbackTo) {
         val dataMap = accountChanges(key)
         val changes = dataMap.remove(currentHeight)
-        changes.reason.foreach(t => includedTx.remove(t.id))
+        changes.reason.foreach(t => {
+          includedTx.remove(t.id)
+          transactionsMap.remove(t.id)
+          t match {
+            case t: ReissueTransaction =>
+              // if you rollback reissue, then before that issue value always was true
+              reissuableIndex.put(t.assetId, true)
+            case t: IssueTransaction =>
+              reissuableIndex.remove(t.assetId)
+            case _ =>
+          }
+        })
         val prevHeight = changes.lastRowHeight
         lastStates.put(key, prevHeight)
         deleteNewer(key)
