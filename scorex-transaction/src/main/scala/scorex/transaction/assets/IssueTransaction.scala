@@ -15,7 +15,6 @@ import scala.util.Try
  TODO: Remove assetIdOpt after Testnet relaunch
  */
 case class IssueTransaction(sender: PublicKeyAccount,
-                            assetIdOpt: Option[Array[Byte]],
                             name: Array[Byte],
                             description: Array[Byte],
                             quantity: Long,
@@ -30,10 +29,10 @@ case class IssueTransaction(sender: PublicKeyAccount,
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val transactionType: TransactionType.Value = TransactionType.IssueTransaction
 
-  override lazy val assetId = assetIdOpt.getOrElse(id)
+  override lazy val assetId = id
 
-  lazy val toSign: Array[Byte] = Bytes.concat(sender.publicKey,
-    assetIdOpt.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte)), arrayWithSize(name), arrayWithSize(description),
+  lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), sender.publicKey,
+    arrayWithSize(name), arrayWithSize(description),
     Longs.toByteArray(quantity), Array(decimals), if (reissuable) Array(1: Byte) else Array(0: Byte),
     Longs.toByteArray(fee), Longs.toByteArray(timestamp))
 
@@ -93,20 +92,20 @@ object IssueTransaction extends Deser[IssueTransaction] {
   def parseTail(bytes: Array[Byte]): Try[IssueTransaction] = Try {
     import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
-    val sender = new PublicKeyAccount(bytes.slice(SignatureLength, SignatureLength + KeyLength))
-    val (assetIdOpt, nameStart) = parseOption(bytes, SignatureLength + KeyLength, AssetIdLength)
-    val (assetName, descriptionStart) = parseArraySize(bytes, nameStart)
+    val txId = bytes(SignatureLength)
+    require(txId == TransactionType.IssueTransaction.id.toByte, s"Signed tx id is not match")
+    val sender = new PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
+    val (assetName, descriptionStart) = parseArraySize(bytes, SignatureLength + KeyLength + 1)
     val (description, quantityStart) = parseArraySize(bytes, descriptionStart)
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
     val decimals = bytes.slice(quantityStart + 8, quantityStart + 9).head
     val reissuable = bytes.slice(quantityStart + 9, quantityStart + 10).head == (1: Byte)
     val fee = Longs.fromByteArray(bytes.slice(quantityStart + 10, quantityStart + 18))
     val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 18, quantityStart + 26))
-    IssueTransaction(sender, assetIdOpt, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
+    IssueTransaction(sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
   }
 
   def create(sender: PrivateKeyAccount,
-             assetIdOpt: Option[Array[Byte]],
              name: Array[Byte],
              description: Array[Byte],
              quantity: Long,
@@ -115,8 +114,9 @@ object IssueTransaction extends Deser[IssueTransaction] {
              fee: Long,
              timestamp: Long): IssueTransaction = {
     val unsigned =
-      IssueTransaction(sender, assetIdOpt, name, description, quantity, decimals, reissuable, fee, timestamp, null)
+      IssueTransaction(sender, name, description, quantity, decimals, reissuable, fee, timestamp, null)
     val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
 }
+

@@ -237,8 +237,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     forAll(issueReissueGenerator) { pair =>
       withRollbackTest {
         val issueTx: IssueTransaction = pair._1
-        val reissueTx: ReissueTransaction = pair._2
-        val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
+        val reissueTx: ReissueTransaction = pair._3
 
         state.isValid(issueTx, Int.MaxValue) shouldBe true
 

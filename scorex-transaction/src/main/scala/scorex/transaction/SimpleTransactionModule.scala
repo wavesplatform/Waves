@@ -166,7 +166,6 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
     val issue = IssueTransaction.create(sender,
-      None,
       request.name.getBytes,
       request.description.getBytes,
       request.quantity,

@@ -34,7 +34,6 @@ object BroadcastRequests {
     def toTx: Try[IssueTransaction] = Try {
       IssueTransaction(
         new PublicKeyAccount(Base58.decode(senderPublicKey).get),
-        None,
         Base58.decode(name).get,
         Base58.decode(description).get,
         quantity,
