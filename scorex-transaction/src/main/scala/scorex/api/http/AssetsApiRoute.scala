@@ -6,7 +6,7 @@ import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
-import play.api.libs.json.{JsError, JsSuccess, Json}
+import play.api.libs.json._
 import scorex.account.Account
 import scorex.app.Application
 import scorex.crypto.encode.Base58
@@ -31,11 +31,11 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ issue ~ reissue ~ transfer
+      balance ~ balances ~ issue ~ reissue ~ transfer
     }
 
   @Path("/balance/{address}/{assetId}")
-  @ApiOperation(value = "Balance", notes = "Account's balance", httpMethod = "GET")
+  @ApiOperation(value = "Asset's balance", notes = "Account's balance by given asset", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
@@ -44,6 +44,19 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     path("balance" / Segment / Segment) { case (address, assetId) =>
       getJsonRoute {
         balanceJson(address, assetId)
+      }
+    }
+  }
+
+  @Path("/balance/{address}")
+  @ApiOperation(value = "Account's balance", notes = "Account's balances for all assets", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+  ))
+  def balances: Route = {
+    path("balance" / Segment) { case address =>
+      getJsonRoute {
+        balanceJson(address)
       }
     }
   }
@@ -185,7 +198,6 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     }
   }
 
-
   private def balanceJson(address: String, assetIdStr: String): JsonResponse = {
     val account = new Account(address)
     Base58.decode(assetIdStr) match {
@@ -198,6 +210,24 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
         JsonResponse(json, StatusCodes.OK)
       case _ => InvalidAddress.response
     }
+  }
+
+  private def balanceJson(address: String): JsonResponse = {
+    val account = new Account(address)
+    if (Account.isValid(account)) {
+      val balances: Seq[JsObject] = state.getAccountBalance(account).map { p =>
+        JsObject(Seq(
+          "assetId" -> JsString(Base58.encode(p._1)),
+          "balance" -> JsNumber(p._2._1),
+          "issued" -> JsBoolean(p._2._2)
+        ))
+      }.toSeq
+      val json = Json.obj(
+        "address" -> account.address,
+        "balances" -> JsArray(balances)
+      )
+      JsonResponse(json, StatusCodes.OK)
+    } else InvalidAddress.response
   }
 
 }

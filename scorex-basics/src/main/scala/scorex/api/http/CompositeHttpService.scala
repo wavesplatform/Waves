@@ -22,8 +22,11 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
   }
 
   val compositeRoute = routes.map(_.route).reduce(_ ~ _) ~ corsHandler(swaggerService.routes) ~
+    path("") {
+      redirectToSwagger
+    } ~
     path("swagger") {
       getFromResource("swagger-ui/index.html")
-    } ~ getFromResourceDirectory("swagger-ui") ~ redirectToSwagger
+    } ~ getFromResourceDirectory("swagger-ui")
 
 }
