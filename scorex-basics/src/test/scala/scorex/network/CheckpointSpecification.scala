@@ -16,15 +16,17 @@ class CheckpointSpecification extends FreeSpec
 
   "history points" in {
     val h = 100000
-    Checkpoint.historyPoints(h, maxRollback, 3) shouldBe Seq(h - 10, h - 100, h - 1000)
+    println(Checkpoint.historyPoints(198500, 100, 100).toList)
+    
+    Checkpoint.historyPoints(h, maxRollback, 3) shouldBe Seq(h - 10, h - 20, h - 40)
 
     Checkpoint.historyPoints(2, maxRollback, 3) shouldBe Seq()
 
-    Checkpoint.historyPoints(1000, maxRollback, 3) shouldBe Seq(990, 900)
+    Checkpoint.historyPoints(1000, maxRollback, 3) shouldBe Seq(990, 980, 960)
 
-    Checkpoint.historyPoints(h, maxRollback, 2) shouldBe Seq(h - 10, h - 100)
+    Checkpoint.historyPoints(h, maxRollback, 2) shouldBe Seq(h - 10, h - 20)
 
-    println(Checkpoint.historyPoints(198500, 100, 100).toList)
+
   }
 
   "serialization" in {

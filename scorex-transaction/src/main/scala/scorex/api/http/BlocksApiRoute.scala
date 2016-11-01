@@ -6,10 +6,15 @@ import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
-import play.api.libs.json.{JsArray, JsNull, Json}
+import play.api.libs.json._
 import scorex.account.Account
 import scorex.app.Application
+import scorex.crypto.EllipticCurveImpl
+import scorex.network.Checkpoint
+import scorex.network.Coordinator.BroadcastCheckpoint
 import scorex.transaction.BlockChain
+
+import scala.util.Try
 
 @Path("/blocks")
 @Api(value = "/blocks")
@@ -20,10 +25,11 @@ case class BlocksApiRoute(application: Application)(implicit val context: ActorR
 
   val settings = application.settings
   private val history = application.history
+  private val coordinator = application.coordinator
 
   override lazy val route =
     pathPrefix("blocks") {
-      signature ~ first ~ last ~ at ~ seq ~ height ~ heightEncoded ~ child ~ address ~ delay
+      signature ~ first ~ last ~ at ~ seq ~ height ~ heightEncoded ~ child ~ address ~ delay ~ checkpoint
     }
 
   @Path("/address/{address}/{from}/{to}")
@@ -197,6 +203,44 @@ case class BlocksApiRoute(application: Application)(implicit val context: ActorR
           val height = history.heightOf(block.uniqueId).map(Json.toJson(_))
             .getOrElse(JsNull)
           block.json + ("height" -> height)
+        }
+      }
+    }
+  }
+
+  @Path("/checkpoint")
+  @ApiOperation(value = "Checkpoint", notes = "Broadcast checkpoint of blocks", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "message", value = "Checkpoint message", required = true, paramType = "body",
+      dataType = "scorex.network.Checkpoint")
+  ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with response or error")
+  ))
+  def checkpoint: Route = {
+    def validateCheckpoint(checkpoint: Checkpoint): Option[ApiError] = {
+      settings.checkpointPublicKey.map {publicKey =>
+        if (!EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) Some(InvalidSignature)
+        else None
+      }.getOrElse(Some(InvalidMessage))
+    }
+
+    path("checkpoint") {
+      entity(as[String]) { body =>
+        postJsonRoute {
+          Try(Json.parse(body)).map { js =>
+            js.validate[Checkpoint] match {
+              case err: JsError =>
+                WrongTransactionJson(err).response
+              case JsSuccess(checkpoint: Checkpoint, _) =>
+                validateCheckpoint(checkpoint) match {
+                  case Some(apiError) => apiError.response
+                  case None =>
+                    coordinator ! BroadcastCheckpoint(checkpoint)
+                    JsonResponse(Json.obj("message" -> "Checkpoint broadcasted"), StatusCodes.OK)
+                }
+            }
+          }.getOrElse(WrongJson.response)
         }
       }
     }
