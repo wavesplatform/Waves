@@ -284,7 +284,11 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
 
               val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
               val newBalance = safeSum(currentChange._1.balance, bc.delta)
-              iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
+              if (newBalance >= 0) {
+                iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
+              } else {
+                throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
+              }
             }
             (newState, validTxs :+ tx)
           } catch {
