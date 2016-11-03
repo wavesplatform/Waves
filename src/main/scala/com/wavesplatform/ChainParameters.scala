@@ -20,12 +20,11 @@ object TestNetParams extends ChainParameters {
   val genesisTimestamp = 1460952000000L
   val genesisTxs = {
     val txs = Seq(
-      GenesisTransaction(new Account("3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"), initialBalance - 5 * Constants.UnitsInWave, genesisTimestamp),
-      GenesisTransaction(new Account("3MyTvqfeLWkvjSZ1hwkhQjzipZr7Pk8dyMR"), Constants.UnitsInWave, genesisTimestamp),
-      GenesisTransaction(new Account("3MqS3mVY4Yr4HoTdpWiEaq9phwbaoWS2W6A"), Constants.UnitsInWave, genesisTimestamp),
-      GenesisTransaction(new Account("3N3CDuzGXB2qP5vb2NvnnDQ68HahNCfYVBg"), Constants.UnitsInWave, genesisTimestamp),
-      GenesisTransaction(new Account("3N2sacZ9XTQUkLDdZZgtb1zJUAmr6oziRrU"), Constants.UnitsInWave, genesisTimestamp),
-      GenesisTransaction(new Account("3N189PMB8BaxngN3fNvDRkFbvbH8xMkk328"), Constants.UnitsInWave, genesisTimestamp)
+      GenesisTransaction(new Account("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"), (initialBalance * 0.04).toLong, genesisTimestamp),
+      GenesisTransaction(new Account("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8"), (initialBalance * 0.02).toLong, genesisTimestamp),
+      GenesisTransaction(new Account("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh"), (initialBalance * 0.02).toLong, genesisTimestamp),
+      GenesisTransaction(new Account("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd"), (initialBalance * 0.02).toLong, genesisTimestamp),
+      GenesisTransaction(new Account("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx"), (initialBalance * 0.9).toLong, genesisTimestamp)
     )
     require(txs.foldLeft(0L)(_ + _.amount) == initialBalance)
     txs
