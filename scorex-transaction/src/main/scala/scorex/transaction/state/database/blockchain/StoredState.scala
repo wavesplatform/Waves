@@ -344,12 +344,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     case tx: TransferTransaction =>
       tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: IssueTransaction =>
-      val reissueValid: Boolean = {
-        lazy val initialIssue: Option[IssueTransaction] = Option(transactionsMap.get(tx.id))
-          .flatMap(b => IssueTransaction.parseBytes(b).toOption)
-        initialIssue.exists(old => old.reissuable && old.sender.address == tx.sender.address)
-      }
-      reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: ReissueTransaction =>
       val reissueValid: Boolean = {
         val sameSender = Option(transactionsMap.get(tx.assetId)).exists(b =>
