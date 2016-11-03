@@ -6,14 +6,15 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
+import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets.{AssetIssuance, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
-import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.util.Try
+import scala.util.control.NonFatal
 
 
 /** Store current balances only, and balances changes within effective balance depth.
@@ -22,7 +23,7 @@ import scala.util.Try
   *
   * Use apply method of StoredState object to create new instance
   */
-class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
+class StoredState(db: MVStore, settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging {
 
 
   val HeightKey = "height"
@@ -51,7 +52,7 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   /**
-    * Transaction Signature -> serialized transaction
+    * Transaction Signature -> reissuable flag
     */
   private val reissuableIndex: MVMap[Array[Byte], Boolean] =
   db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
@@ -123,7 +124,18 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
       if (currentHeight > rollbackTo) {
         val dataMap = accountChanges(key)
         val changes = dataMap.remove(currentHeight)
-        changes.reason.foreach(t => includedTx.remove(t.id))
+        changes.reason.foreach(t => {
+          includedTx.remove(t.id)
+          transactionsMap.remove(t.id)
+          t match {
+            case t: ReissueTransaction =>
+              // if you rollback reissue, then before that issue value always was true
+              reissuableIndex.put(t.assetId, true)
+            case t: IssueTransaction =>
+              reissuableIndex.remove(t.assetId)
+            case _ =>
+          }
+        })
         val prevHeight = changes.lastRowHeight
         lastStates.put(key, prevHeight)
         deleteNewer(key)
@@ -141,7 +153,8 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
     val fees: Map[AssetAcc, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2), List(FeesStateChange(m._2))))
 
-    val newBalances: Map[AssetAcc, (AccState, Reason)] = calcNewBalances(trans, fees)
+    log.info(s"${block.timestampField.value} < ${settings.allowTemporaryNegativeUntil} = ${block.timestampField.value < settings.allowTemporaryNegativeUntil}")
+    val newBalances: Map[AssetAcc, (AccState, Reason)] = calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
     applyChanges(newBalances)
@@ -151,22 +164,20 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
   }
 
 
-  private[blockchain] def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reason)]):
+  private[blockchain] def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reason)], allowTemporaryNegative: Boolean):
   Map[AssetAcc, (AccState, Reason)] = {
-    val newBalances: Map[AssetAcc, (AccState, Reason)] = trans.foldLeft(fees) { case (changes, atx) =>
-      atx match {
-        case tx: Transaction =>
-          tx.balanceChanges().foldLeft(changes) { case (iChanges, bc) =>
-            //update balances sheet
-            val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
-            val newBalance = if (currentChange._1.balance == Long.MinValue) Long.MinValue
-            else Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
+    val newBalances: Map[AssetAcc, (AccState, Reason)] = trans.foldLeft(fees) { case (changes, tx) =>
+      tx.balanceChanges().foldLeft(changes) { case (iChanges, bc) =>
+        //update balances sheet
+        val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
+        val newBalance = if (currentChange._1.balance == Long.MinValue) Long.MinValue
+        else Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
 
-            iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
-          }
+        if (newBalance < 0 && !allowTemporaryNegative) {
+          throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
+        }
 
-        case m =>
-          throw new Error("Wrong transaction type in pattern-matching" + m)
+        iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
       }
     }
     newBalances
@@ -256,26 +267,39 @@ class StoredState(db: MVStore) extends LagonakiState with ScorexLogging {
 
     val validByTimestampTransactions = excludeTransactions(txs, invalidByTimestamp)
 
-    @tailrec
-    def validateBalances(transactions: Seq[Transaction]): Seq[Transaction] = {
-      val nb = calcNewBalances(transactions, Map.empty)
-      val negativeBalances: Map[AssetAcc, (AccState, Reason)] = nb.filter(b => b._2._1.balance < 0)
-      val toRemove: Iterable[Transaction] = negativeBalances flatMap { b =>
-        val accAssetTransactions = transactions.filter(_.balanceChanges().exists(_.assetAcc == b._1))
-        var sumBalance = b._2._1.balance
-        accAssetTransactions.sortBy(-_.balanceChanges().filter(_.assetAcc == b._1).map(_.delta).sum).takeWhile { t =>
-          val prevSum = sumBalance
-          sumBalance = sumBalance - t.balanceChanges().filter(_.assetAcc == b._1).map(_.delta).sum
-          prevSum < 0
-        }
-      }
-      val validTransactions = excludeTransactions(transactions, toRemove)
+    def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
+      val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
+        case ((currentState, validTxs), tx) =>
+          try {
+            val newState = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
+              //update balances sheet
+              def safeSum(first: Long, second: Long): Long = {
+                try {
+                  Math.addExact(first, second)
+                } catch {
+                  case e: ArithmeticException =>
+                    throw new Error(s"Transaction leads to overflow balance: $first + $second = ${first + second}")
+                }
+              }
 
-      if (validTransactions.size == transactions.size) transactions
-      else if (validTransactions.nonEmpty) validateBalances(validTransactions)
-      else validTransactions
+              val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
+              val newBalance = safeSum(currentChange._1.balance, bc.delta)
+              if (newBalance >= 0) {
+                iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
+              } else {
+                throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
+              }
+            }
+            (newState, validTxs :+ tx)
+          } catch {
+            case NonFatal(e) =>
+              (currentState, validTxs)
+          }
+      }
+      validTxs
     }
-    validateBalances(validByTimestampTransactions)
+
+    filterValidTransactionsByState(validByTimestampTransactions)
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =

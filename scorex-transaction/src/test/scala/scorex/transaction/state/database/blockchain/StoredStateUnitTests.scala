@@ -11,11 +11,14 @@ import scorex.transaction._
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.NTP
+import scorex.utils.ScorexLogging
 
 import scala.util.Random
+import scala.util.control.NonFatal
+import scorex.settings.{Settings, WavesHardForkParameters}
 
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
-with PrivateMethodTester with OptionValues with TransactionGen {
+  with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging {
 
   val folder = "/tmp/scorex/test/"
   new File(folder).mkdirs()
@@ -23,7 +26,7 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   new File(stateFile).delete()
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
-  val state = new StoredState(db)
+  val state = new StoredState(db, WavesHardForkParameters.Disabled)
   val testAcc = new PrivateKeyAccount(scorex.utils.randomBytes(64))
   val testAssetAcc = AssetAcc(testAcc, None)
   val testAdd = testAcc.address
@@ -34,7 +37,7 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   property("Transaction seq Long overflow") {
     val TxN: Int = 12
     val InitialBalance: Long = Long.MaxValue / 8
-    state.applyChanges(Map(testAssetAcc ->(AccState(InitialBalance), List(FeesStateChange(InitialBalance)))))
+    state.applyChanges(Map(testAssetAcc -> (AccState(InitialBalance), List(FeesStateChange(InitialBalance)))))
     state.balance(testAcc) shouldBe InitialBalance
 
     val transfers = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
@@ -42,12 +45,12 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
     state.isValid(transfers) shouldBe false
 
-    state.applyChanges(Map(testAssetAcc ->(AccState(0L), List())))
+    state.applyChanges(Map(testAssetAcc -> (AccState(0L), List())))
   }
 
   property("Amount + fee Long overflow") {
     val InitialBalance: Long = 100
-    state.applyChanges(Map(testAssetAcc ->(AccState(InitialBalance), List(FeesStateChange(InitialBalance)))))
+    state.applyChanges(Map(testAssetAcc -> (AccState(InitialBalance), List(FeesStateChange(InitialBalance)))))
     state.balance(testAcc) shouldBe InitialBalance
 
     val transferTx = genTransfer(Long.MaxValue, Long.MaxValue)
@@ -58,7 +61,7 @@ with PrivateMethodTester with OptionValues with TransactionGen {
     (-paymentTx.fee - paymentTx.amount) should be > 0L
     state.isValid(paymentTx) shouldBe false
 
-    state.applyChanges(Map(testAssetAcc ->(AccState(0L), List())))
+    state.applyChanges(Map(testAssetAcc -> (AccState(0L), List())))
 
   }
 
@@ -66,9 +69,24 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   private def withRollbackTest(test: => Unit): Unit = {
     val startedState = state.stateHeight
     val h = state.hash
-    test
-    state.rollbackTo(startedState)
-    h should be(state.hash)
+    var lastFinalStateHash: Option[Int] = None
+    for {i <- 1 to 2} {
+      try {
+        test
+        state.rollbackTo(startedState)
+        h should be(state.hash)
+        lastFinalStateHash match {
+          case Some(lastHash) =>
+            lastHash should be(state.hash)
+          case None =>
+            lastFinalStateHash = Some(state.hash)
+        }
+      } catch {
+        case NonFatal(e) =>
+          log.error(s"Failed on $i iteration: ${e.getMessage}")
+          throw e
+      }
+    }
   }
 
   property("Validate transfer with too big amount") {
@@ -80,7 +98,7 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
         //set some balance
         val genes = GenesisTransaction(testAcc, balance, 0)
-        state.applyChanges(Map(testAssetAcc ->(AccState(genes.amount), List(genes))))
+        state.applyChanges(Map(testAssetAcc -> (AccState(genes.amount), List(genes))))
         state.assetBalance(assetAcc) shouldBe balance
 
         //valid transfer
@@ -93,14 +111,14 @@ with PrivateMethodTester with OptionValues with TransactionGen {
           None, fee, Array())
         state.isValid(invalidtx) shouldBe false
 
-        state.applyChanges(Map(testAssetAcc ->(AccState(0L), List(tx))))
+        state.applyChanges(Map(testAssetAcc -> (AccState(0L), List(tx))))
       }
     }
   }
 
   property("Transfer asset") {
-    withRollbackTest {
-      forAll(transferGenerator) { tx: TransferTransaction =>
+    forAll(transferGenerator) { tx: TransferTransaction =>
+      withRollbackTest {
         val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
         val senderFeeAcc = AssetAcc(tx.sender, tx.feeAsset)
         val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
@@ -109,7 +127,7 @@ with PrivateMethodTester with OptionValues with TransactionGen {
         val senderFeeBalance = state.assetBalance(senderFeeAcc)
         val recipientAmountBalance = state.assetBalance(recipientAmountAcc)
 
-        state.applyChanges(state.calcNewBalances(Seq(tx), Map()))
+        state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
 
         val newSenderAmountBalance = state.assetBalance(senderAmountAcc)
         val newSenderFeeBalance = state.assetBalance(senderFeeAcc)
@@ -128,10 +146,29 @@ with PrivateMethodTester with OptionValues with TransactionGen {
     }
   }
 
-  property("AccountAssetsBalances") {
+  property("Transfer asset without balance should fails") {
     withRollbackTest {
-      forAll(transferGenerator.suchThat(_.assetId.isDefined)) { tx: TransferTransaction =>
-        state.applyChanges(state.calcNewBalances(Seq(tx), Map()))
+      forAll(transferGenerator) { tx: TransferTransaction =>
+        val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
+        val senderFeeAcc = AssetAcc(tx.sender, tx.feeAsset)
+        val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
+
+        val senderAmountBalance = state.assetBalance(senderAmountAcc)
+        val senderFeeBalance = state.assetBalance(senderFeeAcc)
+        val recipientAmountBalance = state.assetBalance(recipientAmountAcc)
+
+        if (tx.amount > 0 && tx.assetId == tx.assetFee._1 && senderAmountBalance < tx.amount + tx.fee) {
+          an[Error] should be thrownBy
+            state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = false))
+        }
+      }
+    }
+  }
+
+  property("AccountAssetsBalances") {
+    forAll(transferGenerator.suchThat(_.assetId.isDefined)) { tx: TransferTransaction =>
+      withRollbackTest {
+        state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
 
         val senderBalances = state.getAccountBalance(tx.sender)
         val receiverBalances = state.getAccountBalance(tx.recipient)
@@ -148,7 +185,7 @@ with PrivateMethodTester with OptionValues with TransactionGen {
       val issueTx2: IssueTransaction = pair._2
       val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
-      state.applyChanges(state.calcNewBalances(Seq(issueTx), Map()))
+      state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
       state.isValid(issueTx2, Int.MaxValue) shouldBe false
     }
@@ -156,13 +193,17 @@ with PrivateMethodTester with OptionValues with TransactionGen {
 
 
   property("Reissue asset") {
-    withRollbackTest {
-      forAll(issueReissueGenerator) { pair =>
+    forAll(issueReissueGenerator) { pair =>
+      withRollbackTest {
         val issueTx: IssueTransaction = pair._1
         val reissueTx: ReissueTransaction = pair._3
         val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
-        state.applyChanges(state.calcNewBalances(Seq(issueTx), Map()))
+        state.isValid(issueTx, Int.MaxValue) shouldBe true
+
+        state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
+
+        state.isValid(issueTx, Int.MaxValue) shouldBe false
 
         state.isValid(reissueTx, Int.MaxValue) shouldBe issueTx.reissuable
       }
@@ -170,23 +211,21 @@ with PrivateMethodTester with OptionValues with TransactionGen {
   }
 
   property("Issue asset") {
-    withRollbackTest {
-      val startedState = state.stateHeight
-      val h = state.hash
-      forAll(issueGenerator) { issueTx: IssueTransaction =>
+    forAll(issueGenerator) { issueTx: IssueTransaction =>
+      withRollbackTest {
         val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
         val networkAcc = AssetAcc(issueTx.sender, None)
 
         //set some balance
         val genes = GenesisTransaction(issueTx.sender, issueTx.fee + Random.nextInt, issueTx.timestamp - 1)
-        state.applyChanges(state.calcNewBalances(Seq(genes), Map()))
+        state.applyChanges(state.calcNewBalances(Seq(genes), Map(), allowTemporaryNegative = true))
         state.assetBalance(assetAcc) shouldBe 0
         state.assetBalance(networkAcc) shouldBe genes.amount
         state.balance(issueTx.sender) shouldBe genes.amount
 
         //issue asset
         state.assetBalance(assetAcc) shouldBe 0
-        val newBalances = state.calcNewBalances(Seq(issueTx), Map())
+        val newBalances = state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true)
         state.applyChanges(newBalances)
         state.assetBalance(assetAcc) shouldBe issueTx.quantity
         state.assetBalance(networkAcc) shouldBe (genes.amount - issueTx.fee)
@@ -200,9 +239,9 @@ with PrivateMethodTester with OptionValues with TransactionGen {
       val networkAcc = AssetAcc(issueTx.sender, None)
       //set some balance
       val genes = GenesisTransaction(issueTx.sender, issueTx.fee + Random.nextInt, issueTx.timestamp - 1)
-      state.applyChanges(state.calcNewBalances(Seq(genes), Map()))
+      state.applyChanges(state.calcNewBalances(Seq(genes), Map(), allowTemporaryNegative = true))
       //issue asset
-      val newBalances = state.calcNewBalances(Seq(issueTx), Map())
+      val newBalances = state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true)
       state.applyChanges(newBalances)
       state.accountTransactions(issueTx.sender).count(_.isInstanceOf[IssueTransaction]) shouldBe 1
     }
@@ -214,36 +253,36 @@ with PrivateMethodTester with OptionValues with TransactionGen {
       val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
       val senderFeeAcc = AssetAcc(tx.sender, tx.feeAsset)
       val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
-      state.applyChanges(state.calcNewBalances(Seq(tx), Map()))
+      state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
       state.accountTransactions(tx.sender).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
     }
   }
 
   property("Applying transactions") {
-    withRollbackTest {
-      val testAssetAcc = AssetAcc(testAcc, None)
-      forAll(paymentGenerator, Gen.posNum[Long]) { (tx: PaymentTransaction,
-                                                    balance: Long) =>
+    val testAssetAcc = AssetAcc(testAcc, None)
+    forAll(paymentGenerator, Gen.posNum[Long]) { (tx: PaymentTransaction,
+                                                  balance: Long) =>
+      withRollbackTest {
         state.balance(testAcc) shouldBe 0
         state.assetBalance(testAssetAcc) shouldBe 0
-        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
         state.balance(testAcc) shouldBe balance
         state.assetBalance(testAssetAcc) shouldBe balance
         state.included(tx).value shouldBe state.stateHeight
-        state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq(tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))))
       }
     }
   }
 
   property("Reopen state") {
     val balance = 1234L
-    state invokePrivate applyChanges(Map(testAssetAcc ->(AccState(balance), Seq(FeesStateChange(balance)))))
+    state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance)))))
     state.balance(testAcc) shouldBe balance
     db.close()
 
-    val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open())
+    val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open(), WavesHardForkParameters.Disabled)
     state2.balance(testAcc) shouldBe balance
-    state2 invokePrivate applyChanges(Map(testAssetAcc ->(AccState(0L), Seq())))
+    state2 invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq())))
   }
 
   private var txTime: Long = 0

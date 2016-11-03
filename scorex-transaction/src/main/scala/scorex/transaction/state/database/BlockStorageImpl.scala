@@ -3,11 +3,12 @@ package scorex.transaction.state.database
 import org.h2.mvstore.MVStore
 import scorex.consensus.ConsensusModule
 import scorex.network.StoredBlockSeq
-import scorex.settings.Settings
+import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction._
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 
-class BlockStorageImpl(settings: TransactionSettings with Settings)
+class BlockStorageImpl(settings: TransactionSettings with Settings,
+                       forksParams: WavesHardForkParameters)
                       (implicit consensusModule: ConsensusModule[_], transactionModule: TransactionModule[_])
   extends BlockStorage {
 
@@ -34,7 +35,7 @@ class BlockStorageImpl(settings: TransactionSettings with Settings)
       new StoredBlockchain(db)(consensusModule, transactionModule)
   }
 
-  override val state = new StoredState(db)
+  override val state = new StoredState(db, forksParams)
 
   override val blockSeq = new StoredBlockSeq(createMVStore(settings.chainFileName))
 }

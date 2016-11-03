@@ -11,7 +11,6 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
 
   object TestSettings extends Settings {
     override lazy val settingsJSON: JsObject = Json.obj()
-    override val filename: String = ""
     override lazy val blacklistResidenceTimeMilliseconds = 1000L
   }
 

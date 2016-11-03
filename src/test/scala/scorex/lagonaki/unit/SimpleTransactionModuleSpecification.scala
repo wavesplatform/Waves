@@ -9,7 +9,7 @@ import scorex.app.Application
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.ConsensusMock
-import scorex.settings.Settings
+import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, TransactionSettings}
 import scorex.wallet.Wallet
 
@@ -22,7 +22,6 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
   object MySettings extends TransactionSettings with Settings {
     override lazy val settingsJSON: JsObject = Json.obj()
     override lazy val dataDirOpt: Option[String] = None
-    override val filename: String = ""
     override lazy val knownPeers = Seq.empty[InetSocketAddress]
   }
 
@@ -34,7 +33,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
   implicit val app = stub[MyApp]
   implicit val settings = MySettings
   implicit val consensusModule = app.consensusModule
-  implicit val transactionModule = new SimpleTransactionModule
+  implicit val transactionModule = new SimpleTransactionModule(WavesHardForkParameters.Disabled)
   val genesisTimestamp = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
     transactionModule.blockStorage.appendBlock(Block.genesis(genesisTimestamp))

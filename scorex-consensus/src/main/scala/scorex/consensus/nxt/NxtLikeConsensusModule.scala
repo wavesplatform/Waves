@@ -3,17 +3,18 @@ package scorex.consensus.nxt
 import com.google.common.primitives.Longs
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
-import scorex.consensus.{ConsensusModule, OneGeneratorConsensusModule, PoSConsensusModule}
+import scorex.consensus.{ConsensusModule, OneGeneratorConsensusModule, PoSConsensusModule, TransactionsOrdering}
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
+import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
+
 import scala.concurrent.duration._
+import scala.util.Try
 import scala.util.control.NonFatal
-import scala.util.{Failure, Try}
-import scorex.crypto.encode.Base58
 
-
-class NxtLikeConsensusModule(AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
+class NxtLikeConsensusModule(config: WavesHardForkParameters, AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
 with OneGeneratorConsensusModule with ScorexLogging {
 
   import NxtLikeConsensusModule._
@@ -40,6 +41,10 @@ with OneGeneratorConsensusModule with ScorexLogging {
     require((blockTime - NTP.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
 
     val history = transactionModule.blockStorage.history
+
+    if (block.timestampField.value > config.requireSortedTransactionsAfter) {
+      require(block.transactions.sorted(TransactionsOrdering) == block.transactions, "Transactions must be sorted correctly")
+    }
 
     val parentOpt = history.parent(block)
     require(parentOpt.isDefined, s"Can't find parent block with id '${Base58.encode(block.referenceField.value)}' of block " +

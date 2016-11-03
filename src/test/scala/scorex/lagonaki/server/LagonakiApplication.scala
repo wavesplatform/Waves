@@ -7,7 +7,9 @@ import scorex.app.{ApplicationVersion, RunnableApplication}
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.lagonaki.mocks.ConsensusMock
 import scorex.network._
+import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
+
 import scala.reflect.runtime.universe._
 
 class LagonakiApplication(val settingsFilename: String) extends RunnableApplication {
@@ -24,11 +26,11 @@ class LagonakiApplication(val settingsFilename: String) extends RunnableApplicat
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
   }
 
-  override implicit lazy val settings = new LagonakiSettings(settingsFilename)
+  override implicit lazy val settings = LagonakiSettings(settingsFilename)
 
   override implicit lazy val consensusModule = new ConsensusMock
 
-  override implicit lazy val transactionModule: SimpleTransactionModule = new SimpleTransactionModule()(settings, this)
+  override implicit lazy val transactionModule: SimpleTransactionModule = new SimpleTransactionModule(WavesHardForkParameters.Disabled)(settings, this)
 
   override lazy val blockStorage = transactionModule.blockStorage
 
