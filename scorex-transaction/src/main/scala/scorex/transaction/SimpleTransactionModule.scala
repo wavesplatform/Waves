@@ -92,7 +92,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
   override def putUnconfirmedIfNew(tx: Transaction): Boolean = synchronized {
     if(feeCalculator.enoughFee(tx)){
-      utxStorage.putIfNew(tx, isValid)
+      utxStorage.putIfNew(tx, isValid(_, tx.timestamp))
     } else false
   }
 
@@ -100,7 +100,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     clearIncorrectTransactions()
 
     val txs = utxStorage.all().sorted(TransactionsOrdering).take(MaxTransactionsPerBlock)
-    val valid = blockStorage.state.validate(txs, heightOpt)
+    val valid = blockStorage.state.validate(txs, heightOpt, NTP.correctedTime())
 
     if (valid.size != txs.size) {
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
@@ -126,7 +126,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     val txs = utxStorage.all()
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeForUnconfirmed }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeDrift }
-    val valid = blockStorage.state.validate(notFromFuture)
+    val valid = blockStorage.state.validate(notFromFuture, blockTime = currentTime)
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
   }
@@ -157,7 +157,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       request.feeAmount,
       Base58.decode(request.attachment).get)
 
-    if (isValid(transfer)) onNewOffchainTransaction(transfer)
+    if (isValid(transfer, transfer.timestamp)) onNewOffchainTransaction(transfer)
     else throw new StateCheckFailed("Invalid transfer transaction generated: " + transfer.json)
     transfer
   }
@@ -172,7 +172,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       request.reissuable,
       request.fee,
       getTimestamp)
-    if (isValid(issue)) onNewOffchainTransaction(issue)
+    if (isValid(issue, issue.timestamp)) onNewOffchainTransaction(issue)
     else throw new StateCheckFailed("Invalid issue transaction generated: " + issue.json)
     issue
   }
@@ -183,7 +183,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   def broadcastTransaction(tx: SignedTransaction): ValidationResult = {
     tx.validate match {
       case ValidationResult.ValidateOke =>
-        if (isValid(tx)) {
+        if (isValid(tx, tx.timestamp)) {
           onNewOffchainTransaction(tx)
           ValidationResult.ValidateOke
         } else ValidationResult.StateCheckFailed
@@ -199,7 +199,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       request.reissuable,
       request.fee,
       getTimestamp)
-    if (isValid(reissue)) onNewOffchainTransaction(reissue)
+    if (isValid(reissue, reissue.timestamp)) onNewOffchainTransaction(reissue)
     else throw new StateCheckFailed("Invalid reissue transaction generated: " + reissue.json)
     reissue
   }
@@ -217,7 +217,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     val time = getTimestamp
     val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
     val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
-    if (isValid(payment)) onNewOffchainTransaction(payment)
+    if (isValid(payment, payment.timestamp)) onNewOffchainTransaction(payment)
     payment
   }
 
@@ -241,10 +241,10 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
   /** Check whether tx is valid on current state and not expired yet
     */
-  override def isValid(tx: Transaction): Boolean = try {
+  override def isValid(tx: Transaction, blockTime: Long): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     val notExpired = (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
-    notExpired && blockStorage.state.isValid(tx)
+    notExpired && blockStorage.state.isValid(tx, blockTime)
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
@@ -257,7 +257,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   override def isValid(block: Block): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     lazy val txsAreNew = block.transactions.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
-    lazy val blockIsValid = blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block))
+    lazy val blockIsValid = blockStorage.state.isValid(block.transactions, blockStorage.history.heightOf(block), block.timestampField.value)
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (!blockIsValid) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs")
     txsAreNew && blockIsValid

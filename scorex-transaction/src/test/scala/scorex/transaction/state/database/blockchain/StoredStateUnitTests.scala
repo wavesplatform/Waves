@@ -41,9 +41,9 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     state.balance(testAcc) shouldBe InitialBalance
 
     val transfers = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
-    transfers.foreach(tx => state.isValid(tx) shouldBe true)
+    transfers.foreach(tx => state.isValid(tx, tx.timestamp) shouldBe true)
 
-    state.isValid(transfers) shouldBe false
+    state.isValid(transfers, blockTime = transfers.map(_.timestamp).max) shouldBe false
 
     state.applyChanges(Map(testAssetAcc -> (AccState(0L), List())))
   }
@@ -55,11 +55,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     val transferTx = genTransfer(Long.MaxValue, Long.MaxValue)
     (-transferTx.fee - transferTx.amount) should be > 0L
-    state.isValid(transferTx) shouldBe false
+    state.isValid(transferTx, transferTx.timestamp) shouldBe false
 
     val paymentTx = genTransfer(Long.MaxValue, Long.MaxValue)
     (-paymentTx.fee - paymentTx.amount) should be > 0L
-    state.isValid(paymentTx) shouldBe false
+    state.isValid(paymentTx, paymentTx.timestamp) shouldBe false
 
     state.applyChanges(Map(testAssetAcc -> (AccState(0L), List())))
 
@@ -104,12 +104,12 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         //valid transfer
         val tx = TransferTransaction.create(None, testAcc, recipient, balance - fee, System.currentTimeMillis(),
           None, fee, Array())
-        state.isValid(tx) shouldBe true
+        state.isValid(tx, tx.timestamp) shouldBe true
 
         //transfer asset
         val invalidtx = TransferTransaction.create(None, testAcc, recipient, balance, System.currentTimeMillis(),
           None, fee, Array())
-        state.isValid(invalidtx) shouldBe false
+        state.isValid(invalidtx, invalidtx.timestamp) shouldBe false
 
         state.applyChanges(Map(testAssetAcc -> (AccState(0L), List(tx))))
       }

@@ -132,12 +132,12 @@ with TransactionTestingCommons {
         val senderBalance = state.asInstanceOf[BalanceSheet].balance(a)
         (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
       }
-      state.validate(trans).nonEmpty shouldBe true
+      state.validate(trans, blockTime = trans.map(_.timestamp).max).nonEmpty shouldBe true
       val valid = transactionModule.packUnconfirmed()
       valid.nonEmpty shouldBe true
       (trans, valid)
     }
-    state.validate(trans).nonEmpty shouldBe true
+    state.validate(trans, blockTime = trans.map(_.timestamp).max).nonEmpty shouldBe true
     if (valid.size >= trans.size) {
       val balance = state.asInstanceOf[BalanceSheet].balance(trans.head.sender)
       log.error(s"Double spending: ${trans.map(_.json)} | ${valid.map(_.json)} | $balance")

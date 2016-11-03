@@ -264,13 +264,13 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
   /**
     * Returns sequence of valid transactions
     */
-  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
+  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)
 
     val txs = trans.filter(t => isValid(t, height))
     val invalidPaymentTransactionsByTimestamp = invalidatePaymentTransactionsByTimestamp(txs)
     val validTransactions = excludeTransactions(txs, invalidPaymentTransactionsByTimestamp)
-    val filteredFromFuture = filterTransactionsFromFuture(validTransactions)
+    val filteredFromFuture = filterTransactionsFromFuture(validTransactions, blockTime)
 
     def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
       val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
@@ -337,10 +337,9 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     selection.foldLeft(List[Transaction]()) { (l, s) => l ++ s._2._1 }
   }
 
-  private def filterTransactionsFromFuture(transactions: Seq[Transaction]): Seq[Transaction] = {
-    val currentTime = NTP.correctedTime()
+  private def filterTransactionsFromFuture(transactions: Seq[Transaction], blockTime: Long): Seq[Transaction] = {
     transactions.filter {
-      tx => (tx.timestamp - currentTime).millis <= SimpleTransactionModule.MaxTimeForUnconfirmed
+      tx => (tx.timestamp - blockTime).millis <= SimpleTransactionModule.MaxTimeForUnconfirmed
     }
   }
 
