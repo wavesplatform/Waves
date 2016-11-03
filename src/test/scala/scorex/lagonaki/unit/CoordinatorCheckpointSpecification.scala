@@ -17,7 +17,7 @@ import scorex.network.ScoreObserver.CurrentScore
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, Message}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.settings.SettingsMock
+import scorex.settings.{SettingsMock, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
 
@@ -46,10 +46,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
   val db = new MVStore.Builder().open()
 
   trait TestAppMock extends Application {
-    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new NxtLikeConsensusModule() {
+    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new NxtLikeConsensusModule(WavesHardForkParameters.Disabled) {
       override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = true
     }
-    lazy implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule()(TestSettings, this)
+    lazy implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule(WavesHardForkParameters.Disabled)(TestSettings, this)
     lazy val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = TestSettings
@@ -192,7 +192,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
 
     var parent = app.history.blockAt(7).get.uniqueId
     val lastCommonBlockId = parent
-    val fork = Seq.fill(3){val b = createBlock(parent); parent = b.uniqueId; b}
+    val fork = Seq.fill(5){val b = createBlock(parent); parent = b.uniqueId; b}
 
     moveCoordinatorToSyncState()
 
@@ -202,6 +202,8 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
     actorRef ! SyncFinished(success = true, Some(lastCommonBlockId, fork.iterator, Some(goodPeer)))
 
     Thread.sleep(1000)
+    awaitCond(app.history.height() ==  12)
+
   }
 
 }
