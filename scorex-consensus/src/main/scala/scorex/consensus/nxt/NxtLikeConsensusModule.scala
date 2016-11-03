@@ -29,7 +29,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
   val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
   val InitialBaseTarget = MaxBaseTarget / 2
 
-  override val generatingBalanceDepth = 50
+  override val generatingBalanceDepth = 1000
 
   private def avgDelayInSeconds: Long = AvgDelay.toSeconds
 
