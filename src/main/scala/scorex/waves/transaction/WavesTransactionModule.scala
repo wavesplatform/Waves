@@ -16,10 +16,9 @@ import scorex.wallet.Wallet
 /**
   * Waves Transaction Module
   */
-class WavesTransactionModule(implicit override val settings: TransactionSettings with Settings,
-                             application: RunnableApplication,
-                             val chainParams: ChainParameters)
-  extends SimpleTransactionModule() {
+class WavesTransactionModule(chainParams: ChainParameters)(implicit override val settings: TransactionSettings with Settings,
+                             application: RunnableApplication)
+  extends SimpleTransactionModule(chainParams) {
 
   override val InitialBalance = chainParams.initialBalance
 

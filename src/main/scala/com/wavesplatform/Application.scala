@@ -6,16 +6,16 @@ import com.wavesplatform.http.NodeApiRoute
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.app.ApplicationVersion
-import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import com.wavesplatform.settings._
 import scorex.waves.transaction.WavesTransactionModule
-
 import scala.reflect.runtime.universe._
 import com.wavesplatform.actor.RootActorSystem
 import scorex.api.http.assets.AssetsBroadcastApiRoute
+import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
+import scorex.settings.Settings
 
 class Application(as: ActorSystem, appSettings: WavesSettings) extends {
   override implicit val settings = appSettings
@@ -27,9 +27,9 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
   override implicit val actorSystem = as
 } with scorex.app.RunnableApplication {
 
-  override implicit lazy val consensusModule = new WavesConsensusModule()
+  override implicit lazy val consensusModule = new WavesConsensusModule(settings.chainParams)
 
-  override implicit lazy val transactionModule = new WavesTransactionModule()(settings, this, settings.chainParams)
+  override implicit lazy val transactionModule = new WavesTransactionModule(settings.chainParams)(settings, this)
 
   override lazy val blockStorage = transactionModule.blockStorage
 
@@ -81,7 +81,7 @@ object Application extends ScorexLogging {
     RootActorSystem.start("wavesplatform") { actorSystem =>
       log.info("Starting with args: {} ", args)
       val filename = args.headOption.getOrElse("settings.json")
-      val settings = new WavesSettings(filename)
+      val settings = new WavesSettings(Settings.readSettingsJson(filename))
 
       configureLogging(settings)
 

@@ -3,10 +3,10 @@ package com.wavesplatform.settings
 import com.wavesplatform.{ChainParameters, MainNetParams, TestNetParams}
 import scorex.settings.Settings
 import scorex.transaction.TransactionSettings
-
 import scala.util.Try
+import play.api.libs.json.JsObject
 
-class WavesSettings(override val filename: String) extends Settings with TransactionSettings {
+class WavesSettings(override val settingsJSON: JsObject) extends Settings with TransactionSettings {
   lazy val loggingLevel = (settingsJSON \ "loggingLevel").asOpt[String].getOrElse("info").toLowerCase
 
   override lazy val genesisTimestamp = 1460678400000L
