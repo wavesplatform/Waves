@@ -23,5 +23,8 @@
   "offlineGeneration": false,
   "apiKeyHash":"",
   "testnet": true,
-  "loggingLevel": "info"
+  "loggingLevel": "info",
+  "checkpoints": {
+    "publicKey": "4PvoqxpWi7kCA9N3UXcEB9CZx4iPPeHX9jSYdAioPhnr"
+  }
 }
