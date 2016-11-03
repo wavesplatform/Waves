@@ -125,7 +125,8 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     val currentTime = NTP.correctedTime()
     val txs = utxStorage.all()
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeForUnconfirmed }
-    val valid = blockStorage.state.validate(notExpired)
+    val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeDrift }
+    val valid = blockStorage.state.validate(notFromFuture)
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
   }
@@ -273,6 +274,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
+  val MaxTimeDrift = 15.seconds
   val MaxTimeForUnconfirmed = 90.minutes
   val MaxTxAndBlockDiff = 2.hour
   val MaxTransactionsPerBlock = 100

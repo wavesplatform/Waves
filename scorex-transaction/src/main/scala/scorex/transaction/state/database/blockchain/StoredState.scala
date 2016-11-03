@@ -10,7 +10,8 @@ import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets.{AssetIssuance, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
-import scorex.utils.{LogMVMapBuilder, ScorexLogging}
+import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
+import scala.concurrent.duration._
 
 import scala.collection.JavaConversions._
 import scala.util.{Failure, Success, Try}
@@ -267,10 +268,9 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     val height = heightOpt.getOrElse(stateHeight)
 
     val txs = trans.filter(t => isValid(t, height))
-
-    val invalidByTimestamp = invalidateTransactionsByTimestamp(txs)
-
-    val validByTimestampTransactions = excludeTransactions(txs, invalidByTimestamp)
+    val invalidPaymentTransactionsByTimestamp = invalidatePaymentTransactionsByTimestamp(txs)
+    val validTransactions = excludeTransactions(txs, invalidPaymentTransactionsByTimestamp)
+    val filteredFromFuture = filterTransactionsFromFuture(validTransactions)
 
     def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
       val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
@@ -304,13 +304,13 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       validTxs
     }
 
-    filterValidTransactionsByState(validByTimestampTransactions)
+    filterValidTransactionsByState(filteredFromFuture)
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
     transactions.filter(t1 => !exclude.exists(t2 => t2.id sameElements t1.id))
 
-  private def invalidateTransactionsByTimestamp(transactions: Seq[Transaction]): Seq[Transaction] = {
+  private def invalidatePaymentTransactionsByTimestamp(transactions: Seq[Transaction]): Seq[Transaction] = {
     val paymentTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
       .map(_.asInstanceOf[PaymentTransaction])
 
@@ -337,6 +337,12 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     selection.foldLeft(List[Transaction]()) { (l, s) => l ++ s._2._1 }
   }
 
+  private def filterTransactionsFromFuture(transactions: Seq[Transaction]): Seq[Transaction] = {
+    val currentTime = NTP.correctedTime()
+    transactions.filter {
+      tx => (tx.timestamp - currentTime).millis <= SimpleTransactionModule.MaxTimeForUnconfirmed
+    }
+  }
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
