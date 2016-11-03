@@ -12,12 +12,10 @@ import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
-import scorex.utils.NTP
 import scorex.utils.ScorexLogging
 
 import scala.util.Random
 import scala.util.control.NonFatal
-import scorex.settings.{Settings, WavesHardForkParameters}
 
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
 
