@@ -21,7 +21,7 @@ case class ReissueTransaction(sender: PublicKeyAccount,
 
   override val transactionType: TransactionType.Value = TransactionType.ReissueTransaction
 
-  lazy val toSign: Array[Byte] = Bytes.concat(sender.publicKey, assetId, Longs.toByteArray(quantity),
+  lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), sender.publicKey, assetId, Longs.toByteArray(quantity),
     if (reissuable) Array(1: Byte) else Array(0: Byte), Longs.toByteArray(fee), Longs.toByteArray(timestamp))
 
   override lazy val json: JsObject = Json.obj(
@@ -68,9 +68,11 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
   def parseTail(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
     import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
-    val sender = new PublicKeyAccount(bytes.slice(SignatureLength, SignatureLength + KeyLength))
-    val assetId = bytes.slice(SignatureLength + KeyLength, SignatureLength + KeyLength + AssetIdLength)
-    val quantityStart = SignatureLength + KeyLength + AssetIdLength
+    val txId = bytes(SignatureLength)
+    require(txId == TransactionType.ReissueTransaction.id.toByte, s"Signed tx id is not match")
+    val sender = new PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
+    val assetId = bytes.slice(SignatureLength + KeyLength + 1, SignatureLength + KeyLength + AssetIdLength + 1)
+    val quantityStart = SignatureLength + KeyLength + AssetIdLength + 1
 
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
     val reissuable = bytes.slice(quantityStart + 8, quantityStart + 9).head == (1: Byte)
