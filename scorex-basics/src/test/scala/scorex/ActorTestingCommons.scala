@@ -18,7 +18,7 @@ import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 
 abstract class ActorTestingCommons extends TestKitBase
-  with FreeSpecLike
+  with org.scalatest.path.FreeSpecLike
   with Matchers
   with ImplicitSender
   with PathMockFactory {
