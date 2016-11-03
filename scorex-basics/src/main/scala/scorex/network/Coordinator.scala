@@ -207,15 +207,15 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 
   private def processFork(lastCommonBlockId: BlockId, blocks: Iterator[Block], from: Option[ConnectedPeer]): Unit = {
-
+    val newBlocks = blocks.toSeq
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
-      blocks.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
+      newBlocks.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
     }
 
     if (application.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
       application.blockStorage.removeAfter(lastCommonBlockId)
 
-      blocks.find(!processNewBlock(_)).foreach { failedBlock =>
+      newBlocks.find(!processNewBlock(_)).foreach { failedBlock =>
         log.warn(s"Can't apply block: ${failedBlock.json}")
         if (try {
           history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)
