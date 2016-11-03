@@ -65,8 +65,8 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
         log.debug(s"Quorum to download blocks is not reached: $actualSize peers but should be $quorumSize")
         context become idle()
       } else if (peerScores.nonEmpty) {
-        blockchainSynchronizer ! GetExtension(peerScores)
         context become syncing
+        blockchainSynchronizer ! GetExtension(peerScores)
       }
   }
 
@@ -207,22 +207,33 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 
   private def processFork(lastCommonBlockId: BlockId, blocks: Iterator[Block], from: Option[ConnectedPeer]): Unit = {
-    application.blockStorage.removeAfter(lastCommonBlockId)
 
-    blocks.find(!processNewBlock(_)).foreach { failedBlock =>
-      log.warn(s"Can't apply block: ${failedBlock.json}")
-      if (try {
-        history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)
-      } catch {
-        case e: UnsupportedOperationException =>
-          log.debug(s"DB can't find last block because of unexpected modification")
-          false
-      }) {
-        from.foreach(_.blacklist())
-      }
+    def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
+      blocks.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
     }
 
-    self ! BroadcastCurrentScore
+    if (application.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
+      application.blockStorage.removeAfter(lastCommonBlockId)
+
+      blocks.find(!processNewBlock(_)).foreach { failedBlock =>
+        log.warn(s"Can't apply block: ${failedBlock.json}")
+        if (try {
+          history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)
+        } catch {
+          case e: UnsupportedOperationException =>
+            log.debug(s"DB can't find last block because of unexpected modification")
+            false
+        }) {
+          from.foreach(_.blacklist())
+        }
+      }
+
+      self ! BroadcastCurrentScore
+
+    } else {
+      from.foreach(_.blacklist())
+      log.info(s"Fork contains block that doesn't match checkpoint, refusing fork")
+    }
   }
 
   private def isValidWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Boolean =
