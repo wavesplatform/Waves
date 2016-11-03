@@ -10,10 +10,13 @@ import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
-import scorex.network.Coordinator.{AddBlock, ClearCheckpoint}
+import scorex.network.BlockchainSynchronizer.GetExtension
+import scorex.network.Coordinator.{AddBlock, ClearCheckpoint, SyncFinished}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
+import scorex.network.ScoreObserver.CurrentScore
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, Message}
+import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.SettingsMock
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
@@ -27,7 +30,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
   val pk = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(100).toByte))
 
   object TestSettings extends SettingsMock with TransactionSettings {
-    var checkpoint: Option[Array[Byte]] = Some(pk.privateKey)
     override lazy val quorum: Int = 1
     override lazy val scoreBroadcastDelay: FiniteDuration = 1000 seconds
     override lazy val MaxRollback: Int = 10
@@ -37,16 +39,17 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
 
   val testblockGenerator = TestProbe("blockGenerator")
   val testBlockchainSynchronizer = TestProbe("BlockChainSynchronizer")
+  val testScoreObserver = TestProbe("ScoreObserver")
   val testPeerManager = TestProbe("PeerManager")
   val connectedPeer = stub[ConnectedPeer]
 
   val db = new MVStore.Builder().open()
 
   trait TestAppMock extends Application {
-    implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new NxtLikeConsensusModule() {
+    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new NxtLikeConsensusModule() {
       override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = true
     }
-    implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule()(TestSettings, this)
+    lazy implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule()(TestSettings, this)
     lazy val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = TestSettings
@@ -56,6 +59,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
     lazy val history: History = transactionModule.blockStorage.history
 
     lazy val blockStorage: BlockStorage = transactionModule.blockStorage
+    lazy val scoreObserver: ActorRef = testScoreObserver.ref
   }
 
   lazy val app = stub[TestAppMock]
@@ -93,25 +97,37 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
     }
   }
 
-  "rollback if block doesn't match checkPoint" in {
-    TestSettings.checkpoint = None
-    var ref = app.history.genesis.uniqueId
+  def genNBlocks(n: Int): Unit = {
+    genNBlocks(1, n)
+  }
 
-    (2 to 10).foreach { i =>
+  def genNBlocks(fromHeight: Int = 1, n: Int): Unit = {
+    var ref = app.history.blockAt(fromHeight).get.uniqueId
+
+    (2 to n).foreach { i =>
       val b = createBlock(ref)
       actorRef ! AddBlock(b, Some(connectedPeer))
       ref = b.uniqueId
     }
 
-    awaitCond(app.history.height() ==  10)
+    awaitCond(app.history.height() ==  n)
+  }
 
-    val historyPoints = Seq(7, 5, 3)
+  def genCheckpoint(historyPoints: Seq[Int]): Checkpoint = {
+    val items = historyPoints.map(h => BlockCheckpoint(h, app.history.blockAt(h).get.signerDataField.value.signature))
+    val checkpoint = Checkpoint(items, Array()).signedBy(pk.privateKey)
+    checkpoint
+  }
+
+  "rollback if block doesn't match checkPoint" in {
+    genNBlocks(10)
+
     val toRolback = 9
     val chpBlock = createBlock(app.history.blockAt(toRolback - 1).get.uniqueId)
-    val items = historyPoints.map(h => BlockCheckpoint(h, app.history.blockAt(h).get.signerDataField.value.signature))
     val p = BlockCheckpoint(toRolback, chpBlock.signerDataField.value.signature)
+    val firstChp = genCheckpoint(Seq(7, 5, 3))
 
-    val checkpoint = Checkpoint(p +: items, Array()).signedBy(pk.privateKey)
+    val checkpoint = Checkpoint(p +: firstChp.items, Array()).signedBy(pk.privateKey)
 
     actorRef ! DataFromPeer(repo.CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
 
@@ -119,27 +135,9 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
   }
 
   "blacklist peer if it sends block that is different from checkPoint" in {
-    TestSettings.checkpoint = None
-    var ref = app.history.genesis.uniqueId
+    genNBlocks(9)
 
-    (2 to 9).foreach { i =>
-      val b = createBlock(ref)
-      actorRef ! AddBlock(b, Some(connectedPeer))
-      ref = b.uniqueId
-    }
-
-    awaitCond(app.history.height() ==  9)
-
-    val historyPoints = Seq(9, 7, 5, 3)
-    val items = historyPoints.map(h => BlockCheckpoint(h, app.history.blockAt(h).get.signerDataField.value.signature))
-    val checkpoint = Checkpoint(items, Array()).signedBy(pk.privateKey)
-
-    actorRef ! DataFromPeer(repo.CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
-
-    networkController.expectMsgPF() {
-      case SendToNetwork(Message(spec, _, _), _) => spec should be(repo.CheckpointMessageSpec)
-      case m => println(m); fail("Checkpoint hasn't been sent")
-    }
+    sendCheckpoint(Seq(9, 7, 5, 3))
 
     val parentId = app.history.blockAt(8).get.uniqueId
     app.blockStorage.removeAfter(parentId)
@@ -148,8 +146,62 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons with Before
     (badPeer.blacklist _).expects
     actorRef ! AddBlock(difBloc, Some(badPeer))
 
-    expectNoMsg()
-
-    verifyExpectations
+    Thread.sleep(1000)
   }
+
+  def sendCheckpoint(historyPoints: Seq[Int]): Unit = {
+    val checkpoint = genCheckpoint(historyPoints)
+
+    actorRef ! DataFromPeer(repo.CheckpointMessageSpec.messageCode, checkpoint, connectedPeer)
+
+    networkController.expectMsgPF() {
+      case SendToNetwork(Message(spec, _, _), _) => spec should be(repo.CheckpointMessageSpec)
+      case m => println(m); fail("Checkpoint hasn't been sent")
+    }
+  }
+
+  def moveCoordinatorToSyncState(): Unit = {
+    actorRef ! CurrentScore(Seq(connectedPeer -> Long.MaxValue))
+    testPeerManager.expectMsg(GetConnectedPeersTyped)
+    actorRef ! ConnectedPeers(Set(connectedPeer))
+    testBlockchainSynchronizer.expectMsgType[GetExtension]
+  }
+
+  "validate checkpoint on receiving new fork" in {
+    genNBlocks(10)
+    sendCheckpoint(Seq(7, 4, 3))
+
+    var parent = app.history.blockAt(5).get.uniqueId
+    val lastCommonBlockId = parent
+    val fork = Seq.fill(5){val b = createBlock(parent); parent = b.uniqueId; b}
+
+    moveCoordinatorToSyncState()
+
+    val forkPeer = stub[ConnectedPeer]
+
+    actorRef ! SyncFinished(success = true, Some(lastCommonBlockId, fork.iterator, Some(forkPeer)))
+
+    Thread.sleep(1000)
+
+    (forkPeer.blacklist _).verify
+  }
+
+  "accept fork if it matches checkpoint" in {
+    genNBlocks(10)
+    sendCheckpoint(Seq(7, 4, 3))
+
+    var parent = app.history.blockAt(7).get.uniqueId
+    val lastCommonBlockId = parent
+    val fork = Seq.fill(3){val b = createBlock(parent); parent = b.uniqueId; b}
+
+    moveCoordinatorToSyncState()
+
+    val goodPeer = mock[ConnectedPeer]
+    (goodPeer.blacklist _).expects().returning().never()
+
+    actorRef ! SyncFinished(success = true, Some(lastCommonBlockId, fork.iterator, Some(goodPeer)))
+
+    Thread.sleep(1000)
+  }
+
 }

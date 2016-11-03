@@ -227,20 +227,22 @@ case class BlocksApiRoute(application: Application)(implicit val context: ActorR
 
     path("checkpoint") {
       entity(as[String]) { body =>
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[Checkpoint] match {
-              case err: JsError =>
-                WrongTransactionJson(err).response
-              case JsSuccess(checkpoint: Checkpoint, _) =>
-                validateCheckpoint(checkpoint) match {
-                  case Some(apiError) => apiError.response
-                  case None =>
-                    coordinator ! BroadcastCheckpoint(checkpoint)
-                    JsonResponse(Json.obj("message" -> "Checkpoint broadcasted"), StatusCodes.OK)
-                }
-            }
-          }.getOrElse(WrongJson.response)
+        withAuth {
+          postJsonRoute {
+            Try(Json.parse(body)).map { js =>
+              js.validate[Checkpoint] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).response
+                case JsSuccess(checkpoint: Checkpoint, _) =>
+                  validateCheckpoint(checkpoint) match {
+                    case Some(apiError) => apiError.response
+                    case None =>
+                      coordinator ! BroadcastCheckpoint(checkpoint)
+                      JsonResponse(Json.obj("message" -> "Checkpoint broadcasted"), StatusCodes.OK)
+                  }
+              }
+            }.getOrElse(WrongJson.response)
+          }
         }
       }
     }
