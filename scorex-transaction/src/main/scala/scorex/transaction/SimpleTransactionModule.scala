@@ -167,8 +167,8 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     val sender = wallet.privateKeyAccount(request.sender).get
     val issue = IssueTransaction.create(sender,
       None,
-      Base58.decode(request.name).get,
-      Base58.decode(request.description).get,
+      request.name.getBytes,
+      request.description.getBytes,
       request.quantity,
       request.decimals,
       request.reissuable,
