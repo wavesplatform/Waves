@@ -1,26 +1,26 @@
 package scorex.transaction.state.database.blockchain
 
 import java.io.File
+import java.util.UUID
 
 import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.{Account, PrivateKeyAccount}
+import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
-import scorex.utils.NTP
 import scorex.utils.ScorexLogging
 
 import scala.util.Random
 import scala.util.control.NonFatal
-import scorex.settings.{Settings, WavesHardForkParameters}
 
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging {
 
-  val folder = "/tmp/scorex/test/"
+  val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"
   new File(folder).mkdirs()
   val stateFile = folder + "state.dat"
   new File(stateFile).delete()
