@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
@@ -163,8 +164,8 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
     val issue = IssueTransaction.create(sender,
-      request.name.getBytes,
-      request.description.getBytes,
+      request.name.getBytes(Charsets.UTF_8),
+      request.description.getBytes(Charsets.UTF_8),
       request.quantity,
       request.decimals,
       request.reissuable,
