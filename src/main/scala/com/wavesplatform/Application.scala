@@ -7,7 +7,6 @@ import com.wavesplatform.http.NodeApiRoute
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.app.ApplicationVersion
-import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
@@ -16,11 +15,15 @@ import scorex.waves.transaction.WavesTransactionModule
 import scala.reflect.runtime.universe._
 
 import com.wavesplatform.actor.RootActorSystem
+import scorex.api.http.assets.AssetsBroadcastApiRoute
+import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
+import scorex.settings.Settings
+
 import com.wavesplatform.matcher.MatcherApplication
 
 class Application(as: ActorSystem, appSettings: WavesSettings) extends {
   override implicit val settings = appSettings
-  override val applicationName = "waves"
+  override val applicationName = Constants.ApplicationName
   override val appVersion = {
     val parts = Constants.VersionString.split("\\.")
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
@@ -29,9 +32,9 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
 } with scorex.app.RunnableApplication
   with MatcherApplication {
 
-  override implicit lazy val consensusModule = new WavesConsensusModule()
+  override implicit lazy val consensusModule = new WavesConsensusModule(settings.chainParams)
 
-  override implicit lazy val transactionModule = new WavesTransactionModule()(settings, this, settings.chainParams)
+  override implicit lazy val transactionModule = new WavesTransactionModule(settings.chainParams)(settings, this)
 
   override lazy val blockStorage = transactionModule.blockStorage
 
@@ -49,7 +52,8 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     DebugApiRoute(this),
     WavesApiRoute(this),
     AssetsApiRoute(this),
-    NodeApiRoute(this)
+    NodeApiRoute(this),
+    AssetsBroadcastApiRoute(this)
   )
 
   override lazy val apiTypes = Seq(
@@ -64,7 +68,8 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     typeOf[DebugApiRoute],
     typeOf[WavesApiRoute],
     typeOf[AssetsApiRoute],
-    typeOf[NodeApiRoute]
+    typeOf[NodeApiRoute],
+    typeOf[AssetsBroadcastApiRoute]
   )
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
@@ -79,10 +84,9 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
 object Application extends ScorexLogging {
   def main(args: Array[String]): Unit =
     RootActorSystem.start("wavesplatform") { actorSystem =>
-      //TODO: gagarin55-change to info cuz default log level is info
-      log.debug("Starting with args: {} ", args)
+      log.info("Starting with args: {} ", args)
       val filename = args.headOption.getOrElse("settings.json")
-      val settings = new WavesSettings(filename)
+      val settings = new WavesSettings(Settings.readSettingsJson(filename))
 
       configureLogging(settings)
 

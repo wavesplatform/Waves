@@ -3,11 +3,12 @@ package com.wavesplatform
 import scorex.account.{Account, AddressScheme}
 import scorex.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.settings.Constants
+import scorex.settings.WavesHardForkParameters
 
 /**
   * ChainParameters contains the data needed for working with an instantiation of particular chain
   */
-abstract class ChainParameters {
+abstract class ChainParameters extends WavesHardForkParameters {
   val initialBalance: Long
   val genesisTimestamp: Long
   val genesisTxs : Seq[Transaction]
@@ -16,15 +17,15 @@ abstract class ChainParameters {
 
 object TestNetParams extends ChainParameters {
   val initialBalance = Constants.UnitsInWave * Constants.TotalWaves
-  val genesisTimestamp = 1460952000000L
+  val genesisTimestamp = 1478000000000L
+  val singleNodeBalance = initialBalance * 0.02
   val genesisTxs = {
     val txs = Seq(
-      GenesisTransaction(new Account("3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K"), initialBalance - 5 * Constants.UnitsInWave, genesisTimestamp),
-      GenesisTransaction(new Account("3MyTvqfeLWkvjSZ1hwkhQjzipZr7Pk8dyMR"), Constants.UnitsInWave, genesisTimestamp),
-      GenesisTransaction(new Account("3MqS3mVY4Yr4HoTdpWiEaq9phwbaoWS2W6A"), Constants.UnitsInWave, genesisTimestamp),
-      GenesisTransaction(new Account("3N3CDuzGXB2qP5vb2NvnnDQ68HahNCfYVBg"), Constants.UnitsInWave, genesisTimestamp),
-      GenesisTransaction(new Account("3N2sacZ9XTQUkLDdZZgtb1zJUAmr6oziRrU"), Constants.UnitsInWave, genesisTimestamp),
-      GenesisTransaction(new Account("3N189PMB8BaxngN3fNvDRkFbvbH8xMkk328"), Constants.UnitsInWave, genesisTimestamp)
+      GenesisTransaction(new Account("3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K"), (2 * singleNodeBalance).toLong, genesisTimestamp),
+      GenesisTransaction(new Account("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8"), singleNodeBalance.toLong, genesisTimestamp),
+      GenesisTransaction(new Account("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh"), singleNodeBalance.toLong, genesisTimestamp),
+      GenesisTransaction(new Account("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd"), singleNodeBalance.toLong, genesisTimestamp),
+      GenesisTransaction(new Account("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx"), (initialBalance - 5 * singleNodeBalance).toLong, genesisTimestamp)
     )
     require(txs.foldLeft(0L)(_ + _.amount) == initialBalance)
     txs
@@ -32,6 +33,10 @@ object TestNetParams extends ChainParameters {
   override val addressScheme: AddressScheme = new AddressScheme {
     override val chainId: Byte = 'T'.toByte
   }
+
+  override def allowTemporaryNegativeUntil: Long = 1477958400000L
+
+  override def requireSortedTransactionsAfter: Long = 1477958400000L
 }
 
 object MainNetParams extends ChainParameters {
@@ -52,4 +57,7 @@ object MainNetParams extends ChainParameters {
   override val addressScheme: AddressScheme = new AddressScheme {
     override val chainId: Byte = 'W'.toByte
   }
+  override def allowTemporaryNegativeUntil: Long = 1478736000000L
+
+  override def requireSortedTransactionsAfter: Long = 1478736000000L
 }
