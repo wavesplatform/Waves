@@ -1,5 +1,6 @@
 package scorex.api.http.assets
 
+import com.google.common.base.Charsets
 import io.swagger.annotations._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
@@ -34,8 +35,8 @@ object BroadcastRequests {
     def toTx: Try[IssueTransaction] = Try {
       IssueTransaction(
         new PublicKeyAccount(Base58.decode(senderPublicKey).get),
-        Base58.decode(name).get,
-        Base58.decode(description).get,
+        name.getBytes(Charsets.UTF_8),
+        description.getBytes(Charsets.UTF_8),
         quantity,
         decimals,
         reissuable,
