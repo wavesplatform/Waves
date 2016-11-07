@@ -7,6 +7,7 @@ import org.scalatest._
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
+import scorex.settings.WavesHardForkParameters
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderMatch}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
@@ -25,7 +26,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   val WAVES_UNITS = Order.PriceConstant
 
   val db = new MVStore.Builder().fileName(stateFile.toString).compress().open()
-  val state = new StoredState(db)
+  val state = new StoredState(db, WavesHardForkParameters.Disabled)
   state.processBlock(new BlockMock(Seq(GenesisTransaction(acc1, 1000 * WAVES_UNITS, 0),
     GenesisTransaction(acc2, 100 * WAVES_UNITS, 0))))
 
@@ -54,9 +55,8 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   private def issueAsset(request: IssueRequest, wallet: Wallet): IssueTransaction = {
     val sender = wallet.privateKeyAccount(request.sender).get
     IssueTransaction.create(sender,
-      None,
-      Base58.decode(request.name).get,
-      Base58.decode(request.description).get,
+      request.name.getBytes,
+      request.description.getBytes,
       request.quantity,
       request.decimals,
       request.reissuable,
