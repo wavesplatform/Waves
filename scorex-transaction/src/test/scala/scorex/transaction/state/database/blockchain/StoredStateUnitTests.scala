@@ -221,7 +221,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       val Seq(buyerBal1, buyerBal2, sellerBal1, sellerBal2, buyerFeeBal, sellerFeeBal, matcherFeeBal) =
         getBalances(buyerAcc1, buyerAcc2, sellerAcc1, sellerAcc2, buyerFeeAcc, sellerFeeAcc, matcherFeeAcc)
 
-      state.applyChanges(state.calcNewBalances(Seq(om), Map()))
+      state.applyChanges(state.calcNewBalances(Seq(om), Map(), false))
 
       val Seq(newBuyerBal1, newBuyerBal2, newSellerBal1, newSellerBal2, newBuyerFeeBal, newSellerFeeBal, newMatcherFeeBal) =
         getBalances(buyerAcc1, buyerAcc2, sellerAcc1, sellerAcc2, buyerFeeAcc, sellerFeeAcc, matcherFeeAcc)

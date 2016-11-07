@@ -27,7 +27,7 @@ import scorex.transaction.assets.exchange.OrderMatch
   *
   * Use apply method of StoredState object to create new instance
   */
-class StoredState(db: MVStore, settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging
+class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging
   with OrderMatchStoredState {
 
 
