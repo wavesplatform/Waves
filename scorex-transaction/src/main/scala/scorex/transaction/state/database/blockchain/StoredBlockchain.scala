@@ -8,6 +8,7 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
+import scorex.network.Checkpoint
 import scorex.transaction.BlockStorage._
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.{BlockChain, TransactionModule}
@@ -44,6 +45,7 @@ class StoredBlockchain(db: MVStore)
             }.toOption)
           }
         })
+    val checkpoint: MVMap[Int, Checkpoint] = database.openMap("checkpoint", new LogMVMapBuilder[Int, Checkpoint])
 
     //TODO: remove when no blockchains without signaturesReverse remains
     if (signaturesReverse.size() != signatures.size()) {
@@ -145,4 +147,11 @@ class StoredBlockchain(db: MVStore)
     val bl = blockAt(h).get
     s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString }"
   }).mkString("\n")
+
+  override def getCheckpoint: Option[Checkpoint] = Option(blockStorage.checkpoint.get(0))
+
+  override def setCheckpoint(c: Option[Checkpoint]): Unit = {
+    if (c.isDefined) blockStorage.checkpoint.put(0, c.get)
+    else blockStorage.checkpoint.remove(0)
+  }
 }
