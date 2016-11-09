@@ -4,6 +4,7 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
+import scorex.network.Checkpoint
 import scorex.transaction.BlockStorage.BlocksToProcess
 
 import scala.util.Try
@@ -102,6 +103,9 @@ trait History {
 
   val genesis: Block
 
+  def getCheckpoint: Option[Checkpoint]
+
+  def setCheckpoint(checkpoint:  Option[Checkpoint])
 }
 
 object History {

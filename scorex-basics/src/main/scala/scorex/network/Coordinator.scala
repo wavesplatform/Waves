@@ -36,7 +36,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   private lazy val history = application.history
 
-  private var currentCheckpoint = Option.empty[Checkpoint]
+  private def currentCheckpoint(): Option[Checkpoint] = history.getCheckpoint
 
   context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, BroadcastCurrentScore)
 
@@ -110,8 +110,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       case ConnectedPeers(_) =>
 
-      case ClearCheckpoint =>
-        currentCheckpoint = None
+      case ClearCheckpoint => history.setCheckpoint(None)
     }
   }
 
@@ -120,7 +119,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       application.settings.checkpointPublicKey foreach {
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
-            setCurrentChechpoint(checkpoint)
+            history.setCheckpoint(Some(checkpoint))
             networkControllerRef ! SendToNetwork(Message(CheckpointMessageSpec, Right(checkpoint), None),
               from.map(BroadcastExceptOf).getOrElse(Broadcast))
             makeBlockchainCompliantWith(checkpoint)
@@ -129,8 +128,6 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
           }
       }
     }
-
-  private def setCurrentChechpoint(checkpoint: Checkpoint) = { currentCheckpoint = Some(checkpoint) }
 
   private def makeBlockchainCompliantWith(checkpoint: Checkpoint): Unit = {
     val existingItems = checkpoint.items.filter {

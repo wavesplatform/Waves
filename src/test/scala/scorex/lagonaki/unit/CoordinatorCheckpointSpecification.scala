@@ -19,6 +19,7 @@ import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.{SettingsMock, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
+import org.scalamock._
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.postfixOps
@@ -143,11 +144,14 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     val parentId = app.history.blockAt(8).get.uniqueId
     app.blockStorage.removeAfter(parentId)
     val difBloc = createBlock(parentId)
-    val badPeer = mock[ConnectedPeer]
-    (badPeer.blacklist _).expects
+    val badPeer = stub[ConnectedPeer]
+
     actorRef ! AddBlock(difBloc, Some(badPeer))
 
     Thread.sleep(1000)
+
+    (badPeer.blacklist _).verify().once
+    verifyExpectations
   }
 
   def sendCheckpoint(historyPoints: Seq[Int]): Unit = {
