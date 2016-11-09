@@ -114,7 +114,7 @@ object BroadcastRequests {
       (JsPath \ "recipient").read[String] and
       (JsPath \ "amount").read[Long] and
       (JsPath \ "fee").read[Long] and
-      (JsPath \ "feeAsset").read[Option[String]] and
+      (JsPath \ "feeAsset").readNullable[String] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "attachment").readNullable[String] and
       (JsPath \ "signature").read[String]
