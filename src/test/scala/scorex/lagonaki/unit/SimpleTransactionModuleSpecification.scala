@@ -51,10 +51,10 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
 
   test("isValid() checks that tx not too old") {
     val validTx = PaymentTransaction(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp)
-    assert(transactionModule.isValid(validTx))
+    assert(transactionModule.isValid(validTx, validTx.timestamp))
 
     val oldTx = PaymentTransaction(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp - (1 day).toMillis)
-    assert(!transactionModule.isValid(oldTx))
+    assert(!transactionModule.isValid(oldTx, oldTx.timestamp))
   }
 
   test("clearIncorrectTransactions() removes valid but expired txs") {

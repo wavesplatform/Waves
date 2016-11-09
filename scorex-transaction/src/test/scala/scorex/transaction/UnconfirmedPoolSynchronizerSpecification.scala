@@ -42,7 +42,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
 
     "broadcast new transaction to network" in {
 
-      (transactionModule.isValid(_:Transaction)) expects * never()
+      (transactionModule.isValid(_:Transaction, _: Long)) expects (*,*) never()
       transactionModule.putUnconfirmedIfNew _ expects * returns true
 
       val actorRef = createPoolSynchronizer(100 seconds)

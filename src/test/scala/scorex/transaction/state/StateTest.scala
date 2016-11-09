@@ -137,7 +137,7 @@ object StateTestSpec extends Commands {
     type Result = (Int, Long)
 
     def run(sut: Sut): Result = sut.synchronized {
-      assert(sut.storedState.isValid(txs))
+      assert(sut.storedState.isValid(txs, blockTime = txs.map(_.timestamp).max))
       val block = new BlockMock(txs)
       sut.storedState.processBlock(block)
       (sut.storedState.stateHeight, sut.storedState.totalBalance)
@@ -159,7 +159,7 @@ object StateTestSpec extends Commands {
     type Result = Seq[Transaction]
 
     def run(sut: Sut): Result = sut.synchronized {
-      sut.storedState.validate(txs.map(_._1))
+      sut.storedState.validate(txs.map(_._1), blockTime = txs.map(_._1.timestamp).max)
     }
 
     def nextState(state: State): State = state

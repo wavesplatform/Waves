@@ -10,7 +10,7 @@ trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[Tran
 
   def isValid(block: Block): Boolean
 
-  def isValid(tx: Transaction): Boolean
+  def isValid(tx: Transaction, blockTime: Long): Boolean
 
   def transactions(block: Block): Seq[Transaction]
 

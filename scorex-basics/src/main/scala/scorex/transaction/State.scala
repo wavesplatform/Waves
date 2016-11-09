@@ -10,11 +10,11 @@ import scala.util.Try
 trait State {
   private[transaction] def processBlock(block: Block): Try[State]
 
-  def isValid(tx: Transaction): Boolean = isValid(Seq(tx))
+  def isValid(tx: Transaction, blockTime: Long): Boolean = isValid(Seq(tx), blockTime = blockTime)
 
-  def isValid(txs: Seq[Transaction], height: Option[Int] = None): Boolean = validate(txs, height).size == txs.size
+  def isValid(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Boolean = validate(txs, height, blockTime).size == txs.size
 
-  def validate(txs: Seq[Transaction], height: Option[Int] = None): Seq[Transaction]
+  def validate(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Seq[Transaction]
 
   def included(signature: Array[Byte], heightOpt: Option[Int]): Option[Int]
 

@@ -37,7 +37,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
       txToForge.amount, txToForge.fee, txToForge.timestamp, forgedSignature)
 
     val transactionsToValidate = transactions :+ forgedTransaction
-    val validTransactions = state.validate(transactionsToValidate)
+    val validTransactions = state.validate(transactionsToValidate, blockTime = transactionsToValidate.map(_.timestamp).max)
 
     validTransactions.count(tx => (tx.id sameElements txToForge.signature) ||
       (tx.id sameElements forgedTransaction.signature)) shouldBe 1
@@ -96,18 +96,18 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     val senderBalance = state.balance(acc)
     senderBalance should be > 0L
     val nonValid = transactionModule.createPayment(acc, recipient, senderBalance, 1)
-    state.isValid(nonValid) shouldBe false
+    state.isValid(nonValid, nonValid.timestamp) shouldBe false
 
     val valid = transactionModule.createPayment(acc, recipient, senderBalance - 1, 1)
-    state.isValid(valid) shouldBe true
+    state.isValid(valid, valid.timestamp) shouldBe true
   }
 
   test("double spending") {
     val senderBalance = state.balance(acc)
     val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recipient, senderBalance / 2, 1))
-    doubleSpending.foreach(t => state.isValid(t) shouldBe true)
-    state.isValid(doubleSpending) shouldBe false
-    state.validate(doubleSpending).size shouldBe 1
+    doubleSpending.foreach(t => state.isValid(t, t.timestamp) shouldBe true)
+    state.isValid(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max) shouldBe false
+    state.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max).size shouldBe 1
     state.processBlock(new BlockMock(doubleSpending)) should be('failure)
   }
 
@@ -136,8 +136,8 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   test("validate plenty of transactions") {
     val trans = Seq.fill(transactionModule.utxStorage.sizeLimit)(genValidTransaction())
-    profile(state.validate(trans)) should be < 1000L
-    state.validate(trans).size should be <= trans.size
+    profile(state.validate(trans, blockTime = trans.map(_.timestamp).max)) should be < 1000L
+    state.validate(trans, blockTime = trans.map(_.timestamp).max).size should be <= trans.size
   }
 
   test("included") {
@@ -152,9 +152,9 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   test("last transaction of account one block behind") {
     val amount = state.balance(acc) / 1000
     val tx1 = transactionModule.createPayment(acc, recipient, amount, 1)
-    state.isValid(tx1) shouldBe true
+    state.isValid(tx1, tx1.timestamp) shouldBe true
     val tx2 = transactionModule.createPayment(acc, recipient, amount, 2)
-    state.isValid(tx2) shouldBe true
+    state.isValid(tx2, tx2.timestamp) shouldBe true
 
     val block = new BlockMock(Seq(tx1, tx2))
     state.processBlock(block)
