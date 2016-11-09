@@ -57,7 +57,7 @@ object MainNetParams extends ChainParameters {
   override val addressScheme: AddressScheme = new AddressScheme {
     override val chainId: Byte = 'W'.toByte
   }
-  override def allowTemporaryNegativeUntil: Long = 1478736000000L
+  override def allowTemporaryNegativeUntil: Long = 1478908800000L
 
-  override def requireSortedTransactionsAfter: Long = 1478736000000L
+  override def requireSortedTransactionsAfter: Long = 1478908800000L
 }
