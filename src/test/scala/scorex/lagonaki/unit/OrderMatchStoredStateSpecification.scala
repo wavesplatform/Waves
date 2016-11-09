@@ -85,16 +85,16 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, fee, getTimestamp)
   }
 
-  def addInitialAssets(acc: PrivateKeyAccount, assetName: String, amount: Long): AssetId = {
+  def addInitialAssets(acc: PrivateKeyAccount, assetName: String, amount: Long): Option[AssetId] = {
     val issueAssetTx = issueAsset(IssueRequest(acc.address, Base58.encode(assetName.getBytes),
       Base58.encode(assetName.getBytes), amount * WAVES_UNITS, 2, reissuable = false, 1 * WAVES_UNITS), wallet)
     state.processBlock(new BlockMock(Seq(issueAssetTx))) should be('success)
-    issueAssetTx.assetId
+    Some(issueAssetTx.assetId)
   }
 
   private def getBalances(acc: Account, pair: AssetPair) = {
-    (state.assetBalance(AssetAcc(acc, None)), state.assetBalance(AssetAcc(acc, Some(pair.first))),
-      state.assetBalance(AssetAcc(acc, Some(pair.second))))
+    (state.assetBalance(AssetAcc(acc, None)), state.assetBalance(AssetAcc(acc, pair.first)),
+      state.assetBalance(AssetAcc(acc, pair.second)))
   }
 
   private def initPairWithBalances(): (AssetPair, PrivateKeyAccount, PrivateKeyAccount) = {
@@ -102,8 +102,8 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val eur = addInitialAssets(acc2, "eur", 100L)
 
     val pair = AssetPair(usd, eur)
-    val sellAcc = if (pair.first sameElements usd) acc1 else acc2
-    val buyAcc = if (pair.second sameElements usd) acc1 else acc2
+    val sellAcc = if (pair.first.forall(_ sameElements usd.get)) acc1 else acc2
+    val buyAcc = if (pair.second.forall(_ sameElements usd.get)) acc1 else acc2
 
     (pair, buyAcc, sellAcc)
   }

@@ -4,11 +4,12 @@ import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.utils.ByteArray
 
-case class AssetPair(private val pair: (AssetId, AssetId)) {
+case class AssetPair(private val pair: (Option[AssetId], Option[AssetId])) {
+  require(!ByteArray.sameOption(pair._1, pair._2))
   val first = if (ByteArray.compare(pair._1, pair._2) < 0) pair._1 else pair._2
   val second = if (ByteArray.compare(pair._1, pair._2) < 0) pair._2 else pair._1
 
-  lazy val key: String = Base58.encode(first) + Base58.encode(second)
+  lazy val key: String = first.map(Base58.encode).getOrElse("") + second.map(Base58.encode).getOrElse("")
 
   override def hashCode(): Int = key.hashCode()
 

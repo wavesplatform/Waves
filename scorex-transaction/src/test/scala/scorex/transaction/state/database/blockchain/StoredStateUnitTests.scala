@@ -16,8 +16,7 @@ import scorex.utils.ScorexLogging
 
 import scala.util.Random
 import scala.util.control.NonFatal
-
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
+import scorex.transaction.assets.exchange.{Order, OrderMatch, OrderType}
 
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging {
@@ -202,18 +201,30 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     a.map(state.assetBalance(_))
   }
 
+
   property("Order matching") {
     forAll { x: (OrderMatch, PrivateKeyAccount) =>
+      def feeInAsset(amount: Long, assetId: Option[AssetId]): Long = {
+        if (assetId.isEmpty) amount else 0L
+      }
+
+      def amountInWaves(amount: Long, order: Order): Long = {
+        if (order.assetPair.first.isEmpty) {
+          val sign = if (order.orderType == OrderType.BUY) 1 else -1
+          amount * sign
+        } else 0L
+      }
+
       val (om, matcher) = x
 
       val pair = om.buyOrder.assetPair
       val buyer = om.buyOrder.sender
       val seller = om.sellOrder.sender
 
-      val buyerAcc1 = AssetAcc(buyer, Some(pair.first))
-      val buyerAcc2 = AssetAcc(buyer, Some(pair.second))
-      val sellerAcc1 = AssetAcc(seller, Some(pair.first))
-      val sellerAcc2 = AssetAcc(seller, Some(pair.second))
+      val buyerAcc1 = AssetAcc(buyer, pair.first)
+      val buyerAcc2 = AssetAcc(buyer, pair.second)
+      val sellerAcc1 = AssetAcc(seller, pair.first)
+      val sellerAcc2 = AssetAcc(seller, pair.second)
       val buyerFeeAcc = AssetAcc(buyer, None)
       val sellerFeeAcc = AssetAcc(seller, None)
       val matcherFeeAcc =  AssetAcc(om.buyOrder.matcher, None)
@@ -221,17 +232,19 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       val Seq(buyerBal1, buyerBal2, sellerBal1, sellerBal2, buyerFeeBal, sellerFeeBal, matcherFeeBal) =
         getBalances(buyerAcc1, buyerAcc2, sellerAcc1, sellerAcc2, buyerFeeAcc, sellerFeeAcc, matcherFeeAcc)
 
-      state.applyChanges(state.calcNewBalances(Seq(om), Map(), false))
+      state.applyChanges(state.calcNewBalances(Seq(om), Map(), allowTemporaryNegative = true))
 
       val Seq(newBuyerBal1, newBuyerBal2, newSellerBal1, newSellerBal2, newBuyerFeeBal, newSellerFeeBal, newMatcherFeeBal) =
         getBalances(buyerAcc1, buyerAcc2, sellerAcc1, sellerAcc2, buyerFeeAcc, sellerFeeAcc, matcherFeeAcc)
 
-      newBuyerBal1 should be (buyerBal1 + om.amount)
-      newBuyerBal2 should be (buyerBal2 - BigInt(om.amount)*Order.PriceConstant/om.price)
-      newSellerBal1 should be (sellerBal1 - om.amount)
-      newSellerBal2 should be (sellerBal2 + BigInt(om.amount)*Order.PriceConstant/om.price)
-      newBuyerFeeBal should be (buyerFeeBal - om.buyMatcherFee)
-      newSellerFeeBal should be (sellerFeeBal - om.sellMatcherFee)
+      newBuyerBal1 should be (buyerBal1 + om.amount - feeInAsset(om.buyMatcherFee, buyerAcc1.assetId))
+      newBuyerBal2 should be (buyerBal2 - BigInt(om.amount)*Order.PriceConstant/om.price -
+        feeInAsset(om.buyMatcherFee, buyerAcc2.assetId))
+      newSellerBal1 should be (sellerBal1 - om.amount - feeInAsset(om.sellMatcherFee, sellerAcc1.assetId))
+      newSellerBal2 should be (sellerBal2 + BigInt(om.amount)*Order.PriceConstant/om.price -
+        feeInAsset(om.sellMatcherFee, sellerAcc2.assetId))
+      newBuyerFeeBal should be (buyerFeeBal - om.buyMatcherFee + amountInWaves(om.amount, om.buyOrder))
+      newSellerFeeBal should be (sellerFeeBal - om.sellMatcherFee + amountInWaves(om.amount, om.sellOrder))
       newMatcherFeeBal should be (matcherFeeBal + om.buyMatcherFee + om.sellMatcherFee - om.fee)
     }
   }
