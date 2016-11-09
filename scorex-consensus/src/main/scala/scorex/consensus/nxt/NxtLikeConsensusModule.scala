@@ -71,9 +71,12 @@ with OneGeneratorConsensusModule with ScorexLogging {
     require(calcGs.sameElements(blockGs),
       s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
 
+    val effectiveBalance = generatingBalance(generator, Some(parentHeight))
+
+    require(effectiveBalance >= MinimalEffictiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffictiveBalanceForGenerator)")
+
     //check hit < target
-    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, generatingBalance(generator, Some(
-      parentHeight)))
+    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance)
   } catch {
     case e: IllegalArgumentException =>
       log.error("Error while checking a block", e)
@@ -92,6 +95,10 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     val height = history.heightOf(lastBlock).get
     val balance = generatingBalance(account, Some(height))
+
+    if (balance < MinimalEffictiveBalanceForGenerator) {
+      throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffictiveBalanceForGenerator)")
+    }
 
     val lastBlockKernelData = consensusBlockData(lastBlock)
 
@@ -247,6 +254,8 @@ with OneGeneratorConsensusModule with ScorexLogging {
 object NxtLikeConsensusModule {
   val BaseTargetLength = 8
   val GeneratorSignatureLength = 32
+  // 10000 waves
+  val MinimalEffictiveBalanceForGenerator = 1000000000000L
 
   val AvgBlockTimeDepth: Int = 3
   val MaxTimeDrift = 15.seconds

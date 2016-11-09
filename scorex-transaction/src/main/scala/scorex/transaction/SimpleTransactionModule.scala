@@ -53,7 +53,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   private val feeCalculator = new FeeCalculator(settings)
 
   val TransactionSizeLength = 4
-  val InitialBalance = 60000000000L
+  val InitialBalance = 10000000000000L
 
   override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl
 
