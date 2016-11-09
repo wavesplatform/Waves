@@ -56,7 +56,7 @@ class WavesTransactionModule(chainParams: ChainParameters)(implicit override val
 
     payment.validate match {
       case ValidationResult.ValidateOke => {
-        if (blockStorage.state.isValid(payment)) {
+        if (blockStorage.state.isValid(payment, payment.timestamp)) {
           Right(payment)
         } else Left(ValidationResult.NoBalance)
       }
@@ -80,7 +80,7 @@ class WavesTransactionModule(chainParams: ChainParameters)(implicit override val
 
       tx.validate match {
         case ValidationResult.ValidateOke => {
-          if (blockStorage.state.isValid(tx)) {
+          if (blockStorage.state.isValid(tx, tx.timestamp)) {
             onNewOffchainTransaction(tx)
             Right(tx)
           } else Left(ValidationResult.NoBalance)
