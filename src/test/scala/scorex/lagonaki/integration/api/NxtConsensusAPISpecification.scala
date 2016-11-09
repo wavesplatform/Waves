@@ -10,6 +10,11 @@ class NxtConsensusAPISpecification extends FunSuite with TestLock with Matchers 
 
   import TestingCommons._
 
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    stopGeneration(applications)
+  }
+
   val wallet = application.wallet
   if (wallet.privateKeyAccounts().size < 10) wallet.generateNewAccounts(10)
   val accounts = wallet.privateKeyAccounts()

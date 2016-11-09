@@ -13,6 +13,8 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
 
+    stopGeneration(applications)
+
     if (wallet.privateKeyAccounts().size < 10) wallet.generateNewAccounts(10)
   }
 
