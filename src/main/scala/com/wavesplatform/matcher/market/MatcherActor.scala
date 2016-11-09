@@ -11,7 +11,7 @@ import scorex.utils.ScorexLogging
 
 object MatcherActor {
   def name = "matcher"
-  def props(): Props = Props(new MatcherActor())
+  def props(orderMatchedActor: ActorRef): Props = Props(new MatcherActor(orderMatchedActor))
 
   sealed trait OrderResponse {
     val json: JsValue
@@ -26,9 +26,9 @@ object MatcherActor {
   case class OrderBookCreated(pair: AssetPair)
 }
 
-class MatcherActor extends PersistentActor with ScorexLogging {
+class MatcherActor(orderMatchedActor: ActorRef) extends PersistentActor with ScorexLogging {
   def createOrderBook(pair: AssetPair) =
-    context.actorOf(OrderBookActor.props(pair), OrderBookActor.name(pair))
+    context.actorOf(OrderBookActor.props(pair, orderMatchedActor), OrderBookActor.name(pair))
 
   def createAndForward(pair: AssetPair, req: Any) = {
     val orderBook = createOrderBook(pair)

@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.market
 
 import java.util.Comparator
 
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import com.wavesplatform.matcher.market.MatcherActor.OrderAccepted
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -12,8 +12,9 @@ import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.ScorexLogging
 
 object OrderBookActor {
-  def props(assetPair: AssetPair): Props = Props(new OrderBookActor(assetPair))
-  def name(assetPair: AssetPair): String = Base58.encode(assetPair.first) + "-" + Base58.encode(assetPair.second)
+  def props(assetPair: AssetPair, orderMatchedActor: ActorRef): Props = Props(new OrderBookActor(assetPair, orderMatchedActor))
+  def name(assetPair: AssetPair): String = assetPair.first.map(Base58.encode).getOrElse("WAVES") + "-" +
+    assetPair.second.map(Base58.encode).getOrElse("WAVES")
 
   //protocol
   val MaxDepth = 50
@@ -26,6 +27,8 @@ object OrderBookActor {
 
   // events
   sealed trait OrderEvent
+
+  @SerialVersionUID(-3697114578758882607L)
   case class OrderAdded(order: OrderItem) extends OrderEvent
   case class OrderMatched(order: Order, items: Seq[OrderItem]) extends OrderEvent
 }
@@ -38,11 +41,13 @@ case object AskComparator extends Comparator[Long] {
   def compare(o1: Long, o2: Long) = o1.compareTo(o2)
 }
 
-class OrderBookActor(assetPair: AssetPair) extends PersistentActor with ScorexLogging {
-  override def persistenceId: String = assetPair.toString()
+class OrderBookActor(assetPair: AssetPair, orderMatchedActor: ActorRef) extends PersistentActor with ScorexLogging {
+  override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private val asks = new OrderBook(assetPair, AskComparator)
   private val bids = new OrderBook(assetPair, BidComparator)
+
+  private var restoreState = true
 
   override def receiveCommand: Receive = {
     case order:Order =>
@@ -66,7 +71,7 @@ class OrderBookActor(assetPair: AssetPair) extends PersistentActor with ScorexLo
 
   override def receiveRecover: Receive = {
     case evt: OrderEvent => log.info("Event: {}", evt); applyEvent(evt)
-    case RecoveryCompleted => log.info("Recovery completed!")
+    case RecoveryCompleted => log.info("Recovery completed!"); restoreState = true
   }
 
   def handleAddOrder(order: Order): Unit = {
@@ -93,9 +98,9 @@ class OrderBookActor(assetPair: AssetPair) extends PersistentActor with ScorexLo
       case OrderType.SELL => bids.execute(order)
     }
 
-    if (executedOrders.nonEmpty) {
+    if (executedOrders.nonEmpty && !restoreState) {
       log.info(s"${order.order.orderType} executed: {}", executedOrders)
-      context.system.eventStream.publish(OrderMatched(order.order, executedOrders))
+      orderMatchedActor ! OrderMatched(order.order, executedOrders)
     }
 
     if (remaining > 0) {

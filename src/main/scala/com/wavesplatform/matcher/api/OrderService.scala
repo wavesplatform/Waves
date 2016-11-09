@@ -10,8 +10,8 @@ trait OrderService {
   val storedState: StoredState
 
   def isBalanceEnough(order: Order): Boolean = {
-    val balance = storedState.assetBalance(AssetAcc(order.sender, Some(order.spendAssetId)))
-    balance >= order.sellAmount()
+    val balance = storedState.assetBalance(AssetAcc(order.sender, order.spendAssetId))
+    balance >= order.sellAmount() + order.matcherFee
   }
 
   def validateOrder(order: Order): Validation = {

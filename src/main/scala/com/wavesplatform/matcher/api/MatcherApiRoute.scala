@@ -47,7 +47,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
 
   override lazy val route =
     pathPrefix("matcher") {
-      place ~ matcherPubKey ~ signOrder ~ balance ~ orderBook
+      place ~ matcherPubKey ~ signOrder ~ balance ~ orderBook ~ orderBookWaves
     }
 
   @Path("/publicKey")
@@ -78,7 +78,8 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
   }
 
   @Path("/orderBook/{asset1}/{asset2}")
-  @ApiOperation(value = "Order ", notes = "Account Public Key", httpMethod = "GET")
+  @ApiOperation(value = "Get Order Book for Asset Pair",
+    notes = "Get Order Book for 2 given AssetIds (Not WAVES)", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "asset1", value = "AssetId", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "asset2", value = "AssetId", required = true, dataType = "string", paramType = "path")
@@ -86,13 +87,35 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
   def orderBook: Route = {
     path("orderBook" / Segment / Segment) { (a1, a2) =>
       getJsonRoute {
-        val asset1 = Base58.decode(a1).get
-        val asset2 = Base58.decode(a2).get
+        val asset1 = Base58.decode(a1).toOption
+        val asset2 = Base58.decode(a2).toOption
 
         (matcher ? GetOrderBookRequest(AssetPair(asset1, asset2)))
           .mapTo[GetOrderBookResponse]
           .map { r =>
             val resp = OrderBookResult(NTP.correctedTime(), AssetPair(asset1, asset2), r.bids, r.asks)
+            JsonResponse(Json.toJson(resp), StatusCodes.OK)
+          }
+      }
+    }
+  }
+
+  @Path("/orderBook/{asset1}")
+  @ApiOperation(value = "Get Order Book for AssetId and WAVES",
+    notes = "Get Order Book for a given AssetId and WAVES", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "asset1", value = "AssetId", required = true, dataType = "string", paramType = "path")
+  ))
+  def orderBookWaves: Route = {
+    path("orderBook" / Segment) { (a) =>
+      getJsonRoute {
+        val asset = Base58.decode(a).toOption
+        val pair = AssetPair(None, asset)
+
+        (matcher ? GetOrderBookRequest(pair))
+          .mapTo[GetOrderBookResponse]
+          .map { r =>
+            val resp = OrderBookResult(NTP.correctedTime(), pair, r.bids, r.asks)
             JsonResponse(Json.toJson(resp), StatusCodes.OK)
           }
       }

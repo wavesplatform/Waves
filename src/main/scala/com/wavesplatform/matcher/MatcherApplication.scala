@@ -5,17 +5,25 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import com.wavesplatform.matcher.api.MatcherApiRoute
-import com.wavesplatform.matcher.market.MatcherActor
+import com.wavesplatform.matcher.market.{MatcherActor, OrderMatchedActor}
 import com.wavesplatform.settings.WavesSettings
 import scorex.api.http.CompositeHttpService
-import scorex.app.Application
+import scorex.app.{Application, RunnableApplication}
 import scorex.settings.Settings
+import scorex.transaction.BlockStorage
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
+import scorex.wallet.Wallet
+import scorex.waves.transaction.WavesTransactionModule
 
 trait MatcherApplication extends ScorexLogging {
-
   implicit def actorSystem: ActorSystem
   implicit def settings: WavesSettings
+  def transactionModule: WavesTransactionModule
+  def blockStorage: BlockStorage
+  def wallet: Wallet
+
+  def storedState: StoredState = blockStorage.state.asInstanceOf[StoredState]
 
   lazy val matcherApiRoutes = Seq(
     MatcherApiRoute(this.asInstanceOf[Application], matcher)
@@ -25,7 +33,9 @@ trait MatcherApplication extends ScorexLogging {
     typeOf[MatcherApiRoute]
   )
 
-  lazy val matcher = actorSystem.actorOf(MatcherActor.props(), MatcherActor.name)
+  lazy val matcher = actorSystem.actorOf(MatcherActor.props(orderMatchedActor), MatcherActor.name)
+  lazy val orderMatchedActor = actorSystem.actorOf(
+    OrderMatchedActor.props(transactionModule, settings, storedState, wallet), OrderMatchedActor.name)
 
   def runMatcher() {
     log.info(s"Starting matcher on: ${settings.matcherHost}:${settings.matcherPort} ...")
