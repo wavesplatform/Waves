@@ -121,6 +121,8 @@ trait Settings extends ScorexLogging {
 
   lazy val genesisTimestamp: Long = (settingsJSON \ "genesisTimestamp").asOpt[Long].getOrElse(DefaultGenesisTimestamp)
 
+  lazy val genesisSignature: Option[String] = (settingsJSON \ "genesisSignature").asOpt[String]
+
   lazy val allowedGenerationTimeFromLastBlockInterval = (settingsJSON \ "allowedGenerationTimeFromLastBlockInterval").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultAllowedGenerationTimeFromLastBlockInterval)
 

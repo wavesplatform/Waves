@@ -215,8 +215,8 @@ object Block extends ScorexLogging {
     build(version, timestamp, reference, consensusData, transactionData, signer, signature)
   }
 
-  def genesis[CDT, TDT](timestamp: Long = 0L)(implicit consModule: ConsensusModule[CDT],
-                                              transModule: TransactionModule[TDT]): Block = new Block {
+  def genesis[CDT, TDT](timestamp: Long = 0L, signatureStringOpt: Option[String] = None)(implicit consModule: ConsensusModule[CDT],
+                                                                       transModule: TransactionModule[TDT]): Block = new Block {
     override type ConsensusDataType = CDT
     override type TransactionDataType = TDT
 
@@ -244,7 +244,11 @@ object Block extends ScorexLogging {
         cBytes ++
         txBytes ++
         genesisSigner.publicKey
-      val signature = EllipticCurveImpl.sign(genesisSigner, toSign)
+
+      val signature = signatureStringOpt.map(Base58.decode(_).get)
+        .getOrElse(EllipticCurveImpl.sign(genesisSigner, toSign))
+
+      EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey)
 
       SignerDataBlockField("signature", SignerData(genesisSigner, signature))
     }
