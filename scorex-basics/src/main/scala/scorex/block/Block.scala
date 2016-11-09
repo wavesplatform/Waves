@@ -227,11 +227,28 @@ object Block extends ScorexLogging {
     override val transactionDataField: BlockField[TDT] = transactionModule.genesisData
     override val referenceField: BlockIdField = BlockIdField("reference", Array.fill(BlockIdLength)(-1: Byte))
     override val consensusDataField: BlockField[CDT] = consensusModule.genesisData
-    override val uniqueId: BlockId = Array.fill(BlockIdLength)(0: Byte)
 
     override val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
 
-    override val signerDataField: SignerDataBlockField = new SignerDataBlockField("signature",
-      SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array.fill(EllipticCurveImpl.SignatureLength)(0)))
+    override val signerDataField: SignerDataBlockField = {
+      val genesisSigner = new PrivateKeyAccount(Array.empty)
+
+      val txBytesSize = transactionDataField.bytes.length
+      val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionDataField.bytes
+      val cBytesSize = consensusDataField.bytes.length
+      val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ consensusDataField.bytes
+
+      val toSign = versionField.bytes ++
+        timestampField.bytes ++
+        referenceField.bytes ++
+        cBytes ++
+        txBytes ++
+        genesisSigner.publicKey
+      val signature = EllipticCurveImpl.sign(genesisSigner, toSign)
+
+      SignerDataBlockField("signature", SignerData(genesisSigner, signature))
+    }
+
+    override val uniqueId: BlockId = signerDataField.value.signature
   }
 }
