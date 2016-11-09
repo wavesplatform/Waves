@@ -1,5 +1,8 @@
 package scorex.transaction.state.database.blockchain
 
+import java.util.concurrent.TimeUnit
+
+import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
 import scorex.block.Block
@@ -9,9 +12,8 @@ import scorex.transaction.BlockStorage._
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.{BlockChain, TransactionModule}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
+
 import scala.collection.JavaConversions._
-import scala.collection.concurrent.TrieMap
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -28,9 +30,20 @@ class StoredBlockchain(db: MVStore)
     val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]])
     val signatures: MVMap[Int, BlockId] = database.openMap("signatures", new LogMVMapBuilder[Int, BlockId])
     val signaturesReverse: MVMap[BlockId, Int] = database.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int])
+
     private val BlocksCacheSizeLimit: Int = 1000
-    private var blocksCacheSize: Int = 0
-    private val blocksCache: TrieMap[Int, Option[Block]] = TrieMap.empty
+    private val blocksCache = CacheBuilder.newBuilder()
+      .maximumSize(BlocksCacheSizeLimit)
+      .build[Integer, Option[Block]](
+        new CacheLoader[Integer, Option[Block]]() {
+          def load(height: Integer): Option[Block] = {
+            Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).recoverWith {
+              case t: Throwable =>
+                log.error("Block.parseBytes error", t)
+                Failure(t)
+            }.toOption)
+          }
+        })
 
     //TODO: remove when no blockchains without signaturesReverse remains
     if (signaturesReverse.size() != signatures.size()) {
@@ -53,22 +66,11 @@ class StoredBlockchain(db: MVStore)
     }
 
     def readBlock(height: Int): Option[Block] = {
-      if (blocksCacheSize > BlocksCacheSizeLimit) {
-        blocksCacheSize = 0
-        blocksCache.clear()
-      } else {
-        blocksCacheSize = blocksCacheSize + 1
-      }
-      blocksCache.getOrElseUpdate(height,
-        Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).recoverWith {
-          case t: Throwable =>
-            log.error("Block.parseBytes error", t)
-            Failure(t)
-        }.toOption))
+      blocksCache.get(height)
     }
 
     def deleteBlock(height: Int): Unit = {
-      blocksCache.remove(height)
+      blocksCache.invalidate(height)
       blocks.remove(height)
       val vOpt = Option(signatures.remove(height))
       vOpt.map(v => signaturesReverse.remove(v))
