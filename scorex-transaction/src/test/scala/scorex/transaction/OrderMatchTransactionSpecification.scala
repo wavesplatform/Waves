@@ -87,7 +87,11 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
     forAll(maxWavesAnountGen, maxWavesAnountGen, maxWavesAnountGen, maxWavesAnountGen, maxWavesAnountGen) {
       (buyAmount: Long, sellAmount: Long, mf1: Long, mf2: Long, mf3: Long) =>
         whenever (buyAmount < sellAmount && BigInt(mf2) * buyAmount / sellAmount > 0) {
-          val pair = assetPairGen.sample.get
+          var pairOption = Option.empty[AssetPair]
+          while(pairOption.isEmpty) {
+            pairOption = assetPairGen.sample
+          }
+          val pair = pairOption.get
           val sender1 = accountGen.sample.get
           val sender2 = accountGen.sample.get
           val matcher = accountGen.sample.get

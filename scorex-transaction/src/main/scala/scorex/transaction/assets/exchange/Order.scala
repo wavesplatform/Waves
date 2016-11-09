@@ -8,8 +8,8 @@ import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction._
 import scorex.utils.{ByteArray, NTP}
-import scala.util.Try
 
+import scala.util.Try
 import io.swagger.annotations.ApiModelProperty
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.assets.exchange.OrderType.OrderType
@@ -24,10 +24,11 @@ object OrderType extends Enumeration {
 /**
   * Order to matcher service for asset exchange
   */
+@SerialVersionUID(2455530529543215878L)
 case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: PublicKeyAccount,
                  @ApiModelProperty(dataType = "java.lang.String", example = "") matcher: PublicKeyAccount,
-                 @ApiModelProperty(dataType = "java.lang.String") spendAssetId: AssetId,
-                 @ApiModelProperty(dataType = "java.lang.String") receiveAssetId: AssetId,
+                 @ApiModelProperty(dataType = "java.lang.String") spendAssetId: Option[AssetId],
+                 @ApiModelProperty(dataType = "java.lang.String") receiveAssetId: Option[AssetId],
                  @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8",
                    example = "100000000") price: Long,
                  @ApiModelProperty("Amount in AssetPair.first") amount: Long,
@@ -41,7 +42,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   def assetPair: AssetPair = AssetPair(spendAssetId, receiveAssetId)
 
-  def orderType: OrderType = if (receiveAssetId sameElements assetPair.first) OrderType.BUY else OrderType.SELL
+  def orderType: OrderType = if (ByteArray.sameOption(receiveAssetId, assetPair.first)) OrderType.BUY else OrderType.SELL
 
   lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
 
@@ -57,7 +58,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
   }
 
   @ApiModelProperty(hidden = true)
-  lazy val toSign: Array[Byte] = sender.publicKey ++ matcher.publicKey ++ spendAssetId ++ receiveAssetId ++
+  lazy val toSign: Array[Byte] = sender.publicKey ++ matcher.publicKey ++
+    assetIdBytes(spendAssetId) ++ assetIdBytes(receiveAssetId) ++
     Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++ Longs.toByteArray(maxTimestamp) ++
     Longs.toByteArray(matcherFee)
 
@@ -80,8 +82,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
     "id" -> Base58.encode(id),
     "sender" -> Base58.encode(sender.publicKey),
     "matcher" -> Base58.encode(matcher.publicKey),
-    "spendAssetId" -> Base58.encode(spendAssetId),
-    "receiveAssetId" -> Base58.encode(receiveAssetId),
+    "spendAssetId" -> spendAssetId.map(Base58.encode),
+    "receiveAssetId" -> receiveAssetId.map(Base58.encode),
     "price" -> price,
     "amount" -> amount,
     "maxTimestamp" -> maxTimestamp,
@@ -131,8 +133,8 @@ object Order extends Deser[Order] {
     unsigned.copy(signature = sig)
   }
 
-  def apply(sender: PrivateKeyAccount, matcher: PublicKeyAccount, spendAssetID: Array[Byte],
-            receiveAssetID: Array[Byte], price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {
+  def apply(sender: PrivateKeyAccount, matcher: PublicKeyAccount, spendAssetID: Option[AssetId],
+            receiveAssetID: Option[AssetId], price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {
     val unsigned = Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxTime, matcherFee, Array())
     val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
     Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxTime, matcherFee, sig)
@@ -143,8 +145,8 @@ object Order extends Deser[Order] {
     var from = 0
     val sender = new PublicKeyAccount(bytes.slice(from, from + KeyLength)); from += KeyLength
     val matcher = new PublicKeyAccount(bytes.slice(from, from + KeyLength)); from += KeyLength
-    val spendAssetId = bytes.slice(from, from + AssetIdLength); from += AssetIdLength
-    val receiveAssetId = bytes.slice(from, from + AssetIdLength); from += AssetIdLength
+    val (spendAssetId, s0) = parseOption(bytes, from, AssetIdLength); from = s0
+    val (receiveAssetId, s1) = parseOption(bytes, from, AssetIdLength); from = s1
     val price = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength)); from += 8
     val amount = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength)); from += 8
     val maxTimestamp = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength)); from += 8
@@ -159,8 +161,13 @@ object Order extends Deser[Order] {
     unsigned.copy(signature = sig)
   }
 
-  def sortByType(o1: Order, o2: Order): (Order, Order) = {
+  def splitByType(o1: Order, o2: Order): (Order, Order) = {
+    require(o1.orderType != o2.orderType)
     if (o1.orderType == OrderType.BUY) (o1, o2)
     else (o2, o1)
+  }
+
+  def assetIdBytes(assetId: Option[AssetId]): Array[Byte] = {
+    assetId.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
   }
 }

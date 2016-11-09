@@ -16,8 +16,8 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
       recovered.id shouldBe order.id
       recovered.sender shouldBe order.sender
       recovered.matcher shouldBe order.matcher
-      recovered.spendAssetId shouldBe order.spendAssetId
-      recovered.receiveAssetId shouldBe order.receiveAssetId
+      ByteArray.sameOption(recovered.spendAssetId, order.spendAssetId) shouldBe true
+      ByteArray.sameOption(recovered.receiveAssetId, order.receiveAssetId) shouldBe true
       recovered.price shouldBe order.price
       recovered.amount shouldBe order.amount
       recovered.maxTimestamp shouldBe order.maxTimestamp
@@ -73,8 +73,10 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
       order.isValid(NTP.correctedTime()) shouldBe valid
       order.copy(sender = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain ("signature should be valid")
       order.copy(matcher = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain ("signature should be valid")
-      order.copy(spendAssetId = Array(0: Byte) ++ order.spendAssetId).isValid(NTP.correctedTime()) should contain ("signature should be valid")
-      order.copy(receiveAssetId = Array(0: Byte) ++ order.receiveAssetId).isValid(NTP.correctedTime()) should contain ("signature should be valid")
+      order.copy(spendAssetId = order.spendAssetId.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte)))).
+        isValid(NTP.correctedTime()) should contain ("signature should be valid")
+      order.copy(receiveAssetId = order.receiveAssetId.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte)))).
+        isValid(NTP.correctedTime()) should contain ("signature should be valid")
       order.copy(price = order.price + 1).isValid(NTP.correctedTime()) should contain ("signature should be valid")
       order.copy(amount = order.amount + 1).isValid(NTP.correctedTime()) should contain ("signature should be valid")
       order.copy(maxTimestamp = order.maxTimestamp + 1).isValid(NTP.correctedTime()) should contain ("signature should be valid")
@@ -96,8 +98,8 @@ class OrderTransactionSpecification extends PropSpec with PropertyChecks with Ma
   }
 
   property("AssetPair test") {
-    forAll(bytes32gen, bytes32gen) { (assetA: Array[Byte], assetB: Array[Byte]) =>
-      whenever(!(assetA sameElements assetB)) {
+    forAll(assetIdGen, assetIdGen) { (assetA: Option[AssetId], assetB: Option[AssetId]) =>
+      whenever(!ByteArray.sameOption(assetA, assetB)) {
         val pair = AssetPair(assetA, assetB)
         ByteArray.compare(pair.first, pair.second) should be < 0
       }

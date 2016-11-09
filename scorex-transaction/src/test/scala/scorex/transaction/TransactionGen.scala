@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.{Arbitrary, Gen, Prop}
 import org.scalatest.Matchers._
 import org.scalatest.enablers.Containing
 import org.scalatest.matchers.{BeMatcher, MatchResult}
@@ -8,7 +8,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderMatch, Validation}
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
-import scorex.utils.NTP
+import scorex.utils.{ByteArray, NTP}
 
 trait TransactionGen {
 
@@ -24,10 +24,12 @@ trait TransactionGen {
 
   val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
 
-  val assetPairGen: Gen[AssetPair] = for {
-    a: AssetId <- bytes32gen
-    b: AssetId <- bytes32gen
-  } yield AssetPair(a, b)
+  val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
+  val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen)))
+
+  val assetPairGen = Gen.zip(assetIdGen, assetIdGen).
+    suchThat(p => !ByteArray.sameOption(p._1, p._2)).
+    map(p => AssetPair(p._1, p._2))
 
   val paymentGenerator: Gen[PaymentTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
@@ -53,8 +55,8 @@ trait TransactionGen {
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
-    spendAssetID: Array[Byte] <- bytes32gen
-    receiveAssetID: Array[Byte] <- bytes32gen
+    spendAssetID: Option[AssetId] <- assetIdGen
+    receiveAssetID: Option[AssetId] <- assetIdGen
     price: Long <- maxWavesAnountGen
     amount: Long <- maxWavesAnountGen
     maxtTime: Long <- maxTimeGen
@@ -86,8 +88,8 @@ trait TransactionGen {
   val invalidOrderGenerator: Gen[Order] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
-    spendAssetID: Array[Byte] <- bytes32gen
-    receiveAssetID: Array[Byte] <- bytes32gen
+    spendAssetID: Option[AssetId] <- assetIdGen
+    receiveAssetID: Option[AssetId] <- assetIdGen
     price: Long <- Arbitrary.arbitrary[Long]
     amount: Long <- Arbitrary.arbitrary[Long]
     maxtTime: Long <- Arbitrary.arbitrary[Long]
