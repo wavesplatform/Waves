@@ -85,11 +85,11 @@ trait Block extends ScorexLogging {
   def isValid: Boolean = {
     if (transactionModule.blockStorage.history.contains(this)) true //applied blocks are valid
     else {
-      lazy val history = transactionModule.blockStorage.history.contains(referenceField.value)
-      lazy val signature = EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
+      val history = transactionModule.blockStorage.history.contains(referenceField.value)
+      val signature = EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
         signerDataField.value.generator.publicKey)
-      lazy val consensus = consensusModule.isValid(this)
-      lazy val transaction = transactionModule.isValid(this)
+      val consensus = consensusModule.isValid(this)
+      val transaction = transactionModule.isValid(this)
 
       if (!history) log.debug(s"Invalid block $encodedId: no parent block in history")
       else if (!signature) log.debug(s"Invalid block $encodedId: signature is not valid")
@@ -215,8 +215,8 @@ object Block extends ScorexLogging {
     build(version, timestamp, reference, consensusData, transactionData, signer, signature)
   }
 
-  def genesis[CDT, TDT](timestamp: Long = 0L)(implicit consModule: ConsensusModule[CDT],
-                                              transModule: TransactionModule[TDT]): Block = new Block {
+  def genesis[CDT, TDT](timestamp: Long = 0L, signatureStringOpt: Option[String] = None)(implicit consModule: ConsensusModule[CDT],
+                                                                       transModule: TransactionModule[TDT]): Block = new Block {
     override type ConsensusDataType = CDT
     override type TransactionDataType = TDT
 
@@ -244,7 +244,11 @@ object Block extends ScorexLogging {
         cBytes ++
         txBytes ++
         genesisSigner.publicKey
-      val signature = EllipticCurveImpl.sign(genesisSigner, toSign)
+
+      val signature = signatureStringOpt.map(Base58.decode(_).get)
+        .getOrElse(EllipticCurveImpl.sign(genesisSigner, toSign))
+
+      require(EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey), "Passed genesis signature is not valid")
 
       SignerDataBlockField("signature", SignerData(genesisSigner, signature))
     }
