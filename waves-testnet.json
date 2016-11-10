@@ -23,7 +23,8 @@
   "offlineGeneration": false,
   "apiKeyHash":"",
   "testnet": true,
-  "loggingLevel": "info",
+  "loggingLevel": "debug",
+  "genesisSignature": "tNCpewAxjWLsvb8VhUSk6xRFRd5rGYHzvZ2Qcq7AqAS9q7XpGN1HJDjT2ecdSsrmGo4wmiFowiM2nsifAr1i6ek",
   "checkpoints": {
     "publicKey": "4PvoqxpWi7kCA9N3UXcEB9CZx4iPPeHX9jSYdAioPhnr"
   }
