@@ -47,7 +47,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
     }
 
     val parentOpt = history.parent(block)
-    require(parentOpt.isDefined, s"Can't find parent block with id '${Base58.encode(block.referenceField.value)}' of block " +
+    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${Base58.encode(block.referenceField.value)}' of block " +
       s"'${Base58.encode(block.uniqueId)}'")
 
     val parent = parentOpt.get
