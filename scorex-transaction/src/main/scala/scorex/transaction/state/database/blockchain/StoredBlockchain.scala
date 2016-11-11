@@ -1,8 +1,7 @@
 package scorex.transaction.state.database.blockchain
 
-import java.util.concurrent.TimeUnit
-
-import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+import com.google.common.cache.{CacheBuilder, CacheLoader}
+import com.google.common.util.concurrent.UncheckedExecutionException
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
 import scorex.block.Block
@@ -35,14 +34,15 @@ class StoredBlockchain(db: MVStore)
     private val BlocksCacheSizeLimit: Int = 1000
     private val blocksCache = CacheBuilder.newBuilder()
       .maximumSize(BlocksCacheSizeLimit)
-      .build[Integer, Option[Block]](
-        new CacheLoader[Integer, Option[Block]]() {
-          def load(height: Integer): Option[Block] = {
-            Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).recoverWith {
+      .build[Integer, Block](
+        new CacheLoader[Integer, Block]() {
+          def load(height: Integer): Block = {
+            val blockOpt = Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).recoverWith {
               case t: Throwable =>
                 log.error("Block.parseBytes error", t)
                 Failure(t)
             }.toOption)
+            blockOpt.get
           }
         })
     val checkpoint: MVMap[Int, Checkpoint] = database.openMap("checkpoint", new LogMVMapBuilder[Int, Checkpoint])
@@ -68,7 +68,13 @@ class StoredBlockchain(db: MVStore)
     }
 
     def readBlock(height: Int): Option[Block] = {
-      blocksCache.get(height)
+      try {
+        Some(blocksCache.get(height))
+      } catch {
+        case e: UncheckedExecutionException =>
+          log.debug(s"There are no block at $height")
+          None
+      }
     }
 
     def deleteBlock(height: Int): Unit = {
