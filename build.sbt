@@ -60,4 +60,14 @@ javaOptions in Universal ++= Seq(
   "-J-XX:+UseStringDeduplication"
 )
 
-enablePlugins(JDebPackaging)
+enablePlugins(JavaServerAppPackaging, JDebPackaging)
+
+val loader = Option(System.getProperty("loader"))
+
+import com.typesafe.sbt.packager.archetypes.systemloader._
+
+enablePlugins(Seq(if (loader.exists(_ == "upstart")) {
+  Some[AutoPlugin](UpstartPlugin)
+} else if (loader.exists(_ == "systemd")) {
+  Some[AutoPlugin](SystemdPlugin)
+} else None).flatten: _*)
