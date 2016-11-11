@@ -34,14 +34,16 @@ object TestNetParams extends ChainParameters {
     override val chainId: Byte = 'T'.toByte
   }
 
-  override def allowTemporaryNegativeUntil: Long = 1477958400000L
+  override val allowTemporaryNegativeUntil: Long = 1477958400000L
 
-  override def requireSortedTransactionsAfter: Long = 1477958400000L
+  override val requireSortedTransactionsAfter: Long = 1477958400000L
+
+  override val allowInvalidPaymentTransactionsByTimestamp: Long = 1477958400000L
 }
 
 object MainNetParams extends ChainParameters {
   val initialBalance = Constants.UnitsInWave * Constants.TotalWaves
-  val genesisTimestamp = 1460952000000L
+  val genesisTimestamp = 1465742577614L
   val genesisTxs = {
     val txs = Seq(
       GenesisTransaction( new Account("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ"), initialBalance - 5 * Constants.UnitsInWave, genesisTimestamp),
@@ -57,7 +59,9 @@ object MainNetParams extends ChainParameters {
   override val addressScheme: AddressScheme = new AddressScheme {
     override val chainId: Byte = 'W'.toByte
   }
-  override def allowTemporaryNegativeUntil: Long = 1478908800000L
+  override val allowTemporaryNegativeUntil: Long = 1479168000000L
 
-  override def requireSortedTransactionsAfter: Long = 1478908800000L
+  override val requireSortedTransactionsAfter: Long = 1479168000000L
+
+  override val allowInvalidPaymentTransactionsByTimestamp: Long = 1479168000000L
 }
