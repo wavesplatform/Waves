@@ -267,13 +267,20 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     val height = heightOpt.getOrElse(stateHeight)
 
     val txs = trans.filter(t => isValid(t, height))
-    val validTransactions = if (trans.nonEmpty && trans.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp) {
+    val allowInvalidPaymentTransactionsByTimestamp = trans.nonEmpty && trans.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
+    val validTransactions = if (allowInvalidPaymentTransactionsByTimestamp) {
       txs
     } else {
       val invalidPaymentTransactionsByTimestamp = invalidatePaymentTransactionsByTimestamp(txs)
       excludeTransactions(txs, invalidPaymentTransactionsByTimestamp)
     }
-    val filteredFromFuture = filterTransactionsFromFuture(validTransactions, blockTime)
+
+    val allowTransactionsFromFutureByTimestamp = trans.nonEmpty && trans.map(_.timestamp).max < settings.allowTransactionsFromFutureUntil
+    val filteredFromFuture = if (allowTransactionsFromFutureByTimestamp) {
+      validTransactions
+    } else {
+      filterTransactionsFromFuture(validTransactions, blockTime)
+    }
 
     def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
       val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {

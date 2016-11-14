@@ -71,7 +71,9 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     val effectiveBalance = generatingBalance(generator, Some(parentHeight))
 
-    require(effectiveBalance >= MinimalEffictiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffictiveBalanceForGenerator)")
+    if (block.timestampField.value >= forksConfig.minimalGeneratingBalanceAfterTimestamp) {
+      require(effectiveBalance >= MinimalEffictiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffictiveBalanceForGenerator)")
+    }
 
     //check hit < target
     calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance)
