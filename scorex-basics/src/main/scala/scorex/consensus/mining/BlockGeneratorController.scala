@@ -21,7 +21,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
-  override def receive: Receive = idle
+  override def receive: Receive = if (application.settings.minerEnabled) idle else Actor.ignoringBehavior
 
   def idle: Receive = state {
 

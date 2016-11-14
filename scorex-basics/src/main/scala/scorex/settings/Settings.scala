@@ -126,6 +126,8 @@ trait Settings extends ScorexLogging {
   lazy val allowedGenerationTimeFromLastBlockInterval = (settingsJSON \ "allowedGenerationTimeFromLastBlockInterval").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultAllowedGenerationTimeFromLastBlockInterval)
 
+  lazy val minerEnabled = (settingsJSON \ "minerEnabled").asOpt[Boolean].getOrElse(true)
+
   lazy val checkpointSettings = settingsJSON \ "checkpoints"
   lazy val checkpointPublicKey = (checkpointSettings \ "publicKey").asOpt[String].flatMap(Base58.decode(_).toOption)
 
@@ -147,7 +149,6 @@ trait Settings extends ScorexLogging {
 
   private val DefaultBlockGenerationDelay: FiniteDuration = 1.second
   private val DefaultHistorySynchronizerTimeout: FiniteDuration = 30.seconds
-  private val DefaultMiningThreads: Int = 1
 
   private val DefaultGenesisTimestamp: Long = 1460952000000L
 }
