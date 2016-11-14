@@ -39,6 +39,8 @@ object TestNetParams extends ChainParameters {
   override val requireSortedTransactionsAfter: Long = 1477958400000L
 
   override val allowInvalidPaymentTransactionsByTimestamp: Long = 1477958400000L
+
+  override val generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MinValue
 }
 
 object MainNetParams extends ChainParameters {
@@ -64,4 +66,6 @@ object MainNetParams extends ChainParameters {
   override val requireSortedTransactionsAfter: Long = 1479168000000L
 
   override val allowInvalidPaymentTransactionsByTimestamp: Long = 1479168000000L
+
+  override val generatingBalanceDepthFrom50To1000AfterHeight: Long = 232000L
 }
