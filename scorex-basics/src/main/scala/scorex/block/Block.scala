@@ -85,11 +85,11 @@ trait Block extends ScorexLogging {
   def isValid: Boolean = {
     if (transactionModule.blockStorage.history.contains(this)) true //applied blocks are valid
     else {
-      val history = transactionModule.blockStorage.history.contains(referenceField.value)
-      val signature = EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
+      def history = transactionModule.blockStorage.history.contains(referenceField.value)
+      def signature = EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
         signerDataField.value.generator.publicKey)
-      val consensus = consensusModule.isValid(this)
-      val transaction = transactionModule.isValid(this)
+      def consensus = consensusModule.isValid(this)
+      def transaction = transactionModule.isValid(this)
 
       if (!history) log.debug(s"Invalid block $encodedId: no parent block in history")
       else if (!signature) log.debug(s"Invalid block $encodedId: signature is not valid")
