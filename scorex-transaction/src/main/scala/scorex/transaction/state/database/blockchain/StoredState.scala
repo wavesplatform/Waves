@@ -14,9 +14,8 @@ import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
 import scala.concurrent.duration._
 
 import scala.collection.JavaConversions._
-import scala.util.{Failure, Success, Try}
-import scala.util.Try
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 
 /** Store current balances only, and balances changes within effective balance depth.
@@ -268,7 +267,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     val height = heightOpt.getOrElse(stateHeight)
 
     val txs = trans.filter(t => isValid(t, height))
-    val validTransactions = if (trans.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp) {
+    val validTransactions = if (trans.nonEmpty && trans.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp) {
       txs
     } else {
       val invalidPaymentTransactionsByTimestamp = invalidatePaymentTransactionsByTimestamp(txs)
@@ -293,7 +292,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
 
               val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
               val newBalance = safeSum(currentChange._1.balance, bc.delta)
-              if (newBalance >= 0) {
+              if (newBalance >= 0 || tx.timestamp < settings.allowTemporaryNegativeUntil) {
                 iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
               } else {
                 throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
@@ -349,7 +348,9 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
+      tx.validate == ValidationResult.ValidateOke && (
+        transaction.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp ||
+          transaction.timestamp >= settings.allowInvalidPaymentTransactionsByTimestamp && isTimestampCorrect(tx))
     case tx: TransferTransaction =>
       tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: IssueTransaction =>

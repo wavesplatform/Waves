@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class NxtLikeConsensusModule(config: WavesHardForkParameters, AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
+class NxtLikeConsensusModule(override val forksConfig: WavesHardForkParameters, AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
 with OneGeneratorConsensusModule with ScorexLogging {
 
   import NxtLikeConsensusModule._
@@ -29,8 +29,6 @@ with OneGeneratorConsensusModule with ScorexLogging {
   val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
   val InitialBaseTarget = MaxBaseTarget / 2
 
-  override val generatingBalanceDepth = 1000
-
   private def avgDelayInSeconds: Long = AvgDelay.toSeconds
 
   private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
@@ -42,7 +40,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     val history = transactionModule.blockStorage.history
 
-    if (block.timestampField.value > config.requireSortedTransactionsAfter) {
+    if (block.timestampField.value > forksConfig.requireSortedTransactionsAfter) {
       require(block.transactions.sorted(TransactionsOrdering) == block.transactions, "Transactions must be sorted correctly")
     }
 
