@@ -90,6 +90,7 @@ publishTo in ThisBuild := {
 }
 
 fork in ThisBuild := true
+fork in Test := false
 
 pomIncludeRepository in ThisBuild := { _ => false }
 

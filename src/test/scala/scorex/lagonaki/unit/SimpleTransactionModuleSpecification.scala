@@ -30,10 +30,19 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     override implicit val consensusModule = new ConsensusMock
   }
 
+  val forkParameters = new AnyRef with WavesHardForkParameters {
+    override def allowTemporaryNegativeUntil: Long = 0L
+    override def requireSortedTransactionsAfter: Long = Long.MaxValue
+    override def allowInvalidPaymentTransactionsByTimestamp: Long = Long.MaxValue
+    override def generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MaxValue
+    override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
+    override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
+  }
+
   implicit val app = stub[MyApp]
   implicit val settings = MySettings
   implicit val consensusModule = app.consensusModule
-  implicit val transactionModule = new SimpleTransactionModule(WavesHardForkParameters.Disabled)
+  implicit val transactionModule = new SimpleTransactionModule(forkParameters)
   val genesisTimestamp = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
     transactionModule.blockStorage.appendBlock(Block.genesis(genesisTimestamp))

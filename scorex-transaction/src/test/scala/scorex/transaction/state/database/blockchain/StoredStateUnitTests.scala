@@ -20,13 +20,22 @@ import scala.util.control.NonFatal
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging {
 
+  val forkParameters = new AnyRef with WavesHardForkParameters {
+    override def allowTemporaryNegativeUntil: Long = 0L
+    override def requireSortedTransactionsAfter: Long = Long.MaxValue
+    override def allowInvalidPaymentTransactionsByTimestamp: Long = Long.MaxValue
+    override def generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MaxValue
+    override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
+    override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
+  }
+
   val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"
   new File(folder).mkdirs()
   val stateFile = folder + "state.dat"
   new File(stateFile).delete()
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
-  val state = new StoredState(db, WavesHardForkParameters.Disabled)
+  val state = new StoredState(db, forkParameters)
   val testAcc = new PrivateKeyAccount(scorex.utils.randomBytes(64))
   val testAssetAcc = AssetAcc(testAcc, None)
   val testAdd = testAcc.address
@@ -107,6 +116,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.isValid(tx, tx.timestamp) shouldBe true
 
         //transfer asset
+        state.balance(testAcc) shouldBe balance
         val invalidtx = TransferTransaction.create(None, testAcc, recipient, balance, System.currentTimeMillis(),
           None, fee, Array())
         state.isValid(invalidtx, invalidtx.timestamp) shouldBe false
@@ -279,7 +289,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     state.balance(testAcc) shouldBe balance
     db.close()
 
-    val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open(), WavesHardForkParameters.Disabled)
+    val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open(), forkParameters)
     state2.balance(testAcc) shouldBe balance
     state2 invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq())))
   }
