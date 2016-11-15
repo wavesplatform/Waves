@@ -37,6 +37,6 @@ class WavesSettings(override val settingsJSON: JsObject) extends Settings with T
       case Some(x) if x.length > 0 => Some(x)
       case _ => Some(DefaultDataDir + dirName)
     }
-    path.ensuring(pathOpt => pathOpt.forall(directoryEnsuring))
+    path.ensuring(pathOpt => pathOpt.forall(directoryEnsuring), s"Can't create or read folder '$path'")
   }
 }
