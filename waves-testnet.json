@@ -10,7 +10,7 @@
   },
   "walletDir": "",
   "walletSeed": "",
-  "walletPassword": "mycookies",
+  "walletPassword": "",
   "dataDir": "",
   "rpcPort": 6869,
   "rpcAddress": "127.0.0.1",
