@@ -30,7 +30,7 @@ case class AddressApiRoute(application: Application)(implicit val context: Actor
   override lazy val route =
     pathPrefix("addresses") {
       validate ~ seed ~ confirmationBalance ~ balance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
-        signText ~ seq
+        signText ~ seq ~ publicKey
     } ~ root ~ create
 
   @Path("/{address}")
@@ -315,4 +315,24 @@ case class AddressApiRoute(application: Application)(implicit val context: Actor
         JsonResponse(Json.obj("valid" -> isValid), StatusCodes.OK)
     }
   }
+
+  @Path("/publicKey/{publicKey}")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "publicKey", value = "Public key Base58-encoded", required = true,
+      paramType = "path", dataType = "string")
+  ))
+  @ApiOperation(value = "Address from Public Key", notes = "Generate a address from public key", httpMethod = "GET")
+  def publicKey: Route =
+    path("publicKey" / Segment) { publicKey =>
+      getJsonRoute {
+        Base58.decode(publicKey) match {
+          case Success(pubKeyBytes) => {
+            val account = Account.fromPublicKey(pubKeyBytes)
+            JsonResponse(Json.obj("address" -> account.address), StatusCodes.OK)
+          }
+          case Failure(e) => JsonResponse(InvalidPublicKey.json, InvalidPublicKey.code)
+        }
+      }
+    }
+
 }

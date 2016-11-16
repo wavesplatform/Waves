@@ -15,6 +15,7 @@ import scala.util.Try
 
 @Path("/payment")
 @Api(value = "/payment", description = "Payment operations.", position = 1)
+@Deprecated
 case class PaymentApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
   val settings = application.settings
@@ -25,8 +26,9 @@ case class PaymentApiRoute(application: RunnableApplication)(implicit val contex
 
   override lazy val route = payment
 
-  @ApiOperation(value = "Send payment",
-    notes = "Send payment to another wallet",
+  @Deprecated
+  @ApiOperation(value = "Send payment. Deprecated: use /assets/transfer instead",
+    notes = "Send payment to another wallet. Deprecated: use /assets/transfer instead",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")

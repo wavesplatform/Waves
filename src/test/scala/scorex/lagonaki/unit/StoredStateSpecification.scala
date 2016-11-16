@@ -46,13 +46,13 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
   private val i = new AtomicInteger
   private def createTransferAssetTx(request: TransferRequest, wallet: Wallet): TransferTransaction = {
     val sender = wallet.privateKeyAccount(request.sender).get
-    TransferTransaction.create(request.assetIdOpt.map(s => Base58.decode(s).get),
+    TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
       new Account(request.recipient),
       request.amount,
       i.incrementAndGet(),
       request.feeAsset.map(s => Base58.decode(s).get),
-      request.feeAmount,
+      request.fee,
       Base58.decode(request.attachment).get)
   }
 

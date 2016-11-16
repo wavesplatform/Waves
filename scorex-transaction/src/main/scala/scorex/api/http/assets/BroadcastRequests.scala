@@ -21,7 +21,7 @@ object BroadcastRequests {
                                description: String,
                                @ApiModelProperty(required = true, example = "1000000")
                                quantity: Long,
-                               @ApiModelProperty(allowableValues = "range[0,8]", example = "2", dataType = "integer", required = true)
+                               @ApiModelProperty(allowableValues = "range[0,8]", example = "8", dataType = "integer", required = true)
                                decimals: Byte,
                                @ApiModelProperty(required = true)
                                reissuable: Boolean,

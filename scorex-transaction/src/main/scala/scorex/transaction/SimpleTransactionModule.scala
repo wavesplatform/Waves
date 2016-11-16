@@ -148,13 +148,13 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   def transferAsset(request: TransferRequest, wallet: Wallet): Try[TransferTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
 
-    val transfer: TransferTransaction = TransferTransaction.create(request.assetIdOpt.map(s => Base58.decode(s).get),
+    val transfer: TransferTransaction = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
       new Account(request.recipient),
       request.amount,
       getTimestamp,
       request.feeAsset.map(s => Base58.decode(s).get),
-      request.feeAmount,
+      request.fee,
       Base58.decode(request.attachment).get)
 
     if (isValid(transfer, transfer.timestamp)) onNewOffchainTransaction(transfer)

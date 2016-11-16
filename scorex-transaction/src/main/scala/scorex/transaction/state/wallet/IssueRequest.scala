@@ -1,19 +1,18 @@
 package scorex.transaction.state.wallet
 
+import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Reads, Writes}
-import scorex.transaction.assets.IssueTransaction
-
-import scala.util.Try
 
 
 case class IssueRequest(sender: String,
-                        name: String,
-                        description: String,
-                        quantity: Long,
-                        decimals: Byte,
-                        reissuable: Boolean,
-                        fee: Long) {
+  name: String,
+  description: String,
+  quantity: Long,
+  @ApiModelProperty(allowableValues = "range[0,8]", example = "8", dataType = "integer", required = true)
+  decimals: Byte,
+  reissuable: Boolean,
+  fee: Long) {
 }
 
 object IssueRequest {
