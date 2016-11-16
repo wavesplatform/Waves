@@ -142,10 +142,10 @@ trait Settings extends ScorexLogging {
 
   //API
   lazy val corsAllowed = (settingsJSON \ "cors").asOpt[Boolean].getOrElse(false)
+  lazy val rpcEnabled = (settingsJSON \ "rpcEnabled").asOpt[Boolean].getOrElse(true)
 
   private val DefaultRpcPort = 9085
   private val DefaultRpcAddress = "127.0.0.1"
-  private val DefaultRpcAllowed = "127.0.0.1"
 
   private val DefaultBlockGenerationDelay: FiniteDuration = 1.second
   private val DefaultHistorySynchronizerTimeout: FiniteDuration = 30.seconds
