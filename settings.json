@@ -14,7 +14,6 @@
   "dataDir": "/tmp/scorex/waves/data",
   "rpcPort": 6869,
   "rpcAddress": "0.0.0.0",
-  "rpcAllowed": [],
   "blockGenerationDelay": 1000,
   "historySynchronizerTimeout": 15,
   "cors": true,

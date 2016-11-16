@@ -12,7 +12,6 @@
   "walletPassword": "mycookies",
   "dataDir": "/tmp/scorex/waves/data",
   "rpcPort": 6869,
-  "rpcAllowed": [],
   "blockGenerationDelay": 1000,
   "cors": true,
   "maxRollback": 100,
