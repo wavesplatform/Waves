@@ -155,7 +155,11 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       getTimestamp,
       request.feeAsset.map(s => Base58.decode(s).get),
       request.fee,
-      Base58.decode(request.attachment).get)
+      if (request.attachment.nonEmpty) {
+        Base58.decode(request.attachment).get
+      } else {
+        Array.empty
+      })
 
     if (isValid(transfer, transfer.timestamp)) onNewOffchainTransaction(transfer)
     else throw new StateCheckFailed("Invalid transfer transaction generated: " + transfer.json)

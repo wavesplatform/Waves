@@ -73,8 +73,12 @@ trait RunnableApplication extends Application with ScorexLogging {
 
     implicit val materializer = ActorMaterializer()
 
-    val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
-    Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
+    if (settings.rpcEnabled) {
+      val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
+      Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort).map(
+        _ => log.info(s"RPC was binded on ${settings.rpcAddress}:${settings.rpcPort}")
+      )
+    }
 
     Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator) foreach {
       _ => // de-lazyning process :-)
