@@ -12,10 +12,6 @@
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
 
   "rpcPort": 9092,
-  "rpcAllowed": [
-    "127.0.0.1",
-    "123.123.123.123"
-  ],
 
   "maxRollback": 100,
   "apiKeyHash": "JDJkZrg24XwvBgBUi6PgpHzrAFgeefb7nU8LJPRR58ga",

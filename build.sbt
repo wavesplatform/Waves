@@ -57,7 +57,15 @@ javaOptions in Universal ++= Seq(
   // may be can't use with jstack and others tools
   "-J-XX:+PerfDisableSharedMem",
   "-J-XX:+ParallelRefProcEnabled",
-  "-J-XX:+UseStringDeduplication"
-)
+  "-J-XX:+UseStringDeduplication",
 
-enablePlugins(JDebPackaging)
+  "-J-Dsun.net.inetaddr.ttl=60",
+
+  s"-DLOG_PATH=/var/log/${packageName.value}/",
+
+  // Use separate configuration file for production environment
+  s"-Dconfig.file=/usr/share/${packageName.value}/conf/application-production.conf",
+
+  // Use separate logger configuration file for production environment
+  s"-Dlogback.configurationFile=/usr/share/${packageName.value}/conf/logback.xml"
+)
