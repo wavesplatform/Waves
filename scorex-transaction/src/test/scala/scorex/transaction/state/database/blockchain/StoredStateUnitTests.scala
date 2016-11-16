@@ -20,13 +20,24 @@ import scala.util.control.NonFatal
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging {
 
-  val forkParameters = new AnyRef with WavesHardForkParameters {
+  val forkParametersWithDisableUnissuedAssetsCheck = new AnyRef with WavesHardForkParameters {
     override def allowTemporaryNegativeUntil: Long = 0L
     override def requireSortedTransactionsAfter: Long = Long.MaxValue
     override def allowInvalidPaymentTransactionsByTimestamp: Long = Long.MaxValue
     override def generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MaxValue
     override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
     override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
+    override def allowUnissuedAssetsUntil: Long = Long.MaxValue
+  }
+
+  val forkParametersWithEnabledUnissuedAssetsCheck = new AnyRef with WavesHardForkParameters {
+    override def allowTemporaryNegativeUntil: Long = 0L
+    override def requireSortedTransactionsAfter: Long = Long.MaxValue
+    override def allowInvalidPaymentTransactionsByTimestamp: Long = Long.MaxValue
+    override def generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MaxValue
+    override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
+    override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
+    override def allowUnissuedAssetsUntil: Long = 0
   }
 
   val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"
@@ -35,7 +46,9 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   new File(stateFile).delete()
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
-  val state = new StoredState(db, forkParameters)
+  val state = new StoredState(db, forkParametersWithDisableUnissuedAssetsCheck)
+  val db2 = new MVStore.Builder().compress().open()
+  val state2 = new StoredState(db2, forkParametersWithEnabledUnissuedAssetsCheck)
   val testAcc = new PrivateKeyAccount(scorex.utils.randomBytes(64))
   val testAssetAcc = AssetAcc(testAcc, None)
   val testAdd = testAcc.address
@@ -122,6 +135,28 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.isValid(invalidtx, invalidtx.timestamp) shouldBe false
 
         state.applyChanges(Map(testAssetAcc -> (AccState(0L), List(tx))))
+      }
+    }
+  }
+
+  property("Transfer unissued asset to yourself is allowed") {
+    withRollbackTest {
+      forAll(selfTransferGenerator suchThat(t => t.assetId.isDefined && t.feeAsset.isEmpty)) { tx: TransferTransaction =>
+        val senderAccount = AssetAcc(tx.sender, None)
+        val txFee = tx.fee
+        state.applyChanges(Map(senderAccount->(AccState(txFee), List(FeesStateChange(txFee)))))
+        state.isValid(Seq(tx), None, System.currentTimeMillis()) shouldBe true
+      }
+    }
+  }
+
+  property("Transfer unissued asset to yourself is not allowed") {
+    withRollbackTest {
+      forAll(selfTransferGenerator suchThat(t => t.assetId.isDefined && t.feeAsset.isEmpty)) { tx: TransferTransaction =>
+        val senderAccount = AssetAcc(tx.sender, None)
+        val txFee = tx.fee
+        state2.applyChanges(Map(senderAccount->(AccState(txFee), List(FeesStateChange(txFee)))))
+        state2.isValid(Seq(tx), None, System.currentTimeMillis()) shouldBe false
       }
     }
   }
@@ -289,7 +324,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     state.balance(testAcc) shouldBe balance
     db.close()
 
-    val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open(), forkParameters)
+    val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open(), forkParametersWithDisableUnissuedAssetsCheck)
     state2.balance(testAcc) shouldBe balance
     state2 invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq())))
   }

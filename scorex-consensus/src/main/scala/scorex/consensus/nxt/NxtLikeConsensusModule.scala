@@ -143,6 +143,9 @@ with OneGeneratorConsensusModule with ScorexLogging {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
       None
+    case e: IllegalStateException =>
+      log.warn(s"Failed to generate new block: ${e.getMessage}")
+      None
   }
 
   override def nextBlockGenerationTime(block: Block, account: PublicKeyAccount)

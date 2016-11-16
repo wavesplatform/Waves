@@ -108,8 +108,8 @@ trait RunnableApplication extends Application with ScorexLogging {
   private def stopNetwork(): Unit = synchronized {
     log.info("Stopping network services")
     if (settings.upnpEnabled) upnp.deletePort(settings.port)
-    implicit val askTimeout = Timeout(10 seconds)
-    Await.result(networkController ? NetworkController.ShutdownNetwork, 10 seconds)
+    implicit val askTimeout = Timeout(10.seconds)
+    Await.result(networkController ? NetworkController.ShutdownNetwork, 10.seconds)
   }
 
   private def checkGenesis(): Unit = {

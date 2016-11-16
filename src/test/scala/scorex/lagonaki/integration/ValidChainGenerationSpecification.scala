@@ -3,6 +3,7 @@ package scorex.lagonaki.integration
 import akka.pattern.ask
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PublicKeyAccount
+import scorex.consensus.nxt
 import scorex.lagonaki.server.LagonakiApplication
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
 import scorex.network.peer.PeerManager.GetBlacklistedPeers
@@ -13,7 +14,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class ValidChainGenerationSpecification extends FunSuite with TestLock with Matchers with ScorexLogging
-with TransactionTestingCommons {
+  with TransactionTestingCommons {
 
   import TestingCommons._
 
@@ -26,11 +27,11 @@ with TransactionTestingCommons {
   val history = app.transactionModule.blockStorage.history
 
   def waitGenerationOfBlocks(howMany: Int): Unit = {
-    val height = maxHeight()
-    untilTimeout(5.minutes, 1.seconds) {
+//    val height = maxHeight()
+    untilTimeout(3.minutes, 1.seconds) {
       val heights = peers.map(_.blockStorage.history.height())
-      log.info(s"Current heights are: $heights. Waiting for ${height + howMany}")
-      heights.foreach(_ should be >= height + howMany)
+      log.info(s"Current heights are: $heights. Waiting for ${howMany}")
+      heights.foreach(_ should be >= howMany)
     }
   }
 
@@ -44,17 +45,21 @@ with TransactionTestingCommons {
   private def blacklistedPeersFor(app: LagonakiApplication) =
     Await.result((app.peerManager ? GetBlacklistedPeers).mapTo[Set[String]], timeout.duration)
 
-  private def checkBlacklists() = applications.foreach { app => assert(blacklistedPeersFor(app).isEmpty)}
+  private def checkBlacklists() = applications.foreach { app => assert(blacklistedPeersFor(app).isEmpty) }
 
-  test("generate 4 blocks and synchronize") {
+  test("generate 50 blocks and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(acc => app.consensusModule.generatingBalance(acc)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
+    genBal should be >= nxt.NxtLikeConsensusModule.MinimalEffictiveBalanceForGenerator
+    peers.head.blockStorage.history.genesis.timestampField.value should be >= System.currentTimeMillis() - 90 * 60 * 1000
     genValidTransaction()
 
-    waitGenerationOfBlocks(4)
+    waitGenerationOfBlocks(50)
 
     val last = peers.head.blockStorage.history.lastBlock
-    untilTimeout(5.minutes, 10.seconds, { checkBlacklists() }) {
+    untilTimeout(5.minutes, 10.seconds, {
+      checkBlacklists()
+    }) {
       peers.head.blockStorage.history.contains(last) shouldBe true
     }
   }
@@ -192,7 +197,7 @@ with TransactionTestingCommons {
   }
 
   private def startGenerationForAllPeers() = {
-    log.info("Stop generation for all peers")
+    log.info("Start generation for all peers")
     startGeneration(peers)
   }
 

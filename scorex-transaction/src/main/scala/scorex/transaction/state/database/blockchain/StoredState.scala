@@ -50,13 +50,13 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     * Transaction ID -> serialized transaction
     */
   private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
-    db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
+  db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   /**
     * Transaction Signature -> reissuable flag
     */
   private val reissuableIndex: MVMap[Array[Byte], Boolean] =
-    db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
+  db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
@@ -282,6 +282,13 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       filterTransactionsFromFuture(validTransactions, blockTime)
     }
 
+    val allowUnissuedAssets = filteredFromFuture.nonEmpty && txs.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
+    val validAssetsTransaction = if (allowUnissuedAssets) {
+      filteredFromFuture
+    } else {
+      filterTransactionsWithUnknownAssets(filteredFromFuture)
+    }
+
     def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
       val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
         case ((currentState, validTxs), tx) =>
@@ -314,7 +321,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       validTxs
     }
 
-    filterValidTransactionsByState(filteredFromFuture)
+    filterValidTransactionsByState(validAssetsTransaction)
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
@@ -351,6 +358,20 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     transactions.filter {
       tx => (tx.timestamp - blockTime).millis <= SimpleTransactionModule.MaxTimeForUnconfirmed
     }
+  }
+
+  private def filterTransactionsWithUnknownAssets(transactions: Seq[Transaction]) = {
+    transactions
+      .filter(t => {
+        t match {
+          case tt: TransferTransaction =>
+            val assetIssued = if (tt.assetId.isDefined) Option(transactionsMap.get(tt.assetId)).isDefined else true
+            val feeAssetIssued = if (tt.feeAsset.isDefined) Option(transactionsMap.get(tt.feeAsset)).isDefined else true
+            assetIssued && feeAssetIssued
+
+          case _ => true
+        }
+      })
   }
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {

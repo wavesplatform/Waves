@@ -18,6 +18,7 @@ trait TransactionGen {
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
+  val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)
 
   val paymentGenerator: Gen[PaymentTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
@@ -37,6 +38,16 @@ trait TransactionGen {
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
     recipient: PrivateKeyAccount <- accountGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment)
+
+  val selfTransferGenerator: Gen[TransferTransaction] = for {
+    amount: Long <- Gen.choose(0, Long.MaxValue)
+    feeAmount: Long <- smallFeeGen
+    assetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
+    feeAssetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
+    timestamp: Long <- positiveLongGen
+    account: PrivateKeyAccount <- accountGen
+    attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
+  } yield TransferTransaction.create(assetId, account, account, amount, timestamp, feeAssetId, feeAmount, attachment)
 
   val orderGenerator: Gen[Order] = for {
     sender: PrivateKeyAccount <- accountGen

@@ -37,6 +37,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     override def generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MaxValue
     override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
     override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
+    override def allowUnissuedAssetsUntil: Long = Long.MaxValue
   }
 
   implicit val app = stub[MyApp]
