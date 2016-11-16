@@ -66,6 +66,7 @@ addCommandAlias("packageAll", "; clean " +
   "; packageJar"
   )
 
+// see https://github.com/muuki88/sbt-native-packager-examples/blob/master/multiple-package-outputs/build.sbt
 lazy val packageDebianUpstart = taskKey[File]("creates deb-upstart package")
 lazy val packageDebianSystemD = taskKey[File]("creates deb-systemd package")
 lazy val packageJar = taskKey[File]("creates fat jar")
