@@ -52,7 +52,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       true
     } else false
   } recoverWith { case e =>
-      log.warn(s"Failed to generate new block: ${e.getMessage}")
+      log.debug(s"Failed to generate new block: ${e.getMessage}")
       Failure(e)
   } getOrElse false
 

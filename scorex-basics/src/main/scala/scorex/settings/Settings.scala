@@ -137,7 +137,7 @@ trait Settings extends ScorexLogging {
   private val DefaultBindAddress = "127.0.0.1"
   lazy val AllowedConnectionsFromOneHost = 5
   lazy val UnrequestedPacketsThreshold = 100
-  private val DefaultAllowedGenerationTimeFromLastBlockInterval: FiniteDuration = 100.minutes
+  private val DefaultAllowedGenerationTimeFromLastBlockInterval: FiniteDuration = 1.day
 
 
   //API
