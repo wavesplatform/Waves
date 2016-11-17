@@ -60,13 +60,5 @@ javaOptions in Universal ++= Seq(
   "-J-XX:+ParallelRefProcEnabled",
   "-J-XX:+UseStringDeduplication",
 
-  "-J-Dsun.net.inetaddr.ttl=60",
-
-  s"-DLOG_PATH=/var/log/${packageName.value}/",
-
-  // Use separate configuration file for production environment
-  s"-Dconfig.file=/usr/share/${packageName.value}/conf/application-production.conf",
-
-  // Use separate logger configuration file for production environment
-  s"-Dlogback.configurationFile=/usr/share/${packageName.value}/conf/logback.xml"
+  "-J-Dsun.net.inetaddr.ttl=60"
 )
