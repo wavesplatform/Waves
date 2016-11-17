@@ -98,8 +98,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
       case o:Order => o.canEqual(this) &&
         sender == o.sender &&
         matcher == o.matcher &&
-        (spendAssetId sameElements o.spendAssetId) &&
-        (receiveAssetId sameElements o.receiveAssetId) &&
+        ByteArray.sameOption(spendAssetId, o.spendAssetId) &&
+        ByteArray.sameOption(receiveAssetId, o.receiveAssetId) &&
         price == o.price &&
         amount == o.amount &&
         maxTimestamp == o.maxTimestamp &&

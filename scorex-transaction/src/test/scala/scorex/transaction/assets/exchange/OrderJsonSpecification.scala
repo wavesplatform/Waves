@@ -10,6 +10,10 @@ import OrderJson._
 
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
+  property("base58") {
+    println(Base58.encode("Some attachement".getBytes()))
+  }
+
   property("Read Order from json") {
     val pk = new PrivateKeyAccount("123".getBytes)
     val pubKeyStr = Base58.encode(pk.publicKey)

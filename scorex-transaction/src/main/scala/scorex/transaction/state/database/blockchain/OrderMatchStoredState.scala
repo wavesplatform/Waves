@@ -1,44 +1,74 @@
 package scorex.transaction.state.database.blockchain
 
-import scala.util.Try
-import com.google.common.primitives.Ints
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
-import scorex.utils.LogMVMapBuilder
+import scorex.utils.NTP
+
+import scala.collection.JavaConversions._
 
 trait OrderMatchStoredState {
   val db: MVStore
+  val transactionsMap: MVMap[Array[Byte], Array[Byte]]
 
   val OrderMatchTx = "OrderMatchTx"
+  val OrderMatchDays = "OrderMatchSavedDays"
+  val MaxLiveDays = (Order.MaxLiveTime / 24L * 60L * 60L * 1000L).toInt
 
   /**
-    * Order id -> serialized OrderMatch transactions
+    * Returns Map Order id -> OrderMatch transactions Ids by Timestamp - starting of the day
     */
-  private val orderMatchTx: MVMap[String, Array[Array[Byte]]] =
-    db.openMap(OrderMatchTx, new LogMVMapBuilder[String, Array[Array[Byte]]])
+  private def orderMatchTxByDay(orderTimestamp: Long): MVMap[String, Array[String]] =
+    db.openMap(OrderMatchTx + orderTimestamp)
+
+  private val savedDays: MVMap[Long, Boolean] = db.openMap(OrderMatchDays)
 
   def putOrderMatch(om: OrderMatch, height: Int): Unit = {
-    def appendBytesIfAbsent(prev: Array[Array[Byte]], bytes: Array[Byte])  = {
-      if (!prev.exists(_ sameElements bytes)) {
-        prev :+ bytes
-      } else prev
+    def isSaveNeeded(order: Order): Boolean = {
+      order.maxTimestamp >= NTP.correctedTime()
     }
-    def putByOrderId(id: Array[Byte]) = {
-      val idStr = Base58.encode(id)
-      val prev = Option(orderMatchTx.get(idStr)).getOrElse(Array[Array[Byte]]())
-      orderMatchTx.put(idStr, appendBytesIfAbsent(prev, Ints.toByteArray(height) ++ om.bytes))
+
+    def putOrder(order: Order) = {
+      if (isSaveNeeded(order)) {
+        val orderDay = calcStartDay(order.maxTimestamp)
+        savedDays.put(orderDay, true)
+        val orderIdStr = Base58.encode(order.id)
+        val omIdStr = Base58.encode(om.id)
+        val m = orderMatchTxByDay(orderDay)
+        val prev = Option(m.get(orderIdStr)).getOrElse(Array.empty[String])
+        if (!prev.contains(omIdStr)) m.put(orderIdStr, prev :+ omIdStr)
+      }
     }
-    putByOrderId(om.buyOrder.id)
-    putByOrderId(om.sellOrder.id)
+
+    putOrder(om.buyOrder)
+    putOrder(om.sellOrder)
+
+    removeObsoleteDays()
   }
 
-  private val emptyTxSeq = Array(Array[Byte]())
+  def removeObsoleteDays(): Unit = {
+    val ts = calcStartDay(NTP.correctedTime())
+    val daysToRemove = savedDays.keySet().filter(t => t < ts)
+    if (daysToRemove.nonEmpty) {
+      savedDays.synchronized {
+        daysToRemove.filter(t => db.hasMap(OrderMatchTx + t)).foreach { d =>
+          db.removeMap(orderMatchTxByDay(d))
+        }
+      }
+    }
+  }
 
-  private def parseTxSeq(aa: Array[Array[Byte]]): Set[OrderMatch] = {
-    aa.flatMap { b =>
-      OrderMatch.parseBytes(b.drop(Ints.BYTES)).toOption
-    }.toSet
+  def calcStartDay(t: Long): Long = {
+    val ts = t / 1000
+    ts - ts % (24 * 60 * 60)
+  }
+
+  private val emptyTxIdSeq = Array.empty[String]
+
+  private def parseTxSeq(a: Array[String]): Set[OrderMatch] = {
+    a.toSet.flatMap { s: String => Base58.decode(s).toOption }.flatMap { id =>
+      OrderMatch.parseBytes(transactionsMap.get(id)).toOption
+    }
   }
 
   def findPrevOrderMatchTxs(om: OrderMatch): Set[OrderMatch] = {
@@ -46,10 +76,8 @@ trait OrderMatchStoredState {
   }
 
   def findPrevOrderMatchTxs(order: Order): Set[OrderMatch] = {
-    parseTxSeq(Option(orderMatchTx.get(Base58.encode(order.id))).getOrElse(emptyTxSeq))
-  }
-
-  def rollbackOrderMatchTo(rollbackTo: Int): Unit = {
-    //orderMatchTx.keySet().forEach()
+    if (order.maxTimestamp >= NTP.correctedTime()) {
+      parseTxSeq(Option(orderMatchTxByDay(calcStartDay(order.maxTimestamp)).get(Base58.encode(order.id))).getOrElse(emptyTxIdSeq))
+    } else Set.empty[OrderMatch]
   }
 }
