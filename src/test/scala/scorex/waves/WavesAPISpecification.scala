@@ -25,11 +25,15 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     val timestamp = 1465391445252L
     val amount = 10000000L
     val payment = UnsignedPayment(timestamp, amount, 100000L, recipient, "5JiSMVVvadkKt2K9dDJjiwLiDzuCMmzcHnNuEzct2LiY", 1)
-    val json = Json.toJson(payment).toString
+    val paymentJson = Json.toJson(payment)
+    val json = paymentJson.toString
 
     val response = postRequest(us = "/waves/create-signed-payment", body = json)
-    println(response.toString)
-    assert(response.toString == NoBalance.json.toString)
+    assert(response \ "timestamp" == paymentJson \ "timestamp")
+    assert(response \ "amount" == paymentJson \ "amount" )
+    assert(response \ "fee" == paymentJson \ "fee" )
+    assert(response \ "recipient" == paymentJson \ "recipient" )
+    assert((response \ "signature").toOption.isDefined)
   }
 
   test("/waves/external-payment API route can not send to address from another net") {

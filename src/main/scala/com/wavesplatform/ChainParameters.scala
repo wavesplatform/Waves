@@ -45,6 +45,8 @@ object TestNetParams extends ChainParameters {
   override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MinValue
 
   override def allowTransactionsFromFutureUntil: Long = Long.MinValue
+
+  override def allowUnissuedAssetsUntil: Long = 1479416400000L
 }
 
 object MainNetParams extends ChainParameters {
@@ -76,4 +78,6 @@ object MainNetParams extends ChainParameters {
   override def minimalGeneratingBalanceAfterTimestamp: Long = 1479168000000L
 
   override def allowTransactionsFromFutureUntil: Long = 1479168000000L
+
+  override def allowUnissuedAssetsUntil: Long = 1479416400000L
 }
