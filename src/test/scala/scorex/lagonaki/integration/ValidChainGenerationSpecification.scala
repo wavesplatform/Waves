@@ -47,14 +47,14 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
 
   private def checkBlacklists() = applications.foreach { app => assert(blacklistedPeersFor(app).isEmpty) }
 
-  test("generate 50 blocks and synchronize") {
+  test("generate 30 blocks and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(acc => app.consensusModule.generatingBalance(acc)).sum
     genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
     genBal should be >= nxt.NxtLikeConsensusModule.MinimalEffictiveBalanceForGenerator
     peers.head.blockStorage.history.genesis.timestampField.value should be >= System.currentTimeMillis() - 90 * 60 * 1000
     genValidTransaction()
 
-    waitGenerationOfBlocks(50)
+    waitGenerationOfBlocks(30)
 
     val last = peers.head.blockStorage.history.lastBlock
     untilTimeout(5.minutes, 10.seconds, {

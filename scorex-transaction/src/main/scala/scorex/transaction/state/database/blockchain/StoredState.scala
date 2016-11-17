@@ -283,17 +283,13 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     }
 
     val allowUnissuedAssets = filteredFromFuture.nonEmpty && txs.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
-    val validAssetsTransaction = if (allowUnissuedAssets) {
-      filteredFromFuture
-    } else {
-      filterTransactionsWithUnknownAssets(filteredFromFuture)
-    }
 
     def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
       val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
         case ((currentState, validTxs), tx) =>
           try {
-            val newState = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
+            val changes = if (allowUnissuedAssets) tx.balanceChanges() else tx.balanceChanges().sortBy(_.delta)
+            val newState = changes.foldLeft(currentState) { case (iChanges, bc) =>
               //update balances sheet
               def safeSum(first: Long, second: Long): Long = {
                 try {
@@ -321,7 +317,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       validTxs
     }
 
-    filterValidTransactionsByState(validAssetsTransaction)
+    filterValidTransactionsByState(filteredFromFuture)
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
@@ -358,20 +354,6 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     transactions.filter {
       tx => (tx.timestamp - blockTime).millis <= SimpleTransactionModule.MaxTimeForUnconfirmed
     }
-  }
-
-  private def filterTransactionsWithUnknownAssets(transactions: Seq[Transaction]) = {
-    transactions
-      .filter(t => {
-        t match {
-          case tt: TransferTransaction =>
-            val assetIssued = if (tt.assetId.isDefined) Option(transactionsMap.get(tt.assetId)).isDefined else true
-            val feeAssetIssued = if (tt.feeAsset.isDefined) Option(transactionsMap.get(tt.feeAsset)).isDefined else true
-            assetIssued && feeAssetIssued
-
-          case _ => true
-        }
-      })
   }
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
