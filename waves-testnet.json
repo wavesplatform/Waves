@@ -26,7 +26,7 @@
   "historySynchronizerTimeout": 15,
   "cors": true,
   "maxRollback": 100,
-  "apiKeyHash": "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu", // ridethewaves!
+  "apiKeyHash": "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu",
   "history": "blockchain",
   "offlineGeneration": false,
   "testnet": true,
