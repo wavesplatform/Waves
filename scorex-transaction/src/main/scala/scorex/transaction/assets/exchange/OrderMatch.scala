@@ -24,6 +24,8 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
 
   override val transactionType: TransactionType.Value = TransactionType.OrderMatchTransaction
 
+  override val typeOrdering = -1
+
   override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)

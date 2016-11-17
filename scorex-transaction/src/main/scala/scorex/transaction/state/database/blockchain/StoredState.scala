@@ -53,7 +53,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
   /**
     * Transaction ID -> serialized transaction
     */
-  private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
+  val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
     db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   /**
@@ -117,6 +117,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
           reissuableIndex.put(tx.assetId, tx.reissuable)
           includedTx.put(tx.id, h)
         case om: OrderMatch =>
+          transactionsMap.put(om.id, om.bytes)
           putOrderMatch(om, h)
           includedTx.put(om.id, h)
         case tx =>
@@ -153,7 +154,6 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     lastStates.keySet().foreach { key =>
       deleteNewer(key)
     }
-    rollbackOrderMatchTo(rollbackTo)
     setStateHeight(rollbackTo)
     this
   }
