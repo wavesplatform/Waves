@@ -2,7 +2,6 @@
   "p2p": {
     "nodeName": "",
     "bindAddress": "0.0.0.0",
-    "myAddress": "",
     "port": 6863,
     "upnp": false,
     "upnpGatewayTimeout": 7000,
