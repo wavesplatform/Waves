@@ -2,13 +2,12 @@
   "p2p": {
     "nodeName": "",
     "bindAddress": "0.0.0.0",
-    "declaredAddress": "",
+    "myAddress": "",
     "port": 6868,
     "upnp": false,
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
     "knownPeers": [
-      "138.201.153.6:6868",
       "138.201.152.166:6868",
       "138.201.152.165:6868",
       "138.201.152.164:6868",
