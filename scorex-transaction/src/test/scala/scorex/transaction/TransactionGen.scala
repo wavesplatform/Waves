@@ -4,7 +4,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.utils.NTP
 
 trait TransactionGen {
@@ -67,27 +67,31 @@ trait TransactionGen {
     matcherFee: Long <- positiveLongGen
   } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
 
-  val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction)] = for {
+  val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, DeleteTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
     assetName <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
     description <- genBoundedBytes(0, IssueTransaction.MaxDescriptionLength)
     quantity <- positiveLongGen
+    deleteAmount <- Gen.choose(0L, quantity)
     decimals <- Gen.choose(0: Byte, 8: Byte)
     reissuable <- Arbitrary.arbitrary[Boolean]
     reissuable2 <- Arbitrary.arbitrary[Boolean]
-    fee <- positiveLongGen
+    fee <- Gen.choose(1L, 2000000L)
+    iFee <- Gen.choose(IssueTransaction.MinFee, 2 * IssueTransaction.MinFee)
     timestamp <- positiveLongGen
   } yield {
-    val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable, fee, timestamp)
+    val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable, iFee, timestamp)
     val issue2 = IssueTransaction.create(sender, assetName, description, quantity, decimals,
-      reissuable, fee, Math.max(timestamp, 1476459220001L))
+      reissuable, iFee, Math.max(timestamp, 1476459220001L))
     val reissue = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable2, fee, timestamp)
-    (issue, issue2, reissue)
+    val delete = DeleteTransaction.create(sender, issue.assetId, deleteAmount, fee, timestamp)
+    (issue, issue2, reissue, delete)
   }
 
 
   val issueGenerator: Gen[IssueTransaction] = issueReissueGenerator.map(_._1)
   val reissueGenerator: Gen[ReissueTransaction] = issueReissueGenerator.map(_._3)
+  val deleteGenerator: Gen[DeleteTransaction] = issueReissueGenerator.map(_._4)
 
   val invalidOrderGenerator: Gen[Order] = for {
     sender: PrivateKeyAccount <- accountGen

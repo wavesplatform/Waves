@@ -8,12 +8,12 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
-import scorex.transaction.assets.{AssetIssuance, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets._
 import scorex.transaction.state.database.state._
-import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
-import scala.concurrent.duration._
+import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConversions._
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -379,6 +379,8 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
         sameSender && reissuable
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+    case tx: DeleteTransaction =>
+      tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>

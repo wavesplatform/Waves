@@ -12,9 +12,6 @@ import scorex.transaction._
 
 import scala.util.Try
 
-/*
- TODO: Remove assetIdOpt after Testnet relaunch
- */
 case class IssueTransaction(sender: PublicKeyAccount,
                             name: Array[Byte],
                             description: Array[Byte],

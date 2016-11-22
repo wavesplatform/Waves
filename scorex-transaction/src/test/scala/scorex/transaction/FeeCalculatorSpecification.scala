@@ -7,11 +7,11 @@ import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
 import scorex.settings.Settings
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 
 
 class FeeCalculatorSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
-with Matchers with TransactionGen {
+  with Matchers with TransactionGen {
 
   val WhitelistedAsset = Base58.decode("JAudr64y6YxTgLn9T5giKKqWGkbMfzhdRAxmNNfn6FJN").get
 
@@ -38,7 +38,7 @@ with Matchers with TransactionGen {
   property("Issue transaction ") {
     val feeCalc = new FeeCalculator(MySettings)
     forAll(issueGenerator) { tx: IssueTransaction =>
-      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 20000000)
+      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 100000000)
     }
   }
 
@@ -49,6 +49,13 @@ with Matchers with TransactionGen {
     }
   }
 
+  property("Delete transaction ") {
+    val feeCalc = new FeeCalculator(MySettings)
+    forAll(deleteGenerator) { tx: DeleteTransaction =>
+      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 300000)
+    }
+  }
+
   private val str =
     """{
       |"feeMap": {
@@ -56,14 +63,17 @@ with Matchers with TransactionGen {
       |    "Waves": 100000
       |  },
       |  "3": {
-      |    "Waves": 10000000
+      |    "Waves": 100000000
       |  },
       |  "4": {
       |    "Waves": 100000,
       |    "JAudr64y6YxTgLn9T5giKKqWGkbMfzhdRAxmNNfn6FJN": 1002
       |  },
       |  "5": {
-      |    "Waves": 100000
+      |    "Waves": 200000
+      |  },
+      |  "6": {
+      |    "Waves": 300000
       |  }
       |}}""".stripMargin
   val feeMapJson: JsObject = Json.parse(str).as[JsObject]
@@ -74,4 +84,5 @@ with Matchers with TransactionGen {
     override lazy val dataDirOpt: Option[String] = None
     override lazy val knownPeers = Seq.empty[InetSocketAddress]
   }
+
 }

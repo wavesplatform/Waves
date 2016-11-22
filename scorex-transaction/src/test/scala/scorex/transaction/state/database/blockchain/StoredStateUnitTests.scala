@@ -10,7 +10,7 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.ScorexLogging
 
@@ -50,6 +50,28 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   val applyChanges = PrivateMethod[Unit]('applyChanges)
   val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
 
+  property("Delete assets") {
+    forAll(issueReissueGenerator) { pair =>
+      withRollbackTest {
+        val issueTx: IssueTransaction = pair._1
+        val deleteTx: DeleteTransaction = pair._4
+        val senderAmountAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
+
+        state.assetBalance(senderAmountAcc) shouldBe 0
+        state.isValid(issueTx, Int.MaxValue) shouldBe true
+
+        state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
+        state.assetBalance(senderAmountAcc) shouldBe issueTx.quantity
+
+        state.isValid(deleteTx, Int.MaxValue) shouldBe true
+
+        state.applyChanges(state.calcNewBalances(Seq(deleteTx), Map(), allowTemporaryNegative = true))
+        state.assetBalance(senderAmountAcc) shouldBe (issueTx.quantity - deleteTx.amount)
+      }
+    }
+  }
+
+
   property("Transaction seq Long overflow") {
     val TxN: Int = 12
     val InitialBalance: Long = Long.MaxValue / 8
@@ -79,30 +101,6 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     state.applyChanges(Map(testAssetAcc -> (AccState(0L), List())))
 
-  }
-
-
-  private def withRollbackTest(test: => Unit): Unit = {
-    val startedState = state.stateHeight
-    val h = state.hash
-    var lastFinalStateHash: Option[Int] = None
-    for {i <- 1 to 2} {
-      try {
-        test
-        state.rollbackTo(startedState)
-        h should be(state.hash)
-        lastFinalStateHash match {
-          case Some(lastHash) =>
-            lastHash should be(state.hash)
-          case None =>
-            lastFinalStateHash = Some(state.hash)
-        }
-      } catch {
-        case NonFatal(e) =>
-          log.error(s"Failed on $i iteration: ${e.getMessage}")
-          throw e
-      }
-    }
   }
 
   property("Validate transfer with too big amount") {
@@ -285,7 +283,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
-  property("Applying transactions") {
+  property("Applying payment transactions") {
     val testAssetAcc = AssetAcc(testAcc, None)
     forAll(paymentGenerator, Gen.posNum[Long]) { (tx: PaymentTransaction,
                                                   balance: Long) =>
@@ -355,6 +353,29 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     val time = getTimestamp
     val sig = PaymentTransaction.generateSignature(testAcc, recipient, amount, fee, time)
     new PaymentTransaction(testAcc, recipient, amount, fee, time, sig)
+  }
+
+  private def withRollbackTest(test: => Unit): Unit = {
+    val startedState = state.stateHeight
+    val h = state.hash
+    var lastFinalStateHash: Option[Int] = None
+    for {i <- 1 to 2} {
+      try {
+        test
+        state.rollbackTo(startedState)
+        h should be(state.hash)
+        lastFinalStateHash match {
+          case Some(lastHash) =>
+            lastHash should be(state.hash)
+          case None =>
+            lastFinalStateHash = Some(state.hash)
+        }
+      } catch {
+        case NonFatal(e) =>
+          log.error(s"Failed on $i iteration: ${e.getMessage}")
+          throw e
+      }
+    }
   }
 
 }
