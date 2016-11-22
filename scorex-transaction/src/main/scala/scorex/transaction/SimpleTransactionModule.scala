@@ -13,9 +13,9 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.ValidationResult.ValidationResult
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
-import scorex.transaction.state.wallet.{IssueRequest, Payment, ReissueRequest, TransferRequest}
+import scorex.transaction.state.wallet._
 import scorex.utils._
 import scorex.wallet.Wallet
 
@@ -208,7 +208,17 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     reissue
   }
 
-
+  def deleteAsset(request: DeleteRequest, wallet: Wallet): Try[DeleteTransaction] = Try {
+    val sender = wallet.privateKeyAccount(request.sender).get
+    val tx = DeleteTransaction.create(sender,
+      Base58.decode(request.assetId).get,
+      request.quantity,
+      request.fee,
+      getTimestamp)
+    if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+    else throw new StateCheckFailed("Invalid reissue transaction generated: " + tx.json)
+    tx
+  }
 
   private var txTime: Long = 0
 
