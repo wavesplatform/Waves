@@ -6,7 +6,7 @@ import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 
 import scala.util.Try
 
@@ -69,6 +69,30 @@ object BroadcastRequests {
         Base58.decode(assetId).get,
         quantity,
         reissuable,
+        fee,
+        timestamp,
+        Base58.decode(signature).get)
+    }
+  }
+
+  case class AssetDeleteRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+                                senderPublicKey: String,
+                                @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
+                                assetId: String,
+                                @ApiModelProperty(required = true, example = "1000000")
+                                amount: Long,
+                                @ApiModelProperty(required = true)
+                                fee: Long,
+                                @ApiModelProperty(required = true)
+                                timestamp: Long,
+                                @ApiModelProperty(required = true)
+                                signature: String) {
+
+    def toTx: Try[DeleteTransaction] = Try {
+      DeleteTransaction(
+        new PublicKeyAccount(Base58.decode(senderPublicKey).get),
+        Base58.decode(assetId).get,
+        amount,
         fee,
         timestamp,
         Base58.decode(signature).get)
@@ -141,5 +165,15 @@ object BroadcastRequests {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "signature").read[String]
     ) (AssetReissueRequest.apply _)
+
+  //TODO put reads/writes together?
+  implicit val assetDeleteRequestReads: Reads[AssetDeleteRequest] = (
+    (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "assetId").read[String] and
+      (JsPath \ "quantity").read[Long] and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "signature").read[String]
+    ) (AssetDeleteRequest.apply _)
 }
 

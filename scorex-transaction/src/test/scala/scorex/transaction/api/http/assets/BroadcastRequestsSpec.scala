@@ -2,7 +2,7 @@ package scorex.transaction.api.http.assets
 
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.api.http.assets.BroadcastRequests.{AssetIssueRequest, AssetReissueRequest}
+import scorex.api.http.assets.BroadcastRequests.{AssetDeleteRequest, AssetIssueRequest, AssetReissueRequest}
 import scorex.api.http.assets.BroadcastResponses.{AssetIssueResponse, AssetReissueResponse, AssetTransferResponse}
 
 
@@ -44,6 +44,22 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |}
       """.stripMargin
     val req = Json.parse(json).validate[AssetReissueRequest].get
+    req.signature shouldBe "4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
+    req.fee shouldBe 100000000L
+  }
+
+  test("AssetDeleteRequest json parsing works") {
+    val json =
+      """
+        |{
+        |"senderPublicKey":"J6JNHaj32DWdgygfPKkiHD7kDFsVM61XuZn44fankgeQ",
+        |"assetId":"6eV67ffUPXVGktrmsoWv1ZRKTuKcWZjeCQXJjD26pTGS",
+        |"quantity":10000,
+        |"fee":100000000,"timestamp":1477302582842,
+        |"signature":"4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
+        |}
+      """.stripMargin
+    val req = Json.parse(json).validate[AssetDeleteRequest].get
     req.signature shouldBe "4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
     req.fee shouldBe 100000000L
   }

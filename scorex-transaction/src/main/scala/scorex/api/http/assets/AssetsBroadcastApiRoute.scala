@@ -22,7 +22,7 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
   val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
-    issue ~ reissue ~ transfer
+    issue ~ reissue ~ transfer ~ deleteRoute
   }
 
   import BroadcastRequests._
@@ -85,6 +85,39 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
             case JsSuccess(request: AssetReissueRequest, _) =>
               request.toTx.map { tx =>
                 broadcast(tx)(t => Json.toJson(AssetReissueResponse(t)))
+              }.getOrElse(WrongJson.response)
+
+            case _: JsError => WrongJson.response
+          }
+        }.getOrElse(WrongJson.response)
+      }
+    }
+  }
+
+  @Path("/delete")
+  @ApiOperation(value = "Broadcast signed Asset delete",
+    notes = "Publish signed Asset delete transaction to the Blockchain",
+    httpMethod = "POST",
+    consumes = "application/json",
+    produces = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with signed Delete transaction",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.api.http.assets.BroadcastRequests$DeleteReissueRequest")))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with signed Asset delete transaction", response = classOf[AssetDeleteResponse]),
+    new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
+  def deleteRoute: Route = path("reissue") {
+    entity(as[String]) { body =>
+      postJsonRoute {
+        Try(Json.parse(body)).map { js =>
+          js.validate[AssetDeleteRequest] match {
+            case JsSuccess(request: AssetDeleteRequest, _) =>
+              request.toTx.map { tx =>
+                broadcast(tx)(t => Json.toJson(AssetDeleteResponse(t)))
               }.getOrElse(WrongJson.response)
 
             case _: JsError => WrongJson.response
