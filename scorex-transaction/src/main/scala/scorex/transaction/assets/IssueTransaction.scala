@@ -34,20 +34,13 @@ case class IssueTransaction(sender: PublicKeyAccount,
     Longs.toByteArray(quantity), Array(decimals), if (reissuable) Array(1: Byte) else Array(0: Byte),
     Longs.toByteArray(fee), Longs.toByteArray(timestamp))
 
-  override lazy val json: JsObject = Json.obj(
-    "type" -> transactionType.id,
-    "id" -> Base58.encode(id),
-    "sender" -> sender.address,
-    "senderPublicKey" -> Base58.encode(sender.publicKey),
+  override lazy val json: JsObject = jsonBase() ++ Json.obj(
     "assetId" -> Base58.encode(assetId),
     "name" -> new String(name, Charsets.UTF_8),
     "description" -> new String(description, Charsets.UTF_8),
     "quantity" -> quantity,
     "decimals" -> decimals,
-    "reissuable" -> reissuable,
-    "fee" -> fee,
-    "timestamp" -> timestamp,
-    "signature" -> Base58.encode(signature)
+    "reissuable" -> reissuable
   )
 
   override lazy val balanceChanges: Seq[BalanceChange] =

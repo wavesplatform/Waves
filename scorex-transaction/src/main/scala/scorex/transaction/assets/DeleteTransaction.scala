@@ -23,17 +23,10 @@ case class DeleteTransaction(sender: PublicKeyAccount,
   lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), sender.publicKey, assetId,
     Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp))
 
-  //TODO move to parent class
-  override lazy val json: JsObject = Json.obj(
-    "type" -> transactionType.id,
-    "id" -> Base58.encode(id),
-    "sender" -> sender.address,
-    "senderPublicKey" -> Base58.encode(sender.publicKey),
+  override lazy val json: JsObject = jsonBase() ++ Json.obj(
     "assetId" -> Base58.encode(assetId),
     "amount" -> amount,
-    "fee" -> fee,
-    "timestamp" -> timestamp,
-    "signature" -> Base58.encode(signature)
+    "fee" -> fee
   )
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)

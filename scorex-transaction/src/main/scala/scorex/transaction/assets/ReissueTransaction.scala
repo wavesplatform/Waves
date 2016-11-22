@@ -24,17 +24,10 @@ case class ReissueTransaction(sender: PublicKeyAccount,
   lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), sender.publicKey, assetId, Longs.toByteArray(quantity),
     if (reissuable) Array(1: Byte) else Array(0: Byte), Longs.toByteArray(fee), Longs.toByteArray(timestamp))
 
-  override lazy val json: JsObject = Json.obj(
-    "type" -> transactionType.id,
-    "id" -> Base58.encode(id),
-    "sender" -> sender.address,
-    "senderPublicKey" -> Base58.encode(sender.publicKey),
+  override lazy val json: JsObject = jsonBase() ++ Json.obj(
     "assetId" -> Base58.encode(assetId),
     "quantity" -> quantity,
-    "reissuable" -> reissuable,
-    "fee" -> fee,
-    "timestamp" -> timestamp,
-    "signature" -> Base58.encode(signature)
+    "reissuable" -> reissuable
   )
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
