@@ -367,25 +367,30 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: ReissueTransaction =>
       val reissueValid: Boolean = {
-        val sameSender = Option(transactionsMap.get(tx.assetId)).exists(b =>
-          IssueTransaction.parseBytes(b) match {
-            case Success(issue) =>
-              issue.sender.address == tx.sender.address
-            case Failure(f) =>
-              log.debug(s"Can't deserialise issue tx", f)
-              false
-          })
+        val senderIsIssuer = isIssuerAddress(tx.assetId, tx.sender.address)
         val reissuable = Option(reissuableIndex.get(tx.assetId)).getOrElse(false)
-        sameSender && reissuable
+        senderIsIssuer && reissuable
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: DeleteTransaction =>
-      tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      val senderIsIssuer = isIssuerAddress(tx.assetId, tx.sender.address)
+      senderIsIssuer && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>
       log.error(s"Wrong kind of tx: $otx")
       false
+  }
+
+  private def isIssuerAddress(assetId: Array[Byte], address: String): Boolean = {
+    Option(transactionsMap.get(assetId)).exists(b =>
+      IssueTransaction.parseBytes(b) match {
+        case Success(issue) =>
+          issue.sender.address == address
+        case Failure(f) =>
+          log.debug(s"Can't deserialise issue tx", f)
+          false
+      })
   }
 
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
