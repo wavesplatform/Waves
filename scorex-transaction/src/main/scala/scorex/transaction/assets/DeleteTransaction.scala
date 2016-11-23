@@ -2,7 +2,7 @@ package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
@@ -36,17 +36,9 @@ case class DeleteTransaction(sender: PublicKeyAccount,
 
   override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
-  //TODO move to parent class
-  def validate: ValidationResult.Value =
-  if (!Account.isValid(sender)) {
-    ValidationResult.InvalidAddress
-  } else if (amount <= 0) {
+  override lazy val validate: ValidationResult.Value = if (amount < 0) {
     ValidationResult.NegativeAmount
-  } else if (fee <= 0) {
-    ValidationResult.InsufficientFee
-  } else if (!signatureValid) {
-    ValidationResult.InvalidSignature
-  } else ValidationResult.ValidateOke
+  } else validationBase
 
 }
 

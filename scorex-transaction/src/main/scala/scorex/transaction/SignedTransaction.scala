@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import play.api.libs.json.Json
-import scorex.account.PublicKeyAccount
+import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
@@ -25,4 +25,12 @@ trait SignedTransaction extends TypedTransaction {
 
 
   def validate: ValidationResult.Value
+
+  protected lazy val validationBase: ValidationResult.Value = if (!Account.isValid(sender)) {
+    ValidationResult.InvalidAddress
+  } else if (assetFee._2 <= 0) {
+    ValidationResult.InsufficientFee
+  } else if (!signatureValid) {
+    ValidationResult.InvalidSignature
+  } else ValidationResult.ValidateOke
 }

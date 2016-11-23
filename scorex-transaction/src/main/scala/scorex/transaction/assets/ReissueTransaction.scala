@@ -37,16 +37,9 @@ case class ReissueTransaction(sender: PublicKeyAccount,
 
   override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
-  def validate: ValidationResult.Value =
-    if (!Account.isValid(sender)) {
-      ValidationResult.InvalidAddress
-    } else if (quantity <= 0) {
-      ValidationResult.NegativeAmount
-    } else if (fee <= 0) {
-      ValidationResult.InsufficientFee
-    } else if (!signatureValid) {
-      ValidationResult.InvalidSignature
-    } else ValidationResult.ValidateOke
+  override lazy val validate: ValidationResult.Value = if (quantity <= 0) {
+    ValidationResult.NegativeAmount
+  } else validationBase
 
 }
 

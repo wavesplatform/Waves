@@ -45,20 +45,13 @@ case class TransferTransaction(assetId: Option[AssetId],
       recipient.bytes, arrayWithSize(attachment))
   }
 
-  def validate: ValidationResult.Value = if (!Account.isValid(recipient)) {
-    ValidationResult.InvalidAddress //CHECK IF RECIPIENT IS VALID ADDRESS
-  } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
+  override lazy val validate: ValidationResult.Value = if (attachment.length > TransferTransaction.MaxAttachmentSize) {
     ValidationResult.TooBigArray
   } else if (amount <= 0) {
     ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
-  } else if (fee <= 0) {
-    ValidationResult.InsufficientFee //CHECK IF FEE IS POSITIVE
   } else if (Try(Math.addExact(amount, fee)).isFailure) {
     ValidationResult.OverflowError // CHECK THAT fee+amount won't overflow Long
-  } else if (!signatureValid) {
-    ValidationResult.InvalidSignature
-  } else ValidationResult.ValidateOke
-
+  } else validationBase
 
   override lazy val json: JsObject = jsonBase() ++ Json.obj(
     "recipient" -> recipient.address,

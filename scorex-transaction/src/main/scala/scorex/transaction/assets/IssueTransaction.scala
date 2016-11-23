@@ -49,22 +49,15 @@ case class IssueTransaction(sender: PublicKeyAccount,
 
   override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
-  def validate: ValidationResult.Value =
-    if (!Account.isValid(sender)) {
-      ValidationResult.InvalidAddress
-    } else if (quantity <= 0) {
-      ValidationResult.NegativeAmount
-    } else if (fee < MinFee) {
-      ValidationResult.InsufficientFee
-    } else if (description.length > MaxDescriptionLength) {
-      ValidationResult.TooBigArray
-    } else if (name.length < MinAssetNameLength || name.length > MaxAssetNameLength) {
-      ValidationResult.InvalidName
-    } else if (decimals < 0 || decimals > MaxDecimals) {
-      ValidationResult.TooBigArray
-    } else if (!signatureValid) {
-      ValidationResult.InvalidSignature
-    } else ValidationResult.ValidateOke
+  override lazy val validate: ValidationResult.Value = if (quantity <= 0) {
+    ValidationResult.NegativeAmount
+  } else if (description.length > MaxDescriptionLength) {
+    ValidationResult.TooBigArray
+  } else if (name.length < MinAssetNameLength || name.length > MaxAssetNameLength) {
+    ValidationResult.InvalidName
+  } else if (decimals < 0 || decimals > MaxDecimals) {
+    ValidationResult.TooBigArray
+  } else validationBase
 
 }
 
