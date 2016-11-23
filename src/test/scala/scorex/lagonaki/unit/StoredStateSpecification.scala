@@ -51,7 +51,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
       new Account(request.recipient),
       request.amount,
       i.incrementAndGet(),
-      request.feeAsset.map(s => Base58.decode(s).get),
+      request.feeAssetId.map(s => Base58.decode(s).get),
       request.fee,
       if (request.attachment.nonEmpty) {
         Base58.decode(request.attachment).get
