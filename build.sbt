@@ -43,22 +43,3 @@ assemblyMergeStrategy in assembly := {
     val oldStrategy = (assemblyMergeStrategy in assembly).value
     oldStrategy(x)
 }
-
-javaOptions in Universal ++= Seq(
-  "-J-server",
-  // JVM memory tuning for 1g ram
-  "-J-Xms128m",
-  "-J-Xmx1024m",
-
-  // from https://groups.google.com/d/msg/akka-user/9s4Yl7aEz3E/zfxmdc0cGQAJ
-  "-J-XX:+UseG1GC",
-  "-J-XX:+UseNUMA",
-  "-J-XX:+AlwaysPreTouch",
-
-  // may be can't use with jstack and others tools
-  "-J-XX:+PerfDisableSharedMem",
-  "-J-XX:+ParallelRefProcEnabled",
-  "-J-XX:+UseStringDeduplication",
-
-  "-J-Dsun.net.inetaddr.ttl=60"
-)
