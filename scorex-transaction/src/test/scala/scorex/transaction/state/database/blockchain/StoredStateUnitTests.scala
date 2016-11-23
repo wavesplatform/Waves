@@ -135,7 +135,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   property("Transfer unissued asset to yourself is not allowed") {
     withRollbackTest {
-      forAll(selfTransferGenerator suchThat (t => t.assetId.isDefined && t.feeAsset.isEmpty)) { tx: TransferTransaction =>
+      forAll(selfTransferGenerator suchThat (t => t.assetId.isDefined && t.feeAssetId.isEmpty)) { tx: TransferTransaction =>
         val senderAccount = AssetAcc(tx.sender, None)
         val txFee = tx.fee
         state.applyChanges(Map(senderAccount -> (AccState(txFee), List(FeesStateChange(txFee)))))
@@ -148,7 +148,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     forAll(transferGenerator) { tx: TransferTransaction =>
       withRollbackTest {
         val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
-        val senderFeeAcc = AssetAcc(tx.sender, tx.feeAsset)
+        val senderFeeAcc = AssetAcc(tx.sender, tx.feeAssetId)
         val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
 
         val senderAmountBalance = state.assetBalance(senderAmountAcc)
@@ -178,7 +178,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     withRollbackTest {
       forAll(transferGenerator) { tx: TransferTransaction =>
         val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
-        val senderFeeAcc = AssetAcc(tx.sender, tx.feeAsset)
+        val senderFeeAcc = AssetAcc(tx.sender, tx.feeAssetId)
         val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
 
         val senderAmountBalance = state.assetBalance(senderAmountAcc)
@@ -276,9 +276,9 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   property("accountTransactions returns TransferTransactions if fee in base token") {
     forAll(transferGenerator) { t: TransferTransaction =>
-      val tx = t.copy(feeAsset = None)
+      val tx = t.copy(feeAssetId = None)
       val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
-      val senderFeeAcc = AssetAcc(tx.sender, tx.feeAsset)
+      val senderFeeAcc = AssetAcc(tx.sender, tx.feeAssetId)
       val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
       state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
       state.accountTransactions(tx.sender).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
@@ -320,7 +320,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     forAll(selfTransferGenerator) { (tx: TransferTransaction) =>
       withRollbackTest {
         val account = tx.sender
-        val assetAccount = AssetAcc(account, tx.feeAsset)
+        val assetAccount = AssetAcc(account, tx.feeAssetId)
         state.balance(account) shouldBe 0
         state.assetBalance(assetAccount) shouldBe 0
         val balance = tx.fee

@@ -13,7 +13,7 @@ class TransferTransactionSpecification extends PropSpec with PropertyChecks with
 
       recovered.sender.address shouldEqual transfer.sender.address
       recovered.assetId.map(_ sameElements transfer.assetId.get).getOrElse(transfer.assetId.isEmpty) shouldBe true
-      recovered.feeAsset.map(_ sameElements transfer.feeAsset.get).getOrElse(transfer.feeAsset.isEmpty) shouldBe true
+      recovered.feeAssetId.map(_ sameElements transfer.feeAssetId.get).getOrElse(transfer.feeAssetId.isEmpty) shouldBe true
       recovered.timestamp shouldEqual transfer.timestamp
       recovered.amount shouldEqual transfer.amount
       recovered.fee shouldEqual transfer.fee
@@ -41,7 +41,7 @@ class TransferTransactionSpecification extends PropSpec with PropertyChecks with
     recovered.recipient.address shouldBe "3MX2WbQQtQjC1oGeAD84WaffNVt3KUtxp1H"
     recovered.amount shouldBe amount
     recovered.timestamp shouldBe timestamp
-    Base58.encode(recovered.feeAsset.get) shouldEqual "51TkL91ARXU2kBqck2W2GQ8PUuh18hNqW2MEQ9vtjw3N"
+    Base58.encode(recovered.feeAssetId.get) shouldEqual "51TkL91ARXU2kBqck2W2GQ8PUuh18hNqW2MEQ9vtjw3N"
     recovered.fee shouldEqual feeAmount
     Base58.encode(recovered.attachment) shouldBe "2ARHupfAZnhTiikJk3o3mFSGUotf"
     Base58.encode(recovered.signature) shouldBe "4s3BuXSF6Fuxh1mUW9pKr1xx9GxhJ3yNsxqtaAejEW39wFBZMkrfy39aJo2JJDfYwu1x11x4tUa9RQPPA1FyGgc7"
