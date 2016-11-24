@@ -19,22 +19,23 @@ lazy val packageJar = taskKey[File]("creates fat jar")
 lazy val packageDebianUpstartTask = packageDebianUpstart := {
   val output = (baseDirectory in root).value / "package" / s"waves-$network-upstart-${version.value}.deb"
   val debianFile = (packageBin in Debian).value
+  streams.value.log.info(s"Moving package ${debianFile.getAbsoluteFile} to ${output.getAbsolutePath}")
   IO.move(debianFile, output)
-  IO.delete(baseDirectory.value)
   output
 }
 
 lazy val packageDebianSystemdTask = packageDebianSystemd := {
   val output = (baseDirectory in root).value / "package" / s"waves-$network-systemd-${version.value}.deb"
   val debianFile = (packageBin in Debian).value
+  streams.value.log.info(s"Moving package ${debianFile.getAbsoluteFile} to ${output.getAbsolutePath}")
   IO.move(debianFile, output)
-  IO.delete(baseDirectory.value)
   output
 }
 
 lazy val packageJarTask = packageJar := {
   val output = baseDirectory.value / "package" / s"waves-${version.value}.jar"
   val jarFile = (assembly in Compile).value
+  streams.value.log.info(s"Moving package ${jarFile.getAbsoluteFile} to ${output.getAbsolutePath}")
   IO.move(jarFile, output)
   output
 }
