@@ -22,13 +22,14 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.+" % "test",
   "org.scalactic" %% "scalactic" % "2.+" % "test",
   "org.scalacheck" %% "scalacheck" % "1.12.+" % "test",
-  "net.databinder.dispatch" %% "dispatch-core" % "+" % "test"
+  "net.databinder.dispatch" %% "dispatch-core" % "+" % "test",
+  "org.scalamock" %% "scalamock-scalatest-support" % "3.2.2" % "test"
 )
 
 val akkaV       = "2.+"
 lazy val addAkkaLibs = Seq(
   "com.typesafe.akka" %% "akka-persistence" % akkaV,
-  //"com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.11" % "test",
+  "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.15" % "test",
   "com.typesafe.akka" %% "akka-http-testkit" % akkaV,
   "org.iq80.leveldb"            % "leveldb"          % "0.7",
   "org.fusesource.leveldbjni"   % "leveldbjni-all"   % "1.8",

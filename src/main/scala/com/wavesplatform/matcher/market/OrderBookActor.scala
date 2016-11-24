@@ -4,15 +4,20 @@ import java.util.Comparator
 
 import akka.actor.{ActorRef, Props}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
-import com.wavesplatform.matcher.market.MatcherActor.OrderAccepted
+import com.wavesplatform.matcher.api.OrderService
+import com.wavesplatform.matcher.market.MatcherActor.{OrderAccepted, OrderRejected}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.{LevelAgg, OrderBook, OrderItem}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType, Validation}
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 
+import scala.annotation.tailrec
+
 object OrderBookActor {
-  def props(assetPair: AssetPair, orderMatchedActor: ActorRef): Props = Props(new OrderBookActor(assetPair, orderMatchedActor))
+  def props(assetPair: AssetPair, orderMatchedActor: ActorRef, storedState: StoredState): Props =
+    Props(new OrderBookActor(assetPair, orderMatchedActor, storedState))
   def name(assetPair: AssetPair): String = assetPair.first.map(Base58.encode).getOrElse("WAVES") + "-" +
     assetPair.second.map(Base58.encode).getOrElse("WAVES")
 
@@ -41,7 +46,9 @@ case object AskComparator extends Comparator[Long] {
   def compare(o1: Long, o2: Long) = o1.compareTo(o2)
 }
 
-class OrderBookActor(assetPair: AssetPair, orderMatchedActor: ActorRef) extends PersistentActor with ScorexLogging {
+class OrderBookActor(assetPair: AssetPair, orderMatchedActor: ActorRef, val storedState: StoredState)
+  extends PersistentActor
+  with ScorexLogging with OrderService {
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private val asks = new OrderBook(assetPair, AskComparator)
@@ -71,13 +78,18 @@ class OrderBookActor(assetPair: AssetPair, orderMatchedActor: ActorRef) extends 
 
   override def receiveRecover: Receive = {
     case evt: OrderEvent => log.info("Event: {}", evt); applyEvent(evt)
-    case RecoveryCompleted => log.info("Recovery completed!"); restoreState = true
+    case RecoveryCompleted => log.info("Recovery completed!"); restoreState = false
   }
 
   def handleAddOrder(order: Order): Unit = {
     persistAsync(OrderAdded(OrderItem(order))) { evt =>
-      place(evt.order)
-      sender() ! OrderAccepted(order)
+      val v = validateNewOrder(order)
+      if (v) {
+        sender() ! OrderAccepted(order)
+        place(evt.order)
+      } else {
+        sender() ! OrderRejected(v.messages)
+      }
     }
   }
 
@@ -92,19 +104,39 @@ class OrderBookActor(assetPair: AssetPair, orderMatchedActor: ActorRef) extends 
     }
   }
 
-  private def place(order: OrderItem) {
-    val (executedOrders, remaining) = order.order.orderType match {
-      case OrderType.BUY => asks.execute(order)
-      case OrderType.SELL => bids.execute(order)
+  @tailrec
+  private def doMatching(order: OrderItem): (Seq[OrderItem], Long) = {
+    val (_, oppositeQ) = order.order.orderType match {
+      case OrderType.BUY => (bids, asks)
+      case OrderType.SELL => (asks, bids)
     }
 
+    val (executedOrders, remaining) = oppositeQ.doMatching(order)
+
+    val inValid = executedOrders.filterNot(validateOrderItem)
+    if (inValid.nonEmpty) {
+      oppositeQ.removeMatched(inValid)
+      removeOpenOrders(inValid)
+      doMatching(order)
+    }
+    else {
+      oppositeQ.removeMatched(executedOrders)
+      removeOpenOrders(executedOrders)
+      (executedOrders, remaining)
+    }
+  }
+
+  private def place(order: OrderItem) {
+    val (executedOrders, remaining) = doMatching(order)
     if (executedOrders.nonEmpty && !restoreState) {
       log.info(s"${order.order.orderType} executed: {}", executedOrders)
       orderMatchedActor ! OrderMatched(order.order, executedOrders)
     }
 
     if (remaining > 0) {
-      putOrder(order.copy(amount = remaining))
+      val remOrder = order.copy(amount = remaining)
+      putOrder(remOrder)
+      addOpenOrder(remOrder)
     }
   }
 

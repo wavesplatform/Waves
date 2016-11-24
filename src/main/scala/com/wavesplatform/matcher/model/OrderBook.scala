@@ -8,7 +8,8 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scala.collection.JavaConversions._
 
 class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) {
-  private val priceOrders: util.TreeMap[Long, Level] = new util.TreeMap[Long, Level](comparator)
+  val priceOrders: util.TreeMap[Long, Level] = new util.TreeMap[Long, Level](comparator)
+  val ordersRemainingAmount = Map.empty[String, Long]
 
   def getBestOrders: Option[Level] = {
     if (priceOrders.isEmpty) {
@@ -19,27 +20,49 @@ class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) {
   }
 
   def add(order: OrderItem) {
-    priceOrders.putIfAbsent(order.price, new Level(assetPair, order.price))
-    priceOrders.get(order.price) += order
+    val prevLevel = priceOrders.getOrDefault(order.price, Level(order.price))
+    priceOrders.put(order.price, prevLevel.copy(orders = prevLevel.orders :+ order))
   }
 
-  def execute(order: OrderItem): (Seq[OrderItem], Long) = {
-    getBestOrders match {
-      case Some(bestOrders) =>
-        if (comparator.compare(bestOrders.price, order.price) <= 0) {
-          val (executed, remaining) = bestOrders.execute(order)
+  def doMatching(order: OrderItem, n: Int = 1): (Seq[OrderItem], Long) = {
+    val bestOrders = priceOrders.keys.take(n)
+    if (bestOrders.size == n) {
+      val bestLevel = priceOrders.get(bestOrders.last)
+      if (comparator.compare(bestLevel.price, order.price) <= 0) {
+        val (executed, remaining) = bestLevel.execute(order)
 
-          if (bestOrders.isEmpty) delete(bestOrders)
-          if (remaining > 0) {
-            val (remainingExecuted, rest) = execute(order.copy(amount = remaining))
-            (executed ++ remainingExecuted, rest)
-          } else (executed, remaining)
-        } else (Seq.empty, order.amount)
-      case None => (Seq.empty, order.amount)
+        if (remaining > 0) {
+          val (remainingExecuted, nextRemaining) = doMatching(order.copy(amount = remaining), n + 1)
+          (executed ++ remainingExecuted, nextRemaining)
+        } else (executed, remaining)
+      } else (Seq.empty, order.amount)
+    } else {
+      (Seq.empty, order.amount)
     }
   }
 
-  def delete(orders: Level) {
+  def removeOrder(order: OrderItem): Unit = {
+    val prevLevel = priceOrders.getOrDefault(order.price, Level(order.price))
+
+    val (before, after) = prevLevel.orders.span(_.order != order.order)
+    if (after.nonEmpty) {
+      val prevOrder = after.head
+      val newOrders = if (order.amount < prevOrder.amount) {
+        (before :+ prevOrder.copy(amount = prevOrder.amount - order.amount)) ++ after.tail
+      } else before ++ after.tail
+
+      if (newOrders.isEmpty) priceOrders.remove(order.price)
+      else priceOrders.put(order.price, prevLevel.copy(orders = newOrders))
+    }
+  }
+
+  def removeMatched(orders: Seq[OrderItem]) = {
+    orders.foreach { o =>
+      removeOrder(o)
+    }
+  }
+
+  private def delete(orders: Level) {
     priceOrders.remove(orders.price)
   }
 

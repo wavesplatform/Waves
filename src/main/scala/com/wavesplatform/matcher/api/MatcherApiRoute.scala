@@ -6,7 +6,7 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import com.wavesplatform.matcher.market.MatcherActor.OrderResponse
+import com.wavesplatform.matcher.market.MatcherActor.{OrderAccepted, OrderResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{GetOrderBookRequest, GetOrderBookResponse}
 import com.wavesplatform.matcher.model.OrderBookResult
 import scorex.transaction.assets.exchange.OrderJson._
@@ -25,16 +25,10 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Try
 
-case class ValidationErrorJson(err: Validation) extends ApiError {
-  override val id: Int = 120
-  override val message: String =  s"Validation failed: ${err.messages}"
-  override val code: StatusCode = StatusCodes.BadRequest
-}
-
 @Path("/matcher")
 @Api(value = "/matcher/")
 case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit val settings: WavesSettings,
-                                              implicit val context: ActorRefFactory) extends ApiRoute with OrderService {
+                                              implicit val context: ActorRefFactory) extends ApiRoute {
 
   val wallet: Wallet = application.wallet
   val storedState: StoredState = application.blockStorage.state.asInstanceOf[StoredState]
@@ -197,16 +191,12 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
             case err: JsError =>
               Future.successful(WrongTransactionJson(err).response)
             case JsSuccess(order: Order, _) =>
-              val v = validateOrder(order)
-              if (v) {
-                (matcher ? order)
-                  .mapTo[OrderResponse]
-                  .map { resp =>
-                    JsonResponse(resp.json, StatusCodes.OK)
-                  }
-              } else {
-                Future.successful(ValidationErrorJson(v).response)
-              }
+              (matcher ? order)
+                .mapTo[OrderResponse]
+                .map { resp =>
+                  JsonResponse(resp.json,
+                    if (resp.isInstanceOf[OrderAccepted]) StatusCodes.OK else StatusCodes.BadRequest)
+                }
               /*if (validation.validate()) {
                 (matcher ? order)
                 .mapTo[OrderResponse]
