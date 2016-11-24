@@ -27,7 +27,7 @@ case class TransactionsApiRoute(application: Application)(implicit val context: 
 
   override lazy val route =
     pathPrefix("transactions") {
-      unconfirmed ~ adressLimit ~ info
+      unconfirmed ~ addressLimit ~ info
     }
 
   //TODO implement general pagination
