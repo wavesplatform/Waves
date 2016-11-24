@@ -84,7 +84,7 @@ val debianSettings = Seq(
   packageSummary in Linux := "Waves node implementation on top of Scorex",
   packageDescription in Linux := "Waves node",
   maintainerScripts in Debian := maintainerScriptsAppend((maintainerScripts in Debian).value)(
-    DebianConstants.Postinst -> s"mkdir -p /home/waves && mkdir -p /home/waves/wallet && mkdir -p /home/waves/data && chmod -R 750 /home/waves && chmod -R 750 /usr/share/waves/settings.json && chown waves:waves /home/waves"),
+    DebianConstants.Postinst -> s"mkdir -p /home/waves && mkdir -p /home/waves/wallet && mkdir -p /home/waves/data && chmod -R 750 /home/waves && chmod -R 750 /usr/share/waves && chmod -R 750 /usr/share/waves/settings.json && chown -R waves:waves /home/waves && chown -R waves:waves /usr/share/waves"),
   mappings in Universal ++= {
     if (network == "mainnet") {
       Seq((baseDirectory in root).value / "waves-mainnet.json" -> "settings.json")
