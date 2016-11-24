@@ -58,20 +58,20 @@ val commonSettings: Seq[Setting[_]] = Seq(
     "-J-XX:+UseStringDeduplication",
 
     "-J-Dsun.net.inetaddr.ttl=60"),
-  mainClass in assembly := Some("com.wavesplatform.Application"),
   assemblyMergeStrategy in assembly := {
     case "application.conf" => MergeStrategy.concat
     case x =>
       val oldStrategy = (assemblyMergeStrategy in assembly).value
       oldStrategy(x)
   },
+  mainClass in Compile := Some("com.wavesplatform.Application"),
   packageJarTask
 )
 
 import NativePackagerHelper._
 
 val debianSettings = Seq(
-  maintainer := "wavesplatform.com",
+  maintainer in Linux := "wavesplatform.com",
   packageName := {
     if (network == "mainnet") {
       "waves"
@@ -81,8 +81,8 @@ val debianSettings = Seq(
       throw new IllegalStateException("invalid network")
     }
   },
-  packageSummary := "Waves node implementation on top of Scorex",
-  packageDescription := "Waves node",
+  packageSummary in Linux := "Waves node implementation on top of Scorex",
+  packageDescription in Linux := "Waves node",
   maintainerScripts in Debian := maintainerScriptsAppend((maintainerScripts in Debian).value)(
     DebianConstants.Postinst -> s"mkdir -p /home/waves && mkdir -p /home/waves/wallet && mkdir -p /home/waves/data && chmod -R 750 /home/waves && chmod -R 750 /usr/share/waves/settings.json && chown waves:waves /home/waves"),
   mappings in Universal ++= {
@@ -94,7 +94,9 @@ val debianSettings = Seq(
       throw new IllegalStateException("invalid network")
     }
   },
-  mappings in Universal ++= contentOf((baseDirectory in root).value / "src" / "main" / "resources").map(to => (to._1, "conf/" + to._2))
+  mappings in Universal ++= contentOf((baseDirectory in root).value / "src" / "main" / "resources").map(to => (to._1, "conf/" + to._2)),
+  serviceAutostart in Debian := false,
+  executableScriptName := packageName.value
 )
 
 val systemdSettings = Seq(
