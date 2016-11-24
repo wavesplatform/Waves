@@ -17,6 +17,13 @@ target
 scorex.log
 scorex-errors.log
 scorex-*.log
+*.log
 
 # local settings
 localsettings.json
+
+# Text files
+*.txt
+*.ods
+*.csv
+*.dat

@@ -2,15 +2,20 @@
   "p2p": {
     "nodeName": "",
     "bindAddress": "0.0.0.0",
-    "port": 6863,
+    "port": 6868,
     "upnp": false,
     "upnpGatewayTimeout": 7000,
     "upnpDiscoverTimeout": 3000,
     "knownPeers": [
-      "52.30.47.67:6863",
-      "52.28.66.217:6863",
-      "52.77.111.219:6863",
-      "52.51.92.182:6863"
+      "138.201.152.166:6868",
+      "138.201.152.165:6868",
+      "138.201.152.164:6868",
+      "138.201.152.163:6868",
+      "34.192.116.209:6868",
+      "52.8.147.91:6868",
+      "52.192.108.188:6868",
+      "52.62.212.53:6868",
+      "52.67.63.123:6868"
     ],
     "maxConnections": 30
   },
@@ -28,10 +33,10 @@
   "apiKeyHash": "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu",
   "history": "blockchain",
   "offlineGeneration": false,
-  "testnet": true,
+  "testnet": false,
   "loggingLevel": "info",
-  "genesisSignature": "4YJxQUyWx6qJYKPePN1CWjzZAbZ3rNPXZ9JteU1G9J4j2zK1Pa5LjvFtMs5ZdM8JRmZKAKqsNmLyuXjBUSCXyS8k",
+  "genesisSignature": "FSH8eAAzZNqnG8xgTZtz5xuLqXySsXgAjmFEC25hXMbEufiGjqWPnGCZFt6gLiVLJny16ipxRNAkkzjjhqTjBE2",
   "checkpoints": {
-    "publicKey": "4PvoqxpWi7kCA9N3UXcEB9CZx4iPPeHX9jSYdAioPhnr"
+    "publicKey": "7EXnkmJyz1gPfLJwytThcwGwpyfjzFXC3hxBhvVK4EQP"
   }
 }

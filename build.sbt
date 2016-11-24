@@ -46,6 +46,7 @@ assemblyJarName in assembly := "waves.jar"
 test in assembly := {}
 
 fork in ThisBuild := true
+fork in Test := false
 parallelExecution in ThisBuild := false
 
 mainClass in assembly := Some("com.wavesplatform.Application")
@@ -71,7 +72,7 @@ javaOptions in Universal ++= Seq(
   // may be can't use with jstack and others tools
   "-J-XX:+PerfDisableSharedMem",
   "-J-XX:+ParallelRefProcEnabled",
-  "-J-XX:+UseStringDeduplication"
-)
+  "-J-XX:+UseStringDeduplication",
 
-enablePlugins(JDebPackaging)
+  "-J-Dsun.net.inetaddr.ttl=60"
+)

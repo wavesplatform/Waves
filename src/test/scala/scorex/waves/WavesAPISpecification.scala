@@ -25,11 +25,15 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     val timestamp = 1465391445252L
     val amount = 10000000L
     val payment = UnsignedPayment(timestamp, amount, 100000L, recipient, "5JiSMVVvadkKt2K9dDJjiwLiDzuCMmzcHnNuEzct2LiY", 1)
-    val json = Json.toJson(payment).toString
+    val paymentJson = Json.toJson(payment)
+    val json = paymentJson.toString
 
     val response = postRequest(us = "/waves/create-signed-payment", body = json)
-    println(response.toString)
-    assert(response.toString == NoBalance.json.toString)
+    assert(response \ "timestamp" == paymentJson \ "timestamp")
+    assert(response \ "amount" == paymentJson \ "amount" )
+    assert(response \ "fee" == paymentJson \ "fee" )
+    assert(response \ "recipient" == paymentJson \ "recipient" )
+    assert((response \ "signature").toOption.isDefined)
   }
 
   test("/waves/external-payment API route can not send to address from another net") {
@@ -91,14 +95,8 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     assert(response.toString == InsufficientFee.json.toString)
   }
 
-  test("/waves/address returns correct CORS header") {
-    val response = postRequestWithResponse(
-      us = "/waves/address", body = "GvXeYd2iFJUNV7KgeGV2cdnScyrEvrr9uPYJeQFtvg21")
-    assert(response.getHeaders("Access-Control-Allow-Origin").size == 1)
-  }
-
   test("/waves/* API returns correct CORS header") {
-    val urls = List("/waves/address",
+    val urls = List(
       "/waves/broadcast-signed-payment",
       "/waves/create-signed-payment",
       "/waves/external-payment",

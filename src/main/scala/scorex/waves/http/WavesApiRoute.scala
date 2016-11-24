@@ -21,6 +21,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/waves")
 @Api(value = "waves")
+@Deprecated
 case class WavesApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
@@ -34,13 +35,13 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
   implicit lazy val transactionModule: WavesTransactionModule = application.transactionModule.asInstanceOf[WavesTransactionModule]
 
   override lazy val route = pathPrefix("waves") {
-    externalPayment ~ address ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
+    externalPayment ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
   }
 
-  // TODO: Should be moved to Scorex
+  @Deprecated
   @Path("/payment")
-  @ApiOperation(value = "Send payment from wallet",
-    notes = "Send payment from wallet to another wallet. Each call sends new payment",
+  @ApiOperation(value = "Send payment from wallet. Deprecated: use /assets/transfer instead",
+    notes = "Send payment from wallet to another wallet. Each call sends new payment. Deprecated: use /assets/transfer instead",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
@@ -89,7 +90,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     }
   }
 
-  // TODO: Should be moved to Scorex
+  @Deprecated
   @Path("/payment/signature")
   @ApiOperation(value = "Create payment signed by address from wallet",
     notes = "Create unique payment signed by address from wallet. Without broadcasting to network.",
@@ -141,6 +142,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     }
   }
 
+  @Deprecated
   @Path("/create-signed-payment")
   @ApiOperation(value = "Sign payment",
     notes = "Sign payment by provided wallet seed",
@@ -153,8 +155,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.waves.http.UnsignedPayment",
-      defaultValue = "{\n\t\"timestamp\": 0,\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"recipient\":\"recipientAddress\", \n\t\"senderWalletSeed\":\"seed\",\n\t\"senderAddressNonce\":\"0\"\n}"
+      dataType = "scorex.waves.http.UnsignedPayment"
     )
   ))
   @ApiResponses(Array(
@@ -196,26 +197,6 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     }
   }
 
-  @Path("/address")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "publicKey", value = "Public key as a plain string", required = true, paramType = "body", dataType = "string")
-  ))
-  @ApiOperation(value = "Generate", notes = "Generate a address from public key", httpMethod = "POST")
-  def address: Route = path("address") {
-    entity(as[String]) { publicKey =>
-      postJsonRoute {
-        Base58.decode(publicKey) match {
-          case Success(pubKeyBytes) => {
-            val account = Account.fromPublicKey(pubKeyBytes)
-            JsonResponse(Json.obj("address" -> account.address), StatusCodes.OK)
-          }
-          case Failure(e) => JsonResponse(InvalidPublicKey.json, InvalidPublicKey.code)
-        }
-      }
-    }
-  }
-
-
   @Deprecated
   @Path("/external-payment")
   @ApiOperation(value = "Broadcast payment", notes = "Publish signed payment to the Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
@@ -253,8 +234,11 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     }
   }
 
+  @Deprecated()
   @Path("/broadcast-signed-payment")
-  @ApiOperation(value = "Broadcast signed payment", notes = "Publish signed payment to the Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
+  @ApiOperation(value = "Broadcast signed payment. Deprecated: use /assets/broadcast/transfer instead",
+    notes = "Publish signed payment to the Blockchain. Deprecated: use /assets/broadcast/transfer instead",
+    httpMethod = "POST", produces = "application/json", consumes = "application/json")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(
       name = "body",
