@@ -1,5 +1,6 @@
 package scorex.transaction.assets
 
+import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
@@ -42,8 +43,8 @@ case class IssueTransaction(sender: PublicKeyAccount,
     "sender" -> sender.address,
     "senderPublicKey" -> Base58.encode(sender.publicKey),
     "assetId" -> Base58.encode(assetId),
-    "name" -> Base58.encode(name),
-    "description" -> Base58.encode(description),
+    "name" -> new String(name, Charsets.UTF_8),
+    "description" -> new String(description, Charsets.UTF_8),
     "quantity" -> quantity,
     "decimals" -> decimals,
     "reissuable" -> reissuable,

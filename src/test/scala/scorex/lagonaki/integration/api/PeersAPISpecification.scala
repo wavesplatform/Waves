@@ -7,6 +7,11 @@ class PeersAPISpecification extends FunSuite with TestLock with Matchers {
 
   import scorex.lagonaki.TestingCommons._
 
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    stopGeneration(applications)
+  }
+
   test("/peers/connected API route") {
     val connected = GET.request("/peers/connected")
     (connected \\ "address").toList.size should be >= 1

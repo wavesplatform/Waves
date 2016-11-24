@@ -10,13 +10,13 @@ import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets.{AssetIssuance, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
-import scorex.utils.{LogMVMapBuilder, ScorexLogging}
+import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
+import scala.concurrent.duration._
 
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
-import scala.util.{Failure, Success, Try}
-import scala.util.Try
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 import scorex.transaction.assets.exchange.OrderMatch
 
@@ -53,14 +53,14 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
   /**
     * Transaction ID -> serialized transaction
     */
-  val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
-    db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
+  private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
+  db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   /**
     * Transaction Signature -> reissuable flag
     */
   private val reissuableIndex: MVMap[Array[Byte], Boolean] =
-    db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
+  db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
@@ -163,7 +163,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     val fees: Map[AssetAcc, (AccState, Reason)] = block.consensusModule.feesDistribution(block)
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2), List(FeesStateChange(m._2))))
 
-    log.info(s"${block.timestampField.value} < ${settings.allowTemporaryNegativeUntil} = ${block.timestampField.value < settings.allowTemporaryNegativeUntil}")
+    log.debug(s"${block.timestampField.value} < ${settings.allowTemporaryNegativeUntil} = ${block.timestampField.value < settings.allowTemporaryNegativeUntil}")
     val newBalances: Map[AssetAcc, (AccState, Reason)] = calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
@@ -296,20 +296,33 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
   /**
     * Returns sequence of valid transactions
     */
-  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None): Seq[Transaction] = {
+  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
     val height = heightOpt.getOrElse(stateHeight)
 
     val txs = trans.filter(t => isValid(t, height))
+    val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
+    val validTransactions = if (allowInvalidPaymentTransactionsByTimestamp) {
+      txs
+    } else {
+      val invalidPaymentTransactionsByTimestamp = invalidatePaymentTransactionsByTimestamp(txs)
+      excludeTransactions(txs, invalidPaymentTransactionsByTimestamp)
+    }
 
-    val invalidByTimestamp = invalidateTransactionsByTimestamp(txs)
+    val allowTransactionsFromFutureByTimestamp = validTransactions.nonEmpty && validTransactions.map(_.timestamp).max < settings.allowTransactionsFromFutureUntil
+    val filteredFromFuture = if (allowTransactionsFromFutureByTimestamp) {
+      validTransactions
+    } else {
+      filterTransactionsFromFuture(validTransactions, blockTime)
+    }
 
-    val validByTimestampTransactions = excludeTransactions(txs, invalidByTimestamp)
+    val allowUnissuedAssets = filteredFromFuture.nonEmpty && txs.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
 
     def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
       val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
         case ((currentState, validTxs), tx) =>
           try {
-            val newState = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
+            val changes = if (allowUnissuedAssets) tx.balanceChanges() else tx.balanceChanges().sortBy(_.delta)
+            val newState = changes.foldLeft(currentState) { case (iChanges, bc) =>
               //update balances sheet
               def safeSum(first: Long, second: Long): Long = {
                 try {
@@ -322,7 +335,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
 
               val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
               val newBalance = safeSum(currentChange._1.balance, bc.delta)
-              if (newBalance >= 0) {
+              if (newBalance >= 0 || tx.timestamp < settings.allowTemporaryNegativeUntil) {
                 iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
               } else {
                 throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
@@ -337,13 +350,13 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
       validTxs
     }
 
-    filterValidTransactionsByState(validByTimestampTransactions)
+    filterValidTransactionsByState(filteredFromFuture)
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
     transactions.filter(t1 => !exclude.exists(t2 => t2.id sameElements t1.id))
 
-  private def invalidateTransactionsByTimestamp(transactions: Seq[Transaction]): Seq[Transaction] = {
+  private def invalidatePaymentTransactionsByTimestamp(transactions: Seq[Transaction]): Seq[Transaction] = {
     val paymentTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
       .map(_.asInstanceOf[PaymentTransaction])
 
@@ -370,9 +383,17 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     selection.foldLeft(List[Transaction]()) { (l, s) => l ++ s._2._1 }
   }
 
+  private def filterTransactionsFromFuture(transactions: Seq[Transaction], blockTime: Long): Seq[Transaction] = {
+    transactions.filter {
+      tx => (tx.timestamp - blockTime).millis <= SimpleTransactionModule.MaxTimeForUnconfirmed
+    }
+  }
+
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.validate == ValidationResult.ValidateOke && isTimestampCorrect(tx)
+      tx.validate == ValidationResult.ValidateOke && (
+        transaction.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp ||
+          transaction.timestamp >= settings.allowInvalidPaymentTransactionsByTimestamp && isTimestampCorrect(tx))
     case tx: TransferTransaction =>
       tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: IssueTransaction =>

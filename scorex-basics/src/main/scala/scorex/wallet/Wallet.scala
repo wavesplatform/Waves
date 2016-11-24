@@ -34,21 +34,8 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
       val SeedSize = 64
       lazy val randomSeed = randomBytes(SeedSize)
       lazy val encodedSeed = Base58.encode(randomSeed)
-      def readSeed(limit: Int = Attempts): Array[Byte] = {
-        println("Please type your wallet seed or type Enter to generate random one")
-        val typed = scala.io.StdIn.readLine()
-        if (typed == "") {
-          println(s"You random generated seed is $encodedSeed")
-          randomSeed
-        } else
-          Base58.decode(typed).getOrElse {
-            if (limit > 0) {
-              println("Wallet seed should be correct Base58 encoded string.")
-              readSeed(limit - 1)
-            } else throw new Error("Sorry you have made too many incorrect seed guesses")
-          }
-      }
-      readSeed()
+      println(s"You random generated seed is $encodedSeed")
+      randomSeed
     }
     seedPersistence.put("seed", seed)
   }

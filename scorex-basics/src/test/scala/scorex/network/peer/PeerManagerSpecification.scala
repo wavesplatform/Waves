@@ -57,7 +57,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
     def connect(address: InetSocketAddress, noneNonce: Long): Unit = {
       actorRef ! Connected(address, peerConnectionHandler.ref, None, inbound = true)
       peerConnectionHandler.expectMsgType[Handshake]
-      actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", noneNonce, Some(address), 0))
+      actorRef ! Handshaked(address, Handshake("test", ApplicationVersion(0, 0, 0), "", noneNonce, Some(address), 0))
     }
 
     def getConnectedPeers =
@@ -197,7 +197,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
         val handler = TestProbe("connection-handler-" + id)
         actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler.expectMsgType[Handshake]
-        actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
+        actorRef ! Handshaked(address, Handshake("test", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
         handler
       }
 
@@ -221,7 +221,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
         val handler = TestProbe("connection-handler-" + id)
         actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler.expectMsgType[Handshake]
-        actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", id, None, 0))
+        actorRef ! Handshaked(address, Handshake("test", ApplicationVersion(0, 0, 0), "", id, None, 0))
         handler
       }
 
@@ -270,7 +270,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       assert(result2.nonEmpty)
       val (a, h) = result2.head
       assert(a == anAddress)
-      assert(h.applicationName == "scorex")
+      assert(h.applicationName == "test")
     }
 
     "get random peers" in {
@@ -358,7 +358,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
         val handler = TestProbe()
         actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler.expectMsgType[Handshake]
-        actorRef ! Handshaked(address, Handshake("scorex", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
+        actorRef ! Handshaked(address, Handshake("test", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
         handler
       }
 

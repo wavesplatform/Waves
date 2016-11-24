@@ -8,6 +8,11 @@ class WalletAPISpecification extends FunSuite with TestLock with Matchers {
 
   import scorex.lagonaki.TestingCommons._
 
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    stopGeneration(applications)
+  }
+
   test("/wallet/ API route") {
     (GET.request("/wallet") \ "exists").as[Boolean] shouldBe true
   }

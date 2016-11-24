@@ -17,7 +17,7 @@
     "localOnly": true,
     "bindAddress": "127.0.0.1",
     "upnp": false,
-    "knownPeers": ["127.0.0.1:9088"],
+    "knownPeers": ["127.0.0.1:9088,127.0.0.1:9084"],
     "port": 9091,
     "maxConnections": 10,
     "peersDataBroadcastDelay": 900

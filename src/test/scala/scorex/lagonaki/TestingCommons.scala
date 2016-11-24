@@ -9,10 +9,11 @@ import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.api.http.ApiKeyNotValid
 import scorex.consensus.mining.BlockGeneratorController.{Idle, StartGeneration, StopGeneration}
-import scorex.lagonaki.server.LagonakiApplication
+import scorex.lagonaki.server.{LagonakiApplication, LagonakiSettings}
 import scorex.transaction.TransactionSettings
 import scorex.utils._
 import scorex.consensus.mining.BlockGeneratorController.GetBlockGenerationStatus
+import scorex.settings.Settings
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -39,6 +40,16 @@ trait TestingCommons {
   }
 }
 
+class TestSettings(override val settingsJSON: JsObject) extends LagonakiSettings(settingsJSON) {
+  override implicit lazy val genesisTimestamp: Long = System.currentTimeMillis() - 1000 * 60
+}
+
+class TestingApplication(settingsFilename: String) extends LagonakiApplication(settingsFilename) {
+
+  override implicit lazy val settings = new TestSettings(Settings.readSettingsJson(settingsFilename))
+
+}
+
 object TestingCommons {
 
   implicit val timeout = Timeout(1.second)
@@ -47,9 +58,9 @@ object TestingCommons {
 
   lazy val applications = {
     val apps = List(
-      new LagonakiApplication("settings-test.json"),
-      new LagonakiApplication("settings-local1.json"),
-      new LagonakiApplication("settings-local2.json")
+      new TestingApplication("settings-test.json"),
+      new TestingApplication("settings-local1.json"),
+      new TestingApplication("settings-local2.json")
     )
     apps.foreach(_.run())
     apps.foreach { a =>

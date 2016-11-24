@@ -61,7 +61,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case ShutdownNetwork =>
       val s = sender()
-      implicit val askTimeout = Timeout(10 seconds)
+      implicit val askTimeout = Timeout(10.seconds)
       Future.sequence(connectedPeers.values.map(_.handlerRef ? CloseConnection)).map(_ => Status.Success()).pipeTo(s)
 
   }: Receive) orElse blacklistOperations orElse peerListOperations orElse peerCycle
@@ -212,6 +212,11 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         sender() ! CloseConnection
 
       case Some(connection@PeerConnection(_, None, inbound)) =>
+        if (application.applicationName != handshake.applicationName &&
+          application.applicationName.dropRight(1) != handshake.applicationName) {
+          log.debug(s"Different application name: ${handshake.applicationName} from $address")
+          self ! AddToBlacklist(address)
+        } else
         if (settings.nodeNonce == handshake.nodeNonce) {
           log.info("Drop connection to self")
           connectedPeers.remove(address)

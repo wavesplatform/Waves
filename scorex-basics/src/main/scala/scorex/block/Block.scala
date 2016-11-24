@@ -85,11 +85,11 @@ trait Block extends ScorexLogging {
   def isValid: Boolean = {
     if (transactionModule.blockStorage.history.contains(this)) true //applied blocks are valid
     else {
-      lazy val history = transactionModule.blockStorage.history.contains(referenceField.value)
-      lazy val signature = EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
+      def history = transactionModule.blockStorage.history.contains(referenceField.value)
+      def signature = EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
         signerDataField.value.generator.publicKey)
-      lazy val consensus = consensusModule.isValid(this)
-      lazy val transaction = transactionModule.isValid(this)
+      def consensus = consensusModule.isValid(this)
+      def transaction = transactionModule.isValid(this)
 
       if (!history) log.debug(s"Invalid block $encodedId: no parent block in history")
       else if (!signature) log.debug(s"Invalid block $encodedId: signature is not valid")
@@ -215,8 +215,8 @@ object Block extends ScorexLogging {
     build(version, timestamp, reference, consensusData, transactionData, signer, signature)
   }
 
-  def genesis[CDT, TDT](timestamp: Long = 0L)(implicit consModule: ConsensusModule[CDT],
-                                              transModule: TransactionModule[TDT]): Block = new Block {
+  def genesis[CDT, TDT](timestamp: Long = 0L, signatureStringOpt: Option[String] = None)(implicit consModule: ConsensusModule[CDT],
+                                                                       transModule: TransactionModule[TDT]): Block = new Block {
     override type ConsensusDataType = CDT
     override type TransactionDataType = TDT
 
@@ -227,11 +227,32 @@ object Block extends ScorexLogging {
     override val transactionDataField: BlockField[TDT] = transactionModule.genesisData
     override val referenceField: BlockIdField = BlockIdField("reference", Array.fill(BlockIdLength)(-1: Byte))
     override val consensusDataField: BlockField[CDT] = consensusModule.genesisData
-    override val uniqueId: BlockId = Array.fill(BlockIdLength)(0: Byte)
 
     override val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
 
-    override val signerDataField: SignerDataBlockField = new SignerDataBlockField("signature",
-      SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array.fill(EllipticCurveImpl.SignatureLength)(0)))
+    override val signerDataField: SignerDataBlockField = {
+      val genesisSigner = new PrivateKeyAccount(Array.empty)
+
+      val txBytesSize = transactionDataField.bytes.length
+      val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionDataField.bytes
+      val cBytesSize = consensusDataField.bytes.length
+      val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ consensusDataField.bytes
+
+      val toSign = versionField.bytes ++
+        timestampField.bytes ++
+        referenceField.bytes ++
+        cBytes ++
+        txBytes ++
+        genesisSigner.publicKey
+
+      val signature = signatureStringOpt.map(Base58.decode(_).get)
+        .getOrElse(EllipticCurveImpl.sign(genesisSigner, toSign))
+
+      require(EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey), "Passed genesis signature is not valid")
+
+      SignerDataBlockField("signature", SignerData(genesisSigner, signature))
+    }
+
+    override val uniqueId: BlockId = signerDataField.value.signature
   }
 }

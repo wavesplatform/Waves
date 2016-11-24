@@ -8,6 +8,11 @@ class PaymentAPISpecification extends FunSuite with TestLock with Matchers with 
 
   import scorex.lagonaki.TestingCommons._
 
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    stopGeneration(applications)
+  }
+
   test("POST /payment API route") {
     POST.incorrectApiKeyTest("/payment")
     val s = accounts.head.address

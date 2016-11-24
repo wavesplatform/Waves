@@ -121,8 +121,12 @@ trait Settings extends ScorexLogging {
 
   lazy val genesisTimestamp: Long = (settingsJSON \ "genesisTimestamp").asOpt[Long].getOrElse(DefaultGenesisTimestamp)
 
+  lazy val genesisSignature: Option[String] = (settingsJSON \ "genesisSignature").asOpt[String]
+
   lazy val allowedGenerationTimeFromLastBlockInterval = (settingsJSON \ "allowedGenerationTimeFromLastBlockInterval").asOpt[Long]
     .map(x => FiniteDuration(x, MILLISECONDS)).getOrElse(DefaultAllowedGenerationTimeFromLastBlockInterval)
+
+  lazy val minerEnabled = (settingsJSON \ "minerEnabled").asOpt[Boolean].getOrElse(true)
 
   lazy val checkpointSettings = settingsJSON \ "checkpoints"
   lazy val checkpointPublicKey = (checkpointSettings \ "publicKey").asOpt[String].flatMap(Base58.decode(_).toOption)
@@ -133,19 +137,18 @@ trait Settings extends ScorexLogging {
   private val DefaultBindAddress = "127.0.0.1"
   lazy val AllowedConnectionsFromOneHost = 5
   lazy val UnrequestedPacketsThreshold = 100
-  private val DefaultAllowedGenerationTimeFromLastBlockInterval: FiniteDuration = 100.minutes
+  private val DefaultAllowedGenerationTimeFromLastBlockInterval: FiniteDuration = 1.day
 
 
   //API
   lazy val corsAllowed = (settingsJSON \ "cors").asOpt[Boolean].getOrElse(false)
+  lazy val rpcEnabled = (settingsJSON \ "rpcEnabled").asOpt[Boolean].getOrElse(true)
 
   private val DefaultRpcPort = 9085
   private val DefaultRpcAddress = "127.0.0.1"
-  private val DefaultRpcAllowed = "127.0.0.1"
 
   private val DefaultBlockGenerationDelay: FiniteDuration = 1.second
   private val DefaultHistorySynchronizerTimeout: FiniteDuration = 30.seconds
-  private val DefaultMiningThreads: Int = 1
 
   private val DefaultGenesisTimestamp: Long = 1460952000000L
 }

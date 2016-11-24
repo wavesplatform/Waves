@@ -147,7 +147,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   }
 
   private def getDeclaredUri: Option[URI] =
-    settings.declaredAddress.map(declaredAddress => new URI(s"http://$declaredAddress"))
+    settings.declaredAddress.flatMap(declaredAddress => Try(new URI(s"http://$declaredAddress")).toOption)
 
   private def getDeclaredHost: Option[String] = getDeclaredUri.map(_.getHost)
 

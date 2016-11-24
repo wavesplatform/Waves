@@ -15,6 +15,8 @@ class TransactionsAPISpecification extends FunSuite with TestLock with Matchers 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
 
+    stopGeneration(applications)
+
     if (application.wallet.privateKeyAccounts().size < 10) application.wallet.generateNewAccounts(10)
   }
 

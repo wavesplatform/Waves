@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class NxtLikeConsensusModule(config: WavesHardForkParameters, AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
+class NxtLikeConsensusModule(override val forksConfig: WavesHardForkParameters, AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
 with OneGeneratorConsensusModule with ScorexLogging {
 
   import NxtLikeConsensusModule._
@@ -29,8 +29,6 @@ with OneGeneratorConsensusModule with ScorexLogging {
   val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
   val InitialBaseTarget = MaxBaseTarget / 2
 
-  override val generatingBalanceDepth = 1000
-
   private def avgDelayInSeconds: Long = AvgDelay.toSeconds
 
   private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
@@ -42,12 +40,12 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     val history = transactionModule.blockStorage.history
 
-    if (block.timestampField.value > config.requireSortedTransactionsAfter) {
+    if (block.timestampField.value > forksConfig.requireSortedTransactionsAfter) {
       require(block.transactions.sorted(TransactionsOrdering) == block.transactions, "Transactions must be sorted correctly")
     }
 
     val parentOpt = history.parent(block)
-    require(parentOpt.isDefined, s"Can't find parent block with id '${Base58.encode(block.referenceField.value)}' of block " +
+    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${Base58.encode(block.referenceField.value)}' of block " +
       s"'${Base58.encode(block.uniqueId)}'")
 
     val parent = parentOpt.get
@@ -71,9 +69,14 @@ with OneGeneratorConsensusModule with ScorexLogging {
     require(calcGs.sameElements(blockGs),
       s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
 
+    val effectiveBalance = generatingBalance(generator, Some(parentHeight))
+
+    if (block.timestampField.value >= forksConfig.minimalGeneratingBalanceAfterTimestamp) {
+      require(effectiveBalance >= MinimalEffictiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffictiveBalanceForGenerator)")
+    }
+
     //check hit < target
-    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, generatingBalance(generator, Some(
-      parentHeight)))
+    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance)
   } catch {
     case e: IllegalArgumentException =>
       log.error("Error while checking a block", e)
@@ -92,6 +95,10 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
     val height = history.heightOf(lastBlock).get
     val balance = generatingBalance(account, Some(height))
+
+    if (balance < MinimalEffictiveBalanceForGenerator) {
+      throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffictiveBalanceForGenerator)")
+    }
 
     val lastBlockKernelData = consensusBlockData(lastBlock)
 
@@ -135,6 +142,9 @@ with OneGeneratorConsensusModule with ScorexLogging {
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
+      None
+    case e: IllegalStateException =>
+      log.warn(s"Failed to generate new block: ${e.getMessage}")
       None
   }
 
@@ -247,6 +257,8 @@ with OneGeneratorConsensusModule with ScorexLogging {
 object NxtLikeConsensusModule {
   val BaseTargetLength = 8
   val GeneratorSignatureLength = 32
+  // 10000 waves
+  val MinimalEffictiveBalanceForGenerator = 1000000000000L
 
   val AvgBlockTimeDepth: Int = 3
   val MaxTimeDrift = 15.seconds

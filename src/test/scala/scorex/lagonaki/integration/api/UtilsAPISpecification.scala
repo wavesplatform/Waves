@@ -12,6 +12,11 @@ class UtilsAPISpecification extends FunSuite with TestLock with Matchers {
 
   import scorex.lagonaki.TestingCommons._
 
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    stopGeneration(applications)
+  }
+
   test("/utils/hash/secure API route does't require api key") {
     val msg = "test"
     val resp = POST.request("/utils/hash/secure", body = msg, headers = Map("api_key" -> "wrong key"))

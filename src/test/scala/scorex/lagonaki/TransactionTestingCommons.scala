@@ -51,7 +51,7 @@ trait TransactionTestingCommons extends TestingCommons {
       else senderBalance - fee
       val recepient = recepientOpt.getOrElse(randomFrom(accounts))
       val tx = application.transactionModule.createPayment(senderAcc, recepient, amt, fee)
-      if (application.transactionModule.blockStorage.state.isValid(tx)) tx
+      if (application.transactionModule.blockStorage.state.isValid(tx, tx.timestamp)) tx
       else genValidTransaction(randomAmnt, recepientOpt, senderOpt)
     }
   }

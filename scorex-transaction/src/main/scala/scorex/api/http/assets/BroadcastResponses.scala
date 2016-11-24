@@ -1,5 +1,6 @@
 package scorex.api.http.assets
 
+import com.google.common.base.Charsets
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Writes}
@@ -40,8 +41,8 @@ object BroadcastResponses {
       Base58.encode(tx.id),
       Base58.encode(tx.assetId),
       Base58.encode(tx.sender.publicKey),
-      Base58.encode(tx.name),
-      Base58.encode(tx.description),
+      new String(tx.name, Charsets.UTF_8),
+      new String(tx.description, Charsets.UTF_8),
       tx.quantity, tx.decimals, tx.reissuable, tx.fee, tx.timestamp,
       Base58.encode(tx.signature)
     )

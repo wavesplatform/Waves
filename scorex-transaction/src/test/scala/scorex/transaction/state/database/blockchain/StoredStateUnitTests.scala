@@ -21,13 +21,29 @@ import scorex.transaction.assets.exchange.{Order, OrderMatch, OrderType}
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging {
 
+  val forkParametersWithEnableUnissuedAssetsCheck = new AnyRef with WavesHardForkParameters {
+    override def allowTemporaryNegativeUntil: Long = 0L
+
+    override def requireSortedTransactionsAfter: Long = Long.MaxValue
+
+    override def allowInvalidPaymentTransactionsByTimestamp: Long = Long.MaxValue
+
+    override def generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MaxValue
+
+    override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
+
+    override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
+
+    override def allowUnissuedAssetsUntil: Long = 0L
+  }
+
   val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"
   new File(folder).mkdirs()
   val stateFile = folder + "state.dat"
   new File(stateFile).delete()
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
-  val state = new StoredState(db, WavesHardForkParameters.Disabled)
+  val state = new StoredState(db, forkParametersWithEnableUnissuedAssetsCheck)
   val testAcc = new PrivateKeyAccount(scorex.utils.randomBytes(64))
   val testAssetAcc = AssetAcc(testAcc, None)
   val testAdd = testAcc.address
@@ -42,9 +58,9 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     state.balance(testAcc) shouldBe InitialBalance
 
     val transfers = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
-    transfers.foreach(tx => state.isValid(tx) shouldBe true)
+    transfers.foreach(tx => state.isValid(tx, tx.timestamp) shouldBe true)
 
-    state.isValid(transfers) shouldBe false
+    state.isValid(transfers, blockTime = transfers.map(_.timestamp).max) shouldBe false
 
     state.applyChanges(Map(testAssetAcc -> (AccState(0L), List())))
   }
@@ -56,11 +72,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     val transferTx = genTransfer(Long.MaxValue, Long.MaxValue)
     (-transferTx.fee - transferTx.amount) should be > 0L
-    state.isValid(transferTx) shouldBe false
+    state.isValid(transferTx, transferTx.timestamp) shouldBe false
 
     val paymentTx = genTransfer(Long.MaxValue, Long.MaxValue)
     (-paymentTx.fee - paymentTx.amount) should be > 0L
-    state.isValid(paymentTx) shouldBe false
+    state.isValid(paymentTx, paymentTx.timestamp) shouldBe false
 
     state.applyChanges(Map(testAssetAcc -> (AccState(0L), List())))
 
@@ -105,14 +121,26 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         //valid transfer
         val tx = TransferTransaction.create(None, testAcc, recipient, balance - fee, System.currentTimeMillis(),
           None, fee, Array())
-        state.isValid(tx) shouldBe true
+        state.isValid(tx, tx.timestamp) shouldBe true
 
         //transfer asset
+        state.balance(testAcc) shouldBe balance
         val invalidtx = TransferTransaction.create(None, testAcc, recipient, balance, System.currentTimeMillis(),
           None, fee, Array())
-        state.isValid(invalidtx) shouldBe false
+        state.isValid(invalidtx, invalidtx.timestamp) shouldBe false
 
         state.applyChanges(Map(testAssetAcc -> (AccState(0L), List(tx))))
+      }
+    }
+  }
+
+  property("Transfer unissued asset to yourself is not allowed") {
+    withRollbackTest {
+      forAll(selfTransferGenerator suchThat (t => t.assetId.isDefined && t.feeAsset.isEmpty)) { tx: TransferTransaction =>
+        val senderAccount = AssetAcc(tx.sender, None)
+        val txFee = tx.fee
+        state.applyChanges(Map(senderAccount -> (AccState(txFee), List(FeesStateChange(txFee)))))
+        state.isValid(Seq(tx), None, System.currentTimeMillis()) shouldBe false
       }
     }
   }
@@ -274,15 +302,41 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
+  property("Validate payment transactions to yourself") {
+    forAll(selfPaymentGenerator) { (tx: PaymentTransaction) =>
+      withRollbackTest {
+        val account = tx.sender
+        val assetAccount = AssetAcc(account, None)
+        state.balance(account) shouldBe 0
+        state.assetBalance(assetAccount) shouldBe 0
+        val balance = tx.fee
+        state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance), Seq(FeesStateChange(balance)))))
+        state.balance(account) shouldBe balance
+        state.isValid(tx, System.currentTimeMillis) should be(false)
+      }
+    }
+  }
+
+  property("Validate transfer transactions to yourself") {
+    forAll(selfTransferGenerator) { (tx: TransferTransaction) =>
+      withRollbackTest {
+        val account = tx.sender
+        val assetAccount = AssetAcc(account, tx.feeAsset)
+        state.balance(account) shouldBe 0
+        state.assetBalance(assetAccount) shouldBe 0
+        val balance = tx.fee
+        state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance), Seq(FeesStateChange(balance)))))
+        state.assetBalance(assetAccount) shouldBe balance
+        state.isValid(tx, System.currentTimeMillis) should be(false)
+      }
+    }
+  }
+
   property("Reopen state") {
     val balance = 1234L
     state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance)))))
     state.balance(testAcc) shouldBe balance
     db.close()
-
-    val state2 = new StoredState(new MVStore.Builder().fileName(stateFile).compress().open(), WavesHardForkParameters.Disabled)
-    state2.balance(testAcc) shouldBe balance
-    state2 invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq())))
   }
 
   private var txTime: Long = 0

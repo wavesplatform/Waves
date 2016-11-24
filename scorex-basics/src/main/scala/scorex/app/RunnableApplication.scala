@@ -73,8 +73,12 @@ trait RunnableApplication extends Application with ScorexLogging {
 
     implicit val materializer = ActorMaterializer()
 
-    val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
-    Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
+    if (settings.rpcEnabled) {
+      val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
+      Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort).map(
+        _ => log.info(s"RPC was binded on ${settings.rpcAddress}:${settings.rpcPort}")
+      )
+    }
 
     Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator) foreach {
       _ => // de-lazyning process :-)
@@ -104,13 +108,13 @@ trait RunnableApplication extends Application with ScorexLogging {
   private def stopNetwork(): Unit = synchronized {
     log.info("Stopping network services")
     if (settings.upnpEnabled) upnp.deletePort(settings.port)
-    implicit val askTimeout = Timeout(10 seconds)
-    Await.result(networkController ? NetworkController.ShutdownNetwork, 10 seconds)
+    implicit val askTimeout = Timeout(10.seconds)
+    Await.result(networkController ? NetworkController.ShutdownNetwork, 10.seconds)
   }
 
   private def checkGenesis(): Unit = {
     if (transactionModule.blockStorage.history.isEmpty) {
-      transactionModule.blockStorage.appendBlock(Block.genesis(settings.genesisTimestamp))
+      transactionModule.blockStorage.appendBlock(Block.genesis(settings.genesisTimestamp, settings.genesisSignature))
       log.info("Genesis block has been added to the state")
     }
   }.ensuring(transactionModule.blockStorage.history.height() >= 1)

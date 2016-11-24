@@ -56,7 +56,7 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   }
 
   @Path("/hash/secure")
-  @ApiOperation(value = "Hash", notes = "Return FastCryptographicHash of specified message", httpMethod = "POST")
+  @ApiOperation(value = "Hash", notes = "Return SecureCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "string")
   ))
@@ -75,7 +75,7 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   }
 
   @Path("/hash/fast")
-  @ApiOperation(value = "Hash", notes = "Return  SecureCryptographicHash of specified message", httpMethod = "POST")
+  @ApiOperation(value = "Hash", notes = "Return FastCryptographicHash of specified message", httpMethod = "POST")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "string")
   ))

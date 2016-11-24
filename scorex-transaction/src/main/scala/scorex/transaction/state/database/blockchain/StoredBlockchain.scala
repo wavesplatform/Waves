@@ -1,17 +1,19 @@
 package scorex.transaction.state.database.blockchain
 
+import com.google.common.cache.{CacheBuilder, CacheLoader}
+import com.google.common.util.concurrent.UncheckedExecutionException
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
+import scorex.network.Checkpoint
 import scorex.transaction.BlockStorage._
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.{BlockChain, TransactionModule}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
+
 import scala.collection.JavaConversions._
-import scala.collection.concurrent.TrieMap
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -28,9 +30,22 @@ class StoredBlockchain(db: MVStore)
     val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]])
     val signatures: MVMap[Int, BlockId] = database.openMap("signatures", new LogMVMapBuilder[Int, BlockId])
     val signaturesReverse: MVMap[BlockId, Int] = database.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int])
+
     private val BlocksCacheSizeLimit: Int = 1000
-    private var blocksCacheSize: Int = 0
-    private val blocksCache: TrieMap[Int, Option[Block]] = TrieMap.empty
+    private val blocksCache = CacheBuilder.newBuilder()
+      .maximumSize(BlocksCacheSizeLimit)
+      .build[Integer, Block](
+        new CacheLoader[Integer, Block]() {
+          def load(height: Integer): Block = {
+            val blockOpt = Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).recoverWith {
+              case t: Throwable =>
+                log.error("Block.parseBytes error", t)
+                Failure(t)
+            }.toOption)
+            blockOpt.get
+          }
+        })
+    val checkpoint: MVMap[Int, Checkpoint] = database.openMap("checkpoint", new LogMVMapBuilder[Int, Checkpoint])
 
     //TODO: remove when no blockchains without signaturesReverse remains
     if (signaturesReverse.size() != signatures.size()) {
@@ -53,22 +68,17 @@ class StoredBlockchain(db: MVStore)
     }
 
     def readBlock(height: Int): Option[Block] = {
-      if (blocksCacheSize > BlocksCacheSizeLimit) {
-        blocksCacheSize = 0
-        blocksCache.clear()
-      } else {
-        blocksCacheSize = blocksCacheSize + 1
+      try {
+        Some(blocksCache.get(height))
+      } catch {
+        case e: UncheckedExecutionException =>
+          log.debug(s"There are no block at $height")
+          None
       }
-      blocksCache.getOrElseUpdate(height,
-        Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).recoverWith {
-          case t: Throwable =>
-            log.error("Block.parseBytes error", t)
-            Failure(t)
-        }.toOption))
     }
 
     def deleteBlock(height: Int): Unit = {
-      blocksCache.remove(height)
+      blocksCache.invalidate(height)
       blocks.remove(height)
       val vOpt = Option(signatures.remove(height))
       vOpt.map(v => signaturesReverse.remove(v))
@@ -143,4 +153,11 @@ class StoredBlockchain(db: MVStore)
     val bl = blockAt(h).get
     s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString }"
   }).mkString("\n")
+
+  override def getCheckpoint: Option[Checkpoint] = Option(blockStorage.checkpoint.get(0))
+
+  override def setCheckpoint(c: Option[Checkpoint]): Unit = {
+    if (c.isDefined) blockStorage.checkpoint.put(0, c.get)
+    else blockStorage.checkpoint.remove(0)
+  }
 }

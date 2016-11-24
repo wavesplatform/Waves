@@ -11,9 +11,11 @@ import play.api.libs.functional.syntax._
 import scala.collection.immutable.Stream
 import scala.util.{Failure, Success}
 
+@SerialVersionUID(-4750343171084108636L)
 case class BlockCheckpoint(height: Int,
                            @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
 
+@SerialVersionUID(-3551519894804767122L)
 case class Checkpoint(items: Seq[BlockCheckpoint],
                       @ApiModelProperty(dataType = "java.lang.String")signature: Array[Byte]) {
   def toSign: Array[Byte] = {
