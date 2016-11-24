@@ -194,8 +194,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
               (matcher ? order)
                 .mapTo[OrderResponse]
                 .map { resp =>
-                  JsonResponse(resp.json,
-                    if (resp.isInstanceOf[OrderAccepted]) StatusCodes.OK else StatusCodes.BadRequest)
+                  JsonResponse(resp.json, if (resp.succeeded) StatusCodes.OK else StatusCodes.BadRequest)
                 }
               /*if (validation.validate()) {
                 (matcher ? order)

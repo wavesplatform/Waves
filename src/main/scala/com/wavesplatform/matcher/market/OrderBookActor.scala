@@ -3,17 +3,20 @@ package com.wavesplatform.matcher.market
 import java.util.Comparator
 
 import akka.actor.{ActorRef, Props}
-import akka.persistence.{PersistentActor, RecoveryCompleted}
+import akka.persistence._
+import com.twitter.storehaus.cache.TTLCache
 import com.wavesplatform.matcher.api.OrderService
 import com.wavesplatform.matcher.market.MatcherActor.{OrderAccepted, OrderRejected}
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.{LevelAgg, OrderBook, OrderItem}
+import com.wavesplatform.matcher.model.{LevelAgg, OrderBook, OrderHistory, OrderItem}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.duration._
 import scala.annotation.tailrec
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object OrderBookActor {
   def props(assetPair: AssetPair, orderMatchedActor: ActorRef, storedState: StoredState): Props =
@@ -21,17 +24,26 @@ object OrderBookActor {
   def name(assetPair: AssetPair): String = assetPair.first.map(Base58.encode).getOrElse("WAVES") + "-" +
     assetPair.second.map(Base58.encode).getOrElse("WAVES")
 
-  //protocol
   val MaxDepth = 50
+  val SnapshotDuration = 1.minutes
+
+  //protocol
   case object GetOrdersRequest
   case class GetOrderBookRequest(pair: AssetPair, depth: Int = MaxDepth)
   case object GetBidOrdersRequest
   case object GetAskOrdersRequest
   case class GetOrdersResponse(orders: Seq[OrderItem])
   case class GetOrderBookResponse(bids: Seq[LevelAgg], asks: Seq[LevelAgg])
+  case object SaveSnapshot
+  case class GetOrdersStatus(id: String)
+  case class GetOrdersStatusResponse(id: String)
+
 
   // events
   sealed trait OrderEvent
+
+  @SerialVersionUID(-5350485695558994597L)
+  case class Snapshot(asks: OrderBook, bids: OrderBook, history: TTLCache[String, Long])
 
   @SerialVersionUID(-3697114578758882607L)
   case class OrderAdded(order: OrderItem) extends OrderEvent
@@ -48,13 +60,15 @@ case object AskComparator extends Comparator[Long] {
 
 class OrderBookActor(assetPair: AssetPair, orderMatchedActor: ActorRef, val storedState: StoredState)
   extends PersistentActor
-  with ScorexLogging with OrderService {
+  with ScorexLogging with OrderService with OrderHistory {
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
-  private val asks = new OrderBook(assetPair, AskComparator)
-  private val bids = new OrderBook(assetPair, BidComparator)
+  private var asks = new OrderBook(assetPair, AskComparator)
+  private var bids = new OrderBook(assetPair, BidComparator)
 
   private var restoreState = true
+
+  context.system.scheduler.schedule(SnapshotDuration, SnapshotDuration, self, SaveSnapshot)
 
   override def receiveCommand: Receive = {
     case order:Order =>
@@ -67,6 +81,13 @@ class OrderBookActor(assetPair: AssetPair, orderMatchedActor: ActorRef, val stor
       sender() ! GetOrdersResponse(bids.flattenOrders)
     case GetOrderBookRequest(pair, depth) =>
       getOrderBook(pair, depth)
+    case SaveSnapshot =>
+        deleteSnapshots(SnapshotSelectionCriteria.Latest)
+        saveSnapshot(Snapshot(asks, bids, ordersRemainingAmount))
+    case SaveSnapshotSuccess(metadata) =>
+      log.info(s"Snapshot saved with metadata $metadata")
+    case SaveSnapshotFailure(metadata, reason) =>
+      log.error(s"Failed to save snapshot: $metadata, $reason.")
   }
 
   def getOrderBook(pair: AssetPair, depth: Int): Unit = {
@@ -79,6 +100,10 @@ class OrderBookActor(assetPair: AssetPair, orderMatchedActor: ActorRef, val stor
   override def receiveRecover: Receive = {
     case evt: OrderEvent => log.info("Event: {}", evt); applyEvent(evt)
     case RecoveryCompleted => log.info("Recovery completed!"); restoreState = false
+    case SnapshotOffer(metadata, snapshot: Snapshot) =>
+      log.info(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")
+      asks = snapshot.asks
+      bids = snapshot.bids
   }
 
   def handleAddOrder(order: Order): Unit = {

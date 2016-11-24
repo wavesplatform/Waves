@@ -16,5 +16,11 @@ case class OrderItem(price: Long, amount: Long, order: Order) {
 }
 
 object OrderItem {
+  sealed trait OrderStatus
+  case object Accepted extends OrderStatus
+  case object NotFound extends OrderStatus
+  case class PartiallyFilled(remainingAmount: Long) extends OrderStatus
+  case object Filled extends OrderStatus
+
   def apply(o: Order): OrderItem = new OrderItem(o.price, o.amount, o)
 }

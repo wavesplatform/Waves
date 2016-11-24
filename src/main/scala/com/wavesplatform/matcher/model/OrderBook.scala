@@ -7,7 +7,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.collection.JavaConversions._
 
-class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) {
+class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) extends Serializable{
   val priceOrders: util.TreeMap[Long, Level] = new util.TreeMap[Long, Level](comparator)
   val ordersRemainingAmount = Map.empty[String, Long]
 

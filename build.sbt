@@ -33,7 +33,8 @@ lazy val addAkkaLibs = Seq(
   "com.typesafe.akka" %% "akka-http-testkit" % akkaV,
   "org.iq80.leveldb"            % "leveldb"          % "0.7",
   "org.fusesource.leveldbjni"   % "leveldbjni-all"   % "1.8",
-  "com.github.romix.akka" %% "akka-kryo-serialization" % "0.4.1"
+  "com.github.romix.akka" %% "akka-kryo-serialization" % "0.4.1",
+  "com.twitter" %% "storehaus-cache_2.11" %  "0.13.0"
 )
 
 libraryDependencies ++= addAkkaLibs

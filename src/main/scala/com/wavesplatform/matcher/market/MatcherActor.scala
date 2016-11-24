@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, Props}
 import akka.persistence.PersistentActor
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.market.OrderBookActor.GetOrderBookRequest
+import com.wavesplatform.matcher.model.OrderItem
 import play.api.libs.json.{JsValue, Json}
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.state.database.blockchain.StoredState
@@ -16,15 +17,24 @@ object MatcherActor {
 
   sealed trait OrderResponse {
     val json: JsValue
+    val succeeded: Boolean
   }
   case class OrderAccepted(order: Order) extends OrderResponse {
     val json = order.json
+    val succeeded = true
   }
   case class OrderRejected(message: String) extends OrderResponse {
     val json = Json.obj("error" -> "OrderRejected", "message" -> message)
+    val succeeded = true
   }
   case object OrderCanceled extends OrderResponse {
     val json = Json.toJson("Order Canceled")
+    val succeeded = true
+  }
+
+  case class OrderStatus(status: OrderItem.OrderStatus) extends OrderResponse {
+    val json = Json.obj("status" -> "OrderRejected", "message" -> status.toString)
+    val succeeded: Boolean = true
   }
 
   case class OrderBookCreated(pair: AssetPair)
