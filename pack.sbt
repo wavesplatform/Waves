@@ -11,7 +11,7 @@ addCommandAlias("packageAll", "; clean " +
 
 val network = Option(System.getProperty("network")).getOrElse("mainnet")
 
-// see https://github.com/muuki88/sbt-native-packager-examples/blob/master/multiple-package-outputs/build.sbt
+// see https://github.com/muuki88/sbt-native-packager-examples/blob/master/multiple-package-outputs/build.sbt and https://github.com/muuki88/sbt-native-packager-examples/blob/master/multi-module-build/build.sbt
 lazy val packageDebianUpstart = taskKey[File]("creates deb with upstart loader")
 lazy val packageDebianSystemd = taskKey[File]("creates deb with systemd loader")
 lazy val packageJar = taskKey[File]("creates fat jar")
