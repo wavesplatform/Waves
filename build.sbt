@@ -10,6 +10,8 @@ version in ThisBuild := appConf.getString("version")
 
 scalaVersion in ThisBuild := "2.11.8"
 
+scalacOptions in ThisBuild += "-target:jvm-1.8"
+
 resolvers += "SonaType" at "https://oss.sonatype.org/content/groups/public"
 
 val scorexVersion = "1.4.4"
