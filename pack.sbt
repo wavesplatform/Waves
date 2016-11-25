@@ -93,6 +93,8 @@ val debianSettings = Seq(
          |ln -s /etc/${packageName.value}.json /usr/share/${packageName.value}/settings.json &&
          |chmod -R 750 /home/${packageName.value} &&
          |chmod -R 750 /usr/share/${packageName.value} &&
+         |chmod -R 750 /etc/${packageName.value} &&
+         |chmod 750 /etc/${packageName.value}.json &&
          |chown -R ${packageName.value}:${packageName.value} /usr/share/${packageName.value} &&
          |chown -R ${packageName.value}:${packageName.value} /home/${packageName.value}""".stripMargin),
   debianPackageDependencies in Debian += "java8-runtime-headless",
@@ -105,7 +107,7 @@ val debianSettings = Seq(
       throw new IllegalStateException("invalid network")
     }
   },
-  bashScriptExtraDefines += """addApp "/etc/${packageName.value}.json"""",
+  bashScriptExtraDefines += s"""addApp "/etc/${packageName.value}.json"""",
   mappings in Universal ++= contentOf((baseDirectory in root).value / "src" / "main" / "resources").map(to => (to._1, "conf/" + to._2)),
   serviceAutostart in Debian := false,
   executableScriptName := packageName.value
