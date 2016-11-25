@@ -33,7 +33,8 @@ trait MatcherApplication extends ScorexLogging {
     typeOf[MatcherApiRoute]
   )
 
-  lazy val matcher = actorSystem.actorOf(MatcherActor.props(orderMatchedActor, storedState), MatcherActor.name)
+  lazy val matcher = actorSystem.actorOf(MatcherActor.props(orderMatchedActor, storedState, wallet, settings,
+    transactionModule), MatcherActor.name)
   lazy val orderMatchedActor = actorSystem.actorOf(
     OrderMatchedActor.props(transactionModule, settings, storedState, wallet), OrderMatchedActor.name)
 

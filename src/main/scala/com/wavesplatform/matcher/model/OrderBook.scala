@@ -9,7 +9,6 @@ import scala.collection.JavaConversions._
 
 class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) extends Serializable{
   val priceOrders: util.TreeMap[Long, Level] = new util.TreeMap[Long, Level](comparator)
-  val ordersRemainingAmount = Map.empty[String, Long]
 
   def getBestOrders: Option[Level] = {
     if (priceOrders.isEmpty) {
@@ -24,7 +23,7 @@ class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) exte
     priceOrders.put(order.price, prevLevel.copy(orders = prevLevel.orders :+ order))
   }
 
-  def doMatching(order: OrderItem, n: Int = 1): (Seq[OrderItem], Long) = {
+  def runMatching(order: OrderItem, n: Int = 1): (Seq[OrderItem], Long) = {
     val bestOrders = priceOrders.keys.take(n)
     if (bestOrders.size == n) {
       val bestLevel = priceOrders.get(bestOrders.last)
@@ -32,7 +31,7 @@ class OrderBook(val assetPair: AssetPair, val comparator: Comparator[Long]) exte
         val (executed, remaining) = bestLevel.execute(order)
 
         if (remaining > 0) {
-          val (remainingExecuted, nextRemaining) = doMatching(order.copy(amount = remaining), n + 1)
+          val (remainingExecuted, nextRemaining) = runMatching(order.copy(amount = remaining), n + 1)
           (executed ++ remainingExecuted, nextRemaining)
         } else (executed, remaining)
       } else (Seq.empty, order.amount)

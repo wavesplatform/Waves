@@ -13,6 +13,8 @@ case class OrderItem(price: Long, amount: Long, order: Order) {
     if (order.orderType == OrderType.BUY) amount
     else (BigInt(amount) * Order.PriceConstant / price).longValue()
   }
+
+  def feeAmount(): Long = (BigInt(amount) * order.matcherFee  / order.amount).toLong
 }
 
 object OrderItem {

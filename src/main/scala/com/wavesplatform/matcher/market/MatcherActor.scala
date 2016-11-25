@@ -5,15 +5,21 @@ import akka.persistence.PersistentActor
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.market.OrderBookActor.GetOrderBookRequest
 import com.wavesplatform.matcher.model.OrderItem
+import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsValue, Json}
+import scorex.transaction.SimpleTransactionModule._
+import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
+import scorex.wallet.Wallet
+import scorex.waves.transaction.WavesTransactionModule
 
 object MatcherActor {
   def name = "matcher"
-  def props(orderMatchedActor: ActorRef, storedState: StoredState): Props =
-    Props(new MatcherActor(orderMatchedActor, storedState))
+  def props(orderMatchedActor: ActorRef, storedState: StoredState,
+            wallet: Wallet, settings: WavesSettings, transactionModule: TransactionModule[StoredInBlock]): Props =
+    Props(new MatcherActor(orderMatchedActor, storedState, wallet, settings, transactionModule))
 
   sealed trait OrderResponse {
     val json: JsValue
@@ -40,9 +46,12 @@ object MatcherActor {
   case class OrderBookCreated(pair: AssetPair)
 }
 
-class MatcherActor(orderMatchedActor: ActorRef, storedState: StoredState) extends PersistentActor with ScorexLogging {
+class MatcherActor(orderMatchedActor: ActorRef, storedState: StoredState,
+                   wallet: Wallet, settings: WavesSettings, transactionModule: TransactionModule[StoredInBlock]
+                  ) extends PersistentActor with ScorexLogging {
   def createOrderBook(pair: AssetPair) =
-    context.actorOf(OrderBookActor.props(pair, orderMatchedActor, storedState), OrderBookActor.name(pair))
+    context.actorOf(OrderBookActor.props(pair, orderMatchedActor, storedState, wallet, settings, transactionModule),
+      OrderBookActor.name(pair))
 
   def createAndForward(pair: AssetPair, req: Any) = {
     val orderBook = createOrderBook(pair)

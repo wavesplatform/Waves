@@ -9,14 +9,19 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.OrderAccepted
 import com.wavesplatform.matcher.market.OrderBookActor.{GetAskOrdersRequest, GetBidOrdersRequest, GetOrdersRequest, GetOrdersResponse}
 import com.wavesplatform.matcher.model.OrderItem
+import com.wavesplatform.settings.WavesSettings
 import org.h2.mvstore.MVStore
-import org.scalamock.scalatest.MockFactory
+import org.scalamock.scalatest.{MockFactory, PathMockFactory}
 import org.scalatest._
+import play.api.libs.json.{JsObject, JsString}
+import scorex.crypto.encode.Base58
 import scorex.settings.WavesHardForkParameters
-import scorex.transaction.AssetAcc
+import scorex.transaction.SimpleTransactionModule._
+import scorex.transaction.{AssetAcc, Transaction, TransactionModule}
 import scorex.transaction.assets.exchange.AssetPair
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
+import scorex.wallet.Wallet
 
 class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     with WordSpecLike
@@ -26,7 +31,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     with MatcherTestData
     with BeforeAndAfterEach
     with ScorexLogging
-    with MockFactory {
+    with PathMockFactory {
 
     override def afterAll: Unit = {
       TestKit.shutdownActorSystem(system)
@@ -40,7 +45,15 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
     }
 
-    var actor = system.actorOf(Props(new OrderBookActor(pair, orderMatchedActor.ref, storedState) with RestartableActor))
+    val settings = new WavesSettings(JsObject(Seq(
+      "matcher" -> JsObject(
+        Seq("account" -> JsString(MatcherAccount.address))
+      )
+    )))
+    val wallet = new Wallet(None, "matcher", Option(WalletSeed))
+    wallet.generateNewAccount()
+    var actor = system.actorOf(Props(new OrderBookActor(pair, orderMatchedActor.ref, storedState,
+      wallet, settings, stub[TransactionModule[StoredInBlock]]) with RestartableActor))
 
 
   override protected def beforeEach() = {
@@ -51,7 +64,11 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       tp.expectMsg(akka.actor.Status.Success(""))
       super.beforeEach()
 
-      actor = system.actorOf(Props(new OrderBookActor(pair, orderMatchedActor.ref, storedState) with RestartableActor))
+      val transactionModule = stub[TransactionModule[StoredInBlock]]
+      (transactionModule.isValid(_: Transaction, _: Long)).when(*, *).returns(true).anyNumberOfTimes()
+
+      actor = system.actorOf(Props(new OrderBookActor(pair, orderMatchedActor.ref, storedState,
+        wallet, settings, transactionModule) with RestartableActor))
     }
 
     "OrderBookActror" should {

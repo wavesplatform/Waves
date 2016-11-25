@@ -1,13 +1,18 @@
 package com.wavesplatform.matcher
 
+import com.google.common.primitives.{Bytes, Ints}
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.{ByteArray, NTP}
 
 trait MatcherTestData  {
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray)
+  val WalletSeed = "Matcher".getBytes
+  val MatcherSeed =  SecureCryptographicHash(Bytes.concat(Ints.toByteArray(0), WalletSeed))
+  val MatcherAccount = new PrivateKeyAccount(MatcherSeed)
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue)
 
@@ -33,18 +38,16 @@ trait MatcherTestData  {
   def buyGenerator(pair: AssetPair, price: Int, amount: Long): Gen[(Order, PrivateKeyAccount)] =
     for {
       sender: PrivateKeyAccount <- accountGen
-      matcher: PrivateKeyAccount <- accountGen
       maxtTime: Long <- maxTimeGen
       matcherFee: Long <- maxWavesAnountGen
-    } yield (Order.buy(sender, matcher, pair, price, amount, maxtTime, matcherFee), sender)
+    } yield (Order.buy(sender, MatcherAccount, pair, price, amount, maxtTime, matcherFee), sender)
 
   def sellGenerator(pair: AssetPair, price: Int, amount: Long): Gen[(Order, PrivateKeyAccount)] =
     for {
       sender: PrivateKeyAccount <- accountGen
-      matcher: PrivateKeyAccount <- accountGen
       maxtTime: Long <- maxTimeGen
       matcherFee: Long <- maxWavesAnountGen
-    } yield (Order.sell(sender, matcher, pair, price, amount, maxtTime, matcherFee), sender)
+    } yield (Order.sell(sender, MatcherAccount, pair, price, amount, maxtTime, matcherFee), sender)
 
   def buy(pair: AssetPair, price: Int, amount: Long): Order = valueFromGen(buyGenerator(pair, price, amount))._1
 
@@ -52,13 +55,12 @@ trait MatcherTestData  {
 
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
-    matcher: PrivateKeyAccount <- accountGen
     spendAssetID: Option[AssetId] <- assetIdGen
     receiveAssetID: Option[AssetId] <- assetIdGen
     price: Long <- maxWavesAnountGen
     amount: Long <- maxWavesAnountGen
     maxtTime: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
-  } yield (Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee), sender)
+  } yield (Order(sender, MatcherAccount, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee), sender)
 
 }
