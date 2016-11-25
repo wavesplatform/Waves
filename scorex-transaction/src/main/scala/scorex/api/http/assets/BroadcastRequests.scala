@@ -103,7 +103,7 @@ object BroadcastRequests {
         timestamp,
         feeAssetId.map(_.getBytes),
         fee,
-        attachment.map(Base58.decode(_).get).getOrElse(new Array[Byte](0)),
+        attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
         Base58.decode(signature).get)
     }
   }
