@@ -84,17 +84,28 @@ val debianSettings = Seq(
   packageSummary in Linux := "Waves node implementation on top of Scorex",
   packageDescription in Linux := "Waves node",
   maintainerScripts in Debian := maintainerScriptsAppend((maintainerScripts in Debian).value)(
-    DebianConstants.Postinst -> s"mkdir -p /home/waves && mkdir -p /home/waves/wallet && mkdir -p /home/waves/data && chmod -R 750 /home/waves && chmod -R 750 /usr/share/waves && chmod -R 750 /usr/share/waves/settings.json && chown -R waves:waves /home/waves && chown -R waves:waves /usr/share/waves"),
+    DebianConstants.Postinst ->
+      s"""
+         |mkdir -p /home/${packageName.value} &&
+         |mkdir -p /home/${packageName.value}/wallet &&
+         |mkdir -p /home/${packageName.value}/data &&
+         |(mv -n /usr/share/${packageName.value}/settings.json /etc/${packageName.value}.json 2>/dev/null || (rm -f /usr/share/${packageName.value}/settings.json && cp -n /usr/share/${packageName.value}/settings.json.default /etc/${packageName.value}.json)) &&
+         |ln -s /etc/${packageName.value}.json /usr/share/${packageName.value}/settings.json &&
+         |chmod -R 750 /home/${packageName.value} &&
+         |chmod -R 750 /usr/share/${packageName.value} &&
+         |chown -R ${packageName.value}:${packageName.value} /usr/share/${packageName.value} &&
+         |chown -R ${packageName.value}:${packageName.value} /home/${packageName.value}""".stripMargin),
   debianPackageDependencies in Debian += "java8-runtime-headless",
   mappings in Universal ++= {
     if (network == "mainnet") {
-      Seq((baseDirectory in root).value / "waves-mainnet.json" -> "settings.json")
+      Seq((baseDirectory in root).value / "waves-mainnet.json" -> "settings.json.default")
     } else if (network == "testnet") {
-      Seq((baseDirectory in root).value / "waves-testnet.json" -> "settings.json")
+      Seq((baseDirectory in root).value / "waves-testnet.json" -> "settings.json.default")
     } else {
       throw new IllegalStateException("invalid network")
     }
   },
+  bashScriptExtraDefines += """addApp "/etc/${packageName.value}.json"""",
   mappings in Universal ++= contentOf((baseDirectory in root).value / "src" / "main" / "resources").map(to => (to._1, "conf/" + to._2)),
   serviceAutostart in Debian := false,
   executableScriptName := packageName.value
