@@ -78,6 +78,12 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   override def balanceChanges(): Seq[BalanceChange] =
     Seq(BalanceChange(AssetAcc(sender, None), -amount - fee), BalanceChange(AssetAcc(recipient, None), amount))
 
+  override def equals(other: Any): Boolean = other match {
+    case o: PaymentTransaction =>  super.equals(other) && timestamp == o.timestamp
+    case _ => false
+  }
+
+  override def hashCode(): Int = super.hashCode() + timestamp.hashCode()
 }
 
 object PaymentTransaction extends Deser[PaymentTransaction] {
