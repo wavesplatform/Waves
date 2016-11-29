@@ -10,10 +10,10 @@ import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets.{AssetIssuance, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
-import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
-import scala.concurrent.duration._
+import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConversions._
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -26,6 +26,7 @@ import scala.util.{Failure, Success, Try}
   */
 class StoredState(db: MVStore, settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging {
 
+  val assetsExtension = new AssetsExtendedState(db)
 
   val HeightKey = "height"
   val DataKey = "dataset"
@@ -33,7 +34,6 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
   val IncludedTx = "includedTx"
   //todo put all transactions in the same map and use links to it
   val AllTxs = "IssueTxs"
-  val ReissueIndex = "reissuableFlag"
 
   if (db.getStoreVersion > 0) db.rollback()
 
@@ -51,12 +51,6 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     */
   private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
   db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
-
-  /**
-    * Transaction Signature -> reissuable flag
-    */
-  private val reissuableIndex: MVMap[Array[Byte], Boolean] =
-  db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
@@ -79,23 +73,21 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
   private def getAccountAssets(address: Address): Set[String] =
     Option(accountAssetsMap.get(address)).getOrElse(Set.empty[String])
 
-  private def isIssuerOfAsset(address: Address, assetId: AssetId): Boolean = {
-    val issueTransaction = Option(transactionsMap.get(assetId)).flatMap(b => IssueTransaction.parseBytes(b).toOption)
+  private def getIssueTransaction(assetId: AssetId): Option[IssueTransaction] =
+    Option(transactionsMap.get(assetId)).flatMap(b => IssueTransaction.parseBytes(b).toOption)
 
-    if (issueTransaction.isDefined) issueTransaction.get.sender.address == address else false
-  }
-
-  def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean)] = {
+  def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = {
     val address = account.address
-    getAccountAssets(address).foldLeft(Map.empty[AssetId, (Long, Boolean)]) { (result, asset) =>
-      val assetIdTry = Base58.decode(asset)
+    getAccountAssets(address).foldLeft(Map.empty[AssetId, (Long, Boolean, Long, IssueTransaction)]) { (result, asset) =>
+      val triedAssetId = Base58.decode(asset)
       val balance = balanceByKey(address + asset)
 
-      if (assetIdTry.isSuccess) {
-        val assetId = assetIdTry.get
-        val issued = isIssuerOfAsset(address, assetId)
-
-        result.updated(assetId, (balance, issued))
+      if (triedAssetId.isSuccess) {
+        val assetId = triedAssetId.get
+        val maybeIssueTransaction = getIssueTransaction(assetId)
+        if (maybeIssueTransaction.isDefined)
+          result.updated(assetId, (balance, isAssetReissuable(assetId), totalAssetQuantity(assetId), maybeIssueTransaction.get))
+        else result
       } else result
     }
   }
@@ -110,7 +102,8 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       ch._2._2.foreach {
         case tx: AssetIssuance =>
           transactionsMap.put(tx.id, tx.bytes)
-          reissuableIndex.put(tx.assetId, tx.reissuable)
+          assetsExtension.setReissuable(tx.assetId, tx.reissuable)
+          assetsExtension.updateAssetQuantity(tx.assetId, tx.quantity)
           includedTx.put(tx.id, h)
         case tx =>
           includedTx.put(tx.id, h)
@@ -131,9 +124,11 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
           t match {
             case t: ReissueTransaction =>
               // if you rollback reissue, then before that issue value always was true
-              reissuableIndex.put(t.assetId, true)
+              assetsExtension.setReissuable(t.assetId, reissuable = true)
+              assetsExtension.updateAssetQuantity(t.assetId, -t.quantity)
             case t: IssueTransaction =>
-              reissuableIndex.remove(t.assetId)
+              assetsExtension.setReissuable(t.assetId, reissuable = false)
+              assetsExtension.updateAssetQuantity(t.assetId, -t.quantity)
             case _ =>
           }
         })
@@ -192,6 +187,9 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     balanceByKey(account.key, atHeight)
   }
 
+  def isAssetReissuable(assetId: AssetId): Boolean = assetsExtension.isReissuable(assetId)
+
+  def totalAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
 
   override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
     balance(account, Some(Math.max(1, heightOpt.getOrElse(stateHeight) - confirmations)))
@@ -286,7 +284,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
 
     def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
       val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
-        case ((currentState, validTxs), tx) =>
+        case ((currentState, seq), tx) =>
           try {
             val changes = if (allowUnissuedAssets) tx.balanceChanges() else tx.balanceChanges().sortBy(_.delta)
             val newState = changes.foldLeft(currentState) { case (iChanges, bc) =>
@@ -308,10 +306,10 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
                 throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
               }
             }
-            (newState, validTxs :+ tx)
+            (newState, seq :+ tx)
           } catch {
             case NonFatal(e) =>
-              (currentState, validTxs)
+              (currentState, seq)
           }
       }
       validTxs
@@ -375,7 +373,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
               log.debug(s"Can't deserialise issue tx", f)
               false
           })
-        val reissuable = Option(reissuableIndex.get(tx.assetId)).getOrElse(false)
+        val reissuable = assetsExtension.isReissuable(tx.assetId)
         sameSender && reissuable
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty

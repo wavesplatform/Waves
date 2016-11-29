@@ -194,15 +194,21 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("AccountAssetsBalances") {
-    forAll(transferGenerator.suchThat(_.assetId.isDefined)) { tx: TransferTransaction =>
+    forAll(issueGenerator) { tx: IssueTransaction =>
       withRollbackTest {
         state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
 
-        val senderBalances = state.getAccountBalance(tx.sender)
-        val receiverBalances = state.getAccountBalance(tx.recipient)
+        val recipient = Account.fromPublicKey(tx.sender.publicKey.reverse)
+        val transfer = TransferTransaction.create(Some(tx.assetId), tx.sender.asInstanceOf[PrivateKeyAccount],
+          recipient, tx.quantity / 2, System.currentTimeMillis(), Some(tx.assetId), tx.quantity / 4,
+          Array.emptyByteArray)
+        state.applyChanges(state.calcNewBalances(Seq(transfer), Map(), allowTemporaryNegative = true))
 
-        senderBalances.keySet should contain(tx.assetId.get)
-        receiverBalances.keySet should contain(tx.assetId.get)
+        val senderBalances = state.getAccountBalance(tx.sender)
+        val receiverBalances = state.getAccountBalance(recipient)
+
+        senderBalances.keySet should contain(tx.assetId)
+        receiverBalances.keySet should contain(tx.assetId)
       }
     }
   }
