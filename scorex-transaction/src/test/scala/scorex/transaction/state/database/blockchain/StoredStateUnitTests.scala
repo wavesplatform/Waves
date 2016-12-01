@@ -213,6 +213,25 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
+  property("Assets quantity with rollback") {
+    forAll(issueGenerator) { tx: IssueTransaction =>
+      withRollbackTest {
+        state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
+        state.totalAssetQuantity(tx.assetId) shouldBe tx.quantity
+
+        val recipient = Account.fromPublicKey(tx.sender.publicKey.reverse)
+        val transfer = TransferTransaction.create(Some(tx.assetId), tx.sender.asInstanceOf[PrivateKeyAccount],
+          recipient, tx.quantity / 2, System.currentTimeMillis(), Some(tx.assetId), tx.quantity / 4,
+          Array.emptyByteArray)
+        state.applyChanges(state.calcNewBalances(Seq(transfer), Map(), allowTemporaryNegative = true))
+        state.totalAssetQuantity(tx.assetId) shouldBe tx.quantity
+
+        state.rollbackTo(state.stateHeight - 1)
+        state.totalAssetQuantity(tx.assetId) shouldBe tx.quantity
+      }
+    }
+  }
+
   property("Old style reissue asset") {
     forAll(issueReissueGenerator) { pair =>
       val issueTx: IssueTransaction = pair._1

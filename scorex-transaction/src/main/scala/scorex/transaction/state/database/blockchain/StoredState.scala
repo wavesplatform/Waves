@@ -102,8 +102,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       ch._2._2.foreach {
         case tx: AssetIssuance =>
           transactionsMap.put(tx.id, tx.bytes)
-          assetsExtension.setReissuable(tx.assetId, tx.reissuable)
-          assetsExtension.updateAssetQuantity(tx.assetId, tx.quantity)
+          assetsExtension.addAsset(tx.assetId, h, tx.id, tx.quantity, tx.reissuable)
           includedTx.put(tx.id, h)
         case tx =>
           includedTx.put(tx.id, h)
@@ -122,13 +121,8 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
           includedTx.remove(t.id)
           transactionsMap.remove(t.id)
           t match {
-            case t: ReissueTransaction =>
-              // if you rollback reissue, then before that issue value always was true
-              assetsExtension.setReissuable(t.assetId, reissuable = true)
-              assetsExtension.updateAssetQuantity(t.assetId, -t.quantity)
-            case t: IssueTransaction =>
-              assetsExtension.setReissuable(t.assetId, reissuable = false)
-              assetsExtension.updateAssetQuantity(t.assetId, -t.quantity)
+            case t: AssetIssuance =>
+              assetsExtension.rollbackTo(t.assetId, currentHeight)
             case _ =>
           }
         })
