@@ -74,10 +74,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       required = true,
       paramType = "body",
       dataType = "scorex.transaction.state.wallet.TransferRequest",
-      defaultValue = "\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\"," +
-        "\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500," +
-        "\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\"," +
-        "\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
+      defaultValue = "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
     )
   ))
   def transfer: Route = path("transfer") {
@@ -120,8 +117,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       required = true,
       paramType = "body",
       dataType = "scorex.transaction.state.wallet.IssueRequest",
-      defaultValue = "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000," +
-        "\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
+      defaultValue = "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
     )
   ))
   def issue: Route = path("issue") {
