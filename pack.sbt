@@ -95,6 +95,7 @@ val debianSettings = Seq(
          |chmod -R 750 /usr/share/${packageName.value} &&
          |chmod -R 750 /etc/${packageName.value} &&
          |chmod 750 /etc/${packageName.value}.json &&
+         |chown -R ${packageName.value}:${packageName.value} /etc/${packageName.value}.json &&
          |chown -R ${packageName.value}:${packageName.value} /usr/share/${packageName.value} &&
          |chown -R ${packageName.value}:${packageName.value} /home/${packageName.value}""".stripMargin),
   debianPackageDependencies in Debian += "java8-runtime-headless",
