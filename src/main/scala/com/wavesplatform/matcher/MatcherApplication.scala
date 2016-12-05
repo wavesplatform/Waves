@@ -1,20 +1,21 @@
 package com.wavesplatform.matcher
 
-import scala.reflect.runtime.universe._
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import com.wavesplatform.matcher.api.MatcherApiRoute
-import com.wavesplatform.matcher.market.{MatcherActor, OrderMatchedActor}
+import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.settings.WavesSettings
 import scorex.api.http.CompositeHttpService
-import scorex.app.{Application, RunnableApplication}
+import scorex.app.Application
 import scorex.settings.Settings
 import scorex.transaction.BlockStorage
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import scorex.waves.transaction.WavesTransactionModule
+
+import scala.reflect.runtime.universe._
 
 trait MatcherApplication extends ScorexLogging {
   implicit def actorSystem: ActorSystem
@@ -33,10 +34,8 @@ trait MatcherApplication extends ScorexLogging {
     typeOf[MatcherApiRoute]
   )
 
-  lazy val matcher = actorSystem.actorOf(MatcherActor.props(orderMatchedActor, storedState, wallet, settings,
+  lazy val matcher = actorSystem.actorOf(MatcherActor.props(storedState, wallet, settings,
     transactionModule), MatcherActor.name)
-  lazy val orderMatchedActor = actorSystem.actorOf(
-    OrderMatchedActor.props(transactionModule, settings, storedState, wallet), OrderMatchedActor.name)
 
   def runMatcher() {
     log.info(s"Starting matcher on: ${settings.matcherHost}:${settings.matcherPort} ...")

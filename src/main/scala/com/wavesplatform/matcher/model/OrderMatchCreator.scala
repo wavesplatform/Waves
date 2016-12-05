@@ -21,15 +21,14 @@ trait OrderMatchCreator {
     txTime
   }
 
-  def createTransaction(order: Order, item: OrderItem): (OrderMatch, OrderItem) = {
+  def createTransaction(order: Order, limitOrder: LimitOrder): OrderMatch = {
     val matcher = wallet.privateKeyAccount(order.matcher.address).get
 
     val price = order.price
-    val amount = item.amount
-    val (buy, sell) = Order.splitByType(order, item.order)
+    val amount = limitOrder.amount
+    val (buy, sell) = Order.splitByType(order, limitOrder.order)
     val (buyFee, sellFee) =  calculateMatcherFee(buy, sell, amount: Long)
-    val om = OrderMatch.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.matcherTxFee, getTimestamp)
-    (om, item)
+    OrderMatch.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.matcherTxFee, getTimestamp)
   }
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
@@ -46,6 +45,10 @@ trait OrderMatchCreator {
   }
 
   def sendToNetwork(txs: Seq[OrderMatch]): Unit = {
-    txs.foreach(transactionModule.onNewOffchainTransaction)
+    txs.foreach(sendToNetwork)
+  }
+
+  def sendToNetwork(tx: OrderMatch): Unit = {
+    transactionModule.onNewOffchainTransaction(tx)
   }
 }

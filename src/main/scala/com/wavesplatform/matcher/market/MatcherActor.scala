@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, Props}
 import akka.persistence.PersistentActor
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.market.OrderBookActor.GetOrderBookRequest
-import com.wavesplatform.matcher.model.OrderItem
+import com.wavesplatform.matcher.model.LimitOrder
 import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsValue, Json}
 import scorex.transaction.SimpleTransactionModule._
@@ -13,13 +13,12 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
-import scorex.waves.transaction.WavesTransactionModule
 
 object MatcherActor {
   def name = "matcher"
-  def props(orderMatchedActor: ActorRef, storedState: StoredState,
-            wallet: Wallet, settings: WavesSettings, transactionModule: TransactionModule[StoredInBlock]): Props =
-    Props(new MatcherActor(orderMatchedActor, storedState, wallet, settings, transactionModule))
+  def props(storedState: StoredState, wallet: Wallet, settings: WavesSettings,
+            transactionModule: TransactionModule[StoredInBlock]): Props =
+    Props(new MatcherActor(storedState, wallet, settings, transactionModule))
 
   sealed trait OrderResponse {
     val json: JsValue
@@ -38,7 +37,7 @@ object MatcherActor {
     val succeeded = true
   }
 
-  case class OrderStatus(status: OrderItem.OrderStatus) extends OrderResponse {
+  case class OrderStatus(status: LimitOrder.OrderStatus) extends OrderResponse {
     val json = Json.obj("status" -> "OrderRejected", "message" -> status.toString)
     val succeeded: Boolean = true
   }
@@ -46,11 +45,11 @@ object MatcherActor {
   case class OrderBookCreated(pair: AssetPair)
 }
 
-class MatcherActor(orderMatchedActor: ActorRef, storedState: StoredState,
-                   wallet: Wallet, settings: WavesSettings, transactionModule: TransactionModule[StoredInBlock]
+class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSettings,
+                   transactionModule: TransactionModule[StoredInBlock]
                   ) extends PersistentActor with ScorexLogging {
   def createOrderBook(pair: AssetPair) =
-    context.actorOf(OrderBookActor.props(pair, orderMatchedActor, storedState, wallet, settings, transactionModule),
+    context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule),
       OrderBookActor.name(pair))
 
   def createAndForward(pair: AssetPair, req: Any) = {

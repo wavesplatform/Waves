@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher.market
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.wavesplatform.matcher.MatcherTestData
@@ -8,20 +8,21 @@ import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.OrderAccepted
 import com.wavesplatform.matcher.market.OrderBookActor.{GetAskOrdersRequest, GetBidOrdersRequest, GetOrdersRequest, GetOrdersResponse}
-import com.wavesplatform.matcher.model.OrderItem
+import com.wavesplatform.matcher.model.Events.{Event, OrderAdded}
+import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.WavesSettings
 import org.h2.mvstore.MVStore
-import org.scalamock.scalatest.{MockFactory, PathMockFactory}
+import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import play.api.libs.json.{JsObject, JsString}
-import scorex.crypto.encode.Base58
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction.SimpleTransactionModule._
-import scorex.transaction.{AssetAcc, Transaction, TransactionModule}
+import scorex.transaction._
 import scorex.transaction.assets.exchange.AssetPair
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
+import scala.concurrent.duration._
 
 class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     with WordSpecLike
@@ -37,7 +38,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       TestKit.shutdownActorSystem(system)
     }
 
-    val orderMatchedActor = TestProbe()
+    var eventsProbe = TestProbe()
 
     val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
     val db = new MVStore.Builder().compress().open()
@@ -52,7 +53,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     )))
     val wallet = new Wallet(None, "matcher", Option(WalletSeed))
     wallet.generateNewAccount()
-    var actor = system.actorOf(Props(new OrderBookActor(pair, orderMatchedActor.ref, storedState,
+    var actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
       wallet, settings, stub[TransactionModule[StoredInBlock]]) with RestartableActor))
 
 
@@ -67,8 +68,11 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       val transactionModule = stub[TransactionModule[StoredInBlock]]
       (transactionModule.isValid(_: Transaction, _: Long)).when(*, *).returns(true).anyNumberOfTimes()
 
-      actor = system.actorOf(Props(new OrderBookActor(pair, orderMatchedActor.ref, storedState,
+      actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
         wallet, settings, transactionModule) with RestartableActor))
+
+      eventsProbe = TestProbe()
+      system.eventStream.subscribe(eventsProbe.ref, classOf[Event])
     }
 
     "OrderBookActror" should {
@@ -86,7 +90,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         expectMsg(OrderAccepted(ord3))
 
         actor ! GetOrdersRequest
-        expectMsg(GetOrdersResponse(Seq(ord2, ord1, ord3).map(OrderItem(_))))
+        expectMsg(GetOrdersResponse(Seq(ord2, ord1, ord3).map(LimitOrder(_))))
       }
 
       "place sell orders" in {
@@ -102,7 +106,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         expectMsg(OrderAccepted(ord3))
 
         actor ! GetOrdersRequest
-        expectMsg(GetOrdersResponse(Seq(ord3, ord1, ord2).map(OrderItem(_))))
+        expectMsg(GetOrdersResponse(Seq(ord3, ord1, ord2).map(LimitOrder(_))))
       }
 
       "sell market" in {
@@ -128,7 +132,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         actor ! RestartActor
         actor ! GetOrdersRequest
 
-        expectMsg(GetOrdersResponse(Seq(ord2, ord1).map(OrderItem(_))))
+        expectMsg(GetOrdersResponse(Seq(ord2, ord1).map(LimitOrder(_))))
       }
 
       "execute partial market orders and preserve remaining after restart" in {
@@ -143,7 +147,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         actor ! RestartActor
         actor ! GetOrdersRequest
 
-        expectMsg(GetOrdersResponse(Seq(OrderItem(ord2.price, 5, ord2))))
+        expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord2.price, 5, ord2))))
       }
 
       "execute one order fully and other partially and restore after restart" in {
@@ -159,7 +163,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         actor ! RestartActor
 
         actor ! GetBidOrdersRequest
-        expectMsg(GetOrdersResponse(Seq(OrderItem(ord2.price, 3, ord2))))
+        expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord2.price, 3, ord2))))
 
         actor ! GetAskOrdersRequest
         expectMsg(GetOrdersResponse(Seq.empty))
@@ -184,7 +188,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         expectMsg(GetOrdersResponse(Seq.empty))
 
         actor ! GetAskOrdersRequest
-        expectMsg(GetOrdersResponse(Seq(OrderItem(ord2.price, 1, ord2))))
+        expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord2.price, 1, ord2))))
 
       }
 
@@ -204,7 +208,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         expectMsg(GetOrdersResponse(Seq.empty))
 
         actor ! GetAskOrdersRequest
-        expectMsg(GetOrdersResponse(Seq(OrderItem(ord3.price, 3, ord3))))
+        expectMsg(GetOrdersResponse(Seq(SellLimitOrder(ord3.price, 3, ord3))))
 
       }
 
@@ -212,25 +216,23 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         val ord1 = sell(pair, 100, 10)
         val ord2 = buy(pair, 100, 19)
 
-        (1 to 1000).foreach({i =>
-          actor ! ord1.copy()
-        })
-        //      actor ! ord1
-        //      actor ! ord2
-
         ignoreMsg {
           case GetOrdersResponse(_) => false
           case m => true
         }
 
-        Thread.sleep(1000)
+        (1 to 1000).foreach({i =>
+          actor ! ord1.copy()
+        })
+
+
         actor ! RestartActor
 
-        actor ! GetOrdersRequest
-
-        val items = expectMsgType[GetOrdersResponse].orders.map(_.order.id) //should have size 1000
-        println(items)
-        //expectMsgGetOrdersResponse(Seq(ord2.copy(amount = 9)))) s
+        within(5 seconds) {
+          actor ! GetOrdersRequest
+          val items = expectMsgType[GetOrdersResponse].orders.map(_.order.id) //should have size 1000
+          println(items.size)
+        }
 
       }
     }
