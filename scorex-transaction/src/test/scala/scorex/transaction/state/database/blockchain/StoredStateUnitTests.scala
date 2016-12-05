@@ -135,7 +135,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   property("Transfer unissued asset to yourself is not allowed") {
     withRollbackTest {
-      forAll(selfTransferGenerator suchThat (t => t.assetId.isDefined && t.feeAssetId.isEmpty)) { tx: TransferTransaction =>
+      forAll(selfTransferWithWavesFeeGenerator suchThat (t => t.assetId.isDefined)) { tx: TransferTransaction =>
         val senderAccount = AssetAcc(tx.sender, None)
         val txFee = tx.fee
         state.applyChanges(Map(senderAccount -> (AccState(txFee), List(FeesStateChange(txFee)))))
@@ -282,6 +282,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
       state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
       state.accountTransactions(tx.sender).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
+      state.accountTransactions(tx.recipient).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
     }
   }
 

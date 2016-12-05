@@ -218,23 +218,31 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
 
   def totalBalance: Long = lastStates.keySet().toList.map(address => balanceByKey(address)).sum
 
-  override def accountTransactions(account: Account, limit: Int = 50): Seq[Transaction] = {
-    Option(lastStates.get(account.address)) match {
-      case Some(accHeight) =>
-        val m = accountChanges(account.address)
+  private val DefaultLimit = 50
 
-        def loop(h: Int, acc: Seq[Transaction]): Seq[Transaction] = Option(m.get(h)) match {
-          case Some(heightChangesBytes) if acc.length < limit =>
-            val heightChanges = heightChangesBytes
-            val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[Transaction])
-              .map(_.asInstanceOf[Transaction])
-            loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
-          case _ => acc
-        }
+  override def accountTransactions(account: Account, limit: Int = DefaultLimit): Seq[Transaction] = {
+    val accountAssets = getAccountAssets(account.address)
+    val keys = account.address :: accountAssets.map(account.address + _).toList
 
-        loop(accHeight, Seq.empty).distinct
-      case None => Seq.empty
-    }
+    keys.foldLeft(Seq.empty[Transaction]) { (result, key) =>
+      val transactions = Option(lastStates.get(key)) match {
+        case Some(accHeight) =>
+          val m = accountChanges(key)
+
+          def loop(h: Int, acc: Seq[Transaction]): Seq[Transaction] = Option(m.get(h)) match {
+            case Some(heightChangesBytes) if acc.length < limit =>
+              val heightChanges = heightChangesBytes
+              val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[Transaction])
+                .map(_.asInstanceOf[Transaction])
+              loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
+            case _ => acc
+          }
+
+          loop(accHeight, Seq.empty)
+        case None => Seq.empty
+      }
+      result ++ transactions
+    }.distinct
   }.takeRight(limit)
 
   def lastAccountLagonakiTransaction(account: Account): Option[LagonakiTransaction] = {
