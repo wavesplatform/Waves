@@ -212,12 +212,12 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         sender() ! CloseConnection
 
       case Some(connection@PeerConnection(_, None, inbound)) =>
+        log.debug(s"Comparing remote application name '${handshake.applicationName}' to local '${application.applicationName}'")
         if (application.applicationName != handshake.applicationName &&
           application.applicationName.dropRight(1) != handshake.applicationName) {
           log.debug(s"Different application name: ${handshake.applicationName} from $address")
           self ! AddToBlacklist(address)
-        } else
-        if (settings.nodeNonce == handshake.nodeNonce) {
+        } else if (settings.nodeNonce == handshake.nodeNonce) {
           log.info("Drop connection to self")
           connectedPeers.remove(address)
           peerDatabase.removePeer(address)

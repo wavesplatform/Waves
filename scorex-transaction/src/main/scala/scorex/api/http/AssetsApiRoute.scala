@@ -54,7 +54,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def balances: Route = {
-    path("balance" / Segment) { case address =>
+    path("balance" / Segment) { address =>
       getJsonRoute {
         balanceJson(address)
       }
@@ -74,7 +74,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       required = true,
       paramType = "body",
       dataType = "scorex.transaction.state.wallet.TransferRequest",
-      defaultValue = "\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
+      defaultValue = "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
     )
   ))
   def transfer: Route = path("transfer") {
@@ -219,7 +219,9 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
         JsObject(Seq(
           "assetId" -> JsString(Base58.encode(p._1)),
           "balance" -> JsNumber(p._2._1),
-          "issued" -> JsBoolean(p._2._2)
+          "reissuable" -> JsBoolean(p._2._2),
+          "quantity" -> JsNumber(p._2._3),
+          "issueTransaction" -> p._2._4.json
         ))
       }.toSeq
       val json = Json.obj(
