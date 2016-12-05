@@ -130,6 +130,7 @@ val upstartSettings = Seq(
 
 lazy val root = project.in(file("."))
   .settings(commonSettings)
+  .enablePlugins(JavaAppPackaging)
 
 lazy val upstart = project.in(file("target/upstart")).dependsOn(root)
   .settings(commonSettings ++ debianSettings ++ upstartSettings)
