@@ -38,8 +38,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         val o = s.get
         o.sender shouldBe new PublicKeyAccount(pk.publicKey)
         o.matcher shouldBe new PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
-        o.spendAssetId shouldBe Base58.decode("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
-        o.receiveAssetId shouldBe Base58.decode("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
+        o.spendAssetId.get shouldBe Base58.decode("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
+        o.receiveAssetId.get shouldBe Base58.decode("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
         o.price shouldBe 0
         o.amount shouldBe 0
         o.matcherFee shouldBe 0

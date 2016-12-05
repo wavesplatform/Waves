@@ -77,13 +77,12 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
       (fee < Order.MaxAmount) :| "fee too large" &&
       (buyOrder.orderType == OrderType.BUY) :| "buyOrder should has OrderType.BUY" &&
       (sellOrder.orderType == OrderType.SELL) :| "sellOrder should has OrderType.SELL" &&
-      isSameMatchers :| "order should have same Matchers" &&
-      isSameAssets :| "order should have same Assets" &&
+      isSameMatchers :| "Both orders should have same Matcher" &&
+      isSameAssets :| "Both orders should have same AssetPair" &&
       ("buyOrder" |: buyOrder.isValid(timestamp)) &&
       ("sellOrder" |: sellOrder.isValid(timestamp)) &&
       priceIsValid :| "price should be valid" &&
       amountIsValid :| "amount should be valid" &&
-      (fee < buyMatcherFee + sellMatcherFee) :| "fee should be < buyMatcherFee + sellMatcherFee" &&
       isFeeValid(buyMatcherFee, buyFeeTotal, buyTotal, buyOrder.matcherFee, buyOrder.amount) :|
         "buyMatcherFee should be valid" &&
       isFeeValid(sellMatcherFee, sellFeeTotal, sellTotal, sellOrder.matcherFee, sellOrder.amount) :|

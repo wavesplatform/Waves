@@ -44,6 +44,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   def orderType: OrderType = if (ByteArray.sameOption(receiveAssetId, assetPair.first)) OrderType.BUY else OrderType.SELL
 
+  @ApiModelProperty(hidden = true)
   lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
 
   def isValid(atTime: Long): Validation = {
@@ -51,6 +52,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
       (price > 0) :| "price should be > 0" &&
       (price < MaxAmount) :| "price too large" &&
       (amount < MaxAmount) :| "amount too large" &&
+      (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (maxTimestamp - atTime <= MaxLiveTime) :| "maxTimestamp should be earlier than 30 days" &&
       (atTime <= maxTimestamp) :| "maxTimestamp should be > currentTime" &&
@@ -65,6 +67,9 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   @ApiModelProperty(hidden = true)
   lazy val id: Array[Byte] = FastCryptographicHash(toSign)
+
+  @ApiModelProperty(hidden = true)
+  lazy val idStr: String = Base58.encode(id)
 
   override def bytes: Array[Byte] = toSign ++ signature
 

@@ -232,7 +232,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
                        buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, wallet: Wallet): Try[OrderMatch] = Try {
     val matcher = wallet.privateKeyAccount(buyOrder.matcher.address).get
     val om = OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp)
-    if (isValid(om)) onNewOffchainTransaction(om)
+    if (isValid(om, om.timestamp)) onNewOffchainTransaction(om)
     else throw new StateCheckFailed("Invalid ordermatch transaction  generated: " + om.json)
     om
   }

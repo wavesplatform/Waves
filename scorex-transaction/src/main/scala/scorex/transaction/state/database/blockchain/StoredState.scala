@@ -53,7 +53,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
   /**
     * Transaction ID -> serialized transaction
     */
-  private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
+  val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
   db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   /**

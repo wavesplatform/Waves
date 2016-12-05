@@ -23,6 +23,8 @@ trait TransactionGen {
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
   val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)
 
+  val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
+
   val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
 
   val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
@@ -68,7 +70,7 @@ trait TransactionGen {
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
   } yield TransferTransaction.create(assetId, account, account, amount, timestamp, feeAssetId, feeAmount, attachment)
 
-  val orderGenerator: Gen[Order] = for {
+  val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
     spendAssetID: Option[AssetId] <- assetIdGen

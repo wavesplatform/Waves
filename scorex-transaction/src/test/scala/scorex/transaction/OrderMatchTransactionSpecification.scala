@@ -40,12 +40,12 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
       signed(unsigned.copy(price = buyPrice), matcher).isValid(Set()) shouldBe valid
       signed(unsigned.copy(amount = buyAmount + 1), matcher).isValid(Set()) should contain ("amount should be valid")
       signed(unsigned.copy(amount = buyAmount - 1, buyMatcherFee = 0, sellMatcherFee = 0), matcher).isValid(Set()) should
-        contain ("fee should be < buyMatcherFee + sellMatcherFee")
+        contain ("buyMatcherFee should be valid")
       signed(unsigned.copy(buyMatcherFee = mf1 + 1), matcher).isValid(Set()) should contain ("buyMatcherFee should be valid")
       signed(unsigned.copy(sellMatcherFee = mf2 + 1), matcher).isValid(Set()) should contain ("sellMatcherFee should be valid")
       signed(unsigned.copy(fee = 0), matcher).isValid(Set()) should contain ("fee should be > 0")
       signed(unsigned.copy(fee = -1), matcher).isValid(Set()) should contain ("fee should be > 0")
-      signed(unsigned.copy(fee = 4), matcher).isValid(Set()) should contain ("fee should be < buyMatcherFee + sellMatcherFee")
+      signed(unsigned.copy(fee = 4), matcher).isValid(Set()) shouldBe valid
       signed(unsigned.copy(timestamp = maxtTime + 1), matcher).isValid(Set())should contain ("buyOrder maxTimestamp should be > currentTime")
       signed(unsigned.copy(timestamp = maxtTime), matcher).isValid(Set())  shouldBe valid
       signed(unsigned.copy(timestamp = maxtTime - 1), matcher).isValid(Set())  shouldBe valid
