@@ -11,10 +11,8 @@ if [ $ECRYPTFS ]; then
 	sudo mount -t tmpfs -o size=512m tmpfs target/streams;
 fi
 
-sbt clean assembly
+sbt packageAll -Dnetwork=testnet
 
 if [ $ECRYPTFS ]; then
 	sudo umount target/streams;
 fi
-
-tar -czf waves-${WAVES_VERSION}-testnet-jar.tgz waves-testnet.json -C target/scala-2.11 waves.jar
