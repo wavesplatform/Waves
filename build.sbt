@@ -14,7 +14,7 @@ scalacOptions in ThisBuild += "-target:jvm-1.8"
 
 resolvers += "SonaType" at "https://oss.sonatype.org/content/groups/public"
 
-val scorexVersion = "1.4.6-SNAPSHOT"
+val scorexVersion = "1.4.6"
 
 libraryDependencies ++= Seq(
   "com.wavesplatform" %% "scorex-basics" % scorexVersion,
