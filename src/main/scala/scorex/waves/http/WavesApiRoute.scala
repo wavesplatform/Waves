@@ -258,12 +258,16 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
             case _: JsError =>
               WrongJson.response
             case JsSuccess(payment: SignedPayment, _) =>
-              Base58.decode(payment.senderPublicKey) match {
-                case Success(senderPubKeyBytes) =>
-                  val senderAccount = Account.fromPublicKey(senderPubKeyBytes)
-                  if (suspendedSenders.contains(senderAccount.address)) InvalidSender.response
-                  else broadcastPayment(payment)
-                case Failure(e) => InvalidSender.response
+              if (payment.senderPublicKey.length > Account.Base58MaxTransactionIdLength) {
+                InvalidPublicKey.response
+              } else {
+                Base58.decode(payment.senderPublicKey) match {
+                  case Success(senderPubKeyBytes) =>
+                    val senderAccount = Account.fromPublicKey(senderPubKeyBytes)
+                    if (suspendedSenders.contains(senderAccount.address)) InvalidSender.response
+                    else broadcastPayment(payment)
+                  case Failure(e) => InvalidSender.response
+                }
               }
           }
         }.getOrElse(WrongJson.response)
