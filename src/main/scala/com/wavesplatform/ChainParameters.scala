@@ -47,6 +47,8 @@ object TestNetParams extends ChainParameters {
   override def allowTransactionsFromFutureUntil: Long = Long.MinValue
 
   override def allowUnissuedAssetsUntil: Long = 1479416400000L
+
+  override def allowDeleteTransactionAfterTimestamp: Long = 1481110521000L
 }
 
 object MainNetParams extends ChainParameters {
@@ -80,4 +82,6 @@ object MainNetParams extends ChainParameters {
   override def allowTransactionsFromFutureUntil: Long = 1479168000000L
 
   override def allowUnissuedAssetsUntil: Long = 1479416400000L
+
+  override def allowDeleteTransactionAfterTimestamp: Long = 1482233593000L
 }
