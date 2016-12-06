@@ -373,8 +373,8 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: DeleteTransaction =>
-      val senderIsIssuer = isIssuerAddress(tx.assetId, tx.sender.address)
-      senderIsIssuer && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      tx.timestamp > settings.allowDeleteTransaction && tx.validate == ValidationResult.ValidateOke &&
+        isIssuerAddress(tx.assetId, tx.sender.address) && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>
