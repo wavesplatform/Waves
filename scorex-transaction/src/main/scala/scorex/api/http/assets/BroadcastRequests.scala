@@ -111,7 +111,7 @@ object BroadcastRequests {
                                   @ApiModelProperty(required = true)
                                   fee: Long,
                                   @ApiModelProperty(value = "Fee asset ID")
-                                  feeAsset: Option[String],
+                                  feeAssetId: Option[String],
                                   @ApiModelProperty(required = true)
                                   timestamp: Long,
                                   @ApiModelProperty(value = "Base58 encoded attachment")
@@ -125,9 +125,9 @@ object BroadcastRequests {
         new Account(recipient),
         amount,
         timestamp,
-        feeAsset.map(_.getBytes),
+        feeAssetId.map(_.getBytes),
         fee,
-        attachment.map(Base58.decode(_).get).getOrElse(new Array[Byte](0)),
+        attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
         Base58.decode(signature).get)
     }
   }
@@ -138,7 +138,7 @@ object BroadcastRequests {
       (JsPath \ "recipient").read[String] and
       (JsPath \ "amount").read[Long] and
       (JsPath \ "fee").read[Long] and
-      (JsPath \ "feeAsset").readNullable[String] and
+      (JsPath \ "feeAssetId").readNullable[String] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "attachment").readNullable[String] and
       (JsPath \ "signature").read[String]

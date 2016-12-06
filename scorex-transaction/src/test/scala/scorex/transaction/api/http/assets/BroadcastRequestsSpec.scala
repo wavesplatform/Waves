@@ -2,7 +2,7 @@ package scorex.transaction.api.http.assets
 
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.api.http.assets.BroadcastRequests.{AssetDeleteRequest, AssetIssueRequest, AssetReissueRequest}
+import scorex.api.http.assets.BroadcastRequests.{AssetDeleteRequest, AssetIssueRequest, AssetReissueRequest, AssetTransferRequest}
 import scorex.api.http.assets.BroadcastResponses.{AssetIssueResponse, AssetReissueResponse, AssetTransferResponse}
 
 
@@ -30,6 +30,11 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
     req.decimals shouldBe 2
     req.timestamp shouldBe 1234L
     req.reissuable shouldBe false
+
+    val tx = req.toTx.get
+    tx.name shouldBe "string".toCharArray
+    tx.description shouldBe "string".toCharArray
+    tx.signature.isEmpty shouldBe false
   }
 
   test("AssetReissueRequest json parsing works") {
@@ -40,12 +45,51 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |"assetId":"6eV67ffUPXVGktrmsoWv1ZRKTuKcWZjeCQXJjD26pTGS",
         |"quantity":10000,"reissuable":true,
         |"fee":100000000,"timestamp":1477302582842,
+        |"reissuable":true,
         |"signature":"4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
         |}
       """.stripMargin
     val req = Json.parse(json).validate[AssetReissueRequest].get
     req.signature shouldBe "4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
     req.fee shouldBe 100000000L
+
+    val tx = req.toTx.get
+    tx.assetId.isEmpty shouldBe false
+    tx.reissuable shouldBe true
+    tx.signature.isEmpty shouldBe false
+  }
+
+  test("AssetTransfer json parsing works") {
+    val json =
+      """
+        |{
+        |   "recipient":"3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq",
+        |   "timestamp":1479462208828,
+        |   "assetId":"GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u",
+        |   "amount":5000,
+        |   "fee":100000,
+        |   "senderPublicKey":"FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn",
+        |   "signature":"4jWTZcRxuFpG4XdCbAhkiWdBjXMHEayPcEhk3yQ3oLYASJ7Fn8ij9C1nAQv61Z7Yo9DoLgy1fysGaaPGbxCWHrfT",
+        |   "attachment":""
+        |}
+      """.stripMargin
+    val req = Json.parse(json).validate[AssetTransferRequest].get
+    req.recipient shouldBe "3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq"
+    req.timestamp shouldBe 1479462208828L
+    req.assetId shouldBe Some("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u")
+    req.amount shouldBe 5000
+    req.fee shouldBe 100000
+    req.senderPublicKey shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
+    req.signature shouldBe "4jWTZcRxuFpG4XdCbAhkiWdBjXMHEayPcEhk3yQ3oLYASJ7Fn8ij9C1nAQv61Z7Yo9DoLgy1fysGaaPGbxCWHrfT"
+    req.attachment shouldBe Some("")
+
+    val tx = req.toTx.get
+    tx.timestamp shouldBe 1479462208828L
+    tx.attachment shouldBe Array.emptyByteArray
+    tx.assetId.isDefined shouldBe true
+    tx.amount shouldBe 5000
+    tx.fee shouldBe 100000
+    tx.signature.nonEmpty shouldBe true
   }
 
   test("AssetDeleteRequest json parsing works") {

@@ -18,11 +18,11 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
   property("Transfer transaction ") {
     val feeCalc = new FeeCalculator(MySettings)
     forAll(transferGenerator) { tx: TransferTransaction =>
-      if (tx.feeAsset.isEmpty) {
+      if (tx.feeAssetId.isEmpty) {
         feeCalc.enoughFee(tx) shouldBe (tx.fee >= 100000)
       } else {
         feeCalc.enoughFee(tx) shouldBe false
-        val tx2: TransferTransaction = tx.feeAsset.map(t => tx.copy(feeAsset = Some(WhitelistedAsset))).getOrElse(tx)
+        val tx2: TransferTransaction = tx.feeAssetId.map(t => tx.copy(feeAssetId = Some(WhitelistedAsset))).getOrElse(tx)
         feeCalc.enoughFee(tx2) shouldBe (tx.fee >= 1002)
       }
     }
