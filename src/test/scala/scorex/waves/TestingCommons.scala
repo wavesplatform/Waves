@@ -74,8 +74,8 @@ object TestingCommons {
     Json.parse(response.getResponseBody)
   }
 
-  def matcherGetRequest(path: String): JsValue = {
-    val request = Http(url(matcherUrl() + path).GET)
+  def matcherGetRequest(path: String, params: Map[String, String] = Map.empty): JsValue = {
+    val request = Http(url(matcherUrl() + path).GET <<? params)
     val response = Await.result(request, 10.seconds)
     Json.parse(response.getResponseBody)
   }

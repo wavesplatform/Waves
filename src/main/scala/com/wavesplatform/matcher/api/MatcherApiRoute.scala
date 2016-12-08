@@ -38,7 +38,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
 
   override lazy val route =
     pathPrefix("matcher") {
-      place ~ matcherPubKey ~ signOrder ~ orderStatusWaves ~ balance ~ orderBook ~ orderBookWaves ~ cancel
+      place ~ matcherPubKey ~ signOrder ~ orderStatus ~ balance ~ orderBook ~ cancel
     }
 
   @Path("/publicKey")
@@ -53,18 +53,18 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     }
   }
 
-  @Path("/orders/{asset1}/status/{id}")
-  @ApiOperation(value = "Order Status", notes = "Get Order status for a given AssetId and WAVES during the last 30 days", httpMethod = "GET")
+  @Path("/orders/status/{id}")
+  @ApiOperation(value = "Order Status", notes = "Get Order status for a given Asset Pair during the last 30 days", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "asset1", value = "AssetId", required = true, dataType = "string", paramType = "path"),
-    new ApiImplicitParam(name = "id", value = "Order Id", required = true, dataType = "string", paramType = "path")
+    new ApiImplicitParam(name = "asset1", value = "Asset Id", required = true, dataType = "string", paramType = "query"),
+    new ApiImplicitParam(name = "asset2", value = "Asset Id or empty for WAVES", required = false, dataType = "string", paramType = "query")
   ))
-  def orderStatusWaves: Route = {
-    pathPrefix("orders" / Segment ) { assetId =>
-      val asset = Base58.decode(assetId).toOption
-      path("status" / Segment) { id =>
+  def orderStatus: Route = {
+    pathPrefix("orders" / "status" / Segment ) { id =>
+      parameters('asset1, 'asset2.?) { (asset1, asset2) =>
+        val pair = AssetPair(Base58.decode(asset1).toOption, asset2.flatMap(Base58.decode(_).toOption))
         getJsonRoute {
-          (matcher ? GetOrderStatus(AssetPair(None, asset), id))
+          (matcher ? GetOrderStatus(pair, id))
             .mapTo[OrderBookResponse]
             .map(r => JsonResponse(r.json, r.code))
         }
@@ -87,41 +87,23 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     }
   }
 
-  @Path("/orderBook/{asset1}/{asset2}")
-  @ApiOperation(value = "Get Order Book for Asset Pair",
-    notes = "Get Order Book for 2 given AssetIds (Not WAVES)", httpMethod = "GET")
+  @Path("/orderBook")
+  @ApiOperation(value = "Get Order Book for a given Asset Pair",
+    notes = "Get Order Book for a given Asset Pair", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "asset1", value = "AssetId", required = true, dataType = "string", paramType = "path"),
-    new ApiImplicitParam(name = "asset2", value = "AssetId", required = true, dataType = "string", paramType = "path")
+    new ApiImplicitParam(name = "asset1", value = "Asset Id", required = true, dataType = "string", paramType = "query"),
+    new ApiImplicitParam(name = "asset2", value = "Asset Id or empty for WAVES", required = false, dataType = "string", paramType = "query")
   ))
   def orderBook: Route = {
-    path("orderBook" / Segment / Segment) { (a1, a2) =>
+    path("orderBook") {
+      parameters('asset1, 'asset2.?) { (asset1, asset2) =>
       getJsonRoute {
-        val asset1 = Base58.decode(a1).toOption
-        val asset2 = Base58.decode(a2).toOption
+          val pair = AssetPair(Base58.decode(asset1).toOption, asset2.flatMap(Base58.decode(_).toOption))
 
-        (matcher ? GetOrderBookRequest(AssetPair(asset1, asset2)))
-          .mapTo[OrderBookResponse]
-          .map(r => JsonResponse(r.json, r.code))
-      }
-    }
-  }
-
-  @Path("/orderBook/{asset1}")
-  @ApiOperation(value = "Get Order Book for AssetId and WAVES",
-    notes = "Get Order Book for a given AssetId and WAVES", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "asset1", value = "AssetId", required = true, dataType = "string", paramType = "path")
-  ))
-  def orderBookWaves: Route = {
-    path("orderBook" / Segment) { (a) =>
-      getJsonRoute {
-        val asset = Base58.decode(a).toOption
-        val pair = AssetPair(None, asset)
-
-        (matcher ? GetOrderBookRequest(pair))
-          .mapTo[OrderBookResponse]
-          .map(r => JsonResponse(r.json, r.code))
+          (matcher ? GetOrderBookRequest(pair))
+            .mapTo[OrderBookResponse]
+            .map(r => JsonResponse(r.json, r.code))
+        }
       }
     }
   }
@@ -204,15 +186,6 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
               (matcher ? order)
                 .mapTo[OrderBookResponse]
                 .map(r => JsonResponse(r.json, r.code))
-              /*if (validation.validate()) {
-                (matcher ? order)
-                .mapTo[OrderResponse]
-                .map { resp =>
-                  JsonResponse(resp.json, StatusCodes.OK)
-                }
-              } else {
-                Future.successful(ValidationErrorJson(validation.errors).response)
-              }*/
           }
         }.recover {
           case t => println(t)

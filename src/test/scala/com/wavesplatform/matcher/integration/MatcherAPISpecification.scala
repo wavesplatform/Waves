@@ -127,11 +127,11 @@ class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfter
   }
 
   def getOrderBook(asset: Option[String]): JsValue = {
-    matcherGetRequest(s"/orderBook/${asset.get}")
+    matcherGetRequest(s"/orderBook", params = Map("asset1" -> asset.get))
   }
 
   def getOrderStatus(asset: Option[String], id: String): JsValue = {
-    matcherGetRequest(s"/orders/${asset.get}/status/$id")
+    matcherGetRequest(s"/orders/status/$id", params = Map("asset1" -> asset.get))
   }
 
   def waitForOrderStatus(asset: Option[String], id: String, status: String) = {
