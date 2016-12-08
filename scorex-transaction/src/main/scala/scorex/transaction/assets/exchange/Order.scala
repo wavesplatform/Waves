@@ -32,7 +32,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
                  @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8",
                    example = "100000000") price: Long,
                  @ApiModelProperty("Amount in AssetPair.first") amount: Long,
-                 maxTimestamp: Long,
+                 @ApiModelProperty(value = "Order time to live, max = 30 days")maxTimestamp: Long,
                  @ApiModelProperty(example = "100000") matcherFee: Long,
                  @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
   extends BytesSerializable
@@ -42,7 +42,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   def assetPair: AssetPair = AssetPair(spendAssetId, receiveAssetId)
 
-  def orderType: OrderType = if (ByteArray.sameOption(receiveAssetId, assetPair.first)) OrderType.BUY else OrderType.SELL
+  def orderType: OrderType = if (ByteArray.sameOption(receiveAssetId, assetPair.second)) OrderType.BUY else OrderType.SELL
 
   @ApiModelProperty(hidden = true)
   lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
@@ -73,13 +73,13 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   override def bytes: Array[Byte] = toSign ++ signature
 
-  def sellAmount(): Long = {
-    if (orderType == OrderType.SELL) amount
+  def getSpendAmount: Long = {
+    if (orderType == OrderType.BUY) amount
     else (BigInt(amount) * PriceConstant / price).longValue()
   }
 
-  def buyAmount(): Long = {
-    if (orderType == OrderType.BUY) amount
+  def getReceiveAmount: Long = {
+    if (orderType == OrderType.SELL) amount
     else (BigInt(amount) * PriceConstant / price).longValue()
   }
 
@@ -126,14 +126,14 @@ object Order extends Deser[Order] {
 
   def buy(sender: PrivateKeyAccount, matcher: PublicKeyAccount, pair: AssetPair,
           price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair.second, pair.first, price, amount, maxTime, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair.first, pair.second, price, amount, maxTime, matcherFee, Array())
     val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
 
   def sell(sender: PrivateKeyAccount, matcher: PublicKeyAccount, pair: AssetPair,
           price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair.first, pair.second, price, amount, maxTime, matcherFee, Array())
+    val unsigned = Order(sender, matcher, pair.second, pair.first, price, amount, maxTime, matcherFee, Array())
     val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }

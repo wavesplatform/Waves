@@ -11,14 +11,13 @@ import scorex.transaction._
 import scorex.transaction.assets.{AssetIssuance, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
-
-import scorex.transaction.assets.exchange.OrderMatch
+import scorex.transaction.assets.exchange.{OrderCancelTransaction, OrderMatch}
 
 
 /** Store current balances only, and balances changes within effective balance depth.
@@ -104,7 +103,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     }
   }
 
-  private[blockchain] def applyChanges(changes: Map[AssetAcc, (AccState, Reason)]): Unit = synchronized {
+  private[blockchain] def applyChanges(changes: Map[AssetAcc, (AccState, Reason)], blockTs: Long = NTP.correctedTime()): Unit = synchronized {
     setStateHeight(stateHeight + 1)
     val h = stateHeight
     changes.foreach { ch =>
@@ -118,8 +117,11 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
           includedTx.put(tx.id, h)
         case om: OrderMatch =>
           transactionsMap.put(om.id, om.bytes)
-          putOrderMatch(om, h)
+          putOrderMatch(om, blockTs)
           includedTx.put(om.id, h)
+        case oc: OrderCancelTransaction =>
+          transactionsMap.put(oc.id, oc.bytes)
+          putOrderCancel(oc)
         case tx =>
           includedTx.put(tx.id, h)
       }
@@ -167,7 +169,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     val newBalances: Map[AssetAcc, (AccState, Reason)] = calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
-    applyChanges(newBalances)
+    applyChanges(newBalances, block.timestampField.value)
     log.trace(s"New state height is $stateHeight, hash: $hash, totalBalance: $totalBalance")
 
     this
@@ -350,7 +352,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
       validTxs
     }
 
-    filterValidTransactionsByState(filteredFromFuture)
+    filterCancelOrderMatch(filterValidTransactionsByState(filteredFromFuture))
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
@@ -413,9 +415,9 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: OrderMatch =>
-      val valid = tx.isValid(findPrevOrderMatchTxs(tx))
-      println(valid)
-      valid && included(tx.id, None).isEmpty
+      isOrderMatchValid(tx) && included(tx.id, None).isEmpty
+    case tx: OrderCancelTransaction =>
+      tx.isValid && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>

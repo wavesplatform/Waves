@@ -28,6 +28,8 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
 
   override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
 
+  lazy val idStr: String = Base58.encode(id)
+
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
   override val sender: PublicKeyAccount = buyOrder.matcher
@@ -117,10 +119,10 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
     val sellFeeChange = Seq(BalanceChange(AssetAcc(sellOrder.sender, None), -sellMatcherFee))
 
     val exchange = Seq(
-      (buyOrder.sender, (buyOrder.spendAssetId, -(BigInt(amount) * Order.PriceConstant / price).longValue())),
-      (buyOrder.sender, (buyOrder.receiveAssetId, amount)),
-      (sellOrder.sender, (sellOrder.receiveAssetId, (BigInt(amount) * Order.PriceConstant / price).longValue())),
-      (sellOrder.sender, (sellOrder.spendAssetId, -amount))
+      (buyOrder.sender, (buyOrder.spendAssetId, -amount)),
+      (buyOrder.sender, (buyOrder.receiveAssetId, (BigInt(amount) * Order.PriceConstant / price).longValue())),
+      (sellOrder.sender, (sellOrder.receiveAssetId, amount)),
+      (sellOrder.sender, (sellOrder.spendAssetId, -(BigInt(amount) * Order.PriceConstant / price).longValue()))
     )
 
     buyFeeChange ++ sellFeeChange ++ matcherChange ++

@@ -22,6 +22,17 @@ object OrderJson {
     }
   }
 
+  implicit val optionByteArrayReads = new Reads[Option[Array[Byte]]] {
+    def reads(json: JsValue) = json match {
+      case JsString(s) if s.isEmpty => JsSuccess(Option.empty[Array[Byte]])
+      case JsString(s) if s.nonEmpty => Base58.decode(s) match {
+        case Success(bytes) => JsSuccess(Some(bytes))
+        case Failure(_) => JsError(Seq(JsPath() -> Seq(ValidationError("error.incorrect.base58"))))
+      }
+      case _ => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.jsstring"))))
+    }
+  }
+
   implicit val publicKeyAccountReads = new Reads[PublicKeyAccount] {
     def reads(json: JsValue) = json match {
       case JsString(s) => Base58.decode(s) match {
@@ -32,23 +43,40 @@ object OrderJson {
     }
   }
 
-  def readOrder(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAssetID: Option[Array[Byte]],
-                        receiveAssetID: Option[Array[Byte]], price: Long, amount: Long, maxTime: Long, matcherFee: Long,
+  def readOrder(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAssetID: Option[Option[Array[Byte]]],
+                        receiveAssetID: Option[Option[Array[Byte]]], price: Long, amount: Long, maxTime: Long, matcherFee: Long,
                         signature: Option[Array[Byte]]): Order = {
-    Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxTime, matcherFee, signature.getOrElse(Array()))
+    Order(sender, matcher, spendAssetID.flatten, receiveAssetID.flatten, price, amount, maxTime, matcherFee, signature.getOrElse(Array()))
   }
 
   implicit val orderReads: Reads[Order] = {
     val r = (JsPath \ "sender").read[PublicKeyAccount] and
       (JsPath \ "matcher").read[PublicKeyAccount] and
-      (JsPath \ "spendAssetId").readNullable[Array[Byte]] and
-      (JsPath \ "receiveAssetId").readNullable[Array[Byte]] and
+      (JsPath \ "spendAssetId").readNullable[Option[Array[Byte]]] and
+      (JsPath \ "receiveAssetId").readNullable[Option[Array[Byte]]] and
       (JsPath \ "price").read[Long] and
       (JsPath \ "amount").read[Long] and
       (JsPath \ "maxTimestamp").read[Long] and
       (JsPath \ "matcherFee").read[Long] and
       (JsPath \ "signature").readNullable[Array[Byte]]
     r(readOrder _)
+  }
+
+  def readOrderCancel(sender: PublicKeyAccount, spendAssetID: Option[Option[Array[Byte]]],
+                      receiveAssetID: Option[Option[Array[Byte]]], orderId: Array[Byte], fee: Long, timestamp: Long,
+                      signature: Array[Byte]): OrderCancelTransaction = {
+    OrderCancelTransaction(sender, spendAssetID.flatten, receiveAssetID.flatten, orderId, fee, timestamp, signature)
+  }
+
+  implicit val orderCancelReads: Reads[OrderCancelTransaction] = {
+    val r = (JsPath \ "sender").read[PublicKeyAccount] and
+      (JsPath \ "spendAssetId").readNullable[Option[Array[Byte]]] and
+      (JsPath \ "receiveAssetId").readNullable[Option[Array[Byte]]] and
+      (JsPath \ "orderId").read[Array[Byte]] and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "signature").read[Array[Byte]]
+    r(readOrderCancel _)
   }
 
   /*implicit val orderJsonWrites: Writes[IssueRequest] = (

@@ -6,7 +6,7 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.{ByteArray, NTP}
 
-class OrderTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Order transaction serialization roundtrip") {
     forAll { x: (Order, PrivateKeyAccount) =>

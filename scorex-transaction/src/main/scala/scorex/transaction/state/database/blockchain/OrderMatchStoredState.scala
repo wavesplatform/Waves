@@ -2,10 +2,11 @@ package scorex.transaction.state.database.blockchain
 
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
-import scorex.utils.NTP
+import scorex.transaction.Transaction
+import scorex.transaction.assets.exchange.{Order, OrderCancelTransaction, OrderMatch}
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable
 
 trait OrderMatchStoredState {
   val db: MVStore
@@ -13,6 +14,7 @@ trait OrderMatchStoredState {
 
   val OrderMatchTx = "OrderMatchTx"
   val OrderMatchDays = "OrderMatchSavedDays"
+  val OrderToCancelTxName = "OrderToCancelTx"
   val MaxLiveDays = (Order.MaxLiveTime / 24L * 60L * 60L * 1000L).toInt
 
   /**
@@ -23,9 +25,14 @@ trait OrderMatchStoredState {
 
   private val savedDays: MVMap[Long, Boolean] = db.openMap(OrderMatchDays)
 
-  def putOrderMatch(om: OrderMatch, height: Int): Unit = {
+  /**
+    * Returns Map OrderId -> OrderCancelTransaction Id
+    */
+  private def orderToCancelTx: MVMap[String, Array[Byte]] = db.openMap(OrderToCancelTxName)
+
+  def putOrderMatch(om: OrderMatch, blockTs: Long): Unit = {
     def isSaveNeeded(order: Order): Boolean = {
-      order.maxTimestamp >= NTP.correctedTime()
+      order.maxTimestamp >= blockTs
     }
 
     def putOrder(order: Order) = {
@@ -43,11 +50,11 @@ trait OrderMatchStoredState {
     putOrder(om.buyOrder)
     putOrder(om.sellOrder)
 
-    removeObsoleteDays()
+    removeObsoleteDays(blockTs)
   }
 
-  def removeObsoleteDays(): Unit = {
-    val ts = calcStartDay(NTP.correctedTime())
+  def removeObsoleteDays(timestamp: Long): Unit = {
+    val ts = calcStartDay(timestamp)
     val daysToRemove = savedDays.keySet().filter(t => t < ts)
     if (daysToRemove.nonEmpty) {
       savedDays.synchronized {
@@ -76,8 +83,30 @@ trait OrderMatchStoredState {
   }
 
   def findPrevOrderMatchTxs(order: Order): Set[OrderMatch] = {
-    if (order.maxTimestamp >= NTP.correctedTime()) {
+    val orderDay = calcStartDay(order.maxTimestamp)
+    if (savedDays.contains(orderDay)) {
       parseTxSeq(Option(orderMatchTxByDay(calcStartDay(order.maxTimestamp)).get(Base58.encode(order.id))).getOrElse(emptyTxIdSeq))
     } else Set.empty[OrderMatch]
+  }
+
+  def isOrderMatchValid(om: OrderMatch): Boolean = {
+    def isNotCancelled(id: String) =
+      Option(orderToCancelTx.get(id)).forall(!transactionsMap.containsKey(_))
+
+    om.isValid(findPrevOrderMatchTxs(om)) && isNotCancelled(om.buyOrder.idStr) && isNotCancelled(om.sellOrder.idStr)
+  }
+
+  def putOrderCancel(oc: OrderCancelTransaction): Unit = {
+    orderToCancelTx.put(oc.orderIdStr, oc.id)
+  }
+
+  def filterCancelOrderMatch(trans: Seq[Transaction]): Seq[Transaction] = {
+    trans.foldLeft(Set.empty[String] -> Seq.empty[Transaction]) { case ((c, v), t) =>
+      t match {
+        case tt: OrderCancelTransaction => (c + tt.orderIdStr) -> (v :+ tt)
+        case tt: OrderMatch if c(tt.buyOrder.idStr) || c(tt.sellOrder.idStr) => c -> v
+        case _ => c -> (v :+ t)
+      }
+    }._2
   }
 }

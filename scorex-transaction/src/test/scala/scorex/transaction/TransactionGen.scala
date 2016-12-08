@@ -6,7 +6,7 @@ import org.scalatest.enablers.Containing
 import org.scalatest.matchers.{BeMatcher, MatchResult}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderMatch, Validation}
+import scorex.transaction.assets.exchange._
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.utils.{ByteArray, NTP}
 
@@ -24,6 +24,7 @@ trait TransactionGen {
   val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)
 
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
+  val timestampGen: Gen[Long] = Gen.choose(1, 1000).map(NTP.correctedTime() - _)
 
   val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
 
@@ -137,6 +138,14 @@ trait TransactionGen {
     val sig = EllipticCurveImpl.sign(matcher, unsigned.toSign)
     (unsigned.copy(signature = sig), matcher)
   }
+
+  val orderCancelGenerator: Gen[(OrderCancelTransaction, PrivateKeyAccount)] = for {
+    sender: PrivateKeyAccount <- accountGen
+    orderId <- bytes32gen
+    assetPair <- assetPairGen
+    timestamp: Long <- timestampGen
+    fee: Long <- maxWavesAnountGen
+  } yield (OrderCancelTransaction(sender, assetPair.first, assetPair.second, orderId, fee, timestamp), sender)
 
   implicit val orderMatchArb: Arbitrary[(OrderMatch, PrivateKeyAccount)] = Arbitrary { orderMatchGenerator }
   implicit val orderArb: Arbitrary[(Order, PrivateKeyAccount)] = Arbitrary { orderGenerator }

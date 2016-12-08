@@ -30,8 +30,8 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
       val mf1 = 1
       val mf2 = 2
 
-      val buy = Order(sender1, matcher, pair.second, pair.first, buyPrice, buyAmount, maxtTime, mf1)
-      val sell = Order(sender2, matcher, pair.first, pair.second, sellPrice, sellAmount, maxtTime, mf2)
+      val buy = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, maxtTime, mf1)
+      val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, maxtTime, mf2)
 
       val unsigned = OrderMatch(buy, sell, sellPrice, buyAmount, mf1, 1, 1, maxtTime - Order.MaxLiveTime, Array())
 

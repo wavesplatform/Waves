@@ -25,7 +25,8 @@ trait TransactionSettings {
     TransactionAssetFee(3, None).key -> 100000,
     TransactionAssetFee(4, None).key -> 100000,
     TransactionAssetFee(5, None).key -> 100000,
-    TransactionAssetFee(6, None).key -> 100000
+    TransactionAssetFee(6, None).key -> 100000,
+    TransactionAssetFee(7, None).key -> 100000
   )
 
 
