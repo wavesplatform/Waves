@@ -88,12 +88,11 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
 }
 
 object Application extends ScorexLogging {
-  def main(args: Array[String]): Unit =
-    RootActorSystem.start("wavesplatform") { actorSystem =>
-      log.info("Starting with args: {} ", args)
-      val filename = args.headOption.getOrElse("settings.json")
-      val settings = new WavesSettings(Settings.readSettingsJson(filename))
-
+  def main(args: Array[String]): Unit = {
+    log.info("Starting with args: {} ", args)
+    val filename = args.headOption.getOrElse("settings.json")
+    val settings = new WavesSettings(Settings.readSettingsJson(filename))
+    RootActorSystem.start("wavesplatform", settings) { actorSystem =>
       configureLogging(settings)
 
       // Initialize global var with actual address scheme
@@ -107,6 +106,7 @@ object Application extends ScorexLogging {
       if (application.wallet.privateKeyAccounts().isEmpty)
         application.wallet.generateNewAccounts(1)
     }
+  }
 
   /**
     * Configure logback logging level according to settings

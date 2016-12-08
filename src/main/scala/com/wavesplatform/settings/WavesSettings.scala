@@ -35,7 +35,7 @@ class WavesSettings(override val settingsJSON: JsObject) extends Settings with T
     * Returns directory path from config or DefaultDataDir/@dirName by default
     * Creates directory if it doesn't exist
     */
-  private def getDir(param: String, dirName: String) = {
+  def getDir(param: String, dirName: String) = {
     val path = (settingsJSON \ param).asOpt[String] match {
       case Some(x) if x.length > 0 => Some(x)
       case _ => Some(DefaultDataDir + dirName)
