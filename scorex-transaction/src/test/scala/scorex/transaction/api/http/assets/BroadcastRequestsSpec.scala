@@ -4,6 +4,7 @@ import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 import scorex.api.http.assets.BroadcastRequests.{AssetDeleteRequest, AssetIssueRequest, AssetReissueRequest, AssetTransferRequest}
 import scorex.api.http.assets.BroadcastResponses.{AssetIssueResponse, AssetReissueResponse, AssetTransferResponse}
+import scorex.crypto.encode.Base58
 
 
 class BroadcastRequestsSpec extends FunSuite with Matchers {
@@ -79,7 +80,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
     req.assetId shouldBe Some("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u")
     req.amount shouldBe 5000
     req.fee shouldBe 100000
-    req.senderPublicKey shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
+    Base58.encode(req.sender.publicKey) shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
     req.signature shouldBe "4jWTZcRxuFpG4XdCbAhkiWdBjXMHEayPcEhk3yQ3oLYASJ7Fn8ij9C1nAQv61Z7Yo9DoLgy1fysGaaPGbxCWHrfT"
     req.attachment shouldBe Some("")
 
