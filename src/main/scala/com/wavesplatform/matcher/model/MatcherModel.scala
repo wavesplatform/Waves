@@ -1,7 +1,8 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.model.MatcherModel.{OrderId, Price}
-import scorex.transaction.assets.exchange.{Order, OrderType}
+import play.api.libs.json.{JsValue, Json}
+import scorex.transaction.assets.exchange.{Order, OrderCancelTransaction, OrderType}
 
 object MatcherModel {
   type Price = Long
@@ -17,29 +18,42 @@ sealed trait LimitOrder {
   def order: Order
   def partial(amount: Long): LimitOrder
 
-  def sellAmount: Long
-  def buyAmount: Long
+  def getSpendAmount: Long
+  def getReceiveAmount: Long
   def feeAmount: Long = (BigInt(amount) * order.matcherFee  / order.amount).toLong
 }
 
 case class BuyLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Price): LimitOrder = copy(amount = amount)
-  def buyAmount: Long = amount
-  def sellAmount: Long = (BigInt(amount) * Order.PriceConstant / price).longValue()
+  def getReceiveAmount: Long = (BigInt(amount) * Order.PriceConstant / price).longValue()
+  def getSpendAmount: Long = amount
 }
 case class SellLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Price): LimitOrder = copy(amount = amount)
-  def sellAmount: Long = amount
-  def buyAmount: Long = (BigInt(amount) * Order.PriceConstant / price).longValue()
+  def getSpendAmount: Long = (BigInt(amount) * Order.PriceConstant / price).longValue()
+  def getReceiveAmount: Long = amount
 }
 
 
 object LimitOrder {
-  sealed trait OrderStatus
-  case object Accepted extends OrderStatus
-  case object NotFound extends OrderStatus
-  case class PartiallyFilled(remainingAmount: Long) extends OrderStatus
-  case object Filled extends OrderStatus
+  sealed trait OrderStatus {
+    def json: JsValue
+  }
+  case object Accepted extends OrderStatus {
+    def json = Json.obj("status" -> "Accepted")
+  }
+  case object NotFound extends OrderStatus {
+    def json = Json.obj("status" -> "NotFound")
+  }
+  case class PartiallyFilled(filledAmount: Long) extends OrderStatus {
+    def json = Json.obj("status" -> "PartiallyFilled", "filledAmount" -> filledAmount)
+  }
+  case object Filled extends OrderStatus {
+    def json = Json.obj("status" -> "Filled")
+  }
+  case object Cancelled extends OrderStatus {
+    def json = Json.obj("status" -> "Cancelled")
+  }
 
   def apply(o: Order): LimitOrder = o.orderType match {
     case OrderType.BUY => BuyLimitOrder(o.price, o.amount, o).copy()
@@ -48,20 +62,17 @@ object LimitOrder {
 
 }
 
-object Commands {
-  sealed trait Command
-  case class AddLimitOrder(o: LimitOrder) extends Command
-  case class CancelOrder(id: OrderId) extends Command
-}
-
 object Events {
   sealed trait Event
   case class OrderExecuted(submittedOrder: LimitOrder, counterOrder: LimitOrder) extends Event {
-    def counterRemaining: Long = Math.max(counterOrder.amount - submittedOrder.amount, 0)
-    def submittedRemaining: Long = Math.max(submittedOrder.amount - counterOrder.amount, 0)
+    def counterRemaining: Long = math.max(counterOrder.amount - submittedOrder.amount, 0)
+    def submittedRemaining: Long = math.max(submittedOrder.amount - counterOrder.amount, 0)
+    def executedAmount: Long = math.min(submittedOrder.amount, counterOrder.amount)
+    def submittedExecuted = submittedOrder.partial(amount = executedAmount)
+    def counterExecuted = counterOrder.partial(amount = executedAmount)
   }
   @SerialVersionUID(-3697114578758882607L)
   case class OrderAdded(order: LimitOrder) extends Event
-  case class OrderRejected(id: OrderId) extends Event
-  case class OrderCanceled(id: OrderId) extends Event
+  case class OrderCanceled(limitOrder: LimitOrder) extends Event
+  case class OrderCancelRejected(id: OrderId, reason: String) extends Event
 }

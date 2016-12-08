@@ -14,5 +14,6 @@ trait MatcherSettings {
   lazy val matcherAccount = (matcherSettings \ "account").as[String]
   lazy val matcherHost = (matcherSettings \ "host").asOpt[String].getOrElse(DefaultHost)
   lazy val matcherPort = (matcherSettings \ "port").asOpt[Int].getOrElse(DefaultPort)
-  lazy val matcherTxFee = (matcherSettings \ "orderMatchTxFee").asOpt[Int].getOrElse(DefaultOrderMatchTxFee)
+  lazy val orderMatchTxFee = (matcherSettings \ "orderMatchTxFee").asOpt[Int].getOrElse(DefaultOrderMatchTxFee)
+  lazy val orderCanceTxFee = (matcherSettings \ "orderCanceTxFee").asOpt[Int].getOrElse(DefaultOrderMatchTxFee)
 }

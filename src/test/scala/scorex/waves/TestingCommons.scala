@@ -64,9 +64,18 @@ object TestingCommons {
   def peerUrl(a: Application = application): String =
     "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
 
+  def matcherUrl(a: Application = application): String =
+    "http://" + a.settings.matcherHost + ":" + a.settings.matcherPort + "/matcher"
+
   def getRequest(us: String, peer: String = peerUrl(application),
                  headers: Map[String, String] = Map.empty): JsValue = {
     val request = Http(url(peer + us).GET <:< headers)
+    val response = Await.result(request, 10.seconds)
+    Json.parse(response.getResponseBody)
+  }
+
+  def matcherGetRequest(path: String): JsValue = {
+    val request = Http(url(matcherUrl() + path).GET)
     val response = Await.result(request, 10.seconds)
     Json.parse(response.getResponseBody)
   }
@@ -78,6 +87,13 @@ object TestingCommons {
                   headers: Map[String, String] = Map("api_key" -> "test"),
                   peer: String = peerUrl(application)): JsValue = {
     val request = Http(url(peer + us).POST << params <:< headers << body)
+    val response = Await.result(request, 5.seconds)
+    Json.parse(response.getResponseBody)
+  }
+
+  def matcherPostRequest(path: String, body: String = "",
+                  headers: Map[String, String] = Map("api_key" -> "test")): JsValue = {
+    val request = Http(url(matcherUrl() + path).POST <:< headers << body )
     val response = Await.result(request, 5.seconds)
     Json.parse(response.getResponseBody)
   }

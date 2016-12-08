@@ -79,6 +79,12 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
   require(transactionModule.accountWatchingSupport)
 
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings, networkController))
+
+  override def run(): Unit = {
+    super.run()
+
+    if (settings.isRunMatcher) runMatcher()
+  }
 }
 
 object Application extends ScorexLogging {
@@ -97,8 +103,6 @@ object Application extends ScorexLogging {
 
       val application = new Application(actorSystem, settings)
       application.run()
-
-      if (settings.isRunMatcher) application.runMatcher()
 
       if (application.wallet.privateKeyAccounts().isEmpty)
         application.wallet.generateNewAccounts(1)

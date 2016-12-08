@@ -2,8 +2,8 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.settings.WavesSettings
 import scorex.transaction.SimpleTransactionModule._
-import scorex.transaction.TransactionModule
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
+import scorex.transaction.{SignedTransaction, TransactionModule}
+import scorex.transaction.assets.exchange.{Order, OrderCancelTransaction, OrderMatch}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.NTP
 import scorex.wallet.Wallet
@@ -21,14 +21,14 @@ trait OrderMatchCreator {
     txTime
   }
 
-  def createTransaction(order: Order, limitOrder: LimitOrder): OrderMatch = {
-    val matcher = wallet.privateKeyAccount(order.matcher.address).get
+  def createTransaction(sumbitted: LimitOrder, counter: LimitOrder): OrderMatch = {
+    val matcher = wallet.privateKeyAccount(sumbitted.order.matcher.address).get
 
-    val price = order.price
-    val amount = limitOrder.amount
-    val (buy, sell) = Order.splitByType(order, limitOrder.order)
+    val price = counter.price
+    val amount = math.min(sumbitted.amount, counter.amount)
+    val (buy, sell) = Order.splitByType(sumbitted.order, counter.order)
     val (buyFee, sellFee) =  calculateMatcherFee(buy, sell, amount: Long)
-    OrderMatch.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.matcherTxFee, getTimestamp)
+    OrderMatch.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
   }
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
@@ -44,11 +44,7 @@ trait OrderMatchCreator {
     transactionModule.isValid(orderMatch, orderMatch.timestamp)
   }
 
-  def sendToNetwork(txs: Seq[OrderMatch]): Unit = {
-    txs.foreach(sendToNetwork)
-  }
-
-  def sendToNetwork(tx: OrderMatch): Unit = {
+  def sendToNetwork(tx: SignedTransaction): Unit = {
     transactionModule.onNewOffchainTransaction(tx)
   }
 }

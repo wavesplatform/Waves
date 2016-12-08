@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.model
 
+import com.wavesplatform.matcher.model.Events.{OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
 import com.wavesplatform.matcher.util.{Cache, TTLCache}
 import scorex.transaction.AssetAcc
@@ -16,21 +17,17 @@ trait OrderHistory {
     val order = limitOrder.order
     val assetAcc = AssetAcc(order.sender, order.spendAssetId)
     val feeAssetAcc = AssetAcc(order.sender, None)
-    assetsToSpend(assetAcc.key) = assetsToSpend.getOrElse(assetAcc.key, 0L) + limitOrder.sellAmount
+    assetsToSpend(assetAcc.key) = assetsToSpend.getOrElse(assetAcc.key, 0L) + limitOrder.getSpendAmount
     assetsToSpend(feeAssetAcc.key) = assetsToSpend.getOrElse(feeAssetAcc.key, 0L) + limitOrder.feeAmount
 
-    ordersRemainingAmount.set(order.idStr, (order.amount, limitOrder.amount))
+    ordersRemainingAmount.set(order.idStr, (order.amount, 0L))
   }
 
-  def removeOrderItems(orderItems: Seq[LimitOrder]): Unit = {
-    orderItems.foreach(removeOrderItem)
-  }
-
-  def removeOrderItem(limitOrder: LimitOrder): Unit = {
-    def reduceSpendAssets(key: Address, value: Long) =
+  def reduceSpendAssets(limitOrder: LimitOrder) = {
+    def reduce(key: Address, value: Long) =
       if (assetsToSpend.contains(key)) {
         val newVal = assetsToSpend(key) - value
-        if (newVal > 0) assetsToSpend(key) = newVal
+        if (newVal > 0) assetsToSpend += (key -> newVal)
         else assetsToSpend -= key
       }
 
@@ -38,12 +35,29 @@ trait OrderHistory {
     val assetAcc = AssetAcc(order.sender, order.spendAssetId)
     val feeAssetAcc = AssetAcc(order.sender, None)
 
-    reduceSpendAssets(assetAcc.key, limitOrder.sellAmount)
-    reduceSpendAssets(feeAssetAcc.key,  limitOrder.feeAmount)
+    reduce(assetAcc.key, limitOrder.getSpendAmount)
+    reduce(feeAssetAcc.key, limitOrder.feeAmount)
+  }
 
-    ordersRemainingAmount.get(order.idStr).foreach(prev =>
-      ordersRemainingAmount.set(order.idStr, (order.amount, prev._2 - limitOrder.amount))
-    )
+
+  def didOrderExecuted(orderExecuted: OrderExecuted): Unit = {
+
+    def updateRemaining(limitOrder: LimitOrder) = {
+      val prev = ordersRemainingAmount.get(limitOrder.order.idStr).map(_._2).getOrElse(0L)
+      ordersRemainingAmount.set(limitOrder.order.idStr, (limitOrder.order.amount, prev + limitOrder.amount))
+    }
+
+    reduceSpendAssets(orderExecuted.counterExecuted)
+
+    updateRemaining(orderExecuted.submittedExecuted)
+    updateRemaining(orderExecuted.counterExecuted)
+  }
+
+  def didOrderCanceled(orderCanceled: OrderCanceled): Unit = {
+    val prev = ordersRemainingAmount.get(orderCanceled.limitOrder.order.idStr).map(_._2).getOrElse(0L)
+    ordersRemainingAmount.set(orderCanceled.limitOrder.order.idStr, (0L, prev))
+
+    reduceSpendAssets(orderCanceled.limitOrder)
   }
 
   def getOrderStatus(id: String): OrderStatus = {
@@ -51,7 +65,8 @@ trait OrderHistory {
       LimitOrder.NotFound
     else {
       val (full, exec) = ordersRemainingAmount.get(id).get
-      if (exec == 0) LimitOrder.Accepted
+      if (full == 0) LimitOrder.Cancelled
+      else if (exec == 0) LimitOrder.Accepted
       else if (exec < full) LimitOrder.PartiallyFilled(exec)
       else LimitOrder.Filled
     }

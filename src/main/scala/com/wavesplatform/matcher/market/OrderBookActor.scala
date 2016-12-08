@@ -1,20 +1,21 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.Props
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence._
-import com.wavesplatform.matcher.market.MatcherActor.{OrderAccepted, OrderRejected}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
 import com.wavesplatform.matcher.util.Cache
 import com.wavesplatform.settings.WavesSettings
+import play.api.libs.json.{JsString, JsValue, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange._
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -42,7 +43,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     case GetBidOrdersRequest =>
       sender() ! GetOrdersResponse(orderBook.bids.values.flatten.toSeq)
     case GetOrderBookRequest(pair, depth) =>
-      getOrderBook(pair, depth)
+      handleGetOrderBook(pair, depth)
     case SaveSnapshot =>
         deleteSnapshots(SnapshotSelectionCriteria.Latest)
         saveSnapshot(Snapshot(orderBook, ordersRemainingAmount))
@@ -50,23 +51,36 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       log.info(s"Snapshot saved with metadata $metadata")
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
-    case GetOrderStatus(id) =>
+    case GetOrderStatus(_, id) =>
       handleOrderStatus(id)
+    case CancelOrder(_, tx) =>
+      handleCancelOrder(tx)
   }
 
   def handleOrderStatus(id: String): Unit = {
     sender() ! GetOrderStatusResponse(getOrderStatus(id))
   }
 
+  def handleCancelOrder(tx: OrderCancelTransaction) = {
+    val v = validateCancelOrder(tx)
+    if (v) {
+      persist(OrderBook.cancelOrder(orderBook, tx.orderIdStr)) { e =>
+        sender() ! OrderCanceled(tx.orderIdStr)
+        handleCancelEvent(e, tx)
+      }
+    } else {
+      sender() ! OrderCancelRejected(v.messages)
+    }
+  }
 
-  def getOrderBook(pair: AssetPair, depth: Int): Unit = {
+  def handleGetOrderBook(pair: AssetPair, depth: Int): Unit = {
     def aggregateLevel(l: (Price, Level[LimitOrder])) = LevelAgg(l._1, l._2.foldLeft(0L)((b, o) => b + o.amount))
 
     if (pair == assetPair) {
       val d = Math.min(depth, MaxDepth)
-      sender() ! GetOrderBookResponse(orderBook.bids.take(d).map(aggregateLevel).toSeq,
+      sender() ! GetOrderBookResponse(pair, orderBook.bids.take(d).map(aggregateLevel).toSeq,
         orderBook.asks.take(d).map(aggregateLevel).toSeq)
-    } else sender() ! GetOrderBookResponse(Seq(), Seq())
+    } else sender() ! GetOrderBookResponse(pair, Seq(), Seq())
   }
 
   override def receiveRecover: Receive = {
@@ -92,18 +106,19 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     orderBook = OrderBook.updateState(orderBook, e)
     e match {
       case OrderAdded(o) => addOpenOrder(o)
-      case OrderExecuted(s, c) =>
+      case e: OrderExecuted => didOrderExecuted(e)
+      case e: Events.OrderCanceled => didOrderCanceled(e)
       case _ =>
     }
   }
 
   def matchOrder(limitOrder: LimitOrder): Unit = {
     persist(OrderBook.matchOrder(orderBook, limitOrder)) { e =>
-      handleEvent(e).foreach(matchOrder)
+      handleMatchEvent(e).foreach(matchOrder)
     }
   }
 
-  def handleEvent(e: Event): Option[LimitOrder] = {
+  def handleMatchEvent(e: Event): Option[LimitOrder] = {
     applyEvent(e)
     context.system.eventStream.publish(e)
 
@@ -111,7 +126,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       case e: OrderAdded =>
         None
       case e@OrderExecuted(o, c) =>
-        val tx = createTransaction(o.order, c)
+        val tx = createTransaction(o, c)
         if (isValid(tx)) {
           sendToNetwork(tx)
         }
@@ -119,6 +134,13 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
         else None
       case _ => None
     }
+  }
+
+  def handleCancelEvent(e: Event, tx: OrderCancelTransaction): Unit = {
+    applyEvent(e)
+    context.system.eventStream.publish(e)
+
+    sendToNetwork(tx)
   }
 
 }
@@ -134,16 +156,61 @@ object OrderBookActor {
   val SnapshotDuration = 1.minutes
 
   //protocol
+  sealed trait OrderBookRequest {
+    def pair: AssetPair
+  }
+  case class GetOrderBookRequest(pair: AssetPair, depth: Int = MaxDepth) extends OrderBookRequest
+  case class GetOrderStatus(pair: AssetPair, id: String) extends OrderBookRequest
+  case class CancelOrder(pair: AssetPair, tx: OrderCancelTransaction) extends OrderBookRequest
+
+  sealed trait OrderBookResponse {
+    def json: JsValue
+    def code: StatusCode
+  }
+
+  sealed trait OrderResponse extends OrderBookResponse
+  case class OrderAccepted(order: Order) extends OrderResponse {
+    val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json)
+    val code = StatusCodes.OK
+  }
+
+  case class OrderRejected(message: String) extends OrderResponse {
+    val json = Json.obj("status" -> "OrderRejected", "message" -> message)
+    val code = StatusCodes.BadRequest
+  }
+
+  case class OrderCanceled(orderId: String) extends OrderResponse {
+    val json = Json.obj("status" -> "OrderCanceled", "orderId" -> orderId)
+    val code = StatusCodes.OK
+  }
+
+  case class OrderCancelRejected(orderId: String) extends OrderResponse {
+    val json = Json.obj("status" -> "OrderCancelRejected")
+    val code = StatusCodes.BadRequest
+  }
+
+  case object NotFoundPair extends OrderBookResponse {
+    val json = JsString("Unknown Assets Pair")
+    val code = StatusCodes.NotFound
+  }
+
+  case class GetOrderStatusResponse(status: LimitOrder.OrderStatus) extends OrderBookResponse {
+    val json = status.json
+    val code = StatusCodes.OK
+  }
+
+  case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends OrderBookResponse {
+    val json = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
+    val code = StatusCodes.OK
+  }
+
+  // Direct requests
   case object GetOrdersRequest
-  case class GetOrderBookRequest(pair: AssetPair, depth: Int = MaxDepth)
   case object GetBidOrdersRequest
   case object GetAskOrdersRequest
   case class GetOrdersResponse(orders: Seq[LimitOrder])
-  case class GetOrderBookResponse(bids: Seq[LevelAgg], asks: Seq[LevelAgg])
-  case object SaveSnapshot
-  case class GetOrderStatus(id: String)
-  case class GetOrderStatusResponse(status: LimitOrder.OrderStatus)
 
+  case object SaveSnapshot
 
   @SerialVersionUID(-5350485695558994597L)
   case class Snapshot(orderBook: OrderBook, history: Cache[String, (Long, Long)])

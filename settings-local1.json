@@ -7,10 +7,10 @@
     "port": 6868,
     "maxConnections": 10
   },
-  "walletDir": "/Users/koloale/waves/matcher/wallet",
+  "walletDir": "",
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
   "walletPassword": "mycookies",
-  "dataDir": "/Users/koloale/waves/matcher/data",
+  "dataDir": "",
   "rpcPort": 6869,
   "blockGenerationDelay": 1000,
   "cors": true,

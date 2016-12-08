@@ -18,9 +18,12 @@ object OrderBook {
   val bidsOrdering: Ordering[Long] = new Ordering[Long] {
     def compare(x: Long, y: Long): Int = - Ordering.Long.compare(x, y)
   }
+  val asksOrdering: Ordering[Long] = new Ordering[Long] {
+    def compare(x: Long, y: Long): Int = Ordering.Long.compare(x, y)
+  }
 
   val empty: OrderBook = OrderBook(TreeMap.empty[Price, Level[BuyLimitOrder]](bidsOrdering),
-    TreeMap.empty[Price, Level[SellLimitOrder]])
+    TreeMap.empty[Price, Level[SellLimitOrder]](asksOrdering))
 
   import Events._
 
@@ -35,6 +38,36 @@ object OrderBook {
         case true => OrderExecuted(o, ob.bestBid.get)
         case false => OrderAdded(oo)
       }
+  }
+
+  def cancelOrder(ob: OrderBook, orderId: String): Event = {
+    ob.bids.find { case (p, v) => v.exists(_.order.idStr == orderId)}
+        .orElse(ob.asks.find { case (p, v) => v.exists(_.order.idStr == orderId)})
+      .fold[Event](OrderCancelRejected(orderId, "Order not found")) {
+        case (p, v) =>
+          OrderCanceled(v.find(_.order.idStr == orderId).get)
+      }
+  }
+
+  def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): (OrderBook) = {
+    (limitOrder match {
+      case oo@BuyLimitOrder(p, _, _) =>
+        ob.bids.get(p).map { lvl =>
+          val updatedQ = lvl.filter(_ != oo)
+          ob.copy(bids = updatedQ.nonEmpty match {
+            case true => ob.bids + (p -> updatedQ)
+            case false => ob.bids - p
+          })
+        }
+      case oo@SellLimitOrder(p, _, _) =>
+        ob.asks.get(p).map { lvl =>
+          val updatedQ = lvl.filter(_ != oo)
+          ob.copy(asks = updatedQ.nonEmpty match {
+            case true => ob.asks + (p -> updatedQ)
+            case false => ob.asks - p
+          })
+        }
+    }).getOrElse(ob)
   }
 
   def matchOrder1(ob: OrderBook, o: LimitOrder): (OrderBook, Option[LimitOrder], Long) = o match {
@@ -59,6 +92,7 @@ object OrderBook {
       val (l1, l2) = l.span(_ != o)
       val ll = if (r > 0) (l1 :+ o.copy(amount = r)) ++ l2.tail else l1 ++ l2.tail
       ob.copy(bids = if (ll.isEmpty) ob.bids - o.price else ob.bids + (o.price -> ll))
+    case None => ob
   }
 
   def updateExecutedSell(ob: OrderBook, o: SellLimitOrder, r: Long) = ob.asks.get(o.price) match {
@@ -66,6 +100,7 @@ object OrderBook {
       val (l1, l2) = l.span(_ != o)
       val ll = if (r > 0) (l1 :+ o.copy(amount = r)) ++ l2.tail else l1 ++ l2.tail
       ob.copy(asks = if (ll.isEmpty) ob.asks - o.price else ob.asks + (o.price -> ll))
+    case None => ob
   }
 
   def updateState(ob: OrderBook, event: Event): OrderBook = event match {
@@ -77,7 +112,8 @@ object OrderBook {
       ob.copy(asks = ob.asks + (o.price -> (orders :+ o)))
     case e@OrderExecuted(_, c: BuyLimitOrder) => updateExecutedBuy(ob, c, e.counterRemaining)
     case e@OrderExecuted(_, c: SellLimitOrder) => updateExecutedSell(ob, c, e.counterRemaining)
-
+    case e@OrderCanceled(limitOrder) => updateCancelOrder(ob, limitOrder)
+    case e: OrderCancelRejected => ob
   }
 
 
@@ -105,76 +141,3 @@ object OrderBook {
   }
 
 }
-
-/*case class OrderBook(assetPair: AssetPair, priceOrders: TreeMap[Long, Level]) {
-
-  def add(order: OrderItem) {
-    val prevLevel = priceOrders.getOrElse(order.price, Level(order.price))
-    copy(priceOrders = priceOrders + (order.price -> prevLevel.copy(orders = prevLevel.orders :+ order)))
-  }
-
-
-  def matchOrder(order: OrderItem): Option[(OrderBook, OrderItem, OrderItem)] = {
-    priceOrders.headOption.flatMap { case (bestPrice, bestLevel) =>
-      if (priceOrders.ordering.compare(bestPrice, order.price) <= 0) {
-        val (level, executed, remaining) = bestLevel.executeOrder(order)
-        val newTree = if (level.isEmpty) priceOrders - bestPrice else priceOrders + (bestPrice -> level)
-        val ob = copy(priceOrders = newTree)
-        Some(this.copy(priceOrders = newTree), executed, order.copy(amount = remaining))
-      } else None
-    }
-  }
-
-  /*def runMatching(order: OrderItem, n: Int = 1): (OrderBook, Seq[OrderItem], Long) = {
-    priceOrders.headOption.map { bestOrders =>
-      val bestLevel = priceOrders(bestOrders.last)
-
-      if (priceOrders.ordering.compare(bestLevel.price, order.price) <= 0) {
-        val (level, executed, remaining) = bestLevel.execute(order)
-
-        if (remaining > 0) {
-          val (remainingExecuted, nextRemaining) = runMatching(order.copy(amount = remaining), n + 1)
-          (executed ++ remainingExecuted, nextRemaining)
-        } else (executed, remaining)
-      } else (Seq.empty, order.amount)
-    } else
-    {
-      (Seq.empty, order.amount)
-    }
-  }*/
-
-
-  /*def removeOrder(order: OrderItem): Unit = {
-    val prevLevel = priceOrders.getOrDefault(order.price, Level(order.price))
-
-    val (before, after) = prevLevel.orders.span(_.order != order.order)
-    if (after.nonEmpty) {
-      val prevOrder = after.head
-      val newOrders = if (order.amount < prevOrder.amount) {
-        (before :+ prevOrder.copy(amount = prevOrder.amount - order.amount)) ++ after.tail
-      } else before ++ after.tail
-
-      if (newOrders.isEmpty) priceOrders.remove(order.price)
-      else priceOrders.put(order.price, prevLevel.copy(orders = newOrders))
-    }
-  }*/
-
-  private def delete(orders: Level) {
-    priceOrders.remove(orders.price)
-  }
-
-  def flattenOrders: Seq[OrderItem] = {
-    priceOrders.flatMap(_._2.orders).toSeq
-  }
-
-  def take(depth: Int): Seq[LevelAgg] = {
-    priceOrders.take(depth).values.map(_.getAgg).toList
-  }
-
-}
-
-object OrderBook {
-  def empty(assetPair: AssetPair, ordering: Ordering[Long]): OrderBook = {
-    OrderBook(assetPair, TreeMap.empty[Long, Level](ordering))
-  }
-}*/

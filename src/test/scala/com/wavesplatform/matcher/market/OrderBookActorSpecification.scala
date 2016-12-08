@@ -6,9 +6,8 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
-import com.wavesplatform.matcher.market.MatcherActor.OrderAccepted
-import com.wavesplatform.matcher.market.OrderBookActor.{GetAskOrdersRequest, GetBidOrdersRequest, GetOrdersRequest, GetOrdersResponse}
-import com.wavesplatform.matcher.model.Events.{Event, OrderAdded}
+import com.wavesplatform.matcher.market.OrderBookActor._
+import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.WavesSettings
 import org.h2.mvstore.MVStore
@@ -22,6 +21,7 @@ import scorex.transaction.assets.exchange.AssetPair
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
+
 import scala.concurrent.duration._
 
 class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
