@@ -57,6 +57,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       withRollbackTest {
         val issueTx: IssueTransaction = pair._1
         val deleteTx: DeleteTransaction = pair._4
+        val senderAddress = issueTx.sender.address
         val senderAmountAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
         state.assetBalance(senderAmountAcc) shouldBe 0
@@ -69,6 +70,13 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         state.applyChanges(state.calcNewBalances(Seq(deleteTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe (issueTx.quantity - deleteTx.amount)
+
+        val senderBalances = state.getAccountBalance(issueTx.sender)
+
+        senderBalances.keySet should contain(issueTx.assetId)
+        val b = senderBalances.head._2
+        b._1 == b._3 shouldBe true
+        b._1 == issueTx.quantity - deleteTx.amount shouldBe true
       }
     }
   }

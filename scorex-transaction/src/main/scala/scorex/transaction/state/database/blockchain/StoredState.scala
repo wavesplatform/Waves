@@ -104,6 +104,8 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
           transactionsMap.put(tx.id, tx.bytes)
           assetsExtension.addAsset(tx.assetId, h, tx.id, tx.quantity, tx.reissuable)
           includedTx.put(tx.id, h)
+        case tx: DeleteTransaction =>
+          assetsExtension.burnAsset(tx.assetId, h, tx.id, -tx.amount)
         case tx =>
           includedTx.put(tx.id, h)
       }
@@ -122,6 +124,8 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
           transactionsMap.remove(t.id)
           t match {
             case t: AssetIssuance =>
+              assetsExtension.rollbackTo(t.assetId, currentHeight)
+            case t: DeleteTransaction =>
               assetsExtension.rollbackTo(t.assetId, currentHeight)
             case _ =>
           }
