@@ -5,7 +5,7 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.api.http.reads._
+import scorex.api.http.formats._
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 
@@ -31,7 +31,7 @@ object BroadcastRequests {
                                @ApiModelProperty(required = true)
                                timestamp: Long,
                                @ApiModelProperty(required = true)
-                               signature: Array[Byte]) {
+                               signature: String) {
 
     def toTx: Try[IssueTransaction] = Try {
       IssueTransaction(
@@ -43,7 +43,7 @@ object BroadcastRequests {
         reissuable,
         fee,
         timestamp,
-        signature
+        Base58.decode(signature).get
       )
     }
   }
@@ -62,7 +62,7 @@ object BroadcastRequests {
                                  @ApiModelProperty(required = true)
                                  timestamp: Long,
                                  @ApiModelProperty(required = true)
-                                 signature: Array[Byte]) {
+                                 signature: String) {
 
     def toTx: Try[ReissueTransaction] = Try {
       ReissueTransaction(
@@ -72,7 +72,7 @@ object BroadcastRequests {
         reissuable,
         fee,
         timestamp,
-        signature)
+        Base58.decode(signature).get)
     }
   }
 
@@ -118,7 +118,7 @@ object BroadcastRequests {
                                   @ApiModelProperty(value = "Base58 encoded attachment")
                                   attachment: Option[String],
                                   @ApiModelProperty(required = true)
-                                  signature: Array[Byte]) {
+                                  signature: String) {
     def toTx: Try[TransferTransaction] = Try {
       TransferTransaction(
         assetId.map(Base58.decode(_).get),
@@ -129,7 +129,7 @@ object BroadcastRequests {
         feeAssetId.map(_.getBytes),
         fee,
         attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
-        signature)
+        Base58.decode(signature).get)
     }
   }
 
@@ -142,7 +142,7 @@ object BroadcastRequests {
       (JsPath \ "feeAssetId").readNullable[String] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "attachment").readNullable[String] and
-      (JsPath \ "signature").read[Array[Byte]](SignatureReads)
+      (JsPath \ "signature").read[String](SignatureReads)
     ) (AssetTransferRequest.apply _)
 
   implicit val assetIssueRequestReads: Reads[AssetIssueRequest] = (
@@ -154,7 +154,7 @@ object BroadcastRequests {
       (JsPath \ "reissuable").read[Boolean] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[Array[Byte]](SignatureReads)
+      (JsPath \ "signature").read[String](SignatureReads)
     ) (AssetIssueRequest.apply _)
 
   implicit val assetReissueRequestReads: Reads[AssetReissueRequest] = (
@@ -164,7 +164,7 @@ object BroadcastRequests {
       (JsPath \ "reissuable").read[Boolean] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[Array[Byte]](SignatureReads)
+      (JsPath \ "signature").read[String](SignatureReads)
     ) (AssetReissueRequest.apply _)
 
   //TODO put reads/writes together?
