@@ -1,16 +1,14 @@
 package scorex.waves
 
-import com.wavesplatform.MainNetParams
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.account.{Account, AddressScheme, PublicKeyAccount}
+import scorex.account.{Account, PublicKeyAccount}
 import scorex.api.http._
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.waves.http.UnsignedPayment
 import scorex.waves.transaction.{ExternalPayment, SignedPayment}
 
-@DoNotDiscover
 class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
   import TestingCommons._
@@ -60,7 +58,7 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(EllipticCurveImpl.SignatureLength)(0.toByte)
-    val payment = SignedPayment(timestamp, amount, 400L, recipient, senderPublicKey, "", signature)
+    val payment = SignedPayment(timestamp, amount, 400L, recipient, senderPublicKey, "", Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
     val response = postRequest(us = "/waves/broadcast-signed-payment", body = json)
@@ -73,7 +71,7 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(EllipticCurveImpl.SignatureLength)(0.toByte)
-    val payment = SignedPayment(timestamp, amount, 4L, recipient, senderPublicKey, "", signature)
+    val payment = SignedPayment(timestamp, amount, 4L, recipient, senderPublicKey, "", Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
     val response = postRequest(us = "/waves/broadcast-signed-payment", body = json)
