@@ -71,7 +71,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                       tx.validate match {
                         case ValidationResult.ValidateOke =>
                           val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                            tx.sender, tx.sender.address, tx.signature)
+                            tx.sender, tx.sender.address, Base58.encode(tx.signature))
                           JsonResponse(Json.toJson(signed), StatusCodes.OK)
 
                         case ValidationResult.InvalidAddress => InvalidAddress.response
@@ -123,7 +123,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                       tx.validate match {
                         case ValidationResult.ValidateOke =>
                           val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                            tx.sender, tx.sender.address, tx.signature)
+                            tx.sender, tx.sender.address, Base58.encode(tx.signature))
                           JsonResponse(Json.toJson(signed), StatusCodes.OK)
 
                         case ValidationResult.InvalidAddress => InvalidAddress.response
@@ -179,7 +179,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                   payment.amount, payment.fee, payment.timestamp) match {
                   case Right(tx) =>
                     val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                      tx.sender, tx.sender.address, tx.signature)
+                      tx.sender, tx.sender.address, Base58.encode(tx.signature))
                     JsonResponse(Json.toJson(signedTx), StatusCodes.OK)
 
                   case Left(e) => e match {
@@ -295,7 +295,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
   private def broadcastPayment(payment: ExternalPayment): JsonResponse = {
     val senderAccount = payment.senderPublicKey
     val signedPayment = SignedPayment(payment.timestamp, payment.amount, payment.fee, payment.recipient,
-      payment.senderPublicKey, senderAccount.address, payment.signature)
+      payment.senderPublicKey, senderAccount.address, Base58.encode(payment.signature))
 
     transactionModule.broadcastPayment(signedPayment) match {
       case Right(tx) =>
