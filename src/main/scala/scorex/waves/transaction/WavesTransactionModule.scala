@@ -72,10 +72,10 @@ class WavesTransactionModule(chainParams: ChainParameters)(implicit override val
       Left(ValidationResult.InsufficientFee)
     else {
       val time = payment.timestamp
-      val sigBytes = Base58.decode(payment.signature).get
-      val senderPubKey = Base58.decode(payment.senderPublicKey).get
-      val recipientAccount = new Account(payment.recipient)
-      val tx = new PaymentTransaction(new PublicKeyAccount(senderPubKey),
+      val sigBytes = payment.signature
+      val senderPubKey = payment.senderPublicKey
+      val recipientAccount = payment.recipient
+      val tx = new PaymentTransaction(senderPubKey,
         recipientAccount, payment.amount, payment.fee, time, sigBytes)
 
       tx.validate match {

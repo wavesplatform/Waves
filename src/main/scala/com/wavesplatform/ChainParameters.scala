@@ -80,4 +80,6 @@ object MainNetParams extends ChainParameters {
   override def allowTransactionsFromFutureUntil: Long = 1479168000000L
 
   override def allowUnissuedAssetsUntil: Long = 1479416400000L
+
+  override def allowDeleteTransactionAfterTimestamp: Long = ???
 }

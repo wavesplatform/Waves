@@ -2,12 +2,14 @@ package scorex.waves.transaction
 
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Reads, Writes}
+import scorex.account.{Account, PublicKeyAccount}
+import scorex.api.http.formats._
 
 case class SignedPayment(timestamp: Long,
                          amount: Long,
                          fee: Long,
-                         recipient: String,
-                         senderPublicKey: String,
+                         recipient: Account,
+                         senderPublicKey: PublicKeyAccount,
                          sender: String,
                          signature: String)
 
@@ -16,8 +18,8 @@ object SignedPayment {
     (JsPath \ "timestamp").write[Long] and
       (JsPath \ "amount").write[Long] and
       (JsPath \ "fee").write[Long] and
-      (JsPath \ "recipient").write[String] and
-      (JsPath \ "senderPublicKey").write[String] and
+      (JsPath \ "recipient").write[Account] and
+      (JsPath \ "senderPublicKey").write[PublicKeyAccount](PublicKeyAccountWrites) and
       (JsPath \ "sender").write[String] and
       (JsPath \ "signature").write[String]
     ) (unlift(SignedPayment.unapply))
@@ -26,9 +28,9 @@ object SignedPayment {
     (JsPath \ "timestamp").read[Long] and
       (JsPath \ "amount").read[Long] and
       (JsPath \ "fee").read[Long] and
-      (JsPath \ "recipient").read[String] and
-      (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "recipient").read[Account] and
+      (JsPath \ "senderPublicKey").read[PublicKeyAccount](PublicKeyAccountReads) and
       (JsPath \ "sender").read[String] and
-      (JsPath \ "signature").read[String]
+      (JsPath \ "signature").read[String](SignatureReads)
     ) (SignedPayment.apply _)
 }
