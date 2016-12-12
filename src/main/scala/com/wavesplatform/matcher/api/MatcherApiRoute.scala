@@ -56,6 +56,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
   @Path("/orders/status/{id}")
   @ApiOperation(value = "Order Status", notes = "Get Order status for a given Asset Pair during the last 30 days", httpMethod = "GET")
   @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "id", value = "Order Id", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "asset1", value = "Asset Id", required = true, dataType = "string", paramType = "query"),
     new ApiImplicitParam(name = "asset2", value = "Asset Id or empty for WAVES", required = false, dataType = "string", paramType = "query")
   ))
@@ -96,11 +97,11 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
   ))
   def orderBook: Route = {
     path("orderBook") {
-      parameters('asset1, 'asset2.?) { (asset1, asset2) =>
+      parameters('asset1, 'asset2.?, "depth".as[Int].?) { (asset1, asset2, depth) =>
       getJsonRoute {
           val pair = AssetPair(Base58.decode(asset1).toOption, asset2.flatMap(Base58.decode(_).toOption))
 
-          (matcher ? GetOrderBookRequest(pair))
+          (matcher ? GetOrderBookRequest(pair, depth))
             .mapTo[OrderBookResponse]
             .map(r => JsonResponse(r.json, r.code))
         }

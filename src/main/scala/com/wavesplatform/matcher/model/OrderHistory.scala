@@ -4,6 +4,7 @@ import com.wavesplatform.matcher.model.Events.{OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
 import com.wavesplatform.matcher.util.{Cache, TTLCache}
 import scorex.transaction.AssetAcc
+import scorex.transaction.assets.exchange.Order
 import scorex.transaction.state.database.state._
 
 import scala.collection.mutable
@@ -11,7 +12,7 @@ import scala.concurrent.duration._
 
 trait OrderHistory {
   val assetsToSpend = mutable.Map.empty[Address, Long]
-  var ordersRemainingAmount: Cache[String, (Long, Long)] = TTLCache[String, (Long, Long)](1.minutes)
+  var ordersRemainingAmount: Cache[String, (Long, Long)] = TTLCache[String, (Long, Long)](Order.MaxLiveTime.millis)
 
   def addOpenOrder(limitOrder: LimitOrder): Unit = {
     val order = limitOrder.order
@@ -64,10 +65,10 @@ trait OrderHistory {
     if (!ordersRemainingAmount.contains(id))
       LimitOrder.NotFound
     else {
-      val (full, exec) = ordersRemainingAmount.get(id).get
-      if (full == 0) LimitOrder.Cancelled
-      else if (exec == 0) LimitOrder.Accepted
-      else if (exec < full) LimitOrder.PartiallyFilled(exec)
+      val (full, filled) = ordersRemainingAmount.get(id).get
+      if (full == 0) LimitOrder.Cancelled(filled)
+      else if (filled == 0) LimitOrder.Accepted
+      else if (filled < full) LimitOrder.PartiallyFilled(filled)
       else LimitOrder.Filled
     }
   }

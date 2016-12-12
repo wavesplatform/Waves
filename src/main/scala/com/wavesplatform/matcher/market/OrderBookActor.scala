@@ -73,11 +73,11 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     }
   }
 
-  def handleGetOrderBook(pair: AssetPair, depth: Int): Unit = {
+  def handleGetOrderBook(pair: AssetPair, depth: Option[Int]): Unit = {
     def aggregateLevel(l: (Price, Level[LimitOrder])) = LevelAgg(l._1, l._2.foldLeft(0L)((b, o) => b + o.amount))
 
     if (pair == assetPair) {
-      val d = Math.min(depth, MaxDepth)
+      val d = Math.min(depth.getOrElse(MaxDepth), MaxDepth)
       sender() ! GetOrderBookResponse(pair, orderBook.bids.take(d).map(aggregateLevel).toSeq,
         orderBook.asks.take(d).map(aggregateLevel).toSeq)
     } else sender() ! GetOrderBookResponse(pair, Seq(), Seq())
@@ -153,13 +153,13 @@ object OrderBookActor {
     assetPair.second.map(Base58.encode).getOrElse("WAVES")
 
   val MaxDepth = 50
-  val SnapshotDuration = 1.minutes
+  val SnapshotDuration = 1.day
 
   //protocol
   sealed trait OrderBookRequest {
     def pair: AssetPair
   }
-  case class GetOrderBookRequest(pair: AssetPair, depth: Int = MaxDepth) extends OrderBookRequest
+  case class GetOrderBookRequest(pair: AssetPair, depth: Option[Int]) extends OrderBookRequest
   case class GetOrderStatus(pair: AssetPair, id: String) extends OrderBookRequest
   case class CancelOrder(pair: AssetPair, tx: OrderCancelTransaction) extends OrderBookRequest
 

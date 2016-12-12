@@ -45,14 +45,14 @@ object LimitOrder {
   case object NotFound extends OrderStatus {
     def json = Json.obj("status" -> "NotFound")
   }
-  case class PartiallyFilled(filledAmount: Long) extends OrderStatus {
-    def json = Json.obj("status" -> "PartiallyFilled", "filledAmount" -> filledAmount)
+  case class PartiallyFilled(filled: Long) extends OrderStatus {
+    def json = Json.obj("status" -> "PartiallyFilled", "filledAmount" -> filled)
   }
   case object Filled extends OrderStatus {
     def json = Json.obj("status" -> "Filled")
   }
-  case object Cancelled extends OrderStatus {
-    def json = Json.obj("status" -> "Cancelled")
+  case class Cancelled(filled: Long) extends OrderStatus {
+    def json = Json.obj("status" -> "Cancelled", "filledAmount" -> filled)
   }
 
   def apply(o: Order): LimitOrder = o.orderType match {
