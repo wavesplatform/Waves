@@ -78,6 +78,7 @@ case class OrderCancelTransaction(@ApiModelProperty(dataType = "java.lang.String
     "signature" -> Base58.encode(signature)
   )
 
+  @ApiModelProperty(hidden = true)
   override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(sender, assetFee._1), -assetFee._2))
 
   override def validate: _root_.scorex.transaction.ValidationResult.Value = ???

@@ -1,8 +1,8 @@
 package scorex.transaction.assets.exchange
 
 import scala.util.Try
-
 import com.google.common.primitives.{Ints, Longs}
+import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -22,16 +22,22 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
                       sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte])
   extends SignedTransaction with BytesSerializable {
 
+  @ApiModelProperty(hidden = true)
   override val transactionType: TransactionType.Value = TransactionType.OrderMatchTransaction
 
+  @ApiModelProperty(hidden = true)
   override val typeOrdering = -1
 
+  @ApiModelProperty(hidden = true)
   override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
 
+  @ApiModelProperty(hidden = true)
   lazy val idStr: String = Base58.encode(id)
 
+  @ApiModelProperty(hidden = true)
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
+  @ApiModelProperty(hidden = true)
   override val sender: PublicKeyAccount = buyOrder.matcher
 
   def isValid(previousMatches: Set[OrderMatch]): Validation =  {

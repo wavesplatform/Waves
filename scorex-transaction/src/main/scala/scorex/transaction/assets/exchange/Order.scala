@@ -73,11 +73,13 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   override def bytes: Array[Byte] = toSign ++ signature
 
+  @ApiModelProperty(hidden = true)
   def getSpendAmount: Long = {
     if (orderType == OrderType.BUY) amount
     else (BigInt(amount) * PriceConstant / price).longValue()
   }
 
+  @ApiModelProperty(hidden = true)
   def getReceiveAmount: Long = {
     if (orderType == OrderType.SELL) amount
     else (BigInt(amount) * PriceConstant / price).longValue()
