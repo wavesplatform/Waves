@@ -36,7 +36,6 @@ object Dependencies {
   )
 
   lazy val http = Seq(
-    "com.typesafe.akka" %% "akka-http-experimental" % "2.+",
     "com.chuusai" %% "shapeless" % "2.+",
     "io.swagger" %% "swagger-scala-module" % "1.+",
     "io.swagger" % "swagger-core" % "1.+",
