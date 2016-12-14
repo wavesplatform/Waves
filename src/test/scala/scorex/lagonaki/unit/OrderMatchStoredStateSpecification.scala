@@ -72,7 +72,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
       new Account(request.recipient),
       request.amount,
       getTimestamp,
-      request.feeAsset.map(s => Base58.decode(s).get),
+      request.feeAssetId.map(s => Base58.decode(s).get),
       request.fee,
       Base58.decode(request.attachment).get)
   }

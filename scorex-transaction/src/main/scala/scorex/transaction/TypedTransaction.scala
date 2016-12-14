@@ -1,7 +1,8 @@
 package scorex.transaction
 
 import scorex.serialization.Deser
-import scorex.transaction.assets.{ReissueTransaction, TransferTransaction, IssueTransaction}
+import scorex.transaction.assets.exchange.{OrderCancelTransaction, OrderMatch}
+import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 
 import scala.util.{Failure, Try}
 
