@@ -10,7 +10,7 @@ trait MatcherSettings {
   def settingsJSON: JsObject
 
   private val DefaultMatcherHost = "127.0.0.1"
-  private val DefaultMatcherPort = 6870
+  private val DefaultMatcherPort = 6886
   private val DefaultOrderMatchTxFee = 100000
   private val DefaultMaxOpenOrderCount = 1000
 
