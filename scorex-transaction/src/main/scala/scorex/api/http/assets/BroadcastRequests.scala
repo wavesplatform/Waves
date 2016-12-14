@@ -5,8 +5,9 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import scorex.account.{Account, PublicKeyAccount}
+import scorex.api.http.formats._
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 
 import scala.util.Try
 
@@ -14,7 +15,7 @@ object BroadcastRequests {
 
   @ApiModel(value = "Signed Asset issue transaction")
   case class AssetIssueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                               senderPublicKey: String,
+                               sender: PublicKeyAccount,
                                @ApiModelProperty(value = "Base58 encoded name of Asset", required = true)
                                name: String,
                                @ApiModelProperty(value = "Base58 encoded description of Asset", required = true)
@@ -34,7 +35,7 @@ object BroadcastRequests {
 
     def toTx: Try[IssueTransaction] = Try {
       IssueTransaction(
-        new PublicKeyAccount(Base58.decode(senderPublicKey).get),
+        sender,
         name.getBytes(Charsets.UTF_8),
         description.getBytes(Charsets.UTF_8),
         quantity,
@@ -49,7 +50,7 @@ object BroadcastRequests {
 
 
   case class AssetReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                                 senderPublicKey: String,
+                                 senderPublicKey: PublicKeyAccount,
                                  @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
                                  assetId: String,
                                  @ApiModelProperty(required = true, example = "1000000")
@@ -65,7 +66,7 @@ object BroadcastRequests {
 
     def toTx: Try[ReissueTransaction] = Try {
       ReissueTransaction(
-        new PublicKeyAccount(Base58.decode(senderPublicKey).get),
+        senderPublicKey,
         Base58.decode(assetId).get,
         quantity,
         reissuable,
@@ -75,19 +76,43 @@ object BroadcastRequests {
     }
   }
 
+  case class AssetDeleteRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+                                senderPublicKey: String,
+                                @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
+                                assetId: String,
+                                @ApiModelProperty(required = true, example = "1000000")
+                                amount: Long,
+                                @ApiModelProperty(required = true)
+                                fee: Long,
+                                @ApiModelProperty(required = true)
+                                timestamp: Long,
+                                @ApiModelProperty(required = true)
+                                signature: String) {
+
+    def toTx: Try[DeleteTransaction] = Try {
+      DeleteTransaction(
+        new PublicKeyAccount(Base58.decode(senderPublicKey).get),
+        Base58.decode(assetId).get,
+        amount,
+        fee,
+        timestamp,
+        Base58.decode(signature).get)
+    }
+  }
+
   @ApiModel(value = "Signed Asset transfer transaction")
   case class AssetTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                  senderPublicKey: String,
+                                  sender: PublicKeyAccount,
                                   @ApiModelProperty(value = "Base58 encoded Asset ID")
                                   assetId: Option[String],
                                   @ApiModelProperty(value = "Recipient address", required = true)
-                                  recipient: String,
+                                  recipient: Account,
                                   @ApiModelProperty(required = true, example = "1000000")
                                   amount: Long,
                                   @ApiModelProperty(required = true)
                                   fee: Long,
                                   @ApiModelProperty(value = "Fee asset ID")
-                                  feeAsset: Option[String],
+                                  feeAssetId: Option[String],
                                   @ApiModelProperty(required = true)
                                   timestamp: Long,
                                   @ApiModelProperty(value = "Base58 encoded attachment")
@@ -97,31 +122,31 @@ object BroadcastRequests {
     def toTx: Try[TransferTransaction] = Try {
       TransferTransaction(
         assetId.map(Base58.decode(_).get),
-        new PublicKeyAccount(Base58.decode(senderPublicKey).get),
-        new Account(recipient),
+        sender,
+        recipient,
         amount,
         timestamp,
-        feeAsset.map(_.getBytes),
+        feeAssetId.map(_.getBytes),
         fee,
-        attachment.map(Base58.decode(_).get).getOrElse(new Array[Byte](0)),
+        attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
         Base58.decode(signature).get)
     }
   }
 
   implicit val assetTransferRequestReads: Reads[AssetTransferRequest] = (
-    (JsPath \ "senderPublicKey").read[String] and
+    (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
       (JsPath \ "assetId").readNullable[String] and
-      (JsPath \ "recipient").read[String] and
+      (JsPath \ "recipient").read[Account] and
       (JsPath \ "amount").read[Long] and
       (JsPath \ "fee").read[Long] and
-      (JsPath \ "feeAsset").readNullable[String] and
+      (JsPath \ "feeAssetId").readNullable[String] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "attachment").readNullable[String] and
-      (JsPath \ "signature").read[String]
+      (JsPath \ "signature").read[String](SignatureReads)
     ) (AssetTransferRequest.apply _)
 
   implicit val assetIssueRequestReads: Reads[AssetIssueRequest] = (
-    (JsPath \ "senderPublicKey").read[String] and
+    (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
       (JsPath \ "name").read[String] and
       (JsPath \ "description").read[String] and
       (JsPath \ "quantity").read[Long] and
@@ -129,17 +154,27 @@ object BroadcastRequests {
       (JsPath \ "reissuable").read[Boolean] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[String]
+      (JsPath \ "signature").read[String](SignatureReads)
     ) (AssetIssueRequest.apply _)
 
   implicit val assetReissueRequestReads: Reads[AssetReissueRequest] = (
-    (JsPath \ "senderPublicKey").read[String] and
+    (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
       (JsPath \ "assetId").read[String] and
       (JsPath \ "quantity").read[Long] and
       (JsPath \ "reissuable").read[Boolean] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[String]
+      (JsPath \ "signature").read[String](SignatureReads)
     ) (AssetReissueRequest.apply _)
+
+  //TODO put reads/writes together?
+  implicit val assetDeleteRequestReads: Reads[AssetDeleteRequest] = (
+    (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "assetId").read[String] and
+      (JsPath \ "quantity").read[Long] and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "signature").read[String]
+    ) (AssetDeleteRequest.apply _)
 }
 

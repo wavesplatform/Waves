@@ -5,7 +5,7 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Writes}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 
 /**
   */
@@ -104,6 +104,46 @@ object BroadcastResponses {
         (JsPath \ "signature").write[String]
       ) (unlift(AssetReissueResponse.unapply))
   }
+
+  @ApiModel(value = "Asset delete transaction")
+  case class AssetDeleteResponse(@ApiModelProperty(value = "Transaction ID", required = true)
+                                 id: String,
+                                 @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
+                                 assetId: String,
+                                 @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+                                 senderPublicKey: String,
+                                 @ApiModelProperty(required = true)
+                                 quantity: Long,
+                                 @ApiModelProperty(required = true)
+                                 fee: Long,
+                                 @ApiModelProperty(required = true)
+                                 timestamp: Long,
+                                 @ApiModelProperty(required = true)
+                                 signature: String) {
+  }
+
+  object AssetDeleteResponse {
+    def apply(tx: DeleteTransaction): AssetDeleteResponse = new AssetDeleteResponse(
+      Base58.encode(tx.id),
+      Base58.encode(tx.assetId),
+      Base58.encode(tx.sender.publicKey),
+      tx.amount,
+      tx.fee,
+      tx.timestamp,
+      Base58.encode(tx.signature)
+    )
+
+    implicit val reissueResponseWrites: Writes[AssetDeleteResponse] = (
+      (JsPath \ "id").write[String] and
+        (JsPath \ "assetId").write[String] and
+        (JsPath \ "senderPublicKey").write[String] and
+        (JsPath \ "quantity").write[Long] and
+        (JsPath \ "fee").write[Long] and
+        (JsPath \ "timestamp").write[Long] and
+        (JsPath \ "signature").write[String]
+      ) (unlift(AssetDeleteResponse.unapply))
+  }
+
 
   @ApiModel(value = "Asset transfer transaction")
   case class AssetTransferResponse(@ApiModelProperty(value = "Transaction ID", required = true)

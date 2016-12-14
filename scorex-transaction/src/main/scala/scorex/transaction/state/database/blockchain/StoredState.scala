@@ -8,13 +8,14 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
-import scorex.transaction.assets.{AssetIssuance, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets._
 import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
 
 import scala.concurrent.duration._
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 import scorex.transaction.assets.exchange.{OrderCancelTransaction, OrderMatch}
@@ -29,6 +30,7 @@ import scorex.transaction.assets.exchange.{OrderCancelTransaction, OrderMatch}
 class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging
   with OrderMatchStoredState {
 
+  val assetsExtension = new AssetsExtendedState(db)
 
   val HeightKey = "height"
   val DataKey = "dataset"
@@ -36,7 +38,6 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
   val IncludedTx = "includedTx"
   //todo put all transactions in the same map and use links to it
   val AllTxs = "IssueTxs"
-  val ReissueIndex = "reissuableFlag"
 
   if (db.getStoreVersion > 0) db.rollback()
 
@@ -54,12 +55,6 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     */
   val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
   db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
-
-  /**
-    * Transaction Signature -> reissuable flag
-    */
-  private val reissuableIndex: MVMap[Array[Byte], Boolean] =
-  db.openMap(ReissueIndex, new LogMVMapBuilder[Array[Byte], Boolean])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
@@ -82,23 +77,21 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
   private def getAccountAssets(address: Address): Set[String] =
     Option(accountAssetsMap.get(address)).getOrElse(Set.empty[String])
 
-  private def isIssuerOfAsset(address: Address, assetId: AssetId): Boolean = {
-    val issueTransaction = Option(transactionsMap.get(assetId)).flatMap(b => IssueTransaction.parseBytes(b).toOption)
+  private def getIssueTransaction(assetId: AssetId): Option[IssueTransaction] =
+    Option(transactionsMap.get(assetId)).flatMap(b => IssueTransaction.parseBytes(b).toOption)
 
-    if (issueTransaction.isDefined) issueTransaction.get.sender.address == address else false
-  }
-
-  def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean)] = {
+  def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = {
     val address = account.address
-    getAccountAssets(address).foldLeft(Map.empty[AssetId, (Long, Boolean)]) { (result, asset) =>
-      val assetIdTry = Base58.decode(asset)
+    getAccountAssets(address).foldLeft(Map.empty[AssetId, (Long, Boolean, Long, IssueTransaction)]) { (result, asset) =>
+      val triedAssetId = Base58.decode(asset)
       val balance = balanceByKey(address + asset)
 
-      if (assetIdTry.isSuccess) {
-        val assetId = assetIdTry.get
-        val issued = isIssuerOfAsset(address, assetId)
-
-        result.updated(assetId, (balance, issued))
+      if (triedAssetId.isSuccess) {
+        val assetId = triedAssetId.get
+        val maybeIssueTransaction = getIssueTransaction(assetId)
+        if (maybeIssueTransaction.isDefined)
+          result.updated(assetId, (balance, isAssetReissuable(assetId), totalAssetQuantity(assetId), maybeIssueTransaction.get))
+        else result
       } else result
     }
   }
@@ -113,8 +106,10 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
       ch._2._2.foreach {
         case tx: AssetIssuance =>
           transactionsMap.put(tx.id, tx.bytes)
-          reissuableIndex.put(tx.assetId, tx.reissuable)
+          assetsExtension.addAsset(tx.assetId, h, tx.id, tx.quantity, tx.reissuable)
           includedTx.put(tx.id, h)
+        case tx: DeleteTransaction =>
+          assetsExtension.burnAsset(tx.assetId, h, tx.id, -tx.amount)
         case om: OrderMatch =>
           transactionsMap.put(om.id, om.bytes)
           putOrderMatch(om, blockTs)
@@ -139,11 +134,10 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
           includedTx.remove(t.id)
           transactionsMap.remove(t.id)
           t match {
-            case t: ReissueTransaction =>
-              // if you rollback reissue, then before that issue value always was true
-              reissuableIndex.put(t.assetId, true)
-            case t: IssueTransaction =>
-              reissuableIndex.remove(t.assetId)
+            case t: AssetIssuance =>
+              assetsExtension.rollbackTo(t.assetId, currentHeight)
+            case t: DeleteTransaction =>
+              assetsExtension.rollbackTo(t.assetId, currentHeight)
             case _ =>
           }
         })
@@ -227,6 +221,9 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     balanceByKey(account.key, atHeight)
   }
 
+  def isAssetReissuable(assetId: AssetId): Boolean = assetsExtension.isReissuable(assetId)
+
+  def totalAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
 
   override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
     balance(account, Some(Math.max(1, heightOpt.getOrElse(stateHeight) - confirmations)))
@@ -253,23 +250,31 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
 
   def totalBalance: Long = lastStates.keySet().toList.map(address => balanceByKey(address)).sum
 
-  override def accountTransactions(account: Account, limit: Int = 50): Seq[Transaction] = {
-    Option(lastStates.get(account.address)) match {
-      case Some(accHeight) =>
-        val m = accountChanges(account.address)
+  private val DefaultLimit = 50
 
-        def loop(h: Int, acc: Seq[Transaction]): Seq[Transaction] = Option(m.get(h)) match {
-          case Some(heightChangesBytes) if acc.length < limit =>
-            val heightChanges = heightChangesBytes
-            val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[Transaction])
-              .map(_.asInstanceOf[Transaction])
-            loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
-          case _ => acc
-        }
+  override def accountTransactions(account: Account, limit: Int = DefaultLimit): Seq[Transaction] = {
+    val accountAssets = getAccountAssets(account.address)
+    val keys = account.address :: accountAssets.map(account.address + _).toList
 
-        loop(accHeight, Seq.empty).distinct
-      case None => Seq.empty
-    }
+    keys.foldLeft(Seq.empty[Transaction]) { (result, key) =>
+      val transactions = Option(lastStates.get(key)) match {
+        case Some(accHeight) =>
+          val m = accountChanges(key)
+
+          def loop(h: Int, acc: Seq[Transaction]): Seq[Transaction] = Option(m.get(h)) match {
+            case Some(heightChangesBytes) if acc.length < limit =>
+              val heightChanges = heightChangesBytes
+              val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[Transaction])
+                .map(_.asInstanceOf[Transaction])
+              loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
+            case _ => acc
+          }
+
+          loop(accHeight, Seq.empty)
+        case None => Seq.empty
+      }
+      result ++ transactions
+    }.distinct
   }.takeRight(limit)
 
   def lastAccountLagonakiTransaction(account: Account): Option[LagonakiTransaction] = {
@@ -321,7 +326,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
 
     def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
       val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
-        case ((currentState, validTxs), tx) =>
+        case ((currentState, seq), tx) =>
           try {
             val changes = if (allowUnissuedAssets) tx.balanceChanges() else tx.balanceChanges().sortBy(_.delta)
             val newState = changes.foldLeft(currentState) { case (iChanges, bc) =>
@@ -343,10 +348,10 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
                 throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
               }
             }
-            (newState, validTxs :+ tx)
+            (newState, seq :+ tx)
           } catch {
             case NonFatal(e) =>
-              (currentState, validTxs)
+              (currentState, seq)
           }
       }
       validTxs
@@ -402,18 +407,14 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
       tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: ReissueTransaction =>
       val reissueValid: Boolean = {
-        val sameSender = Option(transactionsMap.get(tx.assetId)).exists(b =>
-          IssueTransaction.parseBytes(b) match {
-            case Success(issue) =>
-              issue.sender.address == tx.sender.address
-            case Failure(f) =>
-              log.debug(s"Can't deserialise issue tx", f)
-              false
-          })
-        val reissuable = Option(reissuableIndex.get(tx.assetId)).getOrElse(false)
+        val sameSender = isIssuerAddress(tx.assetId, tx.sender.address)
+        val reissuable = assetsExtension.isReissuable(tx.assetId)
         sameSender && reissuable
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+    case tx: DeleteTransaction =>
+      tx.timestamp > settings.allowDeleteTransactionAfterTimestamp && tx.validate == ValidationResult.ValidateOke &&
+        isIssuerAddress(tx.assetId, tx.sender.address) && included(tx.id, None).isEmpty
     case tx: OrderMatch =>
       isOrderMatchValid(tx) && included(tx.id, None).isEmpty
     case tx: OrderCancelTransaction =>
@@ -423,6 +424,17 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     case otx: Any =>
       log.error(s"Wrong kind of tx: $otx")
       false
+  }
+
+  private def isIssuerAddress(assetId: Array[Byte], address: String): Boolean = {
+    Option(transactionsMap.get(assetId)).exists(b =>
+      IssueTransaction.parseBytes(b) match {
+        case Success(issue) =>
+          issue.sender.address == address
+        case Failure(f) =>
+          log.debug(s"Can't deserialise issue tx", f)
+          false
+      })
   }
 
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {

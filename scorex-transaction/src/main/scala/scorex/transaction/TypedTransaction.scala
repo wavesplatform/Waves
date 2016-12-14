@@ -1,8 +1,7 @@
 package scorex.transaction
 
 import scorex.serialization.Deser
-import scorex.transaction.assets.exchange.{OrderCancelTransaction, OrderMatch}
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{ReissueTransaction, TransferTransaction, IssueTransaction}
 
 import scala.util.{Failure, Try}
 
@@ -23,8 +22,9 @@ object TypedTransaction extends Deser[TypedTransaction] {
     val IssueTransaction = Value(3)
     val TransferTransaction = Value(4)
     val ReissueTransaction = Value(5)
-    val OrderMatchTransaction = Value(6)
-    val OrderCancelTransaction = Value(7)
+    val DeleteTransaction = Value(6)
+    val OrderMatchTransaction = Value(7)
+    val OrderCancelTransaction = Value(8)
   }
 
   def parseBytes(data: Array[Byte]): Try[TypedTransaction] =
@@ -43,6 +43,9 @@ object TypedTransaction extends Deser[TypedTransaction] {
 
       case txType: Byte if txType == TransactionType.ReissueTransaction.id =>
         ReissueTransaction.parseTail(data.tail)
+
+      case txType: Byte if txType == TransactionType.DeleteTransaction.id =>
+        DeleteTransaction.parseTail(data.tail)
 
       case txType: Byte if txType == TransactionType.OrderMatchTransaction.id =>
         OrderMatch.parseTail(data.tail)

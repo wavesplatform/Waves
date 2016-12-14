@@ -10,9 +10,9 @@ import play.api.libs.json._
 import scorex.account.Account
 import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.wallet.{IssueRequest, ReissueRequest, TransferRequest}
+import scorex.transaction.state.wallet.{DeleteRequest, IssueRequest, ReissueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, ValidationResult}
 
 import scala.util.{Failure, Success, Try}
@@ -31,7 +31,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ transfer
+      balance ~ balances ~ issue ~ reissue ~ deleteRoute ~ transfer
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -54,7 +54,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def balances: Route = {
-    path("balance" / Segment) { case address =>
+    path("balance" / Segment) { address =>
       getJsonRoute {
         balanceJson(address)
       }
@@ -74,7 +74,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       required = true,
       paramType = "body",
       dataType = "scorex.transaction.state.wallet.TransferRequest",
-      defaultValue = "\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAsset\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
+      defaultValue = "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
     )
   ))
   def transfer: Route = path("transfer") {
@@ -198,6 +198,54 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     }
   }
 
+  @Path("/delete")
+  @ApiOperation(value = "Delete Asset",
+    notes = "Delete some of your assets",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.transaction.state.wallet.DeleteRequest",
+      defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100,\"fee\":100000}"
+    )
+  ))
+  def deleteRoute: Route = path("delete") {
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          walletNotExists(wallet).getOrElse {
+            Try(Json.parse(body)).map { js =>
+              js.validate[DeleteRequest] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).response
+                case JsSuccess(deleteReq: DeleteRequest, _) =>
+                  val txOpt: Try[DeleteTransaction] = transactionModule.deleteAsset(deleteReq, wallet)
+                  txOpt match {
+                    case Success(tx) =>
+                      tx.validate match {
+                        case ValidationResult.ValidateOke =>
+                          JsonResponse(tx.json, StatusCodes.OK)
+                        case error => jsonResponse(error)
+                      }
+                    case Failure(e: StateCheckFailed) =>
+                      StateCheckFailed.response
+                    case _ =>
+                      WrongJson.response
+                  }
+              }
+            }.getOrElse(WrongJson.response)
+          }
+        }
+      }
+    }
+  }
+
+
   private def balanceJson(address: String, assetIdStr: String): JsonResponse = {
     val account = new Account(address)
     Base58.decode(assetIdStr) match {
@@ -219,7 +267,9 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
         JsObject(Seq(
           "assetId" -> JsString(Base58.encode(p._1)),
           "balance" -> JsNumber(p._2._1),
-          "issued" -> JsBoolean(p._2._2)
+          "reissuable" -> JsBoolean(p._2._2),
+          "quantity" -> JsNumber(p._2._3),
+          "issueTransaction" -> p._2._4.json
         ))
       }.toSeq
       val json = Json.obj(
