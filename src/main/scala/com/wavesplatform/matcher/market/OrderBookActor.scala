@@ -20,6 +20,7 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.collection.JavaConversions._
 
 class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
                      val wallet: Wallet, val settings: WavesSettings,
@@ -31,7 +32,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
   private var orderBook = OrderBook.empty
   private var restoreState = true
 
-  context.system.scheduler.schedule(SnapshotDuration, SnapshotDuration, self, SaveSnapshot)
+  context.system.scheduler.schedule(settings.snapshotInterval, settings.snapshotInterval, self, SaveSnapshot)
 
   override def receiveCommand: Receive = {
     case order:Order =>
@@ -46,7 +47,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       handleGetOrderBook(pair, depth)
     case SaveSnapshot =>
         deleteSnapshots(SnapshotSelectionCriteria.Latest)
-        saveSnapshot(Snapshot(orderBook, ordersRemainingAmount))
+        saveSnapshot(Snapshot(orderBook, ordersRemainingAmount.cache.asMap().toMap))
     case SaveSnapshotSuccess(metadata) =>
       log.info(s"Snapshot saved with metadata $metadata")
     case SaveSnapshotFailure(metadata, reason) =>
@@ -66,7 +67,10 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     if (v) {
       persist(OrderBook.cancelOrder(orderBook, tx.orderIdStr)) { e =>
         sender() ! OrderCanceled(tx.orderIdStr)
-        handleCancelEvent(e, tx)
+        e match {
+          case Some(c) => handleCancelEvent(c, tx)
+          case None => sender() ! OrderCancelRejected("Order not found")
+        }
       }
     } else {
       sender() ! OrderCancelRejected(v.messages)
@@ -85,11 +89,12 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
 
   override def receiveRecover: Receive = {
     case evt: Event => log.debug("Event: {}", evt); applyEvent(evt)
-    case RecoveryCompleted => log.info("Recovery completed!");
+    case RecoveryCompleted => log.info(assetPair.toString() + " - Recovery completed!");
     case SnapshotOffer(metadata, snapshot: Snapshot) =>
-      log.info(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")
+      log.debug(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")
       orderBook = snapshot.orderBook
-      ordersRemainingAmount = snapshot.history
+      recoverFromOrderBook(orderBook)
+      initOrdersCache(snapshot.history)
   }
 
   def handleAddOrder(order: Order): Unit = {
@@ -153,7 +158,6 @@ object OrderBookActor {
     assetPair.second.map(Base58.encode).getOrElse("WAVES")
 
   val MaxDepth = 50
-  val SnapshotDuration = 1.day
 
   //protocol
   sealed trait OrderBookRequest {
@@ -213,7 +217,7 @@ object OrderBookActor {
   case object SaveSnapshot
 
   @SerialVersionUID(-5350485695558994597L)
-  case class Snapshot(orderBook: OrderBook, history: Cache[String, (Long, Long)])
+  case class Snapshot(orderBook: OrderBook, history: Map[String, (Long, Long)])
 
   val bidsOrdering: Ordering[Long] = new Ordering[Long] {
     def compare(x: Long, y: Long): Int = - Ordering.Long.compare(x, y)

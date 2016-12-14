@@ -12,16 +12,32 @@ import scala.concurrent.duration._
 
 trait OrderHistory {
   val assetsToSpend = mutable.Map.empty[Address, Long]
-  var ordersRemainingAmount: Cache[String, (Long, Long)] = TTLCache[String, (Long, Long)](Order.MaxLiveTime.millis)
+  val ordersRemainingAmount: Cache[String, (Long, Long)] =
+    TTLCache[String, (Long, Long)]((Order.MaxLiveTime + 3600*1000).millis)
 
-  def addOpenOrder(limitOrder: LimitOrder): Unit = {
-    val order = limitOrder.order
+
+  def initOrdersCache(m: Map[String, (Long, Long)]) = {
+    ordersRemainingAmount.clear()
+    m.foreach(v => ordersRemainingAmount.set(v._1, v._2))
+  }
+
+  def recoverFromOrderBook(ob: OrderBook): Unit = {
+    ob.bids.foreach(_._2.foreach(addAssetsToSpend))
+    ob.asks.foreach(_._2.foreach(addAssetsToSpend))
+  }
+
+  private def addAssetsToSpend(lo: LimitOrder) = {
+    val order = lo.order
     val assetAcc = AssetAcc(order.sender, order.spendAssetId)
     val feeAssetAcc = AssetAcc(order.sender, None)
-    assetsToSpend(assetAcc.key) = assetsToSpend.getOrElse(assetAcc.key, 0L) + limitOrder.getSpendAmount
-    assetsToSpend(feeAssetAcc.key) = assetsToSpend.getOrElse(feeAssetAcc.key, 0L) + limitOrder.feeAmount
+    assetsToSpend(assetAcc.key) = assetsToSpend.getOrElse(assetAcc.key, 0L) + lo.getSpendAmount
+    assetsToSpend(feeAssetAcc.key) = assetsToSpend.getOrElse(feeAssetAcc.key, 0L) + lo.feeAmount
+  }
 
-    ordersRemainingAmount.set(order.idStr, (order.amount, 0L))
+  def addOpenOrder(lo: LimitOrder): Unit = {
+    addAssetsToSpend(lo)
+
+    ordersRemainingAmount.set(lo.order.idStr, (lo.order.amount, 0L))
   }
 
   def reduceSpendAssets(limitOrder: LimitOrder) = {

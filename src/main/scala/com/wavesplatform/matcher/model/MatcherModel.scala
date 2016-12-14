@@ -60,6 +60,11 @@ object LimitOrder {
     case OrderType.SELL => SellLimitOrder(o.price, o.amount, o)
   }
 
+  def limitOrder(price: Long, amount: Long, o: Order): LimitOrder = o.orderType match {
+    case OrderType.BUY => BuyLimitOrder(price, amount, o).copy()
+    case OrderType.SELL => SellLimitOrder(price, amount, o)
+  }
+
 }
 
 object Events {
@@ -77,5 +82,4 @@ object Events {
   case class OrderAdded(order: LimitOrder) extends Event
   @SerialVersionUID(-2668400548412162900L)
   case class OrderCanceled(limitOrder: LimitOrder) extends Event
-  case class OrderCancelRejected(id: OrderId, reason: String) extends Event
 }

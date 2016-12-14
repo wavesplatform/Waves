@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.hash.SecureCryptographicHash
@@ -19,7 +20,7 @@ trait MatcherTestData  {
   val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
 
   val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
-  val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen)))
+  val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, bytes32gen.map(Some(_))))
 
   val assetPairGen = Gen.zip(assetIdGen, assetIdGen).
     suchThat(p => !ByteArray.sameOption(p._1, p._2)).
@@ -55,12 +56,29 @@ trait MatcherTestData  {
 
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
-    spendAssetID: Option[AssetId] <- assetIdGen
-    receiveAssetID: Option[AssetId] <- assetIdGen
+    pair <- assetPairGen
     price: Long <- maxWavesAnountGen
     amount: Long <- maxWavesAnountGen
     maxtTime: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
-  } yield (Order(sender, MatcherAccount, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee), sender)
+  } yield (Order(sender, MatcherAccount, pair.first, pair.second, price, amount, maxtTime, matcherFee), sender)
+
+  val buyLimitOrderGenerator: Gen[BuyLimitOrder] = for {
+    sender: PrivateKeyAccount <- accountGen
+    pair <- assetPairGen
+    price: Long <- maxWavesAnountGen
+    amount: Long <- maxWavesAnountGen
+    maxtTime: Long <- maxTimeGen
+    matcherFee: Long <- maxWavesAnountGen
+  } yield BuyLimitOrder(price, amount, Order.buy(sender, MatcherAccount, pair, price, amount, maxtTime, matcherFee))
+
+  val sellLimitOrderGenerator: Gen[SellLimitOrder] = for {
+    sender: PrivateKeyAccount <- accountGen
+    pair <- assetPairGen
+    price: Long <- maxWavesAnountGen
+    amount: Long <- maxWavesAnountGen
+    maxtTime: Long <- maxTimeGen
+    matcherFee: Long <- maxWavesAnountGen
+  } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, maxtTime, matcherFee))
 
 }

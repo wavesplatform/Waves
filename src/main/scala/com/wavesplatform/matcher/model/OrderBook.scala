@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.model
 
+import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 
 import scala.collection.+:
@@ -40,12 +41,12 @@ object OrderBook {
       }
   }
 
-  def cancelOrder(ob: OrderBook, orderId: String): Event = {
+  def cancelOrder(ob: OrderBook, orderId: String): Option[Event] = {
     ob.bids.find { case (p, v) => v.exists(_.order.idStr == orderId)}
         .orElse(ob.asks.find { case (p, v) => v.exists(_.order.idStr == orderId)})
-      .fold[Event](OrderCancelRejected(orderId, "Order not found")) {
+      .fold(Option.empty[Event]) {
         case (p, v) =>
-          OrderCanceled(v.find(_.order.idStr == orderId).get)
+          Some(OrderCanceled(v.find(_.order.idStr == orderId).get))
       }
   }
 
@@ -113,7 +114,6 @@ object OrderBook {
     case e@OrderExecuted(_, c: BuyLimitOrder) => updateExecutedBuy(ob, c, e.counterRemaining)
     case e@OrderExecuted(_, c: SellLimitOrder) => updateExecutedSell(ob, c, e.counterRemaining)
     case e@OrderCanceled(limitOrder) => updateCancelOrder(ob, limitOrder)
-    case e: OrderCancelRejected => ob
   }
 
 

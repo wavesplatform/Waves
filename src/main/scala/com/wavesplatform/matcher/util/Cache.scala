@@ -12,7 +12,7 @@ sealed trait Caching[K, V] {
   def size: Long
 }
 
-class Cache[K, V](cache: GuavaCache[K,V]) extends Caching[K, V] with Serializable {
+class Cache[K, V](val cache: GuavaCache[K,V]) extends Caching[K, V] with Serializable {
 
   /**
    * Get an optional value from the cache

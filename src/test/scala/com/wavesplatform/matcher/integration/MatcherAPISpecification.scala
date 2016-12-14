@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.integration
 import com.wavesplatform.settings.Constants
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.SpanSugar._
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSuite, Matchers}
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
@@ -18,6 +18,7 @@ import scorex.waves.TestingCommons._
   * !!! Tests should work only as whole TestSuite in sequence one by one, not separately,
   * as the state depends on the previous test
   */
+@DoNotDiscover
 class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll with Eventually {
   val settings = application.settings
   val wallet = application.wallet

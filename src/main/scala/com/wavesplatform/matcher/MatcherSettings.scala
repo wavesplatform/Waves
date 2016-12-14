@@ -3,6 +3,8 @@ package com.wavesplatform.matcher
 import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.JsObject
 
+import scala.concurrent.duration._
+
 trait MatcherSettings {
   this: WavesSettings =>
   def settingsJSON: JsObject
@@ -20,4 +22,5 @@ trait MatcherSettings {
   lazy val orderCanceTxFee = (matcherSettings \ "orderCanceTxFee").asOpt[Int].getOrElse(DefaultOrderMatchTxFee)
   lazy val matcherJournalDataDir = (matcherSettings \ "journalDataDir").asOpt[String].getOrElse(getDir("dataDir", "journal").get)
   lazy val matcherSnapshotsDataDir = (matcherSettings \ "snapshotsDataDir").asOpt[String].getOrElse(getDir("dataDir", "snapshots").get)
+  lazy val snapshotInterval = (matcherSettings \ "snapshotInterval").asOpt[Int].map(x => FiniteDuration(x, MINUTES)).getOrElse(1.day)
 }
