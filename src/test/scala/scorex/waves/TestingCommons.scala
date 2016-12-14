@@ -57,6 +57,8 @@ object UnitTestNetParams extends ChainParameters {
   override def allowTransactionsFromFutureUntil: Long = Long.MinValue
 
   override def allowUnissuedAssetsUntil: Long = 1479416400000L
+
+  override def allowDeleteTransactionAfterTimestamp: Long = 1481110521000L
 }
 
 object TestingCommons {
