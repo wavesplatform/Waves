@@ -20,4 +20,7 @@ case class AssetPair(private val pair: (Option[AssetId], Option[AssetId])) {
       case _ => false
     }
   }
+
+  override def toString: String = "(" + first.map(Base58.encode).getOrElse("") + ", " +
+    second.map(Base58.encode).getOrElse("") + ")"
 }
