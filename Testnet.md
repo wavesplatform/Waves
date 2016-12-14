@@ -3,7 +3,7 @@
 
 **A part of HTTP API must be closed by apiKeyHash in config. Use /utils/hash/secure http api to get hash for your api key.**
 
-[How to configure Waves node](https://github.com/wavesplatform/Waves/wiki/How-to-configure-Waves-node)
+[How to install Waves node](https://github.com/wavesplatform/Waves/wiki/How-to-install-Waves-node)
 
 # You need to install Java SDK
 ## Ubuntu

@@ -27,3 +27,6 @@ localsettings.json
 *.ods
 *.csv
 *.dat
+
+# Packages
+package/
