@@ -70,12 +70,13 @@ object LimitOrder {
 object Events {
   sealed trait Event
   @SerialVersionUID(-6952325887070115993L)
-  case class OrderExecuted(submittedOrder: LimitOrder, counterOrder: LimitOrder) extends Event {
-    def counterRemaining: Long = math.max(counterOrder.amount - submittedOrder.amount, 0)
-    def submittedRemaining: Long = math.max(submittedOrder.amount - counterOrder.amount, 0)
-    def executedAmount: Long = math.min(submittedOrder.amount, counterOrder.amount)
-    def submittedExecuted = submittedOrder.partial(amount = executedAmount)
-    def counterExecuted = counterOrder.partial(amount = executedAmount)
+  case class OrderExecuted(submitted: LimitOrder, counter: LimitOrder) extends Event {
+    def counterRemaining: Long = math.max(counter.amount - submitted.amount, 0)
+    def submittedRemaining: Long = math.max(submitted.amount - counter.amount, 0)
+    def executedAmount: Long = math.min(submitted.amount, counter.amount)
+    def submittedExecuted = submitted.partial(amount = executedAmount)
+    def counterExecuted = counter.partial(amount = executedAmount)
+    def isCounterFilled: Boolean = counterRemaining == 0L
 
   }
   @SerialVersionUID(-3697114578758882607L)

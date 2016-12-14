@@ -27,6 +27,7 @@
   "matcher": {
     "account": "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",
     "host": "127.0.0.1",
-    "port": 9093
+    "port": 9093,
+    "minOrderFee": 100000
   }
 }

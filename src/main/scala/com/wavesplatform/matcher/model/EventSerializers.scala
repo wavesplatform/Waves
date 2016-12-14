@@ -127,8 +127,8 @@ object EventsJson {
 
   implicit val orderExecutedWrites = new Writes[OrderExecuted] {
     def writes(e: OrderExecuted): JsValue = Json.obj(
-      "o1" -> e.submittedOrder,
-      "o2" -> e.counterOrder
+      "o1" -> e.submitted,
+      "o2" -> e.counter
     )
   }
 

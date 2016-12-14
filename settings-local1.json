@@ -21,6 +21,8 @@
     "account": "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",
     "host": "127.0.0.1",
     "port": 6880,
-    "snapshotInterval": 2
+    "snapshotInterval": 2,
+    "minOrderFee": 100000,
+    "maxOpenOrdersCount": 100
   }
 }

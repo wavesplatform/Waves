@@ -14,6 +14,7 @@ trait OrderHistory {
   val assetsToSpend = mutable.Map.empty[Address, Long]
   val ordersRemainingAmount: Cache[String, (Long, Long)] =
     TTLCache[String, (Long, Long)]((Order.MaxLiveTime + 3600*1000).millis)
+  val openOrdersCount = mutable.Map.empty[Address, Int]
 
 
   def initOrdersCache(m: Map[String, (Long, Long)]) = {
@@ -26,18 +27,28 @@ trait OrderHistory {
     ob.asks.foreach(_._2.foreach(addAssetsToSpend))
   }
 
+  private def incCount(address: Address) = openOrdersCount(address) = openOrdersCount.getOrElse(address, 0) + 1
+  private def decCount(address: Address) = openOrdersCount(address) = openOrdersCount.getOrElse(address, 0) - 1
+
   private def addAssetsToSpend(lo: LimitOrder) = {
     val order = lo.order
     val assetAcc = AssetAcc(order.sender, order.spendAssetId)
     val feeAssetAcc = AssetAcc(order.sender, None)
     assetsToSpend(assetAcc.key) = assetsToSpend.getOrElse(assetAcc.key, 0L) + lo.getSpendAmount
     assetsToSpend(feeAssetAcc.key) = assetsToSpend.getOrElse(feeAssetAcc.key, 0L) + lo.feeAmount
+
+    incCount(order.sender.address)
   }
 
-  def addOpenOrder(lo: LimitOrder): Unit = {
+  private def updateRemaining(orderId: String, d: (Long, Long)) = {
+    val prev = ordersRemainingAmount.get(orderId).getOrElse(0L, 0L)
+    ordersRemainingAmount.set(orderId, (prev._1 + d._1 , prev._2 + d._2))
+  }
+
+  def didOrderAccepted(lo: LimitOrder): Unit = {
     addAssetsToSpend(lo)
 
-    ordersRemainingAmount.set(lo.order.idStr, (lo.order.amount, 0L))
+    updateRemaining(lo.order.idStr, (lo.amount, 0L))
   }
 
   def reduceSpendAssets(limitOrder: LimitOrder) = {
@@ -57,24 +68,22 @@ trait OrderHistory {
   }
 
 
-  def didOrderExecuted(orderExecuted: OrderExecuted): Unit = {
+  def didOrderExecuted(e: OrderExecuted): Unit = {
+    reduceSpendAssets(e.counterExecuted)
 
-    def updateRemaining(limitOrder: LimitOrder) = {
-      val prev = ordersRemainingAmount.get(limitOrder.order.idStr).map(_._2).getOrElse(0L)
-      ordersRemainingAmount.set(limitOrder.order.idStr, (limitOrder.order.amount, prev + limitOrder.amount))
-    }
+    updateRemaining(e.submitted.order.idStr, (e.executedAmount, e.executedAmount))
+    updateRemaining(e.counter.order.idStr, (0L, e.executedAmount))
 
-    reduceSpendAssets(orderExecuted.counterExecuted)
-
-    updateRemaining(orderExecuted.submittedExecuted)
-    updateRemaining(orderExecuted.counterExecuted)
+    if (e.isCounterFilled) decCount(e.counterExecuted.order.sender.address)
   }
 
   def didOrderCanceled(orderCanceled: OrderCanceled): Unit = {
-    val prev = ordersRemainingAmount.get(orderCanceled.limitOrder.order.idStr).map(_._2).getOrElse(0L)
-    ordersRemainingAmount.set(orderCanceled.limitOrder.order.idStr, (0L, prev))
+    val o = orderCanceled.limitOrder.order
+    updateRemaining(o.idStr, (-o.amount, 0L))
 
     reduceSpendAssets(orderCanceled.limitOrder)
+
+    decCount(o.sender.address)
   }
 
   def getOrderStatus(id: String): OrderStatus = {

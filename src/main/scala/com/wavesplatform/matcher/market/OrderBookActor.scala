@@ -110,7 +110,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
   def applyEvent(e: Event): Unit = {
     orderBook = OrderBook.updateState(orderBook, e)
     e match {
-      case OrderAdded(o) => addOpenOrder(o)
+      case OrderAdded(o) => didOrderAccepted(o)
       case e: OrderExecuted => didOrderExecuted(e)
       case e: Events.OrderCanceled => didOrderCanceled(e)
       case _ =>
@@ -188,8 +188,8 @@ object OrderBookActor {
     val code = StatusCodes.OK
   }
 
-  case class OrderCancelRejected(orderId: String) extends OrderResponse {
-    val json = Json.obj("status" -> "OrderCancelRejected")
+  case class OrderCancelRejected(message: String) extends OrderResponse {
+    val json = Json.obj("status" -> "OrderCancelRejected", "message" -> message)
     val code = StatusCodes.BadRequest
   }
 
