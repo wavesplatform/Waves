@@ -1,6 +1,6 @@
 package scorex.waves
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSuite, Matchers}
 import play.api.libs.json.Json
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.api.http._
@@ -9,6 +9,7 @@ import scorex.crypto.encode.Base58
 import scorex.waves.http.UnsignedPayment
 import scorex.waves.transaction.{ExternalPayment, SignedPayment}
 
+@DoNotDiscover
 class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
   import TestingCommons._
