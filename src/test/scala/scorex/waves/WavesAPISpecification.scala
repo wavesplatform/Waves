@@ -53,7 +53,7 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
 
   test("/waves/external-payment API route can not send to address with invalid length 'recipient' field") {
     val senderPublicKey = new PublicKeyAccount(Base58.decode("GvXeYd2iFJUNV7KgeGV2cdnScyrEvrr9uPYJeQFtvg21").get)
-    val recipient = new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6")
+    val recipient = new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTy")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(EllipticCurveImpl.SignatureLength)(0.toByte)
@@ -65,8 +65,8 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
   }
 
   test("/waves/external-payment API route can not send to address with invalid length 'senderPublicKey' field") {
-    val senderPublicKey = new PublicKeyAccount(Base58.decode("GvXeYd2iFJUNV7KgeGV2cdnScyrEvrr9uPYJeQFtvg2").get)
-    val recipient = new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J")
+    val senderPublicKey = new PublicKeyAccount(Base58.decode("GvXeYd2iFJUNV7KgeGV2cdnScyrEvrr9uPYJeQF").get)
+    val recipient = new Account("3N1hV1nYsBqJeHQfhEbjhndeLzYFavDsQxM")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(EllipticCurveImpl.SignatureLength)(0.toByte)
@@ -78,8 +78,8 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
   }
 
   test("/waves/external-payment API route can not send to address with invalid length 'signature' field") {
-    val senderPublicKey = new PublicKeyAccount(Base58.decode("GvXeYd2iFJUNV7KgeGV2cdnScyrEvrr9uPYJeQFtvg2").get)
-    val recipient = new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J")
+    val senderPublicKey = new PublicKeyAccount(Base58.decode("GvXeYd2iFJUNV7KgeGV2cdnScyrEvrr9uPYJeQFtvg21").get)
+    val recipient = new Account("3N1hV1nYsBqJeHQfhEbjhndeLzYFavDsQxM")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(EllipticCurveImpl.SignatureLength - 1)(0.toByte)
@@ -93,7 +93,7 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
   // todo move to something else test?
   test("API route can be called with oversized request") {
     val senderPublicKey = new PublicKeyAccount(Base58.decode("GvXeYd2iFJUNV7KgeGV2cdnScyrEvrr9uPYJeQFtvg21").get)
-    val recipient = new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6")
+    val recipient = new Account("3N1hV1nYsBqJeHQfhEbjhndeLzYFavDsQxM")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     // see application.conf: http.server.parsing.max-content-length = 2k
@@ -102,7 +102,7 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     val json = Json.toJson(payment).toString
 
     val response = postRequestWithResponse(us = "/waves/external-payment", body = json)
-    assert(response.getStatusCode == 400)
+    assert(response.getStatusCode == 405)
   }
 
   test("/waves/broadcast-signed-payment API route can not send to address from another net") {

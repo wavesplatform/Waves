@@ -197,7 +197,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
   private def toErrorResponce(error: JsError): JsonResponse = {
     val errors = error.errors.map(_._1.toString).toSet
     if (errors.contains("/recipient")) {
-      InvalidAddress.response
+      InvalidRecipient.response
     } else if (errors.contains("/sender")) {
       InvalidSender.response
     } else if (errors.contains("/senderPublicKey")) {
@@ -317,6 +317,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
         case ValidationResult.NoBalance => NoBalance.response
         case ValidationResult.InvalidAddress => InvalidAddress.response
         case ValidationResult.InsufficientFee => NegativeFee.response
+        case ValidationResult.InvalidSignature => InvalidSignature.response
         case _ => Unknown.response
       }
     }
