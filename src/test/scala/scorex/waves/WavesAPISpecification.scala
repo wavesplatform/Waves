@@ -90,6 +90,7 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     assert(response.toString == InvalidSignature.json.toString)
   }
 
+  // todo move to something else test?
   test("API route can be called with oversized request") {
     val senderPublicKey = new PublicKeyAccount(Base58.decode("GvXeYd2iFJUNV7KgeGV2cdnScyrEvrr9uPYJeQFtvg21").get)
     val recipient = new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6")
