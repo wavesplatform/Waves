@@ -83,13 +83,12 @@ trait TransactionGen {
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
-    spendAssetID: Option[AssetId] <- assetIdGen
-    receiveAssetID: Option[AssetId] <- assetIdGen
+    pair: AssetPair <- assetPairGen
     price: Long <- maxWavesAnountGen
     amount: Long <- maxWavesAnountGen
     maxtTime: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
-  } yield (Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee), sender)
+  } yield (Order(sender, matcher, pair.first, pair.second, price, amount, maxtTime, matcherFee), sender)
 
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, DeleteTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
