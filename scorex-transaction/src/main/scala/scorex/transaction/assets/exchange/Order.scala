@@ -52,8 +52,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
       (price > 0) :| "price should be > 0" &&
       (price < MaxAmount) :| "price too large" &&
       (amount < MaxAmount) :| "amount too large" &&
-      (getSpendAmount > 0) :| "spendAmount should be > 0"
-      (getReceiveAmount > 0) :| "receiveAmount should be > 0"
+      (getSpendAmount > 0) :| "spendAmount should be > 0" &&
+      (getReceiveAmount > 0) :| "receiveAmount should be > 0" &&
       (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (maxTimestamp - atTime <= MaxLiveTime) :| "maxTimestamp should be earlier than 30 days" &&
