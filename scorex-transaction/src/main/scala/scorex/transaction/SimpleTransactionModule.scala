@@ -21,7 +21,7 @@ import scorex.utils._
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
@@ -47,7 +47,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 
 
 class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit val settings: TransactionSettings with Settings,
-                              application: Application)
+                                                                       application: Application)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
 
   import SimpleTransactionModule._
@@ -94,7 +94,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 
   override def putUnconfirmedIfNew(tx: Transaction): Boolean = synchronized {
-    if(feeCalculator.enoughFee(tx)){
+    if (feeCalculator.enoughFee(tx)) {
       utxStorage.putIfNew(tx, isValid(_, tx.timestamp))
     } else false
   }
@@ -148,7 +148,15 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     }
   }
 
-  def transferAsset(request: TransferRequest, wallet: Wallet): Try[TransferTransaction] = Try {
+  def transferAsset(request: TransferRequest, wallet: Wallet): Try[TransferTransaction] = {
+    for {transfer <- transferRequestToTransaction(request, wallet)} yield {
+      if (isValid(transfer, transfer.timestamp)) onNewOffchainTransaction(transfer)
+      else throw new StateCheckFailed("Invalid transfer transaction generated: " + transfer.json)
+      transfer
+    }
+  }
+
+  private def transferRequestToTransaction(request: TransferRequest, wallet: Wallet): Try[TransferTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
 
     val transfer: TransferTransaction = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
@@ -160,9 +168,29 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       request.fee,
       Option(request.attachment).filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
 
-    if (isValid(transfer, transfer.timestamp)) onNewOffchainTransaction(transfer)
-    else throw new StateCheckFailed("Invalid transfer transaction generated: " + transfer.json)
     transfer
+  }
+
+  def transferAssets(requests: Array[TransferRequest], wallet: Wallet): Try[Array[TransferTransaction]] = {
+    for {
+      txs <- requests.foldLeft[Try[Array[TransferTransaction]]](Success(Array.empty)) {
+        (res, request) => {
+          transferRequestToTransaction(request, wallet) match {
+            case Success(tx) => res.map(_ :+ tx)
+            case Failure(f) => Failure(f)
+          }
+        }
+      }
+    } yield {
+      val failedTxOpt = txs.zipWithIndex.find { case (transfer, _) => isValid(transfer, transfer.timestamp) }
+      failedTxOpt match {
+        case None =>
+          txs.foreach(transfer => onNewOffchainTransaction(transfer))
+          txs
+        case Some((failedTx, index)) =>
+          throw new StateCheckFailed(s"Invalid transfer transaction generated at index $index: ${failedTx.json}")
+      }
+    }
   }
 
   def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {

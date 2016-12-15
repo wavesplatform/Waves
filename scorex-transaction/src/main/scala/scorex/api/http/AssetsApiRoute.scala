@@ -104,6 +104,50 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     }
   }
 
+  @Path("/batch_transfer")
+  @ApiOperation(value = "Batch transfer operation",
+    notes = "Transfer assets to new addresses",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Array json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scala.Array[scorex.transaction.state.wallet.TransferRequest]",
+      defaultValue = "[{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008},{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}]"
+    )
+  ))
+  def batchTransfer: Route = path("batch_transfer") {
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          walletNotExists(wallet).getOrElse {
+            Try(Json.parse(body)).map { js =>
+              js.validate[Array[TransferRequest]] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).response
+                case JsSuccess(requests: Array[TransferRequest], _) =>
+                  val txsOpt: Try[Array[TransferTransaction]] =
+                    transactionModule.transferAssets(requests, wallet)
+                  txsOpt match {
+                    case Success(tx) =>
+                      JsonResponse(JsArray(tx.map(_.json)), StatusCodes.OK)
+                    case Failure(e: StateCheckFailed) =>
+                      StateCheckFailed.response
+                    case _ =>
+                      WrongJson.response
+                  }
+              }
+            }.getOrElse(WrongJson.response)
+          }
+        }
+      }
+    }
+  }
+
   @Path("/issue")
   @ApiOperation(value = "Issue Asset",
     notes = "Issue new Asset",
