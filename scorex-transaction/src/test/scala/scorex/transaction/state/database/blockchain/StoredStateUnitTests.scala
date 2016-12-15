@@ -12,7 +12,7 @@ import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.state._
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 
 import scala.util.Random
 import scala.util.control.NonFatal
@@ -327,11 +327,12 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       withRollbackTest {
         state.balance(testAcc) shouldBe 0
         state.assetBalance(testAssetAcc) shouldBe 0
-        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance), tx, tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance), tx, tx))),
+          NTP.correctedTime())
         state.balance(testAcc) shouldBe balance
         state.assetBalance(testAssetAcc) shouldBe balance
         state.included(tx).value shouldBe state.stateHeight
-        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))))
+        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))),  NTP.correctedTime())
       }
     }
   }
@@ -344,7 +345,8 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.balance(account) shouldBe 0
         state.assetBalance(assetAccount) shouldBe 0
         val balance = tx.fee
-        state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance), Seq(FeesStateChange(balance)))))
+        state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance), Seq(FeesStateChange(balance)))),
+          NTP.correctedTime())
         state.balance(account) shouldBe balance
         state.isValid(tx, System.currentTimeMillis) should be(false)
       }
@@ -359,64 +361,12 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.balance(account) shouldBe 0
         state.assetBalance(assetAccount) shouldBe 0
         val balance = tx.fee
-        state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance), Seq(FeesStateChange(balance)))))
+        state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance), Seq(FeesStateChange(balance)))),
+          NTP.correctedTime())
         state.assetBalance(assetAccount) shouldBe balance
         state.isValid(tx, System.currentTimeMillis) should be(false)
       }
     }
-  }
-
-  property("Reopen state") {
-    val balance = 1234L
-    state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance)))))
-    state.balance(testAcc) shouldBe balance
-    db.close()
-  }
-
-  private var txTime: Long = 0
-
-  private def getTimestamp: Long = synchronized {
-    txTime = Math.max(System.currentTimeMillis(), txTime + 1)
-    txTime
-  }
-
-  def genTransfer(amount: Long, fee: Long): TransferTransaction = {
-    val recipient = new PrivateKeyAccount(scorex.utils.randomBytes())
-    TransferTransaction.create(None, testAcc, recipient: Account, amount, getTimestamp, None, fee, Array())
-  }
-
-  def genPayment(amount: Long, fee: Long): PaymentTransaction = {
-    val recipient = new PrivateKeyAccount(scorex.utils.randomBytes())
-    val time = getTimestamp
-    val sig = PaymentTransaction.generateSignature(testAcc, recipient, amount, fee, time)
-    new PaymentTransaction(testAcc, recipient, amount, fee, time, sig)
-  }
-
-  private def withRollbackTest(test: => Unit): Unit = {
-    val startedState = state.stateHeight
-    val h = state.hash
-    var lastFinalStateHash: Option[Int] = None
-    for {i <- 1 to 2} {
-      try {
-        test
-        state.rollbackTo(startedState)
-        h should be(state.hash)
-        lastFinalStateHash match {
-          case Some(lastHash) =>
-            lastHash should be(state.hash)
-          case None =>
-            lastFinalStateHash = Some(state.hash)
-        }
-      } catch {
-        case NonFatal(e) =>
-          log.error(s"Failed on $i iteration: ${e.getMessage}")
-          throw e
-      }
-    }
-  }
-
-  def getBalances(a: AssetAcc*): Seq[Long] = {
-    a.map(state.assetBalance(_))
   }
 
   property("Order matching") {
@@ -468,5 +418,58 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
+  property("Reopen state") {
+    val balance = 1234L
+    state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(balance), Seq(FeesStateChange(balance)))),
+      NTP.correctedTime())
+    state.balance(testAcc) shouldBe balance
+    db.close()
+  }
+
+  private var txTime: Long = 0
+
+  private def getTimestamp: Long = synchronized {
+    txTime = Math.max(System.currentTimeMillis(), txTime + 1)
+    txTime
+  }
+
+  def genTransfer(amount: Long, fee: Long): TransferTransaction = {
+    val recipient = new PrivateKeyAccount(scorex.utils.randomBytes())
+    TransferTransaction.create(None, testAcc, recipient: Account, amount, getTimestamp, None, fee, Array())
+  }
+
+  def genPayment(amount: Long, fee: Long): PaymentTransaction = {
+    val recipient = new PrivateKeyAccount(scorex.utils.randomBytes())
+    val time = getTimestamp
+    val sig = PaymentTransaction.generateSignature(testAcc, recipient, amount, fee, time)
+    new PaymentTransaction(testAcc, recipient, amount, fee, time, sig)
+  }
+
+  private def withRollbackTest(test: => Unit): Unit = {
+    val startedState = state.stateHeight
+    val h = state.hash
+    var lastFinalStateHash: Option[Int] = None
+    for {i <- 1 to 2} {
+      try {
+        test
+        state.rollbackTo(startedState)
+        h should be(state.hash)
+        lastFinalStateHash match {
+          case Some(lastHash) =>
+            lastHash should be(state.hash)
+          case None =>
+            lastFinalStateHash = Some(state.hash)
+        }
+      } catch {
+        case NonFatal(e) =>
+          log.error(s"Failed on $i iteration: ${e.getMessage}")
+          throw e
+      }
+    }
+  }
+
+  def getBalances(a: AssetAcc*): Seq[Long] = {
+    a.map(state.assetBalance(_))
+  }
 
 }
