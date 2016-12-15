@@ -96,7 +96,7 @@ class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
     val recipient = new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
-    //   http.server.parsing.max-content-length = 2k
+    // see application.conf: http.server.parsing.max-content-length = 2k
     val signature = Array.fill(2 * 1024 + 1)(0.toByte)
     val payment = ExternalPayment(timestamp, amount, 400L, senderPublicKey, recipient, signature)
     val json = Json.toJson(payment).toString
