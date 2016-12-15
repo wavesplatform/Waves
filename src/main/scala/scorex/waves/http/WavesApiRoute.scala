@@ -200,6 +200,8 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
       InvalidAddress.response
     } else if (errors.contains("/sender")) {
       InvalidSender.response
+    } else if (errors.contains("/senderPublicKey")) {
+      InvalidSender.response
     } else if (errors.contains("/signature")) {
       InvalidSignature.response
     } else {
@@ -286,6 +288,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
         case ValidationResult.NoBalance => NoBalance.response
         case ValidationResult.InvalidAddress => InvalidAddress.response
         case ValidationResult.InsufficientFee => InsufficientFee.response
+        case ValidationResult.InvalidSignature => InvalidSignature.response
         case _ => Unknown.response
       }
     }
