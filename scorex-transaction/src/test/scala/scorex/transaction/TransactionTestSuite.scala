@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import org.scalatest.Suites
+import scorex.transaction.assets.exchange.{OrderCancelTransactionSpecification, OrderJsonSpecification}
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImplSpecification
 import scorex.transaction.state.database.blockchain.StoredStateUnitTests
 
@@ -10,5 +11,9 @@ class TransactionTestSuite extends Suites(
   new RowSpecification,
   new GenesisTransactionSpecification,
   new UnconfirmedPoolSynchronizerSpecification,
-  new UnconfirmedTransactionsDatabaseImplSpecification
+  new UnconfirmedTransactionsDatabaseImplSpecification,
+  new OrderSpecification,
+  new OrderMatchTransactionSpecification,
+  new OrderCancelTransactionSpecification,
+  new OrderJsonSpecification
 )

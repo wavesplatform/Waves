@@ -1,11 +1,14 @@
 package scorex.transaction
 
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.{Arbitrary, Gen, Prop}
+import org.scalatest.Matchers._
+import org.scalatest.enablers.Containing
+import org.scalatest.matchers.{BeMatcher, MatchResult}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
+import scorex.transaction.assets.exchange._
 import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
-import scorex.utils.NTP
+import scorex.utils.{ByteArray, NTP}
 
 trait TransactionGen {
 
@@ -19,6 +22,18 @@ trait TransactionGen {
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
   val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)
+
+  val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
+  val timestampGen: Gen[Long] = Gen.choose(1, 1000).map(NTP.correctedTime() - _)
+
+  val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
+
+  val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
+  val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen)))
+
+  val assetPairGen = Gen.zip(assetIdGen, assetIdGen).
+    suchThat(p => !ByteArray.sameOption(p._1, p._2)).
+    map(p => AssetPair(p._1, p._2))
 
   val paymentGenerator: Gen[PaymentTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
@@ -65,16 +80,15 @@ trait TransactionGen {
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
   } yield TransferTransaction.create(assetId, account, account, amount, timestamp, None, feeAmount, attachment)
 
-  val orderGenerator: Gen[Order] = for {
+  val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
-    spendAssetID: Array[Byte] <- bytes32gen
-    receiveAssetID: Array[Byte] <- bytes32gen
-    price: Long <- positiveLongGen
-    amount: Long <- positiveLongGen
-    maxtTime: Long <- Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
-    matcherFee: Long <- positiveLongGen
-  } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
+    pair: AssetPair <- assetPairGen
+    price: Long <- maxWavesAnountGen
+    amount: Long <- maxWavesAnountGen
+    maxtTime: Long <- maxTimeGen
+    matcherFee: Long <- maxWavesAnountGen
+  } yield (Order(sender, matcher, pair.first, pair.second, price, amount, maxtTime, matcherFee), sender)
 
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, DeleteTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -105,35 +119,75 @@ trait TransactionGen {
   val invalidOrderGenerator: Gen[Order] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
-    spendAssetID: Array[Byte] <- bytes32gen
-    receiveAssetID: Array[Byte] <- bytes32gen
+    pair <- assetPairGen
     price: Long <- Arbitrary.arbitrary[Long]
     amount: Long <- Arbitrary.arbitrary[Long]
     maxtTime: Long <- Arbitrary.arbitrary[Long]
     matcherFee: Long <- Arbitrary.arbitrary[Long]
-  } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
+  } yield Order(sender, matcher, pair.first, pair.second, price, amount, maxtTime, matcherFee)
 
-  val orderMatchGenerator: Gen[OrderMatch] = for {
+  val orderMatchGenerator: Gen[(OrderMatch, PrivateKeyAccount)] = for {
     sender1: PrivateKeyAccount <- accountGen
     sender2: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
+    assetPair <- assetPairGen
     spendAssetID: Array[Byte] <- bytes32gen
     receiveAssetID: Array[Byte] <- bytes32gen
-    price: Long <- positiveLongGen
-    amount1: Long <- positiveLongGen
-    amount2: Long <- positiveLongGen
-    matchedAmount: Long <- Gen.choose(1L, Math.min(amount1, amount2))
-    maxtTime: Long <- Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
-    timestamp: Long <- positiveLongGen
-    matcherFee: Long <- positiveLongGen
-    fee: Long <- positiveLongGen
+    price: Long <- maxWavesAnountGen
+    amount1: Long <- maxWavesAnountGen
+    amount2: Long <- maxWavesAnountGen
+    matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2)/2, Math.min(amount1, amount2))
+    maxtTime: Long <- maxTimeGen
+    matcherFee: Long <- maxWavesAnountGen
   } yield {
-    val o1 = Order(sender1, matcher, spendAssetID, receiveAssetID, price, amount1, maxtTime, matcherFee)
-    val o2 = Order(sender2, matcher, receiveAssetID, spendAssetID, price, amount2, maxtTime, matcherFee)
-    val unsigned = OrderMatch(o1, o2, price, matchedAmount, matcherFee * 2, fee, timestamp, Array())
+    val o1 = Order.buy(sender1, matcher, assetPair, price, amount1, maxtTime, matcherFee)
+    val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, maxtTime, matcherFee)
+    val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
+    val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
+    val unsigned = OrderMatch(o1, o2, price, matchedAmount,
+      buyFee, sellFee, (buyFee + sellFee) / 2, maxtTime - 100, Array())
     val sig = EllipticCurveImpl.sign(matcher, unsigned.toSign)
-    OrderMatch(o1, o2, price, matchedAmount, matcherFee * 2, fee, timestamp, sig)
+    (unsigned.copy(signature = sig), matcher)
   }
 
+  val orderCancelGenerator: Gen[(OrderCancelTransaction, PrivateKeyAccount)] = for {
+    sender: PrivateKeyAccount <- accountGen
+    orderId <- bytes32gen
+    assetPair <- assetPairGen
+    timestamp: Long <- timestampGen
+    fee: Long <- maxWavesAnountGen
+  } yield (OrderCancelTransaction(sender, assetPair.first, assetPair.second, orderId, fee, timestamp), sender)
+
+  implicit val orderMatchArb: Arbitrary[(OrderMatch, PrivateKeyAccount)] = Arbitrary { orderMatchGenerator }
+  implicit val orderArb: Arbitrary[(Order, PrivateKeyAccount)] = Arbitrary { orderGenerator }
+  implicit val privateKeyAccArb: Arbitrary[PrivateKeyAccount] = Arbitrary { accountGen }
+
+  def validOrderMatch = orderMatchGenerator.sample.get
+
+  /**
+    * Implicit to support <code>Containing</code> nature of <code>Validation</code>.
+    */
+  implicit val containingNatureOfValidation: Containing[Validation] =
+    new Containing[Validation] {
+      def contains(v: Validation, ele: Any): Boolean =
+        !v.status && v.labels.contains(ele.toString)
+      def containsOneOf(v: Validation, elements: scala.collection.Seq[Any]): Boolean = {
+        !v.status && elements.map(_.toString).map(v.labels.contains).reduce(_ || _)
+      }
+      def containsNoneOf(v: Validation, elements: scala.collection.Seq[Any]): Boolean = {
+        v.status || elements.map(_.toString).map(v.labels.contains).reduce(!_ && !_)
+      }
+  }
+
+  class ValidationMatcher extends BeMatcher[Validation] {
+    def apply(left: Validation): MatchResult =
+      MatchResult(
+        left.status,
+        left.toString + " was invalid",
+        left.toString + " was valid"
+      )
+  }
+  val valid = new ValidationMatcher
+  val invalid = not (valid)
 
 }

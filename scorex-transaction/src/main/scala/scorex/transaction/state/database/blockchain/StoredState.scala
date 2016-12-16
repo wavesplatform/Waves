@@ -10,12 +10,15 @@ import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.state.database.state._
-import scorex.utils.{LogMVMapBuilder, ScorexLogging}
+import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
 
+import scala.concurrent.duration._
+import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
+import scorex.transaction.assets.exchange.{OrderCancelTransaction, OrderMatch}
 
 
 /** Store current balances only, and balances changes within effective balance depth.
@@ -24,7 +27,8 @@ import scala.util.{Failure, Success, Try}
   *
   * Use apply method of StoredState object to create new instance
   */
-class StoredState(db: MVStore, settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging {
+class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging
+  with OrderMatchStoredState {
 
   val assetsExtension = new AssetsExtendedState(db)
 
@@ -49,7 +53,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
   /**
     * Transaction ID -> serialized transaction
     */
-  private val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
+  val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
   db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
@@ -92,7 +96,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     }
   }
 
-  private[blockchain] def applyChanges(changes: Map[AssetAcc, (AccState, Reason)]): Unit = synchronized {
+  private[blockchain] def applyChanges(changes: Map[AssetAcc, (AccState, Reason)], blockTs: Long = NTP.correctedTime()): Unit = synchronized {
     setStateHeight(stateHeight + 1)
     val h = stateHeight
     changes.foreach { ch =>
@@ -106,6 +110,13 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
           includedTx.put(tx.id, h)
         case tx: DeleteTransaction =>
           assetsExtension.burnAsset(tx.assetId, h, tx.id, -tx.amount)
+        case om: OrderMatch =>
+          transactionsMap.put(om.id, om.bytes)
+          putOrderMatch(om, blockTs)
+          includedTx.put(om.id, h)
+        case oc: OrderCancelTransaction =>
+          transactionsMap.put(oc.id, oc.bytes)
+          putOrderCancel(oc)
         case tx =>
           includedTx.put(tx.id, h)
       }
@@ -152,7 +163,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     val newBalances: Map[AssetAcc, (AccState, Reason)] = calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
-    applyChanges(newBalances)
+    applyChanges(newBalances, block.timestampField.value)
     log.trace(s"New state height is $stateHeight, hash: $hash, totalBalance: $totalBalance")
 
     this
@@ -176,6 +187,31 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       }
     }
     newBalances
+  }
+
+  private[blockchain] def filterValidTransactions(trans: Seq[Transaction]):
+  Seq[Transaction] = {
+    trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
+      case ((currentState, validTxs), tx) =>
+      try {
+        val newState = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
+          //update balances sheet
+          val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
+          val newBalance = if (currentChange._1.balance == Long.MinValue) Long.MinValue
+          else Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
+
+          if (newBalance < 0 && tx.timestamp >= settings.allowTemporaryNegativeUntil) {
+            throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
+          }
+
+          iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
+        }
+        (newState, validTxs :+ tx)
+      } catch {
+        case NonFatal(e) =>
+          (currentState, validTxs)
+      }
+    }._2
   }
 
   override def balance(account: Account, atHeight: Option[Int] = None): Long =
@@ -321,7 +357,7 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
       validTxs
     }
 
-    filterValidTransactionsByState(filteredFromFuture)
+    filterCancelOrderMatch(filterValidTransactionsByState(filteredFromFuture))
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
@@ -379,6 +415,10 @@ class StoredState(db: MVStore, settings: WavesHardForkParameters) extends Lagona
     case tx: DeleteTransaction =>
       tx.timestamp > settings.allowDeleteTransactionAfterTimestamp && tx.validate == ValidationResult.ValidateOke &&
         isIssuerAddress(tx.assetId, tx.sender.address) && included(tx.id, None).isEmpty
+    case tx: OrderMatch =>
+      isOrderMatchValid(tx) && included(tx.id, None).isEmpty
+    case tx: OrderCancelTransaction =>
+      tx.isValid && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>
