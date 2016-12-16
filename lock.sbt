@@ -51,9 +51,9 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe.play" % "play-functional_2.11" % "2.4.8",
   "com.typesafe.play" % "play-iteratees_2.11" % "2.4.8",
   "com.typesafe.play" % "play-json_2.11" % "2.4.8",
-  "com.wavesplatform" % "scorex-basics_2.11" % "1.5.0-SNAPSHOT",
-  "com.wavesplatform" % "scorex-consensus_2.11" % "1.5.0-SNAPSHOT",
-  "com.wavesplatform" % "scorex-transaction_2.11" % "1.5.0-SNAPSHOT",
+  "com.wavesplatform" % "scorex-basics_2.11" % "1.5.0",
+  "com.wavesplatform" % "scorex-consensus_2.11" % "1.5.0",
+  "com.wavesplatform" % "scorex-transaction_2.11" % "1.5.0",
   "commons-net" % "commons-net" % "3.5",
   "io.dropwizard.metrics" % "metrics-core" % "3.1.2",
   "io.netty" % "netty" % "3.10.0.Final",
@@ -62,8 +62,6 @@ dependencyOverrides in ThisBuild ++= Set(
   "io.netty" % "netty-common" % "4.0.37.Final",
   "io.netty" % "netty-handler" % "4.0.37.Final",
   "io.netty" % "netty-transport" % "4.0.37.Final",
-  "io.spray" % "spray-testkit_2.11" % "1.3.4",
-  "io.spray" % "spray-util_2.11" % "1.3.4",
   "io.swagger" % "swagger-annotations" % "1.5.10",
   "io.swagger" % "swagger-core" % "1.5.10",
   "io.swagger" % "swagger-jaxrs" % "1.5.10",
@@ -106,4 +104,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.12"
 )
-// LIBRARY_DEPENDENCIES_HASH dad8ca99e6930394c44d9f62778ff420c1c4a4bb
+// LIBRARY_DEPENDENCIES_HASH d7bb2b63891572368ad5649c7d23c14e582ef7d1

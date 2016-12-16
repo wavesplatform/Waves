@@ -26,7 +26,7 @@ class NodeAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll
     val version = getRequest("/node/version")
     (version \ "version").as[String].contains("Waves") shouldBe true
     (version \ "version").as[String].contains("Release0") shouldBe true
-    (version \ "version").as[String].contains("v0.3.") shouldBe true
+    (version \ "version").as[String].contains("v0.4.") shouldBe true
   }
 
   test("/node/stop API route protected by api key") {
