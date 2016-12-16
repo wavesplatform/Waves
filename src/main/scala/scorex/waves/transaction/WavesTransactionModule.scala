@@ -17,7 +17,7 @@ import scorex.wallet.Wallet
   * Waves Transaction Module
   */
 class WavesTransactionModule(chainParams: ChainParameters)(implicit override val settings: TransactionSettings with Settings,
-                             application: RunnableApplication)
+                                                           application: RunnableApplication)
   extends SimpleTransactionModule(chainParams) {
 
   override val InitialBalance = chainParams.initialBalance
@@ -68,16 +68,17 @@ class WavesTransactionModule(chainParams: ChainParameters)(implicit override val
     * Publish signed payment transaction which generated outside node
     */
   def broadcastPayment(payment: SignedPayment): Either[ValidationResult, PaymentTransaction] = {
+    val maybeSignatureBytes = Base58.decode(payment.signature).toOption
     if (payment.fee < minimumTxFee)
       Left(ValidationResult.InsufficientFee)
+    else if (maybeSignatureBytes.isEmpty)
+      Left(ValidationResult.InvalidSignature)
     else {
       val time = payment.timestamp
-      val sigBytes = Base58.decode(payment.signature).get
-      val senderPubKey = Base58.decode(payment.senderPublicKey).get
-      val recipientAccount = new Account(payment.recipient)
-      val tx = new PaymentTransaction(new PublicKeyAccount(senderPubKey),
-        recipientAccount, payment.amount, payment.fee, time, sigBytes)
-
+      val sigBytes = maybeSignatureBytes.get
+      val senderPubKey = payment.senderPublicKey
+      val recipientAccount = payment.recipient
+      val tx = new PaymentTransaction(senderPubKey, recipientAccount, payment.amount, payment.fee, time, sigBytes)
       tx.validate match {
         case ValidationResult.ValidateOke => {
           if (blockStorage.state.isValid(tx, tx.timestamp)) {

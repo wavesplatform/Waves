@@ -19,10 +19,6 @@ class WavesSettings(override val settingsJSON: JsObject) extends Settings with T
   lazy val minimumTxFee = (settingsJSON \ "minimumTxFee").asOpt[Long].getOrElse(DefaultMinimumTxFee)
   private val DefaultMinimumTxFee = 100000L
 
-  val suspendedSenders = Try {
-    (settingsJSON \ "suspendedSenders").as[List[String]]
-  }.getOrElse(List[String]())
-
   lazy val isTestNet: Boolean = (settingsJSON \ "testnet").asOpt[Boolean].getOrElse(true)
   lazy val chainParams: ChainParameters = if (isTestNet) TestNetParams else MainNetParams
 

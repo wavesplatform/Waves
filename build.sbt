@@ -38,5 +38,5 @@ lazy val addAkkaLibs = Seq(
 libraryDependencies ++= addAkkaLibs
 
 fork in ThisBuild := true
-fork in Test := false
+fork in Test := true
 parallelExecution in ThisBuild := false

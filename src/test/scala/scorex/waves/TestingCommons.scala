@@ -125,8 +125,7 @@ object TestingCommons {
                   body: String = "",
                   headers: Map[String, String] = Map("api_key" -> "test"),
                   peer: String = peerUrl(application)): JsValue = {
-    val request = Http(url(peer + us).POST << params <:< headers << body)
-    val response = Await.result(request, 5.seconds)
+    val response = postRequestWithResponse(us, params, body, headers, peer)
     Json.parse(response.getResponseBody)
   }
 

@@ -42,13 +42,13 @@ object TestNetParams extends ChainParameters {
 
   override val generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MinValue
 
-  override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MinValue
+  override val minimalGeneratingBalanceAfterTimestamp: Long = Long.MinValue
 
-  override def allowTransactionsFromFutureUntil: Long = Long.MinValue
+  override val allowTransactionsFromFutureUntil: Long = Long.MinValue
 
-  override def allowUnissuedAssetsUntil: Long = 1479416400000L
+  override val allowUnissuedAssetsUntil: Long = 1479416400000L
 
-  override def allowDeleteTransactionAfterTimestamp: Long = 1481110521000L
+  override val allowDeleteTransactionAfterTimestamp: Long = 1481110521000L
 }
 
 object MainNetParams extends ChainParameters {
@@ -77,11 +77,11 @@ object MainNetParams extends ChainParameters {
 
   override val generatingBalanceDepthFrom50To1000AfterHeight: Long = 232000L
 
-  override def minimalGeneratingBalanceAfterTimestamp: Long = 1479168000000L
+  override val minimalGeneratingBalanceAfterTimestamp: Long = 1479168000000L
 
-  override def allowTransactionsFromFutureUntil: Long = 1479168000000L
+  override val allowTransactionsFromFutureUntil: Long = 1479168000000L
 
-  override def allowUnissuedAssetsUntil: Long = 1479416400000L
+  override val allowUnissuedAssetsUntil: Long = 1479416400000L
 
-  override def allowDeleteTransactionAfterTimestamp: Long = 1482233593000L
+  override val allowDeleteTransactionAfterTimestamp: Long = 1482233593000L
 }
