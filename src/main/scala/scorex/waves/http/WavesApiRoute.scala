@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.WavesSettings
 import io.swagger.annotations._
-import play.api.libs.json.{JsError, JsSuccess, Json}
+import play.api.libs.json.{JsError, JsPath, JsSuccess, Json}
 import scorex.account.Account
 import scorex.api.http.{NegativeFee, NoBalance, _}
 import scorex.app.RunnableApplication
@@ -16,6 +16,7 @@ import scorex.transaction.ValidationResult
 import scorex.transaction.state.wallet.Payment
 import scorex.wallet.Wallet
 import scorex.waves.transaction.{ExternalPayment, SignedPayment, WavesTransactionModule}
+import scorex.api.http.formats._
 
 import scala.util.{Failure, Success, Try}
 
@@ -28,8 +29,6 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
   val settings = application.settings
 
   lazy val wallet = application.wallet
-
-  val suspendedSenders = application.settings.asInstanceOf[WavesSettings].suspendedSenders
 
   // TODO asInstanceOf
   implicit lazy val transactionModule: WavesTransactionModule = application.transactionModule.asInstanceOf[WavesTransactionModule]
@@ -71,8 +70,8 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                     case Some(tx) =>
                       tx.validate match {
                         case ValidationResult.ValidateOke =>
-                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
-                            Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
+                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
+                            tx.sender, tx.sender.address, Base58.encode(tx.signature))
                           JsonResponse(Json.toJson(signed), StatusCodes.OK)
 
                         case ValidationResult.InvalidAddress => InvalidAddress.response
@@ -123,8 +122,8 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                     case Some(tx) =>
                       tx.validate match {
                         case ValidationResult.ValidateOke =>
-                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
-                            Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
+                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
+                            tx.sender, tx.sender.address, Base58.encode(tx.signature))
                           JsonResponse(Json.toJson(signed), StatusCodes.OK)
 
                         case ValidationResult.InvalidAddress => InvalidAddress.response
@@ -179,10 +178,8 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                 transactionModule.createSignedPayment(senderAccount, recipientAccount,
                   payment.amount, payment.fee, payment.timestamp) match {
                   case Right(tx) =>
-                    val signature = Base58.encode(tx.signature)
-                    val senderPubKey = Base58.encode(tx.sender.publicKey)
-                    val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.toString,
-                      senderPubKey, tx.sender.address, signature)
+                    val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
+                      tx.sender, tx.sender.address, Base58.encode(tx.signature))
                     JsonResponse(Json.toJson(signedTx), StatusCodes.OK)
 
                   case Left(e) => e match {
@@ -194,6 +191,21 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
           }
         }.getOrElse(WrongJson.response)
       }
+    }
+  }
+
+  private def toErrorResponce(error: JsError): JsonResponse = {
+    val errors = error.errors.map(_._1.toString).toSet
+    if (errors.contains("/recipient")) {
+      InvalidRecipient.response
+    } else if (errors.contains("/sender")) {
+      InvalidSender.response
+    } else if (errors.contains("/senderPublicKey")) {
+      InvalidSender.response
+    } else if (errors.contains("/signature")) {
+      InvalidSignature.response
+    } else {
+      WrongJson.response
     }
   }
 
@@ -217,17 +229,10 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
         Try {
           val js = Json.parse(body)
           js.validate[ExternalPayment] match {
-            case _: JsError => WrongJson.response
+            case error: JsError =>
+              toErrorResponce(error)
             case JsSuccess(payment: ExternalPayment, _) =>
-              Base58.decode(payment.senderPublicKey) match {
-                case Success(senderPublicKeyBytes) =>
-                  val senderAccount = Account.fromPublicKey(senderPublicKeyBytes)
-                  if (suspendedSenders.contains(senderAccount.address))
-                    InvalidSender.response
-                  else
-                    broadcastPayment(payment)
-                case Failure(_) => InvalidSender.response
-              }
+              broadcastPayment(payment)
           }
         }.getOrElse(WrongJson.response)
       }
@@ -255,16 +260,10 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
       postJsonRoute {
         Try(Json.parse(body)).map { js =>
           js.validate[SignedPayment] match {
-            case _: JsError =>
-              WrongJson.response
+            case error: JsError =>
+              toErrorResponce(error)
             case JsSuccess(payment: SignedPayment, _) =>
-              Base58.decode(payment.senderPublicKey) match {
-                case Success(senderPubKeyBytes) =>
-                  val senderAccount = Account.fromPublicKey(senderPubKeyBytes)
-                  if (suspendedSenders.contains(senderAccount.address)) InvalidSender.response
-                  else broadcastPayment(payment)
-                case Failure(e) => InvalidSender.response
-              }
+              broadcastPayment(payment)
           }
         }.getOrElse(WrongJson.response)
       }
@@ -289,6 +288,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
         case ValidationResult.NoBalance => NoBalance.response
         case ValidationResult.InvalidAddress => InvalidAddress.response
         case ValidationResult.InsufficientFee => InsufficientFee.response
+        case ValidationResult.InvalidSignature => InvalidSignature.response
         case _ => Unknown.response
       }
     }
@@ -296,9 +296,9 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
 
   @Deprecated
   private def broadcastPayment(payment: ExternalPayment): JsonResponse = {
-    val senderAccount = Account.fromPublicKey(Base58.decode(payment.senderPublicKey).get)
+    val senderAccount = payment.senderPublicKey
     val signedPayment = SignedPayment(payment.timestamp, payment.amount, payment.fee, payment.recipient,
-      payment.senderPublicKey, senderAccount.address, payment.signature)
+      payment.senderPublicKey, senderAccount.address, Base58.encode(payment.signature))
 
     transactionModule.broadcastPayment(signedPayment) match {
       case Right(tx) =>
@@ -317,6 +317,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
         case ValidationResult.NoBalance => NoBalance.response
         case ValidationResult.InvalidAddress => InvalidAddress.response
         case ValidationResult.InsufficientFee => NegativeFee.response
+        case ValidationResult.InvalidSignature => InvalidSignature.response
         case _ => Unknown.response
       }
     }
