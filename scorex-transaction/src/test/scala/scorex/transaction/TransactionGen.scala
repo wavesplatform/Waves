@@ -119,13 +119,12 @@ trait TransactionGen {
   val invalidOrderGenerator: Gen[Order] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
-    spendAssetID: Option[AssetId] <- assetIdGen
-    receiveAssetID: Option[AssetId] <- assetIdGen
+    pair <- assetPairGen
     price: Long <- Arbitrary.arbitrary[Long]
     amount: Long <- Arbitrary.arbitrary[Long]
     maxtTime: Long <- Arbitrary.arbitrary[Long]
     matcherFee: Long <- Arbitrary.arbitrary[Long]
-  } yield Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxtTime, matcherFee)
+  } yield Order(sender, matcher, pair.first, pair.second, price, amount, maxtTime, matcherFee)
 
   val orderMatchGenerator: Gen[(OrderMatch, PrivateKeyAccount)] = for {
     sender1: PrivateKeyAccount <- accountGen
