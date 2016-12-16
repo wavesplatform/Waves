@@ -1,10 +1,12 @@
 package com.wavesplatform.actor
 
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 import akka.actor.{ActorSystem, AllForOneStrategy, SupervisorStrategy, SupervisorStrategyConfigurator}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.wavesplatform.settings.WavesSettings
 import scorex.utils.ScorexLogging
+
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 object RootActorSystem extends ScorexLogging {
   @volatile private var failed = false
@@ -18,9 +20,11 @@ object RootActorSystem extends ScorexLogging {
     }
   }
 
-  def start(id: String)(init: ActorSystem => Unit): Unit = {
+  def start(id: String, settings: WavesSettings)(init: ActorSystem => Unit): Unit = {
     val system = ActorSystem(id, ConfigFactory.load().withValue("akka.actor.guardian-supervisor-strategy",
-      ConfigValueFactory.fromAnyRef("com.wavesplatform.actor.RootActorSystem$EscalatingStrategy")))
+      ConfigValueFactory.fromAnyRef("com.wavesplatform.actor.RootActorSystem$EscalatingStrategy"))
+      .withValue("akka.persistence.journal.leveldb.dir", ConfigValueFactory.fromAnyRef(settings.matcherJournalDataDir))
+      .withValue("akka.persistence.snapshot-store.local.dir", ConfigValueFactory.fromAnyRef(settings.matcherSnapshotsDataDir)))
 
     sys.addShutdownHook {
       Await.result(system.terminate(), Duration.Inf)

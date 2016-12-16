@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import akka.actor.{ActorSystem, Props}
+
 import com.wavesplatform.consensus.WavesConsensusModule
 import com.wavesplatform.http.NodeApiRoute
 import scorex.account.AddressScheme
@@ -12,10 +13,13 @@ import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import com.wavesplatform.settings._
 import scorex.waves.transaction.WavesTransactionModule
 import scala.reflect.runtime.universe._
+
 import com.wavesplatform.actor.RootActorSystem
 import scorex.api.http.assets.AssetsBroadcastApiRoute
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.settings.Settings
+
+import com.wavesplatform.matcher.MatcherApplication
 
 class Application(as: ActorSystem, appSettings: WavesSettings) extends {
   override implicit val settings = appSettings
@@ -25,7 +29,8 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
   }
   override implicit val actorSystem = as
-} with scorex.app.RunnableApplication {
+} with scorex.app.RunnableApplication
+  with MatcherApplication {
 
   override implicit lazy val consensusModule = new WavesConsensusModule(settings.chainParams)
 
@@ -74,15 +79,20 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
   require(transactionModule.accountWatchingSupport)
 
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings, networkController))
+
+  override def run(): Unit = {
+    super.run()
+
+    if (settings.isRunMatcher) runMatcher()
+  }
 }
 
 object Application extends ScorexLogging {
-  def main(args: Array[String]): Unit =
-    RootActorSystem.start("wavesplatform") { actorSystem =>
-      log.info("Starting with args: {} ", args)
-      val filename = args.headOption.getOrElse("settings.json")
-      val settings = new WavesSettings(Settings.readSettingsJson(filename))
-
+  def main(args: Array[String]): Unit = {
+    log.info("Starting with args: {} ", args)
+    val filename = args.headOption.getOrElse("settings.json")
+    val settings = new WavesSettings(Settings.readSettingsJson(filename))
+    RootActorSystem.start("wavesplatform", settings) { actorSystem =>
       configureLogging(settings)
 
       // Initialize global var with actual address scheme
@@ -96,6 +106,7 @@ object Application extends ScorexLogging {
       if (application.wallet.privateKeyAccounts().isEmpty)
         application.wallet.generateNewAccounts(1)
     }
+  }
 
   /**
     * Configure logback logging level according to settings

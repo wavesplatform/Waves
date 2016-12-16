@@ -7,14 +7,22 @@
     "port": 6868,
     "maxConnections": 10
   },
-  "walletDir": "/tmp/scorex/waves/wallet",
+  "walletDir": "",
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
   "walletPassword": "mycookies",
-  "dataDir": "/tmp/scorex/waves/data",
+  "dataDir": "",
   "rpcPort": 6869,
   "blockGenerationDelay": 1000,
   "cors": true,
   "maxRollback": 100,
   "history": "blockchain",
-  "offlineGeneration": true
+  "offlineGeneration": true,
+  "matcher": {
+    "account": "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",
+    "host": "127.0.0.1",
+    "port": 6886,
+    "snapshotInterval": 2,
+    "minOrderFee": 100000,
+    "maxOpenOrdersCount": 100
+  }
 }

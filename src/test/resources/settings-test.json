@@ -16,9 +16,18 @@
   "maxRollback": 100,
   "apiKeyHash": "JDJkZrg24XwvBgBUi6PgpHzrAFgeefb7nU8LJPRR58ga",
   "history": "blockchain",
-  "offlineGeneration": false,
+  "blockGenerationDelay": 1000,
+  "offlineGeneration": true,
+  "suspendedSenders": ["3N8j8ZrvcaRtJE1oPLA3enbBZAbyHEzRBw5"],
   "minimumTxFee": 333,
   "cors": true,
 
-  "scoreBroadcastDelay": 2000
+  "scoreBroadcastDelay": 2000,
+
+  "matcher": {
+    "account": "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",
+    "host": "127.0.0.1",
+    "port": 9093,
+    "minOrderFee": 100000
+  }
 }
