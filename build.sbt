@@ -27,11 +27,10 @@ libraryDependencies ++= Seq(
   "org.scalamock" %% "scalamock-scalatest-support" % "3.2.2" % "test"
 )
 
-val akkaV       = "2.+"
+val akkaV       = "2.4.14"
 lazy val addAkkaLibs = Seq(
   "com.typesafe.akka" %% "akka-persistence" % akkaV,
-  "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.3.15" % "test",
-  "com.typesafe.akka" %% "akka-http-testkit" % akkaV,
+  "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.+" % "test",
   "org.iq80.leveldb"            % "leveldb"          % "0.7",
   "org.fusesource.leveldbjni"   % "leveldbjni-all"   % "1.8")
 
