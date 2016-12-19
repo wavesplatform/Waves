@@ -222,6 +222,18 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     }
   }
 
+  /**
+    * Validate transactions according to the State and send it to network
+    */
+  def broadcastTransactions(txs: Seq[SignedTransaction]): ValidationResult = {
+    if(txs.nonEmpty && isValid(txs, txs.map(_.timestamp).max)) {
+      txs.foreach(onNewOffchainTransaction)
+      ValidationResult.ValidateOke
+    } else {
+      ValidationResult.StateCheckFailed
+    }
+  }
+
   def reissueAsset(request: ReissueRequest, wallet: Wallet): Try[ReissueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
     val reissue = ReissueTransaction.create(sender,
@@ -295,6 +307,23 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     val notExpired = (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
     notExpired && blockStorage.state.isValid(tx, blockTime)
+  } catch {
+    case e: UnsupportedOperationException =>
+      log.debug(s"DB can't find last block because of unexpected modification")
+      false
+    case NonFatal(t) =>
+      log.error(s"Unexpected error during validation", t)
+      throw t
+  }
+
+  /** Check whether txs is valid on current state and not expired yet
+    */
+  def isValid(txs: Seq[Transaction], blockTime: Long): Boolean = try {
+    val notExpiredForAll = txs.forall(tx => {
+      val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
+      (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
+    })
+    notExpiredForAll && blockStorage.state.isValid(txs, None, blockTime)
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
