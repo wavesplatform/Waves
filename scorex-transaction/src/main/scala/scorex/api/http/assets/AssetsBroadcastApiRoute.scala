@@ -145,25 +145,23 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
   ))
   def batchTransfer: Route = path("batch_transfer") {
     entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[Array[AssetTransferRequest]] match {
-              case err: JsError =>
-                WrongTransactionJson(err).response
-              case JsSuccess(requests: Array[AssetTransferRequest], _) =>
-                val validTransactionsOpt = listTry2TryList(requests.map(_.toTx))
-                validTransactionsOpt match {
-                  case Success(txs) =>
-                    broadcastMany(txs)(txs => JsArray(txs.map(_.json)))
-                  case Failure(e: StateCheckFailed) =>
-                    StateCheckFailed.response
-                  case _ =>
-                    WrongJson.response
-                }
-            }
-          }.getOrElse(WrongJson.response)
-        }
+      postJsonRoute {
+        Try(Json.parse(body)).map { js =>
+          js.validate[Array[AssetTransferRequest]] match {
+            case err: JsError =>
+              WrongTransactionJson(err).response
+            case JsSuccess(requests: Array[AssetTransferRequest], _) =>
+              val validTransactionsOpt = listTry2TryList(requests.map(_.toTx))
+              validTransactionsOpt match {
+                case Success(txs) =>
+                  broadcastMany(txs)(txs => JsArray(txs.map(_.json)))
+                case Failure(e: StateCheckFailed) =>
+                  StateCheckFailed.response
+                case _ =>
+                  WrongJson.response
+              }
+          }
+        }.getOrElse(WrongJson.response)
       }
     }
   }
