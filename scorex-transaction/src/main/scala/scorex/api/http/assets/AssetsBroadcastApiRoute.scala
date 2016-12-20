@@ -22,7 +22,7 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
   val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
-    issue ~ reissue ~ transfer ~ deleteRoute
+    issue ~ reissue ~ transfer ~ deleteRoute ~ batchTransfer
   }
 
   import BroadcastRequests._
