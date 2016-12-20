@@ -50,7 +50,7 @@ object OrderBook {
       }
   }
 
-  def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): (OrderBook) = {
+  private def updateCancelOrder(ob: OrderBook, limitOrder: LimitOrder): (OrderBook) = {
     (limitOrder match {
       case oo@BuyLimitOrder(p, _, _) =>
         ob.bids.get(p).map { lvl =>
@@ -71,24 +71,7 @@ object OrderBook {
     }).getOrElse(ob)
   }
 
-  def matchOrder1(ob: OrderBook, o: LimitOrder): (OrderBook, Option[LimitOrder], Long) = o match {
-    case oo: BuyLimitOrder =>
-      ob.bestAsk.exists(oo.price >= _.price) match {
-        case true => executeBuy(ob, ob.asks.head, oo)
-        case false =>
-          val orders = ob.bids.getOrElse(oo.price, Vector.empty)
-          (ob.copy(bids = ob.bids + (oo.price -> (orders :+ oo))), None, oo.amount)
-      }
-    case oo: SellLimitOrder =>
-      ob.bestBid.exists(oo.price <= _.price) match {
-        case true => executeSell(ob, ob.bids.head, oo)
-        case false =>
-          val orders = ob.asks.getOrElse(oo.price, Vector.empty)
-          (ob.copy(asks = ob.asks + (oo.price -> (orders :+ oo))), None, oo.amount)
-      }
-  }
-
-  def updateExecutedBuy(ob: OrderBook, o: BuyLimitOrder, r: Long) = ob.bids.get(o.price) match {
+  private def updateExecutedBuy(ob: OrderBook, o: BuyLimitOrder, r: Long) = ob.bids.get(o.price) match {
     case Some(l) =>
       val (l1, l2) = l.span(_ != o)
       val ll = if (r > 0) (l1 :+ o.copy(amount = r)) ++ l2.tail else l1 ++ l2.tail
@@ -96,7 +79,7 @@ object OrderBook {
     case None => ob
   }
 
-  def updateExecutedSell(ob: OrderBook, o: SellLimitOrder, r: Long) = ob.asks.get(o.price) match {
+  private def updateExecutedSell(ob: OrderBook, o: SellLimitOrder, r: Long) = ob.asks.get(o.price) match {
     case Some(l) =>
       val (l1, l2) = l.span(_ != o)
       val ll = if (r > 0) (l1 :+ o.copy(amount = r)) ++ l2.tail else l1 ++ l2.tail
@@ -117,7 +100,7 @@ object OrderBook {
   }
 
 
-  def executeBuy(ob: OrderBook, level: (Price, Level[SellLimitOrder]),
+  private def executeBuy(ob: OrderBook, level: (Price, Level[SellLimitOrder]),
                  o: BuyLimitOrder): (OrderBook, Option[SellLimitOrder], Long) = level._2 match {
     case h +: t if h.amount > o.amount =>
       (ob.copy(asks = ob.asks + (level._1 -> (h.copy(amount = h.amount - o.amount) +: t))),
@@ -129,7 +112,7 @@ object OrderBook {
     }
 
 
-  def executeSell(ob: OrderBook, level: (Price, Level[BuyLimitOrder]),
+  private def executeSell(ob: OrderBook, level: (Price, Level[BuyLimitOrder]),
                  o: SellLimitOrder): (OrderBook, Option[BuyLimitOrder], Long) = level._2 match {
     case h +: t if h.amount > o.amount =>
       (ob.copy(bids = ob.bids + (level._1 -> (h.copy(amount = h.amount - o.amount) +: t))),

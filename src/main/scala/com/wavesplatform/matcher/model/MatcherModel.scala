@@ -68,7 +68,7 @@ object LimitOrder {
 }
 
 object Events {
-  sealed trait Event
+  sealed trait Event extends Serializable
   @SerialVersionUID(-6952325887070115993L)
   case class OrderExecuted(submitted: LimitOrder, counter: LimitOrder) extends Event {
     def counterRemaining: Long = math.max(counter.amount - submitted.amount, 0)
