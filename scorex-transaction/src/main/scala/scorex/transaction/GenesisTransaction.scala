@@ -67,6 +67,9 @@ case class GenesisTransaction(override val recipient: Account,
 
 object GenesisTransaction extends Deser[GenesisTransaction] {
 
+
+
+
   import scorex.transaction.LagonakiTransaction._
 
   private val RECIPIENT_LENGTH = Account.AddressLength

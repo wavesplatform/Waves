@@ -6,6 +6,7 @@ libraryDependencies ++=
   Dependencies.serialization ++
   Dependencies.logging ++
   Seq(
-    "com.github.pathikrit" %% "better-files" % "2.13.0"
+    "com.github.pathikrit" %% "better-files" % "2.13.0",
+    "org.typelevel" %% "cats" % "0.8.1"
   )
 

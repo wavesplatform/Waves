@@ -90,13 +90,15 @@ object BroadcastRequests {
                                 signature: String) {
 
     def toTx: Try[DeleteTransaction] = Try {
-      DeleteTransaction(
+
+
+      DeleteTransaction.create(
         new PublicKeyAccount(Base58.decode(senderPublicKey).get),
         Base58.decode(assetId).get,
         amount,
         fee,
         timestamp,
-        Base58.decode(signature).get)
+        Base58.decode(signature).get).right.get
     }
   }
 

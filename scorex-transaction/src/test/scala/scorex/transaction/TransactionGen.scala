@@ -107,7 +107,7 @@ trait TransactionGen {
     val issue2 = IssueTransaction.create(sender, assetName, description, quantity, decimals,
       reissuable, iFee, Math.max(timestamp, 1476459220001L))
     val reissue = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable2, fee, timestamp)
-    val delete = DeleteTransaction.create(sender, issue.assetId, deleteAmount, fee, timestamp)
+    val delete = DeleteTransaction.create(sender, issue.assetId, deleteAmount, fee, timestamp).right.get
     (issue, issue2, reissue, delete)
   }
 

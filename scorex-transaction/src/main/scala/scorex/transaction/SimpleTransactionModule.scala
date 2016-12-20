@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import cats.data.Validated
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json.{JsArray, JsObject, Json}
@@ -23,7 +24,6 @@ import scorex.wallet.Wallet
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
-
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
 
 @SerialVersionUID(3044437555808662124L)
@@ -209,14 +209,21 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
   def deleteAsset(request: DeleteRequest, wallet: Wallet): Try[DeleteTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val tx = DeleteTransaction.create(sender,
+    val txVal: Either[ValidationResult, DeleteTransaction] = DeleteTransaction.create(sender,
       Base58.decode(request.assetId).get,
       request.quantity,
       request.fee,
       getTimestamp)
-    if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-    else throw new StateCheckFailed("Invalid reissue transaction generated: " + tx.json)
-    tx
+
+    txVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid reissue transaction generated: " + tx.json)
+        tx
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+
+    }
   }
 
   private var txTime: Long = 0
