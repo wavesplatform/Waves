@@ -110,7 +110,7 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with signed Asset delete transaction", response = classOf[AssetDeleteResponse]),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
-  def deleteRoute: Route = path("reissue") {
+  def deleteRoute: Route = path("delete") {
     entity(as[String]) { body =>
       postJsonRoute {
         Try(Json.parse(body)).map { js =>
