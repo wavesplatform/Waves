@@ -253,9 +253,13 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         ignoreNoMsg()
 
         actor ! ord1
+        expectMsg(OrderAccepted(ord1))
         actor ! ord2
+        expectMsg(OrderAccepted(ord2))
         actor ! ord3
-        receiveN(3)
+        expectMsg(OrderAccepted(ord3))
+
+        actor ! RestartActor
 
         actor ! GetBidOrdersRequest
         expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100, 10, ord1))))
