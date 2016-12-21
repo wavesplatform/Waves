@@ -32,7 +32,7 @@ class AssetsExtendedState(db: MVStore) extends ScorexLogging {
   }
 
   def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit = {
-    require(quantity < 0, "Quantity of burned asset should be negative")
+    require(quantity <= 0, "Quantity of burned asset should be negative")
 
     val asset = Base58.encode(assetId)
     val transaction = Base58.encode(transactionId)
