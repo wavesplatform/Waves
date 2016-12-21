@@ -14,7 +14,7 @@ scalacOptions in ThisBuild += "-target:jvm-1.8"
 
 resolvers += "SonaType" at "https://oss.sonatype.org/content/groups/public"
 
-val scorexVersion = "1.5.0"
+val scorexVersion = "1.5.1-SNAPSHOT"
 
 libraryDependencies ++= Seq(
   "com.wavesplatform" %% "scorex-basics" % scorexVersion,
@@ -27,12 +27,12 @@ libraryDependencies ++= Seq(
   "org.scalamock" %% "scalamock-scalatest-support" % "3.2.2" % "test"
 )
 
-val akkaV       = "2.4.14"
+val akkaV = "2.4.14"
 lazy val addAkkaLibs = Seq(
   "com.typesafe.akka" %% "akka-persistence" % akkaV,
   "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.+" % "test",
-  "org.iq80.leveldb"            % "leveldb"          % "0.7",
-  "org.fusesource.leveldbjni"   % "leveldbjni-all"   % "1.8")
+  "org.iq80.leveldb" % "leveldb" % "0.7",
+  "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
 
 libraryDependencies ++= addAkkaLibs
 
