@@ -41,7 +41,8 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
 
   if (db.getStoreVersion > 0) db.rollback()
 
-  private def accountChanges(key: Address): MVMap[Int, Row] = db.openMap(key.toString, new LogMVMapBuilder[Int, Row])
+  private def accountChanges(key: Address): MVMap[Int, Row] = db.openMap(key.toString,
+    new LogMVMapBuilder[Int, Row].valueType(RowDataType))
 
   private val lastStates: MVMap[Address, Int] = db.openMap(LastStates, new LogMVMapBuilder[Address, Int])
 
@@ -54,7 +55,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     * Transaction ID -> serialized transaction
     */
   val transactionsMap: MVMap[Array[Byte], Array[Byte]] =
-  db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
+    db.openMap(AllTxs, new LogMVMapBuilder[Array[Byte], Array[Byte]])
 
   private val heightMap: MVMap[String, Int] = db.openMap(HeightKey, new LogMVMapBuilder[String, Int])
 
@@ -193,24 +194,24 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
   Seq[Transaction] = {
     trans.foldLeft((Map.empty[AssetAcc, (AccState, Reason)], Seq.empty[Transaction])) {
       case ((currentState, validTxs), tx) =>
-      try {
-        val newState = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
-          //update balances sheet
-          val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
-          val newBalance = if (currentChange._1.balance == Long.MinValue) Long.MinValue
-          else Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
+        try {
+          val newState = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
+            //update balances sheet
+            val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
+            val newBalance = if (currentChange._1.balance == Long.MinValue) Long.MinValue
+            else Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
 
-          if (newBalance < 0 && tx.timestamp >= settings.allowTemporaryNegativeUntil) {
-            throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
+            if (newBalance < 0 && tx.timestamp >= settings.allowTemporaryNegativeUntil) {
+              throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
+            }
+
+            iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
           }
-
-          iChanges.updated(bc.assetAcc, (AccState(newBalance), tx +: currentChange._2))
+          (newState, validTxs :+ tx)
+        } catch {
+          case NonFatal(e) =>
+            (currentState, validTxs)
         }
-        (newState, validTxs :+ tx)
-      } catch {
-        case NonFatal(e) =>
-          (currentState, validTxs)
-      }
     }._2
   }
 
