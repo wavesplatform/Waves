@@ -7,7 +7,6 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
-import com.wavesplatform.matcher.util.Cache
 import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsString, JsValue, Json}
 import scorex.crypto.encode.Base58
@@ -18,9 +17,8 @@ import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.collection.JavaConversions._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
                      val wallet: Wallet, val settings: WavesSettings,
@@ -125,18 +123,26 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
 
   def handleMatchEvent(e: Event): Option[LimitOrder] = {
     applyEvent(e)
-    context.system.eventStream.publish(e)
 
     e match {
       case e: OrderAdded =>
+        context.system.eventStream.publish(e)
         None
       case e@OrderExecuted(o, c) =>
         val tx = createTransaction(o, c)
         if (isValid(tx)) {
           sendToNetwork(tx)
+          context.system.eventStream.publish(e)
+
+          if (e.submittedRemaining > 0) Some(o.partial(e.submittedRemaining))
+          else None
+        } else {
+          val canceled = Events.OrderCanceled(c)
+          persist(canceled)(e => ())
+          applyEvent(canceled)
+          Some(o)
         }
-        if (e.submittedRemaining > 0) Some(o.partial(e.submittedRemaining))
-        else None
+
       case _ => None
     }
   }

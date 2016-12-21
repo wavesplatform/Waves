@@ -17,7 +17,7 @@ import play.api.libs.json.{JsObject, JsString}
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction._
-import scorex.transaction.assets.exchange.AssetPair
+import scorex.transaction.assets.exchange.{AssetPair, OrderMatch}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
@@ -233,6 +233,35 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
           val items = expectMsgType[GetOrdersResponse].orders.map(_.order.id) //should have size 1000
           println(items.size)
         }
+
+      }
+
+      "order matched with invalid order should keep matching with others, invalid is removed" in {
+        val transactionModule = stub[TransactionModule[StoredInBlock]]
+        val ord1 = buy(pair, 100, 20)
+        val ord2 = buy(pair, 5000, 1000) // should be invalid
+        val ord3 = sell(pair, 100, 10)
+
+        actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
+          wallet, settings, transactionModule) with RestartableActor {
+          override def isValid(orderMatch: OrderMatch): Boolean = {
+            if (orderMatch.buyOrder == ord2) false
+            else true
+          }
+        }))
+
+        ignoreNoMsg()
+
+        actor ! ord1
+        actor ! ord2
+        actor ! ord3
+        receiveN(3)
+
+        actor ! GetBidOrdersRequest
+        expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100, 10, ord1))))
+
+        actor ! GetAskOrdersRequest
+        expectMsg(GetOrdersResponse(Seq.empty))
 
       }
     }
