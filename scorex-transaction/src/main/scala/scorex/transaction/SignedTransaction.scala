@@ -23,14 +23,5 @@ trait SignedTransaction extends TypedTransaction {
     "signature" -> Base58.encode(this.signature)
   )
 
-
   def validate: ValidationResult.Value
-
-  protected lazy val validationBase: ValidationResult.Value = if (!Account.isValid(sender)) {
-    ValidationResult.InvalidAddress
-  } else if (assetFee._2 <= 0) {
-    ValidationResult.InsufficientFee
-  } else if (!signatureValid) {
-    ValidationResult.InvalidSignature
-  } else ValidationResult.ValidateOke
 }

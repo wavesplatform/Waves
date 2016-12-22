@@ -282,7 +282,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     val txs = ipoMembers.map { addr =>
       val recipient = new Account(addr)
       GenesisTransaction.create(recipient, totalBalance / ipoMembers.length, timestamp)
-    }
+    }.map(_.right.get)
 
     TransactionsBlockField(txs)
   }

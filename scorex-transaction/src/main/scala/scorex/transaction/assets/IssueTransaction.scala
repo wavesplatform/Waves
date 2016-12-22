@@ -76,7 +76,7 @@ object IssueTransaction extends Deser[IssueTransaction] {
     parseTail(bytes.tail).get
   }
 
-  def parseTail(bytes: Array[Byte]): Try[IssueTransaction] = {
+  def parseTail(bytes: Array[Byte]): Try[IssueTransaction] = Try {
     import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
     val txId      = bytes(SignatureLength)
@@ -91,7 +91,7 @@ object IssueTransaction extends Deser[IssueTransaction] {
     val timestamp                     = Longs.fromByteArray(bytes.slice(quantityStart + 18, quantityStart + 26))
     IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable, fee, timestamp, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-  }
+  }.flatten
 
   def create(sender: PublicKeyAccount,
              name: Array[Byte],

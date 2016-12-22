@@ -28,8 +28,8 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
   val db = new MVStore.Builder().fileName(stateFile.toString).compress().open()
   val state = new StoredState(db, WavesHardForkParameters.Enabled)
-  state.processBlock(new BlockMock(Seq(GenesisTransaction.create(acc1, 1000 * WAVES_UNITS, 0),
-    GenesisTransaction.create(acc2, 100 * WAVES_UNITS, 0))))
+  state.processBlock(new BlockMock(Seq(GenesisTransaction.create(acc1, 1000 * WAVES_UNITS, 0).right.get,
+    GenesisTransaction.create(acc2, 100 * WAVES_UNITS, 0).right.get)))
 
   override protected def beforeAll(): Unit = {
 

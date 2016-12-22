@@ -66,13 +66,7 @@ object TransferTransaction extends Deser[TransferTransaction] {
                    arrayWithSize(attachment))
     }
 
-    override lazy val validate: ValidationResult.Value = if (attachment.length > TransferTransaction.MaxAttachmentSize) {
-      ValidationResult.TooBigArray
-    } else if (amount <= 0) {
-      ValidationResult.NegativeAmount //CHECK IF AMOUNT IS POSITIVE
-    } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      ValidationResult.OverflowError // CHECK THAT fee+amount won't overflow Long
-    } else validationBase
+    override lazy val validate: ValidationResult.Value = ValidationResult.ValidateOke
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
         "recipient"  -> recipient.address,
@@ -93,7 +87,7 @@ object TransferTransaction extends Deser[TransferTransaction] {
     parseTail(bytes.tail).get
   }
 
-  def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = {
+  def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = Try {
     import EllipticCurveImpl._
 
     val signature = bytes.slice(0, SignatureLength)
@@ -111,7 +105,7 @@ object TransferTransaction extends Deser[TransferTransaction] {
     TransferTransaction
       .create(assetIdOpt, sender, recipient, amount, timestamp, feeAssetIdOpt, feeAmount, attachment, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-  }
+  }.flatten
 
   def create(assetId: Option[AssetId],
              sender: PublicKeyAccount,

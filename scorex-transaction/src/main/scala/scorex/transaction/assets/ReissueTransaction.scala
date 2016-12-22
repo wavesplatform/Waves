@@ -58,7 +58,7 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
     parseTail(bytes.tail).get
   }
 
-  def parseTail(bytes: Array[Byte]): Try[ReissueTransaction] = {
+  def parseTail(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
     import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
     val txId      = bytes(SignatureLength)
@@ -73,7 +73,7 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
     val timestamp  = Longs.fromByteArray(bytes.slice(quantityStart + 17, quantityStart + 25))
     ReissueTransaction.create(sender, assetId, quantity, reissuable, fee, timestamp, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-  }
+  }.flatten
 
   def create(sender: PublicKeyAccount,
              assetId: Array[Byte],

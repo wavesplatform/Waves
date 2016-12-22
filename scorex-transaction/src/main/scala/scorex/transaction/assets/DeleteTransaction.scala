@@ -57,7 +57,7 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
     parseTail(bytes.tail).get
   }
 
-  def parseTail(bytes: Array[Byte]): Try[DeleteTransaction] = {
+  def parseTail(bytes: Array[Byte]): Try[DeleteTransaction] = Try {
     import EllipticCurveImpl._
     val sender        = new PublicKeyAccount(bytes.slice(0, KeyLength))
     val assetId       = bytes.slice(KeyLength, KeyLength + AssetIdLength)
@@ -70,7 +70,7 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
     DeleteTransaction
       .create(sender, assetId, quantity, fee, timestamp, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-  }
+  }.flatten
 
   def create(sender: PublicKeyAccount,
              assetId: Array[Byte],
