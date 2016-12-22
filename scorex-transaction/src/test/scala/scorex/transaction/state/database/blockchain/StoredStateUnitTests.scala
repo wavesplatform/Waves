@@ -263,7 +263,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val networkAcc = AssetAcc(issueTx.sender, None)
 
         //set some balance
-        val genes = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt, issueTx.timestamp - 1).right.get
+        val genes = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
         state.applyChanges(state.calcNewBalances(Seq(genes), Map(), allowTemporaryNegative = true))
         state.assetBalance(assetAcc) shouldBe 0
         state.assetBalance(networkAcc) shouldBe genes.amount
@@ -284,7 +284,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
       val networkAcc = AssetAcc(issueTx.sender, None)
       //set some balance
-      val genes = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt, issueTx.timestamp - 1).right.get
+      val genes = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
       state.applyChanges(state.calcNewBalances(Seq(genes), Map(), allowTemporaryNegative = true))
       //issue asset
       val newBalances = state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true)
