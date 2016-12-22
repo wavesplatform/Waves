@@ -57,7 +57,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
         Base58.decode(request.attachment).get
       } else {
         Array.empty
-      })
+      }).right.get
   }
 
   test("many transfer asset transactions") {

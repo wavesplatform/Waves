@@ -22,8 +22,6 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
         feeCalc.enoughFee(tx) shouldBe (tx.fee >= 100000)
       } else {
         feeCalc.enoughFee(tx) shouldBe false
-        val tx2: TransferTransaction = tx.feeAssetId.map(t => tx.copy(feeAssetId = Some(WhitelistedAsset))).getOrElse(tx)
-        feeCalc.enoughFee(tx2) shouldBe (tx.fee >= 1002)
       }
     }
   }

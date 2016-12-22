@@ -22,7 +22,7 @@ sealed trait IssueTransaction extends AssetIssuance {
 
 object IssueTransaction extends Deser[IssueTransaction] {
 
-  case class IssueTransactionImpl(sender: PublicKeyAccount,
+  private case class IssueTransactionImpl(sender: PublicKeyAccount,
                                   name: Array[Byte],
                                   description: Array[Byte],
                                   quantity: Long,

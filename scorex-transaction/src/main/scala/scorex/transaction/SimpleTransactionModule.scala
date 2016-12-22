@@ -151,7 +151,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   def transferAsset(request: TransferRequest, wallet: Wallet): Try[TransferTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
 
-    val transfer: TransferTransaction = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
+    val transferVal = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
       new Account(request.recipient),
       request.amount,
@@ -160,9 +160,15 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       request.fee,
       Option(request.attachment).filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
 
-    if (isValid(transfer, transfer.timestamp)) onNewOffchainTransaction(transfer)
-    else throw new StateCheckFailed("Invalid transfer transaction generated: " + transfer.json)
-    transfer
+    transferVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid transfer transaction generated: " + tx.json)
+        tx
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+
+    }
   }
 
   def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {

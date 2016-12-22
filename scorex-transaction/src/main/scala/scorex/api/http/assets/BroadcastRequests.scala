@@ -122,7 +122,7 @@ object BroadcastRequests {
                                   @ApiModelProperty(required = true)
                                   signature: String) {
     def toTx: Try[TransferTransaction] = Try {
-      TransferTransaction(
+      TransferTransaction.create(
         assetId.map(Base58.decode(_).get),
         sender,
         recipient,
@@ -131,7 +131,7 @@ object BroadcastRequests {
         feeAssetId.map(_.getBytes),
         fee,
         attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
-        Base58.decode(signature).get)
+        Base58.decode(signature).get).right.get
     }
   }
 

@@ -18,7 +18,7 @@ sealed trait ReissueTransaction extends AssetIssuance {
 
 object ReissueTransaction extends Deser[ReissueTransaction] {
 
-  case class ReissueTransactionImpl(sender: PublicKeyAccount,
+  private case class ReissueTransactionImpl(sender: PublicKeyAccount,
                                     assetId: Array[Byte],
                                     quantity: Long,
                                     reissuable: Boolean,

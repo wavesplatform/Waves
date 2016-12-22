@@ -52,14 +52,26 @@ trait TransactionGen {
 
   val transferGenerator: Gen[TransferTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
-    feeAmount: Long <- positiveLongGen
+    feeAmount: Long <- Gen.choose(0, Long.MaxValue- amount - 1)
     assetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
     feeAssetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
     timestamp: Long <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
     recipient: PrivateKeyAccount <- accountGen
-  } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment)
+  } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
+
+
+  val transferGeneratorWithNoneFeeAssetId: Gen[TransferTransaction] = for {
+    amount: Long <- Gen.choose(0, Long.MaxValue)
+    feeAmount: Long <- Gen.choose(0, Long.MaxValue- amount - 1)
+    assetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
+    timestamp: Long <- positiveLongGen
+    sender: PrivateKeyAccount <- accountGen
+    attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
+    recipient: PrivateKeyAccount <- accountGen
+  } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, None, feeAmount, attachment).right.get
+
 
   val selfTransferGenerator: Gen[TransferTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
@@ -69,7 +81,7 @@ trait TransactionGen {
     timestamp: Long <- positiveLongGen
     account: PrivateKeyAccount <- accountGen
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-  } yield TransferTransaction.create(assetId, account, account, amount, timestamp, feeAssetId, feeAmount, attachment)
+  } yield TransferTransaction.create(assetId, account, account, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
   val selfTransferWithWavesFeeGenerator: Gen[TransferTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
@@ -78,7 +90,7 @@ trait TransactionGen {
     timestamp: Long <- positiveLongGen
     account: PrivateKeyAccount <- accountGen
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-  } yield TransferTransaction.create(assetId, account, account, amount, timestamp, None, feeAmount, attachment)
+  } yield TransferTransaction.create(assetId, account, account, amount, timestamp, None, feeAmount, attachment).right.get
 
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -190,4 +202,11 @@ trait TransactionGen {
   val valid = new ValidationMatcher
   val invalid = not (valid)
 
+  def copyWithFeeAssetId(transferTransaction: TransferTransaction, feeAssetId: Option[Array[Byte]]) : TransferTransaction ={
+   TransferTransaction.create(transferTransaction.assetId,
+     transferTransaction.sender,
+     transferTransaction.recipient,
+     transferTransaction.amount,
+     transferTransaction.timestamp,feeAssetId,transferTransaction.fee,transferTransaction.attachment,transferTransaction.signature).right.get
+  }
 }

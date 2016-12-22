@@ -74,7 +74,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
       getTimestamp,
       request.feeAssetId.map(s => Base58.decode(s).get),
       request.fee,
-      Base58.decode(request.attachment).get)
+      Base58.decode(request.attachment).get).right.get
   }
 
   def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,

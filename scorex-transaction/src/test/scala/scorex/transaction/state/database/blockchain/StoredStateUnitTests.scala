@@ -97,23 +97,6 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     state.applyChanges(Map(testAssetAcc -> (AccState(0L), List())))
   }
 
-  property("Amount + fee Long overflow") {
-    val InitialBalance: Long = 100
-    state.applyChanges(Map(testAssetAcc -> (AccState(InitialBalance), List(FeesStateChange(InitialBalance)))))
-    state.balance(testAcc) shouldBe InitialBalance
-
-    val transferTx = genTransfer(Long.MaxValue, Long.MaxValue)
-    (-transferTx.fee - transferTx.amount) should be > 0L
-    state.isValid(transferTx, transferTx.timestamp) shouldBe false
-
-    val paymentTx = genTransfer(Long.MaxValue, Long.MaxValue)
-    (-paymentTx.fee - paymentTx.amount) should be > 0L
-    state.isValid(paymentTx, paymentTx.timestamp) shouldBe false
-
-    state.applyChanges(Map(testAssetAcc -> (AccState(0L), List())))
-
-  }
-
   property("Validate transfer with too big amount") {
     val recipient = new PrivateKeyAccount("recipient account".getBytes)
 
@@ -128,13 +111,13 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         //valid transfer
         val tx = TransferTransaction.create(None, testAcc, recipient, balance - fee, System.currentTimeMillis(),
-          None, fee, Array())
+          None, fee, Array()).right.get
         state.isValid(tx, tx.timestamp) shouldBe true
 
         //transfer asset
         state.balance(testAcc) shouldBe balance
         val invalidtx = TransferTransaction.create(None, testAcc, recipient, balance, System.currentTimeMillis(),
-          None, fee, Array())
+          None, fee, Array()).right.get
         state.isValid(invalidtx, invalidtx.timestamp) shouldBe false
 
         state.applyChanges(Map(testAssetAcc -> (AccState(0L), List(tx))))
@@ -172,7 +155,9 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         newRecipientAmountBalance shouldBe (recipientAmountBalance + tx.amount)
 
-        if (tx.sameAssetForFee) {
+        val sameAssetForFee = tx.feeAssetId.map(fa => tx.assetId.exists(_ sameElements fa)).getOrElse(tx.assetId.isEmpty)
+
+        if (sameAssetForFee) {
           newSenderAmountBalance shouldBe newSenderFeeBalance
           newSenderAmountBalance shouldBe (senderAmountBalance - tx.amount - tx.fee)
         } else {
@@ -211,7 +196,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val recipient = Account.fromPublicKey(tx.sender.publicKey.reverse)
         val transfer = TransferTransaction.create(Some(tx.assetId), tx.sender.asInstanceOf[PrivateKeyAccount],
           recipient, tx.quantity / 2, System.currentTimeMillis(), Some(tx.assetId), tx.quantity / 4,
-          Array.emptyByteArray)
+          Array.emptyByteArray).right.get
         state.applyChanges(state.calcNewBalances(Seq(transfer), Map(), allowTemporaryNegative = true))
 
         val senderBalances = state.getAccountBalance(tx.sender)
@@ -232,7 +217,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val recipient = Account.fromPublicKey(tx.sender.publicKey.reverse)
         val transfer = TransferTransaction.create(Some(tx.assetId), tx.sender.asInstanceOf[PrivateKeyAccount],
           recipient, tx.quantity / 2, System.currentTimeMillis(), Some(tx.assetId), tx.quantity / 4,
-          Array.emptyByteArray)
+          Array.emptyByteArray).right.get
         state.applyChanges(state.calcNewBalances(Seq(transfer), Map(), allowTemporaryNegative = true))
         state.totalAssetQuantity(tx.assetId) shouldBe tx.quantity
 
@@ -309,14 +294,13 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("accountTransactions returns TransferTransactions if fee in base token") {
-    forAll(transferGenerator) { t: TransferTransaction =>
-      val tx = t.copy(feeAssetId = None)
-      val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
-      val senderFeeAcc = AssetAcc(tx.sender, tx.feeAssetId)
-      val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
-      state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
-      state.accountTransactions(tx.sender).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
-      state.accountTransactions(tx.recipient).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
+    forAll(transferGeneratorWithNoneFeeAssetId) { t: TransferTransaction =>
+      val senderAmountAcc = AssetAcc(t.sender, t.assetId)
+      val senderFeeAcc = AssetAcc(t.sender, t.feeAssetId)
+      val recipientAmountAcc = AssetAcc(t.recipient, t.assetId)
+      state.applyChanges(state.calcNewBalances(Seq(t), Map(), allowTemporaryNegative = true))
+      state.accountTransactions(t.sender).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
+      state.accountTransactions(t.recipient).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
     }
   }
 
@@ -435,7 +419,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   def genTransfer(amount: Long, fee: Long): TransferTransaction = {
     val recipient = new PrivateKeyAccount(scorex.utils.randomBytes())
-    TransferTransaction.create(None, testAcc, recipient: Account, amount, getTimestamp, None, fee, Array())
+    TransferTransaction.create(None, testAcc, recipient: Account, amount, getTimestamp, None, fee, Array()).right.get
   }
 
   def genPayment(amount: Long, fee: Long): PaymentTransaction = {
