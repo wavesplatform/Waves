@@ -49,8 +49,6 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
 
     override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
-    override lazy val validate: ValidationResult.Value =  ValidationResult.ValidateOke
-
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[ReissueTransaction] = Try {

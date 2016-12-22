@@ -62,7 +62,6 @@ object IssueTransaction extends Deser[IssueTransaction] {
 
     override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
-    override lazy val validate: ValidationResult.Value = ValidationResult.ValidateOke
   }
 
   val MaxDescriptionLength = 1000

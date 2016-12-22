@@ -66,7 +66,6 @@ object TransferTransaction extends Deser[TransferTransaction] {
                    arrayWithSize(attachment))
     }
 
-    override lazy val validate: ValidationResult.Value = ValidationResult.ValidateOke
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
         "recipient"  -> recipient.address,

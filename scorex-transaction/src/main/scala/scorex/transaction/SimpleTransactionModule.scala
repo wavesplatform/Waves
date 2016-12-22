@@ -197,14 +197,10 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     * Validate transaction according to the State and send it to network
     */
   def broadcastTransaction(tx: SignedTransaction): ValidationResult = {
-    tx.validate match {
-      case ValidationResult.ValidateOke =>
         if (isValid(tx, tx.timestamp)) {
           onNewOffchainTransaction(tx)
           ValidationResult.ValidateOke
         } else ValidationResult.StateCheckFailed
-      case error: ValidationResult => error
-    }
   }
 
   def reissueAsset(request: ReissueRequest, wallet: Wallet): Try[ReissueTransaction] = Try {

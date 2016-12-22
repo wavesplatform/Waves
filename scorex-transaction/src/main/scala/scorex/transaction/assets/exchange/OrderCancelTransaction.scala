@@ -63,7 +63,7 @@ case class OrderCancelTransaction(@ApiModelProperty(dataType = "java.lang.String
     Longs.toByteArray(timestamp)
 
   @ApiModelProperty(hidden = true)
-  override lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
+  lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
 
   def bytes: Array[Byte] = toSign ++ signature
 
@@ -81,7 +81,6 @@ case class OrderCancelTransaction(@ApiModelProperty(dataType = "java.lang.String
   @ApiModelProperty(hidden = true)
   override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(sender, assetFee._1), -assetFee._2))
 
-  override def validate: _root_.scorex.transaction.ValidationResult.Value = ???
 }
 
 object OrderCancelTransaction extends Deser[OrderCancelTransaction] {

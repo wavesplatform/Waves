@@ -49,8 +49,6 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
 
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
-    override lazy val validate: ValidationResult.Value = ValidationResult.ValidateOke
-
   }
   override def parseBytes(bytes: Array[Byte]): Try[DeleteTransaction] = Try {
     require(bytes.head == TransactionType.DeleteTransaction.id)

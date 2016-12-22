@@ -402,18 +402,18 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
         transaction.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp ||
           (transaction.timestamp >= settings.allowInvalidPaymentTransactionsByTimestamp && isTimestampCorrect(tx))
     case tx: TransferTransaction =>
-      tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      included(tx.id, None).isEmpty
     case tx: IssueTransaction =>
-      tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      included(tx.id, None).isEmpty
     case tx: ReissueTransaction =>
       val reissueValid: Boolean = {
         val sameSender = isIssuerAddress(tx.assetId, tx.sender.address)
         val reissuable = assetsExtension.isReissuable(tx.assetId)
         sameSender && reissuable
       }
-      reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      reissueValid && included(tx.id, None).isEmpty
     case tx: DeleteTransaction =>
-      tx.timestamp > settings.allowDeleteTransactionAfterTimestamp && tx.validate == ValidationResult.ValidateOke &&
+      tx.timestamp > settings.allowDeleteTransactionAfterTimestamp &&
         isIssuerAddress(tx.assetId, tx.sender.address) && included(tx.id, None).isEmpty
     case tx: OrderMatch =>
       isOrderMatchValid(tx) && included(tx.id, None).isEmpty

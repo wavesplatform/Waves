@@ -133,11 +133,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   val txOpt: Try[IssueTransaction] = transactionModule.issueAsset(issue, wallet)
                   txOpt match {
                     case Success(tx) =>
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                        case error => jsonResponse(error)
-                      }
                     case Failure(e: StateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
@@ -180,11 +176,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   val txOpt: Try[ReissueTransaction] = transactionModule.reissueAsset(issue, wallet)
                   txOpt match {
                     case Success(tx) =>
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                        case error => jsonResponse(error)
-                      }
                     case Failure(e: StateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
@@ -227,11 +219,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   val txOpt: Try[DeleteTransaction] = transactionModule.deleteAsset(deleteReq, wallet)
                   txOpt match {
                     case Success(tx) =>
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                        case error => jsonResponse(error)
-                      }
                     case Failure(e: StateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>

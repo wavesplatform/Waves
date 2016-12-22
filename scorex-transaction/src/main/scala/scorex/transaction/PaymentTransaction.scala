@@ -58,8 +58,6 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
       Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes, signature)
     }
 
-    def validate: ValidationResult.Value = ValidationResult.ValidateOke
-
     override def balanceChanges(): Seq[BalanceChange] =
       Seq(BalanceChange(AssetAcc(sender, None), -amount - fee), BalanceChange(AssetAcc(recipient, None), amount))
   }
