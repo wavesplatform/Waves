@@ -59,7 +59,6 @@ case class GenesisTransaction(override val recipient: Account,
       ValidationResult.InvalidAddress
     } else ValidationResult.ValidateOke
 
-  override def involvedAmount(account: Account): Long = if (recipient.address.equals(account.address)) amount else 0
 
   override def balanceChanges(): Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(recipient, None), amount))
 }

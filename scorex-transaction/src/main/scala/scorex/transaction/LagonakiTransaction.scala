@@ -34,13 +34,10 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
 
   val creator: Option[Account]
 
-
   val signatureValid: Boolean
 
   //VALIDATE
   def validate: ValidationResult.Value
-
-  def involvedAmount(account: Account): Long
 
   protected def jsonBase() = {
     Json.obj("type" -> transactionType.id,

@@ -63,17 +63,6 @@ case class PaymentTransaction(sender: PublicKeyAccount,
     } else ValidationResult.ValidateOke
 
 
-  override def involvedAmount(account: Account): Long = {
-    val address = account.address
-
-    if (address.equals(sender.address) && address.equals(recipient.address)) {
-      -fee
-    } else if (address.equals(sender.address)) {
-      -amount - fee
-    } else if (address.equals(recipient.address)) {
-      amount
-    } else 0
-  }
 
   override def balanceChanges(): Seq[BalanceChange] =
     Seq(BalanceChange(AssetAcc(sender, None), -amount - fee), BalanceChange(AssetAcc(recipient, None), amount))
