@@ -2,7 +2,7 @@ package scorex.transaction.api.http.assets
 
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.api.http.assets.BroadcastRequests.{AssetDeleteRequest, AssetIssueRequest, AssetReissueRequest, AssetTransferRequest}
+import scorex.api.http.assets.BroadcastRequests.{AssetBurnRequest, AssetIssueRequest, AssetReissueRequest, AssetTransferRequest}
 import scorex.api.http.assets.BroadcastResponses.{AssetIssueResponse, AssetReissueResponse, AssetTransferResponse}
 import scorex.crypto.encode.Base58
 
@@ -93,7 +93,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
     tx.signature.nonEmpty shouldBe true
   }
 
-  test("AssetDeleteRequest json parsing works") {
+  test("AssetBurnRequest json parsing works") {
     val json =
       """
         |{
@@ -104,7 +104,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |"signature":"4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[AssetDeleteRequest].get
+    val req = Json.parse(json).validate[AssetBurnRequest].get
     req.signature shouldBe "4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
     req.fee shouldBe 100000000L
   }

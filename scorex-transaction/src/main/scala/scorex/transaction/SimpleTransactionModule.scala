@@ -6,14 +6,14 @@ import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
-import scorex.crypto.encode.Base58
 import scorex.consensus.TransactionsOrdering
+import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.ValidationResult.ValidationResult
-import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
@@ -23,8 +23,6 @@ import scorex.wallet.Wallet
 import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
-
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
 
 @SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -47,7 +45,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 
 
 class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit val settings: TransactionSettings with Settings,
-                              application: Application)
+                                                                       application: Application)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
 
   import SimpleTransactionModule._
@@ -94,7 +92,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 
   override def putUnconfirmedIfNew(tx: Transaction): Boolean = synchronized {
-    if(feeCalculator.enoughFee(tx)){
+    if (feeCalculator.enoughFee(tx)) {
       utxStorage.putIfNew(tx, isValid(_, tx.timestamp))
     } else false
   }
@@ -207,15 +205,15 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     reissue
   }
 
-  def deleteAsset(request: DeleteRequest, wallet: Wallet): Try[DeleteTransaction] = Try {
+  def burnAsset(request: BurnRequest, wallet: Wallet): Try[BurnTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val tx = DeleteTransaction.create(sender,
+    val tx = BurnTransaction.create(sender,
       Base58.decode(request.assetId).get,
       request.quantity,
       request.fee,
       getTimestamp)
     if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-    else throw new StateCheckFailed("Invalid reissue transaction generated: " + tx.json)
+    else throw new StateCheckFailed("Invalid burn transaction generated: " + tx.json)
     tx
   }
 

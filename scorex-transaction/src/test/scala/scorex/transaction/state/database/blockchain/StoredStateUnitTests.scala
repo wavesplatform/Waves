@@ -10,13 +10,13 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
-import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.{Order, OrderMatch, OrderType}
 import scorex.transaction.state.database.state._
 import scorex.utils.{NTP, ScorexLogging}
 
 import scala.util.Random
 import scala.util.control.NonFatal
-import scorex.transaction.assets.exchange.{Order, OrderMatch, OrderType}
 
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging {
@@ -36,7 +36,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     override def allowUnissuedAssetsUntil: Long = 0L
 
-    override def allowDeleteTransactionAfterTimestamp: Long = 0L
+    override def allowBurnTransactionAfterTimestamp: Long = 0L
   }
 
   val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"
@@ -53,11 +53,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   val applyChanges = PrivateMethod[Unit]('applyChanges)
   val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
 
-  property("Delete assets") {
+  property("Burn assets") {
     forAll(issueReissueGenerator) { pair =>
       withRollbackTest {
         val issueTx: IssueTransaction = pair._1
-        val deleteTx: DeleteTransaction = pair._4
+        val burnTx: BurnTransaction = pair._4
         val senderAddress = issueTx.sender.address
         val senderAmountAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
@@ -67,17 +67,17 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe issueTx.quantity
 
-        state.isValid(deleteTx, Int.MaxValue) shouldBe true
+        state.isValid(burnTx, Int.MaxValue) shouldBe true
 
-        state.applyChanges(state.calcNewBalances(Seq(deleteTx), Map(), allowTemporaryNegative = true))
-        state.assetBalance(senderAmountAcc) shouldBe (issueTx.quantity - deleteTx.amount)
+        state.applyChanges(state.calcNewBalances(Seq(burnTx), Map(), allowTemporaryNegative = true))
+        state.assetBalance(senderAmountAcc) shouldBe (issueTx.quantity - burnTx.amount)
 
         val senderBalances = state.getAccountBalance(issueTx.sender)
 
         senderBalances.keySet should contain(issueTx.assetId)
         val b = senderBalances.head._2
         b._1 == b._3 shouldBe true
-        b._1 == issueTx.quantity - deleteTx.amount shouldBe true
+        b._1 == issueTx.quantity - burnTx.amount shouldBe true
       }
     }
   }
@@ -332,7 +332,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.balance(testAcc) shouldBe balance
         state.assetBalance(testAssetAcc) shouldBe balance
         state.included(tx).value shouldBe state.stateHeight
-        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))),  NTP.correctedTime())
+        state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))), NTP.correctedTime())
       }
     }
   }
