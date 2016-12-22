@@ -142,7 +142,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     }
 
   @deprecated("Use transferAsset()")
-  def createPayment(payment: Payment, wallet: Wallet): Option[PaymentTransaction] = {
+  def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationResult,PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
     }
@@ -252,12 +252,13 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     txTime
   }
 
-  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
-    val time = getTimestamp
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
-    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
-    if (isValid(payment, payment.timestamp)) onNewOffchainTransaction(payment)
-    payment
+  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationResult,PaymentTransaction] = {
+    val pt = PaymentTransaction.create(sender, recipient, amount, fee, getTimestamp)
+    pt match {
+      case Right(t) => onNewOffchainTransaction(t)
+      case _ =>
+      }
+    pt
   }
 
   def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,

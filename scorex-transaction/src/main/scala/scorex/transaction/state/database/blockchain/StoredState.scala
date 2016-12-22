@@ -285,7 +285,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
           val accountTransactions = row.reason
             .filter(_.isInstanceOf[PaymentTransaction])
             .map(_.asInstanceOf[PaymentTransaction])
-            .filter(_.creator.get.address == address)
+            .filter(_.sender.address == address)
           if (accountTransactions.nonEmpty) Some(accountTransactions.maxBy(_.timestamp))
           else loop(row.lastRowHeight, address)
         case _ => None
@@ -399,9 +399,8 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.validate == ValidationResult.ValidateOke && (
         transaction.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp ||
-          transaction.timestamp >= settings.allowInvalidPaymentTransactionsByTimestamp && isTimestampCorrect(tx))
+          (transaction.timestamp >= settings.allowInvalidPaymentTransactionsByTimestamp && isTimestampCorrect(tx))
     case tx: TransferTransaction =>
       tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
     case tx: IssueTransaction =>

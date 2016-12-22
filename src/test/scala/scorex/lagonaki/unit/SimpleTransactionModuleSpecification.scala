@@ -61,10 +61,10 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
 
 
   test("isValid() checks that tx not too old") {
-    val validTx = PaymentTransaction(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp)
+    val validTx = PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp).right.get
     assert(transactionModule.isValid(validTx, validTx.timestamp))
 
-    val oldTx = PaymentTransaction(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp - (1 day).toMillis)
+    val oldTx = PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp - (1 day).toMillis).right.get
     assert(!transactionModule.isValid(oldTx, oldTx.timestamp))
   }
 
@@ -72,8 +72,8 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     transactionModule.utxStorage.all().foreach(transactionModule.utxStorage.remove)
 
     // prepare
-    val validTx = PaymentTransaction(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp)
-    val oldValidTx = PaymentTransaction(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp - (1 day).toMillis)
+    val validTx = PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp).right.get
+    val oldValidTx = PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp - (1 day).toMillis).right.get
     transactionModule.utxStorage.putIfNew(validTx)
     transactionModule.utxStorage.putIfNew(oldValidTx)
     assert(transactionModule.utxStorage.all().size == 2)
@@ -89,8 +89,8 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
   test("clearIncorrectTransactions() removes not expired but invalid txs") {
     transactionModule.utxStorage.all().foreach(transactionModule.utxStorage.remove)
     // prepare
-    val validTx = PaymentTransaction(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp)
-    val invalidTx = PaymentTransaction(noBalanceAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp)
+    val validTx = PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp).right.get
+    val invalidTx = PaymentTransaction.create(noBalanceAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp).right.get
     transactionModule.utxStorage.putIfNew(validTx)
     transactionModule.utxStorage.putIfNew(invalidTx)
     assert(transactionModule.utxStorage.all().size == 2)

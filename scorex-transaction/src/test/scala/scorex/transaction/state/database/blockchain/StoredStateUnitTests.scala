@@ -425,8 +425,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   def genPayment(amount: Long, fee: Long): PaymentTransaction = {
     val recipient = new PrivateKeyAccount(scorex.utils.randomBytes())
     val time = getTimestamp
-    val sig = PaymentTransaction.generateSignature(testAcc, recipient, amount, fee, time)
-    new PaymentTransaction(testAcc, recipient, amount, fee, time, sig)
+    PaymentTransaction.create(testAcc, recipient, amount, fee, time).right.get
   }
 
   private def withRollbackTest(test: => Unit): Unit = {

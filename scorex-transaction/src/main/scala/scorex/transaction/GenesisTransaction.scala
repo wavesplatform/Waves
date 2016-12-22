@@ -20,7 +20,7 @@ sealed trait GenesisTransaction extends TypedTransaction {
 
 object GenesisTransaction extends Deser[GenesisTransaction] {
 
-  case class GenesisTransactionImpl(recipient: Account, amount: Long, timestamp: Long, signature: Array[Byte]) extends GenesisTransaction {
+  private case class GenesisTransactionImpl(recipient: Account, amount: Long, timestamp: Long, signature: Array[Byte]) extends GenesisTransaction {
 
     override val assetFee: (Option[AssetId], Long) = (None, 0)
     override val id: Array[Byte]                   = signature

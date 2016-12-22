@@ -41,6 +41,6 @@ trait BlockTestingCommons extends TestingCommons {
 
   def genTransaction(seed: Array[Byte]): Transaction = {
     val sender = new PrivateKeyAccount(seed)
-    PaymentTransaction(sender, gen, 1, 1, System.currentTimeMillis() - 5000)
+    PaymentTransaction.create(sender, gen, 1, 1, System.currentTimeMillis() - 5000).right.get
   }
 }

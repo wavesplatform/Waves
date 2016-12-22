@@ -27,7 +27,7 @@ class BlockSpecification extends FunSuite with Matchers with TestingCommons {
 
     val ts = System.currentTimeMillis() - 5000
     val sender = new PrivateKeyAccount(reference.dropRight(2))
-    val tx: Transaction = PaymentTransaction(sender, gen, 5, 1000, ts)
+    val tx: Transaction = PaymentTransaction.create(sender, gen, 5, 1000, ts).right.get
     val tr: TransferTransaction = TransferTransaction.create(None, sender, gen, 5, ts + 1, None, 2, Array()).right.get
     val assetId = Some(Array.fill(EllipticCurveImpl.SignatureLength)(Random.nextInt(100).toByte))
     val tr2: TransferTransaction = TransferTransaction.create(assetId, sender, gen, 5, ts + 2, None, 2, Array()).right.get

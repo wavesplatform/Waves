@@ -81,8 +81,8 @@ object StateTestSpec extends Commands {
     val notIncluded = if (includedPaymentTransactions.nonEmpty) {
       val transactions = (0 until MaxTransactions - i - 1).map(j => (createTransaction(), false))
       val transaction = includedPaymentTransactions.head._1.asInstanceOf[PaymentTransaction]
-      val forgedTransaction = new PaymentTransaction(transaction.sender, transaction.recipient, transaction.amount,
-        transaction.fee, transaction.timestamp, forgeSignature(transaction.signature))
+      val forgedTransaction = PaymentTransaction.create(transaction.sender, transaction.recipient, transaction.amount,
+        transaction.fee, transaction.timestamp, forgeSignature(transaction.signature)).right.get
 
       transactions :+ (forgedTransaction -> true) // forged transaction should be detected as already included in the state
     } else {
@@ -102,8 +102,7 @@ object StateTestSpec extends Commands {
   private def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
     Thread.sleep(2)
     val time = System.currentTimeMillis()
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
-    new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
+    PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
   }
 
   case class State(name: String, height: Int, included: Map[Transaction, Int])

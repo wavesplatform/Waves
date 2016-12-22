@@ -37,18 +37,18 @@ trait TransactionGen {
 
   val paymentGenerator: Gen[PaymentTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
-    fee: Long <- positiveLongGen
+    fee: Long <- Gen.choose(0,Long.MaxValue - amount -1 )
     timestamp: Long <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     recipient: PrivateKeyAccount <- accountGen
-  } yield PaymentTransaction(sender, recipient, amount, fee, timestamp)
+  } yield PaymentTransaction.create(sender, recipient, amount, fee, timestamp).right.get
 
   val selfPaymentGenerator: Gen[PaymentTransaction] = for {
     account: PrivateKeyAccount <- accountGen
     amount: Long <- Gen.choose(0, Long.MaxValue)
     fee: Long <- smallFeeGen
     timestamp: Long <- positiveLongGen
-  } yield PaymentTransaction(account, account, amount, fee, timestamp)
+  } yield PaymentTransaction.create(account, account, amount, fee, timestamp).right.get
 
   val transferGenerator: Gen[TransferTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)

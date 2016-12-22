@@ -29,12 +29,12 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     val amount = state.balance(acc) / 1000
     val ts = System.currentTimeMillis()
     val transactions: Seq[PaymentTransaction] = (1 until 100).map { i =>
-      PaymentTransaction(acc, recipient, amount, i, ts + i)
+      PaymentTransaction.create(acc, recipient, amount, i, ts + i).right.get
     }
     val txToForge = transactions.head
     val forgedSignature = forgeSignature(txToForge.signature)
-    val forgedTransaction = PaymentTransaction(new PublicKeyAccount(txToForge.sender.publicKey), txToForge.recipient,
-      txToForge.amount, txToForge.fee, txToForge.timestamp, forgedSignature)
+    val forgedTransaction = PaymentTransaction.create(new PublicKeyAccount(txToForge.sender.publicKey), txToForge.recipient,
+      txToForge.amount, txToForge.fee, txToForge.timestamp, forgedSignature).right.get
 
     val transactionsToValidate = transactions :+ forgedTransaction
     val validTransactions = state.validate(transactionsToValidate, blockTime = transactionsToValidate.map(_.timestamp).max)
@@ -51,7 +51,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     state.balance(rec) shouldBe 0L
     senderBalance should be > 100L
 
-    val txs = Seq(transactionModule.createPayment(acc, rec, 5, 1))
+    val txs = Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)
     val block = new BlockMock(txs)
     state.processBlock(block)
     state.balance(rec) shouldBe 5L
@@ -62,17 +62,17 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     state.balanceWithConfirmations(rec, 1) shouldBe 5L
     state.balanceWithConfirmations(rec, 2) shouldBe 0L
 
-    val spendingBlock = new BlockMock(Seq(transactionModule.createPayment(rec, acc, 2, 1)))
+    val spendingBlock = new BlockMock(Seq(transactionModule.createPayment(rec, acc, 2, 1).right.get))
     state.processBlock(spendingBlock)
     state.balance(rec) shouldBe 2L
     state.balanceWithConfirmations(rec, 1) shouldBe 2L
 
-    state.processBlock(new BlockMock(Seq(transactionModule.createPayment(acc, rec, 5, 1))))
+    state.processBlock(new BlockMock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
     state.balance(rec) shouldBe 7L
     state.balanceWithConfirmations(rec, 3) shouldBe 2L
 
 
-    state.processBlock(new BlockMock(Seq(transactionModule.createPayment(acc, rec, 5, 1))))
+    state.processBlock(new BlockMock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
     state.balance(rec) shouldBe 12L
     state.balanceWithConfirmations(rec, 1) shouldBe 7L
     state.balanceWithConfirmations(rec, 2) shouldBe 2L
@@ -85,7 +85,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
     val testAcc = new Account(testAdd)
     val applyMethod = PrivateMethod[Unit]('applyChanges)
     state.balance(testAcc) shouldBe 0
-    val tx = transactionModule.createPayment(acc, testAcc, 1, 1)
+    val tx = transactionModule.createPayment(acc, testAcc, 1, 1).right.get
     state invokePrivate applyMethod(Map(AssetAcc(testAcc, None) ->(AccState(2L), Seq(FeesStateChange(1L), tx))))
     state.balance(testAcc) shouldBe 2
     state.included(tx).value shouldBe state.stateHeight
@@ -95,16 +95,16 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   test("validate single transaction") {
     val senderBalance = state.balance(acc)
     senderBalance should be > 0L
-    val nonValid = transactionModule.createPayment(acc, recipient, senderBalance, 1)
+    val nonValid = transactionModule.createPayment(acc, recipient, senderBalance, 1).right.get
     state.isValid(nonValid, nonValid.timestamp) shouldBe false
 
-    val valid = transactionModule.createPayment(acc, recipient, senderBalance - 1, 1)
+    val valid = transactionModule.createPayment(acc, recipient, senderBalance - 1, 1).right.get
     state.isValid(valid, valid.timestamp) shouldBe true
   }
 
   test("double spending") {
     val senderBalance = state.balance(acc)
-    val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recipient, senderBalance / 2, 1))
+    val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recipient, senderBalance / 2, 1).right.get)
     doubleSpending.foreach(t => state.isValid(t, t.timestamp) shouldBe true)
     state.isValid(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max) shouldBe false
     state.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max).size shouldBe 1
@@ -151,9 +151,9 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   test("last transaction of account one block behind") {
     val amount = state.balance(acc) / 1000
-    val tx1 = transactionModule.createPayment(acc, recipient, amount, 1)
+    val tx1 = transactionModule.createPayment(acc, recipient, amount, 1).right.get
     state.isValid(tx1, tx1.timestamp) shouldBe true
-    val tx2 = transactionModule.createPayment(acc, recipient, amount, 2)
+    val tx2 = transactionModule.createPayment(acc, recipient, amount, 2).right.get
     state.isValid(tx2, tx2.timestamp) shouldBe true
 
     val block = new BlockMock(Seq(tx1, tx2))
@@ -166,13 +166,13 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   test("last transaction of account few blocks behind") {
     val amount = state.balance(acc) / 1000
-    val tx1 = transactionModule.createPayment(acc, recipient, amount, 1)
-    val tx2 = transactionModule.createPayment(acc, recipient, amount, 2)
+    val tx1 = transactionModule.createPayment(acc, recipient, amount, 1).right.get
+    val tx2 = transactionModule.createPayment(acc, recipient, amount, 2).right.get
     val block1 = new BlockMock(Seq(tx2, tx1))
     state.processBlock(block1)
 
-    val tx3 = transactionModule.createPayment(recipient, acc, amount / 2, 3)
-    val tx4 = transactionModule.createPayment(recipient, acc, amount / 2, 4)
+    val tx3 = transactionModule.createPayment(recipient, acc, amount / 2, 3).right.get
+    val tx4 = transactionModule.createPayment(recipient, acc, amount / 2, 4).right.get
     val block2 = new BlockMock(Seq(tx3, tx4))
     state.processBlock(block2)
 

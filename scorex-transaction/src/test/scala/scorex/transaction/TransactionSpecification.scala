@@ -12,39 +12,6 @@ with PropertyChecks
 with GeneratorDrivenPropertyChecks
 with Matchers {
 
-  property("transaction signature should be valid in a valid flow") {
-    forAll { (senderSeed: Array[Byte],
-              recipientSeed: Array[Byte],
-              time: Long,
-              amount: Long,
-              fee: Long) =>
-      val sender = new PrivateKeyAccount(senderSeed)
-      val recipient = new PrivateKeyAccount(recipientSeed)
-
-      val tx = PaymentTransaction(sender, recipient, amount, fee, time)
-      tx.signatureValid should be(true)
-    }
-  }
-
-  property("wrong transaction signature should be invalid") {
-    forAll { (senderSeed: Array[Byte],
-              recipientSeed: Array[Byte],
-              time: Long,
-              amount: Long,
-              fee: Long) =>
-      val sender = new PrivateKeyAccount(senderSeed)
-      val recipient = new PrivateKeyAccount(recipientSeed)
-
-      val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
-
-      PaymentTransaction(sender, recipient, amount, fee + 1, time, sig).signatureValid should be(false)
-      PaymentTransaction(sender, recipient, amount, fee, time + 1, sig).signatureValid should be(false)
-      PaymentTransaction(sender, recipient, amount + 1, fee, time + 1, sig).signatureValid should be(false)
-      PaymentTransaction(recipient, sender, amount + 1, fee, time + 1, sig).signatureValid should be(false)
-      PaymentTransaction(recipient, sender, amount, fee, time, (sig.toList :+ 1.toByte).toArray).signatureValid should be(false)
-    }
-  }
-
   property("transaction fields should be constructed in a right way") {
     forAll { (senderSeed: Array[Byte],
               recipientSeed: Array[Byte],
@@ -55,7 +22,7 @@ with Matchers {
       val sender = new PrivateKeyAccount(senderSeed)
       val recipient = new PrivateKeyAccount(recipientSeed)
 
-      val tx = PaymentTransaction(sender, recipient, amount, fee, time)
+      val tx = PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
 
       tx.timestamp shouldEqual time
       tx.amount shouldEqual amount
@@ -74,19 +41,17 @@ with Matchers {
 
       val sender = new PrivateKeyAccount(senderSeed)
       val recipient = new PrivateKeyAccount(recipientSeed)
-      val tx = PaymentTransaction(sender, recipient, amount, fee, time)
+      val tx = PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
       val txAfter = PaymentTransaction.parseBytes(tx.bytes).get
 
       txAfter.getClass.shouldBe(tx.getClass)
 
-      tx.dataLength shouldEqual txAfter.dataLength
       tx.signature shouldEqual txAfter.signature
       tx.sender shouldEqual txAfter.asInstanceOf[PaymentTransaction].sender
       tx.recipient shouldEqual txAfter.recipient
       tx.timestamp shouldEqual txAfter.timestamp
       tx.amount shouldEqual txAfter.amount
       tx.fee shouldEqual txAfter.fee
-      txAfter.signatureValid shouldEqual true
     }
   }
 
@@ -112,19 +77,17 @@ with Matchers {
 
         val sender = new PrivateKeyAccount(senderSeed)
         val recipient = new PrivateKeyAccount(recipientSeed)
-        val tx = PaymentTransaction(sender, recipient, amount, fee, time)
+        val tx = PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
         val txAfter = TypedTransaction.parseBytes(tx.bytes).get.asInstanceOf[PaymentTransaction]
 
         txAfter.getClass.shouldBe(tx.getClass)
 
-        tx.dataLength shouldEqual txAfter.dataLength
         tx.signature shouldEqual txAfter.signature
         tx.sender shouldEqual txAfter.asInstanceOf[PaymentTransaction].sender
         tx.recipient shouldEqual txAfter.recipient
         tx.timestamp shouldEqual txAfter.timestamp
         tx.amount shouldEqual txAfter.amount
         tx.fee shouldEqual txAfter.fee
-        txAfter.signatureValid shouldEqual true
     }
   }
 
