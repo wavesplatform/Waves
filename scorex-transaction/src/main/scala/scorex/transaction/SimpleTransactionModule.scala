@@ -203,15 +203,21 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
   def reissueAsset(request: ReissueRequest, wallet: Wallet): Try[ReissueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val reissue = ReissueTransaction.create(sender,
+    val reissueVal = ReissueTransaction.create(sender,
       Base58.decode(request.assetId).get,
       request.quantity,
       request.reissuable,
       request.fee,
       getTimestamp)
-    if (isValid(reissue, reissue.timestamp)) onNewOffchainTransaction(reissue)
-    else throw new StateCheckFailed("Invalid reissue transaction generated: " + reissue.json)
-    reissue
+
+    reissueVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid reissue transaction generated: " + tx.json)
+        tx
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+    }
   }
 
   def deleteAsset(request: DeleteRequest, wallet: Wallet): Try[DeleteTransaction] = Try {

@@ -65,14 +65,14 @@ object BroadcastRequests {
                                  signature: String) {
 
     def toTx: Try[ReissueTransaction] = Try {
-      ReissueTransaction(
+      ReissueTransaction.create(
         senderPublicKey,
         Base58.decode(assetId).get,
         quantity,
         reissuable,
         fee,
         timestamp,
-        Base58.decode(signature).get)
+        Base58.decode(signature).get).right.get
     }
   }
 
