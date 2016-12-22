@@ -25,7 +25,7 @@ case class PaymentTransaction(sender: PublicKeyAccount,
   import scorex.transaction.LagonakiTransaction._
   import scorex.transaction.PaymentTransaction._
 
-  override lazy val dataLength = TypeLength + BaseLength
+  lazy val dataLength = TypeLength + BaseLength
 
   override lazy val creator = Some(sender)
 

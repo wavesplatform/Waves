@@ -277,14 +277,15 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     }.distinct
   }.takeRight(limit)
 
-  def lastAccountLagonakiTransaction(account: Account): Option[LagonakiTransaction] = {
-    def loop(h: Int, address: Address): Option[LagonakiTransaction] = {
+  def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
+    def loop(h: Int, address: Address): Option[PaymentTransaction] = {
       val changes = accountChanges(address)
       Option(changes.get(h)) match {
         case Some(row) =>
-          val accountTransactions = row.reason.filter(_.isInstanceOf[LagonakiTransaction])
-            .map(_.asInstanceOf[LagonakiTransaction])
-            .filter(_.creator.isDefined).filter(_.creator.get.address == address)
+          val accountTransactions = row.reason
+            .filter(_.isInstanceOf[PaymentTransaction])
+            .map(_.asInstanceOf[PaymentTransaction])
+            .filter(_.creator.get.address == address)
           if (accountTransactions.nonEmpty) Some(accountTransactions.maxBy(_.timestamp))
           else loop(row.lastRowHeight, address)
         case _ => None
@@ -369,7 +370,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
 
     val initialSelection: Map[String, (List[Transaction], Long)] = Map(paymentTransactions.map { payment =>
       val address = payment.sender.address
-      val stateTimestamp = lastAccountLagonakiTransaction(payment.sender) match {
+      val stateTimestamp = lastAccountPaymentTransaction(payment.sender) match {
         case Some(lastTransaction) => lastTransaction.timestamp
         case _ => 0
       }
@@ -438,7 +439,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
   }
 
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
-    lastAccountLagonakiTransaction(tx.sender) match {
+    lastAccountPaymentTransaction(tx.sender) match {
       case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
       case None => true
     }

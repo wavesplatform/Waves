@@ -113,7 +113,7 @@ with Matchers {
         val sender = new PrivateKeyAccount(senderSeed)
         val recipient = new PrivateKeyAccount(recipientSeed)
         val tx = PaymentTransaction(sender, recipient, amount, fee, time)
-        val txAfter = TypedTransaction.parseBytes(tx.bytes).get.asInstanceOf[LagonakiTransaction]
+        val txAfter = TypedTransaction.parseBytes(tx.bytes).get.asInstanceOf[PaymentTransaction]
 
         txAfter.getClass.shouldBe(tx.getClass)
 

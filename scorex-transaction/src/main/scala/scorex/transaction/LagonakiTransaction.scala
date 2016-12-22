@@ -29,8 +29,6 @@ abstract class LagonakiTransaction(val transactionType: TransactionType.Value,
 
   //val TypeId = transactionType.id
 
-  //PARSE/CONVERT
-  val dataLength: Int
 
   val creator: Option[Account]
 

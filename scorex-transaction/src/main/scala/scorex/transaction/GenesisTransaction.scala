@@ -40,7 +40,7 @@ case class GenesisTransaction(override val recipient: Account,
     res
   }
 
-  override lazy val dataLength = TypeLength + BASE_LENGTH
+  val dataLength = TypeLength + BASE_LENGTH
 
   override lazy val signatureValid: Boolean = {
     val typeBytes = Array(TransactionType.GenesisTransaction.id.toByte)
