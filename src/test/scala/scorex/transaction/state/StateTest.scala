@@ -31,7 +31,7 @@ object StateTestSpec extends Commands {
   val accN = accounts.size
   val TotalBalance = 10000000
   val MaxTransactions = 100
-  val genesisTxs: Seq[GenesisTransaction] = accounts.map(a => GenesisTransaction(a, TotalBalance / accN, 0L))
+  val genesisTxs: Seq[GenesisTransaction] = accounts.map(a => GenesisTransaction.create(a, TotalBalance / accN, 0L))
   val genCheckTransaction: Gen[CheckTransaction] = CheckTransaction(createTransaction())
   val genGenesis: Gen[PutTransactions] = PutTransactions(genesisTxs)
   val genTransaction: Gen[PutTransactions] = Gen.chooseNum(1, 2).map { i =>

@@ -27,7 +27,7 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
 
     val balance = 149857264546L
     val timestamp = 4598723454L
-    val expectedTransaction = new GenesisTransaction(defaultRecipient, balance, timestamp)
+    val expectedTransaction = GenesisTransaction.create(defaultRecipient, balance, timestamp)
 
     actualTransaction should equal(expectedTransaction)
   }
@@ -37,7 +37,7 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
               time: Long,
               amount: Long) =>
       val recipient = new PrivateKeyAccount(recipientSeed)
-      val source = new GenesisTransaction(recipient, amount, time)
+      val source = GenesisTransaction.create(recipient, amount, time)
       val bytes = source.bytes
       val dest = GenesisTransaction.parseBytes(bytes).get
 

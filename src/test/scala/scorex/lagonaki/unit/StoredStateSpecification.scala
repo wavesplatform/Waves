@@ -29,7 +29,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
   val state = new StoredState(db, WavesHardForkParameters.Disabled)
-  state.processBlock(new BlockMock(Seq(GenesisTransaction(accounts.head, 100000000000L, 0))))
+  state.processBlock(new BlockMock(Seq(GenesisTransaction.create(accounts.head, 100000000000L, 0))))
 
   private def createIssueAssetTx(request: IssueRequest, wallet: Wallet): IssueTransaction = {
     val sender = wallet.privateKeyAccount(request.sender).get

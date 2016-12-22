@@ -6,26 +6,42 @@ import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction.TransactionType
+import scorex.transaction.TypedTransaction._
 
 import scala.util.{Failure, Try}
+import scala.concurrent.duration._
 
 
-case class GenesisTransaction(override val recipient: Account,
-                              override val amount: Long,
-                              override val timestamp: Long)
-  extends LagonakiTransaction(TransactionType.GenesisTransaction, recipient, amount, 0, timestamp,
-    GenesisTransaction.generateSignature(recipient, amount, timestamp)) {
+case class GenesisTransaction(recipient: Account,
+                              amount: Long,
+                              timestamp: Long,
+                              signature: Array[Byte]
+                             )  extends TypedTransaction {
 
   import scorex.transaction.GenesisTransaction._
-  import scorex.transaction.LagonakiTransaction._
 
-  override lazy val creator: Option[Account] = None
+  override val assetFee: (Option[AssetId], Long) = (None, 0)
+  override val id: Array[Byte] = signature
 
-  override lazy val json: JsObject =
+  protected def jsonBase() = {
+    Json.obj("type" -> transactionType.id,
+      "id" -> Base58.encode(id),
+      "fee" -> 0,
+      "timestamp" -> timestamp,
+      "signature" -> Base58.encode(this.signature)
+    )
+  }
+
+  lazy val deadline = timestamp + 24.hours.toMillis
+
+  val transactionType = TransactionType.GenesisTransaction
+
+  lazy val creator: Option[Account] = None
+
+  lazy val json: JsObject =
     jsonBase() ++ Json.obj("recipient" -> recipient.address, "amount" -> amount)
 
-  override lazy val bytes: Array[Byte] = {
+  lazy val bytes: Array[Byte] = {
     val typeBytes = Array(TransactionType.GenesisTransaction.id.toByte)
 
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
@@ -42,7 +58,7 @@ case class GenesisTransaction(override val recipient: Account,
 
   val dataLength = TypeLength + BASE_LENGTH
 
-  override lazy val signatureValid: Boolean = {
+  lazy val signatureValid: Boolean = {
     val typeBytes = Array(TransactionType.GenesisTransaction.id.toByte)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
@@ -52,7 +68,7 @@ case class GenesisTransaction(override val recipient: Account,
     Bytes.concat(h, h).sameElements(signature)
   }
 
-  override def validate: ValidationResult.Value =
+  def validate: ValidationResult.Value =
     if (amount < 0) {
       ValidationResult.NegativeAmount
     } else if (!Account.isValid(recipient)) {
@@ -65,11 +81,6 @@ case class GenesisTransaction(override val recipient: Account,
 
 
 object GenesisTransaction extends Deser[GenesisTransaction] {
-
-
-
-
-  import scorex.transaction.LagonakiTransaction._
 
   private val RECIPIENT_LENGTH = Account.AddressLength
   private val BASE_LENGTH = TimestampLength + RECIPIENT_LENGTH + AmountLength
@@ -111,6 +122,13 @@ object GenesisTransaction extends Deser[GenesisTransaction] {
     val amountBytes = java.util.Arrays.copyOfRange(data, position, position + AmountLength)
     val amount = Longs.fromByteArray(amountBytes)
 
-    GenesisTransaction(recipient, amount, timestamp)
+    GenesisTransaction(recipient, amount, timestamp, GenesisTransaction.generateSignature(recipient, amount, timestamp))
+  }
+
+  def create(recipient: Account,
+             amount: Long,
+             timestamp: Long) : GenesisTransaction = {
+    val signature = GenesisTransaction.generateSignature(recipient, amount, timestamp)
+    GenesisTransaction(recipient, amount, timestamp, signature)
   }
 }

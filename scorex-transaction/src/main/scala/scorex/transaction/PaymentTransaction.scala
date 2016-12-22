@@ -8,15 +8,15 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction.TransactionType
+import scorex.transaction.TypedTransaction._
 import scala.concurrent.duration._
 import scala.util.{Failure, Try}
-import LagonakiTransaction._
 
 @deprecated("Use TransferTransaction")
 @SerialVersionUID(-4989881425715590828L)
 case class PaymentTransaction(sender: PublicKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long, signature: Array[Byte])
     extends TypedTransaction {
+  import PaymentTransaction._
 
   override val transactionType = TransactionType.PaymentTransaction
 
@@ -35,8 +35,6 @@ case class PaymentTransaction(sender: PublicKeyAccount, recipient: Account, amou
              "signature" -> Base58.encode(this.signature))
   }
 
-  import scorex.transaction.LagonakiTransaction._
-  import scorex.transaction.PaymentTransaction._
 
   lazy val dataLength = TypeLength + BaseLength
 
@@ -89,7 +87,8 @@ case class PaymentTransaction(sender: PublicKeyAccount, recipient: Account, amou
 
 object PaymentTransaction extends Deser[PaymentTransaction] {
 
-  import scorex.transaction.LagonakiTransaction._
+  val MinimumFee = 1
+  val RecipientLength = Account.AddressLength
 
   private val SenderLength    = 32
   private val FeeLength       = 8
