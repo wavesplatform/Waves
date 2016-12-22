@@ -48,7 +48,7 @@ object TestNetParams extends ChainParameters {
 
   override val allowUnissuedAssetsUntil: Long = 1479416400000L
 
-  override val allowDeleteTransactionAfterTimestamp: Long = 1481110521000L
+  override val allowBurnTransactionAfterTimestamp: Long = 1481110521000L
 }
 
 object MainNetParams extends ChainParameters {
@@ -83,5 +83,5 @@ object MainNetParams extends ChainParameters {
 
   override val allowUnissuedAssetsUntil: Long = 1479416400000L
 
-  override val allowDeleteTransactionAfterTimestamp: Long = 1482233593000L
+  override val allowBurnTransactionAfterTimestamp: Long = 1482233593000L
 }
