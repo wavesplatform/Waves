@@ -40,7 +40,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
       request.decimals,
       request.reissuable,
       request.fee,
-      i.incrementAndGet())
+      i.incrementAndGet()).right.get
   }
 
   private val i = new AtomicInteger

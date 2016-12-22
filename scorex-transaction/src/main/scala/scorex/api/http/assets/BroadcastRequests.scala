@@ -34,7 +34,7 @@ object BroadcastRequests {
                                signature: String) {
 
     def toTx: Try[IssueTransaction] = Try {
-      IssueTransaction(
+      IssueTransaction.create(
         sender,
         name.getBytes(Charsets.UTF_8),
         description.getBytes(Charsets.UTF_8),
@@ -44,7 +44,7 @@ object BroadcastRequests {
         fee,
         timestamp,
         Base58.decode(signature).get
-      )
+      ).right.get
     }
   }
 

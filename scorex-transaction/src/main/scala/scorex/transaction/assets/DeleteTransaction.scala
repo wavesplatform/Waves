@@ -2,7 +2,7 @@ package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
@@ -10,7 +10,7 @@ import scorex.transaction.TypedTransaction.TransactionType
 import scorex.transaction.ValidationResult.ValidationResult
 import scorex.transaction._
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 sealed trait DeleteTransaction extends SignedTransaction {
   def assetId: Array[Byte]
@@ -49,9 +49,7 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
 
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
-    override lazy val validate: ValidationResult.Value = if (amount < 0) {
-      ValidationResult.NegativeAmount
-    } else validationBase
+    override lazy val validate: ValidationResult.Value = ValidationResult.ValidateOke
 
   }
   override def parseBytes(bytes: Array[Byte]): Try[DeleteTransaction] = Try {
@@ -59,7 +57,7 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
     parseTail(bytes.tail).get
   }
 
-  def parseTail(bytes: Array[Byte]): Try[DeleteTransaction] = Try {
+  def parseTail(bytes: Array[Byte]): Try[DeleteTransaction] = {
     import EllipticCurveImpl._
     val sender        = new PublicKeyAccount(bytes.slice(0, KeyLength))
     val assetId       = bytes.slice(KeyLength, KeyLength + AssetIdLength)
@@ -69,7 +67,9 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
     val fee       = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
     val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
     val signature = bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength)
-    DeleteTransactionImpl(sender, assetId, quantity, fee, timestamp, signature)
+    DeleteTransaction
+      .create(sender, assetId, quantity, fee, timestamp, signature)
+      .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }
 
   def create(sender: PublicKeyAccount,
@@ -78,9 +78,12 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
              fee: Long,
              timestamp: Long,
              signature: Array[Byte]): Either[ValidationResult, DeleteTransaction] = {
-
     if (quantity < 0) {
       Left(ValidationResult.NegativeAmount)
+    } else if (!Account.isValid(sender)) {
+      Left(ValidationResult.InvalidAddress)
+    } else if (fee <= 0) {
+      Left(ValidationResult.InsufficientFee)
     } else {
       val unsigned = DeleteTransactionImpl(sender, assetId, quantity, fee, timestamp, null)
       if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
@@ -98,6 +101,10 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
              timestamp: Long): Either[ValidationResult, DeleteTransaction] = {
     if (quantity < 0) {
       Left(ValidationResult.NegativeAmount)
+    } else if (!Account.isValid(sender)) {
+      Left(ValidationResult.InvalidAddress)
+    } else if (fee <= 0) {
+      Left(ValidationResult.InsufficientFee)
     } else {
       val unsigned = DeleteTransactionImpl(sender, assetId, quantity, fee, timestamp, null)
       val sig      = EllipticCurveImpl.sign(sender, unsigned.toSign)

@@ -167,7 +167,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
   def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val issue = IssueTransaction.create(sender,
+    val issueVal = IssueTransaction.create(sender,
       request.name.getBytes(Charsets.UTF_8),
       request.description.getBytes(Charsets.UTF_8),
       request.quantity,
@@ -175,9 +175,16 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       request.reissuable,
       request.fee,
       getTimestamp)
-    if (isValid(issue, issue.timestamp)) onNewOffchainTransaction(issue)
-    else throw new StateCheckFailed("Invalid issue transaction generated: " + issue.json)
-    issue
+
+    issueVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid issue transaction generated: " + tx.json)
+        tx
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+
+    }
   }
 
   /**
@@ -218,7 +225,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     txVal match {
       case Right(tx) =>
         if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-        else throw new StateCheckFailed("Invalid reissue transaction generated: " + tx.json)
+        else throw new StateCheckFailed("Invalid delete transaction generated: " + tx.json)
         tx
       case Left(err) =>
         throw new IllegalArgumentException(err.toString)

@@ -62,7 +62,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
       request.decimals,
       request.reissuable,
       request.fee,
-      getTimestamp)
+      getTimestamp).right.get
   }
 
   def transferAsset(request: TransferRequest, wallet: Wallet): TransferTransaction = {
