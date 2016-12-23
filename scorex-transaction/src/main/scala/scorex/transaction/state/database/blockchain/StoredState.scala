@@ -9,16 +9,14 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.OrderMatch
 import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
 
-import scala.concurrent.duration._
-import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
-import scorex.transaction.assets.exchange.{OrderCancelTransaction, OrderMatch}
 
 
 /** Store current balances only, and balances changes within effective balance depth.
@@ -114,9 +112,6 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
           transactionsMap.put(om.id, om.bytes)
           putOrderMatch(om, blockTs)
           includedTx.put(om.id, h)
-        case oc: OrderCancelTransaction =>
-          transactionsMap.put(oc.id, oc.bytes)
-          putOrderCancel(oc)
         case tx =>
           includedTx.put(tx.id, h)
       }
@@ -357,7 +352,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
       validTxs
     }
 
-    filterCancelOrderMatch(filterValidTransactionsByState(filteredFromFuture))
+    filterValidTransactionsByState(filteredFromFuture)
   }
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
@@ -417,8 +412,6 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
         isIssuerAddress(tx.assetId, tx.sender.address) && included(tx.id, None).isEmpty
     case tx: OrderMatch =>
       isOrderMatchValid(tx) && included(tx.id, None).isEmpty
-    case tx: OrderCancelTransaction =>
-      tx.isValid && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0
     case otx: Any =>

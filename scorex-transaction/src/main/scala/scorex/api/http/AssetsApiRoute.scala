@@ -10,11 +10,15 @@ import play.api.libs.json._
 import scorex.account.Account
 import scorex.app.Application
 import scorex.crypto.encode.Base58
+import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet.{DeleteRequest, IssueRequest, ReissueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, ValidationResult}
+import scorex.transaction.assets.exchange.OrderJson._
 
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 
 @Path("/assets")
@@ -31,7 +35,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ deleteRoute ~ transfer
+      balance ~ balances ~ issue ~ reissue ~ deleteRoute ~ transfer ~ signOrder
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -278,6 +282,46 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       )
       JsonResponse(json, StatusCodes.OK)
     } else InvalidAddress.response
+  }
+
+  @Path("/order")
+  @ApiOperation(value = "Sign Order",
+    notes = "Create order signed by address from wallet",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Order Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.transaction.assets.exchange.Order"
+    )
+  ))
+  def signOrder: Route = path("order") {
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          Try(Json.parse(body)).map { js =>
+            js.validate[Order] match {
+              case err: JsError =>
+                Future.successful(WrongTransactionJson(err).response)
+              case JsSuccess(order: Order, _) =>
+                Future {
+                  wallet.privateKeyAccount(order.sender.address).map { sender =>
+                    val signed = Order.sign(order, sender)
+                    JsonResponse(signed.json, StatusCodes.OK)
+                  }.getOrElse(InvalidAddress.response)
+                }
+            }
+          }.recover {
+            case t => println(t)
+              Future.successful(WrongJson.response)
+          }.get
+        }
+      }
+    }
   }
 
 }

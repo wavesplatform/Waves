@@ -125,10 +125,10 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
     val sellFeeChange = Seq(BalanceChange(AssetAcc(sellOrder.sender, None), -sellMatcherFee))
 
     val exchange = Seq(
-      (buyOrder.sender, (buyOrder.spendAssetId, -amount)),
-      (buyOrder.sender, (buyOrder.receiveAssetId, (BigInt(amount) * Order.PriceConstant / price).longValue())),
-      (sellOrder.sender, (sellOrder.receiveAssetId, amount)),
-      (sellOrder.sender, (sellOrder.spendAssetId, -(BigInt(amount) * Order.PriceConstant / price).longValue()))
+      (buyOrder.sender, (buyOrder.spendAssetId, -buyOrder.getSpendAmount(amount))),
+      (buyOrder.sender, (buyOrder.receiveAssetId, buyOrder.getReceiveAmount(amount))),
+      (sellOrder.sender, (sellOrder.receiveAssetId, sellOrder.getReceiveAmount(amount))),
+      (sellOrder.sender, (sellOrder.spendAssetId, -sellOrder.getSpendAmount(amount)))
     )
 
     buyFeeChange ++ sellFeeChange ++ matcherChange ++
