@@ -130,8 +130,9 @@ object TestingCommons {
   }
 
   def matcherPostRequest(path: String, body: String = "",
-                  headers: Map[String, String] = Map("api_key" -> "test")): JsValue = {
-    val request = Http(url(matcherUrl() + path).POST <:< headers << body )
+                         params: Map[String, String] = Map.empty,
+                         headers: Map[String, String] = Map("api_key" -> "test")): JsValue = {
+    val request = Http(url(matcherUrl() + path).POST <:< headers <<? params << body )
     val response = Await.result(request, 5.seconds)
     Json.parse(response.getResponseBody)
   }

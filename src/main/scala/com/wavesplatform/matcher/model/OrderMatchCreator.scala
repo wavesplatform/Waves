@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.model
 import com.wavesplatform.settings.WavesSettings
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.{SignedTransaction, TransactionModule}
-import scorex.transaction.assets.exchange.{Order, OrderCancelTransaction, OrderMatch}
+import scorex.transaction.assets.exchange.{Order, OrderMatch}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.NTP
 import scorex.wallet.Wallet
