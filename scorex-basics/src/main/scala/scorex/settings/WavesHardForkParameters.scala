@@ -9,7 +9,7 @@ object WavesHardForkParameters {
     override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
     override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
     override def allowUnissuedAssetsUntil: Long = Long.MaxValue
-    override def allowDeleteTransactionAfterTimestamp: Long = Long.MaxValue
+    override def allowBurnTransactionAfterTimestamp: Long = Long.MaxValue
   }
 
   val Enabled = new AnyRef with WavesHardForkParameters {
@@ -20,7 +20,7 @@ object WavesHardForkParameters {
     override def minimalGeneratingBalanceAfterTimestamp: Long = 0
     override def allowTransactionsFromFutureUntil: Long = 0
     override def allowUnissuedAssetsUntil: Long = 0
-    override def allowDeleteTransactionAfterTimestamp: Long = 0
+    override def allowBurnTransactionAfterTimestamp: Long = 0
   }
 }
 trait WavesHardForkParameters {
@@ -31,5 +31,5 @@ trait WavesHardForkParameters {
   def minimalGeneratingBalanceAfterTimestamp: Long
   def allowTransactionsFromFutureUntil: Long
   def allowUnissuedAssetsUntil: Long
-  def allowDeleteTransactionAfterTimestamp: Long
+  def allowBurnTransactionAfterTimestamp: Long
 }

@@ -65,5 +65,5 @@ object RowDataType extends DataType {
     }
   }
 
-  override def getMemory(obj: scala.Any): Int = obj.asInstanceOf[Row].bytes.length
+  override def getMemory(obj: scala.Any): Int = obj.asInstanceOf[Row].bytes.length + 24
 }

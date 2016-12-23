@@ -109,7 +109,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
           transactionsMap.put(tx.id, tx.bytes)
           assetsExtension.addAsset(tx.assetId, h, tx.id, tx.quantity, tx.reissuable)
           includedTx.put(tx.id, h)
-        case tx: DeleteTransaction =>
+        case tx: BurnTransaction =>
           assetsExtension.burnAsset(tx.assetId, h, tx.id, -tx.amount)
         case om: OrderMatch =>
           transactionsMap.put(om.id, om.bytes)
@@ -137,7 +137,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
           t match {
             case t: AssetIssuance =>
               assetsExtension.rollbackTo(t.assetId, currentHeight)
-            case t: DeleteTransaction =>
+            case t: BurnTransaction =>
               assetsExtension.rollbackTo(t.assetId, currentHeight)
             case _ =>
           }
@@ -413,8 +413,8 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
         sameSender && reissuable
       }
       reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
-    case tx: DeleteTransaction =>
-      tx.timestamp > settings.allowDeleteTransactionAfterTimestamp && tx.validate == ValidationResult.ValidateOke &&
+    case tx: BurnTransaction =>
+      tx.timestamp > settings.allowBurnTransactionAfterTimestamp && tx.validate == ValidationResult.ValidateOke &&
         isIssuerAddress(tx.assetId, tx.sender.address) && included(tx.id, None).isEmpty
     case tx: OrderMatch =>
       isOrderMatchValid(tx) && included(tx.id, None).isEmpty
