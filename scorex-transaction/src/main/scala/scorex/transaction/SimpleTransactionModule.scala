@@ -149,9 +149,14 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   }
 
   def transferAsset(request: TransferRequest, wallet: Wallet): Try[TransferTransaction] = {
-    for {transfer <- transferRequestToTransaction(request, wallet)} yield {
-      if (isValid(transfer, transfer.timestamp)) onNewOffchainTransaction(transfer)
-      else throw new StateCheckFailed("Invalid transfer transaction generated: " + transfer.json)
+    for {
+      transfer <- transferRequestToTransaction(request, wallet)
+    } yield {
+      if (isValid(transfer, transfer.timestamp)) {
+        onNewOffchainTransaction(transfer)
+      } else {
+        throw new StateCheckFailed("Invalid transfer transaction generated: " + transfer.json)
+      }
       transfer
     }
   }
@@ -169,28 +174,6 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       Option(request.attachment).filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
 
     transfer
-  }
-
-  def transferAssets(requests: Array[TransferRequest], wallet: Wallet): Try[Array[TransferTransaction]] = {
-    for {
-      txs <- requests.foldLeft[Try[Array[TransferTransaction]]](Success(Array.empty)) {
-        (res, request) => {
-          transferRequestToTransaction(request, wallet) match {
-            case Success(tx) => res.map(_ :+ tx)
-            case Failure(f) => Failure(f)
-          }
-        }
-      }
-    } yield {
-      val failedTxOpt = txs.zipWithIndex.find { case (transfer, _) => isValid(transfer, transfer.timestamp) }
-      failedTxOpt match {
-        case None =>
-          txs.foreach(transfer => onNewOffchainTransaction(transfer))
-          txs
-        case Some((failedTx, index)) =>
-          throw new StateCheckFailed(s"Invalid transfer transaction generated at index $index: ${failedTx.json}")
-      }
-    }
   }
 
   def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
