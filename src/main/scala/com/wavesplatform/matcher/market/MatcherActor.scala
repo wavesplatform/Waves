@@ -31,7 +31,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
 
   def basicValidation(order: Order): Validation = {
       order.isValid(NTP.correctedTime()) &&
-        (storedState.assetBalance(AssetAcc(order.sender, order.spendAssetId)) >= order.getSpendAmount) :| "Not enough balance"
+        (storedState.assetBalance(AssetAcc(order.sender, order.spendAssetId)) >= order.getSpendAmount()) :| "Not enough balance"
   }
 
   def createAndForward(order: Order) = {

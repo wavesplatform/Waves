@@ -9,6 +9,7 @@ import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
 import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsString, JsValue, Json}
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.TransactionModule
@@ -52,23 +53,22 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       log.error(s"Failed to save snapshot: $metadata, $reason.")
     case GetOrderStatus(_, id) =>
       handleOrderStatus(id)
-    case CancelOrder(_, tx) =>
-      handleCancelOrder(tx)
+    case cancel: CancelOrder =>
+      handleCancelOrder(cancel)
   }
 
   def handleOrderStatus(id: String): Unit = {
     sender() ! GetOrderStatusResponse(getOrderStatus(id))
   }
 
-  def handleCancelOrder(tx: OrderCancelTransaction) = {
-    val v = validateCancelOrder(tx)
+  def handleCancelOrder(cancel: CancelOrder) = {
+    val v = validateCancelOrder(cancel)
     if (v) {
-      persist(OrderBook.cancelOrder(orderBook, tx.orderIdStr)) { e =>
-        sender() ! OrderCanceled(tx.orderIdStr)
-        e match {
-          case Some(c) => handleCancelEvent(c, tx)
-          case None => sender() ! OrderCancelRejected("Order not found")
-        }
+      persist(OrderBook.cancelOrder(orderBook, cancel.orderId)) {
+        case c@Some(Events.OrderCanceled(lo)) if cancel.isSignatureValid(lo.order) =>
+          handleCancelEvent(c.get)
+          sender() ! OrderCanceled(cancel.orderId)
+        case _ => sender() ! OrderCancelRejected("Order not found")
       }
     } else {
       sender() ! OrderCancelRejected(v.messages)
@@ -147,11 +147,9 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     }
   }
 
-  def handleCancelEvent(e: Event, tx: OrderCancelTransaction): Unit = {
+  def handleCancelEvent(e: Event): Unit = {
     applyEvent(e)
     context.system.eventStream.publish(e)
-
-    sendToNetwork(tx)
   }
 
 }
@@ -171,7 +169,11 @@ object OrderBookActor {
   }
   case class GetOrderBookRequest(pair: AssetPair, depth: Option[Int]) extends OrderBookRequest
   case class GetOrderStatus(pair: AssetPair, id: String) extends OrderBookRequest
-  case class CancelOrder(pair: AssetPair, tx: OrderCancelTransaction) extends OrderBookRequest
+  case class CancelOrder(pair: AssetPair, orderIdBytes: Array[Byte], signature: Array[Byte]) extends OrderBookRequest {
+    def orderId = Base58.encode(orderIdBytes)
+    def isSignatureValid(order: Order) = EllipticCurveImpl.verify(signature, toSign, order.sender.publicKey)
+    lazy val toSign: Array[Byte] = orderIdBytes
+  }
 
   sealed trait OrderBookResponse {
     def json: JsValue
