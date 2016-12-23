@@ -10,14 +10,15 @@ import play.api.libs.json._
 import scorex.account.Account
 import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.exchange.Order
+import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
 import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, ValidationResult}
 import scorex.transaction.assets.exchange.OrderJson._
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 @Path("/assets")
@@ -315,7 +316,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                 }
             }
           }.recover {
-            case t => println(t)
+            case t =>
               Future.successful(WrongJson.response)
           }.get
         }

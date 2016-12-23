@@ -150,14 +150,6 @@ trait TransactionGen {
     (unsigned.copy(signature = sig), matcher)
   }
 
-  val orderCancelGenerator: Gen[(OrderCancelTransaction, PrivateKeyAccount)] = for {
-    sender: PrivateKeyAccount <- accountGen
-    orderId <- bytes32gen
-    assetPair <- assetPairGen
-    timestamp: Long <- timestampGen
-    fee: Long <- maxWavesAnountGen
-  } yield (OrderCancelTransaction(sender, assetPair.first, assetPair.second, orderId, fee, timestamp), sender)
-
   implicit val orderMatchArb: Arbitrary[(OrderMatch, PrivateKeyAccount)] = Arbitrary {
     orderMatchGenerator
   }
