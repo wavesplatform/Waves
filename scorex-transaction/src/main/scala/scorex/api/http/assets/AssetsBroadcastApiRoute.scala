@@ -6,13 +6,13 @@ import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
-import play.api.libs.json.{JsError, JsSuccess, JsValue, Json}
+import play.api.libs.json._
 import scorex.api.http._
 import scorex.app.Application
 import scorex.settings.Settings
-import scorex.transaction.{SignedTransaction, SimpleTransactionModule, ValidationResult}
+import scorex.transaction.{SignedTransaction, SimpleTransactionModule, StateCheckFailed, ValidationResult}
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
@@ -22,7 +22,7 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
   val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
-    issue ~ reissue ~ transfer ~ deleteRoute
+    issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer
   }
 
   import BroadcastRequests._
@@ -94,36 +94,87 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
     }
   }
 
-  @Path("/delete")
-  @ApiOperation(value = "Broadcast signed Asset delete",
-    notes = "Publish signed Asset delete transaction to the Blockchain",
+  @Path("/burn")
+  @ApiOperation(value = "Broadcast signed Asset burn transaction",
+    notes = "Publish signed Asset burn transaction to the Blockchain",
     httpMethod = "POST",
     consumes = "application/json",
     produces = "application/json")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(
       name = "body",
-      value = "Json with signed Delete transaction",
+      value = "Json with signed Burn transaction",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.BroadcastRequests$DeleteReissueRequest")))
+      dataType = "scorex.api.http.assets.BroadcastRequests$AssetBurnRequest")))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with signed Asset delete transaction", response = classOf[AssetDeleteResponse]),
+    new ApiResponse(code = 200, message = "Json with signed Asset burn transaction", response = classOf[AssetBurnResponse]),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
-  def deleteRoute: Route = path("reissue") {
+  def burnRoute: Route = path("burn") {
     entity(as[String]) { body =>
       postJsonRoute {
         Try(Json.parse(body)).map { js =>
-          js.validate[AssetDeleteRequest] match {
-            case JsSuccess(request: AssetDeleteRequest, _) =>
+          js.validate[AssetBurnRequest] match {
+            case JsSuccess(request: AssetBurnRequest, _) =>
               request.toTx.map { tx =>
-                broadcast(tx)(t => Json.toJson(AssetDeleteResponse(t)))
+                broadcast(tx)(t => Json.toJson(AssetBurnResponse(t)))
               }.getOrElse(WrongJson.response)
 
             case _: JsError => WrongJson.response
           }
         }.getOrElse(WrongJson.response)
       }
+    }
+  }
+
+  @Path("/batch_transfer")
+  @ApiOperation(value = "Batch transfer operation",
+    notes = "Transfer assets to new addresses",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Array json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scala.Array[scorex.api.http.assets.BroadcastRequests$AssetTransferRequest]",
+      defaultValue = "[{\n  \"assetId\": \"E9yZC4cVhCDfbjFJCc9CqkAtkoFy5KaCe64iaxHM2adG\",\n  \"senderPublicKey\": \"CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw\",\n  \"recipient\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n  \"fee\": 100000,\n  \"amount\": 5500000000,\n  \"attachment\": \"BJa6cfyGUmzBFTj3vvvaew\",\n  \"timestamp\": 1479222433704, \n  \"signature\": \"2TyN8pNS7mS9gfCbX2ktpkWVYckoAmRmDZzKH3K35DKs6sUoXHArzukV5hvveK9t79uzT3cA8CYZ9z3Utj6CnCEo\"\n, {\n  \"assetId\": \"E9yZC4cVhCDfbjFJCc9CqkAtkoFy5KaCe64iaxHM2adG\",\n  \"senderPublicKey\": \"CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw\",\n  \"recipient\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n  \"fee\": 100000,\n  \"amount\": 5500000000,\n  \"attachment\": \"BJa6cfyGUmzBFTj3vvvaew\",\n  \"timestamp\": 1479222433704, \n  \"signature\": \"2TyN8pNS7mS9gfCbX2ktpkWVYckoAmRmDZzKH3K35DKs6sUoXHArzukV5hvveK9t79uzT3cA8CYZ9z3Utj6CnCEo\"\n}]"
+    )
+  ))
+  def batchTransfer: Route = path("batch_transfer") {
+    entity(as[String]) { body =>
+      postJsonRoute {
+        Try(Json.parse(body)).map { js =>
+          js.validate[Array[AssetTransferRequest]] match {
+            case err: JsError =>
+              WrongTransactionJson(err).response
+            case JsSuccess(requests: Array[AssetTransferRequest], _) =>
+              val validTransactionsOpt = listTry2TryList(requests.map(_.toTx))
+              validTransactionsOpt match {
+                case Success(txs) =>
+                  broadcastMany(txs)(txs => JsArray(txs.map(_.json)))
+                case Failure(e: StateCheckFailed) =>
+                  StateCheckFailed.response
+                case _ =>
+                  WrongJson.response
+              }
+          }
+        }.getOrElse(WrongJson.response)
+      }
+    }
+  }
+
+  private def listTry2TryList[T <: AnyRef](tries: Iterable[Try[T]]): Try[Seq[T]] = {
+    tries.foldLeft[Try[Seq[T]]](Success(Seq.empty)) {
+      case (foldSeq, resultTry) =>
+        for {
+          seq <- foldSeq
+          t <- resultTry
+        } yield {
+          seq :+ t
+        }
     }
   }
 
@@ -163,6 +214,12 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
   private def broadcast[T <: SignedTransaction](tx: T)(toJson: T => JsValue): JsonResponse =
     Try(transactionModule.broadcastTransaction(tx)).map {
       case ValidationResult.ValidateOke => JsonResponse(toJson(tx), StatusCodes.OK)
+      case error => jsonResponse(error)
+    }.getOrElse(WrongJson.response)
+
+  private def broadcastMany[T <: SignedTransaction](txs: Seq[T])(toJson: Seq[T] => JsValue): JsonResponse =
+    Try(transactionModule.broadcastTransactions(txs)).map {
+      case ValidationResult.ValidateOke => JsonResponse(toJson(txs), StatusCodes.OK)
       case error => jsonResponse(error)
     }.getOrElse(WrongJson.response)
 

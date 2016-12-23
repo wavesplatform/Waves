@@ -5,7 +5,7 @@ import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Writes}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets._
 
 /**
   */
@@ -105,25 +105,25 @@ object BroadcastResponses {
       ) (unlift(AssetReissueResponse.unapply))
   }
 
-  @ApiModel(value = "Asset delete transaction")
-  case class AssetDeleteResponse(@ApiModelProperty(value = "Transaction ID", required = true)
-                                 id: String,
-                                 @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
-                                 assetId: String,
-                                 @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                                 senderPublicKey: String,
-                                 @ApiModelProperty(required = true)
-                                 quantity: Long,
-                                 @ApiModelProperty(required = true)
-                                 fee: Long,
-                                 @ApiModelProperty(required = true)
-                                 timestamp: Long,
-                                 @ApiModelProperty(required = true)
-                                 signature: String) {
+  @ApiModel(value = "Asset burn transaction")
+  case class AssetBurnResponse(@ApiModelProperty(value = "Transaction ID", required = true)
+                               id: String,
+                               @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
+                               assetId: String,
+                               @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+                               senderPublicKey: String,
+                               @ApiModelProperty(required = true)
+                               quantity: Long,
+                               @ApiModelProperty(required = true)
+                               fee: Long,
+                               @ApiModelProperty(required = true)
+                               timestamp: Long,
+                               @ApiModelProperty(required = true)
+                               signature: String) {
   }
 
-  object AssetDeleteResponse {
-    def apply(tx: DeleteTransaction): AssetDeleteResponse = new AssetDeleteResponse(
+  object AssetBurnResponse {
+    def apply(tx: BurnTransaction): AssetBurnResponse = new AssetBurnResponse(
       Base58.encode(tx.id),
       Base58.encode(tx.assetId),
       Base58.encode(tx.sender.publicKey),
@@ -133,7 +133,7 @@ object BroadcastResponses {
       Base58.encode(tx.signature)
     )
 
-    implicit val reissueResponseWrites: Writes[AssetDeleteResponse] = (
+    implicit val reissueResponseWrites: Writes[AssetBurnResponse] = (
       (JsPath \ "id").write[String] and
         (JsPath \ "assetId").write[String] and
         (JsPath \ "senderPublicKey").write[String] and
@@ -141,7 +141,7 @@ object BroadcastResponses {
         (JsPath \ "fee").write[Long] and
         (JsPath \ "timestamp").write[Long] and
         (JsPath \ "signature").write[String]
-      ) (unlift(AssetDeleteResponse.unapply))
+      ) (unlift(AssetBurnResponse.unapply))
   }
 
 

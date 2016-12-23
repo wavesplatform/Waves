@@ -11,14 +11,14 @@ import scorex.transaction._
 
 import scala.util.Try
 
-case class DeleteTransaction(sender: PublicKeyAccount,
-                             assetId: Array[Byte],
-                             amount: Long,
-                             fee: Long,
-                             timestamp: Long,
-                             signature: Array[Byte]) extends SignedTransaction {
+case class BurnTransaction(sender: PublicKeyAccount,
+                           assetId: Array[Byte],
+                           amount: Long,
+                           fee: Long,
+                           timestamp: Long,
+                           signature: Array[Byte]) extends SignedTransaction {
 
-  override val transactionType: TransactionType.Value = TransactionType.DeleteTransaction
+  override val transactionType: TransactionType.Value = TransactionType.BurnTransaction
 
   lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), sender.publicKey, assetId,
     Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp))
@@ -43,14 +43,14 @@ case class DeleteTransaction(sender: PublicKeyAccount,
 }
 
 
-object DeleteTransaction extends Deser[DeleteTransaction] {
+object BurnTransaction extends Deser[BurnTransaction] {
 
-  override def parseBytes(bytes: Array[Byte]): Try[DeleteTransaction] = Try {
-    require(bytes.head == TransactionType.DeleteTransaction.id)
+  override def parseBytes(bytes: Array[Byte]): Try[BurnTransaction] = Try {
+    require(bytes.head == TransactionType.BurnTransaction.id)
     parseTail(bytes.tail).get
   }
 
-  def parseTail(bytes: Array[Byte]): Try[DeleteTransaction] = Try {
+  def parseTail(bytes: Array[Byte]): Try[BurnTransaction] = Try {
     import EllipticCurveImpl._
     val sender = new PublicKeyAccount(bytes.slice(0, KeyLength))
     val assetId = bytes.slice(KeyLength, KeyLength + AssetIdLength)
@@ -60,15 +60,15 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
     val fee = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
     val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
     val signature = bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength)
-    DeleteTransaction(sender, assetId, quantity, fee, timestamp, signature)
+    BurnTransaction(sender, assetId, quantity, fee, timestamp, signature)
   }
 
   def create(sender: PrivateKeyAccount,
              assetId: Array[Byte],
              quantity: Long,
              fee: Long,
-             timestamp: Long): DeleteTransaction = {
-    val unsigned = DeleteTransaction(sender, assetId, quantity, fee, timestamp, null)
+             timestamp: Long): BurnTransaction = {
+    val unsigned = BurnTransaction(sender, assetId, quantity, fee, timestamp, null)
     val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
