@@ -14,7 +14,7 @@ import scorex.settings.WavesHardForkParameters
 
 class BlockSpecification extends FunSuite with Matchers with TestingCommons {
 
-  ignore ("Nxt block with txs bytes/parse roundtrip") {
+  test ("Nxt block with txs bytes/parse roundtrip") {
     implicit val consensusModule = new NxtLikeConsensusModule(WavesHardForkParameters.Disabled)
     implicit val transactionModule = new SimpleTransactionModule(WavesHardForkParameters.Disabled)(application.settings, application)
 
