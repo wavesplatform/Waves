@@ -12,23 +12,23 @@ import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-sealed trait DeleteTransaction extends SignedTransaction {
+sealed trait BurnTransaction extends SignedTransaction {
   def assetId: Array[Byte]
   def amount: Long
   def fee: Long
 }
 
-object DeleteTransaction extends Deser[DeleteTransaction] {
+object BurnTransaction extends Deser[BurnTransaction] {
 
-  private case class DeleteTransactionImpl(sender: PublicKeyAccount,
-                                           assetId: Array[Byte],
-                                           amount: Long,
-                                           fee: Long,
-                                           timestamp: Long,
-                                           signature: Array[Byte])
-      extends DeleteTransaction {
+  private case class BurnTransactionImpl(sender: PublicKeyAccount,
+                                         assetId: Array[Byte],
+                                         amount: Long,
+                                         fee: Long,
+                                         timestamp: Long,
+                                         signature: Array[Byte])
+      extends BurnTransaction {
 
-    override val transactionType: TransactionType.Value = TransactionType.DeleteTransaction
+    override val transactionType: TransactionType.Value = TransactionType.BurnTransaction
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
                                                 sender.publicKey,
@@ -50,12 +50,12 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
   }
-  override def parseBytes(bytes: Array[Byte]): Try[DeleteTransaction] = Try {
-    require(bytes.head == TransactionType.DeleteTransaction.id)
+  override def parseBytes(bytes: Array[Byte]): Try[BurnTransaction] = Try {
+    require(bytes.head == TransactionType.BurnTransaction.id)
     parseTail(bytes.tail).get
   }
 
-  def parseTail(bytes: Array[Byte]): Try[DeleteTransaction] = Try {
+  def parseTail(bytes: Array[Byte]): Try[BurnTransaction] = Try {
     import EllipticCurveImpl._
     val sender        = new PublicKeyAccount(bytes.slice(0, KeyLength))
     val assetId       = bytes.slice(KeyLength, KeyLength + AssetIdLength)
@@ -65,7 +65,7 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
     val fee       = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
     val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
     val signature = bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength)
-    DeleteTransaction
+    BurnTransaction
       .create(sender, assetId, quantity, fee, timestamp, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
@@ -75,7 +75,7 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
              quantity: Long,
              fee: Long,
              timestamp: Long,
-             signature: Array[Byte]): Either[ValidationResult, DeleteTransaction] = {
+             signature: Array[Byte]): Either[ValidationResult, BurnTransaction] = {
     if (quantity < 0) {
       Left(ValidationResult.NegativeAmount)
     } else if (!Account.isValid(sender)) {
@@ -83,7 +83,7 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
     } else if (fee <= 0) {
       Left(ValidationResult.InsufficientFee)
     } else {
-      val unsigned = DeleteTransactionImpl(sender, assetId, quantity, fee, timestamp, null)
+      val unsigned = BurnTransactionImpl(sender, assetId, quantity, fee, timestamp, null)
       if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
         Right(unsigned.copy(signature = signature))
       } else {
@@ -96,7 +96,7 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
              assetId: Array[Byte],
              quantity: Long,
              fee: Long,
-             timestamp: Long): Either[ValidationResult, DeleteTransaction] = {
+             timestamp: Long): Either[ValidationResult, BurnTransaction] = {
     if (quantity < 0) {
       Left(ValidationResult.NegativeAmount)
     } else if (!Account.isValid(sender)) {
@@ -104,7 +104,7 @@ object DeleteTransaction extends Deser[DeleteTransaction] {
     } else if (fee <= 0) {
       Left(ValidationResult.InsufficientFee)
     } else {
-      val unsigned = DeleteTransactionImpl(sender, assetId, quantity, fee, timestamp, null)
+      val unsigned = BurnTransactionImpl(sender, assetId, quantity, fee, timestamp, null)
       val sig      = EllipticCurveImpl.sign(sender, unsigned.toSign)
       Right(unsigned.copy(signature = sig))
     }

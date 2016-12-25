@@ -10,9 +10,9 @@ import play.api.libs.json._
 import scorex.account.Account
 import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets._
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.wallet.{DeleteRequest, IssueRequest, ReissueRequest, TransferRequest}
+import scorex.transaction.state.wallet._
 import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, ValidationResult}
 
 import scala.util.{Failure, Success, Try}
@@ -31,7 +31,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ deleteRoute ~ transfer
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -190,9 +190,9 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     }
   }
 
-  @Path("/delete")
-  @ApiOperation(value = "Delete Asset",
-    notes = "Delete some of your assets",
+  @Path("/burn")
+  @ApiOperation(value = "Burn Asset",
+    notes = "Burn some of your assets",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
@@ -202,21 +202,21 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.DeleteRequest",
+      dataType = "scorex.transaction.state.wallet.BurnRequest",
       defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100,\"fee\":100000}"
     )
   ))
-  def deleteRoute: Route = path("delete") {
+  def burnRoute: Route = path("burn") {
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
           walletNotExists(wallet).getOrElse {
             Try(Json.parse(body)).map { js =>
-              js.validate[DeleteRequest] match {
+              js.validate[BurnRequest] match {
                 case err: JsError =>
                   WrongTransactionJson(err).response
-                case JsSuccess(deleteReq: DeleteRequest, _) =>
-                  val txOpt: Try[DeleteTransaction] = transactionModule.deleteAsset(deleteReq, wallet)
+                case JsSuccess(burnRequest: BurnRequest, _) =>
+                  val txOpt: Try[BurnTransaction] = transactionModule.burnAsset(burnRequest, wallet)
                   txOpt match {
                     case Success(tx) =>
                           JsonResponse(tx.json, StatusCodes.OK)

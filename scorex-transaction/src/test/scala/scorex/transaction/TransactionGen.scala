@@ -1,13 +1,13 @@
 package scorex.transaction
 
-import org.scalacheck.{Arbitrary, Gen, Prop}
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Matchers._
 import org.scalatest.enablers.Containing
 import org.scalatest.matchers.{BeMatcher, MatchResult}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
+import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
-import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.utils.{ByteArray, NTP}
 
 trait TransactionGen {
@@ -102,12 +102,12 @@ trait TransactionGen {
     matcherFee: Long <- maxWavesAnountGen
   } yield (Order(sender, matcher, pair.first, pair.second, price, amount, maxtTime, matcherFee), sender)
 
-  val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, DeleteTransaction)] = for {
+  val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
     assetName <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
     description <- genBoundedBytes(0, IssueTransaction.MaxDescriptionLength)
     quantity <- positiveLongGen
-    deleteAmount <- Gen.choose(0L, quantity)
+    burnAmount <- Gen.choose(0L, quantity)
     decimals <- Gen.choose(0: Byte, 8: Byte)
     reissuable <- Arbitrary.arbitrary[Boolean]
     reissuable2 <- Arbitrary.arbitrary[Boolean]
@@ -119,14 +119,14 @@ trait TransactionGen {
     val issue2 = IssueTransaction.create(sender, assetName, description, quantity, decimals,
       reissuable, iFee, Math.max(timestamp, 1476459220001L)).right.get
     val reissue = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable2, fee, timestamp).right.get
-    val delete = DeleteTransaction.create(sender, issue.assetId, deleteAmount, fee, timestamp).right.get
-    (issue, issue2, reissue, delete)
+    val burn = BurnTransaction.create(sender, issue.assetId, burnAmount, fee, timestamp).right.get
+    (issue, issue2, reissue, burn)
   }
 
 
   val issueGenerator: Gen[IssueTransaction] = issueReissueGenerator.map(_._1)
   val reissueGenerator: Gen[ReissueTransaction] = issueReissueGenerator.map(_._3)
-  val deleteGenerator: Gen[DeleteTransaction] = issueReissueGenerator.map(_._4)
+  val burnGenerator: Gen[BurnTransaction] = issueReissueGenerator.map(_._4)
 
   val invalidOrderGenerator: Gen[Order] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -148,7 +148,7 @@ trait TransactionGen {
     price: Long <- maxWavesAnountGen
     amount1: Long <- maxWavesAnountGen
     amount2: Long <- maxWavesAnountGen
-    matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2)/2, Math.min(amount1, amount2))
+    matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2, Math.min(amount1, amount2))
     maxtTime: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
   } yield {
@@ -170,9 +170,15 @@ trait TransactionGen {
     fee: Long <- maxWavesAnountGen
   } yield (OrderCancelTransaction(sender, assetPair.first, assetPair.second, orderId, fee, timestamp), sender)
 
-  implicit val orderMatchArb: Arbitrary[(OrderMatch, PrivateKeyAccount)] = Arbitrary { orderMatchGenerator }
-  implicit val orderArb: Arbitrary[(Order, PrivateKeyAccount)] = Arbitrary { orderGenerator }
-  implicit val privateKeyAccArb: Arbitrary[PrivateKeyAccount] = Arbitrary { accountGen }
+  implicit val orderMatchArb: Arbitrary[(OrderMatch, PrivateKeyAccount)] = Arbitrary {
+    orderMatchGenerator
+  }
+  implicit val orderArb: Arbitrary[(Order, PrivateKeyAccount)] = Arbitrary {
+    orderGenerator
+  }
+  implicit val privateKeyAccArb: Arbitrary[PrivateKeyAccount] = Arbitrary {
+    accountGen
+  }
 
   def validOrderMatch = orderMatchGenerator.sample.get
 
@@ -183,13 +189,15 @@ trait TransactionGen {
     new Containing[Validation] {
       def contains(v: Validation, ele: Any): Boolean =
         !v.status && v.labels.contains(ele.toString)
+
       def containsOneOf(v: Validation, elements: scala.collection.Seq[Any]): Boolean = {
         !v.status && elements.map(_.toString).map(v.labels.contains).reduce(_ || _)
       }
+
       def containsNoneOf(v: Validation, elements: scala.collection.Seq[Any]): Boolean = {
         v.status || elements.map(_.toString).map(v.labels.contains).reduce(!_ && !_)
       }
-  }
+    }
 
   class ValidationMatcher extends BeMatcher[Validation] {
     def apply(left: Validation): MatchResult =
@@ -199,14 +207,8 @@ trait TransactionGen {
         left.toString + " was valid"
       )
   }
-  val valid = new ValidationMatcher
-  val invalid = not (valid)
 
-  def copyWithFeeAssetId(transferTransaction: TransferTransaction, feeAssetId: Option[Array[Byte]]) : TransferTransaction ={
-   TransferTransaction.create(transferTransaction.assetId,
-     transferTransaction.sender,
-     transferTransaction.recipient,
-     transferTransaction.amount,
-     transferTransaction.timestamp,feeAssetId,transferTransaction.fee,transferTransaction.attachment,transferTransaction.signature).right.get
-  }
+  val valid = new ValidationMatcher
+  val invalid = not(valid)
+
 }

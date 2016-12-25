@@ -7,7 +7,7 @@ import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
 import scorex.settings.Settings
-import scorex.transaction.assets.{DeleteTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets._
 
 
 class FeeCalculatorSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
@@ -47,9 +47,9 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
     }
   }
 
-  property("Delete transaction ") {
+  property("Burn transaction ") {
     val feeCalc = new FeeCalculator(MySettings)
-    forAll(deleteGenerator) { tx: DeleteTransaction =>
+    forAll(burnGenerator) { tx: BurnTransaction =>
       feeCalc.enoughFee(tx) shouldBe (tx.fee >= 300000)
     }
   }
