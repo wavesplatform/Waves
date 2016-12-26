@@ -30,37 +30,27 @@ class WavesTransactionModule(chainParams: ChainParameters)(implicit override val
     *
     * TODO: Should be moved to Scorex
     */
-  def signPayment(payment: Payment, wallet: Wallet): Option[PaymentTransaction] = {
+  def signPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationResult,PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
-      signPayment(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
+      PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
     }
   }
 
-  /**
-    * Create signed PaymentTransaction without broadcasting to network
-    *
-    * TODO: Should be moved to Scorex
-    */
-  def signPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): PaymentTransaction = {
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp)
-    val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
-    payment
-  }
 
   /**
     * Create signed payment transaction and validate it through current state.
     */
   def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationResult, PaymentTransaction] = {
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, timestamp)
-    val payment = new PaymentTransaction(sender, recipient, amount, fee, timestamp, sig)
+  
+    val paymentVal = PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
 
-    payment.validate match {
-      case ValidationResult.ValidateOke => {
+    paymentVal match {
+      case Right(payment) => {
         if (blockStorage.state.isValid(payment, payment.timestamp)) {
           Right(payment)
         } else Left(ValidationResult.NoBalance)
       }
-      case error: ValidationResult => Left(error)
+      case Left(err) => Left(err)
     }
   }
 
@@ -78,15 +68,15 @@ class WavesTransactionModule(chainParams: ChainParameters)(implicit override val
       val sigBytes = maybeSignatureBytes.get
       val senderPubKey = payment.senderPublicKey
       val recipientAccount = payment.recipient
-      val tx = new PaymentTransaction(senderPubKey, recipientAccount, payment.amount, payment.fee, time, sigBytes)
-      tx.validate match {
-        case ValidationResult.ValidateOke => {
+      val txVal = PaymentTransaction.create(senderPubKey, recipientAccount, payment.amount, payment.fee, time, sigBytes)
+      txVal match {
+        case Right(tx) => {
           if (blockStorage.state.isValid(tx, tx.timestamp)) {
             onNewOffchainTransaction(tx)
             Right(tx)
           } else Left(ValidationResult.NoBalance)
         }
-        case error: ValidationResult.ValidationResult => Left(error)
+        case Left(err) => Left(err)
       }
     }
   }
