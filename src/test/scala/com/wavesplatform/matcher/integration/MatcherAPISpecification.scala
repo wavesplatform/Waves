@@ -208,11 +208,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfter
     val pubKeyStr = Base58.encode(acc.publicKey)
     val json = s"""{
                    |  "sender": "$pubKeyStr",
-                   |  "spendAssetId": "${spendAsset.getOrElse("")}",
-                   |  "receiveAssetId": "${receiveAsset.getOrElse("")}",
                    |  "orderId": "$orderId",
-                   |  "fee": 100000,
-                   |  "timestamp": $ts,
                    |  "signature": "signature"
                    |}""".stripMargin
     val orderCancel = Json.parse(json).validate[CancelOrderRequest].get
@@ -225,6 +221,8 @@ class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfter
     val resp = matcherPostRequest("/orders/cancel", body = signedJson.toString,
       params =  Map("asset1" -> a1, "asset2" -> a2))
 
+    val s = (resp \ "status").as[String]
+    if (s != expectedStatus) println((resp \ "message").as[String])
     (resp \ "status").as[String] shouldBe expectedStatus
   }
 

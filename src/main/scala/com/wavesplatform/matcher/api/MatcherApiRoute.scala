@@ -223,7 +223,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
                 Future.successful(WrongTransactionJson(err).response)
               case JsSuccess(req: CancelOrderRequest, _) =>
                 val pair = AssetPair(Base58.decode(asset1).toOption, asset2.flatMap(Base58.decode(_).toOption))
-                (matcher ? CancelOrder(pair, req.orderId, req.signature))
+                (matcher ? CancelOrder(pair, req))
                   .mapTo[OrderBookResponse]
                   .map(r => JsonResponse(r.json, r.code))
             }

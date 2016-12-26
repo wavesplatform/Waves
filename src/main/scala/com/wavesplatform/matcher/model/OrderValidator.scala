@@ -34,6 +34,8 @@ trait OrderValidator {
 
   def validateCancelOrder(cancel: CancelOrder): Validation = {
     ordersRemainingAmount.contains(cancel.orderId) :| "Order not found" &&
-      (getOrderStatus(cancel.orderId) != LimitOrder.Filled) :| "Order is already Filled"
+      (getOrderStatus(cancel.orderId) != LimitOrder.Filled) :| "Order is already Filled" &&
+      cancel.req.isSignatureValid :| "Signature should be valid"
+
   }
 }

@@ -3,19 +3,21 @@ package com.wavesplatform.matcher.market
 import akka.actor.Props
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence._
+import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
 import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsString, JsValue, Json}
+import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange._
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils.{ByteArray, NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.collection.JavaConversions._
@@ -65,7 +67,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     val v = validateCancelOrder(cancel)
     if (v) {
       persist(OrderBook.cancelOrder(orderBook, cancel.orderId)) {
-        case c@Some(Events.OrderCanceled(lo)) if cancel.isSignatureValid(lo.order) =>
+        case c@Some(Events.OrderCanceled(lo)) if cancel.req.sender == lo.order.sender =>
           handleCancelEvent(c.get)
           sender() ! OrderCanceled(cancel.orderId)
         case _ => sender() ! OrderCancelRejected("Order not found")
@@ -169,10 +171,8 @@ object OrderBookActor {
   }
   case class GetOrderBookRequest(pair: AssetPair, depth: Option[Int]) extends OrderBookRequest
   case class GetOrderStatus(pair: AssetPair, id: String) extends OrderBookRequest
-  case class CancelOrder(pair: AssetPair, orderIdBytes: Array[Byte], signature: Array[Byte]) extends OrderBookRequest {
-    def orderId = Base58.encode(orderIdBytes)
-    def isSignatureValid(order: Order) = EllipticCurveImpl.verify(signature, toSign, order.sender.publicKey)
-    lazy val toSign: Array[Byte] = orderIdBytes
+  case class CancelOrder(pair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
+    def orderId: String = Base58.encode(req.orderId)
   }
 
   sealed trait OrderBookResponse {

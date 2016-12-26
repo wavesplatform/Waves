@@ -11,6 +11,8 @@ import scorex.transaction.assets.exchange.OrderJson._
 case class CancelOrderRequest(sender: PublicKeyAccount, orderId: Array[Byte], signature: Array[Byte]) {
   lazy val toSign: Array[Byte] = sender.publicKey ++ orderId
 
+  def isSignatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
+
   def json: JsObject = Json.obj(
     "sender" -> Base58.encode(sender.publicKey),
     "orderId" -> Base58.encode(orderId),
