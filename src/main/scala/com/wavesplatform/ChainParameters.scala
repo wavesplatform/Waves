@@ -21,11 +21,11 @@ object TestNetParams extends ChainParameters {
   val singleNodeBalance = initialBalance * 0.02
   val genesisTxs = {
     val txs = Seq(
-      GenesisTransaction.create(new Account("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"), (2 * singleNodeBalance).toLong, genesisTimestamp).right.get,
-      GenesisTransaction.create(new Account("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8"), singleNodeBalance.toLong, genesisTimestamp).right.get,
-      GenesisTransaction.create(new Account("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh"), singleNodeBalance.toLong, genesisTimestamp).right.get,
-      GenesisTransaction.create(new Account("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd"), singleNodeBalance.toLong, genesisTimestamp).right.get,
-      GenesisTransaction.create(new Account("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx"), (initialBalance - 5 * singleNodeBalance).toLong, genesisTimestamp).right.get
+      GenesisTransaction.create(new Account("3MZhiaZx7L2PcUFr1tr6ZdxrLEmorPZmgpz"), (2 * singleNodeBalance).toLong, genesisTimestamp).right.get,
+      GenesisTransaction.create(new Account("3MnAEZRZJ7VqWL9kKbCHru3QWmS2GheDkCz"), singleNodeBalance.toLong, genesisTimestamp).right.get,
+      GenesisTransaction.create(new Account("3MfvprsutzZ2exmdy3BEy8rkVB4i9711J9S"), singleNodeBalance.toLong, genesisTimestamp).right.get,
+      GenesisTransaction.create(new Account("3MnqkyaLPzVc1fG69eF7DUsjYUCDmPPneAa"), singleNodeBalance.toLong, genesisTimestamp).right.get,
+      GenesisTransaction.create(new Account("3MboP54qUGnwGGxZH4EeNi3KtSDoCRJwC3W"), (initialBalance - 5 * singleNodeBalance).toLong, genesisTimestamp).right.get
     )
     require(txs.foldLeft(0L)(_ + _.amount) == initialBalance)
     txs
@@ -61,7 +61,7 @@ object MainNetParams extends ChainParameters {
       GenesisTransaction.create( new Account("3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy"), Constants.UnitsInWave, genesisTimestamp).right.get,
       GenesisTransaction.create( new Account("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF"), Constants.UnitsInWave, genesisTimestamp).right.get,
       GenesisTransaction.create( new Account("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3"), Constants.UnitsInWave, genesisTimestamp).right.get,
-      GenesisTransaction.create( new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J"), Constants.UnitsInWave, genesisTimestamp).right.get
+      GenesisTransaction.create( new Account("3MyViFvajzYyPn7Y4EWWBBsoSCaBdrCZSfw"), Constants.UnitsInWave, genesisTimestamp).right.get
     )
     require(txs.foldLeft(0L)(_ + _.amount) == initialBalance)
     txs

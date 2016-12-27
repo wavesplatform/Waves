@@ -24,6 +24,7 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 
+@DoNotDiscover
 class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     with WordSpecLike
     with Matchers
