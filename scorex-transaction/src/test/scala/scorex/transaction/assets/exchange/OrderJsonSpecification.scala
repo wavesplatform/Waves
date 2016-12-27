@@ -150,31 +150,4 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
 
   }
 
-  property("Read Cancel Order") {
-    val pk = new PrivateKeyAccount("123".getBytes)
-    val pubKeyStr = Base58.encode(pk.publicKey)
-
-    val json = Json.parse(s"""
-        {
-          "sender": "${pubKeyStr}",
-          "spendAssetId": "29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b",
-          "receiveAssetId": "",
-          "orderId": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
-          "fee": 0,
-          "timestamp": 0,
-          "signature": "signature"
-        } """)
-
-    json.validate[OrderCancelTransaction] match {
-      case e: JsError =>
-        fail("Error: " + JsError.toJson(e).toString())
-      case s: JsSuccess[OrderCancelTransaction] =>
-        val o = s.get
-        o.spendAssetId.get shouldBe Base58.decode("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
-        o.orderId shouldBe Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get
-        o.receiveAssetId shouldBe empty
-
-    }
-
-  }
 }

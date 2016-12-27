@@ -50,10 +50,9 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
   def isValid(atTime: Long): Validation = {
     (amount > 0) :| "amount should be > 0" &&
       (price > 0) :| "price should be > 0" &&
-      (price < MaxAmount) :| "price too large" &&
       (amount < MaxAmount) :| "amount too large" &&
-      (getSpendAmount > 0) :| "spendAmount should be > 0" &&
-      (getReceiveAmount > 0) :| "receiveAmount should be > 0" &&
+      (getSpendAmount() > 0) :| "spendAmount should be > 0" &&
+      (getReceiveAmount() > 0) :| "receiveAmount should be > 0" &&
       (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (maxTimestamp - atTime <= MaxLiveTime) :| "maxTimestamp should be earlier than 30 days" &&
@@ -76,15 +75,15 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
   override def bytes: Array[Byte] = toSign ++ signature
 
   @ApiModelProperty(hidden = true)
-  def getSpendAmount: Long = {
-    if (orderType == OrderType.BUY) amount
-    else (BigInt(amount) * PriceConstant / price).longValue()
+  def getSpendAmount(matchPrice: Long = price, matchAmount: Long = amount): Long = {
+    if (orderType == OrderType.BUY) matchAmount
+    else (BigInt(matchAmount) * PriceConstant / matchPrice).longValue()
   }
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAmount: Long = {
-    if (orderType == OrderType.SELL) amount
-    else (BigInt(amount) * PriceConstant / price).longValue()
+  def getReceiveAmount(matchPrice: Long = price, matchAmount: Long = amount): Long = {
+    if (orderType == OrderType.SELL) matchAmount
+    else (BigInt(matchAmount) * PriceConstant / matchPrice).longValue()
   }
 
   override def json: JsObject = Json.obj(

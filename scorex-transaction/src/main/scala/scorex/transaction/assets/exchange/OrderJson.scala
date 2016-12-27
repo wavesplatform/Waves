@@ -62,21 +62,4 @@ object OrderJson {
     r(readOrder _)
   }
 
-  def readOrderCancel(sender: PublicKeyAccount, spendAssetID: Option[Option[Array[Byte]]],
-                      receiveAssetID: Option[Option[Array[Byte]]], orderId: Array[Byte], fee: Long, timestamp: Long,
-                      signature: Array[Byte]): OrderCancelTransaction = {
-    OrderCancelTransaction(sender, spendAssetID.flatten, receiveAssetID.flatten, orderId, fee, timestamp, signature)
-  }
-
-  implicit val orderCancelReads: Reads[OrderCancelTransaction] = {
-    val r = (JsPath \ "sender").read[PublicKeyAccount] and
-      (JsPath \ "spendAssetId").readNullable[Option[Array[Byte]]] and
-      (JsPath \ "receiveAssetId").readNullable[Option[Array[Byte]]] and
-      (JsPath \ "orderId").read[Array[Byte]] and
-      (JsPath \ "fee").read[Long] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[Array[Byte]]
-    r(readOrderCancel _)
-  }
-
 }
