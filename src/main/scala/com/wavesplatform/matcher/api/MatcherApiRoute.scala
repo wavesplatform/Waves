@@ -14,7 +14,7 @@ import scorex.api.http._
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderCancelTransaction}
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
@@ -203,6 +203,8 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     produces = "application/json",
     consumes = "application/json")
   @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "asset1", value = "Asset Id", required = true, dataType = "string", paramType = "query"),
+    new ApiImplicitParam(name = "asset2", value = "Asset Id or empty for WAVES", required = false, dataType = "string", paramType = "query"),
     new ApiImplicitParam(
       name = "body",
       value = "Json with data",
@@ -212,21 +214,24 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     )
   ))
   def cancel: Route = path("orders" / "cancel") {
-    entity(as[String]) { body =>
-      postJsonRouteAsync {
-        Try(Json.parse(body)).map { js =>
-          js.validate[OrderCancelTransaction] match {
-            case err: JsError =>
-              Future.successful(WrongTransactionJson(err).response)
-            case JsSuccess(tx: OrderCancelTransaction, _) =>
-              (matcher ? CancelOrder(tx.assetPair, tx))
-                .mapTo[OrderBookResponse]
-                .map(r => JsonResponse(r.json, r.code))
-          }
-        }.recover {
-          case t => println(t)
-            Future.successful(WrongJson.response)
-        }.get
+    parameters('asset1, 'asset2.?) { (asset1, asset2) =>
+      entity(as[String]) { body =>
+        postJsonRouteAsync {
+          Try(Json.parse(body)).map { js =>
+            js.validate[CancelOrderRequest] match {
+              case err: JsError =>
+                Future.successful(WrongTransactionJson(err).response)
+              case JsSuccess(req: CancelOrderRequest, _) =>
+                val pair = AssetPair(Base58.decode(asset1).toOption, asset2.flatMap(Base58.decode(_).toOption))
+                (matcher ? CancelOrder(pair, req))
+                  .mapTo[OrderBookResponse]
+                  .map(r => JsonResponse(r.json, r.code))
+            }
+          }.recover {
+            case t => println(t)
+              Future.successful(WrongJson.response)
+          }.get
+        }
       }
     }
   }

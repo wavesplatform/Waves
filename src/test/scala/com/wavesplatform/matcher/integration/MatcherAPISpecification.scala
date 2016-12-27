@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.integration
 
+import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.settings.Constants
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.SpanSugar._
@@ -9,7 +10,7 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.assets.exchange.{Order, OrderCancelTransaction}
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.utils.NTP
 import scorex.waves.TestingCommons._
@@ -207,19 +208,21 @@ class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfter
     val pubKeyStr = Base58.encode(acc.publicKey)
     val json = s"""{
                    |  "sender": "$pubKeyStr",
-                   |  "spendAssetId": "${spendAsset.getOrElse("")}",
-                   |  "receiveAssetId": "${receiveAsset.getOrElse("")}",
                    |  "orderId": "$orderId",
-                   |  "fee": 100000,
-                   |  "timestamp": $ts,
                    |  "signature": "signature"
                    |}""".stripMargin
-    val orderCancel = Json.parse(json).validate[OrderCancelTransaction].get
-    val signed = OrderCancelTransaction.sign(orderCancel, acc)
+    val orderCancel = Json.parse(json).validate[CancelOrderRequest].get
+    val signed = CancelOrderRequest.sign(orderCancel, acc)
     val signedJson = signed.json
 
-    val resp = matcherPostRequest("/orders/cancel", body = signedJson.toString)
+    val (a1, a2) = if (spendAsset.isDefined) (spendAsset.get, receiveAsset.getOrElse("")) else
+      (receiveAsset.get, spendAsset.getOrElse(""))
 
+    val resp = matcherPostRequest("/orders/cancel", body = signedJson.toString,
+      params =  Map("asset1" -> a1, "asset2" -> a2))
+
+    val s = (resp \ "status").as[String]
+    if (s != expectedStatus) println((resp \ "message").as[String])
     (resp \ "status").as[String] shouldBe expectedStatus
   }
 

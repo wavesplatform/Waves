@@ -1,9 +1,10 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.Validation.BooleanOperators
-import scorex.transaction.assets.exchange.{Order, OrderCancelTransaction, Validation}
+import scorex.transaction.assets.exchange.{Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.NTP
 
@@ -18,8 +19,8 @@ trait OrderValidator {
     val (assBal, feeBal) = (storedState.assetBalance(acc) - assetsToSpend.getOrElse(acc.key, 0L),
       storedState.assetBalance(feeAcc) - assetsToSpend.getOrElse(feeAcc.key, 0L))
 
-    if (acc != feeAcc) assBal >= order.getSpendAmount && feeBal >= order.matcherFee
-    else assBal >= order.getSpendAmount + order.matcherFee
+    if (acc != feeAcc) assBal >= order.getSpendAmount() && feeBal >= order.matcherFee
+    else assBal >= order.getSpendAmount() + order.matcherFee
   }
 
   def validateNewOrder(order: Order): Validation = {
@@ -31,10 +32,10 @@ trait OrderValidator {
       isBalanceWithOpenOrdersEnough(order) :| "Not enough balance"
   }
 
-  def validateCancelOrder(cancel: OrderCancelTransaction): Validation = {
-    ordersRemainingAmount.contains(cancel.orderIdStr) :| "Order not found" &&
-      cancel.isValid &&
-      (cancel.fee >= settings.minCancelOrderFee) :| s"Cancel Order fee should be >= ${settings.minCancelOrderFee}" &&
-      (getOrderStatus(cancel.orderIdStr) != LimitOrder.Filled) :| "Order is already Filled"
+  def validateCancelOrder(cancel: CancelOrder): Validation = {
+    ordersRemainingAmount.contains(cancel.orderId) :| "Order not found" &&
+      (getOrderStatus(cancel.orderId) != LimitOrder.Filled) :| "Order is already Filled" &&
+      cancel.req.isSignatureValid :| "Signature should be valid"
+
   }
 }
