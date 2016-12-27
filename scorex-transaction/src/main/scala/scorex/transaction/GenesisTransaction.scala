@@ -49,23 +49,6 @@ object GenesisTransaction extends Deser[GenesisTransaction] {
       res
     }
 
-    lazy val signatureValid: Boolean = {
-      val typeBytes      = Array(TransactionType.GenesisTransaction.id.toByte)
-      val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
-      val amountBytes    = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
-      val data           = Bytes.concat(typeBytes, timestampBytes, recipient.bytes, amountBytes)
-
-      val h = hash(data)
-      Bytes.concat(h, h).sameElements(signature)
-    }
-
-    def validate: ValidationResult.Value =
-      if (amount < 0) {
-        ValidationResult.NegativeAmount
-      } else if (!Account.isValid(recipient)) {
-        ValidationResult.InvalidAddress
-      } else ValidationResult.ValidateOke
-
     override def balanceChanges(): Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(recipient, None), amount))
   }
 
