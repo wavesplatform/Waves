@@ -6,12 +6,13 @@ import com.wavesplatform.matcher.model.EventsJson._
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{DoNotDiscover, Matchers, PropSpec}
 import play.api.libs.json.Json
 import scorex.transaction.assets.exchange.AssetPair
 
 import scala.collection.immutable.TreeMap
 
+@DoNotDiscover
 class EventJsonSpecification extends PropSpec
   with PropertyChecks
   with Matchers
