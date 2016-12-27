@@ -22,7 +22,9 @@ class PaymentAPISpecification extends FunSuite with TestLock with Matchers with 
 
     val json = "{\"amount\":" + amount + ",\"fee\":" + fee + ",\"sender\":\"" + s + "\",\"recipient\":\"" + r + "\"\n}"
     val req = POST.request("/payment", body = json)
-    (req \ "type").as[Int] shouldBe 2
+    (req \ "assetId").asOpt[String] shouldBe None
+    (req \ "feeAsset").asOpt[String] shouldBe None
+    (req \ "type").as[Int] shouldBe 4
     (req \ "fee").as[Int] shouldBe 1
     (req \ "amount").as[Int] shouldBe amount
     (req \ "timestamp").asOpt[Long].isDefined shouldBe true
