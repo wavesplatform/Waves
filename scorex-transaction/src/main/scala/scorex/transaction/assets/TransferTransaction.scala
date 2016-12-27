@@ -115,7 +115,9 @@ object TransferTransaction extends Deser[TransferTransaction] {
              feeAmount: Long,
              attachment: Array[Byte],
              signature: Array[Byte]): Either[ValidationResult, TransferTransaction] = {
-    if (attachment.length > TransferTransaction.MaxAttachmentSize) {
+    if (!Account.isValid(recipient)) {
+      Left(ValidationResult.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
+    } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
       Left(ValidationResult.TooBigArray)
     } else if (amount <= 0) {
       Left(ValidationResult.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
@@ -143,7 +145,9 @@ object TransferTransaction extends Deser[TransferTransaction] {
              feeAssetId: Option[AssetId],
              feeAmount: Long,
              attachment: Array[Byte]): Either[ValidationResult, TransferTransaction] = {
-    if (attachment.length > TransferTransaction.MaxAttachmentSize) {
+    if (!Account.isValid(recipient)) {
+      Left(ValidationResult.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
+    } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
       Left(ValidationResult.TooBigArray)
     } else if (amount <= 0) {
       Left(ValidationResult.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE

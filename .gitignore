@@ -4,6 +4,9 @@
 .ensime_cache/
 scorex.yaml
 
+# vim
+*.*~
+
 # scala build folders
 target
 
