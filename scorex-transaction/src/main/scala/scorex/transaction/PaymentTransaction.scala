@@ -10,17 +10,19 @@ import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction._
 import scorex.transaction.ValidationResult.ValidationResult
-import scorex.transaction.assets.ReissueTransaction.ReissueTransactionImpl
 
-import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 @deprecated("Use TransferTransaction")
 sealed trait PaymentTransaction extends TypedTransaction {
   def sender: PublicKeyAccount
+
   def recipient: Account
+
   def amount: Long
+
   def fee: Long
+
   def signature: Array[Byte]
 }
 
@@ -33,27 +35,27 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
                                             fee: Long,
                                             timestamp: Long,
                                             signature: Array[Byte])
-      extends PaymentTransaction {
+    extends PaymentTransaction {
 
-    override val transactionType                   = TransactionType.PaymentTransaction
+    override val transactionType = TransactionType.PaymentTransaction
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override val id: Array[Byte]                   = signature
+    override val id: Array[Byte] = signature
 
     override lazy val json: JsObject =
-      Json.obj("type"            -> transactionType.id,
-               "id"              -> Base58.encode(id),
-               "fee"             -> fee,
-               "timestamp"       -> timestamp,
-               "signature"       -> Base58.encode(this.signature),
-               "sender"          -> sender.address,
-               "senderPublicKey" -> Base58.encode(sender.publicKey),
-               "recipient"       -> recipient.address,
-               "amount"          -> amount)
+      Json.obj("type" -> transactionType.id,
+        "id" -> Base58.encode(id),
+        "fee" -> fee,
+        "timestamp" -> timestamp,
+        "signature" -> Base58.encode(this.signature),
+        "sender" -> sender.address,
+        "senderPublicKey" -> Base58.encode(sender.publicKey),
+        "recipient" -> recipient.address,
+        "amount" -> amount)
 
     override lazy val bytes: Array[Byte] = {
       val timestampBytes = Longs.toByteArray(timestamp)
-      val amountBytes    = Longs.toByteArray(amount)
-      val feeBytes       = Longs.toByteArray(fee)
+      val amountBytes = Longs.toByteArray(amount)
+      val feeBytes = Longs.toByteArray(fee)
 
       Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes, signature)
     }
@@ -62,13 +64,13 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
       Seq(BalanceChange(AssetAcc(sender, None), -amount - fee), BalanceChange(AssetAcc(recipient, None), amount))
   }
 
-  val MinimumFee      = 1
+  val MinimumFee = 1
   val RecipientLength = Account.AddressLength
 
-  private val SenderLength    = 32
-  private val FeeLength       = 8
+  private val SenderLength = 32
+  private val FeeLength = 8
   private val SignatureLength = 64
-  private val BaseLength      = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
+  private val BaseLength = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
   def create(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationResult, PaymentTransaction] = {
     if (!Account.isValid(recipient)) {
@@ -127,27 +129,27 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
 
       //READ TIMESTAMP
       val timestampBytes = data.take(TimestampLength)
-      val timestamp      = Longs.fromByteArray(timestampBytes)
+      val timestamp = Longs.fromByteArray(timestampBytes)
       position += TimestampLength
 
       //READ SENDER
       val senderBytes = util.Arrays.copyOfRange(data, position, position + SenderLength)
-      val sender      = new PublicKeyAccount(senderBytes)
+      val sender = new PublicKeyAccount(senderBytes)
       position += SenderLength
 
       //READ RECIPIENT
       val recipientBytes = util.Arrays.copyOfRange(data, position, position + RecipientLength)
-      val recipient      = new Account(Base58.encode(recipientBytes))
+      val recipient = new Account(Base58.encode(recipientBytes))
       position += RecipientLength
 
       //READ AMOUNT
       val amountBytes = util.Arrays.copyOfRange(data, position, position + AmountLength)
-      val amount      = Longs.fromByteArray(amountBytes)
+      val amount = Longs.fromByteArray(amountBytes)
       position += AmountLength
 
       //READ FEE
       val feeBytes = util.Arrays.copyOfRange(data, position, position + FeeLength)
-      val fee      = Longs.fromByteArray(feeBytes)
+      val fee = Longs.fromByteArray(feeBytes)
       position += FeeLength
 
       //READ SIGNATURE
@@ -159,10 +161,10 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
     }.flatten
 
   private def signatureData(sender: PublicKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
-    val typeBytes      = Ints.toByteArray(TransactionType.PaymentTransaction.id)
+    val typeBytes = Ints.toByteArray(TransactionType.PaymentTransaction.id)
     val timestampBytes = Longs.toByteArray(timestamp)
-    val amountBytes    = Longs.toByteArray(amount)
-    val feeBytes       = Longs.toByteArray(fee)
+    val amountBytes = Longs.toByteArray(amount)
+    val feeBytes = Longs.toByteArray(fee)
 
     Bytes.concat(typeBytes, timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes)
   }
