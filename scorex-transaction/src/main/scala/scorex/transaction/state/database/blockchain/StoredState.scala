@@ -14,6 +14,7 @@ import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
 
 import scala.collection.JavaConversions._
+import scala.collection.SortedMap
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
@@ -252,26 +253,35 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     val accountAssets = getAccountAssets(account.address)
     val keys = account.address :: accountAssets.map(account.address + _).toList
 
-    keys.foldLeft(Seq.empty[Transaction]) { (result, key) =>
-      val transactions = Option(lastStates.get(key)) match {
-        case Some(accHeight) =>
-          val m = accountChanges(key)
+    def getTxSize(m: SortedMap[Int, Seq[Transaction]]) = m.foldLeft(0)((size, txs) => size + txs._2.size)
 
-          def loop(h: Int, acc: Seq[Transaction]): Seq[Transaction] = Option(m.get(h)) match {
-            case Some(heightChangesBytes) if acc.length < limit =>
-              val heightChanges = heightChangesBytes
-              val heightTransactions = heightChanges.reason.toArray.filter(_.isInstanceOf[Transaction])
-                .map(_.asInstanceOf[Transaction])
-              loop(heightChanges.lastRowHeight, heightTransactions ++ acc)
-            case _ => acc
+    def getRowTxs(row: Row) = row.reason.filter(_.isInstanceOf[Transaction]).map(_.asInstanceOf[Transaction])
+
+    keys.foldLeft(SortedMap.empty[Int, Seq[Transaction]]) { (result, key) =>
+
+      Option(lastStates.get(key)) match {
+        case Some(accHeight) if getTxSize(result) < limit || accHeight > result.firstKey =>
+          val accountRows = accountChanges(key)
+          def loop(h: Int, acc: SortedMap[Int, Seq[Transaction]]): SortedMap[Int, Seq[Transaction]] = {
+            Option(accountRows.get(h)) match {
+              case Some(row) =>
+                val rowTxs = getRowTxs(row)
+                val resAcc = acc + (h -> (rowTxs ++ acc.getOrElse(h, Seq.empty[Transaction])))
+                if (getTxSize(resAcc) < limit) {
+                  loop(row.lastRowHeight, resAcc)
+                } else {
+                  if (row.lastRowHeight > resAcc.firstKey) loop(row.lastRowHeight, resAcc.tail)
+                  else resAcc
+                }
+              case _ => acc
+            }
           }
-
-          loop(accHeight, Seq.empty)
-        case None => Seq.empty
+          loop(accHeight, result)
+        case _ => result
       }
-      result ++ transactions
-    }.distinct
-  }.takeRight(limit)
+
+    }.values.flatten.toList.sortWith(_.timestamp > _.timestamp).take(limit)
+  }
 
   def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
     def loop(h: Int, address: Address): Option[PaymentTransaction] = {
