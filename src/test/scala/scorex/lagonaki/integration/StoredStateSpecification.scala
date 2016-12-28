@@ -6,6 +6,8 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
 import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
+import scorex.transaction.ValidationResult.ValidationResult
+import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, BalanceSheet, FeesStateChange, PaymentTransaction}
@@ -125,7 +127,7 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
     val txs = receipements.flatMap(r => Seq.fill(10)(transactionModule.transferAsset(TransferRequest(assetId, None, 10, 1, acc.address, "123", r.address), application.wallet).get))
 
-    val shuffledTxs = Random.shuffle(txs)
+    val shuffledTxs = Random.shuffle(txs).map(_.right.get)
 
     state.processBlock(new BlockMock(shuffledTxs)) should be('success)
 

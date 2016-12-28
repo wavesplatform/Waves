@@ -141,14 +141,13 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     }
 
   @deprecated("Use transferAsset()")
-  def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationResult,PaymentTransaction]] = {
+  def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationResult, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
     }
   }
 
-
-  def transferAsset(request: TransferRequest, wallet: Wallet): Try[TransferTransaction] = Try {
+  def transferAsset(request: TransferRequest, wallet: Wallet): Try[Either[ValidationResult, TransferTransaction]] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
 
     val transferVal = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
@@ -164,11 +163,10 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       case Right(tx) =>
         if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
         else throw new StateCheckFailed("Invalid transfer transaction generated: " + tx.json)
-        tx
       case Left(err) =>
         throw new IllegalArgumentException(err.toString)
-
     }
+    transferVal
   }
 
   def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
@@ -197,17 +195,17 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     * Validate transaction according to the State and send it to network
     */
   def broadcastTransaction(tx: SignedTransaction): ValidationResult = {
-        if (isValid(tx, tx.timestamp)) {
-          onNewOffchainTransaction(tx)
-          ValidationResult.ValidateOke
-        } else ValidationResult.StateCheckFailed
+    if (isValid(tx, tx.timestamp)) {
+      onNewOffchainTransaction(tx)
+      ValidationResult.ValidateOke
+    } else ValidationResult.StateCheckFailed
   }
 
   /**
     * Validate transactions according to the State and send it to network
     */
   def broadcastTransactions(txs: Seq[SignedTransaction]): ValidationResult = {
-    if(txs.nonEmpty && isValid(txs, txs.map(_.timestamp).max)) {
+    if (txs.nonEmpty && isValid(txs, txs.map(_.timestamp).max)) {
       txs.foreach(onNewOffchainTransaction)
       ValidationResult.ValidateOke
     } else {
@@ -260,12 +258,12 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     txTime
   }
 
-  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationResult,PaymentTransaction] = {
+  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationResult, PaymentTransaction] = {
     val pt = PaymentTransaction.create(sender, recipient, amount, fee, getTimestamp)
     pt match {
       case Right(t) => onNewOffchainTransaction(t)
       case _ =>
-      }
+    }
     pt
   }
 

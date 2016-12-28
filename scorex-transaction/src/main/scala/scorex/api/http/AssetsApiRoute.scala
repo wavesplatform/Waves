@@ -91,11 +91,14 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                 case err: JsError =>
                   WrongTransactionJson(err).response
                 case JsSuccess(request: TransferRequest, _) =>
-                  val txOpt: Try[TransferTransaction] = transactionModule.transferAsset(request, wallet)
+                  val txOpt = transactionModule.transferAsset(request, wallet)
                   txOpt match {
-                    case Success(tx) =>
-                      JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
+                    case Success(txVal) =>
+                      txVal match {
+                        case Right(tx) => JsonResponse (tx.json, StatusCodes.OK)
+                        case Left(e) =>   WrongJson.response
+                      }
+                        case Failure(e: StateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
                       WrongJson.response
