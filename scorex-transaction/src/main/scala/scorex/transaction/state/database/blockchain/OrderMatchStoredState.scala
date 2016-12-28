@@ -2,11 +2,9 @@ package scorex.transaction.state.database.blockchain
 
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.crypto.encode.Base58
-import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.{Order, OrderCancelTransaction, OrderMatch}
+import scorex.transaction.assets.exchange.{Order, OrderMatch}
 
 import scala.collection.JavaConversions._
-import scala.collection.mutable
 
 trait OrderMatchStoredState {
   val db: MVStore
@@ -24,11 +22,6 @@ trait OrderMatchStoredState {
     db.openMap(OrderMatchTx + orderTimestamp)
 
   private val savedDays: MVMap[Long, Boolean] = db.openMap(OrderMatchDays)
-
-  /**
-    * Returns Map OrderId -> OrderCancelTransaction Id
-    */
-  private def orderToCancelTx: MVMap[String, Array[Byte]] = db.openMap(OrderToCancelTxName)
 
   def putOrderMatch(om: OrderMatch, blockTs: Long): Unit = {
     def isSaveNeeded(order: Order): Boolean = {
@@ -90,23 +83,6 @@ trait OrderMatchStoredState {
   }
 
   def isOrderMatchValid(om: OrderMatch): Boolean = {
-    def isNotCancelled(id: String) =
-      Option(orderToCancelTx.get(id)).forall(!transactionsMap.containsKey(_))
-
-    om.isValid(findPrevOrderMatchTxs(om)) && isNotCancelled(om.buyOrder.idStr) && isNotCancelled(om.sellOrder.idStr)
-  }
-
-  def putOrderCancel(oc: OrderCancelTransaction): Unit = {
-    orderToCancelTx.put(oc.orderIdStr, oc.id)
-  }
-
-  def filterCancelOrderMatch(trans: Seq[Transaction]): Seq[Transaction] = {
-    trans.foldLeft(Set.empty[String] -> Seq.empty[Transaction]) { case ((c, v), t) =>
-      t match {
-        case tt: OrderCancelTransaction => (c + tt.orderIdStr) -> (v :+ tt)
-        case tt: OrderMatch if c(tt.buyOrder.idStr) || c(tt.sellOrder.idStr) => c -> v
-        case _ => c -> (v :+ t)
-      }
-    }._2
+    om.isValid(findPrevOrderMatchTxs(om))
   }
 }

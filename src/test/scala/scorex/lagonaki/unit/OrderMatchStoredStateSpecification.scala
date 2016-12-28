@@ -8,7 +8,7 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
 import scorex.settings.WavesHardForkParameters
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderCancelTransaction, OrderMatch}
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderMatch}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
@@ -253,39 +253,5 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     sellW should be(prevSellW - om.sellMatcherFee)
     sell1 should be(prevSell1 + om.amount)
     sell2 should be(prevSell2 - BigInt(om.amount) * Order.PriceConstant / om.price)
-  }
-
-  test("Cancel OrderMatch") {
-    val (pair, buyAcc, sellAcc) = initPairWithBalances()
-    val (initBuyW, initBuy1, initBuy2) = getBalances(buyAcc, pair)
-    val (initSellW, initSell1, initSell2) = getBalances(sellAcc, pair)
-
-    val matcherTxFee = 1000L
-    val price = 20 * Order.PriceConstant
-
-    val buy = Order
-      .buy(buyAcc, matcher, pair, price, 10 * Order.PriceConstant, getTimestamp + Order.MaxLiveTime - 1000,
-        1 * WAVES_UNITS)
-    val sell = Order
-      .sell(sellAcc, matcher, pair, price, 100 * Order.PriceConstant, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
-
-    val om = createOrderMatch(buy, sell, price, buy.amount, matcherTxFee)
-    val cancel = OrderCancelTransaction.cancelOrder(sellAcc, sell, matcherTxFee, getTimestamp)
-
-    state.isValid(om, om.timestamp) should be(true)
-    state.isValid(Seq(cancel, om), blockTime = getTimestamp) should be (false)
-
-    state.isValid(om, om.timestamp) should be(true)
-    state.processBlock(new BlockMock(Seq(om))) should be('success)
-
-    state.isValid(cancel, cancel.timestamp) should be(true)
-    state.processBlock(new BlockMock(Seq(cancel))) should be('success)
-
-    val buy2 = Order
-      .buy(buyAcc, matcher, pair, price, 20 * Order.PriceConstant, getTimestamp + Order.MaxLiveTime - 1000,
-        1 * WAVES_UNITS)
-
-    val om2 = createOrderMatch(buy2, sell, price, buy.amount, matcherTxFee)
-    state.isValid(om2, om2.timestamp) should be(false)
   }
 }

@@ -8,8 +8,8 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.app.RunnableApplication
-import scorex.transaction.{ValidationResult, SimpleTransactionModule}
-import scorex.transaction.state.wallet.Payment
+import scorex.transaction.{SimpleTransactionModule, ValidationResult}
+import scorex.transaction.state.wallet.{Payment, TransferRequest}
 
 import scala.util.Try
 
@@ -54,8 +54,9 @@ case class PaymentApiRoute(application: RunnableApplication)(implicit val contex
               js.validate[Payment] match {
                 case err: JsError =>
                   WrongTransactionJson(err).response
-                case JsSuccess(payment: Payment, _) =>
-                  val txOpt = transactionModule.createPayment(payment, wallet)
+                case JsSuccess(p: Payment, _) =>
+                  val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, "", p.recipient)
+                  val txOpt = transactionModule.transferAsset(transferRequest, wallet).toOption
                   txOpt match {
                     case Some(paymentVal) =>
                       paymentVal match {
