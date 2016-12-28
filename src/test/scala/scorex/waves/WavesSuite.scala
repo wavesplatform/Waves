@@ -9,7 +9,8 @@ class WavesSuite extends Suites(
   new DebugAPISpecification,
   new NodeAPISpecification,
   new WavesAPISpecification,
-  new MatcherAPISpecification
+  new MatcherAPISpecification,
+  new OrderBookActorSpecification
 ) with BeforeAndAfterAll {
 
   import TestingCommons._

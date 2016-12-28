@@ -19,7 +19,7 @@ object TestNetParams extends ChainParameters {
   val initialBalance = Constants.UnitsInWave * Constants.TotalWaves
   val genesisTimestamp = 1478000000000L
   val singleNodeBalance = initialBalance * 0.02
-  val genesisTxs = {
+  lazy val genesisTxs = {
     val txs = Seq(
       GenesisTransaction.create(new Account("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"), (2 * singleNodeBalance).toLong, genesisTimestamp).right.get,
       GenesisTransaction.create(new Account("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8"), singleNodeBalance.toLong, genesisTimestamp).right.get,
@@ -54,7 +54,7 @@ object TestNetParams extends ChainParameters {
 object MainNetParams extends ChainParameters {
   val initialBalance = Constants.UnitsInWave * Constants.TotalWaves
   val genesisTimestamp = 1465742577614L
-  val genesisTxs = {
+  lazy val genesisTxs = {
     val txs = Seq(
       GenesisTransaction.create( new Account("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ"), initialBalance - 5 * Constants.UnitsInWave, genesisTimestamp).right.get,
       GenesisTransaction.create( new Account("3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM"), Constants.UnitsInWave, genesisTimestamp).right.get,
