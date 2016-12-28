@@ -135,7 +135,7 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
       accounts.map(a => state.asInstanceOf[BalanceSheet].balance(a)).exists(_ > 2) shouldBe true
       val trans = accounts.flatMap { a =>
         val senderBalance = state.asInstanceOf[BalanceSheet].balance(a)
-        (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1))
+        (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1).right.get)
       }
       state.validate(trans, blockTime = trans.map(_.timestamp).max).nonEmpty shouldBe true
       val valid = transactionModule.packUnconfirmed()

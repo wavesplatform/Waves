@@ -4,6 +4,7 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
+import org.scalacheck.{Arbitrary, Gen}
 
 class GenesisTransactionSpecification extends PropSpec with PropertyChecks with Matchers {
 
@@ -27,17 +28,17 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
 
     val balance = 149857264546L
     val timestamp = 4598723454L
-    val expectedTransaction = new GenesisTransaction(defaultRecipient, balance, timestamp)
+    val expectedTransaction = GenesisTransaction.create(defaultRecipient, balance, timestamp).right.get
 
     actualTransaction should equal(expectedTransaction)
   }
 
   property("GenesisTransaction serialize/deserialize roundtrip") {
-    forAll { (recipientSeed: Array[Byte],
+    forAll( Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray), Gen.posNum[Long], Gen.posNum[Long]) { (recipientSeed: Array[Byte],
               time: Long,
               amount: Long) =>
       val recipient = new PrivateKeyAccount(recipientSeed)
-      val source = new GenesisTransaction(recipient, amount, time)
+      val source = GenesisTransaction.create(recipient, amount, time).right.get
       val bytes = source.bytes
       val dest = GenesisTransaction.parseBytes(bytes).get
 

@@ -28,6 +28,10 @@ object TypedTransaction extends Deser[TypedTransaction] {
     val OrderCancelTransaction = Value(8)
   }
 
+  val TimestampLength = 8
+  val AmountLength = 8
+  val TypeLength = 1
+
   def parseBytes(data: Array[Byte]): Try[TypedTransaction] =
     data.head match {
       case txType: Byte if txType == TransactionType.GenesisTransaction.id =>

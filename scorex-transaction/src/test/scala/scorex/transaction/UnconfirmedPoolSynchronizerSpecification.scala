@@ -38,7 +38,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
     }
 
     val defaultRecipient = new PublicKeyAccount(Array.fill(32)(0: Byte))
-    val tx = new GenesisTransaction(defaultRecipient, 149857264546L, 4598723454L)
+    val tx = GenesisTransaction.create(defaultRecipient, 149857264546L, 4598723454L).right.get
 
     "broadcast new transaction to network" in {
 

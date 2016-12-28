@@ -10,7 +10,7 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
   with MockFactory
   with OneInstancePerTest {
 
-  private def newTx(id: Long) = new GenesisTransaction(new PublicKeyAccount(Array.fill(32)(0: Byte)), id, 4598723454L)
+  private def newTx(id: Long) = GenesisTransaction.create(new PublicKeyAccount(Array.fill(32)(0: Byte)), id, 4598723454L).right.get
 
   "utx database" - {
 

@@ -13,7 +13,7 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.ValidationResult.ValidationResult
-import scorex.transaction.assets._
+import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
@@ -23,6 +23,7 @@ import scorex.wallet.Wallet
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
+import scorex.transaction.assets.exchange.{Order, OrderMatch}
 
 @SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -140,29 +141,16 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     }
 
   @deprecated("Use transferAsset()")
-  def createPayment(payment: Payment, wallet: Wallet): Option[PaymentTransaction] = {
+  def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationResult, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
     }
   }
 
-  def transferAsset(request: TransferRequest, wallet: Wallet): Try[TransferTransaction] = {
-    for {
-      transfer <- transferRequestToTransaction(request, wallet)
-    } yield {
-      if (isValid(transfer, transfer.timestamp)) {
-        onNewOffchainTransaction(transfer)
-      } else {
-        throw new StateCheckFailed("Invalid transfer transaction generated: " + transfer.json)
-      }
-      transfer
-    }
-  }
-
-  private def transferRequestToTransaction(request: TransferRequest, wallet: Wallet): Try[TransferTransaction] = Try {
+  def transferAsset(request: TransferRequest, wallet: Wallet): Try[Either[ValidationResult, TransferTransaction]] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
 
-    val transfer: TransferTransaction = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
+    val transferVal = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
       new Account(request.recipient),
       request.amount,
@@ -171,12 +159,19 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       request.fee,
       Option(request.attachment).filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
 
-    transfer
+    transferVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid transfer transaction generated: " + tx.json)
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+    }
+    transferVal
   }
 
   def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val issue = IssueTransaction.create(sender,
+    val issueVal = IssueTransaction.create(sender,
       request.name.getBytes(Charsets.UTF_8),
       request.description.getBytes(Charsets.UTF_8),
       request.quantity,
@@ -184,30 +179,33 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       request.reissuable,
       request.fee,
       getTimestamp)
-    if (isValid(issue, issue.timestamp)) onNewOffchainTransaction(issue)
-    else throw new StateCheckFailed("Invalid issue transaction generated: " + issue.json)
-    issue
+
+    issueVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid issue transaction generated: " + tx.json)
+        tx
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+
+    }
   }
 
   /**
     * Validate transaction according to the State and send it to network
     */
   def broadcastTransaction(tx: SignedTransaction): ValidationResult = {
-    tx.validate match {
-      case ValidationResult.ValidateOke =>
-        if (isValid(tx, tx.timestamp)) {
-          onNewOffchainTransaction(tx)
-          ValidationResult.ValidateOke
-        } else ValidationResult.StateCheckFailed
-      case error: ValidationResult => error
-    }
+    if (isValid(tx, tx.timestamp)) {
+      onNewOffchainTransaction(tx)
+      ValidationResult.ValidateOke
+    } else ValidationResult.StateCheckFailed
   }
 
   /**
     * Validate transactions according to the State and send it to network
     */
   def broadcastTransactions(txs: Seq[SignedTransaction]): ValidationResult = {
-    if(txs.nonEmpty && isValid(txs, txs.map(_.timestamp).max)) {
+    if (txs.nonEmpty && isValid(txs, txs.map(_.timestamp).max)) {
       txs.foreach(onNewOffchainTransaction)
       ValidationResult.ValidateOke
     } else {
@@ -217,27 +215,40 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
   def reissueAsset(request: ReissueRequest, wallet: Wallet): Try[ReissueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val reissue = ReissueTransaction.create(sender,
+    val reissueVal = ReissueTransaction.create(sender,
       Base58.decode(request.assetId).get,
       request.quantity,
       request.reissuable,
       request.fee,
       getTimestamp)
-    if (isValid(reissue, reissue.timestamp)) onNewOffchainTransaction(reissue)
-    else throw new StateCheckFailed("Invalid reissue transaction generated: " + reissue.json)
-    reissue
+
+    reissueVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid reissue transaction generated: " + tx.json)
+        tx
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+    }
   }
 
   def burnAsset(request: BurnRequest, wallet: Wallet): Try[BurnTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val tx = BurnTransaction.create(sender,
+    val txVal: Either[ValidationResult, BurnTransaction] = BurnTransaction.create(sender,
       Base58.decode(request.assetId).get,
       request.quantity,
       request.fee,
       getTimestamp)
-    if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-    else throw new StateCheckFailed("Invalid burn transaction generated: " + tx.json)
-    tx
+
+    txVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid delete transaction generated: " + tx.json)
+        tx
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+
+    }
   }
 
   private var txTime: Long = 0
@@ -247,12 +258,13 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     txTime
   }
 
-  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
-    val time = getTimestamp
-    val sig = PaymentTransaction.generateSignature(sender, recipient, amount, fee, time)
-    val payment = new PaymentTransaction(new PublicKeyAccount(sender.publicKey), recipient, amount, fee, time, sig)
-    if (isValid(payment, payment.timestamp)) onNewOffchainTransaction(payment)
-    payment
+  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationResult, PaymentTransaction] = {
+    val pt = PaymentTransaction.create(sender, recipient, amount, fee, getTimestamp)
+    pt match {
+      case Right(t) => onNewOffchainTransaction(t)
+      case _ =>
+    }
+    pt
   }
 
   def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
@@ -276,8 +288,8 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
     val txs = ipoMembers.map { addr =>
       val recipient = new Account(addr)
-      GenesisTransaction(recipient, totalBalance / ipoMembers.length, timestamp)
-    }
+      GenesisTransaction.create(recipient, totalBalance / ipoMembers.length, timestamp)
+    }.map(_.right.get)
 
     TransactionsBlockField(txs)
   }

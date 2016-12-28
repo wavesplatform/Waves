@@ -95,7 +95,7 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
         "buyMatcherFee should be valid" &&
       isFeeValid(sellMatcherFee, sellFeeTotal, sellTotal, sellOrder.matcherFee, sellOrder.amount) :|
         "sellMatcherFee should be valid" &&
-      signatureValid :|  "matcherSignatureIsValid should be valid"
+      EllipticCurveImpl.verify(signature, toSign, sender.publicKey) :|  "matcherSignatureIsValid should be valid"
   }
 
   lazy val toSign: Array[Byte] = Array(transactionType.id.toByte) ++
@@ -134,8 +134,6 @@ case class OrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Lo
     buyFeeChange ++ sellFeeChange ++ matcherChange ++
       exchange.map(c => BalanceChange(AssetAcc(c._1, c._2._1), c._2._2))
   }
-
-  override def validate: ValidationResult.Value = ???
 }
 
 object OrderMatch extends Deser[OrderMatch] {

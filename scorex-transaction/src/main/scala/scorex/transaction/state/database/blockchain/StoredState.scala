@@ -273,14 +273,15 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     }.distinct
   }.takeRight(limit)
 
-  def lastAccountLagonakiTransaction(account: Account): Option[LagonakiTransaction] = {
-    def loop(h: Int, address: Address): Option[LagonakiTransaction] = {
+  def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
+    def loop(h: Int, address: Address): Option[PaymentTransaction] = {
       val changes = accountChanges(address)
       Option(changes.get(h)) match {
         case Some(row) =>
-          val accountTransactions = row.reason.filter(_.isInstanceOf[LagonakiTransaction])
-            .map(_.asInstanceOf[LagonakiTransaction])
-            .filter(_.creator.isDefined).filter(_.creator.get.address == address)
+          val accountTransactions = row.reason
+            .filter(_.isInstanceOf[PaymentTransaction])
+            .map(_.asInstanceOf[PaymentTransaction])
+            .filter(_.sender.address == address)
           if (accountTransactions.nonEmpty) Some(accountTransactions.maxBy(_.timestamp))
           else loop(row.lastRowHeight, address)
         case _ => None
@@ -365,7 +366,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
 
     val initialSelection: Map[String, (List[Transaction], Long)] = Map(paymentTransactions.map { payment =>
       val address = payment.sender.address
-      val stateTimestamp = lastAccountLagonakiTransaction(payment.sender) match {
+      val stateTimestamp = lastAccountPaymentTransaction(payment.sender) match {
         case Some(lastTransaction) => lastTransaction.timestamp
         case _ => 0
       }
@@ -394,22 +395,21 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>
-      tx.validate == ValidationResult.ValidateOke && (
         transaction.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp ||
-          transaction.timestamp >= settings.allowInvalidPaymentTransactionsByTimestamp && isTimestampCorrect(tx))
+          (transaction.timestamp >= settings.allowInvalidPaymentTransactionsByTimestamp && isTimestampCorrect(tx))
     case tx: TransferTransaction =>
-      tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      included(tx.id, None).isEmpty
     case tx: IssueTransaction =>
-      tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      included(tx.id, None).isEmpty
     case tx: ReissueTransaction =>
       val reissueValid: Boolean = {
         val sameSender = isIssuerAddress(tx.assetId, tx.sender.address)
         val reissuable = assetsExtension.isReissuable(tx.assetId)
         sameSender && reissuable
       }
-      reissueValid && tx.validate == ValidationResult.ValidateOke && included(tx.id, None).isEmpty
+      reissueValid && included(tx.id, None).isEmpty
     case tx: BurnTransaction =>
-      tx.timestamp > settings.allowBurnTransactionAfterTimestamp && tx.validate == ValidationResult.ValidateOke &&
+      tx.timestamp > settings.allowBurnTransactionAfterTimestamp &&
         isIssuerAddress(tx.assetId, tx.sender.address) && included(tx.id, None).isEmpty
     case tx: OrderMatch =>
       isOrderMatchValid(tx) && included(tx.id, None).isEmpty
@@ -432,7 +432,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
   }
 
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
-    lastAccountLagonakiTransaction(tx.sender) match {
+    lastAccountPaymentTransaction(tx.sender) match {
       case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
       case None => true
     }

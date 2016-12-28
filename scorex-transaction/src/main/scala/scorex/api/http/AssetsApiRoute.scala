@@ -91,11 +91,14 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                 case err: JsError =>
                   WrongTransactionJson(err).response
                 case JsSuccess(request: TransferRequest, _) =>
-                  val txOpt: Try[TransferTransaction] = transactionModule.transferAsset(request, wallet)
+                  val txOpt = transactionModule.transferAsset(request, wallet)
                   txOpt match {
-                    case Success(tx) =>
-                      JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
+                    case Success(txVal) =>
+                      txVal match {
+                        case Right(tx) => JsonResponse (tx.json, StatusCodes.OK)
+                        case Left(e) =>   WrongJson.response
+                      }
+                        case Failure(e: StateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
                       WrongJson.response
@@ -137,11 +140,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   val txOpt: Try[IssueTransaction] = transactionModule.issueAsset(issue, wallet)
                   txOpt match {
                     case Success(tx) =>
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                        case error => jsonResponse(error)
-                      }
                     case Failure(e: StateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
@@ -184,11 +183,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   val txOpt: Try[ReissueTransaction] = transactionModule.reissueAsset(issue, wallet)
                   txOpt match {
                     case Success(tx) =>
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                        case error => jsonResponse(error)
-                      }
                     case Failure(e: StateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
@@ -231,11 +226,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   val txOpt: Try[BurnTransaction] = transactionModule.burnAsset(burnRequest, wallet)
                   txOpt match {
                     case Success(tx) =>
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                        case error => jsonResponse(error)
-                      }
                     case Failure(e: StateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>

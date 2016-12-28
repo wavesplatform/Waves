@@ -58,22 +58,24 @@ case class PaymentApiRoute(application: RunnableApplication)(implicit val contex
                   val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, "", p.recipient)
                   val txOpt = transactionModule.transferAsset(transferRequest, wallet).toOption
                   txOpt match {
-                    case Some(tx) =>
-                      tx.validate match {
-                        case ValidationResult.ValidateOke =>
+                    case Some(paymentVal) =>
+                      paymentVal match {
+                        case Right(tx) =>
                           JsonResponse(tx.json, StatusCodes.OK)
+                        case Left(err) =>
+                          err match {
+                            case ValidationResult.InvalidAddress =>
+                              InvalidAddress.response
 
-                        case ValidationResult.InvalidAddress =>
-                          InvalidAddress.response
+                            case ValidationResult.NegativeAmount =>
+                              NegativeAmount.response
 
-                        case ValidationResult.NegativeAmount =>
-                          NegativeAmount.response
+                            case ValidationResult.InsufficientFee =>
+                              InsufficientFee.response
 
-                        case ValidationResult.InsufficientFee =>
-                          InsufficientFee.response
-
-                        case ValidationResult.NoBalance =>
-                          NoBalance.response
+                            case ValidationResult.NoBalance =>
+                              NoBalance.response
+                          }
                       }
                     case None =>
                       InvalidSender.response

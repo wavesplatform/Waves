@@ -34,7 +34,7 @@ object BroadcastRequests {
                                signature: String) {
 
     def toTx: Try[IssueTransaction] = Try {
-      IssueTransaction(
+      IssueTransaction.create(
         sender,
         name.getBytes(Charsets.UTF_8),
         description.getBytes(Charsets.UTF_8),
@@ -44,7 +44,7 @@ object BroadcastRequests {
         fee,
         timestamp,
         Base58.decode(signature).get
-      )
+      ).right.get
     }
   }
 
@@ -65,14 +65,14 @@ object BroadcastRequests {
                                  signature: String) {
 
     def toTx: Try[ReissueTransaction] = Try {
-      ReissueTransaction(
+      ReissueTransaction.create(
         senderPublicKey,
         Base58.decode(assetId).get,
         quantity,
         reissuable,
         fee,
         timestamp,
-        Base58.decode(signature).get)
+        Base58.decode(signature).get).right.get
     }
   }
 
@@ -90,13 +90,13 @@ object BroadcastRequests {
                                 signature: String) {
 
     def toTx: Try[BurnTransaction] = Try {
-      BurnTransaction(
+      BurnTransaction.create(
         new PublicKeyAccount(Base58.decode(senderPublicKey).get),
         Base58.decode(assetId).get,
         amount,
         fee,
         timestamp,
-        Base58.decode(signature).get)
+        Base58.decode(signature).get).right.get
     }
   }
 
@@ -120,7 +120,7 @@ object BroadcastRequests {
                                   @ApiModelProperty(required = true)
                                   signature: String) {
     def toTx: Try[TransferTransaction] = Try {
-      TransferTransaction(
+      TransferTransaction.create(
         assetId.map(Base58.decode(_).get),
         sender,
         recipient,
@@ -129,7 +129,7 @@ object BroadcastRequests {
         feeAssetId.map(_.getBytes),
         fee,
         attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
-        Base58.decode(signature).get)
+        Base58.decode(signature).get).right.get
     }
   }
 
