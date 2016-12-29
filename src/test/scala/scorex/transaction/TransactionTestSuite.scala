@@ -1,12 +1,12 @@
 package scorex.transaction
 
-import org.scalatest.{BeforeAndAfterAll, Suites}
+import org.scalatest.{BeforeAndAfterAll, Sequential, Suites}
 import scorex.lagonaki.TestingCommons.applications
 import scorex.transaction.assets.exchange.OrderJsonSpecification
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImplSpecification
 import scorex.transaction.state.database.blockchain.StoredStateUnitTests
 
-class TransactionTestSuite extends Suites(
+class TransactionTestSuite extends Sequential(
   new TransactionSpecification,
   new TransferTransactionSpecification,
   new StoredStateUnitTests,

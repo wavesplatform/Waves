@@ -1,6 +1,6 @@
 package scorex
 
-import org.scalatest.{BeforeAndAfterAll, Suites}
+import org.scalatest.{BeforeAndAfterAll, Sequential, Suites}
 import scorex.account.AccountSpecification
 import scorex.consensus.mining.{BlockGeneratorControllerSpecification, MinerSpecification}
 import scorex.crypto.SigningFunctionsSpecification
@@ -10,7 +10,7 @@ import scorex.network.peer.{PeerDatabaseImplSpecification, PeerManagerSpecificat
 import scorex.transaction.BlockStorageSpecification
 import scorex.utils.CircularBufferSpecification
 
-class BasicsTestSuite extends Suites(
+class BasicsTestSuite extends Sequential(
   new MinerSpecification,
   new BlockchainSynchronizerSpecification,
   new StoredBlockSeqSpecification,
