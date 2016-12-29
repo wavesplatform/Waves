@@ -20,5 +20,3 @@ Dockerfile
 # logs
 *.log
 
-# non-submodules code
-src/main
