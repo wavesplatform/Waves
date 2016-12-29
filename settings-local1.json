@@ -7,10 +7,10 @@
     "port": 6868,
     "maxConnections": 10
   },
-  "walletDir": "",
+  "walletDir": "/tmp/scorex/waves1/wallet",
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
   "walletPassword": "mycookies",
-  "dataDir": "",
+  "dataDir": "/tmp/scorex/waves1/data",
   "rpcPort": 6869,
   "blockGenerationDelay": 1000,
   "cors": true,

@@ -68,8 +68,8 @@ libraryDependencies ++= addAkkaLibs
 
 fork in ThisBuild := true
 fork in Test := true
-// fork in Test := false
 parallelExecution in ThisBuild := false
+parallelExecution in Test := false
 
 testOptions in Test += Tests.Argument("-oD", "-u", "target/test-reports")
 

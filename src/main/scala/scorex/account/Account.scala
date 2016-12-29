@@ -56,7 +56,9 @@ object Account extends ScorexLogging {
         log.warn(s"Unknown address version: $version")
         false
       } else if (network != scheme.chainId) {
-        log.warn(s"Unknown network: $network")
+        log.warn(s"~ For address: $address")
+        log.warn(s"~ Expected network: ${scheme.chainId}(${scheme.chainId.toChar}")
+        log.warn(s"~ Actual network: $network(${network.toChar}")
         false
       } else {
         if (addressBytes.length != Account.AddressLength)
