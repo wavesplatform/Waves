@@ -1,6 +1,7 @@
 package scorex.transaction
 
-import org.scalatest.Suites
+import org.scalatest.{BeforeAndAfterAll, Suites}
+import scorex.lagonaki.TestingCommons.applications
 import scorex.transaction.assets.exchange.OrderJsonSpecification
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImplSpecification
 import scorex.transaction.state.database.blockchain.StoredStateUnitTests
@@ -16,4 +17,10 @@ class TransactionTestSuite extends Suites(
   new OrderSpecification,
   new OrderMatchTransactionSpecification,
   new OrderJsonSpecification
-)
+) with BeforeAndAfterAll {
+
+  override protected def afterAll() = {
+    applications.foreach(_.shutdown())
+  }
+}
+
