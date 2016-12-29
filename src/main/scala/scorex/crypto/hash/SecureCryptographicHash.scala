@@ -1,10 +1,6 @@
 package scorex.crypto.hash
 
-import com.typesafe.config.ConfigFactory
 import scorex.crypto.hash.CryptographicHash._
-import scorex.utils._
-
-import scala.util.Try
 
 
 /**
@@ -12,8 +8,7 @@ import scala.util.Try
  */
 object SecureCryptographicHash extends CryptographicHash {
 
-  private val hf: CryptographicHash = Try(ConfigFactory.load().getConfig("scorex").getString("secureHash"))
-    .flatMap(s => objectFromString[CryptographicHash](s)).getOrElse(ScorexHashChain)
+  private val hf: CryptographicHash = scorex.waves.crypto.HashChain
 
   override val DigestSize: Int = hf.DigestSize
 

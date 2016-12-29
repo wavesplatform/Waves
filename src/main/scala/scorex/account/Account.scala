@@ -69,6 +69,7 @@ object Account extends ScorexLogging {
           val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
 
           checkSum.sameElements(checkSumGenerated)
+
         }
       }
     }.getOrElse(false)
