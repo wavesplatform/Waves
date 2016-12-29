@@ -6,36 +6,7 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.11.8"
 )
 
-def subModule(id: String): Project = Project(id = id, base = file(s"scorex-$id"))
-
-lazy val basics = subModule("basics")
-  .settings(commonSettings: _*)
-  .settings(
-    scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128"),
-    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
-  )
-
-lazy val transaction = subModule("transaction")
-  .aggregate(basics)
-  .dependsOn(basics)
-  .settings(commonSettings: _*)
-  .settings(
-    scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128"),
-    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
-  )
-
-lazy val consensus = subModule("consensus")
-  .aggregate(basics)
-  .dependsOn(basics)
-  .settings(commonSettings: _*)
-  .settings(
-    scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128"),
-    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
-  )
-
 lazy val root = Project(id = "scorex", base = file("."))
-  .aggregate(basics, transaction, consensus)
-  .dependsOn(basics % "compile->compile;test->test", transaction, consensus)
   .settings(commonSettings: _*)
   .settings(
     scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128"),
@@ -54,7 +25,13 @@ libraryDependencies ++=
     Dependencies.akka ++
     Dependencies.serialization ++
     Dependencies.testKit ++
-    Dependencies.logging
+    Dependencies.logging ++ 
+    Dependencies.p2p ++ Seq(
+     "org.consensusresearch" %% "scrypto" % "1.0.4",
+     "commons-net" % "commons-net" % "3.+",
+     "com.github.pathikrit" %% "better-files" % "2.13.0",
+     "org.typelevel" %% "cats" % "0.8.1"
+    )
 
 scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
 
