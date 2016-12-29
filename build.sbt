@@ -24,12 +24,12 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.11.8"
 )
 
-lazy val root = Project(id = "scorex", base = file("."))
-  .settings(commonSettings: _*)
-  .settings(
-    scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128"),
-    testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
-  )
+// lazy val root = Project(id = "scorex", base = file("."))
+//   .settings(commonSettings: _*)
+//   .settings(
+//     scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128"),
+//     testOptions in Test := Seq(Tests.Filter(_.matches(".*TestSuite$")))
+//   )
 
 resolvers ++= Seq(
   "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
@@ -49,7 +49,7 @@ libraryDependencies ++=
     "org.consensusresearch" %% "scrypto" % "1.0.4",
     "commons-net" % "commons-net" % "3.+",
     "com.github.pathikrit" %% "better-files" % "2.13.0",
-    "org.typelevel" %% "cats" % "0.8.1",
+//    "org.typelevel" %% "cats" % "0.8.1",
     "org.scalatest" %% "scalatest" % "2.+" % "test",
     "org.scalactic" %% "scalactic" % "2.+" % "test",
     "org.scalacheck" %% "scalacheck" % "1.12.+" % "test",

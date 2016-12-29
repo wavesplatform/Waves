@@ -18,9 +18,9 @@ import scorex.settings.{Settings, WavesHardForkParameters}
 
 class StateTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
-  property("state test") {
-    StateTestSpec.property().mainRunner(Array()) shouldBe 0
-  }
+//  property("state test") {
+//    StateTestSpec.property().mainRunner(Array()) shouldBe 0
+//  }
 }
 
 
