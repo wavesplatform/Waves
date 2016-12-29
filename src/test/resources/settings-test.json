@@ -1,27 +1,47 @@
 {
+  "feeMap": {
+    "2": {
+      "Waves": 0
+    },
+    "3": {
+      "Waves": 10000000
+    },
+    "4": {
+      "Waves": 100000
+    },
+    "5": {
+      "Waves": 100000
+    }
+  },
+
   "p2p": {
     "localOnly": true,
     "bindAddress": "127.0.0.1",
     "upnp": false,
     "knownPeers": ["127.0.0.1"],
     "port": 9091,
-    "maxConnections": 10
+    "maxConnections": 10,
+    "peersDataBroadcastDelay": 900
   },
 
   "walletPassword": "cookies",
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
 
   "rpcPort": 9092,
-
   "maxRollback": 100,
-  "apiKeyHash": "JDJkZrg24XwvBgBUi6PgpHzrAFgeefb7nU8LJPRR58ga",
   "history": "blockchain",
   "blockGenerationDelay": 1000,
-  "offlineGeneration": true,
   "suspendedSenders": ["3N8j8ZrvcaRtJE1oPLA3enbBZAbyHEzRBw5"],
   "minimumTxFee": 333,
   "cors": true,
 
+  "apiKeyHash": "JDJkZrg24XwvBgBUi6PgpHzrAFgeefb7nU8LJPRR58ga",
+  "offlineGeneration": true,
+
+  "_scorex_apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",
+  "_scorex_offlineGeneration": false,
+
+  "forkChunkSize": 1,
   "scoreBroadcastDelay": 2000,
 
   "matcher": {
