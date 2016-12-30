@@ -89,7 +89,7 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
   }
 
   test("POST /addresses/verifyText/{address} API route") {
-    val address = "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX77hKcmc"
+    val address = "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX76fGNCz"
     POST.incorrectApiKeyTest(s"/addresses/verifyText/$address")
 
     val signed = "{\n  \"message\": \"test\",\n  \"publickey\": \"3nU4XEMkwj447BxYBRcHSp4jX2hi3Y8yHnNnfDqcT8J8\",\n  \"signature\": \"5NHde7sCZvkSbc35oaeGE5E52cZLC8p73fyYGz27urjg62e6zNB54NXaQkZgrhiKCPMgLRh5q1PSriMepSLNAkH1\"\n}"
@@ -131,7 +131,7 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
   }
 
   test("POST /addresses/verify/{address} API route") {
-    val address = "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX77hKcmc"
+    val address = "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX76fGNCz"
     POST.incorrectApiKeyTest(s"/addresses/verify/$address")
 
     val signed = "{\n  \"message\": \"3yZe7d\",\n  \"publickey\": \"3nU4XEMkwj447BxYBRcHSp4jX2hi3Y8yHnNnfDqcT8J8\",\n  \"signature\": \"62nn4AZasDof2Avhk8br4ii3UTNAy4HorfeWH6W22a5HAtnqzFPTQau4HVRmrtBo5hNJJu1s5iWBNb5kE8VSKuGu\"\n}"

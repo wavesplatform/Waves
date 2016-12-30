@@ -278,9 +278,9 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
   override def genesisData: BlockField[StoredInBlock] = {
     val ipoMembers = List(
-      "3Mb4mR4taeYS3wci78SntztFwLoaS6Wbg81",
-      "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX77hKcmc",
-      "3Mn3UAtrpGY3cwiqLYf973q29oDR2LpnMYv"
+      "3Mb4mR4taeYS3wci78SntztFwLoaS6iiKY9",
+      "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX76fGNCz",
+      "3Mn3UAtrpGY3cwiqLYf973q29oDR2Kw7UyV"
     )
 
     val timestamp = 0L
