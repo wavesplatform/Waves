@@ -2,7 +2,7 @@ package scorex.transaction.state.database
 
 import org.h2.mvstore.MVStore
 import scorex.consensus.ConsensusModule
-import scorex.network.StoredBlockSeq
+import scorex.network.{InMemoryBlockSeq, StoredBlockSeq}
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction._
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
@@ -37,5 +37,6 @@ class BlockStorageImpl(settings: TransactionSettings with Settings,
 
   override val state = new StoredState(db, forksParams)
 
-  override val blockSeq = new StoredBlockSeq(createMVStore(settings.chainFileName))
+//  override val blockSeq = new StoredBlockSeq(createMVStore(settings.chainFileName))
+  override val blockSeq = new InMemoryBlockSeq()
 }
