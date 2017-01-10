@@ -253,20 +253,20 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     val accountAssets = getAccountAssets(account.address)
     val keys = account.address :: accountAssets.map(account.address + _).toList
 
-    def getTxSize(m: SortedMap[Int, Seq[Transaction]]) = m.foldLeft(0)((size, txs) => size + txs._2.size)
+    def getTxSize(m: SortedMap[Int, Set[Transaction]]) = m.foldLeft(0)((size, txs) => size + txs._2.size)
 
-    def getRowTxs(row: Row) = row.reason.filter(_.isInstanceOf[Transaction]).map(_.asInstanceOf[Transaction])
+    def getRowTxs(row: Row) = row.reason.filter(_.isInstanceOf[Transaction]).map(_.asInstanceOf[Transaction]).toSet
 
-    keys.foldLeft(SortedMap.empty[Int, Seq[Transaction]]) { (result, key) =>
+    keys.foldLeft(SortedMap.empty[Int, Set[Transaction]]) { (result, key) =>
 
       Option(lastStates.get(key)) match {
         case Some(accHeight) if getTxSize(result) < limit || accHeight > result.firstKey =>
           val accountRows = accountChanges(key)
-          def loop(h: Int, acc: SortedMap[Int, Seq[Transaction]]): SortedMap[Int, Seq[Transaction]] = {
+          def loop(h: Int, acc: SortedMap[Int, Set[Transaction]]): SortedMap[Int, Set[Transaction]] = {
             Option(accountRows.get(h)) match {
               case Some(row) =>
                 val rowTxs = getRowTxs(row)
-                val resAcc = acc + (h -> (rowTxs ++ acc.getOrElse(h, Seq.empty[Transaction])).distinct)
+                val resAcc = acc + (h -> (rowTxs ++ acc.getOrElse(h, Set.empty[Transaction])))
                 if (getTxSize(resAcc) < limit) {
                   loop(row.lastRowHeight, resAcc)
                 } else {
