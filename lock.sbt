@@ -20,7 +20,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.github.jnr" % "jnr-posix" % "3.0.27",
   "com.github.jnr" % "jnr-x86asm" % "1.0.2",
   "com.github.pathikrit" % "better-files_2.11" % "2.13.0",
-  "com.github.swagger-akka-http" % "swagger-akka-http_2.11" % "0.8.1",
+  "com.github.swagger-akka-http" % "swagger-akka-http_2.11" % "0.8.2",
   "com.google.code.findbugs" % "annotations" % "2.0.1",
   "com.google.code.findbugs" % "jsr305" % "2.0.1",
   "com.google.guava" % "guava" % "18.0",
@@ -91,9 +91,10 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scalaz" % "scalaz-core_2.11" % "7.2.8",
   "org.scoverage" % "scalac-scoverage-plugin_2.11" % "1.1.1",
   "org.scoverage" % "scalac-scoverage-runtime_2.11" % "1.1.1",
-  "org.slf4j" % "slf4j-api" % "1.7.21",
+  "org.slf4j" % "slf4j-api" % "1.7.22",
+  "org.slf4j" % "slf4j-nop" % "1.7.22",
   "org.typelevel" % "macro-compat_2.11" % "1.1.1",
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.15"
 )
-// LIBRARY_DEPENDENCIES_HASH 319a82a49298c7fa4d54e464a6b34615a9a88e19
+// LIBRARY_DEPENDENCIES_HASH 1d37bae6eda10662148eb0d484832f0404308dd7

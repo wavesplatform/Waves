@@ -67,11 +67,11 @@ lazy val addAkkaLibs = Seq(
 libraryDependencies ++= addAkkaLibs
 
 fork in ThisBuild := true
-fork in Test := true
+fork in Test := false
 parallelExecution in ThisBuild := false
 parallelExecution in Test := false
 
-testOptions in Test += Tests.Argument("-oD", "-u", "target/test-reports")
+testOptions in Test += Tests.Argument("-oIDO", "-u", "target/test-reports")
 
 //assembly settings
 assemblyJarName in assembly := "scorex.jar"
@@ -98,6 +98,9 @@ publishTo in ThisBuild := {
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 
+(dependencyClasspath in Test) <<= (dependencyClasspath in Test).map(
+  _.filterNot(_.data.name.contains("logback"))
+)
 
 pomIncludeRepository in ThisBuild := { _ => false }
 

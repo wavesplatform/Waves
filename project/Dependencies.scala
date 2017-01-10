@@ -31,8 +31,11 @@ object Dependencies {
   )
 
   lazy val logging = Seq(
+
     "ch.qos.logback" % "logback-classic" % "1.+",
-    "ch.qos.logback" % "logback-core" % "1.+"
+    "ch.qos.logback" % "logback-core" % "1.+",
+    "org.slf4j" % "slf4j-api" % "1.7.+",
+    "org.slf4j" % "slf4j-nop" % "1.7.+" % "test"
   )
 
   lazy val http = Seq(
