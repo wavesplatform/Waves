@@ -266,7 +266,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
             Option(accountRows.get(h)) match {
               case Some(row) =>
                 val rowTxs = getRowTxs(row)
-                val resAcc = acc + (h -> (rowTxs ++ acc.getOrElse(h, Seq.empty[Transaction])))
+                val resAcc = acc + (h -> (rowTxs ++ acc.getOrElse(h, Seq.empty[Transaction])).distinct)
                 if (getTxSize(resAcc) < limit) {
                   loop(row.lastRowHeight, resAcc)
                 } else {
