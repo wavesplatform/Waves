@@ -455,6 +455,29 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
 
+  def toWavesJson(heightOpt: Int): JsObject = {
+    val ls = lastStates.keySet().map(add => add -> balanceAtHeight(add, heightOpt))
+      .filter(b => b._1.length == 35 && b._2 != 0).toList.sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
+    JsObject(ls)
+  }
+
+  private def balanceAtHeight(key: String, atHeight: Int): Long = {
+    Option(lastStates.get(key)) match {
+      case Some(h) if h > 0 =>
+
+        def loop(hh: Int): Long = {
+          val row = accountChanges(key).get(hh)
+          if (hh <= atHeight) row.state.balance
+          else if (row.lastRowHeight == 0) 0L
+          else loop(row.lastRowHeight)
+        }
+
+        loop(h)
+      case _ =>
+        0L
+    }
+  }
+
   //for debugging purposes only
   override def toString: String = toJson().toString()
 
