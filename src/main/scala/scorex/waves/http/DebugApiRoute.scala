@@ -23,7 +23,7 @@ case class DebugApiRoute(application: RunnableApplication)(implicit val context:
   lazy val wallet = application.wallet
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ stateAt ~ info ~ getSettings
+    blocks ~ state ~ stateAt ~ info ~ getSettings ~ stateWaves
   }
 
   @Path("/blocks/{howMany}")
@@ -71,6 +71,20 @@ case class DebugApiRoute(application: RunnableApplication)(implicit val context:
     path("state" / IntNumber) { case height =>
       getJsonRoute {
         JsonResponse(application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)), StatusCodes.OK)
+      }
+    }
+  }
+
+  @Path("/stateWaves/{height}")
+  @ApiOperation(value = "State at block", notes = "Get state at specified height", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
+  ))
+  def stateWaves: Route = {
+    path("stateWaves" / IntNumber) { height =>
+      getJsonRoute {
+        val res = application.blockStorage.state.asInstanceOf[StoredState].toWavesJson(height)
+        JsonResponse(res, StatusCodes.OK)
       }
     }
   }
