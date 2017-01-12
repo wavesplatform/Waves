@@ -1,23 +1,21 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import play.api.libs.json.JsValue
 import scorex.crypto.encode.Base58
-import scorex.lagonaki.integration.TestLock
-import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
+import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.BlockChain
 
 
-class BlockAPISpecification extends FunSuite with TestLock with Matchers with TransactionTestingCommons {
+class BlockAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll {
 
-  import TestingCommons._
+  import scorex.waves.TestingCommons._
 
   val history = application.blockStorage.history
   val genesis = history.genesis
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
-
+  override def beforeAll(): Unit = {
+    start()
     stopGeneration(applications)
 
     while (history.height() < 3) {
@@ -27,7 +25,11 @@ class BlockAPISpecification extends FunSuite with TestLock with Matchers with Tr
     startGeneration(applications)
   }
 
-  def last = history.lastBlock
+  override def afterAll(): Unit = {
+    stop()
+  }
+
+  private def last = history.lastBlock
 
   test("GET /blocks/at/{height} API route") {
     val response = GET.request(s"/blocks/at/1")
@@ -84,14 +86,14 @@ class BlockAPISpecification extends FunSuite with TestLock with Matchers with Tr
   }
 
   test("GET /blocks/address/{address}/{from}/{to} API route") {
-    checkGenesis(GET.request(s"/blocks/address/3MgBpqAScs51mTJoLkdNGhscNvwHJSz2jMj/0/1")(0).as[JsValue])
+    checkGenesis(GET.request(s"/blocks/address/3Mp6FarByk73bgv3CFnbrzMzWgLmMHAJnj2/0/1")(0).as[JsValue])
   }
 
 
   def checkGenesis(response: JsValue): Unit = {
     (response \ "reference").as[String] shouldBe "67rpwLCuS5DGA8KGZXKsVQ7dnPb9goRLoKfgGbLfQg9WoLUgNY77E2jT11fem3coV9nAkguBACzrU1iyZM4B8roQ"
-    (response \ "transactions" \\ "fee").toList.size shouldBe 3
-    (response \ "generator").as[String] shouldBe "3MgBpqAScs51mTJoLkdNGhscNvwHJSz2jMj"
+    (response \ "transactions" \\ "fee").toList.size shouldBe 5
+    (response \ "generator").as[String] shouldBe "3Mp6FarByk73bgv3CFnbrzMzWgLmMHAJnj2"
     (response \ "signature").as[String] shouldBe Base58.encode(genesis.uniqueId)
     (response \ "fee").as[Int] shouldBe 0
     checkBlock(response)

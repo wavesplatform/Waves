@@ -1,26 +1,28 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import play.api.libs.json.JsValue
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.GenesisTransaction
-import scorex.lagonaki.integration.TestLock
 
-class TransactionsAPISpecification extends FunSuite with TestLock with Matchers with TransactionTestingCommons {
+class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll {
 
-  import scorex.lagonaki.TestingCommons._
+  import scorex.waves.TestingCommons._
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
-
+  override def beforeAll(): Unit = {
+    start()
     stopGeneration(applications)
 
     if (application.wallet.privateKeyAccounts().size < 10) application.wallet.generateNewAccounts(10)
   }
 
-  def addresses = accounts.map(_.address)
+  override def afterAll(): Unit = {
+    stop()
+  }
+
+  private def addresses = applicationNonEmptyAccounts.map(_.address)
 
   test("/transactions/unconfirmed API route") {
     (1 to 20) foreach (i => genValidTransaction())

@@ -1,30 +1,38 @@
 package scorex.lagonaki.integration
 
-import scala.util.{Failure, Random}
+import com.wavesplatform.settings.Constants
 import org.scalatest._
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
+import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.mocks.BlockMock
-import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
-import scorex.transaction.ValidationResult.ValidationResult
-import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
-import scorex.transaction.{AssetAcc, BalanceSheet, FeesStateChange, PaymentTransaction}
-import scorex.utils.{ScorexLogging, _}
+import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
+import scorex.utils._
+
+import scala.util.Random
 
 //TODO: Should be independed
-class StoredStateSpecification extends FunSuite with TestLock with Matchers with ScorexLogging
-with TransactionTestingCommons with PrivateMethodTester with OptionValues {
+class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues with BeforeAndAfterAll {
 
-  import TestingCommons._
+  import scorex.waves.TestingCommons._
 
-  val peers = applications.tail
-  val app = peers.head
-  val state = app.transactionModule.blockStorage.state
-  val history = app.transactionModule.blockStorage.history
-  val acc = accounts.head
-  val recipient = application.wallet.privateKeyAccounts().last
+  override protected def beforeAll(): Unit = {
+    start()
+  }
+
+  override protected def afterAll(): Unit = {
+    stop()
+  }
+
+  private val peers = applications.tail
+  private val app = peers.head
+  private val state = app.transactionModule.blockStorage.state
+  private val history = app.transactionModule.blockStorage.history
+  private val acc = applicationNonEmptyAccounts.head
+  private val recipient = applicationEmptyAccounts.head
+
   require(acc.address != recipient.address)
 
   test("invalidate transaction with forged signature in sequence") {
@@ -83,15 +91,14 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   }
 
   test("private methods") {
-    val testAdd = "aPFwzRp5TXCzi6DSuHmpmbQunopXRuxLk"
-    val testAcc = new Account(testAdd)
-    val applyMethod = PrivateMethod[Unit]('applyChanges)
+    val testAcc = applicationEmptyAccounts.head
+    val applyChanges = PrivateMethod[Unit]('applyChanges)
     state.balance(testAcc) shouldBe 0
     val tx = transactionModule.createPayment(acc, testAcc, 1, 1).right.get
-    state invokePrivate applyMethod(Map(AssetAcc(testAcc, None) ->(AccState(2L), Seq(FeesStateChange(1L), tx))))
+    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) ->(AccState(2L), Seq(FeesStateChange(1L), tx))), NTP.correctedTime())
     state.balance(testAcc) shouldBe 2
     state.included(tx).value shouldBe state.stateHeight
-    state invokePrivate applyMethod(Map(AssetAcc(testAcc, None) ->(AccState(0L), Seq(tx))))
+    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) ->(AccState(0L), Seq(tx))), NTP.correctedTime())
   }
 
   test("validate single transaction") {
@@ -115,23 +122,25 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   test("many transactions") {
     val senderBalance = state.balance(acc)
+    require(senderBalance > 10 * 1 * Constants.UnitsInWave)
 
-    val receipements = Seq(
+    val recipients = Seq(
       new PrivateKeyAccount(Array(34.toByte, 1.toByte)),
       new PrivateKeyAccount(Array(1.toByte, 23.toByte))
     )
 
     val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), application.wallet).get
     state.processBlock(new BlockMock(Seq(issueAssetTx))) should be('success)
+
     val assetId = Some(Base58.encode(issueAssetTx.assetId))
 
-    val txs = receipements.flatMap(r => Seq.fill(10)(transactionModule.transferAsset(TransferRequest(assetId, None, 10, 1, acc.address, "123", r.address), application.wallet).get))
+    val txs = recipients.flatMap(r => Seq.fill(10)(transactionModule.transferAsset(TransferRequest(assetId, None, 10, 100000, acc.address, "123", r.address), application.wallet).get))
 
     val shuffledTxs = Random.shuffle(txs).map(_.right.get)
 
     state.processBlock(new BlockMock(shuffledTxs)) should be('success)
 
-    receipements.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be (100))
+    recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be (100))
 
     state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be (999800)
   }
@@ -188,10 +197,9 @@ with TransactionTestingCommons with PrivateMethodTester with OptionValues {
   }
 
   test("valid order match transaction with fully executed orders") {
-    application.wallet.privateKeyAccounts().map(AssetAcc(_, None)).map(state.assetBalance(_)).foreach(println)
     val wavesBal = state.assetBalance(AssetAcc(acc, None))
-    val bal2 = state.assetBalance(AssetAcc(new Account("3MbWTyn6Tg7zL6XbdN8TLcFMfhWX76fGNCz"), None))
-    val bal3 = state.assetBalance(AssetAcc(new Account("3Mn3UAtrpGY3cwiqLYf973q29oDR2Kw7UyV"), None))
+    val bal2 = state.assetBalance(AssetAcc(new Account("3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K"), None))
+    val bal3 = state.assetBalance(AssetAcc(new Account("3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY"), None))
     wavesBal should be > 0L
   }
 }

@@ -1,36 +1,43 @@
 package scorex.lagonaki.integration
 
 import akka.pattern.ask
-import org.scalatest.{FunSuite, Matchers}
+import com.wavesplatform.Application
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.account.PublicKeyAccount
 import scorex.consensus.nxt
-import scorex.lagonaki.server.LagonakiApplication
-import scorex.lagonaki.{TestingCommons, TransactionTestingCommons}
+import scorex.lagonaki.TransactionTestingCommons
 import scorex.network.peer.PeerManager.GetBlacklistedPeers
 import scorex.transaction.BalanceSheet
-import scorex.utils.{ScorexLogging, untilTimeout}
+import scorex.utils.untilTimeout
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class ValidChainGenerationSpecification extends FunSuite with TestLock with Matchers with ScorexLogging
-  with TransactionTestingCommons {
+class ValidChainGenerationSpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll {
 
-  import TestingCommons._
+  import scorex.waves.TestingCommons._
 
   implicit override lazy val transactionModule = application.transactionModule
   implicit override lazy val consensusModule = application.consensusModule
 
-  val peers = applications.tail
-  val app = peers.head
-  val state = app.transactionModule.blockStorage.state
-  val history = app.transactionModule.blockStorage.history
+  private val peers = applications.tail
+  private val app = peers.head
+  private val state = app.transactionModule.blockStorage.state
+  private val history = app.transactionModule.blockStorage.history
+
+  override def beforeAll(): Unit = {
+    start()
+    stopGeneration(peers)
+    startGeneration(Seq(app))
+  }
+
+  override def afterAll(): Unit = {
+    stop()
+  }
 
   def waitGenerationOfBlocks(howMany: Int): Unit = {
-//    val height = maxHeight()
     untilTimeout(3.minutes, 1.seconds) {
       val heights = peers.map(_.blockStorage.history.height())
-      log.info(s"Current heights are: $heights. Waiting for ${howMany}")
       heights.foreach(_ should be >= howMany)
     }
   }
@@ -42,16 +49,15 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
     transactionModule.utxStorage.all().size shouldBe 0
   }
 
-  private def blacklistedPeersFor(app: LagonakiApplication) =
+  private def blacklistedPeersFor(app: Application) =
     Await.result((app.peerManager ? GetBlacklistedPeers).mapTo[Set[String]], timeout.duration)
 
   private def checkBlacklists() = applications.foreach { app => assert(blacklistedPeersFor(app).isEmpty) }
 
   test("generate 30 blocks and synchronize") {
     val genBal = peers.flatMap(a => a.wallet.privateKeyAccounts()).map(acc => app.consensusModule.generatingBalance(acc)).sum
-    genBal should be >= (peers.head.transactionModule.InitialBalance / 4)
     genBal should be >= nxt.NxtLikeConsensusModule.MinimalEffictiveBalanceForGenerator
-    peers.head.blockStorage.history.genesis.timestampField.value should be >= System.currentTimeMillis() - 90 * 60 * 1000
+    peers.head.blockStorage.history.genesis.timestampField.value should be <= System.currentTimeMillis() - 90 * 60 * 1000
     genValidTransaction()
 
     waitGenerationOfBlocks(30)
@@ -69,18 +75,18 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
     applications.tail.foreach { app =>
       app.wallet.privateKeyAccounts().foreach { acc =>
         if (state.asInstanceOf[BalanceSheet].balance(acc) > 0) {
-          genValidTransaction(recepientOpt = accounts.headOption, senderOpt = Some(acc))
+          genValidTransaction(recipientOpt = applicationNonEmptyAccounts.headOption, senderOpt = Some(acc))
         }
       }
     }
     waitGenerationOfBlocks(1)
 
     val block = untilTimeout(3.minute) {
-      stopGenerationForAllPeers()
+      stopGeneration(applications)
       transactionModule.clearIncorrectTransactions()
       val toGen = transactionModule.utxStorage.sizeLimit - transactionModule.utxStorage.all().size
       (0 until toGen) foreach (i => genValidTransaction())
-      val blocks = application.consensusModule.generateNextBlocks(accounts)(transactionModule)
+      val blocks = application.consensusModule.generateNextBlocks(applicationNonEmptyAccounts)(transactionModule)
       blocks.nonEmpty shouldBe true
       blocks.head
     }
@@ -88,7 +94,7 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
     block.isValid shouldBe true
     block.transactions.nonEmpty shouldBe true
 
-    startGenerationForAllPeers()
+    startGeneration(applications)
   }
 
   ignore("Don't include same transactions twice") {
@@ -107,7 +113,7 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
       (incl, h)
     }
 
-    stopGenerationForAllPeers()
+    stopGeneration(applications)
     cleanTransactionPool()
 
     incl.foreach(tx => transactionModule.utxStorage.putIfNew(tx))
@@ -131,9 +137,9 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
     val recepient = new PublicKeyAccount(Array.empty)
     val (trans, valid) = untilTimeout(5.seconds) {
       cleanTransactionPool()
-      stopGenerationForAllPeers()
-      accounts.map(a => state.asInstanceOf[BalanceSheet].balance(a)).exists(_ > 2) shouldBe true
-      val trans = accounts.flatMap { a =>
+      stopGeneration(applications)
+      applicationNonEmptyAccounts.map(a => state.asInstanceOf[BalanceSheet].balance(a)).exists(_ > 2) shouldBe true
+      val trans = applicationNonEmptyAccounts.flatMap { a =>
         val senderBalance = state.asInstanceOf[BalanceSheet].balance(a)
         (1 to 2) map (i => transactionModule.createPayment(a, recepient, senderBalance / 2, 1).right.get)
       }
@@ -145,16 +151,16 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
     state.validate(trans, blockTime = trans.map(_.timestamp).max).nonEmpty shouldBe true
     if (valid.size >= trans.size) {
       val balance = state.asInstanceOf[BalanceSheet].balance(trans.head.sender)
-      log.error(s"Double spending: ${trans.map(_.json)} | ${valid.map(_.json)} | $balance")
     }
     valid.size should be < trans.size
 
     waitGenerationOfBlocks(2)
 
-    accounts.foreach(a => state.asInstanceOf[BalanceSheet].balance(a) should be >= 0L)
+    applicationNonEmptyAccounts.foreach(a => state.asInstanceOf[BalanceSheet].balance(a) should be >= 0L)
     trans.exists(tx => state.included(tx).isDefined) shouldBe true // Some of transactions should be included in state
     trans.forall(tx => state.included(tx).isDefined) shouldBe false // But some should not
-    startGenerationForAllPeers()
+
+    startGeneration(applications)
   }
 
   ignore("Rollback state") {
@@ -167,7 +173,7 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
 
       //Wait for nonEmpty block
       untilTimeout(1.minute, 1.second) {
-        genValidTransaction(recepientOpt = recepient)
+        genValidTransaction(recipientOpt = recepient)
         peers.foreach(_.blockStorage.history.height() should be > height)
         history.height() should be > height
         history.lastBlock.transactions.nonEmpty shouldBe true
@@ -177,7 +183,7 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
       waitGenerationOfBlocks(0)
 
       if (peers.forall(p => p.history.contains(last))) {
-        stopGenerationForAllPeers()
+        stopGeneration(applications)
         peers.foreach { p =>
           p.transactionModule.blockStorage.removeAfter(last.uniqueId)
         }
@@ -186,23 +192,13 @@ class ValidChainGenerationSpecification extends FunSuite with TestLock with Matc
           p.history.lastBlock.encodedId shouldBe last.encodedId
         }
         state.hash shouldBe st1
-        startGenerationForAllPeers()
+        startGeneration(applications)
       } else {
         require(i > 0, "History should contain last block at least sometimes")
-        log.warn("History do not contains last block")
         rollback(i - 1)
       }
     }
+
     rollback()
-  }
-
-  private def startGenerationForAllPeers() = {
-    log.info("Start generation for all peers")
-    startGeneration(peers)
-  }
-
-  private def stopGenerationForAllPeers() = {
-    log.info("Stop generation for all peers")
-    stopGeneration(peers)
   }
 }

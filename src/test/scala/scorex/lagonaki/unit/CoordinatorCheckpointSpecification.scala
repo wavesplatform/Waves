@@ -110,7 +110,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
       ref = b.uniqueId
     }
 
-    awaitCond(app.history.height() ==  n)
+    awaitCond(app.history.height() ==  n, max = 20.seconds)
   }
 
   def genCheckpoint(historyPoints: Seq[Int]): Checkpoint = {
@@ -121,11 +121,11 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   "rollback if block doesn't match checkPoint" in {
     before()
-    genNBlocks(10)
+    genNBlocks(9)
 
-    val toRolback = 9
-    val chpBlock = createBlock(app.history.blockAt(toRolback - 1).get.uniqueId)
-    val p = BlockCheckpoint(toRolback, chpBlock.signerDataField.value.signature)
+    val toRollback = 9
+    val chpBlock = createBlock(app.history.blockAt(toRollback - 1).get.uniqueId)
+    val p = BlockCheckpoint(toRollback, chpBlock.signerDataField.value.signature)
     val firstChp = genCheckpoint(Seq(7, 5, 3))
 
     val checkpoint = Checkpoint(p +: firstChp.items, Array()).signedBy(pk.privateKey)

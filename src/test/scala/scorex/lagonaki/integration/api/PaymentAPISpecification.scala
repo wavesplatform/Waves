@@ -1,22 +1,24 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.lagonaki.TransactionTestingCommons
-import scorex.lagonaki.integration.TestLock
 
-class PaymentAPISpecification extends FunSuite with TestLock with Matchers with TransactionTestingCommons {
+class PaymentAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll {
+  import scorex.waves.TestingCommons._
 
-  import scorex.lagonaki.TestingCommons._
-
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
+  override def beforeAll(): Unit = {
+    start()
     stopGeneration(applications)
+  }
+
+  override def afterAll(): Unit = {
+    stop()
   }
 
   test("POST /payment API route") {
     POST.incorrectApiKeyTest("/payment")
-    val s = accounts.head.address
-    val r = accounts.last.address
+    val s = applicationNonEmptyAccounts.head.address
+    val r = applicationNonEmptyAccounts.last.address
     val amount = 2
     val fee = 1
 

@@ -5,15 +5,15 @@ import java.util.concurrent.locks.ReentrantLock
 import akka.pattern.ask
 import akka.util.Timeout
 import com.ning.http.client.Response
+import com.wavesplatform.TestNetParams
 import dispatch.{Http, url}
 import play.api.libs.json.{JsObject, JsValue, Json}
+import scorex.account.AddressScheme
 import scorex.api.http.ApiKeyNotValid
-import scorex.consensus.mining.BlockGeneratorController.{Idle, StartGeneration, StopGeneration}
+import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
 import scorex.lagonaki.server.{LagonakiApplication, LagonakiSettings}
 import scorex.transaction.TransactionSettings
 import scorex.utils._
-import scorex.consensus.mining.BlockGeneratorController.GetBlockGenerationStatus
-import scorex.settings.Settings
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -44,13 +44,9 @@ class TestSettings(override val settingsJSON: JsObject) extends LagonakiSettings
   override implicit lazy val genesisTimestamp: Long = System.currentTimeMillis() - 1000 * 60
 }
 
-class TestingApplication(settingsFilename: String) extends LagonakiApplication(settingsFilename) {
-
-  override implicit lazy val settings = new TestSettings(Settings.readSettingsJson(settingsFilename))
-
-}
-
 object TestingCommons {
+
+  AddressScheme.current = TestNetParams.addressScheme
 
   implicit val timeout = Timeout(1.second)
 
@@ -58,9 +54,9 @@ object TestingCommons {
 
   lazy val applications = {
     val apps = List(
-      new TestingApplication("settings-test.json"),
-      new TestingApplication("settings-local1.json"),
-      new TestingApplication("settings-local2.json")
+      new LagonakiApplication("settings-test.json"),
+      new LagonakiApplication("settings-local1.json"),
+      new LagonakiApplication("settings-local2.json")
     )
     apps.foreach(_.run())
     apps.foreach { a =>
@@ -123,10 +119,10 @@ object TestingCommons {
                 peer: String = peerUrl(application)): JsValue
 
     def requestRaw(us: String,
-                params: Map[String, String] = Map.empty,
-                body: String = "",
-                headers: Map[String, String] = Map("api_key" -> "test"),
-                peer: String = peerUrl(application)): Response
+                   params: Map[String, String] = Map.empty,
+                   body: String = "",
+                   headers: Map[String, String] = Map("api_key" -> "test"),
+                   peer: String = peerUrl(application)): Response
   }
 
   case object GET extends RequestType {
@@ -179,4 +175,5 @@ object TestingCommons {
       Await.result(request, 5.seconds)
     }
   }
+
 }

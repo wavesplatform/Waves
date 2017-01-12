@@ -1,36 +1,42 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.lagonaki.TestingCommons
-import scorex.lagonaki.integration.TestLock
 
-class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
+class AddressesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
-  import TestingCommons._
+  import scorex.waves.TestingCommons._
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
+  private def accounts = wallet.privateKeyAccounts()
 
+  private def addresses = accounts.map(_.address)
+
+  private def wallet = application.wallet
+
+  private def account = accounts.head
+
+  private def address = account.address
+
+  override def beforeAll(): Unit = {
+    start()
     stopGeneration(applications)
-
     if (wallet.privateKeyAccounts().size < 10) wallet.generateNewAccounts(10)
   }
 
-  def wallet = application.wallet
-  def account = accounts.head
-  def address = account.address
+  override protected def afterAll(): Unit = {
+    stop()
+  }
 
   test("/addresses/seq/{from}/{to} API route") {
-    val responsed = GET.request("/addresses/seq/1/4").as[List[String]]
-    responsed.size shouldBe 3
-    responsed.foreach(a => addresses should contain(a))
+    val responded = GET.request("/addresses/seq/1/4").as[List[String]]
+    responded.size shouldBe 3
+    responded.foreach(a => addresses should contain(a))
 
     val r2 = GET.request("/addresses/seq/5/9").as[List[String]]
     r2.size shouldBe 4
     r2.foreach(a => addresses should contain(a))
-    responsed.intersect(r2).isEmpty shouldBe true
+    responded.intersect(r2).isEmpty shouldBe true
   }
 
   test("/addresses/validate/{address} API route") {
@@ -43,10 +49,10 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
   }
 
   test("/addresses/seed/{address} API route") {
-    val path =  s"/addresses/seed/${account.address}"
+    val path = s"/addresses/seed/${account.address}"
     GET.incorrectApiKeyTest(path)
 
-    val response = GET.request(us = path, headers =  Map("api_key" -> "test"))
+    val response = GET.request(us = path, headers = Map("api_key" -> "test"))
     (response \ "address").as[String] shouldBe account.address
     (response \ "seed").as[String] shouldBe Base58.encode(account.seed)
   }
@@ -89,13 +95,23 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
   }
 
   test("POST /addresses/verifyText/{address} API route") {
-    val address = "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX76fGNCz"
+    val address = "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K" /*"3MbWTyn6Tg7zL6XbdN8TLcFMfhWX76fGNCz"*/
     POST.incorrectApiKeyTest(s"/addresses/verifyText/$address")
 
-    val signed = "{\n  \"message\": \"test\",\n  \"publickey\": \"3nU4XEMkwj447BxYBRcHSp4jX2hi3Y8yHnNnfDqcT8J8\",\n  \"signature\": \"5NHde7sCZvkSbc35oaeGE5E52cZLC8p73fyYGz27urjg62e6zNB54NXaQkZgrhiKCPMgLRh5q1PSriMepSLNAkH1\"\n}"
+    val signed =
+      """{
+        |  "message": "test",
+        |  "publickey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
+        |  "signature": "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC"
+        |}""".stripMargin
     (POST.request(s"/addresses/verifyText/$address", body = signed) \ "valid").as[Boolean] shouldBe true
 
-    val incorrect = "{\n  \"message\": \"test2\",\n  \"publickey\": \"3nU4XEMkwj447BxYBRcHSp4jX2hi3Y8yHnNnfDqcT8J8\",\n  \"signature\": \"5NHde7sCZvkSbc35oaeGE5E52cZLC8p73fyYGz27urjg62e6zNB54NXaQkZgrhiKCPMgLRh5q1PSriMepSLNAkH1\"\n}"
+    val incorrect =
+      """{
+        |  "message": "test2",
+        |  "publickey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
+        |  "signature": "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC"
+        |}""".stripMargin
     (POST.request(s"/addresses/verifyText/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
   }
 
@@ -131,18 +147,24 @@ class AddressesAPISpecification extends FunSuite with TestLock with Matchers {
   }
 
   test("POST /addresses/verify/{address} API route") {
-    val address = "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX76fGNCz"
+    val address = "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K"
     POST.incorrectApiKeyTest(s"/addresses/verify/$address")
 
-    val signed = "{\n  \"message\": \"3yZe7d\",\n  \"publickey\": \"3nU4XEMkwj447BxYBRcHSp4jX2hi3Y8yHnNnfDqcT8J8\",\n  \"signature\": \"62nn4AZasDof2Avhk8br4ii3UTNAy4HorfeWH6W22a5HAtnqzFPTQau4HVRmrtBo5hNJJu1s5iWBNb5kE8VSKuGu\"\n}"
+    val signed =
+      """{
+        |  "message": "3yZe7d",
+        |  "publickey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
+        |  "signature": "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC"
+        |}""".stripMargin
     (POST.request(s"/addresses/verify/$address", body = signed) \ "valid").as[Boolean] shouldBe true
 
-    val incorrect = "{\n  \"message\": \"3yZe7dd\",\n  \"publickey\": \"3nU4XEMkwj447BxYBRcHSp4jX2hi3Y8yHnNnfDqcT8J8\",\n  \"signature\": \"62nn4AZasDof2Avhk8br4ii3UTNAy4HorfeWH6W22a5HAtnqzFPTQau4HVRmrtBo5hNJJu1s5iWBNb5kE8VSKuGu\"\n}"
+    val incorrect =
+      """{
+        |  "message": "3yZe7dd",
+        |  "publickey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
+        |  "signature": "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC"
+        |}""".stripMargin
     (POST.request(s"/addresses/verify/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
   }
-
-  def accounts = wallet.privateKeyAccounts()
-
-  def addresses = accounts.map(_.address)
 
 }

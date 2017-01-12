@@ -6,19 +6,16 @@ import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionGen
-import OrderJson._
+import scorex.transaction.assets.exchange.OrderJson._
 
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
-
-  property("base58") {
-    println(Base58.encode("Some attachement".getBytes()))
-  }
 
   property("Read Order from json") {
     val pk = new PrivateKeyAccount("123".getBytes)
     val pubKeyStr = Base58.encode(pk.publicKey)
 
-    val json = Json.parse(s"""
+    val json = Json.parse(
+      s"""
         {
           "sender": "${pubKeyStr}",
           "matcher": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
@@ -47,7 +44,6 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         o.signature shouldBe Base58.decode("signature").get
 
     }
-
   }
 
   property("Read Order without sender and matcher PublicKey") {
@@ -67,14 +63,15 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     json.validate[Order] match {
       case e: JsError =>
         val paths = e.errors.map(_._1)
-        paths should contain allOf (JsPath \ "matcher", JsPath \ "sender")
-      case s: JsSuccess[Order] =>
+        paths should contain allOf(JsPath \ "matcher", JsPath \ "sender")
+      case _ =>
         fail("Should be JsError")
     }
   }
 
   val base58Str = "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ"
-  val json: JsValue = Json.parse(s"""
+  val json: JsValue = Json.parse(
+    s"""
     {
       "sender": "${base58Str}",
       "wrong_sender": "0abcd",
@@ -88,11 +85,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     val sender = (json \ "sender").as[Option[Array[Byte]]]
     sender.get shouldBe Base58.decode(base58Str).get
 
-    (json \ "wrong_sender").validate[Array[Byte]] match {
-      case e: JsError =>
-        println("Errors: " + JsError.toJson(e).toString())
-      case _ => fail("Should be JsError")
-    }
+    (json \ "wrong_sender").validate[Array[Byte]] shouldBe a[JsError]
   }
 
   property("Json Reads PublicKeyAccount") {
@@ -101,7 +94,6 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
 
     (json \ "wrong_publicKey").validate[PublicKeyAccount] match {
       case e: JsError =>
-        println("Errors: " + JsError.toJson(e).toString())
         e.errors.head._2.head.message shouldBe "error.incorrect.publicKeyAccount"
       case _ => fail("Should be JsError")
     }
@@ -125,7 +117,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     val pk = new PrivateKeyAccount("123".getBytes)
     val pubKeyStr = Base58.encode(pk.publicKey)
 
-    val json = Json.parse(s"""
+    val json = Json.parse(
+      s"""
         {
           "sender": "${pubKeyStr}",
           "matcher": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
@@ -147,7 +140,5 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         o.receiveAssetId shouldBe empty
 
     }
-
   }
-
 }

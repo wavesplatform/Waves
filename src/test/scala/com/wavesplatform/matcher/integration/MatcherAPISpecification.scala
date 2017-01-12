@@ -21,20 +21,19 @@ import scorex.waves.TestingCommons._
   */
 @DoNotDiscover
 class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll with Eventually {
-  val settings = application.settings
-  val wallet = application.wallet
-  val AccountM = wallet.privateKeyAccounts()(2)
-  val AccountA = wallet.privateKeyAccounts().head
-  var Asset1 = Option("")
-  var MBalance = 0L
-  var MBalance1 = 0L
-  var ABalance = 0L
-  var ABalance1 = 0L
-  val TxFee = 100000L
-  val storedState = application.storedState
-  var orderIdToCancel = Option.empty[String]
+  private val wallet = application.wallet
+  private val AccountM = wallet.privateKeyAccounts()(2)
+  private val AccountA = wallet.privateKeyAccounts().head
+  private var Asset1 = Option("")
+  private var MBalance = 0L
+  private var MBalance1 = 0L
+  private var ABalance = 0L
+  private var ABalance1 = 0L
+  private val TxFee = 100000L
+  private val storedState = application.storedState
+  private var orderIdToCancel = Option.empty[String]
 
-  val MatcherPubKey = application.wallet.privateKeyAccount(application.settings.matcherAccount).
+  private val MatcherPubKey = application.wallet.privateKeyAccount(application.settings.matcherAccount).
     map(a => Base58.encode(a.publicKey)).get
 
   override def beforeAll: Unit = {
@@ -221,8 +220,6 @@ class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfter
     val resp = matcherPostRequest("/orders/cancel", body = signedJson.toString,
       params =  Map("asset1" -> a1, "asset2" -> a2))
 
-    val s = (resp \ "status").as[String]
-    if (s != expectedStatus) println((resp \ "message").as[String])
     (resp \ "status").as[String] shouldBe expectedStatus
   }
 

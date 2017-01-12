@@ -3,7 +3,7 @@ package scorex.transaction
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json.{JsArray, JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
 import scorex.consensus.TransactionsOrdering
@@ -13,17 +13,16 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.ValidationResult.ValidationResult
-import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
+import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
 import scorex.utils._
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 import scala.util.control.NonFatal
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
 
 @SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -55,7 +54,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   private val feeCalculator = new FeeCalculator(settings)
 
   val TransactionSizeLength = 4
-  val InitialBalance = 10000000000000L
+  val InitialBalance = 100000000000000L
 
   override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl
 
@@ -278,9 +277,14 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
   override def genesisData: BlockField[StoredInBlock] = {
     val ipoMembers = List(
-      "3Mb4mR4taeYS3wci78SntztFwLoaS6iiKY9",
-      "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX76fGNCz",
-      "3Mn3UAtrpGY3cwiqLYf973q29oDR2Kw7UyV"
+      "3N3rfWUDPkFsf2GEZBCLw491A79G46djvQk",
+      "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",
+      "3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY"
+      /*
+            "3Mb4mR4taeYS3wci78SntztFwLoaS6iiKY9",
+            "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX76fGNCz",
+            "3Mn3UAtrpGY3cwiqLYf973q29oDR2Kw7UyV"
+      */
     )
 
     val timestamp = 0L
