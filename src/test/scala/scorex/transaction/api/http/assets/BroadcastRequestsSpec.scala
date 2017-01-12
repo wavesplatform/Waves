@@ -14,50 +14,63 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
       """
         {
           "name": "string",
-          "quantity": 1000000,
-          "timestamp": 1234,
+          "quantity": 100000,
+          "timestamp": 1484064349669,
           "description": "string",
-          "signature": "string",
-          "senderPublicKey": "string",
+          "signature": "d3JTwzxHj3j74yemdvw2xAdFeMo6hDJ9i2s3v3e4GMrz2Q25G89Pp3HyXfKk3mwNcKWjtyoTWvTt1eLk2KzetoL",
+          "senderPublicKey": "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5",
           "decimals": 2,
-          "reissuable": false,
-          "fee": 0
+          "reissuable": true,
+          "fee": 100000
         }
       """
     val req = Json.parse(json).validate[AssetIssueRequest].get
     req.name shouldBe "string"
-    req.quantity shouldBe 1000000L
-    req.fee shouldBe 0L
+    req.quantity shouldBe 100000L
+    req.fee shouldBe 100000L
     req.decimals shouldBe 2
-    req.timestamp shouldBe 1234L
-    req.reissuable shouldBe false
+    req.timestamp shouldBe 1484064349669L
+    req.reissuable shouldBe true
 
     val tx = req.toTx.get
-    tx.name shouldBe "string".toCharArray
-    tx.description shouldBe "string".toCharArray
-    tx.signature.isEmpty shouldBe false
+    Base58.encode(tx.name) shouldBe "zVbyBrMk"
+    Base58.encode(tx.description) shouldBe "zVbyBrMk"
+    tx.reissuable shouldBe true
+    tx.decimals shouldBe 2
+    tx.fee shouldBe 100000L
+    tx.quantity shouldBe 100000L
+    tx.timestamp shouldBe 1484064349669L
+    Base58.encode(tx.signature) shouldBe "d3JTwzxHj3j74yemdvw2xAdFeMo6hDJ9i2s3v3e4GMrz2Q25G89Pp3HyXfKk3mwNcKWjtyoTWvTt1eLk2KzetoL"
   }
 
   test("AssetReissueRequest json parsing works") {
     val json =
       """
         |{
-        |"senderPublicKey":"J6JNHaj32DWdgygfPKkiHD7kDFsVM61XuZn44fankgeQ",
-        |"assetId":"6eV67ffUPXVGktrmsoWv1ZRKTuKcWZjeCQXJjD26pTGS",
-        |"quantity":10000,"reissuable":true,
-        |"fee":100000000,"timestamp":1477302582842,
+        |"senderPublicKey":"D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5",
+        |"assetId":"Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L",
+        |"quantity":100000,"reissuable":true,
+        |"fee":100000,"timestamp":1234,
         |"reissuable":true,
-        |"signature":"4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
+        |"signature":"2zvr1SL8PWktckWi9nmv2vGV65v2mQRo9Q34NMxNhHFANY8GKxCAj7harSv4XBZVGqrFd4SYLHthjazgs8oBoqTU"
         |}
       """.stripMargin
     val req = Json.parse(json).validate[AssetReissueRequest].get
-    req.signature shouldBe "4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
-    req.fee shouldBe 100000000L
+    req.assetId shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
+    req.signature shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
+    req.fee shouldBe 100000L
+    req.quantity shouldBe 100000L
+    req.timestamp shouldBe 1234L
+    req.reissuable shouldBe true
 
     val tx = req.toTx.get
-    tx.assetId.isEmpty shouldBe false
+    Base58.encode(tx.assetId) shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     tx.reissuable shouldBe true
-    tx.signature.isEmpty shouldBe false
+    tx.fee shouldBe 100000L
+    tx.quantity shouldBe 100000L
+    tx.timestamp shouldBe 1234L
+    tx.reissuable shouldBe true
+    Base58.encode(tx.signature) shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
   }
 
   test("AssetTransfer json parsing works") {
@@ -67,46 +80,49 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |   "recipient":"3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq",
         |   "timestamp":1479462208828,
         |   "assetId":"GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u",
-        |   "amount":5000,
+        |   "amount":100000,
         |   "fee":100000,
-        |   "senderPublicKey":"FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn",
-        |   "signature":"4jWTZcRxuFpG4XdCbAhkiWdBjXMHEayPcEhk3yQ3oLYASJ7Fn8ij9C1nAQv61Z7Yo9DoLgy1fysGaaPGbxCWHrfT",
-        |   "attachment":""
+        |   "senderPublicKey":"D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5",
+        |   "signature":"2epehFksBY5C9h5JsquqYmmJz362AKd9Tz6sAYAw35TpCAKTTXJyV5fgN54izyG8ogMnakQvPZNL961KTZM1ZpXX",
+        |   "attachment":"A"
         |}
       """.stripMargin
     val req = Json.parse(json).validate[AssetTransferRequest].get
-    req.recipient shouldBe "3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq"
+    req.recipient.address shouldBe "3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq"
     req.timestamp shouldBe 1479462208828L
     req.assetId shouldBe Some("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u")
-    req.amount shouldBe 5000
+    req.amount shouldBe 100000
     req.fee shouldBe 100000
-    Base58.encode(req.sender.publicKey) shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
-    req.signature shouldBe "4jWTZcRxuFpG4XdCbAhkiWdBjXMHEayPcEhk3yQ3oLYASJ7Fn8ij9C1nAQv61Z7Yo9DoLgy1fysGaaPGbxCWHrfT"
-    req.attachment shouldBe Some("")
+    Base58.encode(req.sender.publicKey) shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
+    req.signature shouldBe "2epehFksBY5C9h5JsquqYmmJz362AKd9Tz6sAYAw35TpCAKTTXJyV5fgN54izyG8ogMnakQvPZNL961KTZM1ZpXX"
+    req.attachment shouldBe Some("A")
 
     val tx = req.toTx.get
+    Base58.encode(tx.sender.publicKey) shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     tx.timestamp shouldBe 1479462208828L
-    tx.attachment shouldBe Array.emptyByteArray
-    tx.assetId.isDefined shouldBe true
+    tx.attachment shouldBe Base58.decode("A").get
+    tx.assetId shouldBe Some(Base58.decode("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u").get)
     tx.amount shouldBe 5000
     tx.fee shouldBe 100000
-    tx.signature.nonEmpty shouldBe true
+    tx.signature shouldBe "2epehFksBY5C9h5JsquqYmmJz362AKd9Tz6sAYAw35TpCAKTTXJyV5fgN54izyG8ogMnakQvPZNL961KTZM1ZpXX"
   }
 
   test("AssetBurnRequest json parsing works") {
     val json =
       """
         |{
-        |"senderPublicKey":"J6JNHaj32DWdgygfPKkiHD7kDFsVM61XuZn44fankgeQ",
+        |"senderPublicKey":"D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5",
         |"assetId":"6eV67ffUPXVGktrmsoWv1ZRKTuKcWZjeCQXJjD26pTGS",
         |"quantity":10000,
         |"fee":100000000,"timestamp":1477302582842,
-        |"signature":"4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
+        |"signature":"H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
         |}
       """.stripMargin
     val req = Json.parse(json).validate[AssetBurnRequest].get
-    req.signature shouldBe "4y7kQ1fwxv61ijgZFrsgSWU6Mxe7A6f4f1jGNXFANxfzK1yVWdKcUMUVZvdZ41JCbqGZKwhmTcfHKV8TYmrmc4QN"
+    req.senderPublicKey shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
+    req.signature shouldBe "H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
     req.fee shouldBe 100000000L
+    req.amount shouldBe 10000
   }
 
   test("AssetIssueResponse json format test") {
