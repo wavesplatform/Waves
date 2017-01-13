@@ -13,7 +13,7 @@ class InMemoryBlockSeq(blockIds: InnerIds) {
 
   private val blocks = mutable.Map.empty[String, Block]
 
-  private var blockIdsSet: Set[String] = blockIds.map(_.toString).toSet
+  private val blockIdsSet: Set[String] = blockIds.map(_.toString).toSet
 
   private def keyToStr(id: BlockId) = Base58.encode(id)
 
