@@ -23,7 +23,7 @@ class InMemoryBlockSeq(blockIds: InnerIds) {
 
   def noIdsWithoutBlock: Boolean = blockIds.size == blocks.size
 
-  def containsBlockId(blockId: BlockId): Boolean = blockIds.contains(keyToStr(blockId))
+  def containsBlockId(blockId: BlockId): Boolean = blockIdsSet.contains(keyToStr(blockId))
 
   def blocksInOrder: Iterator[Block] = blockIds.
     map(id => blocks.get(id.toString)).
@@ -31,7 +31,7 @@ class InMemoryBlockSeq(blockIds: InnerIds) {
     map(_.get).iterator
 
   def cumulativeBlockScore(initialScore: BlockchainScore, consensusModule: ConsensusModule[_]): BlockchainScore = {
-    blocks.values.foldLeft(initialScore) {
+    blocksInOrder.foldLeft(initialScore) {
       (sum, block) => ConsensusModule.cumulativeBlockScore(sum, consensusModule.blockScore(block))
     }
   }

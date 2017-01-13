@@ -2,7 +2,6 @@ package scorex.transaction.state.database
 
 import org.h2.mvstore.MVStore
 import scorex.consensus.ConsensusModule
-import scorex.network.{InMemoryBlockSeq, StoredBlockSeq}
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction._
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}

@@ -1,13 +1,13 @@
 package scorex.transaction
 
-import scala.util.{Failure, Success, Try}
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.Account
 import scorex.block.Block
-import scorex.network.BlockSeq
+
+import scala.util.{Failure, Success, Try}
 
 class BlockStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with PathMockFactory {
   private def mockHistory: History = {
