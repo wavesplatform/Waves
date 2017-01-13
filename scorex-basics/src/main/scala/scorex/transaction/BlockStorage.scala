@@ -18,8 +18,6 @@ trait BlockStorage extends ScorexLogging {
 
   def state: LagonakiState
 
-  def blockSeq: BlockSeq
-
   //Append block to current state
   def appendBlock(block: Block): Try[Unit] = {
     //TODO Rollback state for blocktree

@@ -12,7 +12,6 @@ import scorex.utils.CircularBufferSpecification
 class BasicsTestSuite extends Suites(
   new MinerSpecification,
   new BlockchainSynchronizerSpecification,
-  new StoredBlockSeqSpecification,
   new ScoreObserverSpecification,
   new HistoryReplierSpecification,
   new AccountSpecification,

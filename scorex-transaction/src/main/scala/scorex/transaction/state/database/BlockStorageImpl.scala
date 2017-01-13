@@ -37,6 +37,4 @@ class BlockStorageImpl(settings: TransactionSettings with Settings,
 
   override val state = new StoredState(db, forksParams)
 
-//  override val blockSeq = new StoredBlockSeq(createMVStore(settings.chainFileName))
-  override val blockSeq = new InMemoryBlockSeq()
 }
