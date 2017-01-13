@@ -33,7 +33,6 @@ class BlockStorageSpecification extends PropSpec with PropertyChecks with Genera
       override val history: History = mockHistory
       override protected[this] val db: MVStore = new MVStore.Builder().open()
       override val state: LagonakiState = new MockLagonakiState(f)
-      override val blockSeq: BlockSeq = null
     }.appendBlock(/*i'm a block*/null) shouldBe f
   }
 }
