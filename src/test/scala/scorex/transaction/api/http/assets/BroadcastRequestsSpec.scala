@@ -52,7 +52,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |"quantity":100000,"reissuable":true,
         |"fee":100000,"timestamp":1234,
         |"reissuable":true,
-        |"signature":"2zvr1SL8PWktckWi9nmv2vGV65v2mQRo9Q34NMxNhHFANY8GKxCAj7harSv4XBZVGqrFd4SYLHthjazgs8oBoqTU"
+        |"signature":"4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
         |}
       """.stripMargin
     val req = Json.parse(json).validate[AssetReissueRequest].get
@@ -77,34 +77,34 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
     val json =
       """
         |{
-        |   "recipient":"3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq",
+        |   "recipient":"3Myss6gmMckKYtka3cKCM563TBJofnxvfD7",
         |   "timestamp":1479462208828,
         |   "assetId":"GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u",
         |   "amount":100000,
         |   "fee":100000,
         |   "senderPublicKey":"D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5",
-        |   "signature":"2epehFksBY5C9h5JsquqYmmJz362AKd9Tz6sAYAw35TpCAKTTXJyV5fgN54izyG8ogMnakQvPZNL961KTZM1ZpXX",
+        |   "signature":"4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ",
         |   "attachment":"A"
         |}
       """.stripMargin
     val req = Json.parse(json).validate[AssetTransferRequest].get
-    req.recipient.address shouldBe "3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq"
+    req.recipient.address shouldBe "3Myss6gmMckKYtka3cKCM563TBJofnxvfD7"
     req.timestamp shouldBe 1479462208828L
     req.assetId shouldBe Some("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u")
     req.amount shouldBe 100000
     req.fee shouldBe 100000
     Base58.encode(req.sender.publicKey) shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
-    req.signature shouldBe "2epehFksBY5C9h5JsquqYmmJz362AKd9Tz6sAYAw35TpCAKTTXJyV5fgN54izyG8ogMnakQvPZNL961KTZM1ZpXX"
+    req.signature shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
     req.attachment shouldBe Some("A")
 
     val tx = req.toTx.get
     Base58.encode(tx.sender.publicKey) shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     tx.timestamp shouldBe 1479462208828L
     tx.attachment shouldBe Base58.decode("A").get
-    tx.assetId shouldBe Some(Base58.decode("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u").get)
-    tx.amount shouldBe 5000
+    Base58.encode(tx.assetId.get) shouldBe "GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u"
+    tx.amount shouldBe 100000
     tx.fee shouldBe 100000
-    tx.signature shouldBe "2epehFksBY5C9h5JsquqYmmJz362AKd9Tz6sAYAw35TpCAKTTXJyV5fgN54izyG8ogMnakQvPZNL961KTZM1ZpXX"
+    Base58.encode(tx.signature) shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
   }
 
   test("AssetBurnRequest json parsing works") {
