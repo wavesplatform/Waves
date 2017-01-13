@@ -9,5 +9,5 @@ object AddressScheme {
 }
 
 object DefaultAddressScheme extends AddressScheme {
-  val chainId: Byte = 'S'.toByte
+  val chainId: Byte = 'T'.toByte
 }
