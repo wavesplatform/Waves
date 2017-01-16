@@ -26,6 +26,8 @@ class PeerManagerSpecification extends ActorTestingCommons {
   val hostname = "localhost"
   val knownAddress = new InetSocketAddress(hostname, 6789)
 
+  val timeout = 6 seconds
+
   object TestSettings extends SettingsMock {
     override lazy val dataDirOpt: Option[String] = None
     override lazy val knownPeers: Seq[InetSocketAddress] = Seq(knownAddress)
@@ -196,7 +198,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
         val address = new InetSocketAddress(s"$id.$id.$id.$id", id)
         val handler = TestProbe("connection-handler-" + id)
         actorRef ! Connected(address, handler.ref, None, inbound = true)
-        handler.expectMsgType[Handshake]
+        handler.expectMsgType[Handshake](timeout)
         actorRef ! Handshaked(address, Handshake("test", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
         handler
       }
@@ -309,13 +311,13 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
       (1 to TestSettings.maxConnections).foreach { i =>
         val h = connect(i, true)
-        h.expectMsgType[Handshake]
+        h.expectMsgType[Handshake](15 seconds)
       }
       (1 to TestSettings.maxConnections).foreach { i =>
         val h1 = connect(i, true)
-        h1.expectMsg(CloseConnection)
+        h1.expectMsg(timeout, CloseConnection)
         val h2 = connect(100 + i, false)
-        h2.expectMsgType[Handshake]
+        h2.expectMsgType[Handshake](15 seconds)
       }
     }
 
