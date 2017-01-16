@@ -1,6 +1,7 @@
 package scorex.lagonaki.unit
 
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
 import scala.util.Random
@@ -19,7 +20,7 @@ import scorex.wallet.Wallet
 
 class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPropertyChecks {
 
-  val folder = "/tmp/scorex/test/"
+  val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"
   new File(folder).mkdirs()
   val stateFile = folder + "state.dat"
   new File(stateFile).delete()
