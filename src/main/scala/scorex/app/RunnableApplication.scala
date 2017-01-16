@@ -76,7 +76,7 @@ trait RunnableApplication extends Application with ScorexLogging {
     if (settings.rpcEnabled) {
       val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
       Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort).map(
-        _ => log.info(s"RPC was binded on ${settings.rpcAddress}:${settings.rpcPort}")
+        _ => log.info(s"RPC was bound on ${settings.rpcAddress}:${settings.rpcPort}")
       )
     }
 

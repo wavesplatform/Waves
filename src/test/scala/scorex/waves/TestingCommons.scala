@@ -13,7 +13,6 @@ import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.account.{Account, AddressScheme}
 import scorex.api.http.ApiKeyNotValid
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
-import scorex.lagonaki.server.LagonakiApplication
 import scorex.settings.Settings
 import scorex.transaction.{GenesisTransaction, Transaction, TransactionSettings}
 import scorex.utils._
