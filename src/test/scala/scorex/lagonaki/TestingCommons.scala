@@ -1,3 +1,4 @@
+/*
 package scorex.lagonaki
 
 import java.util.concurrent.locks.ReentrantLock
@@ -177,3 +178,4 @@ object TestingCommons {
   }
 
 }
+*/

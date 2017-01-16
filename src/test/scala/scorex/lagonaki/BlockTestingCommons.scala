@@ -4,15 +4,15 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
-import scorex.lagonaki.mocks.ConsensusMock
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
+import scorex.waves.TestingCommons
 
 import scala.util.Random
 
 trait BlockTestingCommons extends TestingCommons {
 
-    implicit val consensusModule = application.consensusModule
-    implicit val transactionModule = application.transactionModule
+  implicit val consensusModule = application.consensusModule
+  implicit val transactionModule = application.transactionModule
 
   val genesis: Block = Block.genesis()
   val gen = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(Byte.MaxValue).toByte))

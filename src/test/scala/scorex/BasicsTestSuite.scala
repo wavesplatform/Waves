@@ -1,10 +1,9 @@
 package scorex
 
-import org.scalatest.{BeforeAndAfterAll, Sequential, Suites}
+import org.scalatest.{BeforeAndAfterAll, Sequential}
 import scorex.account.AccountSpecification
 import scorex.consensus.mining.{BlockGeneratorControllerSpecification, MinerSpecification}
 import scorex.crypto.SigningFunctionsSpecification
-import scorex.lagonaki.TestingCommons.applications
 import scorex.network._
 import scorex.network.peer.{PeerDatabaseImplSpecification, PeerManagerSpecification}
 import scorex.transaction.BlockStorageSpecification
@@ -33,8 +32,14 @@ class BasicsTestSuite extends Sequential(
   new CheckpointSpecification
 ) with BeforeAndAfterAll {
 
-  override protected def afterAll() = {
-    applications.foreach(_.shutdown())
+  import scorex.waves.TestingCommons._
+
+  override def beforeAll(): Unit = {
+    start()
+  }
+
+  override def afterAll(): Unit = {
+    stop()
   }
 }
 

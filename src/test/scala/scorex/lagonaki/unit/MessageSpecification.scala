@@ -2,16 +2,17 @@ package scorex.lagonaki.unit
 
 import java.nio.ByteBuffer
 
-import org.scalatest.FunSuite
+import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import scorex.block.Block
 import scorex.crypto.EllipticCurveImpl.SignatureLength
-import scorex.lagonaki.TestingCommons
 import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler, MessageSpec}
 import scorex.transaction.History
 
 import scala.util.Try
 
-class MessageSpecification extends FunSuite with TestingCommons {
+class MessageSpecification extends FunSuite with BeforeAndAfterAll {
+
+  import scorex.waves.TestingCommons._
 
   implicit val consensusModule = application.consensusModule
   implicit val transactionModule = application.transactionModule

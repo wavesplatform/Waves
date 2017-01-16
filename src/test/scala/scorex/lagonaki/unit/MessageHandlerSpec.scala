@@ -2,11 +2,12 @@ package scorex.lagonaki.unit
 
 import java.nio.ByteBuffer
 
-import org.scalatest.FunSuite
-import scorex.lagonaki.TestingCommons
+import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler}
 
-class MessageHandlerSpec extends FunSuite with TestingCommons {
+class MessageHandlerSpec extends FunSuite with BeforeAndAfterAll {
+
+  import scorex.waves.TestingCommons._
 
   implicit val consensusModule = application.consensusModule
   implicit val transactionModule = application.transactionModule

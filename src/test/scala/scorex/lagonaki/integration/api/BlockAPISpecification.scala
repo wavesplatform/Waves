@@ -11,8 +11,8 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
 
   import scorex.waves.TestingCommons._
 
-  val history = application.blockStorage.history
-  val genesis = history.genesis
+  private val history = application.blockStorage.history
+  private val genesis = history.genesis
 
   override def beforeAll(): Unit = {
     start()

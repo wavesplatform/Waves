@@ -8,8 +8,7 @@ import scorex.block.Block
 import scorex.lagonaki.BlockTestingCommons
 import scorex.utils._
 
-class BlockStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
-with BlockTestingCommons {
+class BlockStorageSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with BlockTestingCommons {
 
   val blockGen: Gen[Block] = for {
     gb <- Arbitrary.arbitrary[Long]

@@ -1,7 +1,6 @@
 package scorex.transaction
 
-import org.scalatest.{BeforeAndAfterAll, Sequential, Suites}
-import scorex.lagonaki.TestingCommons.applications
+import org.scalatest.{BeforeAndAfterAll, Sequential}
 import scorex.transaction.assets.exchange.OrderJsonSpecification
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImplSpecification
 import scorex.transaction.state.database.blockchain.StoredStateUnitTests
@@ -19,8 +18,14 @@ class TransactionTestSuite extends Sequential(
   new OrderJsonSpecification
 ) with BeforeAndAfterAll {
 
-  override protected def afterAll() = {
-    applications.foreach(_.shutdown())
+  import scorex.waves.TestingCommons._
+
+  override def beforeAll(): Unit = {
+    start()
+  }
+
+  override def afterAll(): Unit = {
+    stop()
   }
 }
 

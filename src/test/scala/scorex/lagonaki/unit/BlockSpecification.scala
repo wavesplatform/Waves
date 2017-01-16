@@ -1,20 +1,28 @@
 package scorex.lagonaki.unit
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
-import scorex.crypto.EllipticCurveImpl
-import scorex.lagonaki.TestingCommons
+import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
-import scorex.settings.WavesHardForkParameters
 
-class BlockSpecification extends FunSuite with Matchers with TestingCommons {
+class BlockSpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
-  test ("Nxt block with txs bytes/parse roundtrip") {
+  import scorex.waves.TestingCommons._
+
+  override def beforeAll(): Unit = {
+    start()
+  }
+
+  override def afterAll(): Unit = {
+    stop()
+  }
+
+  test("Nxt block with txs bytes/parse roundtrip") {
     implicit val consensusModule = new NxtLikeConsensusModule(WavesHardForkParameters.Disabled)
     implicit val transactionModule = new SimpleTransactionModule(WavesHardForkParameters.Disabled)(application.settings, application)
 

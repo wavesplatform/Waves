@@ -1,15 +1,18 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{FunSuite, Matchers}
-import scorex.lagonaki.integration.TestLock
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 
-class PeersAPISpecification extends FunSuite with TestLock with Matchers {
+class PeersAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
-  import scorex.lagonaki.TestingCommons._
+  import scorex.waves.TestingCommons._
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
+  override def beforeAll(): Unit = {
+    start()
     stopGeneration(applications)
+  }
+
+  override def afterAll(): Unit = {
+    stop()
   }
 
   test("/peers/connected API route") {

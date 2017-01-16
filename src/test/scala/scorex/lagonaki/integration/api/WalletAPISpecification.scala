@@ -1,16 +1,19 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.crypto.encode.Base58
-import scorex.lagonaki.integration.TestLock
 
-class WalletAPISpecification extends FunSuite with TestLock with Matchers {
+class WalletAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
-  import scorex.lagonaki.TestingCommons._
+  import scorex.waves.TestingCommons._
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
+  override def beforeAll(): Unit = {
+    start()
     stopGeneration(applications)
+  }
+
+  override def afterAll(): Unit = {
+    stop()
   }
 
   test("/wallet/ API route") {
@@ -20,7 +23,7 @@ class WalletAPISpecification extends FunSuite with TestLock with Matchers {
   test("/wallet/seed API route") {
     GET.incorrectApiKeyTest("/wallet/seed")
 
-    val response = GET.request("/wallet/seed", headers =  Map("api_key" -> "test"))
+    val response = GET.request("/wallet/seed", headers = Map("api_key" -> "test"))
     (response \ "seed").as[String] shouldBe Base58.encode(application.settings.walletSeed.get)
   }
 }

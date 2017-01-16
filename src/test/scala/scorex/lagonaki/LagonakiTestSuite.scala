@@ -1,7 +1,6 @@
 package scorex.lagonaki
 
 import org.scalatest.{BeforeAndAfterAll, Sequential}
-import scorex.lagonaki.TestingCommons._
 import scorex.lagonaki.integration.ValidChainGenerationSpecification
 import scorex.lagonaki.integration.api._
 import scorex.lagonaki.unit._
@@ -33,7 +32,13 @@ class LagonakiTestSuite extends Sequential(
 
 ) with BeforeAndAfterAll {
 
-  override protected def afterAll() = {
-    applications.foreach(_.shutdown())
+  import scorex.waves.TestingCommons._
+
+  override def beforeAll(): Unit = {
+    start()
+  }
+
+  override def afterAll(): Unit = {
+    stop()
   }
 }
