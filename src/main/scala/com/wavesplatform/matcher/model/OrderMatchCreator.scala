@@ -5,6 +5,7 @@ import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.{SignedTransaction, TransactionModule}
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
 import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.state.database.state.extension.OrderMatchStoredState
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
@@ -13,6 +14,9 @@ trait OrderMatchCreator {
   val storedState: StoredState
   val wallet: Wallet
   val settings: WavesSettings
+  //TODO ???
+  val omss = storedState.validators.filter(_.isInstanceOf[OrderMatchStoredState]).head
+    .asInstanceOf[OrderMatchStoredState]
 
   private var txTime: Long = 0
 
@@ -33,7 +37,7 @@ trait OrderMatchCreator {
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
     def calcFee(o: Order, amount: Long): Long = {
-      storedState.findPrevOrderMatchTxs(o)
+      omss.findPrevOrderMatchTxs(o)
       val p = BigInt(amount) * o.matcherFee  / o.amount
       p.toLong
     }

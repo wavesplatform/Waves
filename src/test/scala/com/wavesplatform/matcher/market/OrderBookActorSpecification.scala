@@ -43,9 +43,9 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
     val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
     val db = new MVStore.Builder().compress().open()
-    val storedState = new StoredState(db, WavesHardForkParameters.Disabled) {
-      override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
-    }
+    val storedState = StoredState.fromDB(db, WavesHardForkParameters.Disabled)
+//TODO      override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
+
 
     val settings = new WavesSettings(JsObject(Seq(
       "matcher" -> JsObject(

@@ -109,7 +109,7 @@ object StateTestSpec extends Commands {
 
   case class Sut(fileName: String) {
     val db = new MVStore.Builder().fileName(fileName).compress().open()
-    val storedState = new StoredState(db, WavesHardForkParameters.Disabled)
+    val storedState = StoredState.fromDB(db, WavesHardForkParameters.Disabled)
     storedState.processBlock(new BlockMock(genesisTxs))
   }
 

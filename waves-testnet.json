@@ -14,10 +14,10 @@
     ],
     "maxConnections": 30
   },
-  "walletDir": "",
-  "walletSeed": "",
+  "walletDir": "/tmp/scorex",
+  "walletSeed": "test",
   "walletPassword": "ridethewaves!",
-  "dataDir": "",
+  "dataDir": "/tmp/scorex",
   "rpcEnabled": false,
   "rpcPort": 6869,
   "rpcAddress": "127.0.0.1",
