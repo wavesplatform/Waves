@@ -13,13 +13,12 @@ import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.utils.NTP
-import scorex.waves.TestingCommons._
 
 /**
   * !!! Tests should work only as whole TestSuite in sequence one by one, not separately,
   * as the state depends on the previous test
   */
-class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll with Eventually {
+class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll with Eventually with scorex.waves.TestingCommons {
   private val wallet = application.wallet
   private val AccountM = wallet.privateKeyAccounts()(2)
   private val AccountA = wallet.privateKeyAccounts().head
@@ -36,7 +35,6 @@ class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfter
     map(a => Base58.encode(a.publicKey)).get
 
   override def beforeAll: Unit = {
-    start()
     initBalances()
   }
 

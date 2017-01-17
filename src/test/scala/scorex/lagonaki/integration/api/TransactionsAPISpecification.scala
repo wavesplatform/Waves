@@ -7,12 +7,10 @@ import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.GenesisTransaction
 
-class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll {
+class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll  with scorex.waves.TestingCommons {
 
-  import scorex.waves.TestingCommons._
 
   override def beforeAll(): Unit = {
-    start()
     stopGeneration(applications)
 
     if (application.wallet.privateKeyAccounts().size < 10) application.wallet.generateNewAccounts(10)

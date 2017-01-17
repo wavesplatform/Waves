@@ -7,15 +7,12 @@ import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.BlockChain
 
 
-class BlockAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll {
-
-  import scorex.waves.TestingCommons._
+class BlockAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll  with scorex.waves.TestingCommons {
 
   private val history = application.blockStorage.history
   private val genesis = history.genesis
 
   override def beforeAll(): Unit = {
-    start()
     stopGeneration(applications)
 
     while (history.height() < 3) {

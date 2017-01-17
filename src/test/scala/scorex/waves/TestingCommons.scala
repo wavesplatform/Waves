@@ -22,26 +22,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
 
-trait TestingCommons {
-
-  implicit object TestTransactionLayerSettings extends TransactionSettings {
-    override val settingsJSON: JsObject = Json.obj()
-  }
-
-  lazy val application = TestingCommons.application
-
-  def randomFrom[T](seq: Seq[T]): T = {
-    require(seq.nonEmpty)
-    seq(Random.nextInt(seq.length))
-  }
-
-  def profile[R](block: => R): Long = {
-    val start = System.currentTimeMillis()
-    block
-    System.currentTimeMillis() - start
-  }
-
-}
 
 object UnitTestNetParams extends ChainParameters {
   val initialBalance: Long = Constants.UnitsInWave * Constants.TotalWaves
@@ -79,7 +59,22 @@ object UnitTestNetParams extends ChainParameters {
   override def allowBurnTransactionAfterTimestamp: Long = 1481110521000L
 }
 
-object TestingCommons {
+trait TestingCommons {
+
+  implicit object TestTransactionLayerSettings extends TransactionSettings {
+    override val settingsJSON: JsObject = Json.obj()
+  }
+
+  def randomFrom[T](seq: Seq[T]): T = {
+    require(seq.nonEmpty)
+    seq(Random.nextInt(seq.length))
+  }
+
+  def profile[R](block: => R): Long = {
+    val start = System.currentTimeMillis()
+    block
+    System.currentTimeMillis() - start
+  }
 
   implicit val timeout = Timeout(1.second)
 
@@ -120,17 +115,8 @@ object TestingCommons {
 
   val application: Application = applications.head
 
-  lazy val counter: AtomicInteger = new AtomicInteger(0)
-
-  def start(): Unit = {
-    counter.incrementAndGet
-  }
-
   def stop(): Unit = {
-    if (counter.decrementAndGet == 0) {
-      Http.shutdown()
       applications.foreach(_.shutdown())
-    }
   }
 
   def forgeSignature(signature: Array[Byte]): Array[Byte] = {

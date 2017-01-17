@@ -3,6 +3,8 @@ package scorex.app
 import akka.actor.{ActorSystem, Props}
 import akka.pattern.ask
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
+import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
@@ -14,6 +16,7 @@ import scorex.settings.Settings
 import scorex.transaction.{BlockStorage, History}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -65,6 +68,8 @@ trait RunnableApplication extends Application with ScorexLogging {
   lazy override val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   private lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
+  @volatile var httpF : Future[ServerBinding] = _
+
   def run() {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors }")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory }")
@@ -74,8 +79,9 @@ trait RunnableApplication extends Application with ScorexLogging {
     implicit val materializer = ActorMaterializer()
 
     if (settings.rpcEnabled) {
-      val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
-      Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort).map(
+      val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
+      httpF = Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
+      httpF.map(
         _ => log.info(s"RPC was bound on ${settings.rpcAddress}:${settings.rpcPort}")
       )
     }
@@ -100,16 +106,17 @@ trait RunnableApplication extends Application with ScorexLogging {
     wallet.close()
   }
 
-  def shutdown(): Future[Unit] = synchronized {
-    Try { stopNetwork() }.failed.foreach(e => log.warn("Stop network error", e))
-    actorSystem.terminate().map(_ => ())
-  }
+  def shutdown(): Unit = synchronized {
+    Try {if (settings.rpcEnabled) {
+      Await.ready(httpF.flatMap(x => x.unbind()), 10 seconds)
+    }
+      log.info("Stopping network services")
+      if (settings.upnpEnabled) upnp.deletePort(settings.port)
+      implicit val askTimeout = Timeout(10.seconds)
+      Await.result(networkController ? NetworkController.ShutdownNetwork, 10.seconds)
+      Await.result(actorSystem.terminate(), 10.seconds)
+    }.failed.foreach(e => log.warn("Stop network error", e))
 
-  private def stopNetwork(): Unit = synchronized {
-    log.info("Stopping network services")
-    if (settings.upnpEnabled) upnp.deletePort(settings.port)
-    implicit val askTimeout = Timeout(10.seconds)
-    Await.result(networkController ? NetworkController.ShutdownNetwork, 10.seconds)
   }
 
   private def checkGenesis(): Unit = {

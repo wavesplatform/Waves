@@ -13,9 +13,9 @@ import scorex.utils.untilTimeout
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class ValidChainGenerationSpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll {
+class ValidChainGenerationSpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll with scorex.waves.TestingCommons {
 
-  import scorex.waves.TestingCommons._
+
 
   implicit override lazy val transactionModule = application.transactionModule
   implicit override lazy val consensusModule = application.consensusModule
@@ -26,7 +26,6 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Tran
   private val history = app.transactionModule.blockStorage.history
 
   override def beforeAll(): Unit = {
-    start()
     stopGeneration(peers)
     startGeneration(Seq(app))
   }

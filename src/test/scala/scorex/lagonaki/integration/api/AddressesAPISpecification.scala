@@ -4,9 +4,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 
-class AddressesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
-
-  import scorex.waves.TestingCommons._
+class AddressesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll  with scorex.waves.TestingCommons  {
 
   private def accounts = wallet.privateKeyAccounts()
 
@@ -19,7 +17,6 @@ class AddressesAPISpecification extends FunSuite with Matchers with BeforeAndAft
   private def address = account.address
 
   override def beforeAll(): Unit = {
-    start()
     stopGeneration(applications)
     if (wallet.privateKeyAccounts().size < 10) wallet.generateNewAccounts(10)
   }

@@ -2,12 +2,10 @@ package scorex.lagonaki.integration.api
 
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 
-class NxtConsensusAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
+class NxtConsensusAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll  with scorex.waves.TestingCommons {
 
-  import scorex.waves.TestingCommons._
 
   override def beforeAll(): Unit = {
-    start()
     stopGeneration(applications)
   }
 

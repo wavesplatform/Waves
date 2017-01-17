@@ -3,11 +3,9 @@ package scorex.lagonaki.integration.api
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.lagonaki.TransactionTestingCommons
 
-class PaymentAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll {
-  import scorex.waves.TestingCommons._
+class PaymentAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll  with scorex.waves.TestingCommons {
 
   override def beforeAll(): Unit = {
-    start()
     stopGeneration(applications)
   }
 

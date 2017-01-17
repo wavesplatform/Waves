@@ -10,17 +10,12 @@ import scorex.transaction.state.database.state.AccState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
 import scorex.utils._
+import scorex.waves.TestingCommons
 
 import scala.util.Random
 
 //TODO: Should be independed
-class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues with BeforeAndAfterAll {
-
-  import scorex.waves.TestingCommons._
-
-  override protected def beforeAll(): Unit = {
-    start()
-  }
+class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues with BeforeAndAfterAll with TestingCommons{
 
   override protected def afterAll(): Unit = {
     stop()
