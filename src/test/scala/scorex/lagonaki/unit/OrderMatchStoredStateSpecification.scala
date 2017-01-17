@@ -36,6 +36,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   }
 
   override protected def afterAll(): Unit = {
+    db.close()
     Files.deleteIfExists(stateFile)
   }
 

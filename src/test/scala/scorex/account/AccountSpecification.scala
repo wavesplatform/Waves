@@ -7,10 +7,6 @@ import scorex.crypto.hash.SecureCryptographicHash._
 
 class AccountSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
-//  property("Account.AddressNetwork should be taken from application.conf") {
-//    Account.AddressNetwork shouldBe (83: Byte)
-//  }
-
   property("Account.fromPublicKey should generate valid account") {
     forAll { data: Array[Byte] =>
       Account.isValid(Account.fromPublicKey(data)) shouldBe true
