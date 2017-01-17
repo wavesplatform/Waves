@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.{RestartActor, Restar
 
 trait RestartableActor extends PersistentActor {
 
-  abstract override def receiveCommand = super.receiveCommand orElse {
+  abstract override def receiveCommand: PartialFunction[Any, Unit] = super.receiveCommand orElse {
     case RestartActor => throw RestartActorException
   }
 }

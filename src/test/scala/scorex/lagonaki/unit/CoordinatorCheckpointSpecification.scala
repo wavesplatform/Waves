@@ -19,7 +19,6 @@ import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.{SettingsMock, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
-import org.scalamock._
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.postfixOps
@@ -110,7 +109,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
       ref = b.uniqueId
     }
 
-    awaitCond(app.history.height() ==  n, max = 20.seconds)
+    awaitCond(app.history.height() == n, max = 20.seconds)
   }
 
   def genCheckpoint(historyPoints: Seq[Int]): Checkpoint = {
@@ -132,7 +131,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     actorRef ! DataFromPeer(repo.CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
 
-    networkController.awaitCond(app.history.height() ==  7)
+    networkController.awaitCond(app.history.height() == 7)
   }
 
   "blacklist peer if it sends block that is different from checkPoint" in {
@@ -161,7 +160,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     networkController.expectMsgPF() {
       case SendToNetwork(Message(spec, _, _), _) => spec should be(repo.CheckpointMessageSpec)
-      case m => println(m); fail("Checkpoint hasn't been sent")
+      case _ => fail("Checkpoint hasn't been sent")
     }
   }
 
@@ -179,7 +178,11 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     var parent = app.history.blockAt(5).get.uniqueId
     val lastCommonBlockId = parent
-    val fork = Seq.fill(5){val b = createBlock(parent); parent = b.uniqueId; b}
+    val fork = Seq.fill(5) {
+      val b = createBlock(parent)
+      parent = b.uniqueId
+      b
+    }
 
     moveCoordinatorToSyncState()
 
@@ -199,7 +202,11 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     var parent = app.history.blockAt(7).get.uniqueId
     val lastCommonBlockId = parent
-    val fork = Seq.fill(5){val b = createBlock(parent); parent = b.uniqueId; b}
+    val fork = Seq.fill(5) {
+      val b = createBlock(parent)
+      parent = b.uniqueId
+      b
+    }
 
     moveCoordinatorToSyncState()
 
@@ -209,7 +216,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     actorRef ! SyncFinished(success = true, Some(lastCommonBlockId, fork.iterator, Some(goodPeer)))
 
     Thread.sleep(1000)
-    awaitCond(app.history.height() ==  12)
+    awaitCond(app.history.height() == 12)
 
   }
 
