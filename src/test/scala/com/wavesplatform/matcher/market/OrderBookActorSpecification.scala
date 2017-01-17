@@ -231,7 +231,6 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         within(5 seconds) {
           actor ! GetOrdersRequest
           val items = expectMsgType[GetOrdersResponse].orders.map(_.order.id) //should have size 1000
-          println(items.size)
         }
 
       }

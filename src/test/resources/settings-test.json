@@ -32,10 +32,8 @@
     "maxConnections": 10,
     "peersDataBroadcastDelay": 900
   },
-
   "walletPassword": "cookies",
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
-
   "rpcPort": 9092,
   "maxRollback": 100,
   "history": "blockchain",
@@ -45,7 +43,7 @@
   "cors": true,
 
   "apiKeyHash": "JDJkZrg24XwvBgBUi6PgpHzrAFgeefb7nU8LJPRR58ga",
-  "offlineGeneration": true,
+  "offlineGeneration": false,
 
   "forkChunkSize": 1,
   "scoreBroadcastDelay": 2000,

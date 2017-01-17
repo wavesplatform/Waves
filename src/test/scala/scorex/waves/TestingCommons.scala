@@ -119,6 +119,14 @@ trait TestingCommons {
       applications.foreach(_.shutdown())
   }
 
+  def waitForNextBlock(application: Application): Unit = {
+    val history = application.transactionModule.blockStorage.history
+    val initialHeight = history.height()
+    untilTimeout(5.seconds) {
+      require(history.height() > initialHeight)
+    }
+  }
+
   def forgeSignature(signature: Array[Byte]): Array[Byte] = {
     val modifier: BigInt = BigInt("7237005577332262213973186563042994240857116359379907606001950938285454250989")
     signature.take(32) ++ (BigInt(signature.takeRight(32).reverse) + modifier).toByteArray.reverse
