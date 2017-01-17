@@ -8,8 +8,7 @@ class IncludedValidator(storage: StateStorageI, settings: WavesHardForkParameter
 
 
   override def isValid(tx: Transaction): Boolean = tx match {
-//TODO    case tx: PaymentTransaction if tx.timestamp < settings.requirePaymentNotIncludedAfterTimestamp => true
-    case tx: PaymentTransaction => true
+    case tx: PaymentTransaction if tx.timestamp < settings.requirePaymentNotIncludedAfterTimestamp => true
     case tx: Transaction => storage.included(tx.id, None).isEmpty
   }
 

@@ -39,6 +39,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
     override def allowUnissuedAssetsUntil: Long = Long.MaxValue
     override def allowBurnTransactionAfterTimestamp: Long = Long.MaxValue
+    override def requirePaymentNotIncludedAfterTimestamp: Long = Long.MaxValue
   }
 
   implicit val app = stub[MyApp]
