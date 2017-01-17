@@ -8,7 +8,6 @@ import scorex.settings.SettingsMock
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.{implicitConversions, postfixOps}
 
-@DoNotDiscover
 class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
   val database = new PeerDatabaseImpl(TestSettings, None)
