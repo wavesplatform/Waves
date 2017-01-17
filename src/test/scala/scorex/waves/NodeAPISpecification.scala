@@ -3,7 +3,6 @@ package scorex.waves
 import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSuite, Matchers}
 import scorex.api.http.ApiKeyNotValid
 
-@DoNotDiscover
 class NodeAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
   import TestingCommons._

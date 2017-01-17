@@ -2,7 +2,6 @@ package scorex.waves
 
 import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSuite, Matchers}
 
-@DoNotDiscover
 class DebugAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
   import TestingCommons._

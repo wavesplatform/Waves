@@ -19,7 +19,6 @@ import scorex.waves.TestingCommons._
   * !!! Tests should work only as whole TestSuite in sequence one by one, not separately,
   * as the state depends on the previous test
   */
-@DoNotDiscover
 class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll with Eventually {
   private val wallet = application.wallet
   private val AccountM = wallet.privateKeyAccounts()(2)

@@ -9,7 +9,6 @@ import scorex.crypto.encode.Base58
 import scorex.waves.http.UnsignedPayment
 import scorex.waves.transaction.{ExternalPayment, SignedPayment}
 
-@DoNotDiscover
 class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
 
   import TestingCommons._
