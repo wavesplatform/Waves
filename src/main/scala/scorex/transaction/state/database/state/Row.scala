@@ -9,13 +9,13 @@ import scorex.serialization.BytesSerializable
 import scorex.transaction.{FeesStateChange, StateChangeReason, TypedTransaction}
 
 @SerialVersionUID(-3499112732510272830L)
-case class Row(state: AccState, reason: Reason, lastRowHeight: Int) extends BytesSerializable {
+case class Row(state: AccState, reason: ReasonIds, lastRowHeight: Int) extends BytesSerializable {
 
   lazy val bytes: Array[Byte] = Ints.toByteArray(lastRowHeight) ++
     Longs.toByteArray(state.balance) ++
     Ints.toByteArray(reason.length) ++
     reason.foldLeft(Array.empty: Array[Byte]) { (b, scr) =>
-      b ++ Ints.toByteArray(scr.bytes.length) ++ scr.bytes
+      b ++ Ints.toByteArray(scr.length) ++ scr
     }
 }
 
@@ -32,12 +32,11 @@ object Row {
     val lrh = b.getInt
     val accBalance = b.getLong
     val reasonLength = b.getInt
-    val reason: Seq[StateChangeReason] = (0 until reasonLength) map { i =>
+    val reason: Seq[Array[Byte]] = (0 until reasonLength) map { i =>
       val txSize = b.getInt
-      val tx = new Array[Byte](txSize)
-      b.get(tx)
-      if (txSize == 8) FeesStateChange(Longs.fromByteArray(tx))
-      else TypedTransaction.parseBytes(tx).get //todo: .get w/out catching
+      val txId = new Array[Byte](txSize)
+      b.get(txId)
+      txId
     }
     Row(AccState(accBalance), reason.toList, lrh)
   }
