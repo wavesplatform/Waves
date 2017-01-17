@@ -25,9 +25,9 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
   private def addresses = applicationNonEmptyAccounts.map(_.address)
 
   test("/transactions/unconfirmed API route") {
-    (1 to 20) foreach (i => genValidTransaction())
+    (1 to 20) foreach (_ => genValidTransaction())
     val unconfirmed = transactionModule.utxStorage.all()
-    unconfirmed.size should be > 0
+    unconfirmed.size shouldBe 20
     val tr = GET.request("/transactions/unconfirmed")
     (tr \\ "signature").toList.size shouldBe unconfirmed.size
   }

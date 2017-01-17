@@ -3,10 +3,11 @@ package scorex.lagonaki
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.Block
 import scorex.transaction.{GenesisTransaction, History, Transaction}
+import scorex.utils.ScorexLogging
 
 import scala.util.Random
 
-trait TransactionTestingCommons extends scorex.waves.TestingCommons {
+trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexLogging {
   implicit lazy val consensusModule = application.consensusModule
   implicit lazy val transactionModule = application.transactionModule
 
@@ -46,7 +47,7 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons {
                           senderOpt: Option[PrivateKeyAccount] = None
                          ): Transaction = {
     val senderAcc = senderOpt.getOrElse(randomFrom(applicationNonEmptyAccounts))
-    val senderBalance = application.consensusModule.generatingBalance(senderAcc)
+    val senderBalance = application.consensusModule.generatingBalance(senderAcc) / 1000
     require(senderBalance > 0)
     val fee = Random.nextInt(5).toLong + 1
     if (senderBalance <= fee) {

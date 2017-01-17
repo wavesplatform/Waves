@@ -23,6 +23,14 @@ class MessageSpecification extends FunSuite with BeforeAndAfterAll {
   private def toMessage(v: Try[(MessageSpec[_], Array[Byte])]) =
     v.map { case (spec, bytes) => Message(spec, Left(bytes), None) }
 
+  override def beforeAll(): Unit = {
+    start()
+  }
+
+  override def afterAll(): Unit = {
+    stop()
+  }
+
   test("ScoreMessage roundtrip 1") {
     val s1 = BigInt(Long.MaxValue) * 1000000000L
 

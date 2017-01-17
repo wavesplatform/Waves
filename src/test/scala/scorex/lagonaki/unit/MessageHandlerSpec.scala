@@ -17,6 +17,14 @@ class MessageHandlerSpec extends FunSuite with BeforeAndAfterAll {
 
   import Message._
 
+  override def beforeAll(): Unit = {
+    start()
+  }
+
+  override def afterAll(): Unit = {
+    stop()
+  }
+
   test("parseBytes have to verify Length field in parsing packet") {
     val s1 = BigInt(Long.MaxValue) * 1000000000L
 

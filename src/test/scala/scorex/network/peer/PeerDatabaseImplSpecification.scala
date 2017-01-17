@@ -2,12 +2,13 @@ package scorex.network.peer
 
 import java.net.InetSocketAddress
 
-import org.scalatest.{Matchers, path}
+import org.scalatest.{DoNotDiscover, Matchers, path}
 import scorex.settings.SettingsMock
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.{implicitConversions, postfixOps}
 
+@DoNotDiscover
 class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
   val database = new PeerDatabaseImpl(TestSettings, None)
