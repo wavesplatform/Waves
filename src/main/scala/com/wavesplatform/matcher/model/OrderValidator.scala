@@ -2,16 +2,21 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
+import scorex.account.PublicKeyAccount
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.Validation.BooleanOperators
 import scorex.transaction.assets.exchange.{Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.NTP
+import scorex.wallet.Wallet
 
 trait OrderValidator {
   this: OrderHistory =>
   val storedState: StoredState
   val settings: MatcherSettings
+  val wallet: Wallet
+
+  lazy val matcherPubKey: PublicKeyAccount = wallet.privateKeyAccount(settings.matcherAccount).get
 
   def isBalanceWithOpenOrdersEnough(order: Order): Boolean = {
     val (acc, feeAcc) = (AssetAcc(order.sender, order.spendAssetId), AssetAcc(order.sender, None))
@@ -26,6 +31,7 @@ trait OrderValidator {
   def validateNewOrder(order: Order): Validation = {
     (openOrdersCount.getOrElse(order.sender.address, 0) <= settings.maxOpenOrdersCount) :|
       s"Open orders count limit exceeded (Max = ${settings.maxOpenOrdersCount})" &&
+      (order.matcher == matcherPubKey) :| "Incorrect matcher public key" &&
       order.isValid(NTP.correctedTime()) &&
       (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
       !ordersRemainingAmount.contains(order.idStr) :| "Order is already accepted" &&
