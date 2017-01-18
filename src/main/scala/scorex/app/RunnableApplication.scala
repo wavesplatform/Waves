@@ -68,11 +68,11 @@ trait RunnableApplication extends Application with ScorexLogging {
   lazy override val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   private lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
-  @volatile var httpF : Future[ServerBinding] = _
+  @volatile var httpF: Future[ServerBinding] = _
 
   def run() {
-    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors }")
-    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory }")
+    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
+    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
 
     checkGenesis()
 
@@ -81,8 +81,8 @@ trait RunnableApplication extends Application with ScorexLogging {
     if (settings.rpcEnabled) {
       val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
       httpF = Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
-      httpF.map(
-        _ => log.info(s"RPC was bound on ${settings.rpcAddress}:${settings.rpcPort}")
+      Await.result(httpF, 10 seconds)
+      httpF.map(_ => log.info(s"RPC was bound on ${settings.rpcAddress}:${settings.rpcPort}")
       )
     }
 
@@ -96,26 +96,24 @@ trait RunnableApplication extends Application with ScorexLogging {
     sys.addShutdownHook {
       shutdown()
     }
-    actorSystem.registerOnTermination {
-      stopWallet()
-    }
   }
 
-  private def stopWallet() = synchronized {
-    log.info("Closing wallet")
-    wallet.close()
-  }
-
-  def shutdown(): Unit = synchronized {
-    Try {if (settings.rpcEnabled) {
-      Await.ready(httpF.flatMap(x => x.unbind()), 10 seconds)
-    }
+  def shutdown(): Unit = {
+    Try {
+      if (settings.rpcEnabled) {
+        Await.ready(httpF.flatMap(x => x.unbind()), 9 seconds)
+      }
       log.info("Stopping network services")
       if (settings.upnpEnabled) upnp.deletePort(settings.port)
       implicit val askTimeout = Timeout(10.seconds)
-      Await.result(networkController ? NetworkController.ShutdownNetwork, 10.seconds)
-      Await.result(actorSystem.terminate(), 10.seconds)
-    }.failed.foreach(e => log.warn("Stop network error", e))
+      Await.result(networkController ? NetworkController.ShutdownNetwork, 11.seconds)
+      Await.result(actorSystem.terminate(), 12.seconds)
+      log.info("Closing wallet")
+      wallet.close()
+    }.failed.foreach(e => {
+      println("Stop network error:::" + e)
+      log.warn("Stop network error", e)
+    })
 
   }
 

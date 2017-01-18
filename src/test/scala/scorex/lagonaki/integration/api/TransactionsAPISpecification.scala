@@ -7,12 +7,12 @@ import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.GenesisTransaction
 
-class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll  with scorex.waves.TestingCommons {
+class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons {
 
 
   override def beforeAll(): Unit = {
+    super.beforeAll()
     stopGeneration(applications)
-
     if (application.wallet.privateKeyAccounts().size < 10) application.wallet.generateNewAccounts(10)
   }
 
@@ -27,7 +27,7 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
     val unconfirmed = transactionModule.utxStorage.all()
     unconfirmed.size shouldBe 20
     val tr = GET.request("/transactions/unconfirmed")
-    (tr \\ "signature").toList.size shouldBe unconfirmed.size
+        (tr \\ "signature").toList.size shouldBe unconfirmed.size
   }
 
   test("/transactions/address/{address}/limit/{limit} API route") {

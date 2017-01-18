@@ -2,7 +2,7 @@ package scorex.waves
 
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 
-class DebugAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll  with scorex.waves.TestingCommons {
+class DebugAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
   override def afterAll: Unit = {
     stop()

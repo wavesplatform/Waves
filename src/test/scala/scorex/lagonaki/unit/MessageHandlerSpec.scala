@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler}
 
-class MessageHandlerSpec extends FunSuite with BeforeAndAfterAll  with scorex.waves.TestingCommons  {
+class MessageHandlerSpec extends FunSuite with scorex.waves.TestingCommons  {
 
   implicit val consensusModule = application.consensusModule
   implicit val transactionModule = application.transactionModule

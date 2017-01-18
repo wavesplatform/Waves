@@ -7,7 +7,7 @@ import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.BlockChain
 
 
-class BlockAPISpecification extends FunSuite with Matchers with TransactionTestingCommons with BeforeAndAfterAll  with scorex.waves.TestingCommons {
+class BlockAPISpecification extends FunSuite with Matchers with TransactionTestingCommons {
 
   private val history = application.blockStorage.history
   private val genesis = history.genesis

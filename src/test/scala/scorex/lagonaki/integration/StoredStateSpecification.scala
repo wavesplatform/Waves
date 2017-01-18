@@ -10,11 +10,10 @@ import scorex.transaction.state.database.state.AccState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
 import scorex.utils._
-import scorex.waves.TestingCommons
 
 import scala.util.Random
 
-class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues with BeforeAndAfterAll with TestingCommons{
+class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues with BeforeAndAfterAll {
 
   private val state = application.transactionModule.blockStorage.state
   private val history = application.transactionModule.blockStorage.history

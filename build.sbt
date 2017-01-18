@@ -71,7 +71,9 @@ fork in Test := false
 parallelExecution in ThisBuild := false
 parallelExecution in Test := false
 
-testOptions in Test += Tests.Argument("-oIDO", "-u", "target/test-reports")
+testOptions in Test += Tests.Argument("-oIDOF", "-u", "target/test-reports")
+
+concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 
 //assembly settings
 assemblyJarName in assembly := "scorex.jar"

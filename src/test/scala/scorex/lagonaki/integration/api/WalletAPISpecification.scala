@@ -3,7 +3,7 @@ package scorex.lagonaki.integration.api
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scorex.crypto.encode.Base58
 
-class WalletAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll   with scorex.waves.TestingCommons {
+class WalletAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
 
   override def beforeAll(): Unit = {

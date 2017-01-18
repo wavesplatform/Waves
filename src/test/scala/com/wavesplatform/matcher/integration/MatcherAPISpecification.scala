@@ -18,7 +18,7 @@ import scorex.utils.NTP
   * !!! Tests should work only as whole TestSuite in sequence one by one, not separately,
   * as the state depends on the previous test
   */
-class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll with Eventually with scorex.waves.TestingCommons {
+class MatcherAPISpecification extends FunSuite with Matchers with Eventually with scorex.waves.TestingCommons {
   private val wallet = application.wallet
   private val AccountM = wallet.privateKeyAccounts()(2)
   private val AccountA = wallet.privateKeyAccounts().head
@@ -33,10 +33,6 @@ class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfter
 
   private val MatcherPubKey = application.wallet.privateKeyAccount(application.settings.matcherAccount).
     map(a => Base58.encode(a.publicKey)).get
-
-  override def beforeAll: Unit = {
-    initBalances()
-  }
 
   def initBalances() = {
     assetTransfer(AccountM, AccountA, 2000 * Constants.UnitsInWave)
@@ -95,11 +91,6 @@ class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfter
     stop()
   }
 
-  test("/matcher/publicKey") {
-    val resp = matcherGetRequest("/publicKey")
-    resp.as[String] shouldBe MatcherPubKey
-  }
-
   def placeOrder(acc: PrivateKeyAccount, spendAsset: Option[String], receiveAsset: Option[String],
                  price: Double, amount: Long, expectedStatus: String = "OrderAccepted"): Option[String] = {
     val timeToLive = NTP.correctedTime() + Order.MaxLiveTime - 1000
@@ -136,6 +127,39 @@ class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfter
     eventually(timeout(5 seconds), interval(500 millis)) {
       (getOrderStatus(Asset1, id) \ "status").as[String] should be ("Filled")
     }
+  }
+
+  def cancelOrder(acc: PrivateKeyAccount, spendAsset: Option[String], receiveAsset: Option[String],
+                  orderId: String, expectedStatus: String = "OrderCanceled"): Unit = {
+    val ts = NTP.correctedTime()
+    val pubKeyStr = Base58.encode(acc.publicKey)
+    val json = s"""{
+                  |  "sender": "$pubKeyStr",
+                  |  "orderId": "$orderId",
+                  |  "signature": "signature"
+                  |}""".stripMargin
+    val orderCancel = Json.parse(json).validate[CancelOrderRequest].get
+    val signed = CancelOrderRequest.sign(orderCancel, acc)
+    val signedJson = signed.json
+
+    val (a1, a2) = if (spendAsset.isDefined) (spendAsset.get, receiveAsset.getOrElse("")) else
+      (receiveAsset.get, spendAsset.getOrElse(""))
+
+    val resp = matcherPostRequest("/orders/cancel", body = signedJson.toString,
+      params =  Map("asset1" -> a1, "asset2" -> a2))
+
+    (resp \ "status").as[String] shouldBe expectedStatus
+  }
+
+
+  test("start") {
+    // don't move this to `beforeAll`! if this fails, `afterAll` never happens, leading to ports remain open
+    initBalances()
+  }
+
+  test("/matcher/publicKey") {
+    val resp = matcherGetRequest("/publicKey")
+    resp.as[String] shouldBe MatcherPubKey
   }
 
   test("place sell order") {
@@ -196,28 +220,6 @@ class MatcherAPISpecification extends FunSuite with Matchers with BeforeAndAfter
     waitForBalance(MBalance1, AccountM, Asset1)
     ABalance1 += assetAmount // shouldBe 900
     waitForBalance(ABalance1, AccountA, Asset1)
-  }
-
-  def cancelOrder(acc: PrivateKeyAccount, spendAsset: Option[String], receiveAsset: Option[String],
-                  orderId: String, expectedStatus: String = "OrderCanceled"): Unit = {
-    val ts = NTP.correctedTime()
-    val pubKeyStr = Base58.encode(acc.publicKey)
-    val json = s"""{
-                   |  "sender": "$pubKeyStr",
-                   |  "orderId": "$orderId",
-                   |  "signature": "signature"
-                   |}""".stripMargin
-    val orderCancel = Json.parse(json).validate[CancelOrderRequest].get
-    val signed = CancelOrderRequest.sign(orderCancel, acc)
-    val signedJson = signed.json
-
-    val (a1, a2) = if (spendAsset.isDefined) (spendAsset.get, receiveAsset.getOrElse("")) else
-      (receiveAsset.get, spendAsset.getOrElse(""))
-
-    val resp = matcherPostRequest("/orders/cancel", body = signedJson.toString,
-      params =  Map("asset1" -> a1, "asset2" -> a2))
-
-    (resp \ "status").as[String] shouldBe expectedStatus
   }
 
   test("cancel order and resubmit a new one") {

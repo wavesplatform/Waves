@@ -10,7 +10,7 @@ import scorex.transaction.History
 
 import scala.util.Try
 
-class MessageSpecification extends FunSuite with BeforeAndAfterAll  with scorex.waves.TestingCommons  {
+class MessageSpecification extends FunSuite with scorex.waves.TestingCommons  {
 
   implicit val consensusModule = application.consensusModule
   implicit val transactionModule = application.transactionModule

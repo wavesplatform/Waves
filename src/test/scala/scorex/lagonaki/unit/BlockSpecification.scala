@@ -10,7 +10,7 @@ import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
 
-class BlockSpecification extends FunSuite with Matchers with BeforeAndAfterAll  with scorex.waves.TestingCommons  {
+class BlockSpecification extends FunSuite with Matchers with scorex.waves.TestingCommons  {
 
   override def afterAll(): Unit = {
     stop()

@@ -3,6 +3,7 @@ package scorex.lagonaki.unit
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import org.h2.mvstore.MVStore
+import org.scalatest.DoNotDiscover
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.app.Application
