@@ -35,6 +35,10 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
 
   context.system.scheduler.schedule(settings.snapshotInterval, settings.snapshotInterval, self, SaveSnapshot)
 
+  override def postStop(): Unit = {
+    log.info(context.self.toString() + " - postStop method")
+  }
+
   override def receiveCommand: Receive = {
     case order:Order =>
       handleAddOrder(order)
@@ -167,11 +171,11 @@ object OrderBookActor {
 
   //protocol
   sealed trait OrderBookRequest {
-    def pair: AssetPair
+    def assetPair: AssetPair
   }
-  case class GetOrderBookRequest(pair: AssetPair, depth: Option[Int]) extends OrderBookRequest
-  case class GetOrderStatus(pair: AssetPair, id: String) extends OrderBookRequest
-  case class CancelOrder(pair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
+  case class GetOrderBookRequest(assetPair: AssetPair, depth: Option[Int]) extends OrderBookRequest
+  case class GetOrderStatus(assetPair: AssetPair, id: String) extends OrderBookRequest
+  case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
     def orderId: String = Base58.encode(req.orderId)
   }
 

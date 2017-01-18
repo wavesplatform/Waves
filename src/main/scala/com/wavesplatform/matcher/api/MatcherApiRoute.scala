@@ -210,7 +210,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.assets.exchange.OrderCancelTransaction"
+      dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
     )
   ))
   def cancel: Route = path("orders" / "cancel") {

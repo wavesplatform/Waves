@@ -6,12 +6,15 @@ import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.market.OrderBookActor.{NotFoundPair, OrderBookRequest, OrderRejected}
 import com.wavesplatform.settings.WavesSettings
 import scorex.transaction.SimpleTransactionModule._
-import scorex.transaction.{AssetAcc, TransactionModule}
+import scorex.transaction.TransactionModule
+import scorex.transaction.assets.exchange.Validation.BooleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
-import scorex.transaction.assets.exchange.Validation.BooleanOperators
+
+import scala.language.reflectiveCalls
+import scala.util.Try
 
 object MatcherActor {
   def name = "matcher"
@@ -25,41 +28,48 @@ object MatcherActor {
 class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSettings,
                    transactionModule: TransactionModule[StoredInBlock]
                   ) extends PersistentActor with ScorexLogging {
-  def createOrderBook(pair: AssetPair) =
+
+  def createOrderBook(pair: AssetPair): ActorRef =
     context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule),
       OrderBookActor.name(pair))
 
-  def basicValidation(order: Order): Validation = {
-      order.isValid(NTP.correctedTime()) &&
-        (storedState.assetBalance(AssetAcc(order.sender, order.spendAssetId)) >= order.getSpendAmount()) :| "Not enough balance"
+  def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
+    Try(msg.assetPair).isSuccess :| "Invalid AssetPair" &&
+      msg.assetPair.first.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :| "Not enough balance" &&
+      msg.assetPair.second.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :| "Not enough balance"
   }
 
-  def createAndForward(order: Order) = {
-    val v = basicValidation(order)
-    if (v) {
-      val orderBook = createOrderBook(order.assetPair)
-      persistAsync(OrderBookCreated(order.assetPair)) { _ =>
-        forwardReq(order)(orderBook)
-      }
-    } else sender() ! OrderRejected(v.messages)
+  def createAndForward(order: Order): Unit = {
+    val orderBook = createOrderBook(order.assetPair)
+    persistAsync(OrderBookCreated(order.assetPair)) { _ =>
+      forwardReq(order)(orderBook)
+    }
   }
 
-  def returNotFound() = {
+  def returNotFound(): Unit = {
     sender() ! NotFoundPair
   }
 
-  def forwardReq(req: Any)(orderBook: ActorRef) = orderBook forward req
+  def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
+
+  def checkAssetPair[A <: { def assetPair: AssetPair }](msg: A)(f: => Unit): Unit = {
+    val v = basicValidation(msg)
+    if (v) f
+    else sender() ! OrderRejected(v.messages())
+  }
 
   def forwardToOrderBook: Receive = {
     case order: Order =>
-      context.child(OrderBookActor.name(order.assetPair))
-        .fold(createAndForward(order))(forwardReq(order))
+      checkAssetPair(order) {
+        context.child(OrderBookActor.name(order.assetPair))
+          .fold(createAndForward(order))(forwardReq(order))
+      }
     case ob: OrderBookRequest =>
-      context.child(OrderBookActor.name(ob.pair))
-        .fold(returNotFound())(forwardReq(ob))
+      checkAssetPair(ob) {
+        context.child(OrderBookActor.name(ob.assetPair))
+          .fold(returNotFound())(forwardReq(ob))
+      }
   }
-
-  override def receive: Receive = forwardToOrderBook
 
   override def receiveRecover: Receive = {
     case OrderBookCreated(pair) =>
