@@ -13,7 +13,7 @@ import scorex.utils._
 
 import scala.util.Random
 
-class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues with BeforeAndAfterAll {
+class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   private val state = application.transactionModule.blockStorage.state
   private val history = application.transactionModule.blockStorage.history

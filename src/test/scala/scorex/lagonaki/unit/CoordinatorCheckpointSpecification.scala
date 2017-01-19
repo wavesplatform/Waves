@@ -37,11 +37,11 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     override lazy val checkpointPublicKey: Option[Array[Byte]] = Some(pk.publicKey)
   }
 
-  val testblockGenerator = TestProbe("blockGenerator")
+  val testBlockGenerator = TestProbe("blockGenerator")
   val testBlockchainSynchronizer = TestProbe("BlockChainSynchronizer")
   val testScoreObserver = TestProbe("ScoreObserver")
   val testPeerManager = TestProbe("PeerManager")
-  val connectedPeer = stub[ConnectedPeer]
+  val connectedPeer: ConnectedPeer = stub[ConnectedPeer]
 
   val db = new MVStore.Builder().open()
 
@@ -53,7 +53,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     lazy val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = TestSettings
-    lazy val blockGenerator: ActorRef = testblockGenerator.ref
+    lazy val blockGenerator: ActorRef = testBlockGenerator.ref
     lazy val blockchainSynchronizer: ActorRef = testBlockchainSynchronizer.ref
     lazy val peerManager: ActorRef = testPeerManager.ref
     lazy val history: History = transactionModule.blockStorage.history
@@ -66,7 +66,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   override lazy protected val actorRef: ActorRef = system.actorOf(Props(classOf[Coordinator], app))
   val gen = new PrivateKeyAccount(Array(0.toByte))
-  var score = 10000
+  var score: Int = 10000
 
   def createBlock(reference: Array[Byte]): Block = {
     val version = 1: Byte
@@ -80,10 +80,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     Block.buildAndSign(version, timestamp, reference, cbd, Seq[Transaction](), gen)
   }
 
-  implicit val consensusModule = app.consensusModule
-  implicit val transactionModule = app.transactionModule
+  implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = app.consensusModule
+  implicit val transactionModule: TransactionModule[StoredInBlock] = app.transactionModule
   private lazy val repo = app.basicMessagesSpecsRepo
-  val genesisTimestamp = System.currentTimeMillis()
+  val genesisTimestamp: Long = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
     transactionModule.blockStorage.appendBlock(Block.genesis(genesisTimestamp))
   }

@@ -61,13 +61,11 @@ object UnitTestNetParams extends ChainParameters {
 trait TestingCommons extends Suite with BeforeAndAfterAll {
 
   override def beforeAll(): Unit = {
-    println("!!! TEST STARTED !!!")
     super.beforeAll()
     Thread.sleep(1000)
   }
 
   override def afterAll(): Unit = {
-    println("??? TEST STOPPED ???")
     super.afterAll()
     stop()
   }
@@ -125,26 +123,13 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
 
   val application: Application = applications.head
 
-  def measure[R](msg: String)(f: => R): R = {
-    val t0 = System.currentTimeMillis()
-    val r = f
-    val t1 = System.currentTimeMillis()
-    println(s"$msg : ${(t1 - t0)}ms")
-    r
-  }
-
   def stop(): Unit = {
-    applications.foreach(a => measure(s"shut down ${a.settings.nodeNonce}") {
+    applications.foreach(a => {
 
       if (a.settings.isRunMatcher) {
-        measure(s"matcher for ${a.settings.nodeNonce}") {
-          a.shutdownMatcher()
-        }
+        a.shutdownMatcher()
       }
-      measure(s"main of ${a.settings.nodeNonce}") {
         a.shutdown()
-      }
-
     })
   }
 

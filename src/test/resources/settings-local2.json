@@ -17,7 +17,7 @@
   "rpcPort": 9086,
   "maxRollback": 100,
   "offlineGeneration": false,
-  "scoreBroadcastDelay": 1000,
-  "blockGenerationDelay": 501,
+  "scoreBroadcastDelay": 500,
+  "blockGenerationDelay": 500,
   "tflikeScheduling": false
 }

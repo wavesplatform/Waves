@@ -1,8 +1,8 @@
 package scorex.lagonaki
 
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-import scorex.transaction.{GenesisTransaction, History, Transaction}
+import scorex.transaction.{History, Transaction}
 import scorex.utils.ScorexLogging
 
 import scala.util.Random

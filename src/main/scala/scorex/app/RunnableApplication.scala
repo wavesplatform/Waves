@@ -68,6 +68,8 @@ trait RunnableApplication extends Application with ScorexLogging {
   lazy override val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   private lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
+  @volatile private var shutdownInProgress = false
+
   @volatile var serverBinding: ServerBinding = _
 
   def run() {
@@ -98,18 +100,23 @@ trait RunnableApplication extends Application with ScorexLogging {
   }
 
   def shutdown(): Unit = {
-    log.info("Stopping network services")
-    if (settings.rpcEnabled) {
-      Try(Await.ready(serverBinding.unbind(), 60.seconds)).failed.map(e => log.error("Failed to unbind RPC port" + e.getMessage))
-    }
-    if (settings.upnpEnabled) upnp.deletePort(settings.port)
+    if (!shutdownInProgress) {
+      log.info("Stopping network services")
+      shutdownInProgress = true
+      if (settings.rpcEnabled) {
+        Try(Await.ready(serverBinding.unbind(), 60.seconds)).failed.map(e => log.error("Failed to unbind RPC port: " + e.getMessage))
+      }
+      if (settings.upnpEnabled) upnp.deletePort(settings.port)
 
-    implicit val askTimeout = Timeout(60.seconds)
-    Try(Await.result(networkController ? NetworkController.ShutdownNetwork, 60.seconds)).failed.map(e => log.error("Failed to unbind RPC port" + e.getMessage))
-    Try(Await.result(actorSystem.terminate(), 60.seconds)).failed.map(e => log.error("Failed to unbind RPC port" + e.getMessage))
-    log.debug("Closing wallet")
-    wallet.close()
-    log.info("Shutdown complete")
+      implicit val askTimeout = Timeout(60.seconds)
+      Try(Await.result(networkController ? NetworkController.ShutdownNetwork, 60.seconds))
+        .failed.map(e => log.error("Failed to shutdown network: " + e.getMessage))
+      Try(Await.result(actorSystem.terminate(), 60.seconds))
+        .failed.map(e => log.error("Failed to terminate actor system: " + e.getMessage))
+      log.debug("Closing wallet")
+      wallet.close()
+      log.info("Shutdown complete")
+    }
   }
 
   private def checkGenesis(): Unit = {

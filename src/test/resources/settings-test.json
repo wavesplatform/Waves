@@ -37,7 +37,7 @@
   "rpcPort": 9092,
   "maxRollback": 100,
   "history": "blockchain",
-  "blockGenerationDelay": 1000,
+  "blockGenerationDelay": 500,
   "suspendedSenders": ["3N8j8ZrvcaRtJE1oPLA3enbBZAbyHEzRBw5"],
   "minimumTxFee": 333,
   "cors": true,
@@ -46,7 +46,7 @@
   "offlineGeneration": false,
 
   "forkChunkSize": 1,
-  "scoreBroadcastDelay": 2000,
+  "scoreBroadcastDelay": 500,
 
   "matcher": {
     "account": "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",
