@@ -1,13 +1,9 @@
 package scorex.waves
 
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import scorex.api.http.ApiKeyNotValid
 
 class NodeAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
-
-  override def afterAll: Unit = {
-    stop()
-  }
 
   test("/node/status API route") {
     val status = getRequest("/node/status")

@@ -165,12 +165,12 @@ case class PeerConnectionHandler(application: RunnableApplication,
       context stop self
 
     case CloseConnection =>
-      log.info(s"Enforced to close communication with: " + remote + s" in state $stateName")
-      sender() ! Status.Success()
+      log.info(s"Enforced to close communication with: $remote in state $stateName")
+      sender() ! CloseConnectionCompleted(remote)
       context stop self
 
     case CommandFailed(cmd: Tcp.Command) =>
-      log.warn("Failed to execute command : " + cmd + s" in state $stateName")
+      log.warn(s"Failed to execute command: $cmd in state $stateName")
   }
 
   private var chunksBuffer: ByteString = CompactByteString()
@@ -210,4 +210,6 @@ object PeerConnectionHandler {
   private case object HandshakeTimeout
 
   case object CloseConnection
+
+  case class CloseConnectionCompleted(remote: InetSocketAddress)
 }

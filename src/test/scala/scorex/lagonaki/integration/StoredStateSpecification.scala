@@ -22,10 +22,6 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
   require(acc.address != recipient.address)
 
-  override protected def afterAll(): Unit = {
-    stop()
-  }
-
   test("invalidate transaction with forged signature in sequence") {
     val amount = state.balance(acc) / 1000
     val ts = System.currentTimeMillis()

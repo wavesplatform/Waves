@@ -1,12 +1,8 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 
-class PeersAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons  {
-
-  override def afterAll(): Unit = {
-    stop()
-  }
+class PeersAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
   test("/peers/connect API route") {
     POST.incorrectApiKeyTest("/peers/connect")

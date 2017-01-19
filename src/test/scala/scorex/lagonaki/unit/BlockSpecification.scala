@@ -1,6 +1,6 @@
 package scorex.lagonaki.unit
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
@@ -10,11 +10,7 @@ import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
 
-class BlockSpecification extends FunSuite with Matchers with scorex.waves.TestingCommons  {
-
-  override def afterAll(): Unit = {
-    stop()
-  }
+class BlockSpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
   test("Nxt block with txs bytes/parse roundtrip") {
     implicit val consensusModule = new NxtLikeConsensusModule(WavesHardForkParameters.Disabled)

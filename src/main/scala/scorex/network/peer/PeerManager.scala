@@ -6,7 +6,7 @@ import akka.actor.{Actor, ActorRef, Status}
 import akka.pattern._
 import akka.util.Timeout
 import scorex.app.Application
-import scorex.network.NetworkController.{SendToNetwork, ShutdownNetwork}
+import scorex.network.NetworkController.{NetworkShutdownComplete, SendToNetwork}
 import scorex.network._
 import scorex.network.message.MessageHandler.RawNetworkData
 import scorex.network.message.{Message, MessageSpec}
@@ -47,6 +47,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   }
   private var connectingPeer: Option[InetSocketAddress] = None
 
+  private var maybeShutdownRequester: Option[ActorRef] = None
+
   override def receive: Receive = ({
     case CheckPeers =>
       if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
@@ -59,10 +61,17 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
     case MarkConnectedPeersVisited => handshakedPeers.foreach(peerDatabase.touch)
 
-    case ShutdownNetwork =>
-      val s = sender()
-      implicit val askTimeout = Timeout(10.seconds)
-      Future.sequence(connectedPeers.values.map(_.handlerRef ? CloseConnection)).map(_ => Status.Success()).pipeTo(s)
+    case CloseAllConnections =>
+      if (connectedPeers.isEmpty) {
+        sender() ! CloseAllConnectionsComplete
+      } else {
+        maybeShutdownRequester = Some(sender())
+        connectedPeers.foreach(_._2.handlerRef ! CloseConnection)
+      }
+
+    case CloseConnectionCompleted(remote) =>
+      disconnect(remote)
+      if (connectedPeers.isEmpty) maybeShutdownRequester.foreach(_ ! CloseAllConnectionsComplete)
 
   }: Receive) orElse blacklistOperations orElse peerListOperations orElse peerCycle
 
@@ -324,5 +333,9 @@ object PeerManager {
   private case object MarkConnectedPeersVisited
 
   case object BlacklistResendRequired
+
+  case object CloseAllConnections
+
+  case object CloseAllConnectionsComplete
 
 }

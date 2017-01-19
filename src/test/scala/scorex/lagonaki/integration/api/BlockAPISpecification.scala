@@ -1,6 +1,6 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.JsValue
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
@@ -13,6 +13,7 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
   private val genesis = history.genesis
 
   override def beforeAll(): Unit = {
+    super.beforeAll()
     stopGeneration(applications)
 
     while (history.height() < 3) {
@@ -20,10 +21,6 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
     }
 
     startGeneration(applications)
-  }
-
-  override def afterAll(): Unit = {
-    stop()
   }
 
   private def last = history.lastBlock

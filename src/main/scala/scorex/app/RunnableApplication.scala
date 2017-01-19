@@ -1,11 +1,12 @@
 package scorex.app
 
 import akka.actor.{ActorSystem, Props}
-import akka.pattern.ask
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
+import akka.pattern.ask
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
@@ -17,12 +18,11 @@ import scorex.transaction.{BlockStorage, History}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 import scala.reflect.runtime.universe.Type
 import scala.util.Try
-import akka.util.Timeout
 
 trait RunnableApplication extends Application with ScorexLogging {
 
@@ -68,7 +68,7 @@ trait RunnableApplication extends Application with ScorexLogging {
   lazy override val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   private lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
-  @volatile var httpF: Future[ServerBinding] = _
+  @volatile var serverBinding: ServerBinding = _
 
   def run() {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
@@ -80,10 +80,9 @@ trait RunnableApplication extends Application with ScorexLogging {
 
     if (settings.rpcEnabled) {
       val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
-      httpF = Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
-      Await.result(httpF, 10.seconds)
-      httpF.map(_ => log.info(s"RPC was bound on ${settings.rpcAddress}:${settings.rpcPort}")
-      )
+      val httpFuture = Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
+      serverBinding = Await.result(httpFuture, 10.seconds)
+      log.info(s"RPC was bound on ${settings.rpcAddress}:${settings.rpcPort}")
     }
 
     Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator) foreach {
@@ -99,22 +98,18 @@ trait RunnableApplication extends Application with ScorexLogging {
   }
 
   def shutdown(): Unit = {
-    Try {
-      if (settings.rpcEnabled) {
-        Await.ready(httpF.flatMap(x => x.unbind()), 9.seconds)
-      }
-      log.info("Stopping network services")
-      if (settings.upnpEnabled) upnp.deletePort(settings.port)
-      implicit val askTimeout = Timeout(10.seconds)
-      Await.result(networkController ? NetworkController.ShutdownNetwork, 11.seconds)
-      Await.result(actorSystem.terminate(), 12.seconds)
-      log.info("Closing wallet")
-      wallet.close()
-    }.failed.foreach(e => {
-      println("Stop network error:::" + e)
-      log.warn("Stop network error", e)
-    })
+    log.info("Stopping network services")
+    if (settings.rpcEnabled) {
+      Try(Await.ready(serverBinding.unbind(), 60.seconds)).failed.map(e => log.error("Failed to unbind RPC port" + e.getMessage))
+    }
+    if (settings.upnpEnabled) upnp.deletePort(settings.port)
 
+    implicit val askTimeout = Timeout(60.seconds)
+    Try(Await.result(networkController ? NetworkController.ShutdownNetwork, 60.seconds)).failed.map(e => log.error("Failed to unbind RPC port" + e.getMessage))
+    Try(Await.result(actorSystem.terminate(), 60.seconds)).failed.map(e => log.error("Failed to unbind RPC port" + e.getMessage))
+    log.debug("Closing wallet")
+    wallet.close()
+    log.info("Shutdown complete")
   }
 
   private def checkGenesis(): Unit = {

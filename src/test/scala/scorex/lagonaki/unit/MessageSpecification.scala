@@ -2,7 +2,7 @@ package scorex.lagonaki.unit
 
 import java.nio.ByteBuffer
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.scalatest.FunSuite
 import scorex.block.Block
 import scorex.crypto.EllipticCurveImpl.SignatureLength
 import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler, MessageSpec}
@@ -10,7 +10,7 @@ import scorex.transaction.History
 
 import scala.util.Try
 
-class MessageSpecification extends FunSuite with scorex.waves.TestingCommons  {
+class MessageSpecification extends FunSuite with scorex.waves.TestingCommons {
 
   implicit val consensusModule = application.consensusModule
   implicit val transactionModule = application.transactionModule
@@ -20,10 +20,6 @@ class MessageSpecification extends FunSuite with scorex.waves.TestingCommons  {
 
   private def toMessage(v: Try[(MessageSpec[_], Array[Byte])]) =
     v.map { case (spec, bytes) => Message(spec, Left(bytes), None) }
-
-  override def afterAll(): Unit = {
-    stop()
-  }
 
   test("ScoreMessage roundtrip 1") {
     val s1 = BigInt(Long.MaxValue) * 1000000000L

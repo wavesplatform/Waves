@@ -2,7 +2,7 @@ package scorex.lagonaki.integration
 
 import akka.pattern.ask
 import com.wavesplatform.Application
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PublicKeyAccount
 import scorex.consensus.nxt
 import scorex.lagonaki.TransactionTestingCommons
@@ -24,10 +24,6 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Tran
     super.beforeAll()
     stopGeneration(peers)
     startGeneration(Seq(app))
-  }
-
-  override def afterAll(): Unit = {
-    stop()
   }
 
   def waitGenerationOfBlocks(howMany: Int): Unit = {
