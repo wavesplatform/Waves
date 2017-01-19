@@ -61,13 +61,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
   private trait App extends ApplicationMock {
 
-    class StoredBlockSeqMock extends StoredBlockSeq(new MVStore.Builder().open()) {
-      override protected[this] def toBytes(block: Block): Array[Byte] = block.uniqueId
-      override protected[this] def fromBytes(bytes: Array[Byte]): Option[Block] = Some(blockMock(bytes))
-    }
-
     private val testBlockStorage = mock[BlockStorage]
-    testBlockStorage.blockSeq _ expects() returns new StoredBlockSeqMock anyNumberOfTimes
 
     consensusModule.blockScore _ when * returns blockScore
 
