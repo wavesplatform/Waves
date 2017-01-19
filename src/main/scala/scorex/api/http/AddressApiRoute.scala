@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.account.{Account, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -194,7 +194,8 @@ case class AddressApiRoute(application: Application)(implicit val context: Actor
   def root: Route = {
     path("addresses") {
       getJsonRoute {
-        val json = JsArray(wallet.privateKeyAccounts().map(a => JsString(a.address)))
+        val accounts = wallet.privateKeyAccounts()
+        val json = JsArray(accounts.map(a => JsString(a.address)))
         JsonResponse(json, StatusCodes.OK)
       }
     }

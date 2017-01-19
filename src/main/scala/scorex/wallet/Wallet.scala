@@ -46,7 +46,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
     TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
   }
 
-  def privateKeyAccounts(): Seq[PrivateKeyAccount] = accountsCache.values.toSeq
+  def privateKeyAccounts(): List[PrivateKeyAccount] = accountsCache.values.toList
 
   def generateNewAccounts(howMany: Int): Seq[PrivateKeyAccount] =
     (1 to howMany).flatMap(_ => generateNewAccount())

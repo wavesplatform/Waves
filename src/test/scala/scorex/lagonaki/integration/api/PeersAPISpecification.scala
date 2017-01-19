@@ -2,17 +2,18 @@ package scorex.lagonaki.integration.api
 
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 
-class PeersAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
-
-  import scorex.waves.TestingCommons._
-
-  override def beforeAll(): Unit = {
-    start()
-    stopGeneration(applications)
-  }
+class PeersAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons  {
 
   override def afterAll(): Unit = {
     stop()
+  }
+
+  test("/peers/connect API route") {
+    POST.incorrectApiKeyTest("/peers/connect")
+
+    val req = POST.request("/peers/connect", body = "{\"host\":\"127.0.0.1\",\"port\":123}")
+    (req \ s"status").as[String] shouldBe "Trying to connect"
+    (req \ "hostname").asOpt[String].isDefined shouldBe true
   }
 
   test("/peers/connected API route") {
@@ -34,14 +35,6 @@ class PeersAPISpecification extends FunSuite with Matchers with BeforeAndAfterAl
   test("/peers/blacklisted API route") {
     val blacklisted = GET.request("/peers/blacklisted")
     blacklisted.as[Seq[String]] shouldBe empty
-  }
-
-  test("/peers/connect API route") {
-    POST.incorrectApiKeyTest("/peers/connect")
-
-    val req = POST.request("/peers/connect", body = "{\"host\":\"127.0.0.1\",\"port\":123}")
-    (req \ s"status").as[String] shouldBe "Trying to connect"
-    (req \ "hostname").asOpt[String].isDefined shouldBe true
   }
 
 }

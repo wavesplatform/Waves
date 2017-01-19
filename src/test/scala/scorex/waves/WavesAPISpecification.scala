@@ -9,19 +9,11 @@ import scorex.crypto.encode.Base58
 import scorex.waves.http.UnsignedPayment
 import scorex.waves.transaction.{ExternalPayment, SignedPayment}
 
-@DoNotDiscover
-class WavesAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
-
-  import TestingCommons._
-
-  override def beforeAll: Unit = {
-    start()
-  }
+class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons  {
 
   override def afterAll: Unit = {
     stop()
   }
-
 
   test("/waves/create-signed-payment API route checks sender balance") {
     val recipient = "3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"

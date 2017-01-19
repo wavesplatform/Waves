@@ -26,10 +26,6 @@ object RootActorSystem extends ScorexLogging {
       .withValue("akka.persistence.journal.leveldb.dir", ConfigValueFactory.fromAnyRef(settings.matcherJournalDataDir))
       .withValue("akka.persistence.snapshot-store.local.dir", ConfigValueFactory.fromAnyRef(settings.matcherSnapshotsDataDir)))
 
-    sys.addShutdownHook {
-      Await.result(system.terminate(), Duration.Inf)
-    }
-
     try {
       init(system)
     } catch {

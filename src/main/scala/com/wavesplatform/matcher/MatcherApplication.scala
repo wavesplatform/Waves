@@ -2,6 +2,7 @@ package com.wavesplatform.matcher
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.MatcherActor
@@ -15,7 +16,9 @@ import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import scorex.waves.transaction.WavesTransactionModule
 
+import scala.concurrent.{Await, Future}
 import scala.reflect.runtime.universe._
+import scala.concurrent.duration._
 
 trait MatcherApplication extends ScorexLogging {
   implicit def actorSystem: ActorSystem
@@ -37,13 +40,20 @@ trait MatcherApplication extends ScorexLogging {
   lazy val matcher = actorSystem.actorOf(MatcherActor.props(storedState, wallet, settings,
     transactionModule), MatcherActor.name)
 
+  @volatile var bindingFuture : Future[ServerBinding]= _
+
+  def shutdownMatcher(): Unit = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    Await.result(bindingFuture.flatMap(_.unbind()), 10 seconds)
+  }
+
   def runMatcher() {
     log.info(s"Starting matcher on: ${settings.matcherHost}:${settings.matcherPort} ...")
 
     implicit val materializer = ActorMaterializer()
 
     val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, settings.asInstanceOf[Settings]).compositeRoute
-    val bindingFuture = Http().bindAndHandle(combinedRoute, settings.matcherHost, settings.matcherPort)
+    bindingFuture = Http().bindAndHandle(combinedRoute, settings.matcherHost, settings.matcherPort)
 
     implicit val ec = actorSystem.dispatcher
     bindingFuture.map { serverBinding =>

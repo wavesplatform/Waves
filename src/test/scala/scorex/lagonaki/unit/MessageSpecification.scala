@@ -10,9 +10,7 @@ import scorex.transaction.History
 
 import scala.util.Try
 
-class MessageSpecification extends FunSuite with BeforeAndAfterAll {
-
-  import scorex.waves.TestingCommons._
+class MessageSpecification extends FunSuite with scorex.waves.TestingCommons  {
 
   implicit val consensusModule = application.consensusModule
   implicit val transactionModule = application.transactionModule
@@ -22,10 +20,6 @@ class MessageSpecification extends FunSuite with BeforeAndAfterAll {
 
   private def toMessage(v: Try[(MessageSpec[_], Array[Byte])]) =
     v.map { case (spec, bytes) => Message(spec, Left(bytes), None) }
-
-  override def beforeAll(): Unit = {
-    start()
-  }
 
   override def afterAll(): Unit = {
     stop()

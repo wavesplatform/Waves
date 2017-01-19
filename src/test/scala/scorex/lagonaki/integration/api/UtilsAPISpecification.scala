@@ -7,16 +7,13 @@ import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 
 import scala.util.Random
 
-class UtilsAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
+class UtilsAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons  {
 
-  import scorex.waves.TestingCommons._
-
-  override protected def beforeAll(): Unit = {
-    start()
+  override def beforeAll(): Unit = {
     stopGeneration(applications)
   }
 
-  override protected def afterAll(): Unit = {
+  override def afterAll(): Unit = {
     stop()
   }
 

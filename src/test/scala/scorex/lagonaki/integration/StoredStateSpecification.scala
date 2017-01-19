@@ -13,10 +13,7 @@ import scorex.utils._
 
 import scala.util.Random
 
-//TODO: Should be independed
 class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues with BeforeAndAfterAll {
-
-  import scorex.waves.TestingCommons._
 
   private val state = application.transactionModule.blockStorage.state
   private val history = application.transactionModule.blockStorage.history
@@ -24,10 +21,6 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   private val recipient = applicationEmptyAccounts.head
 
   require(acc.address != recipient.address)
-
-  override protected def beforeAll(): Unit = {
-    start()
-  }
 
   override protected def afterAll(): Unit = {
     stop()
