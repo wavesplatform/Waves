@@ -23,7 +23,7 @@ abstract class ActorTestingCommons extends TestKitBase
   with ImplicitSender
   with PathMockFactory {
 
-  protected implicit val testTimeout = Timeout(2000 milliseconds)
+  protected implicit val testTimeout = Timeout(2000.milliseconds)
   protected val testDuration = testTimeout.duration
 
   implicit final lazy val system = ActorSystem(getClass.getSimpleName)

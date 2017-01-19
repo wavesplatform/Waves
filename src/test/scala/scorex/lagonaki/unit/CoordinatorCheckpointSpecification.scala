@@ -31,7 +31,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   object TestSettings extends SettingsMock with TransactionSettings {
     override lazy val quorum: Int = 1
-    override lazy val scoreBroadcastDelay: FiniteDuration = 1000 seconds
+    override lazy val scoreBroadcastDelay: FiniteDuration = 1000.seconds
     override lazy val MaxRollback: Int = 10
 
     override lazy val checkpointPublicKey: Option[Array[Byte]] = Some(pk.publicKey)

@@ -26,7 +26,7 @@ class PeerSynchronizerSpecification extends ActorTestingCommons
     override lazy val dataDirOpt: Option[String] = None
     override lazy val nodeNonce: Long = 123456789
     override lazy val maxConnections: Int = 10
-    override lazy val peersDataResidenceTime: FiniteDuration = 100 seconds
+    override lazy val peersDataResidenceTime: FiniteDuration = 100.seconds
     override lazy val blacklistResidenceTimeMilliseconds: Long = 1000
   }
 

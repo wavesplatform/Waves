@@ -81,7 +81,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
 
   def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None): Unit = {
     val assetId = asset.flatMap(Base58.decode(_).toOption)
-    eventually(timeout(5 seconds), interval(500 millis)) {
+    eventually(timeout(5.seconds), interval(500.millis)) {
       storedState.assetBalance(
         AssetAcc(acc, assetId)) should be(balance)
     }
@@ -124,7 +124,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   }
 
   def waitForOrderStatus(asset: Option[String], id: String, status: String) = {
-    eventually(timeout(5 seconds), interval(500 millis)) {
+    eventually(timeout(5.seconds), interval(500.millis)) {
       (getOrderStatus(Asset1, id) \ "status").as[String] should be ("Filled")
     }
   }

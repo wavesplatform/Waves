@@ -180,5 +180,5 @@ object BlockGeneratorController {
 
   case object GetBlockGenerationStatus
 
-  private val SelfCheckInterval = 5 seconds
+  private val SelfCheckInterval = 5.seconds
 }

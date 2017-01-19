@@ -17,7 +17,7 @@ class NetworkListenerSpecification extends ActorTestingCommons {
   private val testPeerManager = TestProbe("peerManager")
   private val testTcp = TestProbe()
 
-  private val timeout = 6 seconds
+  private val timeout = 6.seconds
 
   private val address1 = new InetSocketAddress(InetAddress.getByName("1.1.1.1"), 12301)
   private val address2 = new InetSocketAddress(InetAddress.getByName("2.2.2.2"), 12302)

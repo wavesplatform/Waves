@@ -45,7 +45,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
       (transactionModule.isValid(_:Transaction, _: Long)) expects (*,*) never()
       transactionModule.putUnconfirmedIfNew _ expects * returns true
 
-      val actorRef = createPoolSynchronizer(100 seconds)
+      val actorRef = createPoolSynchronizer(100.seconds)
       val sender = stub[ConnectedPeer]
       actorRef ! DataFromPeer(TransactionMessageSpec.messageCode, tx, sender)
 
@@ -60,7 +60,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
 
       transactionModule.putUnconfirmedIfNew _ expects * returns false
 
-      val actorRef = createPoolSynchronizer(100 seconds)
+      val actorRef = createPoolSynchronizer(100.seconds)
       val sender = stub[ConnectedPeer]
       actorRef ! DataFromPeer(TransactionMessageSpec.messageCode, tx, sender)
 

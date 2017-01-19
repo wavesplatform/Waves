@@ -103,12 +103,12 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
   object TestSettings extends SettingsMock {
     override lazy val dataDirOpt: Option[String] = None
-    override lazy val peersDataResidenceTime: FiniteDuration = 1 seconds
+    override lazy val peersDataResidenceTime: FiniteDuration = 1.seconds
   }
 
   object TestSettings2 extends SettingsMock {
     override lazy val dataDirOpt: Option[String] = None
-    override lazy val peersDataResidenceTime: FiniteDuration = 10 seconds
+    override lazy val peersDataResidenceTime: FiniteDuration = 10.seconds
   }
 
 }

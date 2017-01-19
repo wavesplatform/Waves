@@ -44,7 +44,7 @@ trait MatcherApplication extends ScorexLogging {
 
   def shutdownMatcher(): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
-    Await.result(bindingFuture.flatMap(_.unbind()), 10 seconds)
+    Await.result(bindingFuture.flatMap(_.unbind()), 10.seconds)
   }
 
   def runMatcher() {

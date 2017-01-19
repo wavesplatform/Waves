@@ -81,7 +81,7 @@ trait RunnableApplication extends Application with ScorexLogging {
     if (settings.rpcEnabled) {
       val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
       httpF = Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
-      Await.result(httpF, 10 seconds)
+      Await.result(httpF, 10.seconds)
       httpF.map(_ => log.info(s"RPC was bound on ${settings.rpcAddress}:${settings.rpcPort}")
       )
     }
@@ -101,7 +101,7 @@ trait RunnableApplication extends Application with ScorexLogging {
   def shutdown(): Unit = {
     Try {
       if (settings.rpcEnabled) {
-        Await.ready(httpF.flatMap(x => x.unbind()), 9 seconds)
+        Await.ready(httpF.flatMap(x => x.unbind()), 9.seconds)
       }
       log.info("Stopping network services")
       if (settings.upnpEnabled) upnp.deletePort(settings.port)
