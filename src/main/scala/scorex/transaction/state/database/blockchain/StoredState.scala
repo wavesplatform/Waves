@@ -253,20 +253,20 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     val accountAssets = getAccountAssets(account.address)
     val keys = account.address :: accountAssets.map(account.address + _).toList
 
-    def getTxSize(m: SortedMap[Int, Seq[Transaction]]) = m.foldLeft(0)((size, txs) => size + txs._2.size)
+    def getTxSize(m: SortedMap[Int, Set[Transaction]]) = m.foldLeft(0)((size, txs) => size + txs._2.size)
 
-    def getRowTxs(row: Row) = row.reason.filter(_.isInstanceOf[Transaction]).map(_.asInstanceOf[Transaction])
+    def getRowTxs(row: Row) = row.reason.filter(_.isInstanceOf[Transaction]).map(_.asInstanceOf[Transaction]).toSet
 
-    keys.foldLeft(SortedMap.empty[Int, Seq[Transaction]]) { (result, key) =>
+    keys.foldLeft(SortedMap.empty[Int, Set[Transaction]]) { (result, key) =>
 
       Option(lastStates.get(key)) match {
         case Some(accHeight) if getTxSize(result) < limit || accHeight > result.firstKey =>
           val accountRows = accountChanges(key)
-          def loop(h: Int, acc: SortedMap[Int, Seq[Transaction]]): SortedMap[Int, Seq[Transaction]] = {
+          def loop(h: Int, acc: SortedMap[Int, Set[Transaction]]): SortedMap[Int, Set[Transaction]] = {
             Option(accountRows.get(h)) match {
               case Some(row) =>
                 val rowTxs = getRowTxs(row)
-                val resAcc = acc + (h -> (rowTxs ++ acc.getOrElse(h, Seq.empty[Transaction])))
+                val resAcc = acc + (h -> (rowTxs ++ acc.getOrElse(h, Set.empty[Transaction])))
                 if (getTxSize(resAcc) < limit) {
                   loop(row.lastRowHeight, resAcc)
                 } else {
@@ -453,6 +453,29 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     val ls = lastStates.keySet().map(add => add -> balanceByKey(add, heightOpt))
       .filter(b => b._2 != 0).toList.sortBy(_._1)
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
+  }
+
+  def toWavesJson(heightOpt: Int): JsObject = {
+    val ls = lastStates.keySet().map(add => add -> balanceAtHeight(add, heightOpt))
+      .filter(b => b._1.length == 35 && b._2 != 0).toList.sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
+    JsObject(ls)
+  }
+
+  private def balanceAtHeight(key: String, atHeight: Int): Long = {
+    Option(lastStates.get(key)) match {
+      case Some(h) if h > 0 =>
+
+        def loop(hh: Int): Long = {
+          val row = accountChanges(key).get(hh)
+          if (hh <= atHeight) row.state.balance
+          else if (row.lastRowHeight == 0) 0L
+          else loop(row.lastRowHeight)
+        }
+
+        loop(h)
+      case _ =>
+        0L
+    }
   }
 
   //for debugging purposes only

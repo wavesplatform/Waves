@@ -13,7 +13,6 @@ import scorex.utils.CircularBufferSpecification
 class BasicsTestSuite extends Sequential(
   new MinerSpecification,
   new BlockchainSynchronizerSpecification,
-  new StoredBlockSeqSpecification,
   new ScoreObserverSpecification,
   new HistoryReplierSpecification,
   new AccountSpecification,
