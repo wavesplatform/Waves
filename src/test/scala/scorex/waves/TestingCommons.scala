@@ -62,7 +62,6 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    Thread.sleep(1000)
   }
 
   override def afterAll(): Unit = {
@@ -136,7 +135,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   def waitForNextBlock(application: Application): Unit = {
     val history = application.transactionModule.blockStorage.history
     val initialHeight = history.height()
-    untilTimeout(5.seconds) {
+    untilTimeout(15.seconds) {
       require(history.height() > initialHeight)
     }
   }

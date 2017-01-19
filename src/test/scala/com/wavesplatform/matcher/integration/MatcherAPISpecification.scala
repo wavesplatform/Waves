@@ -155,6 +155,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   test("start") {
     // don't move this to `beforeAll`! if this fails, `afterAll` never happens, leading to ports remain open
     initBalances()
+    Thread.sleep(1000)
   }
 
   test("/matcher/publicKey") {

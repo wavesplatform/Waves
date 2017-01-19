@@ -4,6 +4,11 @@ import org.scalatest.{FunSuite, Matchers}
 
 class PeersAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    Thread.sleep(1000)
+  }
+
   test("/peers/connect API route") {
     POST.incorrectApiKeyTest("/peers/connect")
 
