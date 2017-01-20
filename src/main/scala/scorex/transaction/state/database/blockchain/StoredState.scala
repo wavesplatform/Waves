@@ -279,7 +279,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
         case _ => result
       }
 
-    }.values.flatten.toList.sortWith(_.timestamp > _.timestamp).take(limit)
+    }.values.flatten.toList.sortWith(_.timestamp < _.timestamp).take(limit)
   }
 
   def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
