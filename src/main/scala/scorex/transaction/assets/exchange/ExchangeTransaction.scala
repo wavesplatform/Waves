@@ -29,13 +29,11 @@ sealed trait ExchangeTransaction extends SignedTransaction{
 
 object ExchangeTransaction {
 
-  case class ExchangeTransactionImpl(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
+  private case class ExchangeTransactionImpl(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
                                      sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte])
     extends SignedTransaction with BytesSerializable {
 
     override val transactionType: TransactionType.Value = TransactionType.OrderMatchTransaction
-
-    override val typeOrdering = -1
 
     override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
 
