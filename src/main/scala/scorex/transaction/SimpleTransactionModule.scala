@@ -192,22 +192,22 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   /**
     * Validate transaction according to the State and send it to network
     */
-  def broadcastTransaction(tx: SignedTransaction): ValidationResult = {
+  def broadcastTransaction(tx: SignedTransaction): Either[ValidationResult, Unit] = {
     if (isValid(tx, tx.timestamp)) {
       onNewOffchainTransaction(tx)
-      ValidationResult.ValidateOke
-    } else ValidationResult.StateCheckFailed
+      Right(())
+    } else Left(ValidationResult.StateCheckFailed)
   }
 
   /**
     * Validate transactions according to the State and send it to network
     */
-  def broadcastTransactions(txs: Seq[SignedTransaction]): ValidationResult = {
+  def broadcastTransactions(txs: Seq[SignedTransaction]): Either[ValidationResult, Unit] = {
     if (txs.nonEmpty && isValid(txs, txs.map(_.timestamp).max)) {
       txs.foreach(onNewOffchainTransaction)
-      ValidationResult.ValidateOke
+      Right(())
     } else {
-      ValidationResult.StateCheckFailed
+      Left(ValidationResult.StateCheckFailed)
     }
   }
 
