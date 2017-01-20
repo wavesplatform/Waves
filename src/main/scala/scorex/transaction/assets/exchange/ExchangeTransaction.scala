@@ -142,14 +142,8 @@ object ExchangeTransaction {
     }
   }
 
-  def create2(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
-              sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte]) :  Either[ValidationResult, ExchangeTransaction] = ???
-
   def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
              buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long) :  Either[ValidationResult, ExchangeTransaction] = ???
-
-  def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-             fee: Long, timestamp: Long) :  Either[ValidationResult, ExchangeTransaction] = ???
 
 
   def parseBytes(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {

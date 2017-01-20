@@ -156,8 +156,8 @@ trait TransactionGen {
     val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, maxtTime, matcherFee)
     val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
     val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
-    val trans = ExchangeTransaction.create2(o1, o2, price, matchedAmount,
-      buyFee, sellFee, (buyFee + sellFee) / 2, maxtTime - 100, Array()).right.get
+    val trans = ExchangeTransaction.create(matcher,o1, o2, price, matchedAmount,
+      buyFee, sellFee, (buyFee + sellFee) / 2, maxtTime - 100).right.get
 
     (trans,matcher)
   }
