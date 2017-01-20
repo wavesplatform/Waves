@@ -76,11 +76,11 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
   def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
                        buyMatcherFee: Long, sellMatcherFee: Long, fee: Long): OrderMatch = {
-    OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp)
+    OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp).right.get
   }
 
   def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, fee: Long): OrderMatch = {
-    OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, fee, getTimestamp)
+    OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, fee, getTimestamp).right.get
   }
 
   def addInitialAssets(acc: PrivateKeyAccount, assetName: String, amount: Long): Option[AssetId] = {

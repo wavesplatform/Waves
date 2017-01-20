@@ -2,6 +2,7 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.settings.WavesSettings
 import scorex.transaction.SimpleTransactionModule._
+import scorex.transaction.ValidationResult.ValidationResult
 import scorex.transaction.{SignedTransaction, TransactionModule}
 import scorex.transaction.assets.exchange.{Order, OrderMatch}
 import scorex.transaction.state.database.blockchain.StoredState
@@ -21,7 +22,7 @@ trait OrderMatchCreator {
     txTime
   }
 
-  def createTransaction(sumbitted: LimitOrder, counter: LimitOrder): OrderMatch = {
+  def createTransaction(sumbitted: LimitOrder, counter: LimitOrder): Either[ValidationResult, OrderMatch] = {
     val matcher = wallet.privateKeyAccount(sumbitted.order.matcher.address).get
 
     val price = counter.price

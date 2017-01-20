@@ -156,10 +156,10 @@ trait TransactionGen {
     val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, maxtTime, matcherFee)
     val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
     val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
-    val unsigned = OrderMatch(o1, o2, price, matchedAmount,
-      buyFee, sellFee, (buyFee + sellFee) / 2, maxtTime - 100, Array())
-    val sig = EllipticCurveImpl.sign(matcher, unsigned.toSign)
-    (unsigned.copy(signature = sig), matcher)
+    val trans = OrderMatch.create2(o1, o2, price, matchedAmount,
+      buyFee, sellFee, (buyFee + sellFee) / 2, maxtTime - 100, Array()).right.get
+
+    (trans,matcher)
   }
 
   implicit val orderMatchArb: Arbitrary[(OrderMatch, PrivateKeyAccount)] = Arbitrary {

@@ -21,7 +21,7 @@ import scorex.utils._
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Left, Right, Try}
 import scala.util.control.NonFatal
 
 @SerialVersionUID(3044437555808662124L)
@@ -266,12 +266,17 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   }
 
   def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, wallet: Wallet): Try[OrderMatch] = Try {
+                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, wallet: Wallet): Try[Either[ValidationResult,OrderMatch]] = Try {
     val matcher = wallet.privateKeyAccount(buyOrder.matcher.address).get
-    val om = OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp)
-    if (isValid(om, om.timestamp)) onNewOffchainTransaction(om)
-    else throw new StateCheckFailed("Invalid ordermatch transaction  generated: " + om.json)
-    om
+    val omVal = OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp)
+    omVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid ordermatch transaction generated: " + tx.json)
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+    }
+    omVal
   }
 
   override def genesisData: BlockField[StoredInBlock] = {

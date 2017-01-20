@@ -27,7 +27,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
                      val wallet: Wallet, val settings: WavesSettings,
                      val transactionModule: TransactionModule[StoredInBlock])
   extends PersistentActor
-  with ScorexLogging with OrderValidator with OrderHistory with OrderMatchCreator {
+    with ScorexLogging with OrderValidator with OrderHistory with OrderMatchCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private var orderBook = OrderBook.empty
@@ -40,7 +40,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
   }
 
   override def receiveCommand: Receive = {
-    case order:Order =>
+    case order: Order =>
       handleAddOrder(order)
     case GetOrdersRequest =>
       sender() ! GetOrdersResponse(orderBook.asks.values.flatten.toSeq ++ orderBook.bids.values.flatten.toSeq)
@@ -51,8 +51,8 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     case GetOrderBookRequest(pair, depth) =>
       handleGetOrderBook(pair, depth)
     case SaveSnapshot =>
-        deleteSnapshots(SnapshotSelectionCriteria.Latest)
-        saveSnapshot(Snapshot(orderBook, ordersRemainingAmount.cache.asMap().toMap))
+      deleteSnapshots(SnapshotSelectionCriteria.Latest)
+      saveSnapshot(Snapshot(orderBook, ordersRemainingAmount.cache.asMap().toMap))
     case SaveSnapshotSuccess(metadata) =>
       log.info(s"Snapshot saved with metadata $metadata")
     case SaveSnapshotFailure(metadata, reason) =>
@@ -135,18 +135,19 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
         context.system.eventStream.publish(e)
         None
       case e@OrderExecuted(o, c) =>
-        val tx = createTransaction(o, c)
-        if (isValid(tx)) {
-          sendToNetwork(tx)
-          context.system.eventStream.publish(e)
-
-          if (e.submittedRemaining > 0) Some(o.partial(e.submittedRemaining))
-          else None
-        } else {
-          val canceled = Events.OrderCanceled(c)
-          persist(canceled)(e => ())
-          applyEvent(canceled)
-          Some(o)
+        val txVal = createTransaction(o, c)
+        txVal match {
+          case Right(tx) =>
+            sendToNetwork(tx)
+            context.system.eventStream.publish(e)
+            if (e.submittedRemaining > 0)
+              Some(o.partial(e.submittedRemaining))
+            else None
+          case Left(err) =>
+            val canceled = Events.OrderCanceled(c)
+            persist(canceled)(e => ())
+            applyEvent(canceled)
+            Some(o)
         }
 
       case _ => None
@@ -164,6 +165,7 @@ object OrderBookActor {
   def props(assetPair: AssetPair, storedState: StoredState,
             wallet: Wallet, settings: WavesSettings, transactionModule: TransactionModule[StoredInBlock]): Props =
     Props(new OrderBookActor(assetPair, storedState, wallet, settings, transactionModule))
+
   def name(assetPair: AssetPair): String = assetPair.first.map(Base58.encode).getOrElse("WAVES") + "-" +
     assetPair.second.map(Base58.encode).getOrElse("WAVES")
 
@@ -173,18 +175,23 @@ object OrderBookActor {
   sealed trait OrderBookRequest {
     def assetPair: AssetPair
   }
+
   case class GetOrderBookRequest(assetPair: AssetPair, depth: Option[Int]) extends OrderBookRequest
+
   case class GetOrderStatus(assetPair: AssetPair, id: String) extends OrderBookRequest
+
   case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
     def orderId: String = Base58.encode(req.orderId)
   }
 
   sealed trait OrderBookResponse {
     def json: JsValue
+
     def code: StatusCode
   }
 
   sealed trait OrderResponse extends OrderBookResponse
+
   case class OrderAccepted(order: Order) extends OrderResponse {
     val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json)
     val code = StatusCodes.OK
@@ -222,8 +229,11 @@ object OrderBookActor {
 
   // Direct requests
   case object GetOrdersRequest
+
   case object GetBidOrdersRequest
+
   case object GetAskOrdersRequest
+
   case class GetOrdersResponse(orders: Seq[LimitOrder])
 
   case object SaveSnapshot
@@ -232,7 +242,7 @@ object OrderBookActor {
   case class Snapshot(orderBook: OrderBook, history: Map[String, (Long, Long)])
 
   val bidsOrdering: Ordering[Long] = new Ordering[Long] {
-    def compare(x: Long, y: Long): Int = - Ordering.Long.compare(x, y)
+    def compare(x: Long, y: Long): Int = -Ordering.Long.compare(x, y)
   }
 
   val asksOrdering: Ordering[Long] = new Ordering[Long] {
