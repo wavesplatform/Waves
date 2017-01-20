@@ -4,7 +4,7 @@ import com.wavesplatform.settings.WavesSettings
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.ValidationResult.ValidationResult
 import scorex.transaction.{SignedTransaction, TransactionModule}
-import scorex.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransaction$, Order}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.NTP
 import scorex.wallet.Wallet

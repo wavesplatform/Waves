@@ -13,7 +13,7 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.ValidationResult.ValidationResult
-import scorex.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransaction$, Order}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._

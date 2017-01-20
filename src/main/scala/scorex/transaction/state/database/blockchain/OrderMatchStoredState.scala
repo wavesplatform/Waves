@@ -2,7 +2,7 @@ package scorex.transaction.state.database.blockchain
 
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransaction$, Order}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 
 import scala.collection.JavaConversions._
 

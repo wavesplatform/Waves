@@ -9,7 +9,7 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransaction$}
+import scorex.transaction.assets.exchange.{ExchangeTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
 

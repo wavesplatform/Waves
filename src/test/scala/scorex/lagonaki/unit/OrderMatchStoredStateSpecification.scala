@@ -8,7 +8,7 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
 import scorex.settings.WavesHardForkParameters
-import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, ExchangeTransaction$, Order}
+import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
