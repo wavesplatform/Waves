@@ -128,16 +128,17 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
   }
 
   def handleMatchEvent(e: Event): Option[LimitOrder] = {
-    applyEvent(e)
-
     e match {
       case e: OrderAdded =>
+        applyEvent(e)
         context.system.eventStream.publish(e)
         None
       case e@OrderExecuted(o, c) =>
         val tx = createTransaction(o, c)
         if (isValid(tx)) {
           sendToNetwork(tx)
+
+          applyEvent(e)
           context.system.eventStream.publish(e)
 
           if (e.submittedRemaining > 0) Some(o.partial(e.submittedRemaining))

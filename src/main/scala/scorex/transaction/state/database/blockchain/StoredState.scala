@@ -135,7 +135,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
       }
 
       //TODO unique by id?
-    }.values.flatten.groupBy(t => Base58.encode(t.id)).map(_._2.head).toList.sortWith(_.timestamp > _.timestamp)
+    }.values.flatten.groupBy(t => Base58.encode(t.id)).map(_._2.head).toList.sortWith(_.timestamp < _.timestamp)
       .take(limit)
   }
 
