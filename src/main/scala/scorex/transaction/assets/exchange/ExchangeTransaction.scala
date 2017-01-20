@@ -1,6 +1,5 @@
 package scorex.transaction.assets.exchange
 
-import scala.util.Try
 import com.google.common.primitives.{Ints, Longs}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
@@ -8,14 +7,15 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.serialization.{BytesSerializable, Deser}
+import scorex.serialization.BytesSerializable
 import scorex.transaction.TypedTransaction.TransactionType
-import scorex.transaction.ValidationError
-import scorex.transaction._
-import scorex.transaction.assets.exchange.Validation.BooleanOperators
+import scorex.transaction.ValidationError.CustomValidationError
+import scorex.transaction.{ValidationError, _}
+
+import scala.util.{Failure, Success, Try}
 
 
-sealed trait ExchangeTransaction extends SignedTransaction{
+sealed trait ExchangeTransaction extends SignedTransaction {
   def buyOrder: Order
   def sellOrder: Order
   def price: Long
@@ -24,83 +24,22 @@ sealed trait ExchangeTransaction extends SignedTransaction{
   def sellMatcherFee: Long
   def fee: Long
 
-  def isValid(previousMatches: Set[ExchangeTransaction]): Validation
 }
 
 object ExchangeTransaction {
 
   private case class ExchangeTransactionImpl(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
-                                     sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte])
-    extends SignedTransaction with BytesSerializable {
+                                             sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte])
+    extends ExchangeTransaction with BytesSerializable {
 
     override val transactionType: TransactionType.Value = TransactionType.OrderMatchTransaction
 
     override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
 
-    lazy val idStr: String = Base58.encode(id)
-
     override val assetFee: (Option[AssetId], Long) = (None, fee)
 
     @ApiModelProperty(hidden = true)
     override val sender: PublicKeyAccount = buyOrder.matcher
-
-    def isValid(previousMatches: Set[ExchangeTransaction]): Validation = {
-      lazy val buyTransactions = previousMatches.filter { om =>
-        om.buyOrder.id sameElements buyOrder.id
-      }
-      lazy val sellTransactions = previousMatches.filter { om =>
-        om.sellOrder.id sameElements sellOrder.id
-      }
-
-      lazy val buyTotal = buyTransactions.foldLeft(0L)(_ + _.amount) + amount
-      lazy val sellTotal = sellTransactions.foldLeft(0L)(_ + _.amount) + amount
-
-      lazy val buyFeeTotal = buyTransactions.map(_.buyMatcherFee).sum + buyMatcherFee
-      lazy val sellFeeTotal = sellTransactions.map(_.sellMatcherFee).sum + sellMatcherFee
-
-      lazy val isSameAssets = {
-        buyOrder.assetPair == sellOrder.assetPair
-      }
-
-      lazy val isSameMatchers = {
-        buyOrder.matcher == sellOrder.matcher
-      }
-
-      lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
-
-      lazy val amountIsValid: Boolean = {
-        val b = buyTotal <= buyOrder.amount
-        val s = sellTotal <= sellOrder.amount
-        b && s
-      }
-
-      def isFeeValid(fee: Long, feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long): Boolean = {
-        fee > 0 &&
-          feeTotal <= BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
-      }
-
-      (fee > 0) :| "fee should be > 0" &&
-        (amount > 0) :| "amount should be > 0" &&
-        (price > 0) :| "price should be > 0" &&
-        (price < Order.MaxAmount) :| "price too large" &&
-        (amount < Order.MaxAmount) :| "amount too large" &&
-        (sellMatcherFee < Order.MaxAmount) :| "sellMatcherFee too large" &&
-        (buyMatcherFee < Order.MaxAmount) :| "buyMatcherFee too large" &&
-        (fee < Order.MaxAmount) :| "fee too large" &&
-        (buyOrder.orderType == OrderType.BUY) :| "buyOrder should has OrderType.BUY" &&
-        (sellOrder.orderType == OrderType.SELL) :| "sellOrder should has OrderType.SELL" &&
-        isSameMatchers :| "Both orders should have same Matcher" &&
-        isSameAssets :| "Both orders should have same AssetPair" &&
-        ("buyOrder" |: buyOrder.isValid(timestamp)) &&
-        ("sellOrder" |: sellOrder.isValid(timestamp)) &&
-        priceIsValid :| "price should be valid" &&
-        amountIsValid :| "amount should be valid" &&
-        isFeeValid(buyMatcherFee, buyFeeTotal, buyTotal, buyOrder.matcherFee, buyOrder.amount) :|
-          "buyMatcherFee should be valid" &&
-        isFeeValid(sellMatcherFee, sellFeeTotal, sellTotal, sellOrder.matcherFee, sellOrder.amount) :|
-          "sellMatcherFee should be valid" &&
-        EllipticCurveImpl.verify(signature, toSign, sender.publicKey) :| "matcherSignatureIsValid should be valid"
-    }
 
     lazy val toSign: Array[Byte] = Array(transactionType.id.toByte) ++
       Ints.toByteArray(buyOrder.bytes.length) ++ Ints.toByteArray(sellOrder.bytes.length) ++
@@ -141,8 +80,105 @@ object ExchangeTransaction {
   }
 
   def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-               buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long) :  Either[ValidationError, ExchangeTransaction] = ???
+             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
 
+    lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
+
+    if (fee <= 0) {
+      Left(ValidationError.InsufficientFee)
+    } else if (amount <= 0) {
+      Left(ValidationError.NegativeAmount)
+    } else if (price <= 0) {
+      Left(CustomValidationError("price should be > 0"))
+    } else if (price > Order.MaxAmount) {
+      Left(CustomValidationError("price too large"))
+    } else if (amount > Order.MaxAmount) {
+      Left(CustomValidationError("price too large"))
+    } else if (sellMatcherFee > Order.MaxAmount) {
+      Left(CustomValidationError("sellMatcherFee too large"))
+    } else if (buyMatcherFee > Order.MaxAmount) {
+      Left(CustomValidationError("buyMatcherFee too large"))
+    } else if (fee > Order.MaxAmount) {
+      Left(CustomValidationError("asda"))
+    } else if (buyOrder.orderType != OrderType.BUY) {
+      Left(CustomValidationError("buyOrder should has OrderType.BUY"))
+    } else if (sellOrder.orderType != OrderType.SELL) {
+      Left(CustomValidationError("sellOrder should has OrderType.SELL"))
+    } else if (buyOrder.matcher != sellOrder.matcher) {
+      Left(CustomValidationError("buyOrder.matcher should be the same as sellOrder.matcher"))
+    } else if (buyOrder.assetPair != sellOrder.assetPair) {
+      Left(CustomValidationError("Both orders should have same AssetPair"))
+    } else if (!buyOrder.isValid(timestamp)) {
+      Left(CustomValidationError("buyOrder"))
+    } else if (!sellOrder.isValid(timestamp)) {
+      Left(CustomValidationError("sellOrder"))
+    } else if (!priceIsValid) {
+      Left(CustomValidationError("priceIsValid"))
+    } else {
+      val signature = EllipticCurveImpl.sign(matcher.privateKey, sigData(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp))
+      Right(ExchangeTransactionImpl(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
+    }
+  }
+
+
+  def create(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
+             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte]): Either[ValidationError, ExchangeTransaction] = {
+
+    lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
+
+    if (fee <= 0) {
+      Left(ValidationError.InsufficientFee)
+    } else if (amount <= 0) {
+      Left(ValidationError.NegativeAmount)
+    } else if (price <= 0) {
+      Left(CustomValidationError("price should be > 0"))
+    } else if (price > Order.MaxAmount) {
+      Left(CustomValidationError("price too large"))
+    } else if (amount > Order.MaxAmount) {
+      Left(CustomValidationError("price too large"))
+    } else if (sellMatcherFee > Order.MaxAmount) {
+      Left(CustomValidationError("sellMatcherFee too large"))
+    } else if (buyMatcherFee > Order.MaxAmount) {
+      Left(CustomValidationError("buyMatcherFee too large"))
+    } else if (fee > Order.MaxAmount) {
+      Left(CustomValidationError("asda"))
+    } else if (buyOrder.orderType != OrderType.BUY) {
+      Left(CustomValidationError("buyOrder should has OrderType.BUY"))
+    } else if (sellOrder.orderType != OrderType.SELL) {
+      Left(CustomValidationError("sellOrder should has OrderType.SELL"))
+    } else if (buyOrder.matcher != sellOrder.matcher) {
+      Left(CustomValidationError("buyOrder.matcher should be the same as sellOrder.matcher"))
+    } else if (buyOrder.assetPair != sellOrder.assetPair) {
+      Left(CustomValidationError("Both orders should have same AssetPair"))
+    } else if (!buyOrder.isValid(timestamp)) {
+      Left(CustomValidationError("buyOrder"))
+    } else if (!sellOrder.isValid(timestamp)) {
+      Left(CustomValidationError("sellOrder"))
+    } else if (!priceIsValid) {
+      Left(CustomValidationError("priceIsValid"))
+    } else if (!EllipticCurveImpl.verify(signature, sigData(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp), buyOrder.matcher.publicKey)) {
+      Left(CustomValidationError("matcherSignatureIsValid should be valid"))
+    } else {
+      val sigD = sigData(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp)
+      if (EllipticCurveImpl.verify(signature, sigD, buyOrder.matcher.publicKey)) {
+        Right(ExchangeTransactionImpl(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
+      } else {
+        Left(ValidationError.InvalidSignature)
+      }
+    }
+
+  }
+
+
+  private def sigData(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
+                      buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Array[Byte] = {
+    Array(TransactionType.OrderMatchTransaction.id.toByte) ++
+      Ints.toByteArray(buyOrder.bytes.length) ++ Ints.toByteArray(sellOrder.bytes.length) ++
+      buyOrder.bytes ++ sellOrder.bytes ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+      Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
+      Longs.toByteArray(timestamp)
+
+  }
 
   def parseBytes(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {
     require(bytes.head == TransactionType.OrderMatchTransaction.id)
@@ -152,18 +188,31 @@ object ExchangeTransaction {
   def parseTail(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {
     import EllipticCurveImpl._
     var from = 0
-    val o1Size = Ints.fromByteArray(bytes.slice(from, from + 4)); from += 4
-    val o2Size = Ints.fromByteArray(bytes.slice(from, from + 4)); from += 4
-    val o1 = Order.parseBytes(bytes.slice(from, from + o1Size)).get; from += o1Size
-    val o2 = Order.parseBytes(bytes.slice(from, from + o2Size)).get; from += o2Size
-    val price = Longs.fromByteArray(bytes.slice(from, from + 8)); from += 8
-    val amount = Longs.fromByteArray(bytes.slice(from, from + 8)); from += 8
-    val buyMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8)); from += 8
-    val sellMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8)); from += 8
-    val fee = Longs.fromByteArray(bytes.slice(from, from + 8)); from += 8
-    val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8)); from += 8
-    val signature = bytes.slice(from, from + SignatureLength); from += SignatureLength
-    ???
-  }
+    val o1Size = Ints.fromByteArray(bytes.slice(from, from + 4));
+    from += 4
+    val o2Size = Ints.fromByteArray(bytes.slice(from, from + 4));
+    from += 4
+    val o1 = Order.parseBytes(bytes.slice(from, from + o1Size)).get;
+    from += o1Size
+    val o2 = Order.parseBytes(bytes.slice(from, from + o2Size)).get;
+    from += o2Size
+    val price = Longs.fromByteArray(bytes.slice(from, from + 8));
+    from += 8
+    val amount = Longs.fromByteArray(bytes.slice(from, from + 8));
+    from += 8
+    val buyMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8));
+    from += 8
+    val sellMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8));
+    from += 8
+    val fee = Longs.fromByteArray(bytes.slice(from, from + 8));
+    from += 8
+    val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8));
+    from += 8
+    val signature = bytes.slice(from, from + SignatureLength);
+    from += SignatureLength
+
+    create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
+      .fold(left => Failure(new Exception(left.toString)), right => Success(right))
+  }.flatten
 
 }
