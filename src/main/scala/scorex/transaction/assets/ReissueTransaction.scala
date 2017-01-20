@@ -7,7 +7,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction.TransactionType
-import scorex.transaction.ValidationResult.ValidationResult
+import scorex.transaction.ValidationError
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -79,19 +79,19 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signature: Array[Byte]): Either[ValidationResult, ReissueTransaction] = {
+             signature: Array[Byte]): Either[ValidationError, ReissueTransaction] = {
     if (quantity <= 0) {
-      Left(ValidationResult.NegativeAmount)
+      Left(ValidationError.NegativeAmount)
     } else if (!Account.isValid(sender)) {
-      Left(ValidationResult.InvalidAddress)
+      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
-      Left(ValidationResult.InsufficientFee)
+      Left(ValidationError.InsufficientFee)
     } else {
       val unsigned = ReissueTransactionImpl(sender, assetId, quantity, reissuable, fee, timestamp, null)
       if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
         Right(unsigned.copy(signature = signature))
       } else {
-        Left(ValidationResult.InvalidSignature)
+        Left(ValidationError.InvalidSignature)
       }
     }
   }
@@ -101,13 +101,13 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
-             timestamp: Long): Either[ValidationResult, ReissueTransaction] = {
+             timestamp: Long): Either[ValidationError, ReissueTransaction] = {
     if (quantity <= 0) {
-      Left(ValidationResult.NegativeAmount)
+      Left(ValidationError.NegativeAmount)
     } else if (!Account.isValid(sender)) {
-      Left(ValidationResult.InvalidAddress)
+      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
-      Left(ValidationResult.InsufficientFee)
+      Left(ValidationError.InsufficientFee)
     } else {
       val unsigned = ReissueTransactionImpl(sender, assetId, quantity, reissuable, fee, timestamp, null)
       val sig      = EllipticCurveImpl.sign(sender, unsigned.toSign)

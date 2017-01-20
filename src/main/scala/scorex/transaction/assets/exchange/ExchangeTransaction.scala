@@ -10,7 +10,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TypedTransaction.TransactionType
-import scorex.transaction.ValidationResult.ValidationResult
+import scorex.transaction.ValidationError
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.BooleanOperators
 
@@ -143,7 +143,7 @@ object ExchangeTransaction {
   }
 
   def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-               buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long) :  Either[ValidationResult, ExchangeTransaction] = ???
+               buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long) :  Either[ValidationError, ExchangeTransaction] = ???
 
 
   def parseBytes(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {

@@ -10,7 +10,7 @@ import play.api.libs.json._
 import scorex.api.http._
 import scorex.app.Application
 import scorex.settings.Settings
-import scorex.transaction.{SignedTransaction, SimpleTransactionModule, StateCheckFailed, ValidationResult}
+import scorex.transaction.{SignedTransaction, SimpleTransactionModule, StateCheckFailed, ValidationError}
 
 import scala.util.{Failure, Success, Try}
 

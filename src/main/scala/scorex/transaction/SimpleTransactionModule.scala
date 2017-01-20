@@ -12,8 +12,6 @@ import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
-import scorex.transaction.ValidationResult.ValidationResult
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
@@ -21,8 +19,8 @@ import scorex.utils._
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
-import scala.util.{Left, Right, Try}
 import scala.util.control.NonFatal
+import scala.util.{Left, Right, Try}
 
 @SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -139,13 +137,13 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
     }
 
-  def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationResult, PaymentTransaction]] = {
+  def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
     }
   }
 
-  def transferAsset(request: TransferRequest, wallet: Wallet): Try[Either[ValidationResult, TransferTransaction]] = Try {
+  def transferAsset(request: TransferRequest, wallet: Wallet): Try[Either[ValidationError, TransferTransaction]] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
 
     val transferVal = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
@@ -192,22 +190,22 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   /**
     * Validate transaction according to the State and send it to network
     */
-  def broadcastTransaction(tx: SignedTransaction): Either[ValidationResult, Unit] = {
+  def broadcastTransaction(tx: SignedTransaction): Either[ValidationError, Unit] = {
     if (isValid(tx, tx.timestamp)) {
       onNewOffchainTransaction(tx)
       Right(())
-    } else Left(ValidationResult.StateCheckFailed)
+    } else Left(ValidationError.StateCheckFailed)
   }
 
   /**
     * Validate transactions according to the State and send it to network
     */
-  def broadcastTransactions(txs: Seq[SignedTransaction]): Either[ValidationResult, Unit] = {
+  def broadcastTransactions(txs: Seq[SignedTransaction]): Either[ValidationError, Unit] = {
     if (txs.nonEmpty && isValid(txs, txs.map(_.timestamp).max)) {
       txs.foreach(onNewOffchainTransaction)
       Right(())
     } else {
-      Left(ValidationResult.StateCheckFailed)
+      Left(ValidationError.StateCheckFailed)
     }
   }
 
@@ -232,7 +230,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
   def burnAsset(request: BurnRequest, wallet: Wallet): Try[BurnTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val txVal: Either[ValidationResult, BurnTransaction] = BurnTransaction.create(sender,
+    val txVal: Either[ValidationError, BurnTransaction] = BurnTransaction.create(sender,
       Base58.decode(request.assetId).get,
       request.quantity,
       request.fee,
@@ -256,7 +254,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     txTime
   }
 
-  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationResult, PaymentTransaction] = {
+  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction] = {
     val pt = PaymentTransaction.create(sender, recipient, amount, fee, getTimestamp)
     pt match {
       case Right(t) => onNewOffchainTransaction(t)

@@ -14,7 +14,7 @@ import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
-import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, ValidationResult}
+import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, ValidationError}
 import scorex.transaction.assets.exchange.OrderJson._
 
 import scala.concurrent.ExecutionContext.Implicits.global

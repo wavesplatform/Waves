@@ -7,10 +7,8 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction._
-import scorex.transaction.ValidationResult.ValidationResult
 
 import scala.util.{Failure, Success, Try}
-import scala.concurrent.duration._
 
 sealed trait GenesisTransaction extends TypedTransaction {
   def recipient: Account
@@ -96,11 +94,11 @@ object GenesisTransaction extends Deser[GenesisTransaction] {
       GenesisTransaction.create(recipient, amount, timestamp).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
-  def create(recipient: Account, amount: Long, timestamp: Long): Either[ValidationResult, GenesisTransaction] = {
+  def create(recipient: Account, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
     if (amount < 0) {
-      Left(ValidationResult.NegativeAmount)
+      Left(ValidationError.NegativeAmount)
     } else if (!Account.isValid(recipient)) {
-      Left(ValidationResult.InvalidAddress)
+      Left(ValidationError.InvalidAddress)
     } else {
       val signature = GenesisTransaction.generateSignature(recipient, amount, timestamp)
       Right(GenesisTransactionImpl(recipient, amount, timestamp, signature))
