@@ -15,7 +15,7 @@ import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.BooleanOperators
 
 
-sealed trait OrderMatch extends SignedTransaction{
+sealed trait ExchangeTransaction extends SignedTransaction{
   def buyOrder: Order
   def sellOrder: Order
   def price: Long
@@ -24,13 +24,13 @@ sealed trait OrderMatch extends SignedTransaction{
   def sellMatcherFee: Long
   def fee: Long
 
-  def isValid(previousMatches: Set[OrderMatch]): Validation
+  def isValid(previousMatches: Set[ExchangeTransaction]): Validation
 }
 
-object OrderMatch {
+object ExchangeTransaction {
 
-  case class OrderMatchImpl(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
-                            sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte])
+  case class ExchangeTransactionImpl(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
+                                     sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte])
     extends SignedTransaction with BytesSerializable {
 
     override val transactionType: TransactionType.Value = TransactionType.OrderMatchTransaction
@@ -46,7 +46,7 @@ object OrderMatch {
     @ApiModelProperty(hidden = true)
     override val sender: PublicKeyAccount = buyOrder.matcher
 
-    def isValid(previousMatches: Set[OrderMatch]): Validation = {
+    def isValid(previousMatches: Set[ExchangeTransaction]): Validation = {
       lazy val buyTransactions = previousMatches.filter { om =>
         om.buyOrder.id sameElements buyOrder.id
       }
@@ -143,21 +143,21 @@ object OrderMatch {
   }
 
   def create2(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
-              sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte]) :  Either[ValidationResult, OrderMatch] = ???
+              sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte]) :  Either[ValidationResult, ExchangeTransaction] = ???
 
   def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long) :  Either[ValidationResult, OrderMatch] = ???
+             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long) :  Either[ValidationResult, ExchangeTransaction] = ???
 
   def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-             fee: Long, timestamp: Long) :  Either[ValidationResult, OrderMatch] = ???
+             fee: Long, timestamp: Long) :  Either[ValidationResult, ExchangeTransaction] = ???
 
 
-  def parseBytes(bytes: Array[Byte]): Try[OrderMatch] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {
     require(bytes.head == TransactionType.OrderMatchTransaction.id)
     parseTail(bytes.tail).get
   }
 
-  def parseTail(bytes: Array[Byte]): Try[OrderMatch] = Try {
+  def parseTail(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {
     import EllipticCurveImpl._
     var from = 0
     val o1Size = Ints.fromByteArray(bytes.slice(from, from + 4)); from += 4

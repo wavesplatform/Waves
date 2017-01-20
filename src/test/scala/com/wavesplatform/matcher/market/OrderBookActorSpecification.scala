@@ -17,7 +17,7 @@ import play.api.libs.json.{JsObject, JsString}
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction._
-import scorex.transaction.assets.exchange.{AssetPair, OrderMatch}
+import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, ExchangeTransaction$}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
@@ -243,7 +243,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
         actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
           wallet, settings, transactionModule) with RestartableActor {
-          override def isValid(orderMatch: OrderMatch): Boolean = {
+          override def isValid(orderMatch: ExchangeTransaction): Boolean = {
             if (orderMatch.buyOrder == ord2) false
             else true
           }

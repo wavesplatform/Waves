@@ -9,7 +9,7 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.OrderMatch
+import scorex.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransaction$}
 import scorex.transaction.state.database.state._
 import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging}
 
@@ -110,7 +110,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
           includedTx.put(tx.id, h)
         case tx: BurnTransaction =>
           assetsExtension.burnAsset(tx.assetId, h, tx.id, -tx.amount)
-        case om: OrderMatch =>
+        case om: ExchangeTransaction =>
           transactionsMap.put(om.id, om.bytes)
           putOrderMatch(om, blockTs)
           includedTx.put(om.id, h)
@@ -420,7 +420,7 @@ class StoredState(val db: MVStore, settings: WavesHardForkParameters) extends La
     case tx: BurnTransaction =>
       tx.timestamp > settings.allowBurnTransactionAfterTimestamp &&
         isIssuerAddress(tx.assetId, tx.sender.address) && included(tx.id, None).isEmpty
-    case tx: OrderMatch =>
+    case tx: ExchangeTransaction =>
       isOrderMatchValid(tx) && included(tx.id, None).isEmpty
     case gtx: GenesisTransaction =>
       height == 0

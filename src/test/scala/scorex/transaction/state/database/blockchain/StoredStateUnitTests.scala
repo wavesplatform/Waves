@@ -11,7 +11,7 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.{Order, OrderMatch, OrderType}
+import scorex.transaction.assets.exchange.{Order, ExchangeTransaction, OrderType}
 import scorex.transaction.state.database.state._
 import scorex.utils.{NTP, ScorexLogging}
 
@@ -354,7 +354,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Order matching") {
-    forAll { x: (OrderMatch, PrivateKeyAccount) =>
+    forAll { x: (ExchangeTransaction, PrivateKeyAccount) =>
       withRollbackTest {
         def feeInAsset(amount: Long, assetId: Option[AssetId]): Long = {
           if (assetId.isEmpty) amount else 0L

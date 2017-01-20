@@ -8,7 +8,7 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
 import scorex.settings.WavesHardForkParameters
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderMatch}
+import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, ExchangeTransaction$, Order}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
@@ -75,12 +75,12 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   }
 
   def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long): OrderMatch = {
-    OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp).right.get
+                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long): ExchangeTransaction = {
+    ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp).right.get
   }
 
-  def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, fee: Long): OrderMatch = {
-    OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, fee, getTimestamp).right.get
+  def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, fee: Long): ExchangeTransaction = {
+    ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, fee, getTimestamp).right.get
   }
 
   def addInitialAssets(acc: PrivateKeyAccount, assetName: String, amount: Long): Option[AssetId] = {
@@ -233,7 +233,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   private def withCheckBalances(pair: AssetPair,
                                 buyAcc: PrivateKeyAccount,
                                 sellAcc: PrivateKeyAccount,
-                                om: OrderMatch)(f: => Unit): Unit = {
+                                om: ExchangeTransaction)(f: => Unit): Unit = {
     val (prevBuyW, prevBuy1, prevBuy2) = getBalances(buyAcc, pair)
     val (prevSellW, prevSell1, prevSell2) = getBalances(sellAcc, pair)
 

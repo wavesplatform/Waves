@@ -4,7 +4,7 @@ import com.wavesplatform.settings.WavesSettings
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.ValidationResult.ValidationResult
 import scorex.transaction.{SignedTransaction, TransactionModule}
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransaction$, Order}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.NTP
 import scorex.wallet.Wallet
@@ -22,14 +22,14 @@ trait OrderMatchCreator {
     txTime
   }
 
-  def createTransaction(sumbitted: LimitOrder, counter: LimitOrder): Either[ValidationResult, OrderMatch] = {
+  def createTransaction(sumbitted: LimitOrder, counter: LimitOrder): Either[ValidationResult, ExchangeTransaction] = {
     val matcher = wallet.privateKeyAccount(sumbitted.order.matcher.address).get
 
     val price = counter.price
     val amount = math.min(sumbitted.amount, counter.amount)
     val (buy, sell) = Order.splitByType(sumbitted.order, counter.order)
     val (buyFee, sellFee) =  calculateMatcherFee(buy, sell, amount: Long)
-    OrderMatch.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+    ExchangeTransaction.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
   }
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
@@ -41,7 +41,7 @@ trait OrderMatchCreator {
     (calcFee(buy, amount), calcFee(sell, amount))
   }
 
-  def isValid(orderMatch: OrderMatch): Boolean = {
+  def isValid(orderMatch: ExchangeTransaction): Boolean = {
     transactionModule.isValid(orderMatch, orderMatch.timestamp)
   }
 

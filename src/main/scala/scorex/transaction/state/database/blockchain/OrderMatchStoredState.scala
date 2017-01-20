@@ -2,7 +2,7 @@ package scorex.transaction.state.database.blockchain
 
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransaction$, Order}
 
 import scala.collection.JavaConversions._
 
@@ -23,7 +23,7 @@ trait OrderMatchStoredState {
 
   private val savedDays: MVMap[Long, Boolean] = db.openMap(OrderMatchDays)
 
-  def putOrderMatch(om: OrderMatch, blockTs: Long): Unit = {
+  def putOrderMatch(om: ExchangeTransaction, blockTs: Long): Unit = {
     def isSaveNeeded(order: Order): Boolean = {
       order.maxTimestamp >= blockTs
     }
@@ -65,24 +65,24 @@ trait OrderMatchStoredState {
 
   private val emptyTxIdSeq = Array.empty[String]
 
-  private def parseTxSeq(a: Array[String]): Set[OrderMatch] = {
+  private def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] = {
     a.toSet.flatMap { s: String => Base58.decode(s).toOption }.flatMap { id =>
-      OrderMatch.parseBytes(transactionsMap.get(id)).toOption
+      ExchangeTransaction.parseBytes(transactionsMap.get(id)).toOption
     }
   }
 
-  def findPrevOrderMatchTxs(om: OrderMatch): Set[OrderMatch] = {
+  def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction] = {
     findPrevOrderMatchTxs(om.buyOrder) ++ findPrevOrderMatchTxs(om.sellOrder)
   }
 
-  def findPrevOrderMatchTxs(order: Order): Set[OrderMatch] = {
+  def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = {
     val orderDay = calcStartDay(order.maxTimestamp)
     if (savedDays.contains(orderDay)) {
       parseTxSeq(Option(orderMatchTxByDay(calcStartDay(order.maxTimestamp)).get(Base58.encode(order.id))).getOrElse(emptyTxIdSeq))
-    } else Set.empty[OrderMatch]
+    } else Set.empty[ExchangeTransaction]
   }
 
-  def isOrderMatchValid(om: OrderMatch): Boolean = {
+  def isOrderMatchValid(om: ExchangeTransaction): Boolean = {
     om.isValid(findPrevOrderMatchTxs(om))
   }
 }

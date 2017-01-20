@@ -13,7 +13,7 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.ValidationResult.ValidationResult
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransaction$, Order}
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
@@ -266,9 +266,9 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   }
 
   def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, wallet: Wallet): Try[Either[ValidationResult,OrderMatch]] = Try {
+                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, wallet: Wallet): Try[Either[ValidationResult,ExchangeTransaction]] = Try {
     val matcher = wallet.privateKeyAccount(buyOrder.matcher.address).get
-    val omVal = OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp)
+    val omVal = ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp)
     omVal match {
       case Right(tx) =>
         if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)

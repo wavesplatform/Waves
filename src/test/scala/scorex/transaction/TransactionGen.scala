@@ -138,7 +138,7 @@ trait TransactionGen {
     matcherFee: Long <- Arbitrary.arbitrary[Long]
   } yield Order(sender, matcher, pair.first, pair.second, price, amount, maxtTime, matcherFee)
 
-  val orderMatchGenerator: Gen[(OrderMatch, PrivateKeyAccount)] = for {
+  val orderMatchGenerator: Gen[(ExchangeTransaction, PrivateKeyAccount)] = for {
     sender1: PrivateKeyAccount <- accountGen
     sender2: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
@@ -156,13 +156,13 @@ trait TransactionGen {
     val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, maxtTime, matcherFee)
     val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
     val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
-    val trans = OrderMatch.create2(o1, o2, price, matchedAmount,
+    val trans = ExchangeTransaction.create2(o1, o2, price, matchedAmount,
       buyFee, sellFee, (buyFee + sellFee) / 2, maxtTime - 100, Array()).right.get
 
     (trans,matcher)
   }
 
-  implicit val orderMatchArb: Arbitrary[(OrderMatch, PrivateKeyAccount)] = Arbitrary {
+  implicit val orderMatchArb: Arbitrary[(ExchangeTransaction, PrivateKeyAccount)] = Arbitrary {
     orderMatchGenerator
   }
   implicit val orderArb: Arbitrary[(Order, PrivateKeyAccount)] = Arbitrary {
