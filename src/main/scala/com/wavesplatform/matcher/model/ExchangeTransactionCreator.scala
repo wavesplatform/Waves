@@ -9,7 +9,7 @@ import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
-trait OrderMatchCreator {
+trait ExchangeTransactionCreator {
   val transactionModule: TransactionModule[StoredInBlock]
   val storedState: StoredState
   val wallet: Wallet

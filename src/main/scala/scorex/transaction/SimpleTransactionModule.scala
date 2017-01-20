@@ -265,20 +265,6 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     pt
   }
 
-  def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, wallet: Wallet): Try[Either[ValidationResult,ExchangeTransaction]] = Try {
-    val matcher = wallet.privateKeyAccount(buyOrder.matcher.address).get
-    val omVal = ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp)
-    omVal match {
-      case Right(tx) =>
-        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-        else throw new StateCheckFailed("Invalid ordermatch transaction generated: " + tx.json)
-      case Left(err) =>
-        throw new IllegalArgumentException(err.toString)
-    }
-    omVal
-  }
-
   override def genesisData: BlockField[StoredInBlock] = {
     val ipoMembers = List(
       "3N3rfWUDPkFsf2GEZBCLw491A79G46djvQk",

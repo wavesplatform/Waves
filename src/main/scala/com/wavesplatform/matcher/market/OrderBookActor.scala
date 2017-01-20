@@ -27,7 +27,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
                      val wallet: Wallet, val settings: WavesSettings,
                      val transactionModule: TransactionModule[StoredInBlock])
   extends PersistentActor
-    with ScorexLogging with OrderValidator with OrderHistory with OrderMatchCreator {
+    with ScorexLogging with OrderValidator with OrderHistory with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private var orderBook = OrderBook.empty
