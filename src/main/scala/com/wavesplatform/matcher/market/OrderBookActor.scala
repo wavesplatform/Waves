@@ -134,16 +134,17 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       case e: OrderAdded =>
         context.system.eventStream.publish(e)
         None
+
       case e@OrderExecuted(o, c) =>
         val txVal = createTransaction(o, c)
         txVal match {
-          case Right(tx) =>
+          case Right(tx) if isValid(tx) =>
             sendToNetwork(tx)
             context.system.eventStream.publish(e)
             if (e.submittedRemaining > 0)
               Some(o.partial(e.submittedRemaining))
             else None
-          case Left(err) =>
+          case _ =>
             val canceled = Events.OrderCanceled(c)
             persist(canceled)(e => ())
             applyEvent(canceled)
