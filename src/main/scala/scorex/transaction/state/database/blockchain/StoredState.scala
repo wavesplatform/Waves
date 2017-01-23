@@ -10,7 +10,7 @@ import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.state.database.state._
-import scorex.transaction.state.database.state.extension.{ActivatedValidator, IncludedValidator, OrderMatchStoredState, StateExtension}
+import scorex.transaction.state.database.state.extension._
 import scorex.transaction.state.database.state.storage._
 import scorex.utils.{NTP, ScorexLogging}
 
@@ -343,14 +343,12 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   }
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = {
-    val extensionValidated: Boolean = validators.forall(_.isValid(transaction))
+    val extensionValidated: Boolean = validators.forall(_.isValid(transaction, height))
     //TODO move to extensions
     val restValidation: Boolean = transaction match {
       case tx: PaymentTransaction =>
         transaction.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp ||
           (transaction.timestamp >= settings.allowInvalidPaymentTransactionsByTimestamp && isTimestampCorrect(tx))
-      case gtx: GenesisTransaction =>
-        height == 0
       case _ => true
     }
     extensionValidated && restValidation
@@ -396,6 +394,7 @@ object StoredState {
     val extendedState = new AssetsExtendedState(storage)
     val validators = Seq(
       extendedState,
+      new GenesisValidator,
       new OrderMatchStoredState(storage),
       new IncludedValidator(storage, settings),
       new ActivatedValidator(settings)
