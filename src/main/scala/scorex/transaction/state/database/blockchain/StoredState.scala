@@ -26,7 +26,7 @@ import scala.util.control.NonFatal
   * Use fromDB method of StoredState object to create new instance
   */
 class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
-                  assetsExtension: AssetsExtendedState,
+                  val assetsExtension: AssetsExtendedState,
                   val validators: Seq[StateExtension],
                   settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging {
 
@@ -109,7 +109,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
 
     def getTxSize(m: SortedMap[Int, Seq[Transaction]]) = m.foldLeft(0)((size, txs) => size + txs._2.size)
 
-    def getRowTxs(row: Row) = row.reason.filter(_.isInstanceOf[Transaction]).map(_.asInstanceOf[Transaction])
+    def getRowTxs(row: Row) = row.reason.flatMap(id => storage.getTransaction(id))
 
     keys.foldLeft(SortedMap.empty[Int, Seq[Transaction]]) { (result, key) =>
 
@@ -134,7 +134,8 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
       }
 
       //TODO unique by id?
-    }.values.flatten.groupBy(_.id).map(_._2.head).toList.sortWith(_.timestamp > _.timestamp).take(limit)
+    }.values.flatten.groupBy(t => Base58.encode(t.id)).map(_._2.head).toList.sortWith(_.timestamp > _.timestamp)
+      .take(limit)
   }
 
   /**

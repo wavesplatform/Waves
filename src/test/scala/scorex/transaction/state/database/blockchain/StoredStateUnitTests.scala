@@ -8,6 +8,7 @@ import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.{Account, PrivateKeyAccount}
+import scorex.crypto.encode.Base58
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets._
