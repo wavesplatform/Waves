@@ -30,9 +30,6 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
   val db = new MVStore.Builder().compress().open()
   val storedState = StoredState.fromDB(db, WavesHardForkParameters.Disabled)
-//  {
-//    override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
-//  }
 
   val settings = new WavesSettings(JsObject(Seq(
     "matcher" -> JsObject(
