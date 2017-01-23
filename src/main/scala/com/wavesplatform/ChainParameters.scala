@@ -50,7 +50,7 @@ object TestNetParams extends ChainParameters {
 
   override val allowBurnTransactionAfterTimestamp: Long = 1481110521000L
 
-  override val requirePaymentNotIncludedAfterTimestamp: Long = 1485942685000L
+  override val requirePaymentUniqueId: Long = 1485942685000L
 }
 
 object MainNetParams extends ChainParameters {
@@ -87,5 +87,5 @@ object MainNetParams extends ChainParameters {
 
   override val allowBurnTransactionAfterTimestamp: Long = 1482233593000L
 
-  override val requirePaymentNotIncludedAfterTimestamp: Long = 1488361885000L
+  override val requirePaymentUniqueId: Long = 1488361885000L
 }

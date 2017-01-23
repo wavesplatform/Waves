@@ -78,7 +78,7 @@ object UnitTestNetParams extends ChainParameters {
 
   override def allowBurnTransactionAfterTimestamp: Long = 1481110521000L
 
-  override def requirePaymentNotIncludedAfterTimestamp: Long = 0L
+  override def requirePaymentUniqueId: Long = 0L
 }
 
 object TestingCommons {

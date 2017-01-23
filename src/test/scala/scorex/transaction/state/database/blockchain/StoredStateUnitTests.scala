@@ -38,7 +38,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     override def allowBurnTransactionAfterTimestamp: Long = 0L
 
-    override def requirePaymentNotIncludedAfterTimestamp: Long = 0L
+    override def requirePaymentUniqueId: Long = 0L
   }
 
   val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"

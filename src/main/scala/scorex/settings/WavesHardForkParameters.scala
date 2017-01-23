@@ -10,7 +10,7 @@ object WavesHardForkParameters {
     override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
     override def allowUnissuedAssetsUntil: Long = Long.MaxValue
     override def allowBurnTransactionAfterTimestamp: Long = Long.MaxValue
-    override def requirePaymentNotIncludedAfterTimestamp: Long = Long.MaxValue
+    override def requirePaymentUniqueId: Long = Long.MaxValue
   }
 
   val Enabled = new AnyRef with WavesHardForkParameters {
@@ -22,7 +22,7 @@ object WavesHardForkParameters {
     override def allowTransactionsFromFutureUntil: Long = 0
     override def allowUnissuedAssetsUntil: Long = 0
     override def allowBurnTransactionAfterTimestamp: Long = 0
-    override def requirePaymentNotIncludedAfterTimestamp: Long = 0
+    override def requirePaymentUniqueId: Long = 0
   }
 }
 trait WavesHardForkParameters {
@@ -34,5 +34,5 @@ trait WavesHardForkParameters {
   def allowTransactionsFromFutureUntil: Long
   def allowUnissuedAssetsUntil: Long
   def allowBurnTransactionAfterTimestamp: Long
-  def requirePaymentNotIncludedAfterTimestamp: Long
+  def requirePaymentUniqueId: Long
 }
