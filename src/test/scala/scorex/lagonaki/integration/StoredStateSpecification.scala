@@ -7,6 +7,7 @@ import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.mocks.BlockMock
 import scorex.transaction.state.database.state.AccState
+import scorex.transaction.state.database.state.extension.IncrementingTimestampValidator
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
 import scorex.utils._
@@ -19,6 +20,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   private val history = application.transactionModule.blockStorage.history
   private val acc = applicationNonEmptyAccounts.head
   private val recipient = applicationEmptyAccounts.head
+  private val incrementingTimestampValidator: IncrementingTimestampValidator = state.validators.filter(_.isInstanceOf[IncrementingTimestampValidator]).head.asInstanceOf[IncrementingTimestampValidator]
 
   require(acc.address != recipient.address)
 
@@ -120,7 +122,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), application.wallet).get
 
     waitForNextBlock(application)
-//    state.processBlock(new BlockMock(Seq(issueAssetTx))) should be('success)
+    //    state.processBlock(new BlockMock(Seq(issueAssetTx))) should be('success)
 
     val assetId = Some(Base58.encode(issueAssetTx.assetId))
 
@@ -129,24 +131,18 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
       transactionModule.transferAsset(TransferRequest(assetId, None, 10, 100000, acc.address, "123", r.address), application.wallet).get
     }))
 
-    txs.size should be (20)
+    txs.size should be(20)
 
     val shuffledTxs = Random.shuffle(txs).map(_.right.get)
 
-    shuffledTxs.size should be (20)
+    shuffledTxs.size should be(20)
 
     waitForNextBlock(application)
-//    state.processBlock(new BlockMock(shuffledTxs)) should be('success)
+    //    state.processBlock(new BlockMock(shuffledTxs)) should be('success)
 
     state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
 
     recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be(100))
-  }
-
-  test("validate plenty of transactions") {
-    val trans = Seq.fill(transactionModule.utxStorage.sizeLimit)(genValidTransaction())
-    profile(state.validate(trans, blockTime = trans.map(_.timestamp).max)) should be < 1000L
-    state.validate(trans, blockTime = trans.map(_.timestamp).max).size should be <= trans.size
   }
 
   test("included") {
@@ -168,7 +164,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val block = new BlockMock(Seq(tx1, tx2))
     state.processBlock(block)
 
-    val result = state.lastAccountPaymentTransaction(acc)
+    val result = state.incrementingTimestampValidator.lastAccountPaymentTransaction(acc)
     result.isDefined shouldBe true
     result.get shouldBe tx2
   }
@@ -185,11 +181,11 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val block2 = new BlockMock(Seq(tx3, tx4))
     state.processBlock(block2)
 
-    val result1 = state.lastAccountPaymentTransaction(acc)
+    val result1 = state.incrementingTimestampValidator.lastAccountPaymentTransaction(acc)
     result1.isDefined shouldBe true
     result1.get shouldBe tx2
 
-    val result2 = state.lastAccountPaymentTransaction(recipient)
+    val result2 = state.incrementingTimestampValidator.lastAccountPaymentTransaction(recipient)
     result2.isDefined shouldBe true
     result2.get shouldBe tx4
   }
