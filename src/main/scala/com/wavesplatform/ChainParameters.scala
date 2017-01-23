@@ -11,7 +11,7 @@ import scorex.settings.WavesHardForkParameters
 abstract class ChainParameters extends WavesHardForkParameters {
   val initialBalance: Long
   val genesisTimestamp: Long
-  val genesisTxs : Seq[Transaction]
+  val genesisTxs: Seq[Transaction]
   val addressScheme: AddressScheme
 }
 
@@ -56,12 +56,12 @@ object MainNetParams extends ChainParameters {
   val genesisTimestamp = 1465742577614L
   lazy val genesisTxs = {
     val txs = Seq(
-      GenesisTransaction.create( new Account("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ"), initialBalance - 5 * Constants.UnitsInWave, genesisTimestamp).right.get,
-      GenesisTransaction.create( new Account("3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM"), Constants.UnitsInWave, genesisTimestamp).right.get,
-      GenesisTransaction.create( new Account("3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy"), Constants.UnitsInWave, genesisTimestamp).right.get,
-      GenesisTransaction.create( new Account("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF"), Constants.UnitsInWave, genesisTimestamp).right.get,
-      GenesisTransaction.create( new Account("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3"), Constants.UnitsInWave, genesisTimestamp).right.get,
-      GenesisTransaction.create( new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J"), Constants.UnitsInWave, genesisTimestamp).right.get
+      GenesisTransaction.create(new Account("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ"), initialBalance - 5 * Constants.UnitsInWave, genesisTimestamp).right.get,
+      GenesisTransaction.create(new Account("3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM"), Constants.UnitsInWave, genesisTimestamp).right.get,
+      GenesisTransaction.create(new Account("3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy"), Constants.UnitsInWave, genesisTimestamp).right.get,
+      GenesisTransaction.create(new Account("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF"), Constants.UnitsInWave, genesisTimestamp).right.get,
+      GenesisTransaction.create(new Account("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3"), Constants.UnitsInWave, genesisTimestamp).right.get,
+      GenesisTransaction.create(new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J"), Constants.UnitsInWave, genesisTimestamp).right.get
     )
     require(txs.foldLeft(0L)(_ + _.amount) == initialBalance)
     txs

@@ -1,19 +1,8 @@
 package scorex.waves
 
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 
-@DoNotDiscover
-class DebugAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
-
-  import TestingCommons._
-
-  override def beforeAll: Unit = {
-    start()
-  }
-
-  override def afterAll: Unit = {
-    stop()
-  }
+class DebugAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
   test("/debug/state") {
     val state = getRequest("/debug/state")

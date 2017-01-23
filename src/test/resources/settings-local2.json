@@ -1,0 +1,24 @@
+{
+  "p2p": {
+    "nodeName": "Node2",
+    "localOnly": true,
+    "myAddress": "127.0.0.1",
+    "bindAddress": "127.0.0.1",
+    "upnp": false,
+    "upnpGatewayTimeout": 7000,
+    "upnpDiscoverTimeout": 3000,
+    "port": 9088,
+    "knownPeers": ["127.0.0.1:9084","127.0.0.1:9091"],
+    "maxConnections": 10,
+    "peersDataBroadcastDelay": 900
+  },
+  "walletPassword": "cookies",
+  "walletSeed": "222",
+  "rpcPort": 9086,
+  "maxRollback": 100,
+  "offlineGeneration": false,
+  "scoreBroadcastDelay": 500,
+  "blockGenerationDelay": 500,
+  "tflikeScheduling": false,
+  "genesisSignature": "2weB9AueX8BhBR9AVnuozd3F1mmryp5MfGAnGWEEhoi5i5gJz9qZE7F5GaSckiDxuLBsGAGjBYtuRazUkm79G6b8"
+}

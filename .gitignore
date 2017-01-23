@@ -9,9 +9,17 @@ target
 *.tgz
 *.jar
 
+# vim
+*.*~
+
+# scala build folders
+target
+
+
 # dotfiles
 .dockerignore
 .editorconfig
+
 
 # logs
 scorex.log
@@ -30,3 +38,10 @@ localsettings.json
 
 # Packages
 package/
+
+# standalone docker
+Dockerfile
+
+# logs
+*.log
+
