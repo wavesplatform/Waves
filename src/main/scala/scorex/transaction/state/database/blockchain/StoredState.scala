@@ -317,6 +317,31 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   }
 
   //for debugging purposes only
+  def toWavesJson(heightOpt: Int): JsObject = {
+    val ls = storage.lastStatesKeys.map(add => add -> balanceAtHeight(add, heightOpt))
+      .filter(b => b._1.length == 35 && b._2 != 0).sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
+    JsObject(ls)
+  }
+
+  //for debugging purposes only
+  private def balanceAtHeight(key: String, atHeight: Int): Long = {
+    storage.getLastStates(key) match {
+      case Some(h) if h > 0 =>
+
+        def loop(hh: Int): Long = {
+          val row = storage.getAccountChanges(key, hh).get
+          if (hh <= atHeight) row.state.balance
+          else if (row.lastRowHeight == 0) 0L
+          else loop(row.lastRowHeight)
+        }
+
+        loop(h)
+      case _ =>
+        0L
+    }
+  }
+
+  //for debugging purposes only
   override def toString: String = toJson().toString()
 
   //for debugging purposes only
