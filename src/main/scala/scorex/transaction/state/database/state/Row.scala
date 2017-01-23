@@ -6,7 +6,6 @@ import com.google.common.primitives.{Ints, Longs}
 import org.h2.mvstore.WriteBuffer
 import org.h2.mvstore.`type`.DataType
 import scorex.serialization.BytesSerializable
-import scorex.transaction.{FeesStateChange, StateChangeReason, TypedTransaction}
 
 @SerialVersionUID(-3499112732510272830L)
 case class Row(state: AccState, reason: ReasonIds, lastRowHeight: Int) extends BytesSerializable {
@@ -17,6 +16,11 @@ case class Row(state: AccState, reason: ReasonIds, lastRowHeight: Int) extends B
     reason.foldLeft(Array.empty: Array[Byte]) { (b, scr) =>
       b ++ Ints.toByteArray(scr.length) ++ scr
     }
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case s: Row => s.bytes sameElements bytes
+    case _ => false
+  }
 }
 
 object Row {
