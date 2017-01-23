@@ -7,7 +7,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TypedTransaction.TransactionType
-import scorex.transaction.ValidationResult.ValidationResult
+import scorex.transaction.ValidationError
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -114,25 +114,25 @@ object TransferTransaction extends Deser[TransferTransaction] {
              feeAssetId: Option[AssetId],
              feeAmount: Long,
              attachment: Array[Byte],
-             signature: Array[Byte]): Either[ValidationResult, TransferTransaction] = {
+             signature: Array[Byte]): Either[ValidationError, TransferTransaction] = {
     if (!Account.isValid(recipient)) {
-      Left(ValidationResult.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
+      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
-      Left(ValidationResult.TooBigArray)
+      Left(ValidationError.TooBigArray)
     } else if (amount <= 0) {
-      Left(ValidationResult.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
+      Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (Try(Math.addExact(amount, feeAmount)).isFailure) {
-      Left(ValidationResult.OverflowError) // CHECK THAT fee+amount won't overflow Long
+      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else if (!Account.isValid(sender)) {
-      Left(ValidationResult.InvalidAddress)
+      Left(ValidationError.InvalidAddress)
     } else if (feeAmount <= 0) {
-      Left(ValidationResult.InsufficientFee)
+      Left(ValidationError.InsufficientFee)
     } else {
       val unsigned = TransferTransactionImpl(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, null)
       if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
         Right(unsigned.copy(signature = signature))
       } else {
-        Left(ValidationResult.InvalidSignature)
+        Left(ValidationError.InvalidSignature)
       }
     }
   }
@@ -144,19 +144,19 @@ object TransferTransaction extends Deser[TransferTransaction] {
              timestamp: Long,
              feeAssetId: Option[AssetId],
              feeAmount: Long,
-             attachment: Array[Byte]): Either[ValidationResult, TransferTransaction] = {
+             attachment: Array[Byte]): Either[ValidationError, TransferTransaction] = {
     if (!Account.isValid(recipient)) {
-      Left(ValidationResult.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
+      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
-      Left(ValidationResult.TooBigArray)
+      Left(ValidationError.TooBigArray)
     } else if (amount <= 0) {
-      Left(ValidationResult.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
+      Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (Try(Math.addExact(amount, feeAmount)).isFailure) {
-      Left(ValidationResult.OverflowError) // CHECK THAT fee+amount won't overflow Long
+      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else if (!Account.isValid(sender)) {
-      Left(ValidationResult.InvalidAddress)
+      Left(ValidationError.InvalidAddress)
     } else if (feeAmount <= 0) {
-      Left(ValidationResult.InsufficientFee)
+      Left(ValidationError.InsufficientFee)
     } else {
       val unsigned = TransferTransactionImpl(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, null)
       val sig      = EllipticCurveImpl.sign(sender, unsigned.toSign)

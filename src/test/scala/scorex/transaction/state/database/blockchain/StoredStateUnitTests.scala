@@ -8,19 +8,19 @@ import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.{Account, PrivateKeyAccount}
-import scorex.crypto.encode.Base58
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.{Order, OrderMatch, OrderType}
+import scorex.transaction.assets.exchange.{Order, ExchangeTransaction, OrderType}
 import scorex.transaction.state.database.state._
 import scorex.utils.{NTP, ScorexLogging}
+import scorex.waves.TestingCommons
 
 import scala.util.Random
 import scala.util.control.NonFatal
 
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
-  with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging {
+  with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging with TestingCommons {
 
   val forkParametersWithEnableUnissuedAssetsCheck = new AnyRef with WavesHardForkParameters {
     override def allowTemporaryNegativeUntil: Long = 0L
@@ -56,6 +56,21 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   val applyChanges = PrivateMethod[Unit]('applyChanges)
   val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
 
+
+
+  property("validate plenty of transactions") {
+    val TxN: Int = 1000
+    val InitialBalance: Long = Long.MaxValue / 8
+    state.applyChanges(Map(testAssetAcc -> (AccState(InitialBalance), List(FeesStateChange(InitialBalance)))))
+    state.balance(testAcc) shouldBe InitialBalance
+    val trans = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
+
+    val bts = trans.map(_.timestamp).max
+    val (time, result) = profile(state.validate(trans, blockTime = bts))
+    time should be < 1000L
+    result.size should be <= trans.size
+  }
+
   property("Burn assets") {
     forAll(issueReissueGenerator) { pair =>
       withRollbackTest {
@@ -84,7 +99,6 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
       }
     }
   }
-
 
   property("Transaction seq Long overflow") {
     val TxN: Int = 12
@@ -357,7 +371,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Order matching") {
-    forAll { x: (OrderMatch, PrivateKeyAccount) =>
+    forAll { x: (ExchangeTransaction, PrivateKeyAccount) =>
       withRollbackTest {
         def feeInAsset(amount: Long, assetId: Option[AssetId]): Long = {
           if (assetId.isEmpty) amount else 0L
@@ -456,6 +470,12 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   def getBalances(a: AssetAcc*): Seq[Long] = {
     a.map(state.assetBalance(_))
+  }
+
+  def profile[R](block: => R): (Long, R) = {
+    val start = System.currentTimeMillis()
+    val result = block // call-by-name
+    (System.currentTimeMillis() - start, result)
   }
 
 }

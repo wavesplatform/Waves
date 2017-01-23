@@ -8,7 +8,7 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
 import scorex.settings.WavesHardForkParameters
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderMatch}
+import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
@@ -74,13 +74,16 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
       Base58.decode(request.attachment).get).right.get
   }
 
-  def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long): OrderMatch = {
-    OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp)
+  def createExchangeTransaction(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
+                                buyMatcherFee: Long, sellMatcherFee: Long, fee: Long): ExchangeTransaction = {
+    ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp).right.get
   }
 
-  def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, fee: Long): OrderMatch = {
-    OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, fee, getTimestamp)
+  def createExchangeTransaction(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, fee: Long): ExchangeTransaction = {
+
+    val buyMatcherFee: Long = buyOrder.matcherFee * amount / buyOrder.amount
+    val sellMatcherFee: Long = sellOrder.matcherFee * amount / sellOrder.amount
+    ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee,sellMatcherFee,fee, getTimestamp).right.get
   }
 
   def addInitialAssets(acc: PrivateKeyAccount, assetName: String, amount: Long): Option[AssetId] = {
@@ -117,7 +120,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val sell1 = Order
       .sell(sellAcc, matcher, pair, price, 5 * WAVES_UNITS, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
     val buy1Fee = (0.5 * WAVES_UNITS).toLong
-    val om1 = createOrderMatch(buy1, sell1, price, 5 * WAVES_UNITS, buy1Fee, sell1.matcherFee, matcherTxFee)
+    val om1 = createExchangeTransaction(buy1, sell1, price, 5 * WAVES_UNITS, buy1Fee, sell1.matcherFee, matcherTxFee)
 
     state.isValid(om1, om1.timestamp) should be(true)
     state.processBlock(new BlockMock(Seq(om1))) should be('success)
@@ -136,7 +139,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
     val sell2 = Order
       .sell(sellAcc, matcher, pair, price, 6 * WAVES_UNITS, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
-    val notEnoughRemainingFromPrevOm = createOrderMatch(buy1, sell2, price, 6 * WAVES_UNITS, buy1Fee, sell1.matcherFee,
+    val notEnoughRemainingFromPrevOm = createExchangeTransaction(buy1, sell2, price, 6 * WAVES_UNITS, buy1Fee, sell1.matcherFee,
       matcherTxFee)
 
     state.isValid(notEnoughRemainingFromPrevOm, notEnoughRemainingFromPrevOm.timestamp) should be(false)
@@ -144,14 +147,14 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val buy2 = Order.buy(buyAcc, matcher, pair, price, om1buy1 + 1, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
     val sell3 = Order
       .sell(sellAcc, matcher, pair, price, om1buy1 + 1, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
-    val notEnoughBalOm = createOrderMatch(buy2, sell3, price, om1buy1 + 1, matcherTxFee)
+    val notEnoughBalOm = createExchangeTransaction(buy2, sell3, price, om1buy1 + 1, matcherTxFee)
 
     state.isValid(notEnoughBalOm, notEnoughBalOm.timestamp) should be(false)
     state.processBlock(new BlockMock(Seq(notEnoughBalOm))) should be('failure)
 
     val sell4 = Order
       .sell(sellAcc, matcher, pair, price, 5 * Order.PriceConstant, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
-    val om2 = createOrderMatch(buy1, sell4, price, 5 * Order.PriceConstant, buy1.matcherFee - buy1Fee,
+    val om2 = createExchangeTransaction(buy1, sell4, price, 5 * Order.PriceConstant, buy1.matcherFee - buy1Fee,
       sell4.matcherFee, matcherTxFee)
 
     state.isValid(om2, om2.timestamp) should be(true)
@@ -190,7 +193,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
       buyAcc.address, "spend", sellAcc.address), wallet)
     //state.processBlock(new BlockMock(Seq(spendTx))) should be('success)
 
-    val validOm = createOrderMatch(buy, sell, price, 5 * Order.PriceConstant, buyFee, sellFee, matcherTxFee)
+    val validOm = createExchangeTransaction(buy, sell, price, 5 * Order.PriceConstant, buyFee, sellFee, matcherTxFee)
 
     state.isValid(spendTx, spendTx.timestamp) should be(true)
     state.isValid(validOm, validOm.timestamp) should be(true)
@@ -217,7 +220,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
     (1 to 11).foreach { i =>
       val aBuy = Order.sign(buy.copy(maxTimestamp = buy.maxTimestamp + i), buyAcc)
-      val om = createOrderMatch(aBuy, sell, price, aBuy.amount, matcherTxFee)
+      val om = createExchangeTransaction(aBuy, sell, price, aBuy.amount, matcherTxFee)
 
       if (i < 11) {
         withCheckBalances(pair, buyAcc, sellAcc, om) {
@@ -233,7 +236,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   private def withCheckBalances(pair: AssetPair,
                                 buyAcc: PrivateKeyAccount,
                                 sellAcc: PrivateKeyAccount,
-                                om: OrderMatch)(f: => Unit): Unit = {
+                                om: ExchangeTransaction)(f: => Unit): Unit = {
     val (prevBuyW, prevBuy1, prevBuy2) = getBalances(buyAcc, pair)
     val (prevSellW, prevSell1, prevSell2) = getBalances(sellAcc, pair)
 

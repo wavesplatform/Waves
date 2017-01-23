@@ -9,7 +9,6 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction._
-import scorex.transaction.ValidationResult.ValidationResult
 
 import scala.util.{Failure, Success, Try}
 
@@ -71,15 +70,15 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
   private val SignatureLength = 64
   private val BaseLength = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
-  def create(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationResult, PaymentTransaction] = {
+  def create(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
     if (!Account.isValid(recipient)) {
-      Left(ValidationResult.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
+      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (amount <= 0) {
-      Left(ValidationResult.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
+      Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
-      Left(ValidationResult.InsufficientFee) //CHECK IF FEE IS POSITIVE
+      Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationResult.OverflowError) // CHECK THAT fee+amount won't overflow Long
+      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
       val signature = EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
       Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
@@ -91,21 +90,21 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             signature: Array[Byte]): Either[ValidationResult, PaymentTransaction] = {
+             signature: Array[Byte]): Either[ValidationError, PaymentTransaction] = {
     if (!Account.isValid(recipient)) {
-      Left(ValidationResult.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
+      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (amount <= 0) {
-      Left(ValidationResult.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
+      Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
-      Left(ValidationResult.InsufficientFee) //CHECK IF FEE IS POSITIVE
+      Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationResult.OverflowError) // CHECK THAT fee+amount won't overflow Long
+      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
       val sigData = signatureData(sender, recipient, amount, fee, timestamp)
       if (EllipticCurveImpl.verify(signature, sigData, sender.publicKey)) {
         Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
       } else {
-        Left(ValidationResult.InvalidSignature)
+        Left(ValidationError.InvalidSignature)
       }
 
     }

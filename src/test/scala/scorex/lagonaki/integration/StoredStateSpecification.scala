@@ -145,13 +145,6 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be(100))
   }
 
-  test("validate plenty of transactions") {
-    val trans = Seq.fill(transactionModule.utxStorage.sizeLimit)(genValidTransaction())
-    val (time, result) = profile(state.validate(trans, blockTime = trans.map(_.timestamp).max))
-    time should be < 1000L
-    result.size should be <= trans.size
-  }
-
   test("included") {
     val incl = includedTransactions(history.lastBlock, history)
     incl.nonEmpty shouldBe true

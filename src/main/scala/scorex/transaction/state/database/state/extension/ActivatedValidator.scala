@@ -1,7 +1,7 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.settings.WavesHardForkParameters
-import scorex.transaction.assets.exchange.OrderMatch
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 
@@ -15,7 +15,7 @@ class ActivatedValidator(settings: WavesHardForkParameters) extends StateExtensi
     case tx: IssueTransaction => true
     case tx: ReissueTransaction => true
     case tx: BurnTransaction => tx.timestamp > settings.allowBurnTransactionAfterTimestamp
-    case tx: OrderMatch => true
+    case tx: ExchangeTransaction => true
     case _ => false
   }
 

@@ -2,29 +2,57 @@ package scorex.transaction.state.database.state.extension
 
 import scorex.crypto.encode.Base58
 import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
+import scorex.transaction.assets.exchange.{Order, ExchangeTransaction}
 import scorex.transaction.state.database.state.storage.{OrderMatchStorageI, StateStorageI}
 
 class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends StateExtension {
 
 
   override def isValid(tx: Transaction, height: Int): Boolean = tx match {
-    case om: OrderMatch => isOrderMatchValid(om)
+    case om: ExchangeTransaction => isOrderMatchValid(om)
     case _ => true
   }
 
   override def process(tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
-    case om: OrderMatch => putOrderMatch(om, blockTs)
+    case om: ExchangeTransaction => putOrderMatch(om, blockTs)
     case _ =>
   }
 
   val MaxLiveDays = (Order.MaxLiveTime / 24L * 60L * 60L * 1000L).toInt
 
-  private def isOrderMatchValid(om: OrderMatch): Boolean = {
-    om.isValid(findPrevOrderMatchTxs(om))
+  def isOrderMatchValid(exTrans: ExchangeTransaction): Boolean = {
+    val previousMatches = findPrevOrderMatchTxs(exTrans)
+
+    lazy val buyTransactions = previousMatches.filter { om =>
+      om.buyOrder.id sameElements exTrans.buyOrder.id
+    }
+    lazy val sellTransactions = previousMatches.filter { om =>
+      om.sellOrder.id sameElements exTrans.sellOrder.id
+    }
+
+    lazy val buyTotal = buyTransactions.foldLeft(0L)(_ + _.amount) + exTrans.amount
+    lazy val sellTotal = sellTransactions.foldLeft(0L)(_ + _.amount) + exTrans.amount
+
+    lazy val buyFeeTotal = buyTransactions.map(_.buyMatcherFee).sum + exTrans.buyMatcherFee
+    lazy val sellFeeTotal = sellTransactions.map(_.sellMatcherFee).sum + exTrans.sellMatcherFee
+
+    lazy val amountIsValid: Boolean = {
+      val b = buyTotal <= exTrans.buyOrder.amount
+      val s = sellTotal <= exTrans.sellOrder.amount
+      b && s
+    }
+
+    def isFeeValid(fee: Long, feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long): Boolean = {
+      fee > 0 &&
+        feeTotal <= BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
+    }
+
+    amountIsValid &&
+      isFeeValid(exTrans.buyMatcherFee, buyFeeTotal, buyTotal, exTrans.buyOrder.matcherFee, exTrans.buyOrder.amount) &&
+      isFeeValid(exTrans.sellMatcherFee, sellFeeTotal, sellTotal, exTrans.sellOrder.matcherFee, exTrans.sellOrder.amount)
   }
 
-  private def putOrderMatch(om: OrderMatch, blockTs: Long): Unit = {
+  private def putOrderMatch(om: ExchangeTransaction, blockTs: Long): Unit = {
     def isSaveNeeded(order: Order): Boolean = {
       order.maxTimestamp >= blockTs
     }
@@ -63,21 +91,21 @@ class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) exte
 
   private val emptyTxIdSeq = Array.empty[String]
 
-  private def parseTxSeq(a: Array[String]): Set[OrderMatch] = {
+  private def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] = {
     a.toSet.flatMap { s: String => Base58.decode(s).toOption }.flatMap { id =>
-      storage.getTransactionBytes(id).flatMap(b => OrderMatch.parseBytes(b).toOption)
+      storage.getTransactionBytes(id).flatMap(b => ExchangeTransaction.parseBytes(b).toOption)
     }
   }
 
-  private def findPrevOrderMatchTxs(om: OrderMatch): Set[OrderMatch] = {
+  private def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction] = {
     findPrevOrderMatchTxs(om.buyOrder) ++ findPrevOrderMatchTxs(om.sellOrder)
   }
 
-  def findPrevOrderMatchTxs(order: Order): Set[OrderMatch] = {
+  def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = {
     val orderDay = calcStartDay(order.maxTimestamp)
     if (storage.containsSavedDays(orderDay)) {
       parseTxSeq(storage.getOrderMatchTxByDay(calcStartDay(order.maxTimestamp), Base58.encode(order.id))
         .getOrElse(emptyTxIdSeq))
-    } else Set.empty[OrderMatch]
+    } else Set.empty[ExchangeTransaction]
   }
 }
