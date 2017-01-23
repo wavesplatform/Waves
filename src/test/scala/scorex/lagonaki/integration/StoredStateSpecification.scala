@@ -22,6 +22,12 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
   require(acc.address != recipient.address)
 
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+
+    waitForNextBlock(application)
+  }
+
   test("invalidate transaction with forged signature in sequence") {
     val amount = state.balance(acc) / 1000
     val ts = System.currentTimeMillis()
@@ -120,7 +126,6 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), application.wallet).get
 
     waitForNextBlock(application)
-//    state.processBlock(new BlockMock(Seq(issueAssetTx))) should be('success)
 
     val assetId = Some(Base58.encode(issueAssetTx.assetId))
 
@@ -136,7 +141,6 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     shuffledTxs.size should be (20)
 
     waitForNextBlock(application)
-//    state.processBlock(new BlockMock(shuffledTxs)) should be('success)
 
     state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
 
