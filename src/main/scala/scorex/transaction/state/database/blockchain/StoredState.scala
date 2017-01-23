@@ -27,6 +27,7 @@ import scala.util.control.NonFatal
   */
 class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
                   val assetsExtension: AssetsExtendedState,
+                  val incrementingTimestampValidator: IncrementingTimestampValidator,
                   val validators: Seq[StateExtension],
                   settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging {
 
@@ -150,7 +151,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     val validTransactions = if (allowInvalidPaymentTransactionsByTimestamp) {
       txs
     } else {
-      val invalidPaymentTransactionsByTimestamp = invalidatePaymentTransactionsByTimestamp(txs)
+      val invalidPaymentTransactionsByTimestamp = incrementingTimestampValidator.invalidatePaymentTransactionsByTimestamp(txs)
       excludeTransactions(txs, invalidPaymentTransactionsByTimestamp)
     }
 
@@ -162,6 +163,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
 
     val allowUnissuedAssets = filteredFromFuture.nonEmpty && txs.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
+
 
     def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
       val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Transaction])) {
@@ -198,27 +200,6 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
 
     filterValidTransactionsByState(filteredFromFuture)
   }
-
-  def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
-    def loop(h: Int, address: Address): Option[PaymentTransaction] = {
-      storage.getAccountChanges(address, h) match {
-        case Some(row) =>
-          val accountTransactions = row.reason.flatMap(id => storage.getTransaction(id))
-            .filter(_.isInstanceOf[PaymentTransaction])
-            .map(_.asInstanceOf[PaymentTransaction])
-            .filter(_.sender.address == address)
-          if (accountTransactions.nonEmpty) Some(accountTransactions.maxBy(_.timestamp))
-          else loop(row.lastRowHeight, address)
-        case _ => None
-      }
-    }
-
-    storage.getLastStates(account.address) match {
-      case Some(height) => loop(height, account.address)
-      case None => None
-    }
-  }
-
 
   private[blockchain] def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean):
   Map[AssetAcc, (AccState, Reasons)] = {
@@ -309,32 +290,6 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
     transactions.filter(t1 => !exclude.exists(t2 => t2.id sameElements t1.id))
 
-  private def invalidatePaymentTransactionsByTimestamp(transactions: Seq[Transaction]): Seq[Transaction] = {
-    val paymentTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
-      .map(_.asInstanceOf[PaymentTransaction])
-
-    val initialSelection: Map[String, (List[Transaction], Long)] = Map(paymentTransactions.map { payment =>
-      val address = payment.sender.address
-      val stateTimestamp = lastAccountPaymentTransaction(payment.sender) match {
-        case Some(lastTransaction) => lastTransaction.timestamp
-        case _ => 0
-      }
-      address -> (List[Transaction](), stateTimestamp)
-    }: _*)
-
-    val orderedTransaction = paymentTransactions.sortBy(_.timestamp)
-    val selection: Map[String, (List[Transaction], Long)] = orderedTransaction.foldLeft(initialSelection) { (s, t) =>
-      val address = t.sender.address
-      val tuple = s(address)
-      if (t.timestamp > tuple._2) {
-        s.updated(address, (tuple._1, t.timestamp))
-      } else {
-        s.updated(address, (tuple._1 :+ t, tuple._2))
-      }
-    }
-
-    selection.foldLeft(List[Transaction]()) { (l, s) => l ++ s._2._1 }
-  }
 
   private def filterTransactionsFromFuture(transactions: Seq[Transaction], blockTime: Long): Seq[Transaction] = {
     transactions.filter {
@@ -343,23 +298,9 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   }
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = {
-    val extensionValidated: Boolean = validators.forall(_.isValid(transaction, height))
-    //TODO move to extensions
-    val restValidation: Boolean = transaction match {
-      case tx: PaymentTransaction =>
-        transaction.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp ||
-          (transaction.timestamp >= settings.allowInvalidPaymentTransactionsByTimestamp && isTimestampCorrect(tx))
-      case _ => true
-    }
-    extensionValidated && restValidation
+    validators.forall(_.isValid(transaction, height))
   }
 
-  private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
-    lastAccountPaymentTransaction(tx.sender) match {
-      case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
-      case None => true
-    }
-  }
 
   private def getIssueTransaction(assetId: AssetId): Option[IssueTransaction] =
     storage.getTransactionBytes(assetId).flatMap(b => IssueTransaction.parseBytes(b).toOption)
@@ -392,14 +333,16 @@ object StoredState {
       if (db.getStoreVersion > 0) db.rollback()
     }
     val extendedState = new AssetsExtendedState(storage)
+    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings, storage)
     val validators = Seq(
       extendedState,
+      incrementingTimestampValidator,
       new GenesisValidator,
       new OrderMatchStoredState(storage),
       new IncludedValidator(storage, settings),
       new ActivatedValidator(settings)
     )
-    new StoredState(storage, extendedState, validators, settings)
+    new StoredState(storage, extendedState, incrementingTimestampValidator, validators, settings)
   }
 
 }

@@ -80,10 +80,10 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
     seq(Random.nextInt(seq.length))
   }
 
-  def profile[R](block: => R): Long = {
+  def profile[R](block: => R): (Long, R) = {
     val start = System.currentTimeMillis()
-    block
-    System.currentTimeMillis() - start
+    val result = block // call-by-name
+    (System.currentTimeMillis() - start, result)
   }
 
   implicit val timeout = Timeout(1.second)
