@@ -56,6 +56,8 @@ object UnitTestNetParams extends ChainParameters {
   override def allowUnissuedAssetsUntil: Long = 1479416400000L
 
   override def allowBurnTransactionAfterTimestamp: Long = 1481110521000L
+
+  override def requirePaymentUniqueId: Long = 0L
 }
 
 trait TestingCommons extends Suite with BeforeAndAfterAll {
@@ -76,12 +78,6 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   def randomFrom[T](seq: Seq[T]): T = {
     require(seq.nonEmpty)
     seq(Random.nextInt(seq.length))
-  }
-
-  def profile[R](block: => R): Long = {
-    val start = System.currentTimeMillis()
-    block
-    System.currentTimeMillis() - start
   }
 
   implicit val timeout = Timeout(1.second)
