@@ -10,16 +10,15 @@ import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
 import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsString, JsValue, Json}
-import scorex.account.PublicKeyAccount
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange._
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.utils.{ByteArray, NTP, ScorexLogging}
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
+import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -121,35 +120,38 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     }
   }
 
-  def matchOrder(limitOrder: LimitOrder): Unit = {
-    persist(OrderBook.matchOrder(orderBook, limitOrder)) { e =>
-      handleMatchEvent(e).foreach(matchOrder)
-    }
+  @tailrec
+  private def matchOrder(limitOrder: LimitOrder): Unit = {
+    val remOrder = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
+    if (remOrder.isDefined) matchOrder(remOrder.get)
   }
 
   def handleMatchEvent(e: Event): Option[LimitOrder] = {
+    def processEvent(e: Event) = {
+      persist(e)(_ => ())
+      applyEvent(e)
+      context.system.eventStream.publish(e)
+    }
+
     e match {
       case e: OrderAdded =>
-        applyEvent(e)
-        context.system.eventStream.publish(e)
+        processEvent(e)
+
         None
       case e@OrderExecuted(o, c) =>
         val tx = createTransaction(o, c)
         if (isValid(tx)) {
           sendToNetwork(tx)
-
-          applyEvent(e)
-          context.system.eventStream.publish(e)
+          processEvent(e)
 
           if (e.submittedRemaining > 0) Some(o.partial(e.submittedRemaining))
           else None
         } else {
           val canceled = Events.OrderCanceled(c)
-          persist(canceled)(e => ())
-          applyEvent(canceled)
+          processEvent(canceled)
+
           Some(o)
         }
-
       case _ => None
     }
   }
