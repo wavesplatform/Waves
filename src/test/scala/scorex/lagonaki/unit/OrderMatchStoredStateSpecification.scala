@@ -31,10 +31,6 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   state.processBlock(new BlockMock(Seq(GenesisTransaction.create(acc1, 1000 * WAVES_UNITS, 0).right.get,
     GenesisTransaction.create(acc2, 100 * WAVES_UNITS, 0).right.get)))
 
-  override protected def beforeAll(): Unit = {
-
-  }
-
   override protected def afterAll(): Unit = {
     db.close()
     Files.deleteIfExists(stateFile)

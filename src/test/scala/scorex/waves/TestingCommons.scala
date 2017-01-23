@@ -1,7 +1,5 @@
 package scorex.waves
 
-import java.util.concurrent.atomic.AtomicInteger
-
 import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.util.Timeout
@@ -60,11 +58,15 @@ object UnitTestNetParams extends ChainParameters {
   override def allowBurnTransactionAfterTimestamp: Long = 1481110521000L
 }
 
-trait TestingCommons extends Suite with BeforeAndAfterAll{
+trait TestingCommons extends Suite with BeforeAndAfterAll {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    Thread.sleep(1000)
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    stop()
   }
 
   implicit object TestTransactionLayerSettings extends TransactionSettings {
@@ -87,67 +89,53 @@ trait TestingCommons extends Suite with BeforeAndAfterAll{
   AddressScheme.current = TestNetParams.addressScheme
 
   val applications = List(
-      new Application(ActorSystem("test0"), new WavesSettings(Settings.readSettingsJson("settings-test.json")) {
-        override lazy val chainParams = UnitTestNetParams
-        override lazy val walletDirOpt = None
-        override lazy val dataDirOpt = None
-        override lazy val nodeNonce = 111L
-      }),
-      new Application(ActorSystem("test1"), new WavesSettings(Settings.readSettingsJson("settings-local1.json")) {
-        override lazy val chainParams = UnitTestNetParams
-        override lazy val walletDirOpt = None
-        override lazy val dataDirOpt = None
-        override lazy val nodeNonce = 222L
-      }),
-      new Application(ActorSystem("test2"), new WavesSettings(Settings.readSettingsJson("settings-local2.json")) {
-        override lazy val chainParams = UnitTestNetParams
-        override lazy val walletDirOpt = None
-        override lazy val dataDirOpt = None
-        override lazy val nodeNonce = 333L
-      })
-    )
+    new Application(ActorSystem("test0"), new WavesSettings(Settings.readSettingsJson("settings-test.json")) {
+      override lazy val chainParams = UnitTestNetParams
+      override lazy val walletDirOpt = None
+      override lazy val dataDirOpt = None
+      override lazy val nodeNonce = 111L
+    }),
+    new Application(ActorSystem("test1"), new WavesSettings(Settings.readSettingsJson("settings-local1.json")) {
+      override lazy val chainParams = UnitTestNetParams
+      override lazy val walletDirOpt = None
+      override lazy val dataDirOpt = None
+      override lazy val nodeNonce = 222L
+    }),
+    new Application(ActorSystem("test2"), new WavesSettings(Settings.readSettingsJson("settings-local2.json")) {
+      override lazy val chainParams = UnitTestNetParams
+      override lazy val walletDirOpt = None
+      override lazy val dataDirOpt = None
+      override lazy val nodeNonce = 333L
+    })
+  )
   applications.foreach(_.run())
   applications.foreach { a =>
-      if (a.wallet.privateKeyAccounts().isEmpty) a.wallet.generateNewAccounts(3)
-      untilTimeout(20.seconds, 1.second) {
-        val request = Http(url(peerUrl(a) + "/consensus/algo").GET)
-        val response = Await.result(request, 10.seconds)
-        val json = Json.parse(response.getResponseBody).as[JsObject]
-        assert((json \ "consensusAlgo").asOpt[String].isDefined)
-      }
+    if (a.wallet.privateKeyAccounts().isEmpty) a.wallet.generateNewAccounts(3)
+    untilTimeout(20.seconds, 1.second) {
+      val request = Http(url(peerUrl(a) + "/consensus/algo").GET)
+      val response = Await.result(request, 10.seconds)
+      val json = Json.parse(response.getResponseBody).as[JsObject]
+      assert((json \ "consensusAlgo").asOpt[String].isDefined)
     }
+  }
 
 
   val application: Application = applications.head
 
-  def measure[R](msg: String)(f: => R): R = {
-    val t0 = System.currentTimeMillis()
-    val r = f
-    val t1 = System.currentTimeMillis()
-    println(s"$msg : ${(t1 - t0)}ms")
-    r
-  }
-
-  def stop(): Unit = measure("stop") {
-
-    applications.foreach(a => measure(s"shut down ${a.settings.nodeNonce}") {
+  def stop(): Unit = {
+    applications.foreach(a => {
 
       if (a.settings.isRunMatcher) {
-        measure(s"matcher for ${a.settings.nodeNonce}") {
-          a.shutdownMatcher()
-        }
+        a.shutdownMatcher()
       }
-      measure(s"main of ${a.settings.nodeNonce}") {
         a.shutdown()
-      }
-
     })
   }
 
   def waitForNextBlock(application: Application): Unit = {
     val history = application.transactionModule.blockStorage.history
     val initialHeight = history.height()
-    untilTimeout(5.seconds) {
+    untilTimeout(15.seconds) {
       require(history.height() > initialHeight)
     }
   }

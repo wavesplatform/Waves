@@ -139,7 +139,6 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
     }
 
-  @deprecated("Use transferAsset()")
   def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationResult, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
@@ -350,8 +349,8 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 object SimpleTransactionModule {
   type StoredInBlock = Seq[Transaction]
 
-  val MaxTimeDrift = 15.seconds
-  val MaxTimeForUnconfirmed = 90.minutes
-  val MaxTxAndBlockDiff = 2.hour
-  val MaxTransactionsPerBlock = 100
+  val MaxTimeDrift: FiniteDuration = 15.seconds
+  val MaxTimeForUnconfirmed: FiniteDuration = 90.minutes
+  val MaxTxAndBlockDiff: FiniteDuration = 2.hour
+  val MaxTransactionsPerBlock: Int = 100
 }

@@ -1,19 +1,15 @@
 package scorex.waves
 
-import org.scalatest.{BeforeAndAfterAll, DoNotDiscover, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.account.{Account, AddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PublicKeyAccount}
 import scorex.api.http._
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.waves.http.UnsignedPayment
 import scorex.waves.transaction.{ExternalPayment, SignedPayment}
 
-class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons  {
-
-  override def afterAll: Unit = {
-    stop()
-  }
+class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
   test("/waves/create-signed-payment API route checks sender balance") {
     val recipient = "3N5jhcA7R98AUN12ee9pB7unvnAKfzb3nen"
@@ -25,9 +21,9 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
 
     val response = postRequest(us = "/waves/create-signed-payment", body = json)
     assert(response \ "timestamp" == paymentJson \ "timestamp")
-    assert(response \ "amount" == paymentJson \ "amount" )
-    assert(response \ "fee" == paymentJson \ "fee" )
-    assert(response \ "recipient" == paymentJson \ "recipient" )
+    assert(response \ "amount" == paymentJson \ "amount")
+    assert(response \ "fee" == paymentJson \ "fee")
+    assert(response \ "recipient" == paymentJson \ "recipient")
     assert((response \ "signature").toOption.isDefined)
   }
 
@@ -98,7 +94,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     assert(response.getStatusCode == 405)
   }
 
-  ignore ("/waves/broadcast-signed-payment API route can not send to address from another net") {
+  ignore("/waves/broadcast-signed-payment API route can not send to address from another net") {
 
     val senderPublicKey = new PublicKeyAccount(Base58.decode("GvXeYd2iFJUNV7KgeGV2cdnScyrEvrr9uPYJeQFtvg21").get)
     val recipient = new Account("3MyViFvajzYyPn7Y4EWWBBsoSCaBdrCZSfw")

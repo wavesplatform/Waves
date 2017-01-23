@@ -1,20 +1,17 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import scorex.api.http.TooBigArrayAllocation
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 
 import scala.util.Random
 
-class UtilsAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons  {
+class UtilsAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
   override def beforeAll(): Unit = {
+    super.beforeAll()
     stopGeneration(applications)
-  }
-
-  override def afterAll(): Unit = {
-    stop()
   }
 
   test("/utils/hash/secure API route does't require api key") {

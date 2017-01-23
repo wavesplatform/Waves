@@ -1,10 +1,10 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 
-class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons  {
+class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
   private def accounts = application.wallet.privateKeyAccounts()
 
@@ -17,10 +17,6 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
   override def beforeAll(): Unit = {
     if (application.wallet.privateKeyAccounts().size < 10) application.wallet.generateNewAccounts(10)
     super.beforeAll()
-  }
-
-  override protected def afterAll(): Unit = {
-    stop()
   }
 
   test("/addresses/seq/{from}/{to} API route") {

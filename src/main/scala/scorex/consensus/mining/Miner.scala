@@ -92,7 +92,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
   }
 
   private def setSchedule(schedule: Seq[FiniteDuration]): Seq[Cancellable] = {
-    val repeatIfNotDeliveredInterval = 10 seconds
+    val repeatIfNotDeliveredInterval = 10.seconds
     val systemScheduler = context.system.scheduler
 
     schedule.map { t => systemScheduler.schedule(t, repeatIfNotDeliveredInterval, self, GenerateBlock) }

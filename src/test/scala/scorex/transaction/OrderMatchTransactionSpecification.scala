@@ -22,7 +22,7 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
   property("OrderMatch balance changes") {
     forAll(accountGen, accountGen, accountGen, assetPairGen) {
       (sender1: PrivateKeyAccount, sender2: PrivateKeyAccount, matcher: PrivateKeyAccount, pair: AssetPair) =>
-      val maxtTime = NTP.correctedTime() + Order.MaxLiveTime
+      val maxTime = NTP.correctedTime() + Order.MaxLiveTime
       val buyPrice = 60
       val sellPrice = 50
       val buyAmount = 2
@@ -30,10 +30,10 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
       val mf1 = 1
       val mf2 = 2
 
-      val buy = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, maxtTime, mf1)
-      val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, maxtTime, mf2)
+      val buy = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, maxTime, mf1)
+      val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, maxTime, mf2)
 
-      val unsigned = OrderMatch(buy, sell, sellPrice, buyAmount, mf1, 1, 1, maxtTime - Order.MaxLiveTime, Array())
+      val unsigned = OrderMatch(buy, sell, sellPrice, buyAmount, mf1, 1, 1, maxTime - Order.MaxLiveTime, Array())
 
       signed(unsigned, matcher).isValid(Set()) shouldBe valid
       signed(unsigned.copy(price = sellPrice + 1), matcher).isValid(Set()) shouldBe valid
@@ -46,9 +46,9 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
       signed(unsigned.copy(fee = 0), matcher).isValid(Set()) should contain ("fee should be > 0")
       signed(unsigned.copy(fee = -1), matcher).isValid(Set()) should contain ("fee should be > 0")
       signed(unsigned.copy(fee = 4), matcher).isValid(Set()) shouldBe valid
-      signed(unsigned.copy(timestamp = maxtTime + 1), matcher).isValid(Set())should contain ("buyOrder maxTimestamp should be > currentTime")
-      signed(unsigned.copy(timestamp = maxtTime), matcher).isValid(Set())  shouldBe valid
-      signed(unsigned.copy(timestamp = maxtTime - 1), matcher).isValid(Set())  shouldBe valid
+      signed(unsigned.copy(timestamp = maxTime + 1), matcher).isValid(Set())should contain ("buyOrder maxTimestamp should be > currentTime")
+      signed(unsigned.copy(timestamp = maxTime), matcher).isValid(Set())  shouldBe valid
+      signed(unsigned.copy(timestamp = maxTime - 1), matcher).isValid(Set())  shouldBe valid
     }
   }
 

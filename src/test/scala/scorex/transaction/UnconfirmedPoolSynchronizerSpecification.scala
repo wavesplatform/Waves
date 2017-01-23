@@ -20,7 +20,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
   with BeforeAndAfterAll
   with OneInstancePerTest {
 
-  override def afterAll {
+  override def afterAll(): Unit = {
     TestKit.shutdownActorSystem(system)
   }
 
@@ -42,10 +42,10 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
 
     "broadcast new transaction to network" in {
 
-      (transactionModule.isValid(_:Transaction, _: Long)) expects (*,*) never()
+      (transactionModule.isValid(_: Transaction, _: Long)) expects(*, *) never()
       transactionModule.putUnconfirmedIfNew _ expects * returns true
 
-      val actorRef = createPoolSynchronizer(100 seconds)
+      val actorRef = createPoolSynchronizer(100.seconds)
       val sender = stub[ConnectedPeer]
       actorRef ! DataFromPeer(TransactionMessageSpec.messageCode, tx, sender)
 
@@ -60,7 +60,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
 
       transactionModule.putUnconfirmedIfNew _ expects * returns false
 
-      val actorRef = createPoolSynchronizer(100 seconds)
+      val actorRef = createPoolSynchronizer(100.seconds)
       val sender = stub[ConnectedPeer]
       actorRef ! DataFromPeer(TransactionMessageSpec.messageCode, tx, sender)
 
@@ -72,7 +72,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
     }
 
     "broadcast one tx periodically" in {
-     (transactionModule.unconfirmedTxs _).expects().returning(Seq(tx))
+      (transactionModule.unconfirmedTxs _).expects().returning(Seq(tx))
 
       val actorRef = createPoolSynchronizer(1 second)
       val spec = TransactionalMessagesRepo.TransactionMessageSpec

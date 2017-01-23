@@ -1,16 +1,13 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 
 class NxtConsensusAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
 
   override def beforeAll(): Unit = {
+    super.beforeAll()
     stopGeneration(applications)
-  }
-
-  override def afterAll(): Unit = {
-    stop()
   }
 
   private val wallet = application.wallet

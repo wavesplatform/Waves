@@ -13,7 +13,7 @@ import scorex.utils._
 
 import scala.util.Random
 
-class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues with BeforeAndAfterAll {
+class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   private val state = application.transactionModule.blockStorage.state
   private val history = application.transactionModule.blockStorage.history
@@ -21,10 +21,6 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   private val recipient = applicationEmptyAccounts.head
 
   require(acc.address != recipient.address)
-
-  override protected def afterAll(): Unit = {
-    stop()
-  }
 
   test("invalidate transaction with forged signature in sequence") {
     val amount = state.balance(acc) / 1000

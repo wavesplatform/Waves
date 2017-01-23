@@ -1,6 +1,6 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.JsValue
 import scorex.block.Block
 import scorex.crypto.encode.Base58
@@ -16,10 +16,6 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
     if (application.wallet.privateKeyAccounts().size < 10) application.wallet.generateNewAccounts(10)
   }
 
-  override def afterAll(): Unit = {
-    stop()
-  }
-
   private def addresses = applicationNonEmptyAccounts.map(_.address)
 
   test("/transactions/unconfirmed API route") {
@@ -27,7 +23,7 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
     val unconfirmed = transactionModule.utxStorage.all()
     unconfirmed.size shouldBe 20
     val tr = GET.request("/transactions/unconfirmed")
-        (tr \\ "signature").toList.size shouldBe unconfirmed.size
+    (tr \\ "signature").toList.size shouldBe unconfirmed.size
   }
 
   test("/transactions/address/{address}/limit/{limit} API route") {
