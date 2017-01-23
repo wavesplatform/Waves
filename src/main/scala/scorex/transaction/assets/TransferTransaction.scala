@@ -5,7 +5,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.Deser
+import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TypedTransaction.TransactionType
 import scorex.transaction.ValidationResult.ValidationResult
 import scorex.transaction._
@@ -63,7 +63,7 @@ object TransferTransaction extends Deser[TransferTransaction] {
                    amountBytes,
                    feeBytes,
                    recipient.bytes,
-                   arrayWithSize(attachment))
+                   BytesSerializable.arrayWithSize(attachment))
     }
 
 

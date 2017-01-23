@@ -6,7 +6,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.Deser
+import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TypedTransaction.TransactionType
 import scorex.transaction.ValidationResult.ValidationResult
 import scorex.transaction._
@@ -40,8 +40,8 @@ object IssueTransaction extends Deser[IssueTransaction] {
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
                                                 sender.publicKey,
-                                                arrayWithSize(name),
-                                                arrayWithSize(description),
+                                                BytesSerializable.arrayWithSize(name),
+                                                BytesSerializable.arrayWithSize(description),
                                                 Longs.toByteArray(quantity),
                                                 Array(decimals),
                                                 if (reissuable) Array(1: Byte) else Array(0: Byte),
