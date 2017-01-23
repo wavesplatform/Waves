@@ -57,6 +57,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (maxTimestamp - atTime <= MaxLiveTime) :| "maxTimestamp should be earlier than 30 days" &&
       (atTime <= maxTimestamp) :| "maxTimestamp should be > currentTime" &&
+      !ByteArray.sameOption(spendAssetId, receiveAssetId) :| "Invalid AssetPair" &&
       signatureValid :| "signature should be valid"
   }
 

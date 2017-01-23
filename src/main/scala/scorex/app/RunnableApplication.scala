@@ -1,9 +1,12 @@
 package scorex.app
 
 import akka.actor.{ActorSystem, Props}
-import akka.pattern.ask
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
+import akka.http.scaladsl.server.Route
+import akka.pattern.ask
 import akka.stream.ActorMaterializer
+import akka.util.Timeout
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
@@ -14,12 +17,12 @@ import scorex.settings.Settings
 import scorex.transaction.{BlockStorage, History}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
+
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 import scala.reflect.runtime.universe.Type
 import scala.util.Try
-import akka.util.Timeout
 
 trait RunnableApplication extends Application with ScorexLogging {
 
@@ -65,19 +68,23 @@ trait RunnableApplication extends Application with ScorexLogging {
   lazy override val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   private lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
 
+  @volatile private var shutdownInProgress = false
+
+  @volatile var serverBinding: ServerBinding = _
+
   def run() {
-    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors }")
-    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory }")
+    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
+    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
 
     checkGenesis()
 
     implicit val materializer = ActorMaterializer()
 
     if (settings.rpcEnabled) {
-      val combinedRoute = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
-      Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort).map(
-        _ => log.info(s"RPC was bound on ${settings.rpcAddress}:${settings.rpcPort}")
-      )
+      val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings).compositeRoute
+      val httpFuture = Http().bindAndHandle(combinedRoute, settings.rpcAddress, settings.rpcPort)
+      serverBinding = Await.result(httpFuture, 10.seconds)
+      log.info(s"RPC was bound on ${settings.rpcAddress}:${settings.rpcPort}")
     }
 
     Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator) foreach {
@@ -90,26 +97,26 @@ trait RunnableApplication extends Application with ScorexLogging {
     sys.addShutdownHook {
       shutdown()
     }
-    actorSystem.registerOnTermination {
-      stopWallet()
+  }
+
+  def shutdown(): Unit = {
+    if (!shutdownInProgress) {
+      log.info("Stopping network services")
+      shutdownInProgress = true
+      if (settings.rpcEnabled) {
+        Try(Await.ready(serverBinding.unbind(), 60.seconds)).failed.map(e => log.error("Failed to unbind RPC port: " + e.getMessage))
+      }
+      if (settings.upnpEnabled) upnp.deletePort(settings.port)
+
+      implicit val askTimeout = Timeout(60.seconds)
+      Try(Await.result(networkController ? NetworkController.ShutdownNetwork, 60.seconds))
+        .failed.map(e => log.error("Failed to shutdown network: " + e.getMessage))
+      Try(Await.result(actorSystem.terminate(), 60.seconds))
+        .failed.map(e => log.error("Failed to terminate actor system: " + e.getMessage))
+      log.debug("Closing wallet")
+      wallet.close()
+      log.info("Shutdown complete")
     }
-  }
-
-  private def stopWallet() = synchronized {
-    log.info("Closing wallet")
-    wallet.close()
-  }
-
-  def shutdown(): Future[Unit] = synchronized {
-    Try { stopNetwork() }.failed.foreach(e => log.warn("Stop network error", e))
-    actorSystem.terminate().map(_ => ())
-  }
-
-  private def stopNetwork(): Unit = synchronized {
-    log.info("Stopping network services")
-    if (settings.upnpEnabled) upnp.deletePort(settings.port)
-    implicit val askTimeout = Timeout(10.seconds)
-    Await.result(networkController ? NetworkController.ShutdownNetwork, 10.seconds)
   }
 
   private def checkGenesis(): Unit = {

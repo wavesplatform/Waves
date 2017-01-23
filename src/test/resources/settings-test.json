@@ -29,26 +29,26 @@
     "upnp": false,
     "knownPeers": ["127.0.0.1:9088","127.0.0.1:9084"],
     "port": 9091,
+    "nodeName": "Node0",
     "maxConnections": 10,
     "peersDataBroadcastDelay": 900
   },
-
   "walletPassword": "cookies",
   "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
-
   "rpcPort": 9092,
   "maxRollback": 100,
   "history": "blockchain",
-  "blockGenerationDelay": 1000,
+  "blockGenerationDelay": 500,
   "suspendedSenders": ["3N8j8ZrvcaRtJE1oPLA3enbBZAbyHEzRBw5"],
   "minimumTxFee": 333,
   "cors": true,
 
   "apiKeyHash": "JDJkZrg24XwvBgBUi6PgpHzrAFgeefb7nU8LJPRR58ga",
-  "offlineGeneration": true,
+  "offlineGeneration": false,
 
   "forkChunkSize": 1,
-  "scoreBroadcastDelay": 2000,
+  "scoreBroadcastDelay": 500,
+  "genesisSignature": "2weB9AueX8BhBR9AVnuozd3F1mmryp5MfGAnGWEEhoi5i5gJz9qZE7F5GaSckiDxuLBsGAGjBYtuRazUkm79G6b8",
 
   "matcher": {
     "account": "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",

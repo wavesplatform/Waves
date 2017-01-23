@@ -3,6 +3,7 @@ package scorex.lagonaki.unit
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import org.h2.mvstore.MVStore
+import org.scalatest.DoNotDiscover
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.app.Application
@@ -19,7 +20,6 @@ import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.{SettingsMock, WavesHardForkParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
-import org.scalamock._
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.postfixOps
@@ -31,17 +31,17 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   object TestSettings extends SettingsMock with TransactionSettings {
     override lazy val quorum: Int = 1
-    override lazy val scoreBroadcastDelay: FiniteDuration = 1000 seconds
+    override lazy val scoreBroadcastDelay: FiniteDuration = 1000.seconds
     override lazy val MaxRollback: Int = 10
 
     override lazy val checkpointPublicKey: Option[Array[Byte]] = Some(pk.publicKey)
   }
 
-  val testblockGenerator = TestProbe("blockGenerator")
+  val testBlockGenerator = TestProbe("blockGenerator")
   val testBlockchainSynchronizer = TestProbe("BlockChainSynchronizer")
   val testScoreObserver = TestProbe("ScoreObserver")
   val testPeerManager = TestProbe("PeerManager")
-  val connectedPeer = stub[ConnectedPeer]
+  val connectedPeer: ConnectedPeer = stub[ConnectedPeer]
 
   val db = new MVStore.Builder().open()
 
@@ -53,7 +53,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     lazy val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = TestSettings
-    lazy val blockGenerator: ActorRef = testblockGenerator.ref
+    lazy val blockGenerator: ActorRef = testBlockGenerator.ref
     lazy val blockchainSynchronizer: ActorRef = testBlockchainSynchronizer.ref
     lazy val peerManager: ActorRef = testPeerManager.ref
     lazy val history: History = transactionModule.blockStorage.history
@@ -66,7 +66,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   override lazy protected val actorRef: ActorRef = system.actorOf(Props(classOf[Coordinator], app))
   val gen = new PrivateKeyAccount(Array(0.toByte))
-  var score = 10000
+  var score: Int = 10000
 
   def createBlock(reference: Array[Byte]): Block = {
     val version = 1: Byte
@@ -80,10 +80,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     Block.buildAndSign(version, timestamp, reference, cbd, Seq[Transaction](), gen)
   }
 
-  implicit val consensusModule = app.consensusModule
-  implicit val transactionModule = app.transactionModule
+  implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = app.consensusModule
+  implicit val transactionModule: TransactionModule[StoredInBlock] = app.transactionModule
   private lazy val repo = app.basicMessagesSpecsRepo
-  val genesisTimestamp = System.currentTimeMillis()
+  val genesisTimestamp: Long = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
     transactionModule.blockStorage.appendBlock(Block.genesis(genesisTimestamp))
   }
@@ -110,7 +110,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
       ref = b.uniqueId
     }
 
-    awaitCond(app.history.height() ==  n, max = 20.seconds)
+    awaitCond(app.history.height() == n, max = 20.seconds)
   }
 
   def genCheckpoint(historyPoints: Seq[Int]): Checkpoint = {
@@ -132,7 +132,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     actorRef ! DataFromPeer(repo.CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
 
-    networkController.awaitCond(app.history.height() ==  7)
+    networkController.awaitCond(app.history.height() == 7)
   }
 
   "blacklist peer if it sends block that is different from checkPoint" in {
@@ -161,7 +161,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     networkController.expectMsgPF() {
       case SendToNetwork(Message(spec, _, _), _) => spec should be(repo.CheckpointMessageSpec)
-      case m => println(m); fail("Checkpoint hasn't been sent")
+      case _ => fail("Checkpoint hasn't been sent")
     }
   }
 
@@ -179,7 +179,11 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     var parent = app.history.blockAt(5).get.uniqueId
     val lastCommonBlockId = parent
-    val fork = Seq.fill(5){val b = createBlock(parent); parent = b.uniqueId; b}
+    val fork = Seq.fill(5) {
+      val b = createBlock(parent)
+      parent = b.uniqueId
+      b
+    }
 
     moveCoordinatorToSyncState()
 
@@ -199,7 +203,11 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     var parent = app.history.blockAt(7).get.uniqueId
     val lastCommonBlockId = parent
-    val fork = Seq.fill(5){val b = createBlock(parent); parent = b.uniqueId; b}
+    val fork = Seq.fill(5) {
+      val b = createBlock(parent)
+      parent = b.uniqueId
+      b
+    }
 
     moveCoordinatorToSyncState()
 
@@ -209,7 +217,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     actorRef ! SyncFinished(success = true, Some(lastCommonBlockId, fork.iterator, Some(goodPeer)))
 
     Thread.sleep(1000)
-    awaitCond(app.history.height() ==  12)
+    awaitCond(app.history.height() == 12)
 
   }
 

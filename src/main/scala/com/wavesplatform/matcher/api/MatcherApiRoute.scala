@@ -25,18 +25,18 @@ import scala.util.Try
 @Path("/matcher")
 @Api(value = "/matcher/")
 case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit val settings: WavesSettings,
-                                              implicit val context: ActorRefFactory) extends ApiRoute {
+                                                                        implicit val context: ActorRefFactory) extends ApiRoute {
 
   val wallet: Wallet = application.wallet
   val storedState: StoredState = application.blockStorage.state.asInstanceOf[StoredState]
 
   def postJsonRouteAsync(fn: Future[JsonResponse]): Route = {
-    onSuccess(fn) {res: JsonResponse =>
+    onSuccess(fn) { res: JsonResponse =>
       complete(res.code -> HttpEntity(ContentTypes.`application/json`, res.response.toString))
     }
   }
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("matcher") {
       place ~ matcherPubKey ~ signOrder ~ orderStatus ~ balance ~ orderBook ~ cancel
     }
@@ -61,7 +61,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     new ApiImplicitParam(name = "asset2", value = "Asset Id or empty for WAVES", required = false, dataType = "string", paramType = "query")
   ))
   def orderStatus: Route = {
-    pathPrefix("orders" / "status" / Segment ) { id =>
+    pathPrefix("orders" / "status" / Segment) { id =>
       parameters('asset1, 'asset2.?) { (asset1, asset2) =>
         val pair = AssetPair(Base58.decode(asset1).toOption, asset2.flatMap(Base58.decode(_).toOption))
         getJsonRoute {
@@ -98,7 +98,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
   def orderBook: Route = {
     path("orderBook") {
       parameters('asset1, 'asset2.?, "depth".as[Int].?) { (asset1, asset2, depth) =>
-      getJsonRoute {
+        getJsonRoute {
           val pair = AssetPair(Base58.decode(asset1).toOption, asset2.flatMap(Base58.decode(_).toOption))
 
           (matcher ? GetOrderBookRequest(pair, depth))
@@ -140,7 +140,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
               }
           }
         }.recover {
-          case t => println(t)
+          case _ =>
             Future.successful(WrongJson.response)
         }.get
       }
@@ -189,7 +189,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
                 .map(r => JsonResponse(r.json, r.code))
           }
         }.recover {
-          case t => println(t)
+          case _ =>
             Future.successful(WrongJson.response)
         }.get
       }
@@ -210,7 +210,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.assets.exchange.OrderCancelTransaction"
+      dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
     )
   ))
   def cancel: Route = path("orders" / "cancel") {
@@ -228,7 +228,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
                   .map(r => JsonResponse(r.json, r.code))
             }
           }.recover {
-            case t => println(t)
+            case _ =>
               Future.successful(WrongJson.response)
           }.get
         }

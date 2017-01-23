@@ -13,23 +13,10 @@ import scorex.utils._
 
 import scala.util.Random
 
-//TODO: Should be independed
-class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues with BeforeAndAfterAll {
+class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
-  import scorex.waves.TestingCommons._
-
-  override protected def beforeAll(): Unit = {
-    start()
-  }
-
-  override protected def afterAll(): Unit = {
-    stop()
-  }
-
-  private val peers = applications.tail
-  private val app = peers.head
-  private val state = app.transactionModule.blockStorage.state
-  private val history = app.transactionModule.blockStorage.history
+  private val state = application.transactionModule.blockStorage.state
+  private val history = application.transactionModule.blockStorage.history
   private val acc = applicationNonEmptyAccounts.head
   private val recipient = applicationEmptyAccounts.head
 
@@ -95,10 +82,10 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val applyChanges = PrivateMethod[Unit]('applyChanges)
     state.balance(testAcc) shouldBe 0
     val tx = transactionModule.createPayment(acc, testAcc, 1, 1).right.get
-    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) ->(AccState(2L), Seq(FeesStateChange(1L), tx))), NTP.correctedTime())
+    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(2L), Seq(FeesStateChange(1L), tx))), NTP.correctedTime())
     state.balance(testAcc) shouldBe 2
     state.included(tx).value shouldBe state.stateHeight
-    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) ->(AccState(0L), Seq(tx))), NTP.correctedTime())
+    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(0L), Seq(tx))), NTP.correctedTime())
   }
 
   test("validate single transaction") {
@@ -122,27 +109,38 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
   test("many transactions") {
     val senderBalance = state.balance(acc)
-    require(senderBalance > 10 * 1 * Constants.UnitsInWave)
 
     val recipients = Seq(
       new PrivateKeyAccount(Array(34.toByte, 1.toByte)),
       new PrivateKeyAccount(Array(1.toByte, 23.toByte))
     )
 
+    require(senderBalance > 10 * recipients.size * Constants.UnitsInWave)
+
     val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), application.wallet).get
-    state.processBlock(new BlockMock(Seq(issueAssetTx))) should be('success)
+
+    waitForNextBlock(application)
+//    state.processBlock(new BlockMock(Seq(issueAssetTx))) should be('success)
 
     val assetId = Some(Base58.encode(issueAssetTx.assetId))
 
-    val txs = recipients.flatMap(r => Seq.fill(10)(transactionModule.transferAsset(TransferRequest(assetId, None, 10, 100000, acc.address, "123", r.address), application.wallet).get))
+    val txs = recipients.flatMap(r => Seq.fill(10)({
+      Thread.sleep(1000)
+      transactionModule.transferAsset(TransferRequest(assetId, None, 10, 100000, acc.address, "123", r.address), application.wallet).get
+    }))
+
+    txs.size should be (20)
 
     val shuffledTxs = Random.shuffle(txs).map(_.right.get)
 
-    state.processBlock(new BlockMock(shuffledTxs)) should be('success)
+    shuffledTxs.size should be (20)
 
-    recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be (100))
+    waitForNextBlock(application)
+//    state.processBlock(new BlockMock(shuffledTxs)) should be('success)
 
-    state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be (999800)
+    state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
+
+    recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be(100))
   }
 
   test("validate plenty of transactions") {

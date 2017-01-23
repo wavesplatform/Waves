@@ -24,7 +24,6 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 
-@DoNotDiscover
 class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     with WordSpecLike
     with Matchers
@@ -229,10 +228,9 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
         actor ! RestartActor
 
-        within(5 seconds) {
+        within(5.seconds) {
           actor ! GetOrdersRequest
           val items = expectMsgType[GetOrdersResponse].orders.map(_.order.id) //should have size 1000
-          println(items.size)
         }
 
       }

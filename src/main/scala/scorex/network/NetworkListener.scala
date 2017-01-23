@@ -19,6 +19,8 @@ class NetworkListener(networkController: ActorRef, peerManager: ActorRef, bindAd
 
   override def receive: Receive = initializing
 
+  var socketActor: Option[ActorRef] = None
+
   override def preStart(): Unit = {
     peerManager ! PeerManager.RegisterBlacklistListener(self)
   }
@@ -50,11 +52,17 @@ class NetworkListener(networkController: ActorRef, peerManager: ActorRef, bindAd
       IO(Tcp) ! Bind(self, bindAddress)
 
     case NetworkListener.StopListen =>
-      IO(Tcp) ! Unbind
+      log.debug("Unbinding the port")
+      socketActor.foreach(_ ! Unbind)
 
     case Bound(localAddress) =>
+      socketActor = Some(sender())
       log.debug("Successfully bound to the port " + localAddress.getPort)
       networkController ! NetworkController.ListeningStarted
+
+    case Unbound =>
+      log.debug("Successfully unbound the port")
+      networkController ! NetworkController.ListeningStopped
 
     case CommandFailed(_: Bind) =>
       log.error("Network port " + bindAddress.getPort + " already in use!")
@@ -68,6 +76,10 @@ class NetworkListener(networkController: ActorRef, peerManager: ActorRef, bindAd
         val connection = sender()
         networkController ! NetworkController.InboundConnection(connection, remote)
       }
+  }
+
+  override def unhandled(message: Any): Unit = {
+    super.unhandled(message)
   }
 }
 

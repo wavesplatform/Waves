@@ -28,5 +28,5 @@ class SwaggerDocService(system: ActorSystem, val apiTypes: Seq[Type], settings: 
   )
 
   //Let swagger-ui determine the host and port
-  override def swaggerConfig = new Swagger().basePath(prependSlashIfNecessary(basePath)).info(info).scheme(scheme)
+  override val swaggerConfig = new Swagger().basePath(prependSlashIfNecessary(basePath)).info(info).scheme(scheme)
 }

@@ -1,19 +1,14 @@
 package scorex.lagonaki.integration.api
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 import scorex.crypto.encode.Base58
 
-class WalletAPISpecification extends FunSuite with Matchers with BeforeAndAfterAll {
+class WalletAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
-  import scorex.waves.TestingCommons._
 
   override def beforeAll(): Unit = {
-    start()
+    super.beforeAll()
     stopGeneration(applications)
-  }
-
-  override def afterAll(): Unit = {
-    stop()
   }
 
   test("/wallet/ API route") {

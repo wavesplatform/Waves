@@ -13,11 +13,12 @@
     "peersDataBroadcastDelay": 900
   },
   "walletPassword": "cookies",
-  "walletSeed": "111",
+  "walletSeed": "222",
   "rpcPort": 9086,
   "maxRollback": 100,
   "offlineGeneration": false,
-  "scoreBroadcastDelay": 1000,
-  "blockGenerationDelay": 501,
-  "tflikeScheduling": false
+  "scoreBroadcastDelay": 500,
+  "blockGenerationDelay": 500,
+  "tflikeScheduling": false,
+  "genesisSignature": "2weB9AueX8BhBR9AVnuozd3F1mmryp5MfGAnGWEEhoi5i5gJz9qZE7F5GaSckiDxuLBsGAGjBYtuRazUkm79G6b8"
 }

@@ -87,7 +87,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       case GetCoordinatorStatus => sender() ! status
 
       case GetStatus =>
-        implicit val timeout = Timeout(5 seconds)
+        implicit val timeout = Timeout(5.seconds)
         (blockchainSynchronizer ? GetSyncStatus).mapTo[Status]
           .map { syncStatus =>
             if (syncStatus == BlockchainSynchronizer.Idle && status == CIdle)

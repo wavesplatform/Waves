@@ -1,7 +1,5 @@
 package scorex.waves
 
-import java.util.concurrent.atomic.AtomicInteger
-
 import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.util.Timeout
@@ -9,6 +7,7 @@ import com.ning.http.client.Response
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.{Application, ChainParameters, TestNetParams}
 import dispatch.{Http, url}
+import org.scalatest.{BeforeAndAfterAll, Suite}
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.account.{Account, AddressScheme}
 import scorex.api.http.ApiKeyNotValid
@@ -22,26 +21,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
 
-trait TestingCommons {
-
-  implicit object TestTransactionLayerSettings extends TransactionSettings {
-    override val settingsJSON: JsObject = Json.obj()
-  }
-
-  lazy val application = TestingCommons.application
-
-  def randomFrom[T](seq: Seq[T]): T = {
-    require(seq.nonEmpty)
-    seq(Random.nextInt(seq.length))
-  }
-
-  def profile[R](block: => R): Long = {
-    val start = System.currentTimeMillis()
-    block
-    System.currentTimeMillis() - start
-  }
-
-}
 
 object UnitTestNetParams extends ChainParameters {
   val initialBalance: Long = Constants.UnitsInWave * Constants.TotalWaves
@@ -81,57 +60,85 @@ object UnitTestNetParams extends ChainParameters {
   override def requirePaymentUniqueId: Long = 0L
 }
 
-object TestingCommons {
+trait TestingCommons extends Suite with BeforeAndAfterAll {
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    stop()
+  }
+
+  implicit object TestTransactionLayerSettings extends TransactionSettings {
+    override val settingsJSON: JsObject = Json.obj()
+  }
+
+  def randomFrom[T](seq: Seq[T]): T = {
+    require(seq.nonEmpty)
+    seq(Random.nextInt(seq.length))
+  }
+
+  def profile[R](block: => R): Long = {
+    val start = System.currentTimeMillis()
+    block
+    System.currentTimeMillis() - start
+  }
 
   implicit val timeout = Timeout(1.second)
 
   AddressScheme.current = TestNetParams.addressScheme
-  lazy val applications: Seq[Application] = {
-    val apps = List(
-      new Application(ActorSystem("test"), new WavesSettings(Settings.readSettingsJson("settings-test.json")) {
-        override lazy val chainParams = UnitTestNetParams
-        override lazy val walletDirOpt = None
-        override lazy val dataDirOpt = None
-        override lazy val nodeNonce = 111L
-      }),
-      new Application(ActorSystem("test"), new WavesSettings(Settings.readSettingsJson("settings-local1.json")) {
-        override lazy val chainParams = UnitTestNetParams
-        override lazy val walletDirOpt = None
-        override lazy val dataDirOpt = None
-        override lazy val nodeNonce = 222L
-      }),
-      new Application(ActorSystem("test"), new WavesSettings(Settings.readSettingsJson("settings-local2.json")) {
-        override lazy val chainParams = UnitTestNetParams
-        override lazy val walletDirOpt = None
-        override lazy val dataDirOpt = None
-        override lazy val nodeNonce = 333L
-      })
-    )
-    apps.foreach(_.run())
-    apps.foreach { a =>
-      if (a.wallet.privateKeyAccounts().isEmpty) a.wallet.generateNewAccounts(3)
-      untilTimeout(20.seconds, 1.second) {
-        val request = Http(url(peerUrl(a) + "/consensus/algo").GET)
-        val response = Await.result(request, 10.seconds)
-        val json = Json.parse(response.getResponseBody).as[JsObject]
-        assert((json \ "consensusAlgo").asOpt[String].isDefined)
-      }
+
+  val applications = List(
+    new Application(ActorSystem("test0"), new WavesSettings(Settings.readSettingsJson("settings-test.json")) {
+      override lazy val chainParams = UnitTestNetParams
+      override lazy val walletDirOpt = None
+      override lazy val dataDirOpt = None
+      override lazy val nodeNonce = 111L
+    }),
+    new Application(ActorSystem("test1"), new WavesSettings(Settings.readSettingsJson("settings-local1.json")) {
+      override lazy val chainParams = UnitTestNetParams
+      override lazy val walletDirOpt = None
+      override lazy val dataDirOpt = None
+      override lazy val nodeNonce = 222L
+    }),
+    new Application(ActorSystem("test2"), new WavesSettings(Settings.readSettingsJson("settings-local2.json")) {
+      override lazy val chainParams = UnitTestNetParams
+      override lazy val walletDirOpt = None
+      override lazy val dataDirOpt = None
+      override lazy val nodeNonce = 333L
+    })
+  )
+  applications.foreach(_.run())
+  applications.foreach { a =>
+    if (a.wallet.privateKeyAccounts().isEmpty) a.wallet.generateNewAccounts(3)
+    untilTimeout(20.seconds, 1.second) {
+      val request = Http(url(peerUrl(a) + "/consensus/algo").GET)
+      val response = Await.result(request, 10.seconds)
+      val json = Json.parse(response.getResponseBody).as[JsObject]
+      assert((json \ "consensusAlgo").asOpt[String].isDefined)
     }
-    apps
   }
+
 
   val application: Application = applications.head
 
-  lazy val counter: AtomicInteger = new AtomicInteger(0)
+  def stop(): Unit = {
+    applications.foreach(a => {
 
-  def start(): Unit = {
-    counter.incrementAndGet
+      if (a.settings.isRunMatcher) {
+        a.shutdownMatcher()
+      }
+        a.shutdown()
+    })
   }
 
-  def stop(): Unit = {
-    if (counter.decrementAndGet == 0) {
-      Http.shutdown()
-      applications.foreach(_.shutdown())
+  def waitForNextBlock(application: Application): Unit = {
+    val history = application.transactionModule.blockStorage.history
+    val initialHeight = history.height()
+    untilTimeout(15.seconds) {
+      require(history.height() > initialHeight)
     }
   }
 

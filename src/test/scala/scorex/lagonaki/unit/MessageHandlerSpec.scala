@@ -2,12 +2,10 @@ package scorex.lagonaki.unit
 
 import java.nio.ByteBuffer
 
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.scalatest.FunSuite
 import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler}
 
-class MessageHandlerSpec extends FunSuite with BeforeAndAfterAll {
-
-  import scorex.waves.TestingCommons._
+class MessageHandlerSpec extends FunSuite with scorex.waves.TestingCommons {
 
   implicit val consensusModule = application.consensusModule
   implicit val transactionModule = application.transactionModule
@@ -16,14 +14,6 @@ class MessageHandlerSpec extends FunSuite with BeforeAndAfterAll {
   private lazy val handler = new MessageHandler(repo.specs)
 
   import Message._
-
-  override def beforeAll(): Unit = {
-    start()
-  }
-
-  override def afterAll(): Unit = {
-    stop()
-  }
 
   test("parseBytes have to verify Length field in parsing packet") {
     val s1 = BigInt(Long.MaxValue) * 1000000000L

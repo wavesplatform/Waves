@@ -10,10 +10,12 @@ import akka.util.Timeout
 import scorex.app.RunnableApplication
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager
+import scorex.network.peer.PeerManager.{CloseAllConnections, CloseAllConnectionsComplete}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConversions._
 import scala.collection.mutable
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
@@ -42,11 +44,14 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
 
   private implicit val system = context.system
 
-  private implicit val timeout = Timeout(5.seconds)
 
   private val peerManager = application.peerManager
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
+
+  private var listeningStopped: Boolean = false
+  private var conncetionClosed: Boolean = false
+  private var maybeRequester: Option[ActorRef] = None
 
   //check own declared address for validity
   if (!settings.localOnly) {
@@ -128,11 +133,22 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   //calls from API / application
   def interfaceCalls: Receive = {
     case ShutdownNetwork =>
+      maybeRequester = Some(sender())
       log.info("Going to shutdown all connections & unbind port")
-      val s = sender()
+      peerManager ! CloseAllConnections
       listener ! NetworkListener.StopListen
-      (peerManager ? ShutdownNetwork).map(_ => Status.Success).pipeTo(s)
-      context stop self
+
+    case CloseAllConnectionsComplete =>
+      conncetionClosed = true
+      sendShutdownComplete()
+
+    case ListeningStopped =>
+      listeningStopped = true
+      sendShutdownComplete()
+  }
+
+  private def sendShutdownComplete(): Unit = {
+    if (conncetionClosed && listeningStopped) maybeRequester.foreach(_ ! NetworkShutdownComplete)
   }
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse interfaceCalls orElse {
@@ -190,7 +206,11 @@ object NetworkController {
 
   case object ShutdownNetwork
 
+  case object NetworkShutdownComplete
+
   case object ListeningStarted
+
+  case object ListeningStopped
 
   case object ListeningFailed
 

@@ -71,7 +71,6 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
   private val SignatureLength = 64
   private val BaseLength = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
-  @deprecated("Use TransferTransaction")
   def create(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationResult, PaymentTransaction] = {
     if (!Account.isValid(recipient)) {
       Left(ValidationResult.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS

@@ -14,11 +14,12 @@
     "peersDataBroadcastDelay": 900
   },
   "walletPassword": "cookies",
-  "walletSeed": "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz",
+  "walletSeed": "111",
   "rpcPort": 9085,
   "maxRollback": 100,
-  "offlineGeneration": true,
-  "scoreBroadcastDelay": 1000,
+  "offlineGeneration": false,
+  "scoreBroadcastDelay": 500,
   "apiKeyHash": "EfwB3nNEwDSc885diz76v3mnPw2EhjyUSnDfw1XPbz92",
-  "blockGenerationDelay": 5001
+  "blockGenerationDelay": 500,
+  "genesisSignature": "2weB9AueX8BhBR9AVnuozd3F1mmryp5MfGAnGWEEhoi5i5gJz9qZE7F5GaSckiDxuLBsGAGjBYtuRazUkm79G6b8"
 }

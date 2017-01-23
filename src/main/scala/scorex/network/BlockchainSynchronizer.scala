@@ -99,13 +99,9 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
         case None =>
           val lastCommonBlockId = downloadInfo.lastCommon.blockId
-          val initialScore = history.scoreOf(lastCommonBlockId)
-
-          val forkStorage = application.blockStorage.blockSeq
-          forkStorage.initialize(fork, initialScore)
 
           run(initial, GettingBlocks) { updatedPeerData =>
-            gettingBlocks(forkStorage, lastCommonBlockId, updatedPeerData)
+            gettingBlocks(fork, lastCommonBlockId, updatedPeerData)
           }
       }
     } else {
@@ -141,16 +137,19 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         }
     }
 
-  def gettingBlocks(forkStorage: BlockSeq,
+  def gettingBlocks(blockIds: InnerIds,
                     lastCommonBlockId: BlockId,
                     peers: PeerSet): Receive = {
 
-    val blockIds = forkStorage.allIdsWithoutBlock
     log.info(s"Going to request blocks: ${blockIds.mkString(",")}, peer: ${peers.active}")
+
     blockIds.foreach { blockId =>
       val msg = Message(GetBlockSpec, Right(blockId.blockId), None)
       networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peers.active))
     }
+    val initialScore = history.scoreOf(lastCommonBlockId)
+    val forkStorage = new InMemoryBlockSeq(blockIds)
+    val consensusModule = application.consensusModule
 
     state(GettingBlocks) {
       case BlockFromPeer(block, connectedPeer)
@@ -159,14 +158,11 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         if (forkStorage.addIfNotContained(block)) {
           log.info("Got block: " + block.encodedId)
 
-          val currentScore = history.score()
-          val forkScore = forkStorage.cumulativeBlockScore
-
           val author = Some(connectedPeer).filter(_ => ! peers.activeChanged)
-
           val allBlocksAreLoaded = forkStorage.noIdsWithoutBlock
+          val forkScore = forkStorage.cumulativeBlockScore(initialScore, consensusModule)
 
-          if (forkScore > currentScore) {
+          if (forkScore > history.score()) {
             if (partialBlockLoading || allBlocksAreLoaded) {
               finish(SyncFinished(success = true, Some(lastCommonBlockId, forkStorage.blocksInOrder, author)))
             }

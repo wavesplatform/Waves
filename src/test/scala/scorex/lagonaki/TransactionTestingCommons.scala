@@ -1,8 +1,8 @@
 package scorex.lagonaki
 
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-import scorex.transaction.{GenesisTransaction, History, Transaction}
+import scorex.transaction.{History, Transaction}
 import scorex.utils.ScorexLogging
 
 import scala.util.Random
@@ -15,23 +15,18 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
     application.transactionModule.blockStorage.appendBlock(Block.genesis())
   }
 
-  if (application.wallet.privateKeyAccounts().size < 3) application.wallet.generateNewAccounts(3)
+  if (application.wallet.privateKeyAccounts().size < 3) {
+    application.wallet.generateNewAccounts(3)
+  }
+
+  val ab = applicationNonEmptyAccounts.map(application.consensusModule.generatingBalance(_)).sum
+  require(ab > 2)
 
   def applicationNonEmptyAccounts: Seq[PrivateKeyAccount] =
     application.wallet.privateKeyAccounts().filter(application.consensusModule.generatingBalance(_) > 0)
 
   def applicationEmptyAccounts: Seq[PrivateKeyAccount] =
     application.wallet.privateKeyAccounts().filter(application.consensusModule.generatingBalance(_) == 0)
-
-  val genesisAccounts: Seq[Account] = application.blockStorage.history.genesis.transactions.flatMap(_ match {
-    case gtx: GenesisTransaction => Some(gtx.recipient)
-    case _ => None
-  })
-
-  application
-
-  val ab = applicationNonEmptyAccounts.map(application.consensusModule.generatingBalance(_)).sum
-  require(ab > 2)
 
   def genValidBlock(): Block = {
     application.consensusModule.generateNextBlocks(applicationNonEmptyAccounts)(application.transactionModule).headOption match {
