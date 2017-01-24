@@ -11,7 +11,7 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TypedTransaction.TransactionType
 import scorex.transaction._
-import scorex.transaction.assets.exchange.Validation.BooleanOperators
+import scorex.transaction.assets.exchange.Validation.booleanOperators
 
 
 /**

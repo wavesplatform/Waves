@@ -29,7 +29,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   val pk = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(100).toByte))
 
-  object TestSettings extends SettingsMock with TransactionSettings {
+  object TestSettings extends SettingsMock {
     override lazy val quorum: Int = 1
     override lazy val scoreBroadcastDelay: FiniteDuration = 1000.seconds
     override lazy val MaxRollback: Int = 10

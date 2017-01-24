@@ -8,12 +8,12 @@ import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.{Application, ChainParameters, TestNetParams}
 import dispatch.{Http, url}
 import org.scalatest.{BeforeAndAfterAll, Suite}
-import play.api.libs.json.{JsObject, JsValue, Json}
+import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 import scorex.account.{Account, AddressScheme}
 import scorex.api.http.ApiKeyNotValid
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
 import scorex.settings.Settings
-import scorex.transaction.{GenesisTransaction, Transaction, TransactionSettings}
+import scorex.transaction.{GenesisTransaction, Transaction}
 import scorex.utils._
 
 import scala.concurrent.Await
@@ -71,7 +71,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
     stop()
   }
 
-  implicit object TestTransactionLayerSettings extends TransactionSettings {
+  implicit object TestTransactionLayerSettings extends Settings {
     override val settingsJSON: JsObject = Json.obj()
   }
 
@@ -133,6 +133,19 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
     val initialHeight = history.height()
     untilTimeout(15.seconds) {
       require(history.height() > initialHeight)
+    }
+  }
+
+  def getConnectedPeersCount(app: Application): Int = {
+    val response = GET.request("/peers/connected", peer = peerUrl(app))
+    val peers = (response \ "peers").asOpt[JsArray]
+
+    peers.get.value.size
+  }
+
+  def waitForSingleConnection(application: Application): Unit = {
+    untilTimeout(30.seconds) {
+      require(getConnectedPeersCount(application) > 0)
     }
   }
 

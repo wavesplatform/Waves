@@ -1,11 +1,12 @@
 package scorex.transaction
 
 import scorex.crypto.encode.Base58
+import scorex.settings.Settings
 
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
   */
-class FeeCalculator(settings: TransactionSettings) {
+class FeeCalculator(settings: Settings) {
 
   private val map: Map[String, Long] = settings.feeMap
 
