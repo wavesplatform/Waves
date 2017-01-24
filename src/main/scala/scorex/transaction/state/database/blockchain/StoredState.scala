@@ -363,6 +363,7 @@ object StoredState {
       extendedState,
       incrementingTimestampValidator,
       new GenesisValidator,
+      new SignatureValidator,
       new OrderMatchStoredState(storage),
       new IncludedValidator(storage, settings),
       new ActivatedValidator(settings)

@@ -101,6 +101,7 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationResult.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
+      //TODO extend from SignedTransaction and remove
       val sigData = signatureData(sender, recipient, amount, fee, timestamp)
       if (EllipticCurveImpl.verify(signature, sigData, sender.publicKey)) {
         Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))

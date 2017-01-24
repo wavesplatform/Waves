@@ -114,12 +114,7 @@ object IssueTransaction extends Deser[IssueTransaction] {
     } else if (fee <= 0) {
       Left(ValidationResult.InsufficientFee)
     } else {
-      val unsigned = IssueTransactionImpl(sender, name, description, quantity, decimals, reissuable, fee, timestamp, null)
-      if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
-        Right(unsigned.copy(signature = signature))
-      } else {
-        Left(ValidationResult.InvalidSignature)
-      }
+      Right(IssueTransactionImpl(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature))
     }
   }
 
