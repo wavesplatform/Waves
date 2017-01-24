@@ -7,7 +7,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction.TransactionType
+import scorex.transaction.TypedTransaction._
 import scorex.transaction.ValidationResult.ValidationResult
 import scorex.transaction._
 

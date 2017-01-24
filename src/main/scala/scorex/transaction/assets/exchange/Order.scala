@@ -7,6 +7,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction._
+import scorex.transaction.TypedTransaction._
 import scorex.utils.{ByteArray, NTP}
 
 import scala.util.Try

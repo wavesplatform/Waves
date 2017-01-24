@@ -1,9 +1,8 @@
 package scorex.crypto
 
-import org.whispersystems.curve25519.Curve25519
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.encode.Base58
-import scorex.crypto.signatures.SigningFunctions.{MessageToSign, Signature}
+import scorex.crypto.signatures.Curve25519
+import scorex.crypto.signatures.SigningFunctions.{MessageToSign, PrivateKey, PublicKey, Signature}
 
 /**
   * This implementation is being used from many places in the code. We consider easy switching from one
@@ -12,13 +11,11 @@ import scorex.crypto.signatures.SigningFunctions.{MessageToSign, Signature}
   * big signature size).
   */
 object EllipticCurveImpl {
-  val crv = Curve25519.getInstance(Curve25519.JAVA)
+  def sign(privateKey: PrivateKey, message: MessageToSign): Signature = Curve25519.sign(privateKey, message)
 
   def sign(account: PrivateKeyAccount, message: MessageToSign): Signature = sign(account.privateKey, message)
 
-  def sign(privateKey: Array[Byte], message: MessageToSign): Signature = crv.calculateSignature(privateKey, message)
+  def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean = Curve25519.verify(signature, message, publicKey)
 
-  def verify(pub: Array[Byte], message: Array[Byte], sig: Array[Byte]): Boolean = crv.verifySignature(pub, message, sig)
-
-  def createPair = crv.generateKeyPair()
+  def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = Curve25519.createKeyPair(seed)
 }

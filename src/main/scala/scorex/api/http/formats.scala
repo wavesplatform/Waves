@@ -4,7 +4,7 @@ import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-
+import scorex.transaction.TypedTransaction._
 import scala.util.{Failure, Success}
 
 object formats {
@@ -31,10 +31,10 @@ object formats {
         val bytesT = Base58.decode(base58String)
         bytesT match {
           case Success(bytes) =>
-            if (bytes.length == EllipticCurveImpl.KeyLength) {
+            if (bytes.length == KeyLength) {
               JsSuccess(new PublicKeyAccount(bytes))
             } else {
-              JsError(s"Invalid length of public key '$base58String': ${base58String.length} != ${EllipticCurveImpl.KeyLength}")
+              JsError(s"Invalid length of public key '$base58String': ${base58String.length} != ${KeyLength}")
             }
           case Failure(f) =>
             JsError(s"Invalid base58 string in public key '$base58String'")
@@ -53,10 +53,10 @@ object formats {
         val bytesT = Base58.decode(base58String)
         bytesT match {
           case Success(bytes) =>
-            if (bytes.length == EllipticCurveImpl.SignatureLength) {
+            if (bytes.length == SignatureLength) {
               JsSuccess(Base58.encode(bytes))
             } else {
-              JsError(s"Invalid length of signature '$base58String': ${base58String.length} != ${EllipticCurveImpl.SignatureLength}")
+              JsError(s"Invalid length of signature '$base58String': ${base58String.length} != ${SignatureLength}")
             }
           case Failure(f) =>
             JsError("Invalid base58 string in signature '$base58String'")

@@ -6,9 +6,9 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.consensus.ConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.Deser
 import scorex.transaction.TransactionModule
 import scorex.utils.ScorexLogging
+import scorex.transaction.TypedTransaction._
 
 import scala.util.{Failure, Try}
 
@@ -80,7 +80,7 @@ trait Block extends ScorexLogging {
       signerDataField.bytes
   }
 
-  lazy val bytesWithoutSignature = bytes.dropRight(EllipticCurveImpl.SignatureLength)
+  lazy val bytesWithoutSignature = bytes.dropRight(SignatureLength)
 
   def isValid: Boolean = {
     if (transactionModule.blockStorage.history.contains(this)) true //applied blocks are valid
@@ -111,7 +111,7 @@ object Block extends ScorexLogging {
   type BlockId = Array[Byte]
   type BlockIds = Seq[BlockId]
 
-  val BlockIdLength = EllipticCurveImpl.SignatureLength
+  val BlockIdLength = SignatureLength
 
   //TODO Deser[Block] ??
   def parseBytes[CDT, TDT](bytes: Array[Byte])
@@ -140,10 +140,10 @@ object Block extends ScorexLogging {
     val txBlockField = transModule.parseBytes(tBytes).get
     position += tBytesLength
 
-    val genPK = bytes.slice(position, position + EllipticCurveImpl.KeyLength)
-    position += EllipticCurveImpl.KeyLength
+    val genPK = bytes.slice(position, position + KeyLength)
+    position += KeyLength
 
-    val signature = bytes.slice(position, position + EllipticCurveImpl.SignatureLength)
+    val signature = bytes.slice(position, position + SignatureLength)
 
     new Block {
       override type ConsensusDataType = CDT
