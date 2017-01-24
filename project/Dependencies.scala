@@ -4,17 +4,18 @@ object Dependencies {
 
   lazy val testKit = Seq(
     "com.typesafe.akka" %% "akka-testkit" % "2.+",
-    "org.scalatest" %% "scalatest" % "2.+" % "test",
-    "org.scalactic" %% "scalactic" % "2.+" % "test",
-    "org.scalacheck" %% "scalacheck" % "1.12.+" % "test",
+    "org.scalatest" %% "scalatest" % "3.+" % "test",
+    "org.scalactic" %% "scalactic" % "3.+" % "test",
+    "org.scalacheck" %% "scalacheck" % "1.13.+" % "test",
     "net.databinder.dispatch" %% "dispatch-core" % "+" % "test",
-    "org.scalamock" %% "scalamock-scalatest-support" % "3.2.2" % "test",
-    "org.mockito" % "mockito-all" % "1.10.19" % "test"
+    "org.mockito" % "mockito-all" % "1.10.19" % "test",
+    "net.databinder.dispatch" %% "dispatch-core" % "+" % "test",
+    "org.scalamock" %% "scalamock-scalatest-support" % "3.5.+" % "test"
   )
 
   lazy val serialization = Seq(
     "com.google.guava" % "guava" % "18.+",
-    "com.typesafe.play" %% "play-json" % "2.4.+"
+    "com.typesafe.play" %% "play-json" % "2.6.0-M1"
   )
 
   lazy val akka = Seq(
@@ -32,8 +33,8 @@ object Dependencies {
 
   lazy val logging = Seq(
 
-    "ch.qos.logback" % "logback-classic" % "1.+",
-    "ch.qos.logback" % "logback-core" % "1.+",
+    "ch.qos.logback" % "logback-classic" % "1.1.9+",
+    "ch.qos.logback" % "logback-core" % "1.1.9+",
     "org.slf4j" % "slf4j-api" % "1.7.+",
     "org.slf4j" % "slf4j-nop" % "1.7.+" % "test"
   )

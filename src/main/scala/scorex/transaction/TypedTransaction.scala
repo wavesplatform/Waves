@@ -31,6 +31,7 @@ object TypedTransaction extends Deser[TypedTransaction] {
   val TimestampLength = 8
   val AmountLength = 8
   val TypeLength = 1
+  val SignatureLength = 64
 
   def parseBytes(data: Array[Byte]): Try[TypedTransaction] =
     data.head match {

@@ -76,7 +76,6 @@ object IssueTransaction extends Deser[IssueTransaction] {
   }
 
   def parseTail(bytes: Array[Byte]): Try[IssueTransaction] = Try {
-    import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
     val txId      = bytes(SignatureLength)
     require(txId == TransactionType.IssueTransaction.id.toByte, s"Signed tx id is not match")

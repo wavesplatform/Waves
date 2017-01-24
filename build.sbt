@@ -9,7 +9,7 @@ organization in ThisBuild := "com.wavesplatform"
 
 version in ThisBuild := appConf.getString("version")
 
-scalaVersion in ThisBuild := "2.11.8"
+scalaVersion in ThisBuild := "2.12.1"
 
 scalacOptions in ThisBuild += "-target:jvm-1.8"
 scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
@@ -21,7 +21,7 @@ javaOptions ++= Seq(
 lazy val commonSettings = Seq(
   organization := "com.wavesplatform",
   version := version.value,
-  scalaVersion := "2.11.8"
+  scalaVersion := "2.12.1"
 )
 
 // lazy val root = Project(id = "scorex", base = file("."))
@@ -46,15 +46,11 @@ libraryDependencies ++=
     Dependencies.testKit ++
     Dependencies.logging ++ 
     Dependencies.p2p ++ Seq(
-    "org.consensusresearch" %% "scrypto" % "1.0.4",
+    "org.scorexfoundation" %% "scrypto" % "1.2.0",
     "commons-net" % "commons-net" % "3.+",
-    "com.github.pathikrit" %% "better-files" % "2.13.0",
+    "com.github.pathikrit" %% "better-files" % "2.17.+"
 //    "org.typelevel" %% "cats" % "0.8.1",
-    "org.scalatest" %% "scalatest" % "2.+" % "test",
-    "org.scalactic" %% "scalactic" % "2.+" % "test",
-    "org.scalacheck" %% "scalacheck" % "1.12.+" % "test",
-    "net.databinder.dispatch" %% "dispatch-core" % "+" % "test",
-    "org.scalamock" %% "scalamock-scalatest-support" % "3.2.2" % "test"
+
 )
 
 val akkaV = "2.4.14"
