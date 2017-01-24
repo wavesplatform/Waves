@@ -18,7 +18,7 @@ class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) exte
     case _ =>
   }
 
-  val MaxLiveDays = (Order.MaxLiveTime / 24L * 60L * 60L * 1000L).toInt
+  val MaxLiveDays: Int = (Order.MaxLiveTime / 24L * 60L * 60L * 1000L).toInt
 
   private def isOrderMatchValid(om: OrderMatch): Boolean = {
     om.isValid(findPrevOrderMatchTxs(om))
@@ -36,7 +36,9 @@ class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) exte
         val orderIdStr = Base58.encode(order.id)
         val omIdStr = Base58.encode(om.id)
         val prev = storage.getOrderMatchTxByDay(orderDay, orderIdStr).getOrElse(Array.empty[String])
-        if (!prev.contains(omIdStr)) storage.putOrderMatchTxByDay(orderDay, orderIdStr, prev :+ omIdStr)
+        if (!prev.contains(omIdStr)) {
+          storage.putOrderMatchTxByDay(orderDay, orderIdStr, prev :+ omIdStr)
+        }
       }
     }
 
@@ -78,6 +80,8 @@ class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) exte
     if (storage.containsSavedDays(orderDay)) {
       parseTxSeq(storage.getOrderMatchTxByDay(calcStartDay(order.maxTimestamp), Base58.encode(order.id))
         .getOrElse(emptyTxIdSeq))
-    } else Set.empty[OrderMatch]
+    } else {
+      Set.empty[OrderMatch]
+    }
   }
 }

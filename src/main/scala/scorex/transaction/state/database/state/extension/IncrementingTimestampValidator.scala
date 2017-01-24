@@ -57,8 +57,11 @@ class IncrementingTimestampValidator(settings: WavesHardForkParameters, storage:
             .filter(_.isInstanceOf[PaymentTransaction])
             .map(_.asInstanceOf[PaymentTransaction])
             .filter(_.sender.address == address)
-          if (accountTransactions.nonEmpty) Some(accountTransactions.maxBy(_.timestamp))
-          else loop(row.lastRowHeight, address)
+          if (accountTransactions.nonEmpty) {
+            Some(accountTransactions.maxBy(_.timestamp))
+          } else {
+            loop(row.lastRowHeight, address)
+          }
         case _ => None
       }
     }
