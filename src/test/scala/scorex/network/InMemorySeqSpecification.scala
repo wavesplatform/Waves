@@ -22,7 +22,7 @@ class InMemorySeqSpecification extends FreeSpec
   private implicit def toInnerId(i: Int): InnerId = InnerId(toBlockId(i))
 
   private def mockBlock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
-    trait BlockMock extends Block {
+    abstract class BlockMock extends Block(0,1,conv(id),null) {
       override type ConsensusDataType = Unit
       override type TransactionDataType = Unit
 

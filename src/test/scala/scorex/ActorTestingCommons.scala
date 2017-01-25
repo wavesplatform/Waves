@@ -64,12 +64,11 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
   protected def blockMock[Id](id: Id, ts: Long = System.currentTimeMillis())(implicit conv: Id => BlockId): Block = {
-    trait BlockMock extends Block {
+    abstract class BlockMock extends Block(ts,0,conv(id),null) {
       override type ConsensusDataType = Unit
       override type TransactionDataType = Unit
 
       override val uniqueId: BlockId = id
-      override val timestampField: LongBlockField = LongBlockField("timestamp", ts)
     }
     mock[BlockMock]
   }
