@@ -4,7 +4,7 @@ import scorex.account.PublicKeyAccount
 import scorex.block.Block.BlockId
 import scorex.block._
 import scorex.consensus.ConsensusModule
-import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, NxtLikeConsensusModule}
+import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.crypto.EllipticCurveImpl
 import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction.{Transaction, TransactionModule, TransactionsBlockField}
@@ -13,7 +13,7 @@ class BlockMock(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyA
 
 
   override lazy val transactions = txs
-  override implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new NxtLikeConsensusModule(WavesHardForkParameters.Disabled)
+  override implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new WavesConsensusModule(WavesHardForkParameters.Disabled)
 
   override type ConsensusDataType = NxtLikeConsensusBlockData
   override type TransactionDataType = Seq[Transaction]

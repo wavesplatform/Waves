@@ -5,9 +5,10 @@ import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FreeSpecLike, Matchers}
+import scorex.account.PublicKeyAccount
 import scorex.app.Application
 import scorex.block.Block._
-import scorex.block.{Block, LongBlockField}
+import scorex.block.{Block, LongBlockField, SignerData}
 import scorex.consensus.ConsensusModule
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
@@ -64,7 +65,7 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
   protected def blockMock[Id](id: Id, ts: Long = System.currentTimeMillis())(implicit conv: Id => BlockId): Block = {
-    abstract class BlockMock extends Block(ts,0,conv(id),null) {
+    abstract class BlockMock extends Block(ts,0,conv(id),new SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array())) {
       override type ConsensusDataType = Unit
       override type TransactionDataType = Unit
 
