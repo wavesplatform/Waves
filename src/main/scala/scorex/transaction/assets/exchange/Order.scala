@@ -13,7 +13,7 @@ import scala.util.Try
 import io.swagger.annotations.ApiModelProperty
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.assets.exchange.OrderType.OrderType
-import Validation.BooleanOperators
+import Validation.booleanOperators
 import scorex.transaction.assets.TransferTransaction
 
 object OrderType extends Enumeration {

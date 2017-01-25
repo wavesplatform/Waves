@@ -77,7 +77,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
   val feeMapJson: JsObject = Json.parse(str).as[JsObject]
 
 
-  object MySettings extends TransactionSettings with Settings {
+  object MySettings extends Settings {
     override lazy val settingsJSON: JsObject = feeMapJson
     override lazy val dataDirOpt: Option[String] = None
     override lazy val knownPeers = Seq.empty[InetSocketAddress]

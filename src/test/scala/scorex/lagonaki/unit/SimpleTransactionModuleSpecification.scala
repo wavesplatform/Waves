@@ -10,7 +10,7 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.ConsensusMock
 import scorex.settings.{Settings, WavesHardForkParameters}
-import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, TransactionSettings}
+import scorex.transaction.{PaymentTransaction, SimpleTransactionModule}
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
@@ -19,7 +19,7 @@ import scala.language.postfixOps
 //TODO: gagarin55 - Can't move it to appropriate module due to dependancy on some ConsesusModule impl
 class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
 
-  object MySettings extends TransactionSettings with Settings {
+  object MySettings extends Settings {
     override lazy val settingsJSON: JsObject = Json.obj()
     override lazy val dataDirOpt: Option[String] = None
     override lazy val knownPeers = Seq.empty[InetSocketAddress]

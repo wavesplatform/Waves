@@ -26,7 +26,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-
+    waitForSingleConnection(application)
     waitForNextBlock(application)
   }
 
