@@ -6,7 +6,7 @@ class PeersAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    Thread.sleep(1000)
+    waitForSingleConnection(application)
   }
 
   test("/peers/connect API route") {

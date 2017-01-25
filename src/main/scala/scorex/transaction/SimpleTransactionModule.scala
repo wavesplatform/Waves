@@ -44,7 +44,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 }
 
 
-class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit val settings: TransactionSettings with Settings,
+class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit val settings: Settings,
                                                                        application: Application)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
 
@@ -56,7 +56,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   val TransactionSizeLength = 4
   val InitialBalance = 100000000000000L
 
-  override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl
+  override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings)
 
   override val blockStorage = new BlockStorageImpl(settings, hardForkParams)(application.consensusModule, this)
 

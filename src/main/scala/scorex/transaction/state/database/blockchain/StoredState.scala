@@ -14,6 +14,7 @@ import scorex.transaction.state.database.state.extension._
 import scorex.transaction.state.database.state.storage._
 import scorex.utils.{NTP, ScorexLogging}
 
+import scala.annotation.tailrec
 import scala.collection.SortedMap
 import scala.concurrent.duration._
 import scala.util.Try
@@ -108,19 +109,20 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     val accountAssets = storage.getAccountAssets(account.address)
     val keys = account.address :: accountAssets.map(account.address + _).toList
 
-    def getTxSize(m: SortedMap[Int, Seq[Transaction]]) = m.foldLeft(0)((size, txs) => size + txs._2.size)
+    def getTxSize(m: SortedMap[Int, Set[Transaction]]) = m.foldLeft(0)((size, txs) => size + txs._2.size)
 
-    def getRowTxs(row: Row) = row.reason.flatMap(id => storage.getTransaction(id))
+    def getRowTxs(row: Row): Set[Transaction] = row.reason.flatMap(id => storage.getTransaction(id)).toSet
 
-    keys.foldLeft(SortedMap.empty[Int, Seq[Transaction]]) { (result, key) =>
+    keys.foldLeft(SortedMap.empty[Int, Set[Transaction]]) { (result, key) =>
 
       storage.getLastStates(key) match {
         case Some(accHeight) if getTxSize(result) < limit || accHeight > result.firstKey =>
-          def loop(h: Int, acc: SortedMap[Int, Seq[Transaction]]): SortedMap[Int, Seq[Transaction]] = {
+          @tailrec
+          def loop(h: Int, acc: SortedMap[Int, Set[Transaction]]): SortedMap[Int, Set[Transaction]] = {
             storage.getAccountChanges(key, h) match {
               case Some(row) =>
                 val rowTxs = getRowTxs(row)
-                val resAcc = acc + (h -> (rowTxs ++ acc.getOrElse(h, Seq.empty[Transaction])))
+                val resAcc = acc + (h -> (rowTxs ++ acc.getOrElse(h, Set.empty[Transaction])))
                 if (getTxSize(resAcc) < limit) {
                   loop(row.lastRowHeight, resAcc)
                 } else {
@@ -134,9 +136,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
         case _ => result
       }
 
-      //TODO unique by id?
-    }.values.flatten.groupBy(t => Base58.encode(t.id)).map(_._2.head).toList.sortWith(_.timestamp > _.timestamp)
-      .take(limit)
+    }.values.flatten.toList.sortWith(_.timestamp > _.timestamp).take(limit)
   }
 
   /**

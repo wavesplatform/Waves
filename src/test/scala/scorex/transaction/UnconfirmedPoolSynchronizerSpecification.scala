@@ -10,6 +10,7 @@ import scorex.network.NetworkController.DataFromPeer
 import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
 import scorex.network.message.Message
 import scorex.network.{NetworkController, _}
+import scorex.settings.Settings
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 
 import scala.concurrent.duration._
@@ -29,7 +30,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
     val transactionModule = mock[TransactionModule[StoredInBlock]]
 
     def createPoolSynchronizer(broadcastInterval: FiniteDuration) = {
-      val settings = new TransactionSettings {
+      val settings = new Settings {
         override val settingsJSON: JsObject = Json.obj()
         override lazy val utxRebroadcastInterval = broadcastInterval
       }

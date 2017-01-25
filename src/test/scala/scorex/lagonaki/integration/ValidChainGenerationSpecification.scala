@@ -18,19 +18,12 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Even
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    Thread.sleep(1000)
+    waitForSingleConnection(application)
   }
 
   def cleanTransactionPool(): Unit = untilTimeout(1.second) {
     transactionModule.utxStorage.all().foreach(tx => transactionModule.utxStorage.remove(tx))
     transactionModule.utxStorage.all().size shouldBe 0
-  }
-
-  private def getConnectedPeersCount(app: Application): Int = {
-    val response = GET.request("/peers/connected", peer = peerUrl(app))
-    val peers = (response \ "peers").asOpt[JsArray]
-
-    peers.get.value.size
   }
 
   private def getMaxWalletGeneratingBalanceWaves(app: Application): Long = {

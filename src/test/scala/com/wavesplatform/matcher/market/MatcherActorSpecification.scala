@@ -12,9 +12,9 @@ import play.api.libs.json.{JsObject, JsString}
 import scorex.account.PrivateKeyAccount
 import scorex.settings.WavesHardForkParameters
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
+import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{AssetAcc, TransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
