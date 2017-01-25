@@ -1,10 +1,10 @@
 package scorex.transaction.state.database.state.extension
 
-import scorex.settings.WavesHardForkParameters
+import scorex.settings.ChainParameters
 import scorex.transaction.state.database.state.storage.StateStorageI
 import scorex.transaction.{PaymentTransaction, Transaction}
 
-class IncludedValidator(storage: StateStorageI, settings: WavesHardForkParameters) extends StateExtension {
+class IncludedValidator(storage: StateStorageI, settings: ChainParameters) extends StateExtension {
 
 
   override def isValid(tx: Transaction, height: Int): Boolean = tx match {

@@ -10,7 +10,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import play.api.libs.json.{JsObject, JsString}
 import scorex.account.PrivateKeyAccount
-import scorex.settings.WavesHardForkParameters
+import scorex.settings.ChainParameters
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange.Order
@@ -29,7 +29,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   with PathMockFactory {
 
   val db = new MVStore.Builder().compress().open()
-  val storedState = StoredState.fromDB(db, WavesHardForkParameters.Disabled)
+  val storedState = StoredState.fromDB(db, ChainParameters.Disabled)
 
   val settings = new WavesSettings(JsObject(Seq(
     "matcher" -> JsObject(

@@ -2,11 +2,11 @@ package scorex.transaction.state.database
 
 import org.h2.mvstore.MVStore
 import scorex.consensus.ConsensusModule
-import scorex.settings.{Settings, WavesHardForkParameters}
+import scorex.settings.{Settings, ChainParameters}
 import scorex.transaction._
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 
-class BlockStorageImpl(settings: Settings, forksParams: WavesHardForkParameters)
+class BlockStorageImpl(settings: Settings, forksParams: ChainParameters)
                       (implicit consensusModule: ConsensusModule[_], transactionModule: TransactionModule[_])
   extends BlockStorage {
 

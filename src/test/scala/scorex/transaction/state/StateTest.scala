@@ -14,7 +14,7 @@ import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 import scorex.utils._
 
 import scala.util.{Random, Success, Try}
-import scorex.settings.{Settings, WavesHardForkParameters}
+import scorex.settings.{Settings, ChainParameters}
 
 class StateTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
@@ -109,7 +109,7 @@ object StateTestSpec extends Commands {
 
   case class Sut(fileName: String) {
     val db = new MVStore.Builder().fileName(fileName).compress().open()
-    val storedState = StoredState.fromDB(db, WavesHardForkParameters.Disabled)
+    val storedState = StoredState.fromDB(db, ChainParameters.Disabled)
     storedState.processBlock(new BlockMock(genesisTxs))
   }
 

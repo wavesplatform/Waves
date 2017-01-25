@@ -11,8 +11,9 @@ import scorex.account.Account
 import scorex.api.http.{NegativeFee, NoBalance, _}
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError
+import scorex.transaction.{PaymentTransaction, ValidationError}
 import scorex.transaction.state.wallet.Payment
+import scorex.utils.NTP
 import scorex.wallet.Wallet
 import scorex.waves.transaction.{ExternalPayment, SignedPayment, WavesTransactionModule}
 
@@ -117,7 +118,9 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                 case err: JsError =>
                   WrongTransactionJson(err).response
                 case JsSuccess(payment: Payment, _) =>
-                  val txOpt = transactionModule.signPayment(payment, wallet)
+                  val txOpt = wallet.privateKeyAccount(payment.sender).map { sender =>
+                    PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
+                  }
                   txOpt match {
                     case Some(paymentVal) =>
                       paymentVal match {

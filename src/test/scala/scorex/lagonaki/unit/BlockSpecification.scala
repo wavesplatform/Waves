@@ -4,7 +4,7 @@ import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
-import scorex.settings.WavesHardForkParameters
+import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
@@ -13,8 +13,8 @@ import scala.util.Random
 class BlockSpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
   test("Nxt block with txs bytes/parse roundtrip") {
-    implicit val consensusModule = new WavesConsensusModule(WavesHardForkParameters.Disabled)
-    implicit val transactionModule = new SimpleTransactionModule(WavesHardForkParameters.Disabled)(application.settings, application)
+    implicit val consensusModule = new WavesConsensusModule(ChainParameters.Disabled)
+    implicit val transactionModule = new SimpleTransactionModule(ChainParameters.Disabled)(application.settings, application)
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
     val gen = new PrivateKeyAccount(reference)

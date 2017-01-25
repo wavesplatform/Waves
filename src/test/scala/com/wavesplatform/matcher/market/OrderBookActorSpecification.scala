@@ -14,7 +14,7 @@ import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import play.api.libs.json.{JsObject, JsString}
-import scorex.settings.WavesHardForkParameters
+import scorex.settings.ChainParameters
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction}
@@ -44,7 +44,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
   val db = new MVStore.Builder().compress().open()
-  val storedState = fromDBWithUnlimitedBalance(db, WavesHardForkParameters.Disabled)
+  val storedState = fromDBWithUnlimitedBalance(db, ChainParameters.Disabled)
 
 
   val settings = new WavesSettings(JsObject(Seq(
@@ -270,7 +270,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     }
   }
 
-  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: WavesHardForkParameters): StoredState = {
+  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): StoredState = {
     val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage {
       override val db: MVStore = mvStore
       if (db.getStoreVersion > 0) db.rollback()

@@ -17,7 +17,7 @@ import scorex.network.ScoreObserver.CurrentScore
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, Message}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.settings.{SettingsMock, WavesHardForkParameters}
+import scorex.settings.{SettingsMock, ChainParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
 
@@ -46,10 +46,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db = new MVStore.Builder().open()
 
   trait TestAppMock extends Application {
-    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new WavesConsensusModule(WavesHardForkParameters.Disabled) {
+    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new WavesConsensusModule(ChainParameters.Disabled) {
       override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = true
     }
-    lazy implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule(WavesHardForkParameters.Disabled)(TestSettings, this)
+    lazy implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule(ChainParameters.Disabled)(TestSettings, this)
     lazy val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = TestSettings

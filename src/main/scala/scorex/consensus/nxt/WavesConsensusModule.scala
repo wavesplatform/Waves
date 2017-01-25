@@ -6,7 +6,7 @@ import scorex.block.{Block, BlockField}
 import scorex.consensus.{ConsensusModule, OneGeneratorConsensusModule, PoSConsensusModule, TransactionsOrdering}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
-import scorex.settings.WavesHardForkParameters
+import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 
@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class WavesConsensusModule(override val forksConfig: WavesHardForkParameters, AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
+class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
 with OneGeneratorConsensusModule with ScorexLogging {
 
   import WavesConsensusModule._

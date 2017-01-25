@@ -3,17 +3,8 @@ package com.wavesplatform
 import scorex.account.{Account, AddressScheme}
 import scorex.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.settings.Constants
-import scorex.settings.WavesHardForkParameters
+import scorex.settings.{ChainParameters}
 
-/**
-  * ChainParameters contains the data needed for working with an instantiation of particular chain
-  */
-abstract class ChainParameters extends WavesHardForkParameters {
-  val initialBalance: Long
-  val genesisTimestamp: Long
-  val genesisTxs: Seq[Transaction]
-  val addressScheme: AddressScheme
-}
 
 object TestNetParams extends ChainParameters {
   val initialBalance: Long = Constants.UnitsInWave * Constants.TotalWaves

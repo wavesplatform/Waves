@@ -65,7 +65,7 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
   protected def blockMock[Id](id: Id, ts: Long = System.currentTimeMillis())(implicit conv: Id => BlockId): Block = {
-    abstract class BlockMock extends Block(ts,0,conv(id),new SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array())) {
+    abstract class BlockMock extends Block(ts,0,conv(id),SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array())) {
       override type ConsensusDataType = Unit
       override type TransactionDataType = Unit
 

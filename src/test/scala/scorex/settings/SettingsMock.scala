@@ -1,8 +1,8 @@
 package scorex.settings
 
+import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsObject, Json}
 
-trait SettingsMock extends Settings {
-  override final lazy val settingsJSON: JsObject = Json.obj()
+abstract class SettingsMock extends WavesSettings(Json.obj()) {
   override final lazy val upnpEnabled: Boolean = false
 }
