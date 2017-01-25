@@ -101,14 +101,7 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationResult.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
-      //TODO extend from SignedTransaction and remove
-      val sigData = signatureData(sender, recipient, amount, fee, timestamp)
-      if (EllipticCurveImpl.verify(signature, sigData, sender.publicKey)) {
-        Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
-      } else {
-        Left(ValidationResult.InvalidSignature)
-      }
-
+      Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
     }
   }
 
@@ -160,7 +153,7 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
         .fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
-  private def signatureData(sender: PublicKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
+  def signatureData(sender: PublicKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
     val typeBytes = Ints.toByteArray(TransactionType.PaymentTransaction.id)
     val timestampBytes = Longs.toByteArray(timestamp)
     val amountBytes = Longs.toByteArray(amount)
