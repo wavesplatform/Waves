@@ -1,8 +1,18 @@
 package scorex.transaction
 
-import scorex.block.{Block, BlockProcessingModule}
+import scorex.block.{Block, BlockField, BlockProcessingModule}
 
-trait TransactionModule[TransactionBlockData] extends BlockProcessingModule[TransactionBlockData] {
+import scala.util.Try
+
+trait TransactionModule[TransactionBlockData] {
+
+  def parseBytes(bytes: Array[Byte]): Try[BlockField[TransactionBlockData]]
+
+  def parseBlockFields(blockFields: BlockField[TransactionBlockData]): TransactionBlockData = blockFields.value
+
+  def genesisData: BlockField[TransactionBlockData]
+
+  def formBlockData(data: TransactionBlockData): BlockField[TransactionBlockData]
 
   val blockStorage: BlockStorage
 
