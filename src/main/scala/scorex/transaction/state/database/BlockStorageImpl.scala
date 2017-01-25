@@ -6,8 +6,7 @@ import scorex.settings.{Settings, WavesHardForkParameters}
 import scorex.transaction._
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 
-class BlockStorageImpl(settings: TransactionSettings with Settings,
-                       forksParams: WavesHardForkParameters)
+class BlockStorageImpl(settings: Settings, forksParams: WavesHardForkParameters)
                       (implicit consensusModule: ConsensusModule[_], transactionModule: TransactionModule[_])
   extends BlockStorage {
 
@@ -24,7 +23,7 @@ class BlockStorageImpl(settings: TransactionSettings with Settings,
     }
   }
 
-  protected[this] override val db = database
+  protected[this] override val db: MVStore = database
 
   override val history: History = settings.history match {
     case s: String if s.equalsIgnoreCase("blockchain") =>
@@ -34,6 +33,6 @@ class BlockStorageImpl(settings: TransactionSettings with Settings,
       new StoredBlockchain(db)(consensusModule, transactionModule)
   }
 
-  override val state = StoredState.fromDB(db, forksParams)
+  override val state: StoredState = StoredState.fromDB(db, forksParams)
 
 }

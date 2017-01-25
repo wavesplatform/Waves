@@ -1,25 +1,24 @@
 package scorex.transaction.assets.exchange
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.Longs
+import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction._
-import scorex.utils.{ByteArray, NTP}
+import scorex.transaction.assets.exchange.Validation.booleanOperators
+import scorex.utils.ByteArray
 
 import scala.util.Try
-import io.swagger.annotations.ApiModelProperty
-import scorex.crypto.hash.FastCryptographicHash
-import Validation.BooleanOperators
 
 sealed trait OrderType
 
 object OrderType {
 
   case object BUY extends OrderType
-
   case object SELL extends OrderType
 
 }

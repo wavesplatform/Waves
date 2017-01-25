@@ -16,7 +16,7 @@ import scorex.wallet.Wallet
 /**
   * Waves Transaction Module
   */
-class WavesTransactionModule(chainParams: ChainParameters)(implicit override val settings: TransactionSettings with Settings,
+class WavesTransactionModule(chainParams: ChainParameters)(implicit override val settings: Settings,
                                                            application: RunnableApplication)
   extends SimpleTransactionModule(chainParams) {
 
