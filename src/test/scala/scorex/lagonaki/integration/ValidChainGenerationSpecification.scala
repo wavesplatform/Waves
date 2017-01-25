@@ -19,6 +19,7 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Even
   override def beforeAll(): Unit = {
     super.beforeAll()
     waitForSingleConnection(application)
+    Thread.sleep(1000)
   }
 
   def cleanTransactionPool(): Unit = untilTimeout(1.second) {
