@@ -3,6 +3,7 @@ package scorex.block
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -41,10 +42,8 @@ abstract class Block(timestamp: Long, version: Byte, reference: Block.BlockId, s
   val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
   val referenceField: BlockIdField = BlockIdField("reference", reference)
   val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
+  val uniqueId: BlockId = signerData.signature
 
-  // Some block characteristic which is uniq for a block
-  // e.g. hash or signature. Used in referencing
-  val uniqueId: Block.BlockId
 
   lazy val encodedId: String = Base58.encode(uniqueId)
 
@@ -158,8 +157,6 @@ object Block extends ScorexLogging {
 
       override val consensusDataField: BlockField[ConsensusDataType] = consBlockField
 
-      override val uniqueId: BlockId = signature
-
     }
   }.recoverWith { case t: Throwable =>
     log.error("Error when parsing block", t)
@@ -188,7 +185,6 @@ object Block extends ScorexLogging {
 
       override val consensusDataField: BlockField[CDT] = consensusModule.formBlockData(consensusData)
 
-      override val uniqueId: BlockId = signature
 
     }
   }
@@ -248,7 +244,6 @@ object Block extends ScorexLogging {
       override val transactionDataField: BlockField[TDT] = transactionModule.genesisData
       override val consensusDataField: BlockField[CDT] = consensusModule.genesisData
 
-      override val uniqueId: BlockId = signerDataField.value.signature
     }
   }
 }
