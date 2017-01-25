@@ -87,12 +87,7 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
     } else if (fee <= 0) {
       Left(ValidationResult.InsufficientFee)
     } else {
-      val unsigned = ReissueTransactionImpl(sender, assetId, quantity, reissuable, fee, timestamp, null)
-      if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
-        Right(unsigned.copy(signature = signature))
-      } else {
-        Left(ValidationResult.InvalidSignature)
-      }
+      Right(ReissueTransactionImpl(sender, assetId, quantity, reissuable, fee, timestamp, signature))
     }
   }
 

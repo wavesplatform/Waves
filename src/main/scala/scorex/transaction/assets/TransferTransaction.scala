@@ -128,12 +128,7 @@ object TransferTransaction extends Deser[TransferTransaction] {
     } else if (feeAmount <= 0) {
       Left(ValidationResult.InsufficientFee)
     } else {
-      val unsigned = TransferTransactionImpl(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, null)
-      if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
-        Right(unsigned.copy(signature = signature))
-      } else {
-        Left(ValidationResult.InvalidSignature)
-      }
+      Right(TransferTransactionImpl(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature))
     }
   }
 

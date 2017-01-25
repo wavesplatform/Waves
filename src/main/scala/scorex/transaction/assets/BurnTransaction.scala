@@ -83,12 +83,7 @@ object BurnTransaction extends Deser[BurnTransaction] {
     } else if (fee <= 0) {
       Left(ValidationResult.InsufficientFee)
     } else {
-      val unsigned = BurnTransactionImpl(sender, assetId, quantity, fee, timestamp, null)
-      if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
-        Right(unsigned.copy(signature = signature))
-      } else {
-        Left(ValidationResult.InvalidSignature)
-      }
+      Right(BurnTransactionImpl(sender, assetId, quantity, fee, timestamp, signature))
     }
   }
 
