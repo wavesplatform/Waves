@@ -106,15 +106,15 @@ object TransferTransaction extends Deser[TransferTransaction] {
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
-  def create(assetId: Option[AssetId],
-             sender: PublicKeyAccount,
-             recipient: Account,
-             amount: Long,
-             timestamp: Long,
-             feeAssetId: Option[AssetId],
-             feeAmount: Long,
-             attachment: Array[Byte],
-             signature: Array[Byte]): Either[ValidationError, TransferTransaction] = {
+  private def createUnverified(assetId: Option[AssetId],
+      sender: PublicKeyAccount,
+      recipient: Account,
+      amount: Long,
+      timestamp: Long,
+      feeAssetId: Option[AssetId],
+      feeAmount: Long,
+      attachment: Array[Byte],
+      signature: Option[Array[Byte]] = None) = {
     if (!Account.isValid(recipient)) {
       Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
     } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
@@ -128,13 +128,21 @@ object TransferTransaction extends Deser[TransferTransaction] {
     } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
-      val unsigned = TransferTransactionImpl(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, null)
-      if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
-        Right(unsigned.copy(signature = signature))
-      } else {
-        Left(ValidationError.InvalidSignature)
-      }
+      Right(TransferTransactionImpl(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, signature.orNull))
     }
+  }
+
+  def create(assetId: Option[AssetId],
+             sender: PublicKeyAccount,
+             recipient: Account,
+             amount: Long,
+             timestamp: Long,
+             feeAssetId: Option[AssetId],
+             feeAmount: Long,
+             attachment: Array[Byte],
+             signature: Array[Byte]): Either[ValidationError, TransferTransaction] = {
+    createUnverified(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, Some(signature))
+      .right.flatMap(SignedTransaction.verify)
   }
 
   def create(assetId: Option[AssetId],
@@ -145,22 +153,8 @@ object TransferTransaction extends Deser[TransferTransaction] {
              feeAssetId: Option[AssetId],
              feeAmount: Long,
              attachment: Array[Byte]): Either[ValidationError, TransferTransaction] = {
-    if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
-      Left(ValidationError.TooBigArray)
-    } else if (amount <= 0) {
-      Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
-    } else if (Try(Math.addExact(amount, feeAmount)).isFailure) {
-      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
-    } else if (feeAmount <= 0) {
-      Left(ValidationError.InsufficientFee)
-    } else {
-      val unsigned = TransferTransactionImpl(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, null)
-      val sig      = EllipticCurveImpl.sign(sender, unsigned.toSign)
-      Right(unsigned.copy(signature = sig))
+    createUnverified(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.map { unsigned =>
+      unsigned.copy(signature = EllipticCurveImpl.sign(sender, unsigned.toSign))
     }
   }
 }
