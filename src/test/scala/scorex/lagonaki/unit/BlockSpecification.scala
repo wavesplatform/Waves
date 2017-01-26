@@ -9,11 +9,12 @@ import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
+import scala.concurrent.duration._
 
 class BlockSpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
   test("Nxt block with txs bytes/parse roundtrip") {
-    implicit val consensusModule = new WavesConsensusModule(ChainParameters.Disabled)
+    implicit val consensusModule = new WavesConsensusModule(ChainParameters.Disabled, 5.seconds)
     implicit val transactionModule = new SimpleTransactionModule(ChainParameters.Disabled)(application.settings, application)
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)

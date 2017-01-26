@@ -8,12 +8,13 @@ import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, 
 import scorex.crypto.EllipticCurveImpl
 import scorex.settings.{Settings, ChainParameters}
 import scorex.transaction.{Transaction, TransactionModule, TransactionsBlockField}
+import scala.concurrent.duration._
 
 class BlockMock(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyAccount(Array.fill(32)(0))) extends Block(0, 0, Array.fill(EllipticCurveImpl.SignatureLength)(0: Byte),SignerData(signer, Array.fill(EllipticCurveImpl.SignatureLength)(0))) {
 
 
   override lazy val transactions = txs
-  override implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new WavesConsensusModule(ChainParameters.Disabled)
+  override implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new WavesConsensusModule(ChainParameters.Disabled, 5.seconds)
 
   override type ConsensusDataType = NxtLikeConsensusBlockData
   override type TransactionDataType = Seq[Transaction]

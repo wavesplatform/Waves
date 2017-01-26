@@ -25,6 +25,7 @@ import scorex.transaction._
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.postfixOps
 import scala.util.Random
+import scala.concurrent.duration._
 
 class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
@@ -48,7 +49,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db = new MVStore.Builder().open()
 
   trait TestAppMock extends Application {
-    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new WavesConsensusModule(ChainParameters.Disabled) {
+    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new WavesConsensusModule(ChainParameters.Disabled, 5.seconds) {
       override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = true
     }
     lazy implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule(ChainParameters.Disabled)(TestSettings, this)

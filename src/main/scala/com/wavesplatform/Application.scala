@@ -30,7 +30,7 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
 } with scorex.app.RunnableApplication
   with MatcherApplication {
 
-  override implicit lazy val consensusModule = new WavesConsensusModule(settings.chainParams)
+  override implicit lazy val consensusModule = new WavesConsensusModule(settings.chainParams, Constants.AvgBlockDelay)
 
   override implicit lazy val transactionModule = new WavesTransactionModule(settings.chainParams)(settings, this)
 
