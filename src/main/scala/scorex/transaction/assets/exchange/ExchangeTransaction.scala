@@ -78,9 +78,8 @@ object ExchangeTransaction {
     }
   }
 
-  def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
-
+  private def createUnverified(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
+      buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Option[Array[Byte]] = None) = {
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     if (fee <= 0) {
@@ -114,69 +113,21 @@ object ExchangeTransaction {
     } else if (!priceIsValid) {
       Left(CustomValidationError("priceIsValid"))
     } else {
-      val signature = EllipticCurveImpl.sign(matcher.privateKey, sigData(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp))
-      Right(ExchangeTransactionImpl(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
+      Right(ExchangeTransactionImpl(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature.orNull))
     }
   }
 
+  def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
+             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
+    createUnverified(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp).right.map { unverified =>
+      unverified.copy(signature = EllipticCurveImpl.sign(matcher.privateKey, unverified.toSign))
+    }
+  }
 
   def create(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
              buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte]): Either[ValidationError, ExchangeTransaction] = {
-
-    lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
-
-    if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
-    } else if (amount <= 0) {
-      Left(ValidationError.NegativeAmount)
-    } else if (price <= 0) {
-      Left(CustomValidationError("price should be > 0"))
-    } else if (price > Order.MaxAmount) {
-      Left(CustomValidationError("price too large"))
-    } else if (amount > Order.MaxAmount) {
-      Left(CustomValidationError("price too large"))
-    } else if (sellMatcherFee > Order.MaxAmount) {
-      Left(CustomValidationError("sellMatcherFee too large"))
-    } else if (buyMatcherFee > Order.MaxAmount) {
-      Left(CustomValidationError("buyMatcherFee too large"))
-    } else if (fee > Order.MaxAmount) {
-      Left(CustomValidationError("fee too large"))
-    } else if (buyOrder.orderType != OrderType.BUY) {
-      Left(CustomValidationError("buyOrder should has OrderType.BUY"))
-    } else if (sellOrder.orderType != OrderType.SELL) {
-      Left(CustomValidationError("sellOrder should has OrderType.SELL"))
-    } else if (buyOrder.matcher != sellOrder.matcher) {
-      Left(CustomValidationError("buyOrder.matcher should be the same as sellOrder.matcher"))
-    } else if (buyOrder.assetPair != sellOrder.assetPair) {
-      Left(CustomValidationError("Both orders should have same AssetPair"))
-    } else if (!buyOrder.isValid(timestamp)) {
-      Left(CustomValidationError("buyOrder"))
-    } else if (!sellOrder.isValid(timestamp)) {
-      Left(CustomValidationError("sellOrder"))
-    } else if (!priceIsValid) {
-      Left(CustomValidationError("priceIsValid"))
-    } else if (!EllipticCurveImpl.verify(signature, sigData(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp), buyOrder.matcher.publicKey)) {
-      Left(CustomValidationError("matcherSignatureIsValid should be valid"))
-    } else {
-      val sigD = sigData(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp)
-      if (EllipticCurveImpl.verify(signature, sigD, buyOrder.matcher.publicKey)) {
-        Right(ExchangeTransactionImpl(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
-      } else {
-        Left(ValidationError.InvalidSignature)
-      }
-    }
-
-  }
-
-
-  private def sigData(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                      buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Array[Byte] = {
-    Array(TransactionType.OrderMatchTransaction.id.toByte) ++
-      Ints.toByteArray(buyOrder.bytes.length) ++ Ints.toByteArray(sellOrder.bytes.length) ++
-      buyOrder.bytes ++ sellOrder.bytes ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
-      Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
-      Longs.toByteArray(timestamp)
-
+    createUnverified(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, Some(signature))
+      .right.flatMap(SignedTransaction.verify)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {
