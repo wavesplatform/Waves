@@ -3,8 +3,8 @@ package scorex.api.http
 import akka.http.scaladsl.model.StatusCodes
 import play.api.libs.json.{JsObject, JsValue}
 import scorex.account.Account
-import scorex.transaction.ValidationResult
-import scorex.transaction.ValidationResult._
+import scorex.transaction.ValidationError
+import scorex.transaction.ValidationError._
 import scorex.wallet.Wallet
 
 
@@ -29,15 +29,15 @@ trait CommonTransactionApiFunctions extends CommonApiFunctions {
   protected[api] def walletNotExists(wallet: Wallet): Option[JsonResponse] =
     if (!wallet.exists()) Some(WalletNotExist.response) else None
 
-  def jsonResponse(result: ValidationResult): JsonResponse = result match {
-    case ValidationResult.InsufficientFee => InsufficientFee.response
-    case ValidationResult.NoBalance => NoBalance.response
-    case ValidationResult.StateCheckFailed => StateCheckFailed.response
-    case ValidationResult.InvalidAddress => InvalidAddress.response
-    case ValidationResult.NegativeAmount => InvalidAmount.response
-    case ValidationResult.InvalidName => InvalidName.response
-    case ValidationResult.InvalidSignature => InvalidSignature.response
-    case ValidationResult.TooBigArray => TooBigArrayAllocation.response
+  def jsonResponse(result: ValidationError): JsonResponse = result match {
+    case ValidationError.InsufficientFee => InsufficientFee.response
+    case ValidationError.NoBalance => NoBalance.response
+    case ValidationError.StateCheckFailed => StateCheckFailed.response
+    case ValidationError.InvalidAddress => InvalidAddress.response
+    case ValidationError.NegativeAmount => InvalidAmount.response
+    case ValidationError.InvalidName => InvalidName.response
+    case ValidationError.InvalidSignature => InvalidSignature.response
+    case ValidationError.TooBigArray => TooBigArrayAllocation.response
     case _ => Unknown.response
   }
 }

@@ -2,15 +2,17 @@ package scorex.lagonaki.unit
 
 import java.net.InetSocketAddress
 
+import com.wavesplatform.settings.WavesSettings
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.FunSuite
 import play.api.libs.json.{JsObject, Json}
+import scorex.account.AddressScheme
 import scorex.app.Application
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.ConsensusMock
-import scorex.settings.{Settings, WavesHardForkParameters}
-import scorex.transaction.{PaymentTransaction, SimpleTransactionModule}
+import scorex.settings.{ChainParameters, Settings}
+import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
@@ -19,8 +21,7 @@ import scala.language.postfixOps
 //TODO: gagarin55 - Can't move it to appropriate module due to dependancy on some ConsesusModule impl
 class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
 
-  object MySettings extends Settings {
-    override lazy val settingsJSON: JsObject = Json.obj()
+  object MySettings extends WavesSettings(Json.obj()) {
     override lazy val dataDirOpt: Option[String] = None
     override lazy val knownPeers = Seq.empty[InetSocketAddress]
   }
@@ -30,7 +31,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     override implicit val consensusModule = new ConsensusMock
   }
 
-  val forkParameters = new AnyRef with WavesHardForkParameters {
+  val forkParameters = new AnyRef with ChainParameters {
     override def allowTemporaryNegativeUntil: Long = 0L
     override def requireSortedTransactionsAfter: Long = Long.MaxValue
     override def allowInvalidPaymentTransactionsByTimestamp: Long = Long.MaxValue
@@ -40,6 +41,14 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     override def allowUnissuedAssetsUntil: Long = Long.MaxValue
     override def allowBurnTransactionAfterTimestamp: Long = Long.MaxValue
     override def requirePaymentUniqueId: Long = Long.MaxValue
+
+    override def initialBalance: Long = 100000000000000L
+
+    override def genesisTimestamp: Long = ???
+
+    override def genesisTxs: Seq[Transaction] = ???
+
+    override def addressScheme: AddressScheme = ???
   }
 
   implicit val app = stub[MyApp]

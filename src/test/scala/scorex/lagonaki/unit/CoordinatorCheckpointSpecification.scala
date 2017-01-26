@@ -4,12 +4,13 @@ import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import org.h2.mvstore.MVStore
 import org.scalatest.DoNotDiscover
+import play.api.libs.json.JsObject
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
-import scorex.consensus.nxt.{NxtLikeConsensusBlockData, NxtLikeConsensusModule}
+import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.network.BlockchainSynchronizer.GetExtension
 import scorex.network.Coordinator.{AddBlock, ClearCheckpoint, SyncFinished}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
@@ -17,13 +18,14 @@ import scorex.network.ScoreObserver.CurrentScore
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, Message}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.settings.{SettingsMock, WavesHardForkParameters}
+import scorex.settings.{ChainParameters, SettingsMock}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.postfixOps
 import scala.util.Random
+import scala.concurrent.duration._
 
 class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
@@ -35,6 +37,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     override lazy val MaxRollback: Int = 10
 
     override lazy val checkpointPublicKey: Option[Array[Byte]] = Some(pk.publicKey)
+
   }
 
   val testBlockGenerator = TestProbe("blockGenerator")
@@ -46,10 +49,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db = new MVStore.Builder().open()
 
   trait TestAppMock extends Application {
-    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new NxtLikeConsensusModule(WavesHardForkParameters.Disabled) {
+    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new WavesConsensusModule(ChainParameters.Disabled, 5.seconds) {
       override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = true
     }
-    lazy implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule(WavesHardForkParameters.Disabled)(TestSettings, this)
+    lazy implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule(ChainParameters.Disabled)(TestSettings, this)
     lazy val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = TestSettings
@@ -73,7 +76,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     val timestamp = System.currentTimeMillis()
     //val reference = Array.fill(Block.BlockIdLength)(id.toByte)
     val cbd = new NxtLikeConsensusBlockData {
-      override val generationSignature: Array[Byte] = Array.fill(NxtLikeConsensusModule.GeneratorSignatureLength)(
+      override val generationSignature: Array[Byte] = Array.fill(WavesConsensusModule.GeneratorSignatureLength)(
         Random.nextInt(100).toByte)
       override val baseTarget: Long = score + 1
     }

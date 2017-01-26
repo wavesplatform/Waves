@@ -5,14 +5,14 @@ import akka.pattern.ask
 import akka.util.Timeout
 import com.ning.http.client.Response
 import com.wavesplatform.settings.{Constants, WavesSettings}
-import com.wavesplatform.{Application, ChainParameters, TestNetParams}
+import com.wavesplatform.{Application, TestNetParams}
 import dispatch.{Http, url}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 import scorex.account.{Account, AddressScheme}
 import scorex.api.http.ApiKeyNotValid
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
-import scorex.settings.Settings
+import scorex.settings.{ChainParameters, Settings}
 import scorex.transaction.{GenesisTransaction, Transaction}
 import scorex.utils._
 

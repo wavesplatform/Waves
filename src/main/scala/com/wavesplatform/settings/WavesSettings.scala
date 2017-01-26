@@ -1,9 +1,9 @@
 package com.wavesplatform.settings
 
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.{ChainParameters, MainNetParams, TestNetParams}
+import com.wavesplatform.{MainNetParams, TestNetParams}
 import play.api.libs.json.JsObject
-import scorex.settings.Settings
+import scorex.settings.{ChainParameters, Settings}
 
 class WavesSettings(override val settingsJSON: JsObject) extends Settings with MatcherSettings {
   lazy val loggingLevel: String = (settingsJSON \ "loggingLevel").asOpt[String].getOrElse("info").toLowerCase

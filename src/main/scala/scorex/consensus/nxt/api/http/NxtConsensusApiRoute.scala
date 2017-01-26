@@ -10,7 +10,7 @@ import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress, JsonResponse}
 import scorex.app.RunnableApplication
-import scorex.consensus.nxt.NxtLikeConsensusModule
+import scorex.consensus.nxt.{WavesConsensusModule}
 import scorex.crypto.encode.Base58
 
 
@@ -20,7 +20,7 @@ class NxtConsensusApiRoute(application: RunnableApplication)(implicit val contex
   extends ApiRoute with CommonApiFunctions {
 
   val settings = application.settings
-  private val consensusModule = application.consensusModule.asInstanceOf[NxtLikeConsensusModule]
+  private val consensusModule = application.consensusModule.asInstanceOf[WavesConsensusModule]
   private val blockStorage = application.blockStorage
 
   override val route: Route =

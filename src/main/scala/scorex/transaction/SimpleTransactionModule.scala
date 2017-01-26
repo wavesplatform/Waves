@@ -2,6 +2,7 @@ package scorex.transaction
 
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.app.Application
@@ -10,19 +11,18 @@ import scorex.consensus.TransactionsOrdering
 import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
-import scorex.settings.{Settings, WavesHardForkParameters}
+import scorex.settings.{Settings, ChainParameters}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
-import scorex.transaction.ValidationResult.ValidationResult
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
 import scorex.utils._
 import scorex.wallet.Wallet
+import scorex.waves.transaction.SignedPayment
 
 import scala.concurrent.duration._
-import scala.util.Try
 import scala.util.control.NonFatal
+import scala.util.{Left, Right, Try}
 
 @SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -44,8 +44,8 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 }
 
 
-class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit val settings: Settings,
-                                                                       application: Application)
+class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val settings: Settings,
+                                                               application: Application)
   extends TransactionModule[StoredInBlock] with ScorexLogging {
 
   import SimpleTransactionModule._
@@ -54,7 +54,8 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   private val feeCalculator = new FeeCalculator(settings)
 
   val TransactionSizeLength = 4
-  val InitialBalance = 100000000000000L
+//  val InitialBalance = 100000000000000L
+  val InitialBalance = hardForkParams.initialBalance
 
   override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings)
 
@@ -139,13 +140,13 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
     }
 
-  def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationResult, PaymentTransaction]] = {
+  def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
     }
   }
 
-  def transferAsset(request: TransferRequest, wallet: Wallet): Try[Either[ValidationResult, TransferTransaction]] = Try {
+  def transferAsset(request: TransferRequest, wallet: Wallet): Try[Either[ValidationError, TransferTransaction]] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
 
     val transferVal = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
@@ -192,22 +193,22 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
   /**
     * Validate transaction according to the State and send it to network
     */
-  def broadcastTransaction(tx: SignedTransaction): ValidationResult = {
+  def broadcastTransaction(tx: SignedTransaction): Either[ValidationError, Unit] = {
     if (isValid(tx, tx.timestamp)) {
       onNewOffchainTransaction(tx)
-      ValidationResult.ValidateOke
-    } else ValidationResult.StateCheckFailed
+      Right(())
+    } else Left(ValidationError.StateCheckFailed)
   }
 
   /**
     * Validate transactions according to the State and send it to network
     */
-  def broadcastTransactions(txs: Seq[SignedTransaction]): ValidationResult = {
+  def broadcastTransactions(txs: Seq[SignedTransaction]): Either[ValidationError, Unit] = {
     if (txs.nonEmpty && isValid(txs, txs.map(_.timestamp).max)) {
       txs.foreach(onNewOffchainTransaction)
-      ValidationResult.ValidateOke
+      Right(())
     } else {
-      ValidationResult.StateCheckFailed
+      Left(ValidationError.StateCheckFailed)
     }
   }
 
@@ -232,7 +233,7 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
 
   def burnAsset(request: BurnRequest, wallet: Wallet): Try[BurnTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val txVal: Either[ValidationResult, BurnTransaction] = BurnTransaction.create(sender,
+    val txVal: Either[ValidationError, BurnTransaction] = BurnTransaction.create(sender,
       Base58.decode(request.assetId).get,
       request.quantity,
       request.fee,
@@ -256,22 +257,13 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     txTime
   }
 
-  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationResult, PaymentTransaction] = {
+  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction] = {
     val pt = PaymentTransaction.create(sender, recipient, amount, fee, getTimestamp)
     pt match {
       case Right(t) => onNewOffchainTransaction(t)
       case _ =>
     }
     pt
-  }
-
-  def createOrderMatch(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, wallet: Wallet): Try[OrderMatch] = Try {
-    val matcher = wallet.privateKeyAccount(buyOrder.matcher.address).get
-    val om = OrderMatch.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp)
-    if (isValid(om, om.timestamp)) onNewOffchainTransaction(om)
-    else throw new StateCheckFailed("Invalid ordermatch transaction  generated: " + om.json)
-    om
   }
 
   override def genesisData: BlockField[StoredInBlock] = {
@@ -343,6 +335,55 @@ class SimpleTransactionModule(hardForkParams: WavesHardForkParameters)(implicit 
     case NonFatal(t) =>
       log.error(s"Unexpected error during validation", t)
       throw t
+  }
+
+  val minimumTxFee = settings.asInstanceOf[WavesSettings].minimumTxFee
+
+  def signPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError,PaymentTransaction]] = {
+    wallet.privateKeyAccount(payment.sender).map { sender =>
+      PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
+    }
+  }
+
+  def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
+
+    val paymentVal = PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
+
+    paymentVal match {
+      case Right(payment) => {
+        if (blockStorage.state.isValid(payment, payment.timestamp)) {
+          Right(payment)
+        } else Left(ValidationError.NoBalance)
+      }
+      case Left(err) => Left(err)
+    }
+  }
+
+  /**
+    * Publish signed payment transaction which generated outside node
+    */
+  def broadcastPayment(payment: SignedPayment): Either[ValidationError, PaymentTransaction] = {
+    val maybeSignatureBytes = Base58.decode(payment.signature).toOption
+    if (payment.fee < minimumTxFee)
+      Left(ValidationError.InsufficientFee)
+    else if (maybeSignatureBytes.isEmpty)
+      Left(ValidationError.InvalidSignature)
+    else {
+      val time = payment.timestamp
+      val sigBytes = maybeSignatureBytes.get
+      val senderPubKey = payment.senderPublicKey
+      val recipientAccount = payment.recipient
+      val txVal = PaymentTransaction.create(senderPubKey, recipientAccount, payment.amount, payment.fee, time, sigBytes)
+      txVal match {
+        case Right(tx) => {
+          if (blockStorage.state.isValid(tx, tx.timestamp)) {
+            onNewOffchainTransaction(tx)
+            Right(tx)
+          } else Left(ValidationError.NoBalance)
+        }
+        case Left(err) => Left(err)
+      }
+    }
   }
 }
 

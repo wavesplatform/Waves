@@ -6,7 +6,7 @@ import scorex.account.Account
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.settings.WavesHardForkParameters
+import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.state.database.state._
@@ -30,7 +30,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
                   val assetsExtension: AssetsExtendedState,
                   val incrementingTimestampValidator: IncrementingTimestampValidator,
                   val validators: Seq[StateExtension],
-                  settings: WavesHardForkParameters) extends LagonakiState with ScorexLogging {
+                  settings: ChainParameters) extends LagonakiState with ScorexLogging {
 
   override def included(id: Array[Byte], heightOpt: Option[Int]): Option[Int] = storage.included(id, heightOpt)
 
@@ -352,7 +352,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
 }
 
 object StoredState {
-  def fromDB(mvStore: MVStore, settings: WavesHardForkParameters): StoredState = {
+  def fromDB(mvStore: MVStore, settings: ChainParameters): StoredState = {
     val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage {
       override val db: MVStore = mvStore
       if (db.getStoreVersion > 0) db.rollback()

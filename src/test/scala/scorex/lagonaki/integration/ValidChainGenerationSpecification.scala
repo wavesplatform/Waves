@@ -6,7 +6,7 @@ import com.wavesplatform.settings.Constants
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.{JsArray, JsNumber, JsString}
-import scorex.consensus.nxt.NxtLikeConsensusModule
+import scorex.consensus.nxt.{WavesConsensusModule}
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.network.peer.PeerManager.GetBlacklistedPeers
 import scorex.utils.untilTimeout
@@ -65,7 +65,7 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Even
 
     // Check that every node has enough money to generate blocks
     val requiredBalanceForGenerationInWaves =
-      NxtLikeConsensusModule.MinimalEffictiveBalanceForGenerator / Constants.UnitsInWave
+      WavesConsensusModule.MinimalEffictiveBalanceForGenerator / Constants.UnitsInWave
 
     eventually(timeout(1.second), interval(100.millis)) {
       applications.exists(getMaxWalletGeneratingBalanceWaves(_) > requiredBalanceForGenerationInWaves) shouldBe true

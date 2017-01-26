@@ -7,7 +7,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction.TransactionType
-import scorex.transaction.ValidationResult.ValidationResult
+import scorex.transaction.ValidationError
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -73,45 +73,42 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
+  private def createUnverified(sender: PublicKeyAccount,
+                               assetId: Array[Byte],
+                               quantity: Long,
+                               reissuable: Boolean,
+                               fee: Long,
+                               timestamp: Long,
+                               signature: Option[Array[Byte]] = None) =
+    if (quantity <= 0) {
+      Left(ValidationError.NegativeAmount)
+    } else if (!Account.isValid(sender)) {
+      Left(ValidationError.InvalidAddress)
+    } else if (fee <= 0) {
+      Left(ValidationError.InsufficientFee)
+    } else {
+      Right(ReissueTransactionImpl(sender, assetId, quantity, reissuable, fee, timestamp, signature.orNull))
+    }
+
   def create(sender: PublicKeyAccount,
              assetId: Array[Byte],
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signature: Array[Byte]): Either[ValidationResult, ReissueTransaction] = {
-    if (quantity <= 0) {
-      Left(ValidationResult.NegativeAmount)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationResult.InvalidAddress)
-    } else if (fee <= 0) {
-      Left(ValidationResult.InsufficientFee)
-    } else {
-      val unsigned = ReissueTransactionImpl(sender, assetId, quantity, reissuable, fee, timestamp, null)
-      if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
-        Right(unsigned.copy(signature = signature))
-      } else {
-        Left(ValidationResult.InvalidSignature)
-      }
-    }
-  }
+             signature: Array[Byte]): Either[ValidationError, ReissueTransaction] =
+    createUnverified(sender, assetId, quantity, reissuable, fee, timestamp, Some(signature))
+      .right
+      .flatMap(SignedTransaction.verify)
+
 
   def create(sender: PrivateKeyAccount,
              assetId: Array[Byte],
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
-             timestamp: Long): Either[ValidationResult, ReissueTransaction] = {
-    if (quantity <= 0) {
-      Left(ValidationResult.NegativeAmount)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationResult.InvalidAddress)
-    } else if (fee <= 0) {
-      Left(ValidationResult.InsufficientFee)
-    } else {
-      val unsigned = ReissueTransactionImpl(sender, assetId, quantity, reissuable, fee, timestamp, null)
-      val sig      = EllipticCurveImpl.sign(sender, unsigned.toSign)
-      Right(unsigned.copy(signature = sig))
+             timestamp: Long): Either[ValidationError, ReissueTransaction] =
+    createUnverified(sender, assetId, quantity, reissuable, fee, timestamp).right.map { unsigned =>
+      unsigned.copy(signature = EllipticCurveImpl.sign(sender, unsigned.toSign))
     }
-  }
 }

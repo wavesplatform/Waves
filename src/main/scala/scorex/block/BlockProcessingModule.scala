@@ -9,11 +9,5 @@ import scala.util.Try
   */
 
 trait BlockProcessingModule[BlockPartDataType] extends Deser[BlockField[BlockPartDataType]] {
-  def parseBytes(bytes: Array[Byte]): Try[BlockField[BlockPartDataType]]
 
-  def parseBlockFields(blockFields: BlockField[BlockPartDataType]): BlockPartDataType = blockFields.value
-
-  def genesisData: BlockField[BlockPartDataType]
-
-  def formBlockData(data: BlockPartDataType): BlockField[BlockPartDataType]
 }
