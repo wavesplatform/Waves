@@ -4,6 +4,7 @@ import java.nio.file.{Files, Paths}
 
 import org.h2.mvstore.MVStore
 import org.scalatest._
+import org.scalatest.prop.PropertyChecks
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
@@ -11,9 +12,10 @@ import scorex.settings.ChainParameters
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.state.database.state.extension.OrderMatchStoredState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
-import scorex.transaction.{AssetAcc, AssetId, GenesisTransaction}
-import scorex.utils.ByteArray
+import scorex.transaction.{AssetAcc, AssetId, GenesisTransaction, TransactionGen}
+import scorex.utils.{ByteArray, NTP}
 import scorex.wallet.Wallet
 
 class OrderMatchStoredStateSpecification extends FunSuite with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -83,7 +85,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
     val buyMatcherFee: Long = buyOrder.matcherFee * amount / buyOrder.amount
     val sellMatcherFee: Long = sellOrder.matcherFee * amount / sellOrder.amount
-    ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee,sellMatcherFee,fee, getTimestamp).right.get
+    ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp).right.get
   }
 
   def addInitialAssets(acc: PrivateKeyAccount, assetName: String, amount: Long): Option[AssetId] = {
@@ -106,6 +108,28 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val buyAcc = if (ByteArray.sameOption(usd, pair.first)) acc1 else acc2
     val sellAcc = if (ByteArray.sameOption(usd, pair.first)) acc2 else acc1
     (pair, buyAcc, sellAcc)
+  }
+
+  private def withCheckBalances(pair: AssetPair,
+                                buyAcc: PrivateKeyAccount,
+                                sellAcc: PrivateKeyAccount,
+                                om: ExchangeTransaction)(f: => Unit): Unit = {
+    val (prevBuyW, prevBuy1, prevBuy2) = getBalances(buyAcc, pair)
+    val (prevSellW, prevSell1, prevSell2) = getBalances(sellAcc, pair)
+
+    f
+
+    //buyAcc buy1
+    val (buyW, buy1, buy2) = getBalances(buyAcc, pair)
+    buyW should be(prevBuyW - om.buyMatcherFee)
+    buy1 should be(prevBuy1 - om.amount)
+    buy2 should be(prevBuy2 + BigInt(om.amount) * Order.PriceConstant / om.price)
+
+    //sellAcc sell1
+    val (sellW, sell1, sell2) = getBalances(sellAcc, pair)
+    sellW should be(prevSellW - om.sellMatcherFee)
+    sell1 should be(prevSell1 + om.amount)
+    sell2 should be(prevSell2 - BigInt(om.amount) * Order.PriceConstant / om.price)
   }
 
   test("Validate enough order balances") {
@@ -232,26 +256,45 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
 
   }
+}
 
-  private def withCheckBalances(pair: AssetPair,
-                                buyAcc: PrivateKeyAccount,
-                                sellAcc: PrivateKeyAccount,
-                                om: ExchangeTransaction)(f: => Unit): Unit = {
-    val (prevBuyW, prevBuy1, prevBuy2) = getBalances(buyAcc, pair)
-    val (prevSellW, prevSell1, prevSell2) = getBalances(sellAcc, pair)
+class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
-    f
+  property("validates ExchangeTransaction against previous partial matches") {
+    forAll(accountGen, maxWavesAnountGen, maxWavesAnountGen, maxWavesAnountGen, maxWavesAnountGen, maxWavesAnountGen) {
+      (acc: PrivateKeyAccount, buyAmount: Long, sellAmount: Long, mf1: Long, mf2: Long, mf3: Long) =>
+        whenever(buyAmount < sellAmount && BigInt(mf2) * buyAmount / sellAmount > 0) {
+          var pairOption = Option.empty[AssetPair]
+          while (pairOption.isEmpty) {
+            pairOption = assetPairGen.sample
+          }
+          val pair = pairOption.get
+          val sender1 = accountGen.sample.get
+          val sender2 = accountGen.sample.get
+          val matcher = accountGen.sample.get
+          val curTime = NTP.correctedTime()
 
-    //buyAcc buy1
-    val (buyW, buy1, buy2) = getBalances(buyAcc, pair)
-    buyW should be(prevBuyW - om.buyMatcherFee)
-    buy1 should be(prevBuy1 - om.amount)
-    buy2 should be(prevBuy2 + BigInt(om.amount) * Order.PriceConstant / om.price)
+          val buyPrice = sellAmount
+          val sellPrice = buyAmount
 
-    //sellAcc sell1
-    val (sellW, sell1, sell2) = getBalances(sellAcc, pair)
-    sellW should be(prevSellW - om.sellMatcherFee)
-    sell1 should be(prevSell1 + om.amount)
-    sell2 should be(prevSell2 - BigInt(om.amount) * Order.PriceConstant / om.price)
+          val buy1 = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, curTime, mf1)
+          val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, curTime, mf2)
+          val buy2 = Order.buy(sender1, matcher, pair, buyPrice, sellAmount - buyAmount, curTime, mf3)
+
+          val om1 = ExchangeTransaction.create(acc, buy1, sell, buyPrice, buyAmount, mf1,
+            (BigInt(mf2) * buyAmount / BigInt(sellAmount)).toLong, 1, curTime).right.get
+
+
+          val om2 = ExchangeTransaction.create(acc, buy2, sell, buyPrice, sellAmount - om1.amount,
+            mf3, mf2 - (BigInt(mf2) * buyAmount / sellAmount).toLong, 1, curTime).right.get
+
+          // we should spent all fee
+          val om2Invalid = ExchangeTransaction.create(acc, buy2, sell, buyPrice, sellAmount - om1.amount,
+            mf3, (mf2 - (BigInt(mf2) * buyAmount / sellAmount).toLong) + 1, 1, curTime).right.get
+
+          OrderMatchStoredState.isOrderMatchValid(om2Invalid, Set(om1)) shouldBe false
+        }
+    }
+
   }
 }
