@@ -77,15 +77,19 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   }
 
   def createExchangeTransaction(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                                buyMatcherFee: Long, sellMatcherFee: Long, fee: Long): ExchangeTransaction = {
-    ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp).right.get
-  }
+                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long) =
+    ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp) match {
+      case Right(o) => o
+      case Left(error) => fail(s"Error creating order: $error")
+    }
 
-  def createExchangeTransaction(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, fee: Long): ExchangeTransaction = {
-
+  def createExchangeTransaction(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, fee: Long) = {
     val buyMatcherFee: Long = buyOrder.matcherFee * amount / buyOrder.amount
     val sellMatcherFee: Long = sellOrder.matcherFee * amount / sellOrder.amount
-    ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp).right.get
+    ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp) match {
+      case Right(o) => o
+      case Left(error) => fail(s"Error creating order: $error")
+    }
   }
 
   def addInitialAssets(acc: PrivateKeyAccount, assetName: String, amount: Long): Option[AssetId] = {

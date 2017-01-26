@@ -266,10 +266,6 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     pt
   }
 
-//  override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
-//    TransactionsBlockField(hardForkParams.genesisTxs)
-//  }
-
   override def genesisData: BlockField[StoredInBlock] = {
     val ipoMembers = List(
       "3N3rfWUDPkFsf2GEZBCLw491A79G46djvQk",

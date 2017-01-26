@@ -26,12 +26,12 @@ trait ExchangeTransactionCreator {
     txTime
   }
 
-  def createTransaction(sumbitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
-    val matcher = wallet.privateKeyAccount(sumbitted.order.matcher.address).get
+  def createTransaction(submitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
+    val matcher = wallet.privateKeyAccount(submitted.order.matcher.address).get
 
     val price = counter.price
-    val amount = math.min(sumbitted.amount, counter.amount)
-    val (buy, sell) = Order.splitByType(sumbitted.order, counter.order)
+    val amount = math.min(submitted.amount, counter.amount)
+    val (buy, sell) = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) =  calculateMatcherFee(buy, sell, amount: Long)
     ExchangeTransaction.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
   }
