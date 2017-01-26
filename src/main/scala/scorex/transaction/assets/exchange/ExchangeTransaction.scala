@@ -23,7 +23,6 @@ sealed trait ExchangeTransaction extends SignedTransaction {
   def buyMatcherFee: Long
   def sellMatcherFee: Long
   def fee: Long
-
 }
 
 object ExchangeTransaction {
@@ -99,7 +98,7 @@ object ExchangeTransaction {
     } else if (buyMatcherFee > Order.MaxAmount) {
       Left(CustomValidationError("buyMatcherFee too large"))
     } else if (fee > Order.MaxAmount) {
-      Left(CustomValidationError("asda"))
+      Left(CustomValidationError("fee too large"))
     } else if (buyOrder.orderType != OrderType.BUY) {
       Left(CustomValidationError("buyOrder should has OrderType.BUY"))
     } else if (sellOrder.orderType != OrderType.SELL) {
@@ -141,7 +140,7 @@ object ExchangeTransaction {
     } else if (buyMatcherFee > Order.MaxAmount) {
       Left(CustomValidationError("buyMatcherFee too large"))
     } else if (fee > Order.MaxAmount) {
-      Left(CustomValidationError("asda"))
+      Left(CustomValidationError("fee too large"))
     } else if (buyOrder.orderType != OrderType.BUY) {
       Left(CustomValidationError("buyOrder should has OrderType.BUY"))
     } else if (sellOrder.orderType != OrderType.SELL) {
