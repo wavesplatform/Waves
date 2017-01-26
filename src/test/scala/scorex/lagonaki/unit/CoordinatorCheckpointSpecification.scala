@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import org.h2.mvstore.MVStore
 import org.scalatest.DoNotDiscover
+import play.api.libs.json.JsObject
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.app.Application
@@ -17,7 +18,7 @@ import scorex.network.ScoreObserver.CurrentScore
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, Message}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.settings.{SettingsMock, ChainParameters}
+import scorex.settings.{ChainParameters, SettingsMock}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
 
@@ -35,6 +36,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     override lazy val MaxRollback: Int = 10
 
     override lazy val checkpointPublicKey: Option[Array[Byte]] = Some(pk.publicKey)
+
   }
 
   val testBlockGenerator = TestProbe("blockGenerator")
