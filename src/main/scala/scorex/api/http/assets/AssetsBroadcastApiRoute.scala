@@ -10,7 +10,7 @@ import play.api.libs.json._
 import scorex.api.http._
 import scorex.app.Application
 import scorex.settings.Settings
-import scorex.transaction.{SignedTransaction, SimpleTransactionModule, StateCheckFailed, ValidationResult}
+import scorex.transaction.{SignedTransaction, SimpleTransactionModule, StateCheckFailed, ValidationError}
 
 import scala.util.{Failure, Success, Try}
 
@@ -213,14 +213,14 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
 
   private def broadcast[T <: SignedTransaction](tx: T)(toJson: T => JsValue): JsonResponse =
     Try(transactionModule.broadcastTransaction(tx)).map {
-      case ValidationResult.ValidateOke => JsonResponse(toJson(tx), StatusCodes.OK)
-      case error => jsonResponse(error)
+      case Right(()) => JsonResponse(toJson(tx), StatusCodes.OK)
+      case Left(error)=> jsonResponse(error)
     }.getOrElse(WrongJson.response)
 
   private def broadcastMany[T <: SignedTransaction](txs: Seq[T])(toJson: Seq[T] => JsValue): JsonResponse =
     Try(transactionModule.broadcastTransactions(txs)).map {
-      case ValidationResult.ValidateOke => JsonResponse(toJson(txs), StatusCodes.OK)
-      case error => jsonResponse(error)
+      case Right(()) => JsonResponse(toJson(txs), StatusCodes.OK)
+      case Left(error) => jsonResponse(error)
     }.getOrElse(WrongJson.response)
 
 }

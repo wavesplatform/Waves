@@ -7,11 +7,11 @@ import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import scorex.account.{Account, PrivateKeyAccount}
-import scorex.settings.WavesHardForkParameters
+import scorex.account.{Account, AddressScheme, PrivateKeyAccount}
+import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.{Order, OrderMatch, OrderType}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 import scorex.transaction.state.database.state._
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.waves.TestingCommons
@@ -22,7 +22,7 @@ import scala.util.control.NonFatal
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging with TestingCommons {
 
-  val forkParametersWithEnableUnissuedAssetsCheck = new AnyRef with WavesHardForkParameters {
+  val forkParametersWithEnableUnissuedAssetsCheck = new AnyRef with ChainParameters {
     override def allowTemporaryNegativeUntil: Long = 0L
 
     override def requireSortedTransactionsAfter: Long = Long.MaxValue
@@ -40,6 +40,14 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     override def allowBurnTransactionAfterTimestamp: Long = 0L
 
     override def requirePaymentUniqueId: Long = 0L
+
+    override def initialBalance: Long = ???
+
+    override def genesisTimestamp: Long = ???
+
+    override def genesisTxs: Seq[Transaction] = ???
+
+    override def addressScheme: AddressScheme = ???
   }
 
   val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"
@@ -371,7 +379,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Order matching") {
-    forAll { x: (OrderMatch, PrivateKeyAccount) =>
+    forAll { x: (ExchangeTransaction, PrivateKeyAccount) =>
       withRollbackTest {
         def feeInAsset(amount: Long, assetId: Option[AssetId]): Long = {
           if (assetId.isEmpty) amount else 0L

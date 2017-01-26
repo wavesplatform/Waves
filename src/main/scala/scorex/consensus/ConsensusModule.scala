@@ -1,11 +1,21 @@
 package scorex.consensus
 
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.block.{Block, BlockProcessingModule}
+import scorex.block.{Block, BlockField, BlockProcessingModule}
 import scorex.transaction.{AssetAcc, TransactionModule}
 
+import scala.util.Try
 
-trait ConsensusModule[ConsensusBlockData] extends BlockProcessingModule[ConsensusBlockData] {
+
+trait ConsensusModule[ConsensusBlockData] {
+
+  def parseBytes(bytes: Array[Byte]): Try[BlockField[ConsensusBlockData]]
+
+  def parseBlockFields(blockFields: BlockField[ConsensusBlockData]): ConsensusBlockData = blockFields.value
+
+  def genesisData: BlockField[ConsensusBlockData]
+
+  def formBlockData(data: ConsensusBlockData): BlockField[ConsensusBlockData]
 
   def isValid[TransactionalBlockData](block: Block)(implicit transactionModule: TransactionModule[TransactionalBlockData]): Boolean
 
