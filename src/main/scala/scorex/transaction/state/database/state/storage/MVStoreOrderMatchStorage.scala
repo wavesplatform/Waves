@@ -2,7 +2,7 @@ package scorex.transaction.state.database.state.storage
 
 import org.h2.mvstore.{MVMap, MVStore}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.util.Try
 
 trait MVStoreOrderMatchStorage extends OrderMatchStorageI {
@@ -16,7 +16,7 @@ trait MVStoreOrderMatchStorage extends OrderMatchStorageI {
 
   def containsSavedDays(day: Long): Boolean = Option(savedDays.get(day)).isDefined
 
-  def savedDaysKeys: List[Long] = savedDays.keyList().toList
+  def savedDaysKeys: List[Long] = savedDays.keyList().asScala.toList
 
 
   // ============= Order match

@@ -19,7 +19,7 @@ import scorex.utils.{ByteArray, NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.annotation.tailrec
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
@@ -51,7 +51,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       handleGetOrderBook(pair, depth)
     case SaveSnapshot =>
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
-      saveSnapshot(Snapshot(orderBook, ordersRemainingAmount.cache.asMap().toMap))
+      saveSnapshot(Snapshot(orderBook, ordersRemainingAmount.cache.asMap().asScala.toMap))
     case SaveSnapshotSuccess(metadata) =>
       log.info(s"Snapshot saved with metadata $metadata")
     case SaveSnapshotFailure(metadata, reason) =>

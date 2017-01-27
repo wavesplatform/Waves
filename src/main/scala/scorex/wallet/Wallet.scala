@@ -7,7 +7,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.utils.{LogMVMapBuilder, ScorexLogging, randomBytes}
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.collection.concurrent.TrieMap
 
 //todo: add accs txs?
@@ -42,7 +42,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
   val seed: Array[Byte] = seedPersistence.get("seed")
 
   private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
-    val accounts = accountsPersistence.keys.map(k => accountsPersistence.get(k)).map(seed => new PrivateKeyAccount(seed))
+    val accounts = accountsPersistence.asScala.keys.map(k => accountsPersistence.get(k)).map(seed => new PrivateKeyAccount(seed))
     TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
   }
 
@@ -56,7 +56,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
     val account = Wallet.generateNewAccount(seed, nonce)
 
     val address = account.address
-    val created = if (!accountsCache.containsKey(address)) {
+    val created = if (!accountsCache.contains(address)) {
       accountsCache += account.address -> account
       accountsPersistence.put(accountsPersistence.lastKey() + 1, account.seed)
       database.commit()
@@ -70,7 +70,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
   }
 
   def deleteAccount(account: PrivateKeyAccount): Boolean = synchronized {
-    val res = accountsPersistence.keys.find { k =>
+    val res = accountsPersistence.asScala.keys.find { k =>
       if (accountsPersistence.get(k) sameElements account.seed) {
         accountsPersistence.remove(k)
         true
@@ -91,7 +91,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
     accountsCache.clear()
   }
 
-  def exists(): Boolean = walletFileOpt.map(_.exists()).getOrElse(true)
+  def exists(): Boolean = walletFileOpt.forall(_.exists())
 
   def nonce(): Int = Option(noncePersistence.get(NonceFieldName)).getOrElse(0)
 
