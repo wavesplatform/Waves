@@ -18,4 +18,6 @@ object EllipticCurveImpl {
   def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean = Curve25519.verify(signature, message, publicKey)
 
   def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = Curve25519.createKeyPair(seed)
+
+  val SignatureLength: Int = Curve25519.SignatureLength
 }
