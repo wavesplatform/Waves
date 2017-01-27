@@ -21,7 +21,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
   property("ExchangeTransaction balance changes") {
     forAll(accountGen, accountGen, accountGen, assetPairGen) {
       (sender1: PrivateKeyAccount, sender2: PrivateKeyAccount, matcher: PrivateKeyAccount, pair: AssetPair) =>
-        val expirationTimestamp = NTP.correctedTime() + Order.MaxLiveTime
+        val time = NTP.correctedTime()
+        val expirationTimestamp = time + Order.MaxLiveTime
         val buyPrice = 60
         val sellPrice = 50
         val buyAmount = 2
@@ -29,8 +30,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val mf1 = 1
         val mf2 = 2
 
-        val buy = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, expirationTimestamp, mf1)
-        val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, expirationTimestamp, mf2)
+        val buy = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, time, expirationTimestamp, mf1)
+        val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, time, expirationTimestamp, mf2)
 
 
         def create(matcher: PrivateKeyAccount = sender1, buyOrder: Order = buy, sellOrder: Order = sell, price: Long = sellPrice, amount: Long = buyAmount,
@@ -58,7 +59,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(buyOrder = buy.copy(matcher = sender2)) shouldBe an[Left[_, _]]
         create(sellOrder = buy.copy(matcher = sender2)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.copy(spendAssetId = None), sellOrder = sell.copy(receiveAssetId = Some(Array(1: Byte)))) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.copy(maxTimestamp = 1L)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.copy(expiration = 1L)) shouldBe an[Left[_, _]]
         create(price = buy.price + 1) shouldBe an[Left[_, _]]
         create(price = sell.price - 1) shouldBe an[Left[_, _]]
         create(sellOrder = sell.copy(amount = -1)) shouldBe an[Left[_, _]]

@@ -144,9 +144,9 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val price = 20 * Order.PriceConstant
 
     val buy1 = Order
-      .buy(buyAcc, matcher, pair, price, 10 * WAVES_UNITS, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
+      .buy(buyAcc, matcher, pair, price, 10 * WAVES_UNITS, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
     val sell1 = Order
-      .sell(sellAcc, matcher, pair, price, 5 * WAVES_UNITS, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
+      .sell(sellAcc, matcher, pair, price, 5 * WAVES_UNITS, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
     val buy1Fee = (0.5 * WAVES_UNITS).toLong
     val om1 = createExchangeTransaction(buy1, sell1, price, 5 * WAVES_UNITS, buy1Fee, sell1.matcherFee, matcherTxFee)
 
@@ -166,22 +166,22 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     om1sell2 should be(initSell2 - BigInt(om1.amount) * Order.PriceConstant / price)
 
     val sell2 = Order
-      .sell(sellAcc, matcher, pair, price, 6 * WAVES_UNITS, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
+      .sell(sellAcc, matcher, pair, price, 6 * WAVES_UNITS, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
     val notEnoughRemainingFromPrevOm = createExchangeTransaction(buy1, sell2, price, 6 * WAVES_UNITS, buy1Fee, sell1.matcherFee,
       matcherTxFee)
 
     state.isValid(notEnoughRemainingFromPrevOm, notEnoughRemainingFromPrevOm.timestamp) should be(false)
 
-    val buy2 = Order.buy(buyAcc, matcher, pair, price, om1buy1 + 1, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
+    val buy2 = Order.buy(buyAcc, matcher, pair, price, om1buy1 + 1, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
     val sell3 = Order
-      .sell(sellAcc, matcher, pair, price, om1buy1 + 1, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
+      .sell(sellAcc, matcher, pair, price, om1buy1 + 1, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
     val notEnoughBalOm = createExchangeTransaction(buy2, sell3, price, om1buy1 + 1, matcherTxFee)
 
     state.isValid(notEnoughBalOm, notEnoughBalOm.timestamp) should be(false)
     state.processBlock(new BlockMock(Seq(notEnoughBalOm))) should be('failure)
 
     val sell4 = Order
-      .sell(sellAcc, matcher, pair, price, 5 * Order.PriceConstant, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
+      .sell(sellAcc, matcher, pair, price, 5 * Order.PriceConstant, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
     val om2 = createExchangeTransaction(buy1, sell4, price, 5 * Order.PriceConstant, buy1.matcherFee - buy1Fee,
       sell4.matcherFee, matcherTxFee)
 
@@ -210,9 +210,9 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val price = 20 * Order.PriceConstant
 
     val buy = Order
-      .buy(buyAcc, matcher, pair, price, 5 * Order.PriceConstant, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
+      .buy(buyAcc, matcher, pair, price, 5 * Order.PriceConstant, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
     val sell = Order
-      .sell(sellAcc, matcher, pair, price, 10 * Order.PriceConstant, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
+      .sell(sellAcc, matcher, pair, price, 10 * Order.PriceConstant, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
     val sellFee = (0.5 * WAVES_UNITS).toLong
     val buyFee = 1 * WAVES_UNITS
 
@@ -241,13 +241,13 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val price = 20 * Order.PriceConstant
 
     val buy = Order
-      .buy(buyAcc, matcher, pair, price, 10 * Order.PriceConstant, getTimestamp + Order.MaxLiveTime - 1000,
+      .buy(buyAcc, matcher, pair, price, 10 * Order.PriceConstant, getTimestamp, getTimestamp + Order.MaxLiveTime - 1000,
         1 * WAVES_UNITS)
     val sell = Order
-      .sell(sellAcc, matcher, pair, price, 100 * Order.PriceConstant, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
+      .sell(sellAcc, matcher, pair, price, 100 * Order.PriceConstant, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
 
     (1 to 11).foreach { i =>
-      val aBuy = Order.sign(buy.copy(maxTimestamp = buy.maxTimestamp + i), buyAcc)
+      val aBuy = Order.sign(buy.copy(expiration = buy.expiration + i), buyAcc)
       val om = createExchangeTransaction(aBuy, sell, price, aBuy.amount, matcherTxFee)
 
       if (i < 11) {
@@ -277,13 +277,14 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
           val sender2 = accountGen.sample.get
           val matcher = accountGen.sample.get
           val curTime = NTP.correctedTime()
+          val expired = curTime + 100*1000
 
           val buyPrice = sellAmount
           val sellPrice = buyAmount
 
-          val buy1 = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, curTime, mf1)
-          val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, curTime, mf2)
-          val buy2 = Order.buy(sender1, matcher, pair, buyPrice, sellAmount - buyAmount, curTime, mf3)
+          val buy1 = Order.buy(sender1, matcher, pair, buyPrice, buyAmount, curTime, expired, mf1)
+          val sell = Order.sell(sender2, matcher, pair, sellPrice, sellAmount, curTime, expired, mf2)
+          val buy2 = Order.buy(sender1, matcher, pair, buyPrice, sellAmount - buyAmount, curTime, expired, mf3)
 
           val om1 = ExchangeTransaction.create(acc, buy1, sell, buyPrice, buyAmount, mf1,
             (BigInt(mf2) * buyAmount / BigInt(sellAmount)).toLong, 1, curTime).right.get

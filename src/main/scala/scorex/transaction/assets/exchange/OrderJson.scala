@@ -44,9 +44,10 @@ object OrderJson {
   }
 
   def readOrder(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAssetID: Option[Option[Array[Byte]]],
-                        receiveAssetID: Option[Option[Array[Byte]]], price: Long, amount: Long, maxTime: Long, matcherFee: Long,
-                        signature: Option[Array[Byte]]): Order = {
-    Order(sender, matcher, spendAssetID.flatten, receiveAssetID.flatten, price, amount, maxTime, matcherFee, signature.getOrElse(Array()))
+                receiveAssetID: Option[Option[Array[Byte]]], price: Long, amount: Long, timestamp: Long,
+                expiration: Long, matcherFee: Long, signature: Option[Array[Byte]]): Order = {
+    Order(sender, matcher, spendAssetID.flatten, receiveAssetID.flatten, price, amount, timestamp, expiration,
+      matcherFee, signature.getOrElse(Array()))
   }
 
   implicit val orderReads: Reads[Order] = {
@@ -56,7 +57,8 @@ object OrderJson {
       (JsPath \ "receiveAssetId").readNullable[Option[Array[Byte]]] and
       (JsPath \ "price").read[Long] and
       (JsPath \ "amount").read[Long] and
-      (JsPath \ "maxTimestamp").read[Long] and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "expiration").read[Long] and
       (JsPath \ "matcherFee").read[Long] and
       (JsPath \ "signature").readNullable[Array[Byte]]
     r(readOrder _)

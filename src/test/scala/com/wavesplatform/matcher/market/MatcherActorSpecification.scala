@@ -47,7 +47,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
   "MatcherActor" should {
     def sameAssetsOrder(): Order = Order.apply(new PrivateKeyAccount("123".getBytes()), new PrivateKeyAccount("mather".getBytes()),
-      Some.apply("asset1".getBytes), Some.apply("asset1".getBytes), 100000000L, 100L, 1L, 100000L)
+      Some.apply("asset1".getBytes), Some.apply("asset1".getBytes), 100000000L, 100L, 1L, 1000L, 100000L)
 
     "accept orders with wrong AssetPair" in {
       val invalidOrder = sameAssetsOrder()
