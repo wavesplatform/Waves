@@ -91,7 +91,8 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
 
   def placeOrder(acc: PrivateKeyAccount, spendAsset: Option[String], receiveAsset: Option[String],
                  price: Double, amount: Long, expectedStatus: String = "OrderAccepted"): Option[String] = {
-    val timeToLive = NTP.correctedTime() + Order.MaxLiveTime - 1000
+    val created = NTP.correctedTime()
+    val timeToLive = created + Order.MaxLiveTime - 1000
     val pubKeyStr = Base58.encode(acc.publicKey)
     val json =
       s"""{
@@ -100,7 +101,8 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
          |  "spendAssetId": "${spendAsset.getOrElse("")}",
          |  "receiveAssetId": "${receiveAsset.getOrElse("")}",
          |  "amount": $amount,
-         |  "maxTimestamp": $timeToLive,
+         |  "timestamp": $created,
+         |  "expiration": $timeToLive,
          |  "matcher": "$MatcherPubKey",
          |  "sender": "$pubKeyStr"
          |}""".stripMargin

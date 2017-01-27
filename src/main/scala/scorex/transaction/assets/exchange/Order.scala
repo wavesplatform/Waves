@@ -34,7 +34,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
                  @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8",
                    example = "100000000") price: Long,
                  @ApiModelProperty("Amount in AssetPair.first") amount: Long,
-                 @ApiModelProperty(value = "Order time to live, max = 30 days") maxTimestamp: Long,
+                 @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
+                 @ApiModelProperty(value = "Order time to live, max = 30 days")expiration: Long,
                  @ApiModelProperty(example = "100000") matcherFee: Long,
                  @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
   extends BytesSerializable
@@ -57,8 +58,10 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
       (getReceiveAmount() > 0) :| "receiveAmount should be > 0" &&
       (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
-      (maxTimestamp - atTime <= MaxLiveTime) :| "maxTimestamp should be earlier than 30 days" &&
-      (atTime <= maxTimestamp) :| "maxTimestamp should be > currentTime" &&
+      (timestamp > 0) :| "timestamp should be > 0" &&
+      (timestamp <= atTime) :| "timestamp should be before created before execution" &&
+      (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
+      (expiration >= atTime) :| "expiration should be > currentTime" &&
       !ByteArray.sameOption(spendAssetId, receiveAssetId) :| "Invalid AssetPair" &&
       signatureValid :| "signature should be valid"
   }
@@ -66,7 +69,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
   @ApiModelProperty(hidden = true)
   lazy val toSign: Array[Byte] = sender.publicKey ++ matcher.publicKey ++
     assetIdBytes(spendAssetId) ++ assetIdBytes(receiveAssetId) ++
-    Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++ Longs.toByteArray(maxTimestamp) ++
+    Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+    Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
     Longs.toByteArray(matcherFee)
 
   @ApiModelProperty(hidden = true)
@@ -97,7 +101,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
     "receiveAssetId" -> receiveAssetId.map(Base58.encode),
     "price" -> price,
     "amount" -> amount,
-    "maxTimestamp" -> maxTimestamp,
+    "timestamp" -> timestamp,
+    "expiration" -> expiration,
     "matcherFee" -> matcherFee,
     "signature" -> Base58.encode(signature)
   )
@@ -113,7 +118,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
         ByteArray.sameOption(receiveAssetId, o.receiveAssetId) &&
         price == o.price &&
         amount == o.amount &&
-        maxTimestamp == o.maxTimestamp &&
+        expiration == o.expiration &&
         matcherFee == o.matcherFee &&
         (signature sameElements o.signature)
       case _ => false
@@ -131,24 +136,24 @@ object Order extends Deser[Order] {
 
 
   def buy(sender: PrivateKeyAccount, matcher: PublicKeyAccount, pair: AssetPair,
-          price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair.first, pair.second, price, amount, maxTime, matcherFee, Array())
+          price: Long, amount: Long, timestamp: Long, expiration: Long, matcherFee: Long): Order = {
+    val unsigned = Order(sender, matcher, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee, Array())
     val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
 
   def sell(sender: PrivateKeyAccount, matcher: PublicKeyAccount, pair: AssetPair,
-           price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, pair.second, pair.first, price, amount, maxTime, matcherFee, Array())
+           price: Long, amount: Long, timestamp: Long, expiration: Long, matcherFee: Long): Order = {
+    val unsigned = Order(sender, matcher, pair.second, pair.first, price, amount, timestamp, expiration, matcherFee, Array())
     val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }
 
-  def apply(sender: PrivateKeyAccount, matcher: PublicKeyAccount, spendAssetID: Option[AssetId],
-            receiveAssetID: Option[AssetId], price: Long, amount: Long, maxTime: Long, matcherFee: Long): Order = {
-    val unsigned = Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxTime, matcherFee, Array())
+  def apply(sender: PrivateKeyAccount, matcher: PublicKeyAccount, spendAssetID: Option[AssetId], receiveAssetID: Option[AssetId],
+            price: Long, amount: Long, timestamp: Long, expiration: Long, matcherFee: Long): Order = {
+    val unsigned = Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, timestamp, expiration, matcherFee, Array())
     val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
-    Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, maxTime, matcherFee, sig)
+    Order(sender, matcher, spendAssetID, receiveAssetID, price, amount, timestamp, expiration, matcherFee, sig)
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
@@ -166,13 +171,14 @@ object Order extends Deser[Order] {
     from += 8
     val amount = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength));
     from += 8
-    val maxTimestamp = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength));
+    val timestamp = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength)); from += 8
+    val expiration = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength));
     from += 8
     val matcherFee = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength));
     from += 8
     val signature = bytes.slice(from, from + SignatureLength);
     from += SignatureLength
-    Order(sender, matcher, spendAssetId, receiveAssetId, price, amount, maxTimestamp, matcherFee, signature)
+    Order(sender, matcher, spendAssetId, receiveAssetId, price, amount, timestamp, expiration, matcherFee, signature)
   }
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
