@@ -54,8 +54,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
     (amount > 0) :| "amount should be > 0" &&
       (price > 0) :| "price should be > 0" &&
       (amount < MaxAmount) :| "amount too large" &&
-      (getSpendAmount() > 0) :| "spendAmount should be > 0" &&
-      (getReceiveAmount() > 0) :| "receiveAmount should be > 0" &&
+      (getSpendAmount(price, amount) > 0) :| "spendAmount should be > 0" &&
+      (getReceiveAmount(price, amount) > 0) :| "receiveAmount should be > 0" &&
       (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (timestamp > 0) :| "timestamp should be > 0" &&
@@ -82,13 +82,13 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
   override def bytes: Array[Byte] = toSign ++ signature
 
   @ApiModelProperty(hidden = true)
-  def getSpendAmount(matchPrice: Long = price, matchAmount: Long = amount): Long = {
+  def getSpendAmount(matchPrice: Long, matchAmount: Long): Long = {
     if (orderType == OrderType.BUY) matchAmount
     else (BigInt(matchAmount) * PriceConstant / matchPrice).longValue()
   }
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAmount(matchPrice: Long = price, matchAmount: Long = amount): Long = {
+  def getReceiveAmount(matchPrice: Long, matchAmount: Long): Long = {
     if (orderType == OrderType.SELL) matchAmount
     else (BigInt(matchAmount) * PriceConstant / matchPrice).longValue()
   }

@@ -24,8 +24,8 @@ trait OrderValidator {
     val (assBal, feeBal) = (storedState.assetBalance(acc) - assetsToSpend.getOrElse(acc.key, 0L),
       storedState.assetBalance(feeAcc) - assetsToSpend.getOrElse(feeAcc.key, 0L))
 
-    if (acc != feeAcc) assBal >= order.getSpendAmount() && feeBal >= order.matcherFee
-    else assBal >= order.getSpendAmount() + order.matcherFee
+    if (acc != feeAcc) assBal >= order.getSpendAmount(order.price, order.amount) && feeBal >= order.matcherFee
+    else assBal >= order.getSpendAmount(order.price, order.amount) + order.matcherFee
   }
 
   def validateNewOrder(order: Order): Validation = {
