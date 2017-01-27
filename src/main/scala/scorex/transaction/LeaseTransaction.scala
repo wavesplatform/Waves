@@ -6,7 +6,6 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction.TransactionType
-import scorex.transaction.ValidationResult.ValidationResult
 
 import scala.util.{Failure, Success, Try}
 
@@ -14,8 +13,6 @@ sealed trait LeaseTransaction extends SignedTransaction {
   def amount: Long
 
   def fee: Long
-
-  def timestamp: Long
 
   def untilBlock: Long
 
@@ -52,7 +49,8 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
     override lazy val balanceChanges: Seq[BalanceChange] = Seq.empty
-    override lazy val effectiveBalanceChanges: Seq[EffectiveBalanceChange] = Seq(EffectiveBalanceChange(sender, -amount), EffectiveBalanceChange(recipient, amount))
+    override lazy val effectiveBalanceChanges: Seq[EffectiveBalanceChange] =
+      Seq(EffectiveBalanceChange(sender, -amount), EffectiveBalanceChange(recipient, amount))
 
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
@@ -79,53 +77,48 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
+  private def createUnverified(sender: PublicKeyAccount,
+                               amount: Long,
+                               fee: Long,
+                               timestamp: Long,
+                               untilBlock: Long,
+                               recipient: Account,
+                               signature: Option[Array[Byte]] = None) = {
+    if (amount <= 0) {
+      Left(ValidationError.NegativeAmount)
+    } else if (Try(Math.addExact(amount, fee)).isFailure) {
+      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
+    } else if (!Account.isValid(recipient)) {
+      Left(ValidationError.InvalidAddress)
+    } else if (!Account.isValid(sender)) {
+      Left(ValidationError.InvalidAddress)
+    } else if (fee <= 0) {
+      Left(ValidationError.InsufficientFee)
+    } else {
+      Right(LeaseTransactionImpl(sender, amount, fee, timestamp, untilBlock, recipient, signature.orNull))
+    }
+  }
+
   def create(sender: PublicKeyAccount,
              amount: Long,
              fee: Long,
              timestamp: Long,
              untilBlock: Long,
              recipient: Account,
-             signature: Array[Byte]): Either[ValidationResult, LeaseTransaction] = {
-    if (amount <= 0) {
-      Left(ValidationResult.NegativeAmount)
-    } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationResult.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else if (!Account.isValid(recipient)) {
-      Left(ValidationResult.InvalidAddress)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationResult.InvalidAddress)
-    } else if (fee <= 0) {
-      Left(ValidationResult.InsufficientFee)
-    } else {
-      val unsigned = LeaseTransactionImpl(sender, amount, fee, timestamp, untilBlock, recipient, null)
-      if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
-        Right(unsigned.copy(signature = signature))
-      } else {
-        Left(ValidationResult.InvalidSignature)
-      }
-    }
+             signature: Array[Byte]): Either[ValidationError, LeaseTransaction] = {
+    createUnverified(sender, amount, fee, timestamp, untilBlock, recipient, Some(signature))
+      .right.flatMap(SignedTransaction.verify)
   }
+
 
   def create(sender: PrivateKeyAccount,
              amount: Long,
              fee: Long,
              timestamp: Long,
              untilBlock: Long,
-             recipient: Account): Either[ValidationResult, LeaseTransaction] = {
-    if (amount <= 0) {
-      Left(ValidationResult.NegativeAmount)
-    } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationResult.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else if (!Account.isValid(recipient)) {
-      Left(ValidationResult.InvalidAddress)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationResult.InvalidAddress)
-    } else if (fee <= 0) {
-      Left(ValidationResult.InsufficientFee)
-    } else {
-      val unsigned = LeaseTransactionImpl(sender, amount, fee, timestamp, untilBlock, recipient, null)
-      val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
-      Right(unsigned.copy(signature = sig))
+             recipient: Account): Either[ValidationError, LeaseTransaction] = {
+    createUnverified(sender, amount, fee, timestamp, untilBlock, recipient).right.map { unsigned =>
+      unsigned.copy(signature = EllipticCurveImpl.sign(sender, unsigned.toSign))
     }
   }
 }
