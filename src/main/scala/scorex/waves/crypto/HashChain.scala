@@ -1,7 +1,7 @@
 package scorex.waves.crypto
 
-import scorex.crypto._
-import scorex.crypto.hash.CryptographicHash._
+import scorex.crypto.applyHashes
+import scorex.crypto.hash.SecureCryptographicHash.{Message, Digest}
 import scorex.crypto.hash.{Blake2b256, CryptographicHash, Keccak256}
 
 object HashChain extends CryptographicHash {
