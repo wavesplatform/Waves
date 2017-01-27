@@ -15,8 +15,6 @@ sealed trait LeaseTransaction extends SignedTransaction {
 
   def fee: Long
 
-  def timestamp: Long
-
   def untilBlock: Long
 
   def recipient: Account
