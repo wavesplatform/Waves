@@ -1,9 +1,12 @@
 package com.wavesplatform.matcher.market
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.market.OrderBookActor.OrderRejected
+import com.wavesplatform.matcher.fixtures.RestartableActor
+import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
+import com.wavesplatform.matcher.market.OrderBookActor._
+import com.wavesplatform.matcher.model.{BuyLimitOrder, LevelAgg, LimitOrder}
 import com.wavesplatform.settings.WavesSettings
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
@@ -13,8 +16,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.settings.ChainParameters
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.TransactionModule
-import scorex.transaction.assets.exchange.Order
-import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
@@ -29,7 +31,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   with PathMockFactory {
 
   val db = new MVStore.Builder().compress().open()
-  val storedState = StoredState.fromDB(db, ChainParameters.Disabled)
+  val storedState = fromDBWithUnlimitedBalance(db, ChainParameters.Disabled)
 
   val settings = new WavesSettings(JsObject(Seq(
     "matcher" -> JsObject(
@@ -38,21 +40,34 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   )))
   val wallet = new Wallet(None, "matcher", Option(WalletSeed))
   wallet.generateNewAccount()
-  val actor: ActorRef = system.actorOf(MatcherActor.props(storedState, wallet, settings,
-    stub[TransactionModule[StoredInBlock]]), MatcherActor.name)
+  val actor: ActorRef = system.actorOf(Props(new MatcherActor(storedState, wallet, settings,
+    stub[TransactionModule[StoredInBlock]]) with RestartableActor))
 
   override protected def beforeEach() = {
     super.beforeEach()
   }
 
   "MatcherActor" should {
-    def sameAssetsOrder(): Order = Order.apply(new PrivateKeyAccount("123".getBytes()), new PrivateKeyAccount("mather".getBytes()),
-      Some.apply("asset1".getBytes), Some.apply("asset1".getBytes), 100000000L, 100L, 1L, 100000L)
 
     "accept orders with wrong AssetPair" in {
+      def sameAssetsOrder(): Order = Order.apply(new PrivateKeyAccount("123".getBytes()), new PrivateKeyAccount("mather".getBytes()),
+        Some.apply("asset1".getBytes), Some.apply("asset1".getBytes), 100000000L, 100L, 1L, 1000L, 100000L)
+
       val invalidOrder = sameAssetsOrder()
       actor ! invalidOrder
       expectMsg(OrderRejected("Invalid AssetPair"))
+    }
+
+    "restore OrderBook after restart" in {
+      val pair = AssetPair(None, Some("123".getBytes))
+      val order = buy(pair, 100000000, 2000)
+
+      actor ! order
+      expectMsg(OrderAccepted(order))
+
+      actor ! RestartActor
+      actor ! GetOrderBookRequest(pair, None)
+      expectMsg(GetOrderBookResponse(pair, Seq(LevelAgg(100000000,2000)), Seq()))
     }
   }
 }

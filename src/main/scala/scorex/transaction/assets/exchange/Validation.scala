@@ -1,5 +1,7 @@
 package scorex.transaction.assets.exchange
 
+import scala.language.implicitConversions
+
 case class Validation(status: Boolean, labels: Set[String] = Set.empty) {
   def hasError(error: String): Boolean = !status && labels.contains(error)
 

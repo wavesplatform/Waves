@@ -2,11 +2,16 @@ package com.wavesplatform.matcher
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
+import org.h2.mvstore.MVStore
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.hash.SecureCryptographicHash
+import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
+import scorex.transaction.state.database.blockchain.{AssetsExtendedState, StoredState}
+import scorex.transaction.state.database.state.extension._
+import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
 import scorex.utils.{ByteArray, NTP}
 
 trait MatcherTestData  {
@@ -27,6 +32,7 @@ trait MatcherTestData  {
     map(p => AssetPair(p._1, p._2))
 
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
+  val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(NTP.correctedTime() - _)
 
   def valueFromGen[T](gen: Gen[T]): T = {
     var value = gen.sample
@@ -36,49 +42,77 @@ trait MatcherTestData  {
     value.get
   }
 
-  def buyGenerator(pair: AssetPair, price: Int, amount: Long): Gen[(Order, PrivateKeyAccount)] =
+  def buyGenerator(pair: AssetPair, price: Long, amount: Long): Gen[(Order, PrivateKeyAccount)] =
     for {
       sender: PrivateKeyAccount <- accountGen
-      maxtTime: Long <- maxTimeGen
+      timestamp: Long <- createdTimeGen
+      expiration: Long <- maxTimeGen
       matcherFee: Long <- maxWavesAnountGen
-    } yield (Order.buy(sender, MatcherAccount, pair, price, amount, maxtTime, matcherFee), sender)
+    } yield (Order.buy(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee), sender)
 
-  def sellGenerator(pair: AssetPair, price: Int, amount: Long): Gen[(Order, PrivateKeyAccount)] =
+  def sellGenerator(pair: AssetPair, price: Long, amount: Long): Gen[(Order, PrivateKeyAccount)] =
     for {
       sender: PrivateKeyAccount <- accountGen
-      maxtTime: Long <- maxTimeGen
+      timestamp: Long <- createdTimeGen
+      expiration: Long <- maxTimeGen
       matcherFee: Long <- maxWavesAnountGen
-    } yield (Order.sell(sender, MatcherAccount, pair, price, amount, maxtTime, matcherFee), sender)
+    } yield (Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee), sender)
 
-  def buy(pair: AssetPair, price: Int, amount: Long): Order = valueFromGen(buyGenerator(pair, price, amount))._1
+  def buy(pair: AssetPair, price: Long, amount: Long): Order = valueFromGen(buyGenerator(pair, price, amount))._1
 
-  def sell(pair: AssetPair, price: Int, amount: Long) = valueFromGen(sellGenerator(pair, price, amount))._1
+  def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price, amount))._1
 
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     pair <- assetPairGen
     price: Long <- maxWavesAnountGen
     amount: Long <- maxWavesAnountGen
-    maxtTime: Long <- maxTimeGen
+    timestamp: Long <- createdTimeGen
+    expiration: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
-  } yield (Order(sender, MatcherAccount, pair.first, pair.second, price, amount, maxtTime, matcherFee), sender)
+  } yield (Order(sender, MatcherAccount, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee), sender)
 
   val buyLimitOrderGenerator: Gen[BuyLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen
     pair <- assetPairGen
     price: Long <- maxWavesAnountGen
     amount: Long <- maxWavesAnountGen
-    maxtTime: Long <- maxTimeGen
+    timestamp: Long <- createdTimeGen
+    expiration: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
-  } yield BuyLimitOrder(price, amount, Order.buy(sender, MatcherAccount, pair, price, amount, maxtTime, matcherFee))
+  } yield BuyLimitOrder(price, amount, Order.buy(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
   val sellLimitOrderGenerator: Gen[SellLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen
     pair <- assetPairGen
     price: Long <- maxWavesAnountGen
     amount: Long <- maxWavesAnountGen
-    maxtTime: Long <- maxTimeGen
+    timestamp: Long <- createdTimeGen
+    expiration: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
-  } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, maxtTime, matcherFee))
+  } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
+  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): StoredState = {
+    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage {
+      override val db: MVStore = mvStore
+      if (db.getStoreVersion > 0) db.rollback()
+    }
+
+    val extendedState = new AssetsExtendedState(storage) {
+      override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
+    }
+
+    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings, storage)
+    val validators = Seq(
+      extendedState,
+      incrementingTimestampValidator,
+      new GenesisValidator,
+      new OrderMatchStoredState(storage),
+      new IncludedValidator(storage, settings),
+      new ActivatedValidator(settings)
+    )
+    new StoredState(storage, extendedState, incrementingTimestampValidator, validators, settings) {
+      override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
+    }
+  }
 }
