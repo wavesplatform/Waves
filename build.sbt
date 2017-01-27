@@ -30,27 +30,17 @@ resolvers ++= Seq(
 
 libraryDependencies ++=
   Dependencies.db ++
-    Dependencies.http ++
-    Dependencies.akka ++
-    Dependencies.serialization ++
-    Dependencies.testKit ++
-    Dependencies.logging ++
-    Dependencies.p2p ++ Seq(
+  Dependencies.http ++
+  Dependencies.akka ++
+  Dependencies.serialization ++
+  Dependencies.testKit ++
+  Dependencies.logging ++
+  Dependencies.matcher ++
+  Dependencies.p2p ++ Seq(
     "org.scorexfoundation" %% "scrypto" % "1.2.0",
     "commons-net" % "commons-net" % "3.+",
     "com.github.pathikrit" %% "better-files" % "2.17.+"
-//    "org.typelevel" %% "cats" % "0.8.1",
-
-)
-
-val akkaV = "2.4.14"
-lazy val addAkkaLibs = Seq(
-  "com.typesafe.akka" %% "akka-persistence" % akkaV,
-  "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.+" % "test",
-  "org.iq80.leveldb" % "leveldb" % "0.7",
-  "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8")
-
-libraryDependencies ++= addAkkaLibs
+  )
 
 fork in ThisBuild := false
 fork in Test := false

@@ -3,10 +3,10 @@ import sbt._
 object Dependencies {
 
   lazy val testKit = Seq(
-    "com.typesafe.akka" %% "akka-testkit" % "2.+",
+    akkaModule("testkit") % "test",
     "org.scalatest" %% "scalatest" % "3.+" % "test",
     "org.scalactic" %% "scalactic" % "3.+" % "test",
-    "org.scalacheck" %% "scalacheck" % "1.13.+" % "test",
+    "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
     "net.databinder.dispatch" %% "dispatch-core" % "+" % "test",
     "org.mockito" % "mockito-all" % "1.10.19" % "test",
     "net.databinder.dispatch" %% "dispatch-core" % "+" % "test",
@@ -18,10 +18,8 @@ object Dependencies {
     "com.typesafe.play" %% "play-json" % "2.6.0-M1"
   )
 
-  lazy val akka = Seq(
-    "com.typesafe.akka" %% "akka-actor" % "2.+",
-    "com.typesafe.akka" %% "akka-slf4j" % "2.+"
-  )
+  def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.14"
+  lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
   lazy val p2p = Seq(
     "org.bitlet" % "weupnp" % "0.1.+"
@@ -32,7 +30,6 @@ object Dependencies {
   )
 
   lazy val logging = Seq(
-
     "ch.qos.logback" % "logback-classic" % "1.1.9+",
     "ch.qos.logback" % "logback-core" % "1.1.9+",
     "org.slf4j" % "slf4j-api" % "1.7.+",
@@ -47,5 +44,12 @@ object Dependencies {
     "io.swagger" % "swagger-models" % "1.+",
     "io.swagger" % "swagger-jaxrs" % "1.+",
     "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.+"
+  )
+
+  lazy val matcher = Seq(
+    akkaModule("persistence"),
+    "com.github.dnvriend" %% "akka-persistence-inmemory" % "1.+" % "test",
+    "org.iq80.leveldb" % "leveldb" % "0.7",
+    "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
   )
 }
