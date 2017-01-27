@@ -31,9 +31,7 @@ object Dependencies {
 
   lazy val logging = Seq(
     "ch.qos.logback" % "logback-classic" % "1.1.9+",
-    "ch.qos.logback" % "logback-core" % "1.1.9+",
-    "org.slf4j" % "slf4j-api" % "1.7.+",
-    "org.slf4j" % "slf4j-nop" % "1.7.+" % "test"
+    "org.slf4j" % "slf4j-api" % "1.7.+"
   )
 
   def swaggerModule(module: String) = "io.swagger" % s"swagger-$module" % "1.+"

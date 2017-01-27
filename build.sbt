@@ -7,9 +7,7 @@ inThisBuild(Seq(
   organization in ThisBuild := "com.wavesplatform",
   name := "waves",
   version := appConf.getString("version"),
-  scalaVersion := "2.12.1",
-  fork := false,
-  parallelExecution := false
+  scalaVersion := "2.12.1"
 ))
 
 scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
@@ -34,7 +32,8 @@ libraryDependencies ++=
   )
 
 inConfig(Test)(Seq(
-  fork := false,
+  javaOptions += "-Dlogback.configurationFile=logback-sbt.xml",
+  fork := true,
   parallelExecution := false,
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
@@ -42,7 +41,3 @@ inConfig(Test)(Seq(
 concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 
 test in assembly := {}
-
-(dependencyClasspath in Test) <<= (dependencyClasspath in Test).map(
-  _.filterNot(_.data.name.contains("logback"))
-)
