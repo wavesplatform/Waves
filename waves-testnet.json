@@ -30,7 +30,7 @@
   "offlineGeneration": false,
   "testnet": true,
   "loggingLevel": "info",
-  "genesisSignature": "4YJxQUyWx6qJYKPePN1CWjzZAbZ3rNPXZ9JteU1G9J4j2zK1Pa5LjvFtMs5ZdM8JRmZKAKqsNmLyuXjBUSCXyS8k",
+  "genesisSignature": "5uqnLK3Z9eiot6FyYBfwUnbyid3abicQbAZjz38GQ1Q8XigQMxTK4C1zNkqS1SVw7FqSidbZKxWAKLVoEsp4nNqa",
   "checkpoints": {
     "publicKey": "4PvoqxpWi7kCA9N3UXcEB9CZx4iPPeHX9jSYdAioPhnr"
   }
