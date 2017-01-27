@@ -4,7 +4,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import scorex.account.PublicKeyAccount
 import scorex.transaction.AssetAcc
-import scorex.transaction.assets.exchange.Validation.BooleanOperators
+import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.NTP
@@ -24,8 +24,8 @@ trait OrderValidator {
     val (assBal, feeBal) = (storedState.assetBalance(acc) - assetsToSpend.getOrElse(acc.key, 0L),
       storedState.assetBalance(feeAcc) - assetsToSpend.getOrElse(feeAcc.key, 0L))
 
-    if (acc != feeAcc) assBal >= order.getSpendAmount() && feeBal >= order.matcherFee
-    else assBal >= order.getSpendAmount() + order.matcherFee
+    if (acc != feeAcc) assBal >= order.getSpendAmount(order.price, order.amount) && feeBal >= order.matcherFee
+    else assBal >= order.getSpendAmount(order.price, order.amount) + order.matcherFee
   }
 
   def validateNewOrder(order: Order): Validation = {

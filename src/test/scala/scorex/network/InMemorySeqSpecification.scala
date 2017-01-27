@@ -2,7 +2,8 @@ package scorex.network
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
-import scorex.block.Block
+import scorex.account.PublicKeyAccount
+import scorex.block.{Block, SignerData}
 import scorex.block.Block._
 import scorex.consensus.ConsensusModule
 import scorex.network.BlockchainSynchronizer.{InnerId, _}
@@ -22,7 +23,7 @@ class InMemorySeqSpecification extends FreeSpec
   private implicit def toInnerId(i: Int): InnerId = InnerId(toBlockId(i))
 
   private def mockBlock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
-    trait BlockMock extends Block {
+    abstract class BlockMock extends Block(0,1,conv(id),SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array())) {
       override type ConsensusDataType = Unit
       override type TransactionDataType = Unit
 

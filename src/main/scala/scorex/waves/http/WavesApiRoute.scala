@@ -5,20 +5,19 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.settings.WavesSettings
 import io.swagger.annotations._
-import play.api.libs.json.{JsError, JsPath, JsSuccess, Json}
+import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
 import scorex.api.http.{NegativeFee, NoBalance, _}
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationResult
+import scorex.transaction.{PaymentTransaction, ValidationError}
 import scorex.transaction.state.wallet.Payment
+import scorex.utils.NTP
 import scorex.wallet.Wallet
 import scorex.waves.transaction.{ExternalPayment, SignedPayment, WavesTransactionModule}
-import scorex.api.http.formats._
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 @Path("/waves")
 @Api(value = "waves")
@@ -68,18 +67,18 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                   val txOpt = transactionModule.createPayment(payment, wallet)
                   txOpt match {
                     case Some(paymentVal) =>
-                       paymentVal match {
+                      paymentVal match {
                         case Right(tx) =>
                           val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
                             tx.sender, tx.sender.address, Base58.encode(tx.signature))
                           JsonResponse(Json.toJson(signed), StatusCodes.OK)
                         case Left(err) =>
                           err match {
-                        case ValidationResult.InvalidAddress => InvalidAddress.response
-                        case ValidationResult.NegativeAmount => NegativeAmount.response
-                        case ValidationResult.InsufficientFee => InsufficientFee.response
-                        case ValidationResult.NoBalance => NoBalance.response
-                      }
+                            case ValidationError.InvalidAddress => InvalidAddress.response
+                            case ValidationError.NegativeAmount => NegativeAmount.response
+                            case ValidationError.InsufficientFee => InsufficientFee.response
+                            case ValidationError.NoBalance => NoBalance.response
+                          }
                       }
                     case None => InvalidSender.response
                   }
@@ -119,21 +118,23 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                 case err: JsError =>
                   WrongTransactionJson(err).response
                 case JsSuccess(payment: Payment, _) =>
-                  val txOpt = transactionModule.signPayment(payment, wallet)
+                  val txOpt = wallet.privateKeyAccount(payment.sender).map { sender =>
+                    PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
+                  }
                   txOpt match {
                     case Some(paymentVal) =>
-                       paymentVal match {
+                      paymentVal match {
                         case Right(tx) =>
                           val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
                             tx.sender, tx.sender.address, Base58.encode(tx.signature))
                           JsonResponse(Json.toJson(signed), StatusCodes.OK)
                         case Left(err) =>
                           err match {
-                        case ValidationResult.InvalidAddress => InvalidAddress.response
-                        case ValidationResult.NegativeAmount => NegativeAmount.response
-                        case ValidationResult.InsufficientFee => InsufficientFee.response
-                        case ValidationResult.NoBalance => NoBalance.response
-                      }
+                            case ValidationError.InvalidAddress => InvalidAddress.response
+                            case ValidationError.NegativeAmount => NegativeAmount.response
+                            case ValidationError.InsufficientFee => InsufficientFee.response
+                            case ValidationError.NoBalance => NoBalance.response
+                          }
                       }
                     case None => InvalidSender.response
                   }
@@ -187,8 +188,8 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                     JsonResponse(Json.toJson(signedTx), StatusCodes.OK)
 
                   case Left(e) => e match {
-                    case ValidationResult.NoBalance => NoBalance.response
-                    case ValidationResult.InvalidAddress => InvalidAddress.response
+                    case ValidationError.NoBalance => NoBalance.response
+                    case ValidationError.InvalidAddress => InvalidAddress.response
                   }
                 }
               }
@@ -277,12 +278,12 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
   private def broadcastPayment(payment: SignedPayment): JsonResponse = {
     transactionModule.broadcastPayment(payment) match {
       case Right(tx) =>
-              JsonResponse(tx.json, StatusCodes.OK)
+        JsonResponse(tx.json, StatusCodes.OK)
       case Left(e) => e match {
-        case ValidationResult.NoBalance => NoBalance.response
-        case ValidationResult.InvalidAddress => InvalidAddress.response
-        case ValidationResult.InsufficientFee => InsufficientFee.response
-        case ValidationResult.InvalidSignature => InvalidSignature.response
+        case ValidationError.NoBalance => NoBalance.response
+        case ValidationError.InvalidAddress => InvalidAddress.response
+        case ValidationError.InsufficientFee => InsufficientFee.response
+        case ValidationError.InvalidSignature => InvalidSignature.response
         case _ => Unknown.response
       }
     }
@@ -298,10 +299,10 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
       case Right(tx) =>
         JsonResponse(tx.json, StatusCodes.OK)
       case Left(e) => e match {
-        case ValidationResult.NoBalance => NoBalance.response
-        case ValidationResult.InvalidAddress => InvalidAddress.response
-        case ValidationResult.InsufficientFee => NegativeFee.response
-        case ValidationResult.InvalidSignature => InvalidSignature.response
+        case ValidationError.NoBalance => NoBalance.response
+        case ValidationError.InvalidAddress => InvalidAddress.response
+        case ValidationError.InsufficientFee => NegativeFee.response
+        case ValidationError.InvalidSignature => InvalidSignature.response
         case _ => Unknown.response
       }
     }

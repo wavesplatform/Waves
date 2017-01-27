@@ -1,12 +1,12 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.account.Account
-import scorex.settings.WavesHardForkParameters
+import scorex.settings.ChainParameters
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.storage.StateStorageI
 import scorex.transaction.{PaymentTransaction, Transaction}
 
-class IncrementingTimestampValidator(settings: WavesHardForkParameters, storage: StateStorageI) extends StateExtension {
+class IncrementingTimestampValidator(settings: ChainParameters, storage: StateStorageI) extends StateExtension {
 
   override def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
     case tx: PaymentTransaction =>

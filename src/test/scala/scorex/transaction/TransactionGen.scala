@@ -98,9 +98,10 @@ trait TransactionGen {
     pair: AssetPair <- assetPairGen
     price: Long <- maxWavesAnountGen
     amount: Long <- maxWavesAnountGen
-    maxtTime: Long <- maxTimeGen
+    timestamp: Long <- timestampGen
+    expiration: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
-  } yield (Order(sender, matcher, pair.first, pair.second, price, amount, maxtTime, matcherFee), sender)
+  } yield (Order(sender, matcher, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee), sender)
 
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -134,11 +135,12 @@ trait TransactionGen {
     pair <- assetPairGen
     price: Long <- Arbitrary.arbitrary[Long]
     amount: Long <- Arbitrary.arbitrary[Long]
-    maxtTime: Long <- Arbitrary.arbitrary[Long]
+    timestamp: Long <- Arbitrary.arbitrary[Long]
+    expiration: Long <- Arbitrary.arbitrary[Long]
     matcherFee: Long <- Arbitrary.arbitrary[Long]
-  } yield Order(sender, matcher, pair.first, pair.second, price, amount, maxtTime, matcherFee)
+  } yield Order(sender, matcher, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee)
 
-  val orderMatchGenerator: Gen[(OrderMatch, PrivateKeyAccount)] = for {
+  val orderMatchGenerator: Gen[(ExchangeTransaction, PrivateKeyAccount)] = for {
     sender1: PrivateKeyAccount <- accountGen
     sender2: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
@@ -149,20 +151,21 @@ trait TransactionGen {
     amount1: Long <- maxWavesAnountGen
     amount2: Long <- maxWavesAnountGen
     matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2, Math.min(amount1, amount2))
-    maxtTime: Long <- maxTimeGen
+    timestamp: Long <- timestampGen
+    expiration: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
   } yield {
-    val o1 = Order.buy(sender1, matcher, assetPair, price, amount1, maxtTime, matcherFee)
-    val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, maxtTime, matcherFee)
+    val o1 = Order.buy(sender1, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
+    val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
     val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
     val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
-    val unsigned = OrderMatch(o1, o2, price, matchedAmount,
-      buyFee, sellFee, (buyFee + sellFee) / 2, maxtTime - 100, Array())
-    val sig = EllipticCurveImpl.sign(matcher, unsigned.toSign)
-    (unsigned.copy(signature = sig), matcher)
+    val trans = ExchangeTransaction.create(matcher,o1, o2, price, matchedAmount,
+      buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100).right.get
+
+    (trans,matcher)
   }
 
-  implicit val orderMatchArb: Arbitrary[(OrderMatch, PrivateKeyAccount)] = Arbitrary {
+  implicit val orderMatchArb: Arbitrary[(ExchangeTransaction, PrivateKeyAccount)] = Arbitrary {
     orderMatchGenerator
   }
   implicit val orderArb: Arbitrary[(Order, PrivateKeyAccount)] = Arbitrary {

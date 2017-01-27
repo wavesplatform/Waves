@@ -2,14 +2,15 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.settings.WavesSettings
 import scorex.transaction.SimpleTransactionModule._
+import scorex.transaction.ValidationError
 import scorex.transaction.{SignedTransaction, TransactionModule}
-import scorex.transaction.assets.exchange.{Order, OrderMatch}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.extension.OrderMatchStoredState
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
-trait OrderMatchCreator {
+trait ExchangeTransactionCreator {
   val transactionModule: TransactionModule[StoredInBlock]
   val storedState: StoredState
   val wallet: Wallet
@@ -25,14 +26,14 @@ trait OrderMatchCreator {
     txTime
   }
 
-  def createTransaction(sumbitted: LimitOrder, counter: LimitOrder): OrderMatch = {
-    val matcher = wallet.privateKeyAccount(sumbitted.order.matcher.address).get
+  def createTransaction(submitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
+    val matcher = wallet.privateKeyAccount(submitted.order.matcher.address).get
 
     val price = counter.price
-    val amount = math.min(sumbitted.amount, counter.amount)
-    val (buy, sell) = Order.splitByType(sumbitted.order, counter.order)
+    val amount = math.min(submitted.amount, counter.amount)
+    val (buy, sell) = Order.splitByType(submitted.order, counter.order)
     val (buyFee, sellFee) =  calculateMatcherFee(buy, sell, amount: Long)
-    OrderMatch.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+    ExchangeTransaction.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
   }
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
@@ -44,7 +45,7 @@ trait OrderMatchCreator {
     (calcFee(buy, amount), calcFee(sell, amount))
   }
 
-  def isValid(orderMatch: OrderMatch): Boolean = {
+  def isValid(orderMatch: ExchangeTransaction): Boolean = {
     transactionModule.isValid(orderMatch, orderMatch.timestamp)
   }
 

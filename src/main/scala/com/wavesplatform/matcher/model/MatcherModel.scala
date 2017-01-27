@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import play.api.libs.json.{JsValue, Json}
-import scorex.transaction.assets.exchange.{Order, OrderType}
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 object MatcherModel {
   type Price = Long
@@ -12,7 +12,7 @@ object MatcherModel {
 
 case class LevelAgg(price: Long, amount: Long)
 
-sealed trait LimitOrder {
+sealed trait  LimitOrder {
   def price: Price
   def amount: Long
   def order: Order
@@ -68,8 +68,7 @@ object LimitOrder {
 }
 
 object Events {
-  sealed trait Event extends Serializable
-  @SerialVersionUID(-6952325887070115993L)
+  sealed trait Event
   case class OrderExecuted(submitted: LimitOrder, counter: LimitOrder) extends Event {
     def counterRemaining: Long = math.max(counter.amount - submitted.amount, 0)
     def submittedRemaining: Long = math.max(submitted.amount - counter.amount, 0)
@@ -79,8 +78,7 @@ object Events {
     def isCounterFilled: Boolean = counterRemaining == 0L
 
   }
-  @SerialVersionUID(-3697114578758882607L)
   case class OrderAdded(order: LimitOrder) extends Event
-  @SerialVersionUID(-2668400548412162900L)
   case class OrderCanceled(limitOrder: LimitOrder) extends Event
+  case class OrderBookCreated(pair: AssetPair) extends Event
 }

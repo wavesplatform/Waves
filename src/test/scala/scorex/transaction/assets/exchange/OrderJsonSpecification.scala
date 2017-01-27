@@ -24,7 +24,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
           "amount": 0,
           "matcherFee": 0,
           "price": 0,
-          "maxTimestamp": 0,
+          "timestamp": 0,
+          "expiration": 0,
           "signature": "signature"
         } """)
 
@@ -40,7 +41,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         o.price shouldBe 0
         o.amount shouldBe 0
         o.matcherFee shouldBe 0
-        o.maxTimestamp shouldBe 0
+        o.timestamp shouldBe 0
+        o.expiration shouldBe 0
         o.signature shouldBe Base58.decode("signature").get
 
     }
@@ -56,7 +58,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
           "amount": 0,
           "matcherFee": 0,
           "price": 0,
-          "maxTimestamp": 0,
+          "timestamp": 0,
+          "expiration": 0,
           "signature": "signature"
         } """)
 
@@ -127,7 +130,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
           "amount": 0,
           "matcherFee": 0,
           "price": 0,
-          "maxTimestamp": 0,
+          "timestamp": 0,
+          "expiration": 0,
           "signature": "signature"
         } """)
 

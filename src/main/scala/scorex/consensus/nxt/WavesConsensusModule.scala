@@ -6,7 +6,7 @@ import scorex.block.{Block, BlockField}
 import scorex.consensus.{ConsensusModule, OneGeneratorConsensusModule, PoSConsensusModule, TransactionsOrdering}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
-import scorex.settings.WavesHardForkParameters
+import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 
@@ -14,10 +14,10 @@ import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class NxtLikeConsensusModule(override val forksConfig: WavesHardForkParameters, AvgDelay: Duration = 5.seconds) extends PoSConsensusModule[NxtLikeConsensusBlockData]
+class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration) extends PoSConsensusModule[NxtLikeConsensusBlockData]
 with OneGeneratorConsensusModule with ScorexLogging {
 
-  import NxtLikeConsensusModule._
+  import WavesConsensusModule._
 
   implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = this
 
@@ -27,7 +27,8 @@ with OneGeneratorConsensusModule with ScorexLogging {
   val MaxBlocktimeLimit = normalize(67)
   val BaseTargetGamma = normalize(64)
   val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
-  val InitialBaseTarget = MaxBaseTarget / 2
+//  val InitialBaseTarget = MaxBaseTarget / 2
+  val InitialBaseTarget = 153722867L // for compatibility reason
 
   private def avgDelayInSeconds: Long = AvgDelay.toSeconds
 
@@ -254,7 +255,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
   }
 }
 
-object NxtLikeConsensusModule {
+object WavesConsensusModule {
   val BaseTargetLength = 8
   val GeneratorSignatureLength = 32
   // 10000 waves

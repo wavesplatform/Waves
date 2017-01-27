@@ -6,9 +6,9 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.Deser
+import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TypedTransaction.TransactionType
-import scorex.transaction.ValidationResult.ValidationResult
+import scorex.transaction.ValidationError
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -40,8 +40,8 @@ object IssueTransaction extends Deser[IssueTransaction] {
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
                                                 sender.publicKey,
-                                                arrayWithSize(name),
-                                                arrayWithSize(description),
+                                                BytesSerializable.arrayWithSize(name),
+                                                BytesSerializable.arrayWithSize(description),
                                                 Longs.toByteArray(quantity),
                                                 Array(decimals),
                                                 if (reissuable) Array(1: Byte) else Array(0: Byte),
@@ -92,6 +92,31 @@ object IssueTransaction extends Deser[IssueTransaction] {
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
+  private def createUnverified(sender: PublicKeyAccount,
+                               name: Array[Byte],
+                               description: Array[Byte],
+                               quantity: Long,
+                               decimals: Byte,
+                               reissuable: Boolean,
+                               fee: Long,
+                               timestamp: Long,
+                               signature: Option[Array[Byte]] = None) =
+    if (quantity <= 0) {
+      Left(ValidationError.NegativeAmount)
+    } else if (description.length > MaxDescriptionLength) {
+      Left(ValidationError.TooBigArray)
+    } else if (name.length < MinAssetNameLength || name.length > MaxAssetNameLength) {
+      Left(ValidationError.InvalidName)
+    } else if (decimals < 0 || decimals > MaxDecimals) {
+      Left(ValidationError.TooBigArray)
+    } else if (!Account.isValid(sender)) {
+      Left(ValidationError.InvalidAddress)
+    } else if (fee <= 0) {
+      Left(ValidationError.InsufficientFee)
+    } else {
+      Right(IssueTransactionImpl(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature.orNull))
+    }
+
   def create(sender: PublicKeyAccount,
              name: Array[Byte],
              description: Array[Byte],
@@ -100,28 +125,9 @@ object IssueTransaction extends Deser[IssueTransaction] {
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signature: Array[Byte]): Either[ValidationResult, IssueTransaction] = {
-    if (quantity <= 0) {
-      Left(ValidationResult.NegativeAmount)
-    } else if (description.length > MaxDescriptionLength) {
-      Left(ValidationResult.TooBigArray)
-    } else if (name.length < MinAssetNameLength || name.length > MaxAssetNameLength) {
-      Left(ValidationResult.InvalidName)
-    } else if (decimals < 0 || decimals > MaxDecimals) {
-      Left(ValidationResult.TooBigArray)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationResult.InvalidAddress)
-    } else if (fee <= 0) {
-      Left(ValidationResult.InsufficientFee)
-    } else {
-      val unsigned = IssueTransactionImpl(sender, name, description, quantity, decimals, reissuable, fee, timestamp, null)
-      if (EllipticCurveImpl.verify(signature, unsigned.toSign, sender.publicKey)) {
-        Right(unsigned.copy(signature = signature))
-      } else {
-        Left(ValidationResult.InvalidSignature)
-      }
-    }
-  }
+             signature: Array[Byte]): Either[ValidationError, IssueTransaction] =
+    createUnverified(sender, name, description, quantity, decimals, reissuable, fee, timestamp, Some(signature))
+      .right.flatMap(SignedTransaction.verify)
 
   def create(sender: PrivateKeyAccount,
              name: Array[Byte],
@@ -130,23 +136,8 @@ object IssueTransaction extends Deser[IssueTransaction] {
              decimals: Byte,
              reissuable: Boolean,
              fee: Long,
-             timestamp: Long): Either[ValidationResult, IssueTransaction] = {
-    if (quantity <= 0) {
-      Left(ValidationResult.NegativeAmount)
-    } else if (description.length > MaxDescriptionLength) {
-      Left(ValidationResult.TooBigArray)
-    } else if (name.length < MinAssetNameLength || name.length > MaxAssetNameLength) {
-      Left(ValidationResult.InvalidName)
-    } else if (decimals < 0 || decimals > MaxDecimals) {
-      Left(ValidationResult.TooBigArray)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationResult.InvalidAddress)
-    } else if (fee <= 0) {
-      Left(ValidationResult.InsufficientFee)
-    } else {
-      val unsigned = IssueTransactionImpl(sender, name, description, quantity, decimals, reissuable, fee, timestamp, null)
-      val sig      = EllipticCurveImpl.sign(sender, unsigned.toSign)
-      Right(unsigned.copy(signature = sig))
+             timestamp: Long): Either[ValidationError, IssueTransaction] =
+    createUnverified(sender, name, description, quantity, decimals, reissuable, fee, timestamp).right.map { unverified =>
+      unverified.copy(signature = EllipticCurveImpl.sign(sender, unverified.toSign))
     }
-  }
 }

@@ -2,7 +2,7 @@ package scorex.consensus
 
 import scorex.account.Account
 import scorex.block.Block
-import scorex.settings.WavesHardForkParameters
+import scorex.settings.ChainParameters
 import scorex.transaction.{BalanceSheet, TransactionModule}
 
 /**
@@ -10,7 +10,7 @@ import scorex.transaction.{BalanceSheet, TransactionModule}
  */
 trait PoSConsensusModule[ConsensusBlockData] extends ConsensusModule[ConsensusBlockData] {
 
-  def forksConfig: WavesHardForkParameters
+  def forksConfig: ChainParameters
   
   def generatingBalance[TransactionalBlockData](account: Account, atHeight: Option[Int] = None)
                                                (implicit transactionModule: TransactionModule[TransactionalBlockData]): Long =

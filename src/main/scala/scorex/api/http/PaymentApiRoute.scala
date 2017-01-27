@@ -8,8 +8,8 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.app.RunnableApplication
-import scorex.transaction.{SimpleTransactionModule, ValidationResult}
 import scorex.transaction.state.wallet.{Payment, TransferRequest}
+import scorex.transaction.{SimpleTransactionModule, ValidationError}
 
 import scala.util.Try
 
@@ -64,16 +64,16 @@ case class PaymentApiRoute(application: RunnableApplication)(implicit val contex
                           JsonResponse(tx.json, StatusCodes.OK)
                         case Left(err) =>
                           err match {
-                            case ValidationResult.InvalidAddress =>
+                            case ValidationError.InvalidAddress =>
                               InvalidAddress.response
 
-                            case ValidationResult.NegativeAmount =>
+                            case ValidationError.NegativeAmount =>
                               NegativeAmount.response
 
-                            case ValidationResult.InsufficientFee =>
+                            case ValidationError.InsufficientFee =>
                               InsufficientFee.response
 
-                            case ValidationResult.NoBalance =>
+                            case ValidationError.NoBalance =>
                               NoBalance.response
                           }
                       }

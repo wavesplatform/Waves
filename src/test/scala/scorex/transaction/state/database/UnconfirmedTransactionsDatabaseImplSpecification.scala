@@ -2,7 +2,9 @@ package scorex.transaction.state.database
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
+import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
+import scorex.settings.Settings
 import scorex.transaction.{GenesisTransaction, Transaction}
 
 class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
@@ -10,15 +12,23 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
   with MockFactory
   with OneInstancePerTest {
 
-  private def newTx(id: Long) = GenesisTransaction.create(new PublicKeyAccount(Array.fill(32)(0: Byte)), id, 4598723454L).right.get
-
   "utx database" - {
 
     val validator = mockFunction[Transaction, Boolean]
+    val defaultSizedUtxSettings = new Settings {
+      override lazy val utxSize = 1000
+      override def settingsJSON: JsObject = Json.obj()
+    }
+
 
     "do nothing if tx db becomes full" in {
 
-      val db = new UnconfirmedTransactionsDatabaseImpl(1)
+      val smallSizedUTXSettings = new Settings {
+        override lazy val utxSize = 1
+        override def settingsJSON: JsObject = Json.obj()
+      }
+
+      val db = new UnconfirmedTransactionsDatabaseImpl(smallSizedUTXSettings)
 
       validator expects * returns true once()
 
@@ -30,8 +40,7 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
     }
 
     "does not call validator if same tx comes again" in {
-
-      val db = new UnconfirmedTransactionsDatabaseImpl
+      val db = new UnconfirmedTransactionsDatabaseImpl(defaultSizedUtxSettings)
 
       validator expects * returns true once()
 
@@ -40,8 +49,7 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
     }
 
     "validator returns false" in {
-
-      val db = new UnconfirmedTransactionsDatabaseImpl
+      val db = new UnconfirmedTransactionsDatabaseImpl(defaultSizedUtxSettings)
 
       validator expects * returns false
 
@@ -51,4 +59,7 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
       db.all() shouldBe empty
     }
   }
+
+  private def newTx(id: Long) = GenesisTransaction.create(new PublicKeyAccount(Array.fill(32)(0: Byte)), id, 4598723454L).right.get
+
 }
