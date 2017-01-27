@@ -38,7 +38,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      place ~ matcherPubKey ~ signOrder ~ orderStatus ~ balance ~ orderBook ~ cancel
+      place ~ matcherPubKey ~ orderStatus ~ balance ~ orderBook ~ cancel
     }
 
   @Path("/publicKey")
@@ -105,44 +105,6 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
             .mapTo[OrderBookResponse]
             .map(r => JsonResponse(r.json, r.code))
         }
-      }
-    }
-  }
-
-  @Path("/sign")
-  @ApiOperation(value = "Sign Order",
-    notes = "Create order signed by address from wallet",
-    httpMethod = "POST",
-    produces = "application/json",
-    consumes = "application/json")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(
-      name = "body",
-      value = "Order Json with data",
-      required = true,
-      paramType = "body",
-      dataType = "scorex.transaction.assets.exchange.Order"
-    )
-  ))
-  def signOrder: Route = path("sign") {
-    entity(as[String]) { body =>
-      postJsonRouteAsync {
-        Try(Json.parse(body)).map { js =>
-          js.validate[Order] match {
-            case err: JsError =>
-              Future.successful(WrongTransactionJson(err).response)
-            case JsSuccess(order: Order, _) =>
-              Future {
-                wallet.privateKeyAccount(order.sender.address).map { sender =>
-                  val signed = Order.sign(order, sender)
-                  JsonResponse(signed.json, StatusCodes.OK)
-                }.getOrElse(InvalidAddress.response)
-              }
-          }
-        }.recover {
-          case _ =>
-            Future.successful(WrongJson.response)
-        }.get
       }
     }
   }
