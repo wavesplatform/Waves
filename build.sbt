@@ -3,25 +3,16 @@ import sbt.Keys._
 
 val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
 
-name in ThisBuild := "waves"
+inThisBuild(Seq(
+  organization in ThisBuild := "com.wavesplatform",
+  name := "waves",
+  version := appConf.getString("version"),
+  scalaVersion := "2.12.1",
+  fork := false,
+  parallelExecution := false
+))
 
-organization in ThisBuild := "com.wavesplatform"
-
-version in ThisBuild := appConf.getString("version")
-
-scalaVersion in ThisBuild := "2.12.1"
-
-scalacOptions in ThisBuild += "-target:jvm-1.8"
 scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
-
-javaOptions ++= Seq(
-  "-server", "-Xmx1G"
-)
-
-lazy val commonSettings = Seq(
-  organization := "com.wavesplatform",
-  scalaVersion := "2.12.1"
-)
 
 resolvers ++= Seq(
   "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
@@ -42,12 +33,11 @@ libraryDependencies ++=
     "com.github.pathikrit" %% "better-files" % "2.17.+"
   )
 
-fork in ThisBuild := false
-fork in Test := false
-parallelExecution in ThisBuild := false
-parallelExecution in Test := false
-
-testOptions in Test += Tests.Argument("-oIDOF", "-u", "target/test-reports")
+inConfig(Test)(Seq(
+  fork := false,
+  parallelExecution := false,
+  testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
+))
 
 concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 
