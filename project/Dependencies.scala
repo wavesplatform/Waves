@@ -36,13 +36,9 @@ object Dependencies {
     "org.slf4j" % "slf4j-nop" % "1.7.+" % "test"
   )
 
-  lazy val http = Seq(
+  def swaggerModule(module: String) = "io.swagger" % s"swagger-$module" % "1.+"
+  lazy val http = Seq("scala-module_2.12", "core", "annotations", "models", "jaxrs").map(swaggerModule) ++ Seq(
     "com.chuusai" %% "shapeless" % "2.+",
-    "io.swagger" %% "swagger-scala-module" % "1.+",
-    "io.swagger" % "swagger-core" % "1.+",
-    "io.swagger" % "swagger-annotations" % "1.+",
-    "io.swagger" % "swagger-models" % "1.+",
-    "io.swagger" % "swagger-jaxrs" % "1.+",
     "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.+"
   )
 
