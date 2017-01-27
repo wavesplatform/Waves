@@ -26,6 +26,7 @@ object TypedTransaction extends Deser[TypedTransaction] {
     val BurnTransaction = Value(6)
     val OrderMatchTransaction = Value(7)
     val OrderCancelTransaction = Value(8)
+    val LeaseTransaction = Value(9)
   }
 
   val TimestampLength = 8
