@@ -4,8 +4,8 @@ object Dependencies {
 
   lazy val testKit = Seq(
     akkaModule("testkit") % "test",
-    "org.scalatest" %% "scalatest" % "3.+" % "test",
-    "org.scalactic" %% "scalactic" % "3.+" % "test",
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+    "org.scalactic" %% "scalactic" % "3.0.0" % "test",
     "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
     "net.databinder.dispatch" %% "dispatch-core" % "+" % "test",
     "org.mockito" % "mockito-all" % "1.10.19" % "test",
