@@ -18,9 +18,6 @@ import scorex.settings.ChainParameters
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction}
-import scorex.transaction.state.database.blockchain.{AssetsExtendedState, StoredState}
-import scorex.transaction.state.database.state.extension._
-import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
@@ -267,26 +264,6 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))
 
-    }
-  }
-
-  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): StoredState = {
-    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage {
-      override val db: MVStore = mvStore
-      if (db.getStoreVersion > 0) db.rollback()
-    }
-    val extendedState = new AssetsExtendedState(storage)
-    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings, storage)
-    val validators = Seq(
-      extendedState,
-      incrementingTimestampValidator,
-      new GenesisValidator,
-      new OrderMatchStoredState(storage),
-      new IncludedValidator(storage, settings),
-      new ActivatedValidator(settings)
-    )
-    new StoredState(storage, extendedState, incrementingTimestampValidator, validators, settings) {
-      override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
     }
   }
 

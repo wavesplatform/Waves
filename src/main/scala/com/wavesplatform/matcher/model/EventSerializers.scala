@@ -2,15 +2,15 @@ package com.wavesplatform.matcher.model
 
 import akka.serialization._
 import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
-import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
-import com.wavesplatform.matcher.util.Cache
-import play.api.libs.json._
-import play.api.libs.json.Reads._
 import play.api.libs.functional.syntax._
-import scorex.transaction.assets.exchange.Order
+import play.api.libs.json.Reads._
+import play.api.libs.json._
+import scorex.crypto.encode.Base58
+import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.OrderJson._
-import scala.collection.JavaConversions._
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.collection.immutable.TreeMap
 
@@ -144,10 +144,26 @@ object EventsJson {
   implicit val orderCanceledReads: Reads[OrderCanceled] =
     (JsPath \ "o").read[LimitOrder](limitOrderReads).map(OrderCanceled.apply)
 
+  implicit val orderBookeCreatedWrites = new Writes[OrderBookCreated] {
+    def writes(e: OrderBookCreated): JsValue = Json.obj(
+      "a1" -> e.pair.first.map(Base58.encode),
+      "a2" -> e.pair.second.map(Base58.encode))
+  }
+
+  def readOrderBookCreated(a1: Option[Option[AssetId]], a2: Option[Option[AssetId]]) =
+    OrderBookCreated(AssetPair(a1.flatten, a2.flatten))
+
+  implicit val orderBookCreatedReads: Reads[OrderBookCreated] = {
+    val r = (JsPath \ "a1").readNullable[Option[Array[Byte]]] and
+      (JsPath \ "a2").readNullable[Option[Array[Byte]]]
+    r.apply(readOrderBookCreated _)
+  }
+
   object EventFormat extends Format[Event] {
     val OrderAddedId=  JsNumber(1)
     val OrderExecutedId =  JsNumber(2)
     val OrderCanceledId =  JsNumber(3)
+    val OrderBookCreatedId =  JsNumber(4)
 
     override def writes(event: Event): JsValue = {
       event match {
@@ -157,6 +173,8 @@ object EventsJson {
           Json.arr(OrderExecutedId, orderExecutedWrites.writes(e))
         case e: OrderCanceled =>
           Json.arr(OrderCanceledId, orderCanceledWrites.writes(e))
+        case e: OrderBookCreated =>
+          Json.arr(OrderBookCreatedId, orderBookeCreatedWrites.writes(e))
       }
     }
 
@@ -168,6 +186,8 @@ object EventsJson {
           orderExecutedReads.reads(jsEvent)
         case JsArray(Seq(`OrderCanceledId`, jsEvent)) =>
           orderCanceledReads.reads(jsEvent)
+        case JsArray(Seq(`OrderBookCreatedId`, jsEvent)) =>
+          orderBookCreatedReads.reads(jsEvent)
         case e => JsError("Unexpected event:" + e)
 
       }
