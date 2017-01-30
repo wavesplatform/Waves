@@ -2,6 +2,7 @@ package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import play.api.libs.json.Json
+import scorex.transaction.ValidationError
 
 case class ApiErrorResponse(error: Int, message: String)
 
@@ -12,6 +13,21 @@ trait ApiError {
 
   lazy val json = Json.obj("error" -> id, "message" -> message)
   lazy val response = JsonResponse(json, code)
+}
+
+object ApiError {
+  def fromValidationError(e: ValidationError) = e match {
+    case ValidationError.InvalidAddress => InvalidAddress.response
+    case ValidationError.NegativeAmount => NegativeAmount.response
+    case ValidationError.InsufficientFee => InsufficientFee.response
+    case ValidationError.NoBalance => NoBalance.response
+    case ValidationError.InvalidName => InvalidName.response
+    case ValidationError.InvalidSignature => InvalidSignature.response
+    case ValidationError.TooBigArray => TooBigArrayAllocation.response
+    case ValidationError.StateCheckFailed => StateCheckFailed.response
+    case ValidationError.OverflowError => OverflowError.response
+    case ValidationError.CustomValidationError(m) => CustomValidationError(m).response
+  }
 }
 
 case object Unknown extends ApiError {
@@ -110,6 +126,18 @@ case object InvalidName extends ApiError {
 case object StateCheckFailed extends ApiError {
   override val id: Int = 112
   override val message: String = "State check failed"
+  override val code: StatusCode = StatusCodes.BadRequest
+}
+
+case object OverflowError extends ApiError {
+  override val id: Int = 113
+  override val message: String = "overflow error"
+  override val code: StatusCode = StatusCodes.BadRequest
+}
+
+case class CustomValidationError(errorMessage: String) extends ApiError {
+  override val id: Int = 199
+  override val message: String = s"validation error: $errorMessage"
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
