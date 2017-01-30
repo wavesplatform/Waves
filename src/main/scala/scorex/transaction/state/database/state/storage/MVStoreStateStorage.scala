@@ -6,7 +6,7 @@ import scorex.transaction._
 import scorex.transaction.state.database.state._
 import scorex.utils.LogMVMapBuilder
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 
 trait MVStoreStateStorage extends StateStorageI {
@@ -34,7 +34,7 @@ trait MVStoreStateStorage extends StateStorageI {
 
   def putLastStates(a: Address, s: Int): Unit = lastStates.put(a, s)
 
-  def lastStatesKeys: List[Address] = lastStates.keySet().toList
+  def lastStatesKeys: List[Address] = lastStates.keySet().asScala.toList
 
 
   // ============= Last States

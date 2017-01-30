@@ -1,7 +1,5 @@
 package scorex.crypto.hash
 
-import scorex.crypto.hash.CryptographicHash._
-
 
 /**
  * Hash function for cases, where security is more important, then speed

@@ -2,7 +2,6 @@ package scorex.network
 
 import com.google.common.primitives.{Bytes, Ints}
 import io.swagger.annotations.ApiModelProperty
-import play.api.data.validation.ValidationError
 import play.api.libs.json._
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -42,11 +41,11 @@ object Checkpoint {
   implicit val byteArrayReads = new Reads[Array[Byte]] {
     def reads(json: JsValue) = json match {
       case JsString(s) => Base58.decode(s) match {
-        case Success(bytes) if bytes.length == EllipticCurveImpl.SignatureLength => JsSuccess(bytes)
-        case Success(bytes) => JsError(Seq(JsPath() -> Seq(ValidationError("error.incorrect.signatureLength"))))
-        case Failure(_) => JsError(Seq(JsPath() -> Seq(ValidationError("error.incorrect.base58"))))
+        case Success(bytes) if bytes.length == scorex.transaction.TypedTransaction.SignatureLength => JsSuccess(bytes)
+        case Success(bytes) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.signatureLength"))))
+        case Failure(_) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
       }
-      case _ => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.jsstring"))))
+      case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
     }
   }
 

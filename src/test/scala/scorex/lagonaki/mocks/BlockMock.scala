@@ -6,11 +6,13 @@ import scorex.block._
 import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.crypto.EllipticCurveImpl
-import scorex.settings.{Settings, ChainParameters}
+import scorex.settings.ChainParameters
+import scorex.transaction.TypedTransaction._
 import scorex.transaction.{Transaction, TransactionModule, TransactionsBlockField}
+
 import scala.concurrent.duration._
 
-class BlockMock(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyAccount(Array.fill(32)(0))) extends Block(0, 0, Array.fill(EllipticCurveImpl.SignatureLength)(0: Byte),SignerData(signer, Array.fill(EllipticCurveImpl.SignatureLength)(0))) {
+class BlockMock(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyAccount(Array.fill(32)(0))) extends Block(0, 0, Array.fill(SignatureLength)(0: Byte),SignerData(signer, Array.fill(EllipticCurveImpl.SignatureLength)(0))) {
 
 
   override lazy val transactions = txs
@@ -20,7 +22,7 @@ class BlockMock(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyA
   override type TransactionDataType = Seq[Transaction]
 
   override val transactionDataField: BlockField[TransactionDataType] = TransactionsBlockField(txs)
-  override val uniqueId: BlockId = Array.fill(EllipticCurveImpl.SignatureLength)(0: Byte)
+  override val uniqueId: BlockId = Array.fill(SignatureLength)(0: Byte)
 
   //TODO implement mock?
   override implicit lazy val transactionModule: TransactionModule[TransactionDataType] = {
@@ -29,7 +31,7 @@ class BlockMock(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyA
   }
   override lazy val consensusDataField: BlockField[ConsensusDataType] = NxtConsensusBlockField(
     new NxtLikeConsensusBlockData {
-      val generationSignature: Array[Byte] = Array.fill(EllipticCurveImpl.SignatureLength)(0: Byte)
+      val generationSignature: Array[Byte] = Array.fill(SignatureLength)(0: Byte)
       val baseTarget = 1L
     })
 

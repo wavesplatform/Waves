@@ -8,6 +8,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.waves.http.UnsignedPayment
 import scorex.waves.transaction.{ExternalPayment, SignedPayment}
+import scorex.transaction.TypedTransaction._
 
 class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
@@ -32,7 +33,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val recipient = new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
-    val signature = Array.fill(EllipticCurveImpl.SignatureLength)(0.toByte)
+    val signature = Array.fill(SignatureLength)(0.toByte)
     val payment = ExternalPayment(timestamp, amount, 400L, senderPublicKey, recipient, signature)
     val json = Json.toJson(payment).toString
 
@@ -45,7 +46,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val recipient = new Account("3PBWXDFUc86N2EQxKJmW8eFco65xTy")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
-    val signature = Array.fill(EllipticCurveImpl.SignatureLength)(0.toByte)
+    val signature = Array.fill(SignatureLength)(0.toByte)
     val payment = ExternalPayment(timestamp, amount, 400L, senderPublicKey, recipient, signature)
     val json = Json.toJson(payment).toString
 
@@ -58,7 +59,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val recipient = new Account("3N1hV1nYsBqJeHQfhEbjhndeLzYFavDsQxM")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
-    val signature = Array.fill(EllipticCurveImpl.SignatureLength)(0.toByte)
+    val signature = Array.fill(SignatureLength)(0.toByte)
     val payment = ExternalPayment(timestamp, amount, 400L, senderPublicKey, recipient, signature)
     val json = Json.toJson(payment).toString
 
@@ -71,7 +72,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val recipient = new Account("3N1hV1nYsBqJeHQfhEbjhndeLzYFavDsQxM")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
-    val signature = Array.fill(EllipticCurveImpl.SignatureLength - 1)(0.toByte)
+    val signature = Array.fill(SignatureLength - 1)(0.toByte)
     val payment = ExternalPayment(timestamp, amount, 400L, senderPublicKey, recipient, signature)
     val json = Json.toJson(payment).toString
 
@@ -100,7 +101,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val recipient = new Account("3MyViFvajzYyPn7Y4EWWBBsoSCaBdrCZSfw")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
-    val signature = Array.fill(EllipticCurveImpl.SignatureLength)(0.toByte)
+    val signature = Array.fill(SignatureLength)(0.toByte)
     val payment = SignedPayment(timestamp, amount, 400L, recipient, senderPublicKey, "", Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
@@ -113,7 +114,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val recipient = new Account("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx")
     val timestamp = 1465391445252L
     val amount = 10000000000000L
-    val signature = Array.fill(EllipticCurveImpl.SignatureLength)(0.toByte)
+    val signature = Array.fill(SignatureLength)(0.toByte)
     val payment = SignedPayment(timestamp, amount, 4L, recipient, senderPublicKey, "", Base58.encode(signature))
     val json = Json.toJson(payment).toString
 

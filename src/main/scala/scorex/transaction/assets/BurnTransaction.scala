@@ -6,7 +6,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction.TransactionType
+import scorex.transaction.TypedTransaction._
 import scorex.transaction.ValidationError
 import scorex.transaction._
 
@@ -102,4 +102,4 @@ object BurnTransaction extends Deser[BurnTransaction] {
     createUnverified(sender, assetId, quantity, fee, timestamp).right.map { unverified =>
       unverified.copy(signature = EllipticCurveImpl.sign(sender, unverified.toSign))
     }
-}
+  }

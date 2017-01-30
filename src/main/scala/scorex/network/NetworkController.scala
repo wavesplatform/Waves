@@ -5,17 +5,14 @@ import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import akka.pattern._
-import akka.util.Timeout
 import scorex.app.RunnableApplication
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.{CloseAllConnections, CloseAllConnectionsComplete}
 import scorex.utils.ScorexLogging
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success, Try}
@@ -59,8 +56,8 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
       Try {
         val myAddress = InetAddress.getAllByName(myHost)
 
-        NetworkInterface.getNetworkInterfaces.exists { networkInterface =>
-          networkInterface.getInterfaceAddresses.exists { interfaceAddress =>
+        NetworkInterface.getNetworkInterfaces.asScala.exists { networkInterface =>
+          networkInterface.getInterfaceAddresses.asScala.exists { interfaceAddress =>
             val externalAddress = interfaceAddress.getAddress
             myAddress.contains(externalAddress)
           }

@@ -1,7 +1,5 @@
 package scorex.crypto.hash
 
-import scorex.crypto.hash.CryptographicHash._
-
 /**
  * Fast and secure hash function
  */

@@ -11,6 +11,8 @@ import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.utils.ByteArray
+import scorex.transaction.TypedTransaction._
+import scorex.utils.{ByteArray, NTP}
 
 import scala.util.Try
 

@@ -158,8 +158,8 @@ object ExchangeTransaction {
     from += 8
     val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8));
     from += 8
-    val signature = bytes.slice(from, from + SignatureLength);
-    from += SignatureLength
+    val signature = bytes.slice(from, from + TypedTransaction.SignatureLength);
+    from += TypedTransaction.SignatureLength
 
     create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))

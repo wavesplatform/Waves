@@ -6,6 +6,7 @@ import scorex.consensus.ConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.network.message.BasicMessagesRepo
 import scorex.transaction.TransactionModule
+import scorex.transaction.TypedTransaction._
 
 class CheckpointSpecification extends FreeSpec
   with Matchers
@@ -31,7 +32,7 @@ class CheckpointSpecification extends FreeSpec
   "serialization" in {
     val spec = new BasicMessagesRepo()(stub[TransactionModule[Unit]], stub[ConsensusModule[Unit]]).CheckpointMessageSpec
 
-    def sig(b: Byte) = Array.fill[Byte](EllipticCurveImpl.SignatureLength)(b)
+    def sig(b: Byte) = Array.fill[Byte](SignatureLength)(b)
 
     val c = Checkpoint(Seq(BlockCheckpoint(1, sig(1)), BlockCheckpoint(2, sig(2))), sig(3))
 

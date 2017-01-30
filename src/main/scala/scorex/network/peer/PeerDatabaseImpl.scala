@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.settings.Settings
 import scorex.utils.{CircularBuffer, LogMVMapBuilder}
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.util.Random
 
 class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends PeerDatabase {
@@ -31,7 +31,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
 
   override def removePeer(socketAddress: InetSocketAddress): Unit = {
     unverifiedPeers.remove(socketAddress)
-    if (peersPersistence.contains(socketAddress)) {
+    if (peersPersistence.asScala.contains(socketAddress)) {
       peersPersistence.remove(socketAddress)
       database.commit()
     }
@@ -48,17 +48,17 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
 
   override def blacklistHost(host: String): Unit = {
     unverifiedPeers.drop(_.getHostName == host)
-    blacklist.update(host, System.currentTimeMillis())
+    blacklist.put(host, System.currentTimeMillis())
     database.commit()
   }
 
   override def getKnownPeers: Map[InetSocketAddress, PeerInfo] = {
     withoutObsoleteRecords(peersPersistence, (peerData: PeerInfo) => peerData.timestamp, peersDataResidenceTime.toMillis)
-      .toMap.filterKeys(address => !getBlacklist.contains(address.getHostName))
+        .asScala.toMap.filterKeys(address => !getBlacklist.contains(address.getHostName))
   }
 
   override def getBlacklist: Set[String] =
-    withoutObsoleteRecords(blacklist, { t: Long => t }, blacklistResidenceTimeMilliseconds).keySet().toSet
+    withoutObsoleteRecords(blacklist, { t: Long => t }, blacklistResidenceTimeMilliseconds).keySet().asScala.toSet
 
   override def getRandomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = {
     val unverifiedCandidate = if (unverifiedPeers.nonEmpty)
@@ -83,7 +83,7 @@ class PeerDatabaseImpl(settings: Settings, filename: Option[String]) extends Pee
   private def withoutObsoleteRecords[K, T](map: MVMap[K, T], timestamp: T => Long, residenceTimeInMillis: Long) = {
     val t = System.currentTimeMillis()
 
-    val obsoletePeers = map.toArray
+    val obsoletePeers = map.asScala.toArray
       .filter { case (_, value) =>
         timestamp(value) <= System.currentTimeMillis() - residenceTimeInMillis
       }.map(_._1)

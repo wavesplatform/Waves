@@ -215,7 +215,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     moveCoordinatorToSyncState()
 
     val goodPeer = mock[ConnectedPeer]
-    (goodPeer.blacklist _).expects().returning().never()
+    (goodPeer.blacklist _).expects().returning(()).never()
 
     actorRef ! SyncFinished(success = true, Some(lastCommonBlockId, fork.iterator, Some(goodPeer)))
 
