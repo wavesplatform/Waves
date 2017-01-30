@@ -67,7 +67,6 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
 
   private val SenderLength = 32
   private val FeeLength = 8
-  private val SignatureLength = 64
   private val BaseLength = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
   def create(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {

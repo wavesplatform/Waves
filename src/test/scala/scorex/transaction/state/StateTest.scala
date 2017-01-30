@@ -1,28 +1,24 @@
 package scorex.transaction.state
 
 import java.io.File
-
 import org.h2.mvstore.MVStore
 import org.scalacheck.commands.Commands
 import org.scalacheck.{Gen, Prop}
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import org.scalatest.{Matchers, PropSpec}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import org.scalatest.prop.Checkers
+import org.scalatest.PropSpec
+import scorex.account.{Account, PrivateKeyAccount}
 import scorex.lagonaki.mocks.BlockMock
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 import scorex.utils._
-
 import scala.util.{Random, Success, Try}
-import scorex.settings.{Settings, ChainParameters}
+import scorex.settings.ChainParameters
 
-class StateTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
-
+class StateTest extends PropSpec with Checkers {
   property("state test") {
-    StateTestSpec.property().mainRunner(Array()) shouldBe 0
+    check(StateTestSpec.property())
   }
 }
-
 
 object StateTestSpec extends Commands {
   val TestFolder = "target/test/"
@@ -77,22 +73,22 @@ object StateTestSpec extends Commands {
 
   def genValidateTransactions(state: State): Gen[ValidateTransactions] = Gen.chooseNum(1, MaxTransactions).map { i =>
     val included = Random.shuffle(state.included.keys).take(i).map((_, true)).toSeq
-    val includedPaymentTransactions = included.filter(_._1.isInstanceOf[PaymentTransaction])
-    val notIncluded = if (includedPaymentTransactions.nonEmpty) {
-      val transactions = (0 until MaxTransactions - i - 1).map(j => (createTransaction(), false))
-      val transaction = includedPaymentTransactions.head._1.asInstanceOf[PaymentTransaction]
-      val forgedTransaction = PaymentTransaction.create(transaction.sender, transaction.recipient, transaction.amount,
-        transaction.fee, transaction.timestamp, forgeSignature(transaction.signature)).right.get
+    val firstInsludedPayment = included.collectFirst { case (p: PaymentTransaction, _) => p }
+    val notIncluded = firstInsludedPayment match {
+      case Some(ptx) =>
+        val transactions = Seq.fill(MaxTransactions - i - 1)((createTransaction(), false))
+        val forgedTransaction = PaymentTransaction.create(ptx.sender, ptx.recipient, ptx.amount,
+          ptx.fee, ptx.timestamp, forgeSignature(ptx.signature)).right.get
 
-      transactions :+ (forgedTransaction -> true) // forged transaction should be detected as already included in the state
-    } else {
-      (0 until MaxTransactions - i).map(j => (createTransaction(), false))
+        transactions :+ (forgedTransaction -> true) // forged transaction should be detected as already included in the state
+      case None =>
+        Seq.fill(MaxTransactions - i)((createTransaction(), false))
     }
 
     ValidateTransactions(included ++ notIncluded)
   }
 
-  def createTransaction(amount: Long, fee: Long): Transaction = {
+  private def createTransaction(amount: Long, fee: Long): Transaction = {
     val randomAccounts = Random.shuffle(accounts).take(2)
     createPayment(randomAccounts.head, randomAccounts.last, amount, fee)
   }
@@ -100,7 +96,6 @@ object StateTestSpec extends Commands {
   private def createTransaction(): Transaction = createTransaction(1 + Random.nextInt(10), 1 + Random.nextInt(10))
 
   private def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): PaymentTransaction = {
-    Thread.sleep(2)
     val time = System.currentTimeMillis()
     PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
   }

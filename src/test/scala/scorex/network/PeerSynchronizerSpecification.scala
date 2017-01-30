@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props, Scheduler}
 import akka.testkit.TestProbe
-import org.scalatest.mock.MockitoSugar
+import org.scalatest.mockito.MockitoSugar
 import scorex.ActorTestingCommons
 import scorex.app.{Application, ApplicationVersion}
 import scorex.network.NetworkController.DataFromPeer

@@ -7,11 +7,12 @@ import com.google.common.primitives.{Bytes, Ints}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.singing.SigningFunctions
-import scorex.crypto.singing.SigningFunctions.Signature
+import scorex.crypto.signatures.SigningFunctions
+import scorex.crypto.signatures.SigningFunctions.Signature
 import scorex.network.{BlockCheckpoint, Checkpoint}
 import scorex.network.message.Message._
 import scorex.transaction.{History, TransactionModule}
+import scorex.transaction.TypedTransaction._
 
 import scala.util.Try
 
@@ -66,7 +67,7 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
 
   trait SignaturesSeqSpec extends MessageSpec[Seq[SigningFunctions.Signature]] {
 
-    import scorex.crypto.EllipticCurveImpl.SignatureLength
+    import scorex.transaction.TypedTransaction.SignatureLength
 
     private val DataLength = 4
 
@@ -108,7 +109,7 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
     override def serializeData(signature: Block.BlockId): Array[Byte] = signature
 
     override def deserializeData(bytes: Array[Byte]): Try[Block.BlockId] = Try {
-      require(bytes.length == EllipticCurveImpl.SignatureLength, "Data does not match length")
+      require(bytes.length == scorex.transaction.TypedTransaction.SignatureLength, "Data does not match length")
       bytes
     }
   }
@@ -155,7 +156,6 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_]
       require(length <= Checkpoint.MaxCheckpoints)
 
       val HeightLength = Ints.BYTES
-      val SignatureLength = EllipticCurveImpl.SignatureLength
 
       val items = (0 until length).map { i =>
         val position = lengthBytes.length + (i * (HeightLength + SignatureLength))

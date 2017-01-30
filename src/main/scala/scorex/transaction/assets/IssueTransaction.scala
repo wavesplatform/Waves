@@ -7,7 +7,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
-import scorex.transaction.TypedTransaction.TransactionType
+import scorex.transaction.TypedTransaction._
 import scorex.transaction.ValidationError
 import scorex.transaction._
 
@@ -76,7 +76,6 @@ object IssueTransaction extends Deser[IssueTransaction] {
   }
 
   def parseTail(bytes: Array[Byte]): Try[IssueTransaction] = Try {
-    import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
     val txId      = bytes(SignatureLength)
     require(txId == TransactionType.IssueTransaction.id.toByte, s"Signed tx id is not match")

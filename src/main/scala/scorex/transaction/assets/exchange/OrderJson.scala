@@ -1,6 +1,5 @@
 package scorex.transaction.assets.exchange
 
-import play.api.data.validation.ValidationError
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.crypto.encode.Base58
@@ -16,9 +15,9 @@ object OrderJson {
     def reads(json: JsValue) = json match {
       case JsString(s) => Base58.decode(s) match {
         case Success(bytes) => JsSuccess(bytes)
-        case Failure(_) => JsError(Seq(JsPath() -> Seq(ValidationError("error.incorrect.base58"))))
+        case Failure(_) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
       }
-      case _ => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.jsstring"))))
+      case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
     }
   }
 
@@ -27,9 +26,9 @@ object OrderJson {
       case JsString(s) if s.isEmpty => JsSuccess(Option.empty[Array[Byte]])
       case JsString(s) if s.nonEmpty => Base58.decode(s) match {
         case Success(bytes) => JsSuccess(Some(bytes))
-        case Failure(_) => JsError(Seq(JsPath() -> Seq(ValidationError("error.incorrect.base58"))))
+        case Failure(_) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
       }
-      case _ => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.jsstring"))))
+      case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
     }
   }
 
@@ -37,9 +36,9 @@ object OrderJson {
     def reads(json: JsValue) = json match {
       case JsString(s) => Base58.decode(s) match {
         case Success(bytes) if bytes.length == 32 => JsSuccess(new PublicKeyAccount(bytes))
-        case _ => JsError(Seq(JsPath() -> Seq(ValidationError("error.incorrect.publicKeyAccount"))))
+        case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.publicKeyAccount"))))
       }
-      case _ => JsError(Seq(JsPath() -> Seq(ValidationError("error.expected.jsstring"))))
+      case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
     }
   }
 

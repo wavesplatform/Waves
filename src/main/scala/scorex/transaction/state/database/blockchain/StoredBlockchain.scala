@@ -13,7 +13,7 @@ import scorex.transaction.History.BlockchainScore
 import scorex.transaction.{BlockChain, TransactionModule}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -50,7 +50,7 @@ class StoredBlockchain(db: MVStore)
     //TODO: remove when no blockchains without signaturesReverse remains
     if (signaturesReverse.size() != signatures.size()) {
       signaturesReverse.clear()
-      signatures.keySet().foreach(k => signaturesReverse.put(signatures.get(k), k))
+      signatures.keySet().asScala.foreach(k => signaturesReverse.put(signatures.get(k), k))
       database.commit()
     }
 
