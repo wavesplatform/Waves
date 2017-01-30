@@ -96,7 +96,7 @@ object OrderBook {
       ob.copy(asks = ob.asks + (o.price -> (orders :+ o)))
     case e@OrderExecuted(_, c: BuyLimitOrder) => updateExecutedBuy(ob, c, e.counterRemaining)
     case e@OrderExecuted(_, c: SellLimitOrder) => updateExecutedSell(ob, c, e.counterRemaining)
-    case e@OrderCanceled(limitOrder) => updateCancelOrder(ob, limitOrder)
+    case OrderCanceled(limitOrder) => updateCancelOrder(ob, limitOrder)
   }
 
 
