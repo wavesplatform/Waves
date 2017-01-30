@@ -5,7 +5,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction.TransactionType
+import scorex.transaction.TypedTransaction._
 
 import scala.util.{Failure, Success, Try}
 
