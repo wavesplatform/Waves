@@ -5,13 +5,14 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount}
+import scorex.api.http.assets.LeaseRequest
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
-import scorex.settings.{Settings, ChainParameters}
+import scorex.settings.{ChainParameters, Settings}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
@@ -54,7 +55,6 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   private val feeCalculator = new FeeCalculator(settings)
 
   val TransactionSizeLength = 4
-//  val InitialBalance = 100000000000000L
   val InitialBalance = hardForkParams.initialBalance
 
   override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings)
@@ -166,6 +166,20 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
         throw new IllegalArgumentException(err.toString)
     }
     transferVal
+  }
+
+  def lease(request: LeaseRequest, wallet: Wallet): Try[Either[ValidationError, LeaseTransaction]] = Try {
+    val sender = wallet.privateKeyAccount(request.sender).get
+
+    val leaseTransactionVal = LeaseTransaction.create(sender, request.amount, request.fee, getTimestamp, request.untilBlock, new Account(request.recipient))
+    leaseTransactionVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid transfer transaction generated: " + tx.json)
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+    }
+    leaseTransactionVal
   }
 
   def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
@@ -338,12 +352,6 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   }
 
   val minimumTxFee = settings.asInstanceOf[WavesSettings].minimumTxFee
-
-  def signPayment(payment: PaymentRequest, wallet: Wallet): Option[Either[ValidationError,PaymentTransaction]] = {
-    wallet.privateKeyAccount(payment.sender).map { sender =>
-      PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
-    }
-  }
 
   def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
 

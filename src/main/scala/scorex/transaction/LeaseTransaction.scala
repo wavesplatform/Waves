@@ -110,7 +110,6 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
       .right.flatMap(SignedTransaction.verify)
   }
 
-
   def create(sender: PrivateKeyAccount,
              amount: Long,
              fee: Long,
