@@ -15,7 +15,7 @@ import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange._
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.utils.{ByteArray, NTP, ScorexLogging}
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.annotation.tailrec
@@ -141,16 +141,16 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       case e@OrderExecuted(o, c) =>
         val txVal = createTransaction(o, c)
         txVal match {
-          case Right(tx)if isValid(tx)=>
+          case Right(tx) if isValid(tx) =>
             sendToNetwork(tx)
             processEvent(e)
             if (e.submittedRemaining > 0)
               Some(o.partial(e.submittedRemaining))
             else None
-        case _ =>
-          val canceled = Events.OrderCanceled(c)
-          processEvent(canceled)
-          Some(o)
+          case _ =>
+            val canceled = Events.OrderCanceled(c)
+            processEvent(canceled)
+            Some(o)
         }
       case _ => None
     }
@@ -231,8 +231,11 @@ object OrderBookActor {
 
   // Direct requests
   case object GetOrdersRequest
+
   case object GetBidOrdersRequest
+
   case object GetAskOrdersRequest
+
   case class GetOrdersResponse(orders: Seq[LimitOrder])
 
   case object SaveSnapshot

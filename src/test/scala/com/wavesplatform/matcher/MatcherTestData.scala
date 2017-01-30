@@ -1,10 +1,10 @@
 package com.wavesplatform.matcher
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
+import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import org.h2.mvstore.MVStore
 import org.scalacheck.{Arbitrary, Gen}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.PrivateKeyAccount
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.settings.ChainParameters
 import scorex.transaction._
@@ -12,12 +12,12 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.state.database.blockchain.{AssetsExtendedState, StoredState}
 import scorex.transaction.state.database.state.extension._
 import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
-import scorex.utils.{ByteArray, NTP}
+import scorex.utils.{ByteArrayExtension, NTP}
 
-trait MatcherTestData  {
+trait MatcherTestData {
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray)
   val WalletSeed = "Matcher".getBytes
-  val MatcherSeed =  SecureCryptographicHash(Bytes.concat(Ints.toByteArray(0), WalletSeed))
+  val MatcherSeed = SecureCryptographicHash(Bytes.concat(Ints.toByteArray(0), WalletSeed))
   val MatcherAccount = new PrivateKeyAccount(MatcherSeed)
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue)
@@ -28,7 +28,7 @@ trait MatcherTestData  {
   val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, bytes32gen.map(Some(_))))
 
   val assetPairGen = Gen.zip(assetIdGen, assetIdGen).
-    suchThat(p => !ByteArray.sameOption(p._1, p._2)).
+    suchThat(p => !ByteArrayExtension.sameOption(p._1, p._2)).
     map(p => AssetPair(p._1, p._2))
 
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())

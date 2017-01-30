@@ -8,11 +8,10 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
+import scorex.transaction.TypedTransaction._
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
-import scorex.utils.ByteArray
-import scorex.transaction.TypedTransaction._
-import scorex.utils.{ByteArray, NTP}
+import scorex.utils.ByteArrayExtension
 
 import scala.util.Try
 
@@ -21,6 +20,7 @@ sealed trait OrderType
 object OrderType {
 
   case object BUY extends OrderType
+
   case object SELL extends OrderType
 
 }
@@ -37,7 +37,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
                    example = "100000000") price: Long,
                  @ApiModelProperty("Amount in AssetPair.first") amount: Long,
                  @ApiModelProperty(value = "Creation timestamp") timestamp: Long,
-                 @ApiModelProperty(value = "Order time to live, max = 30 days")expiration: Long,
+                 @ApiModelProperty(value = "Order time to live, max = 30 days") expiration: Long,
                  @ApiModelProperty(example = "100000") matcherFee: Long,
                  @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
   extends BytesSerializable
@@ -47,7 +47,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   def assetPair: AssetPair = AssetPair(spendAssetId, receiveAssetId)
 
-  def orderType: OrderType = if (ByteArray.sameOption(receiveAssetId, assetPair.second)) OrderType.BUY else OrderType.SELL
+  def orderType: OrderType = if (ByteArrayExtension.sameOption(receiveAssetId, assetPair.second)) OrderType.BUY else OrderType.SELL
 
   @ApiModelProperty(hidden = true)
   lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
@@ -64,7 +64,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
       (timestamp <= atTime) :| "timestamp should be before created before execution" &&
       (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
       (expiration >= atTime) :| "expiration should be > currentTime" &&
-      !ByteArray.sameOption(spendAssetId, receiveAssetId) :| "Invalid AssetPair" &&
+      !ByteArrayExtension.sameOption(spendAssetId, receiveAssetId) :| "Invalid AssetPair" &&
       signatureValid :| "signature should be valid"
   }
 
@@ -116,8 +116,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
       case o: Order => o.canEqual(this) &&
         sender == o.sender &&
         matcher == o.matcher &&
-        ByteArray.sameOption(spendAssetId, o.spendAssetId) &&
-        ByteArray.sameOption(receiveAssetId, o.receiveAssetId) &&
+        ByteArrayExtension.sameOption(spendAssetId, o.spendAssetId) &&
+        ByteArrayExtension.sameOption(receiveAssetId, o.receiveAssetId) &&
         price == o.price &&
         amount == o.amount &&
         expiration == o.expiration &&
@@ -173,7 +173,8 @@ object Order extends Deser[Order] {
     from += 8
     val amount = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength));
     from += 8
-    val timestamp = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength)); from += 8
+    val timestamp = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength));
+    from += 8
     val expiration = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength));
     from += 8
     val matcherFee = Longs.fromByteArray(bytes.slice(from, from + AssetIdLength));
