@@ -25,7 +25,6 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer
   }
 
-  import BroadcastRequests._
   import BroadcastResponses._
 
   @Path("/issue")

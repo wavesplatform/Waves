@@ -2,7 +2,7 @@ package scorex.transaction.api.http.assets
 
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.api.http.assets.BroadcastRequests.{AssetBurnRequest, AssetIssueRequest, AssetReissueRequest, AssetTransferRequest}
+import scorex.api.http.assets._
 import scorex.api.http.assets.BroadcastResponses.{AssetIssueResponse, AssetReissueResponse, AssetTransferResponse}
 import scorex.crypto.encode.Base58
 

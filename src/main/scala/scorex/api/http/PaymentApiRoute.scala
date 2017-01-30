@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.app.RunnableApplication
-import scorex.transaction.state.wallet.{Payment, TransferRequest}
+import scorex.transaction.state.wallet.{PaymentRequest, TransferRequest}
 import scorex.transaction.{SimpleTransactionModule, ValidationError}
 
 import scala.util.Try
@@ -26,7 +26,6 @@ case class PaymentApiRoute(application: RunnableApplication)(implicit val contex
 
   override lazy val route = payment
 
-  @Deprecated
   @ApiOperation(value = "Send payment. Deprecated: use /assets/transfer instead",
     notes = "Send payment to another wallet. Deprecated: use /assets/transfer instead",
     httpMethod = "POST",
@@ -38,7 +37,7 @@ case class PaymentApiRoute(application: RunnableApplication)(implicit val contex
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.Payment",
+      dataType = "scorex.transaction.state.wallet.PaymentRequest",
       defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))
@@ -51,10 +50,10 @@ case class PaymentApiRoute(application: RunnableApplication)(implicit val contex
         postJsonRoute {
           walletNotExists(wallet).getOrElse {
             Try(Json.parse(body)).map { js =>
-              js.validate[Payment] match {
+              js.validate[PaymentRequest] match {
                 case err: JsError =>
                   WrongTransactionJson(err).response
-                case JsSuccess(p: Payment, _) =>
+                case JsSuccess(p: PaymentRequest, _) =>
                   val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, "", p.recipient)
                   val txOpt = transactionModule.transferAsset(transferRequest, wallet).toOption
                   txOpt match {

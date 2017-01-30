@@ -140,7 +140,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
     }
 
-  def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
+  def createPayment(payment: PaymentRequest, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
     }
@@ -339,7 +339,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   val minimumTxFee = settings.asInstanceOf[WavesSettings].minimumTxFee
 
-  def signPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError,PaymentTransaction]] = {
+  def signPayment(payment: PaymentRequest, wallet: Wallet): Option[Either[ValidationError,PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
     }
