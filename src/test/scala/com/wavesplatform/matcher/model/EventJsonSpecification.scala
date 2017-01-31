@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.model
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
-import com.wavesplatform.matcher.model.EventsJson._
+import com.wavesplatform.matcher.model.MatcherSerializer._
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
@@ -58,7 +58,7 @@ class EventJsonSpecification extends PropSpec
   property("OrderBookCreated json serialization roundtrip") {
     forAll(assetPairGen) { pair: AssetPair =>
       val obc = OrderBookCreated(pair)
-      val js = orderBookCreatedWrites.writes(obc)
+      val js = orderBookCreatedFormat.writes(obc)
       val r = js.as[OrderBookCreated]
       obc shouldBe r
     }
