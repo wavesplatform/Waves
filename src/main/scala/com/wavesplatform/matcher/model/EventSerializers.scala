@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.model
 
+import java.io.NotSerializableException
 import akka.serialization._
 import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
@@ -8,88 +9,71 @@ import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import scorex.crypto.encode.Base58
 import scorex.transaction.AssetId
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-
 import scala.collection.immutable.TreeMap
+import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
+import scorex.crypto.encode.Base58
 
-abstract class SerializerBase(val identifier: Int, val includeManifest: Boolean = false) extends Serializer
-
-class EventSerializer extends SerializerBase(1001) {
-  import EventsJson._
-
-  def toBinary(obj: AnyRef): Array[Byte] = {
-    obj match {
-      case e: Event =>
-        Json.stringify(EventFormat.writes(e)).getBytes
-      case msg =>
-        throw new Exception(s"Cannot serialize $msg with ${this.getClass}")
-    }
+class MatcherSerializer extends SerializerWithStringManifest {
+  import MatcherSerializer._
+  override def identifier: Int = id
+  override def manifest(o: AnyRef): String = o match {
+    case _: OrderBookActor.Snapshot => Manifest.Snapshot
+    case _: MatcherActor.OrderBookCreated => Manifest.OrderBookCreated
+    case _: OrderAdded => Manifest.OrderAdded
+    case _: OrderExecuted => Manifest.OrderExecuted
+    case _: OrderCanceled => Manifest.OrderCancelled
   }
 
-  def fromBinary(bytes: Array[Byte],
-                 manifest: Option[Class[_]]): AnyRef = {
-    val json = Json.parse(bytes)
-    EventFormat.reads(json).get
-  }
-}
+  override def toBinary(o: AnyRef): Array[Byte] = Json.stringify(o match {
+    case s: OrderBookActor.Snapshot => snapshotFormat.writes(s)
+    case obc: MatcherActor.OrderBookCreated => orderBookCreatedFormat.writes(obc)
+    case oa: OrderAdded => orderAddedFormat.writes(oa)
+    case oe: OrderExecuted => orderExecutedFormat.writes(oe)
+    case oc: OrderCanceled => orderCancelledFormat.writes(oc)
+  }).getBytes
 
-class SnapshotSerializer extends SerializerBase(2001) {
-  import EventsJson._
-
-  def toBinary(obj: AnyRef): Array[Byte] = {
-    obj match {
-      case snap: Snapshot => Json.stringify(snapshotFormat.writes(snap)).getBytes
-      case msg => throw new Exception(s"Cannot serialize $msg")
-    }
-  }
-
-  def fromBinary(bytes: Array[Byte],
-                 manifest: Option[Class[_]]): AnyRef = {
-    val json = Json.parse(bytes)
-    snapshotFormat.reads(json).get
+  override def fromBinary(bytes: Array[Byte], manifest: String): AnyRef = manifest match {
+    case Manifest.Snapshot => snapshotFormat.reads(Json.parse(bytes)).get
+    case Manifest.OrderBookCreated => orderBookCreatedFormat.reads(Json.parse(bytes)).get
+    case Manifest.OrderAdded => orderAddedFormat.reads(Json.parse(bytes)).get
+    case Manifest.OrderExecuted => orderExecutedFormat.reads(Json.parse(bytes)).get
+    case Manifest.OrderCancelled => orderCancelledFormat.reads(Json.parse(bytes)).get
+    case _ => throw new NotSerializableException(manifest)
   }
 }
 
-class OrderBookCreatedSerializer extends SerializerBase(3001) {
-  override def toBinary(o: AnyRef): Array[Byte] = o match {
-    case obc: OrderBookCreated =>
-      Json.stringify(EventsJson.orderBookCreatedWrites.writes(obc)).getBytes
-    case other => throw new Exception(s"Cannot serialize $other")
+object MatcherSerializer {
+  private[MatcherSerializer] val id = 4001
+
+  private[MatcherSerializer] object Manifest {
+    val Snapshot = "snapshot"
+    val OrderBookCreated = "orderBookCreated"
+    val OrderAdded = "event.OrderAdded"
+    val OrderExecuted = "event.OrderExecuted"
+    val OrderCancelled = "event.OrderCancelled"
   }
-  override def fromBinary(bytes: Array[Byte], manifest: Option[Class[_]]): AnyRef =
-    EventsJson.orderBookCreatedReads.reads(Json.parse(bytes)).get
-}
 
-object EventsJson {
+  implicit val byteArrayWrites: Format[Option[Array[Byte]]] = Format(
+    Reads {
+      case JsString("") => JsSuccess(Option.empty[Array[Byte]])
+      case JsString(v) => Base58.decode(v).map(b => JsSuccess(Option(b))).getOrElse(JsError())
+      case _ => JsError()
+    },
+    Writes(_.fold(JsString(""))(b => JsString(Base58.encode(b))))
+  )
 
-  implicit val limitOrderReads: Reads[LimitOrder] = (
-    (JsPath \ "price").read[Long] and
-      (JsPath \ "amount").read[Long] and
-      (JsPath \ "order").read[Order]
-    )(LimitOrder.limitOrder _)
+  private def zzz(lo: LimitOrder) = (lo.price, lo.amount, lo.order)
+  private def fmt[T <: LimitOrder](f1: (Long, Long, Order) => T): Format[T] =
+    ((__ \ "price").format[Long] and
+    (__ \ "amount").format[Long] and
+    (__ \ "order").format[Order])(f1, zzz)
 
-  implicit val buyLimitOrderReads: Reads[BuyLimitOrder] = (
-    (JsPath \ "price").read[Long] and
-      (JsPath \ "amount").read[Long] and
-      (JsPath \ "order").read[Order]
-    )(BuyLimitOrder.apply _)
-
-  implicit val sellLimOrderReads: Reads[SellLimitOrder] = (
-    (JsPath \ "price").read[Long] and
-      (JsPath \ "amount").read[Long] and
-      (JsPath \ "order").read[Order]
-    )(SellLimitOrder.apply _)
-
-  implicit val limitOrderWrites = new Writes[LimitOrder] {
-    def writes(o: LimitOrder): JsValue = Json.obj(
-      "price" -> o.price,
-      "amount" -> o.amount,
-      "order" -> o.order.json
-    )
-  }
+  implicit val limitFormat: Format[LimitOrder] = fmt[LimitOrder](LimitOrder.limitOrder)
+  implicit val buyFormat: Format[BuyLimitOrder] = fmt[BuyLimitOrder](BuyLimitOrder.apply)
+  implicit val sellFormat: Format[SellLimitOrder] = fmt[SellLimitOrder](SellLimitOrder.apply)
 
   implicit val orderMapWrites = new Writes[Map[Price, Level[LimitOrder]]] {
     def writes(tree: Map[Price, Level[LimitOrder]]): JsValue =
@@ -112,89 +96,30 @@ object EventsJson {
     }
   }
 
-  implicit val orderBookWrites = new Writes[OrderBook] {
-    def writes(o: OrderBook): JsValue = Json.obj(
-      "bids" -> o.bids,
-      "asks" -> o.asks
-    )
-  }
+  implicit val orderBookFormat = (
+    (__ \ "bids").format[TreeMap[Price, Level[BuyLimitOrder]]] and
+    (__ \ "asks").format[TreeMap[Price, Level[SellLimitOrder]]])(OrderBook.apply, unlift(OrderBook.unapply))
 
-  implicit val orderBookReads: Reads[OrderBook] = (
-    (JsPath \ "bids").read[TreeMap[Price, Level[BuyLimitOrder]]] and
-      (JsPath \ "asks").read[TreeMap[Price, Level[SellLimitOrder]]]
-    )(OrderBook.apply _)
+  val orderAddedFormat = Format(
+    (__ \ "o").read[LimitOrder].map(OrderAdded),
+    Writes[OrderAdded](oa => Json.obj("o" -> oa.order))
+  )
 
+  val orderExecutedFormat = (
+    (__ \ "o1").format[LimitOrder] and
+    (__ \ "o2").format[LimitOrder])(OrderExecuted.apply, unlift(OrderExecuted.unapply))
 
-  implicit val orderAddedWrites = new Writes[OrderAdded] {
-    def writes(e: OrderAdded): JsValue = Json.obj("o" -> e.order)
-  }
+  val orderCancelledFormat = Format(
+    (__ \ "o").read[LimitOrder].map(OrderCanceled),
+    Writes[OrderCanceled](oc => Json.obj("o" -> oc.limitOrder))
+  )
 
-  implicit val orderAddedReads: Reads[OrderAdded] =
-    (JsPath \ "o").read[LimitOrder](limitOrderReads).map(OrderAdded.apply)
+  private def mkOrderBookCreated(a1: Option[AssetId], a2: Option[AssetId]) = OrderBookCreated(AssetPair(a1, a2))
+  private def orderBookToPair(obc: OrderBookCreated) = (obc.pair.first, obc.pair.second)
 
-  implicit val orderExecutedWrites = new Writes[OrderExecuted] {
-    def writes(e: OrderExecuted): JsValue = Json.obj(
-      "o1" -> e.submitted,
-      "o2" -> e.counter
-    )
-  }
-
-  implicit val orderExecutedReads: Reads[OrderExecuted] = (
-    (JsPath \ "o1").read[LimitOrder](limitOrderReads) and
-      (JsPath \ "o2").read[LimitOrder](limitOrderReads)
-    )(OrderExecuted.apply _)
-
-  implicit val orderCanceledWrites = new Writes[OrderCanceled] {
-    def writes(e: OrderCanceled): JsValue = Json.obj("o" -> e.limitOrder)
-  }
-
-  implicit val orderCanceledReads: Reads[OrderCanceled] =
-    (JsPath \ "o").read[LimitOrder](limitOrderReads).map(OrderCanceled.apply)
-
-  implicit val orderBookCreatedWrites = new Writes[OrderBookCreated] {
-    def writes(e: OrderBookCreated): JsValue = Json.obj(
-      "a1" -> e.pair.first.map(Base58.encode),
-      "a2" -> e.pair.second.map(Base58.encode))
-  }
-
-  def readOrderBookCreated(a1: Option[Option[AssetId]], a2: Option[Option[AssetId]]) =
-    OrderBookCreated(AssetPair(a1.flatten, a2.flatten))
-
-  implicit val orderBookCreatedReads: Reads[OrderBookCreated] = {
-    val r = (JsPath \ "a1").readNullable[Option[Array[Byte]]] and
-      (JsPath \ "a2").readNullable[Option[Array[Byte]]]
-    r.apply(readOrderBookCreated _)
-  }
-
-  object EventFormat extends Format[Event] {
-    val OrderAddedId=  JsNumber(1)
-    val OrderExecutedId =  JsNumber(2)
-    val OrderCanceledId =  JsNumber(3)
-
-    override def writes(event: Event): JsValue = {
-      event match {
-        case e: OrderAdded =>
-          Json.arr(OrderAddedId, orderAddedWrites.writes(e))
-        case e: OrderExecuted =>
-          Json.arr(OrderExecutedId, orderExecutedWrites.writes(e))
-        case e: OrderCanceled =>
-          Json.arr(OrderCanceledId, orderCanceledWrites.writes(e))
-      }
-    }
-
-    override def reads(json: JsValue): JsResult[Event] = {
-      json match {
-        case JsArray(Seq(`OrderAddedId`, jsEvent)) =>
-          orderAddedReads.reads(jsEvent)
-        case JsArray(Seq(`OrderExecutedId`, jsEvent)) =>
-          orderExecutedReads.reads(jsEvent)
-        case JsArray(Seq(`OrderCanceledId`, jsEvent)) =>
-          orderCanceledReads.reads(jsEvent)
-        case e => JsError("Unexpected event:" + e)
-
-      }
-    }
-  }
+  implicit val orderBookCreatedFormat: Format[OrderBookCreated] = (
+    (__ \ "a1").format[Option[Array[Byte]]] and
+    (__ \ "a2").format[Option[Array[Byte]]])(mkOrderBookCreated, orderBookToPair)
 
   implicit val tuple2Format = new Format[(Long, Long)] {
     def writes(o: (Long, Long)): JsValue = Json.arr(o._1, o._2)
