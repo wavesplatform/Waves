@@ -15,7 +15,7 @@ import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.extension.OrderMatchStoredState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, AssetId, GenesisTransaction, TransactionGen}
-import scorex.utils.{ByteArray, NTP}
+import scorex.utils.{ByteArrayExtension, NTP}
 import scorex.wallet.Wallet
 
 class OrderMatchStoredStateSpecification extends FunSuite with Matchers with BeforeAndAfterAll with BeforeAndAfterEach {
@@ -77,7 +77,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   }
 
   def createExchangeTransaction(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                       buyMatcherFee: Long, sellMatcherFee: Long, fee: Long) =
+                                buyMatcherFee: Long, sellMatcherFee: Long, fee: Long) =
     ExchangeTransaction.create(matcher, buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, getTimestamp) match {
       case Right(o) => o
       case Left(error) => fail(s"Error creating order: $error")
@@ -109,8 +109,8 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val eur = addInitialAssets(acc2, "eur", 100L)
 
     val pair = AssetPair(usd, eur)
-    val buyAcc = if (ByteArray.sameOption(usd, pair.first)) acc1 else acc2
-    val sellAcc = if (ByteArray.sameOption(usd, pair.first)) acc2 else acc1
+    val buyAcc = if (ByteArrayExtension.sameOption(usd, pair.first)) acc1 else acc2
+    val sellAcc = if (ByteArrayExtension.sameOption(usd, pair.first)) acc2 else acc1
     (pair, buyAcc, sellAcc)
   }
 
@@ -277,7 +277,7 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
           val sender2 = accountGen.sample.get
           val matcher = accountGen.sample.get
           val curTime = NTP.correctedTime()
-          val expired = curTime + 100*1000
+          val expired = curTime + 100 * 1000
 
           val buyPrice = sellAmount
           val sellPrice = buyAmount

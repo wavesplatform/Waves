@@ -80,5 +80,5 @@ object Events {
   }
   case class OrderAdded(order: LimitOrder) extends Event
   case class OrderCanceled(limitOrder: LimitOrder) extends Event
-  case class OrderBookCreated(pair: AssetPair) extends Event
+
 }

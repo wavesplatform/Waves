@@ -9,7 +9,7 @@ case class MessageHandler(specs: Seq[MessageSpec[_]]) {
 
   import Message._
 
-  private val specsMap = Map(specs.map(s => s.messageCode -> s): _*)
+  private val specsMap = Map[MessageCode, MessageSpec[_]](specs.map(s => s.messageCode -> s): _*)
     .ensuring(m => m.size == specs.size, "Duplicate message codes")
 
   /**

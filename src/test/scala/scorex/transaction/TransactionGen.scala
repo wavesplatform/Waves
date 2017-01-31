@@ -5,10 +5,9 @@ import org.scalatest.Matchers._
 import org.scalatest.enablers.Containing
 import org.scalatest.matchers.{BeMatcher, MatchResult}
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
-import scorex.utils.{ByteArray, NTP}
+import scorex.utils.{ByteArrayExtension, NTP}
 
 trait TransactionGen {
 
@@ -32,12 +31,12 @@ trait TransactionGen {
   val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen)))
 
   val assetPairGen = Gen.zip(assetIdGen, assetIdGen).
-    suchThat(p => !ByteArray.sameOption(p._1, p._2)).
+    suchThat(p => !ByteArrayExtension.sameOption(p._1, p._2)).
     map(p => AssetPair(p._1, p._2))
 
   val paymentGenerator: Gen[PaymentTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
-    fee: Long <- Gen.choose(0,Long.MaxValue - amount -1 )
+    fee: Long <- Gen.choose(0, Long.MaxValue - amount - 1)
     timestamp: Long <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     recipient: PrivateKeyAccount <- accountGen
@@ -52,7 +51,7 @@ trait TransactionGen {
 
   val transferGenerator: Gen[TransferTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
-    feeAmount: Long <- Gen.choose(0, Long.MaxValue- amount - 1)
+    feeAmount: Long <- Gen.choose(0, Long.MaxValue - amount - 1)
     assetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
     feeAssetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
     timestamp: Long <- positiveLongGen
@@ -64,7 +63,7 @@ trait TransactionGen {
 
   val transferGeneratorWithNoneFeeAssetId: Gen[TransferTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
-    feeAmount: Long <- Gen.choose(0, Long.MaxValue- amount - 1)
+    feeAmount: Long <- Gen.choose(0, Long.MaxValue - amount - 1)
     assetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
     timestamp: Long <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
@@ -159,10 +158,10 @@ trait TransactionGen {
     val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
     val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
     val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
-    val trans = ExchangeTransaction.create(matcher,o1, o2, price, matchedAmount,
+    val trans = ExchangeTransaction.create(matcher, o1, o2, price, matchedAmount,
       buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100).right.get
 
-    (trans,matcher)
+    (trans, matcher)
   }
 
   implicit val orderMatchArb: Arbitrary[(ExchangeTransaction, PrivateKeyAccount)] = Arbitrary {
