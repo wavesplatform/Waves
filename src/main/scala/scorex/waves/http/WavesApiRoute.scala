@@ -104,10 +104,10 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
         postJsonRoute {
           walletNotExists(wallet).getOrElse {
             Try(Json.parse(body)).map { js =>
-              js.validate[Payment] match {
+              js.validate[PaymentRequest] match {
                 case err: JsError =>
                   WrongTransactionJson(err).response
-                case JsSuccess(payment: Payment, _) =>
+                case JsSuccess(payment: PaymentRequest, _) =>
                   val txOpt = wallet.privateKeyAccount(payment.sender).map { sender =>
                     PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee,
                       NTP.correctedTime())
