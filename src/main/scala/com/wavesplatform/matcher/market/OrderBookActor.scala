@@ -66,13 +66,15 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     sender() ! GetOrderStatusResponse(getOrderStatus(id))
   }
 
-  def handleCancelOrder(cancel: CancelOrder) = {
+  private def handleCancelOrder(cancel: CancelOrder) = {
     val v = validateCancelOrder(cancel)
     if (v) {
-      persist(OrderBook.cancelOrder(orderBook, cancel.orderId)) {
-        case c@Some(Events.OrderCanceled(lo)) if cancel.req.sender == lo.order.sender =>
-          handleCancelEvent(c.get)
-          sender() ! OrderCanceled(cancel.orderId)
+      OrderBook.cancelOrder(orderBook, cancel.orderId) match {
+        case Some(oc) if cancel.req.sender == oc.limitOrder.order.sender =>
+          persist(oc) { v =>
+            handleCancelEvent(oc)
+            sender() ! OrderCanceled(cancel.orderId)
+          }
         case _ => sender() ! OrderCancelRejected("Order not found")
       }
     } else {
@@ -116,7 +118,6 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       case OrderAdded(o) => didOrderAccepted(o)
       case e: OrderExecuted => didOrderExecuted(e)
       case e: Events.OrderCanceled => didOrderCanceled(e)
-      case _ =>
     }
   }
 
