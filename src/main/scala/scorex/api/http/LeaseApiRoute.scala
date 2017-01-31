@@ -7,13 +7,13 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.api.http.assets.LeaseRequest
+import scorex.api.http.assets.{LeaseCancelRequest, LeaseRequest}
 import scorex.app.Application
-import scorex.transaction.{SimpleTransactionModule, StateCheckFailed}
+import scorex.transaction.SimpleTransactionModule
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
-@Path("/lease")
+@Path("/leasing")
 @Api(value = "/lease/")
 class LeaseApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
@@ -25,12 +25,12 @@ class LeaseApiRoute(application: Application)(implicit val context: ActorRefFact
   private implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
 
   override val route =
-    pathPrefix("lease") {
-      lease
+    pathPrefix("leasing") {
+      lease ~ cancel
     }
 
   @Path("/lease")
-  @ApiOperation(value = "Creates a lease transaction",
+  @ApiOperation(value = "Creates a lease",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
@@ -40,8 +40,8 @@ class LeaseApiRoute(application: Application)(implicit val context: ActorRefFact
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.PaymentRequest",
-      defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
+      dataType = "scorex.transaction.state.wallet.LeaseRequest",
+      defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"untilBlock\":\"blockId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
@@ -55,17 +55,45 @@ class LeaseApiRoute(application: Application)(implicit val context: ActorRefFact
                 case err: JsError =>
                   WrongTransactionJson(err).response
                 case JsSuccess(r: LeaseRequest, _) =>
-                  transactionModule.lease(r, wallet) match {
-                    case Success(txVal) =>
-                      txVal match {
-                        case Right(tx) => JsonResponse(tx.json, StatusCodes.OK)
-                        case Left(e) => WrongJson.response
-                      }
-                    case Failure(e: StateCheckFailed) =>
-                      StateCheckFailed.response
-                    case _ =>
-                      WrongJson.response
-                  }
+                  transactionModule.lease(r, wallet).map {
+                    _.fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
+                  }.getOrElse(InvalidSender.response)
+              }
+            }.getOrElse(WrongJson.response)
+          }
+        }
+      }
+    }
+  }
+
+  @Path("/lease")
+  @ApiOperation(value = "Interrupt a lease",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.transaction.state.wallet.LeaseCancelRequest",
+      defaultValue = "{\n\t\"sender\":\"senderId\",\n\t\"txId\":\"leaseTranscationId\"\n}"
+    )
+  ))
+  def cancel: Route = path("cancel") {
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          walletNotExists(wallet).getOrElse {
+            Try(Json.parse(body)).map { js =>
+              js.validate[LeaseCancelRequest] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).response
+                case JsSuccess(r: LeaseCancelRequest, _) =>
+                  transactionModule.leaseCancel(r, wallet).map {
+                    _.fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
+                  }.getOrElse(InvalidSender.response)
               }
             }.getOrElse(WrongJson.response)
           }
