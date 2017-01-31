@@ -15,13 +15,12 @@ import scala.util.Try
 
 @Path("/leasing")
 @Api(value = "/lease/")
-class LeaseApiRoute(application: Application)(implicit val context: ActorRefFactory)
+case class LeaseApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   val settings = application.settings
 
   private val wallet = application.wallet
-  private val state = application.blockStorage.state
   private implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
 
   override val route =
