@@ -2,6 +2,7 @@ package com.wavesplatform.matcher.model
 
 import akka.serialization._
 import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
+import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import play.api.libs.functional.syntax._
@@ -14,11 +15,10 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.collection.immutable.TreeMap
 
-class EventSerializer extends Serializer {
-  import EventsJson._
+abstract class SerializerBase(val identifier: Int, val includeManifest: Boolean = false) extends Serializer
 
-  val includeManifest: Boolean = false
-  val identifier = 1001
+class EventSerializer extends SerializerBase(1001) {
+  import EventsJson._
 
   def toBinary(obj: AnyRef): Array[Byte] = {
     obj match {
@@ -36,11 +36,8 @@ class EventSerializer extends Serializer {
   }
 }
 
-class SnapshotSerializer extends Serializer {
+class SnapshotSerializer extends SerializerBase(2001) {
   import EventsJson._
-
-  val includeManifest: Boolean = false
-  val identifier = 2001
 
   def toBinary(obj: AnyRef): Array[Byte] = {
     obj match {
@@ -54,6 +51,16 @@ class SnapshotSerializer extends Serializer {
     val json = Json.parse(bytes)
     snapshotFormat.reads(json).get
   }
+}
+
+class OrderBookCreatedSerializer extends SerializerBase(3001) {
+  override def toBinary(o: AnyRef): Array[Byte] = o match {
+    case obc: OrderBookCreated =>
+      Json.stringify(EventsJson.orderBookCreatedWrites.writes(obc)).getBytes
+    case other => throw new Exception(s"Cannot serialize $other")
+  }
+  override def fromBinary(bytes: Array[Byte], manifest: Option[Class[_]]): AnyRef =
+    EventsJson.orderBookCreatedReads.reads(Json.parse(bytes)).get
 }
 
 object EventsJson {
@@ -144,7 +151,7 @@ object EventsJson {
   implicit val orderCanceledReads: Reads[OrderCanceled] =
     (JsPath \ "o").read[LimitOrder](limitOrderReads).map(OrderCanceled.apply)
 
-  implicit val orderBookeCreatedWrites = new Writes[OrderBookCreated] {
+  implicit val orderBookCreatedWrites = new Writes[OrderBookCreated] {
     def writes(e: OrderBookCreated): JsValue = Json.obj(
       "a1" -> e.pair.first.map(Base58.encode),
       "a2" -> e.pair.second.map(Base58.encode))
@@ -163,7 +170,6 @@ object EventsJson {
     val OrderAddedId=  JsNumber(1)
     val OrderExecutedId =  JsNumber(2)
     val OrderCanceledId =  JsNumber(3)
-    val OrderBookCreatedId =  JsNumber(4)
 
     override def writes(event: Event): JsValue = {
       event match {
@@ -173,8 +179,6 @@ object EventsJson {
           Json.arr(OrderExecutedId, orderExecutedWrites.writes(e))
         case e: OrderCanceled =>
           Json.arr(OrderCanceledId, orderCanceledWrites.writes(e))
-        case e: OrderBookCreated =>
-          Json.arr(OrderBookCreatedId, orderBookeCreatedWrites.writes(e))
       }
     }
 
@@ -186,8 +190,6 @@ object EventsJson {
           orderExecutedReads.reads(jsEvent)
         case JsArray(Seq(`OrderCanceledId`, jsEvent)) =>
           orderCanceledReads.reads(jsEvent)
-        case JsArray(Seq(`OrderBookCreatedId`, jsEvent)) =>
-          orderBookCreatedReads.reads(jsEvent)
         case e => JsError("Unexpected event:" + e)
 
       }
@@ -215,6 +217,4 @@ object EventsJson {
     (JsPath \ "o").format[OrderBook] and
       (JsPath \ "h").format[Map[String, (Long, Long)]]
     )(Snapshot.apply, unlift(Snapshot.unapply))
-
 }
-

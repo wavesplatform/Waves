@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
-import scorex.api.http.{NegativeFee, NoBalance, _}
+import scorex.api.http._
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
 import scorex.transaction.{PaymentTransaction, ValidationError}
@@ -61,28 +61,18 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
           walletNotExists(wallet).getOrElse {
             Try(Json.parse(body)).map { js =>
               js.validate[Payment] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
+                case err: JsError => WrongTransactionJson(err).response
                 case JsSuccess(payment: Payment, _) =>
-                  val txOpt = transactionModule.createPayment(payment, wallet)
-                  txOpt match {
-                    case Some(paymentVal) =>
-                      paymentVal match {
-                        case Right(tx) =>
-                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                            tx.sender, tx.sender.address, Base58.encode(tx.signature))
-                          JsonResponse(Json.toJson(signed), StatusCodes.OK)
-                        case Left(err) =>
-                          err match {
-                            case ValidationError.InvalidAddress => InvalidAddress.response
-                            case ValidationError.NegativeAmount => NegativeAmount.response
-                            case ValidationError.InsufficientFee => InsufficientFee.response
-                            case ValidationError.NoBalance => NoBalance.response
-                          }
-                      }
-                    case None => InvalidSender.response
-                  }
-              }
+                  transactionModule
+                    .createPayment(payment, wallet)
+                    .fold(InvalidSender.response) { paymentVal =>
+                      paymentVal.fold(ApiError.fromValidationError, { tx =>
+                        val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
+                          tx.sender, tx.sender.address, Base58.encode(tx.signature))
+                        JsonResponse(Json.toJson(signed), StatusCodes.OK)
+                      })
+                    }
+                }
             }.getOrElse(WrongJson.response)
           }
         }
@@ -115,28 +105,19 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
           walletNotExists(wallet).getOrElse {
             Try(Json.parse(body)).map { js =>
               js.validate[Payment] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
+                case err: JsError => WrongTransactionJson(err).response
                 case JsSuccess(payment: Payment, _) =>
                   val txOpt = wallet.privateKeyAccount(payment.sender).map { sender =>
-                    PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
+                    PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee,
+                      NTP.correctedTime())
                   }
-                  txOpt match {
-                    case Some(paymentVal) =>
-                      paymentVal match {
-                        case Right(tx) =>
-                          val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                            tx.sender, tx.sender.address, Base58.encode(tx.signature))
-                          JsonResponse(Json.toJson(signed), StatusCodes.OK)
-                        case Left(err) =>
-                          err match {
-                            case ValidationError.InvalidAddress => InvalidAddress.response
-                            case ValidationError.NegativeAmount => NegativeAmount.response
-                            case ValidationError.InsufficientFee => InsufficientFee.response
-                            case ValidationError.NoBalance => NoBalance.response
-                          }
-                      }
-                    case None => InvalidSender.response
+
+                  txOpt.fold(InvalidSender.response) { paymentVal =>
+                    paymentVal.fold(ApiError.fromValidationError, { tx =>
+                      val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
+                        tx.sender, tx.sender.address, Base58.encode(tx.signature))
+                      JsonResponse(Json.toJson(signed), StatusCodes.OK)
+                    })
                   }
               }
             }.getOrElse(WrongJson.response)
@@ -180,18 +161,13 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                 val senderAccount = Wallet.generateNewAccount(senderWalletSeed, payment.senderAddressNonce)
                 val recipientAccount = new Account(payment.recipient)
 
-                transactionModule.createSignedPayment(senderAccount, recipientAccount,
-                  payment.amount, payment.fee, payment.timestamp) match {
-                  case Right(tx) =>
-                    val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                      tx.sender, tx.sender.address, Base58.encode(tx.signature))
+                transactionModule
+                  .createSignedPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
+                  .fold(ApiError.fromValidationError, { tx =>
+                    val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient, tx.sender,
+                      tx.sender.address, Base58.encode(tx.signature))
                     JsonResponse(Json.toJson(signedTx), StatusCodes.OK)
-
-                  case Left(e) => e match {
-                    case ValidationError.NoBalance => NoBalance.response
-                    case ValidationError.InvalidAddress => InvalidAddress.response
-                  }
-                }
+                })
               }
           }
         }.getOrElse(WrongJson.response)
@@ -275,19 +251,9 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     }
   }
 
-  private def broadcastPayment(payment: SignedPayment): JsonResponse = {
-    transactionModule.broadcastPayment(payment) match {
-      case Right(tx) =>
-        JsonResponse(tx.json, StatusCodes.OK)
-      case Left(e) => e match {
-        case ValidationError.NoBalance => NoBalance.response
-        case ValidationError.InvalidAddress => InvalidAddress.response
-        case ValidationError.InsufficientFee => InsufficientFee.response
-        case ValidationError.InvalidSignature => InvalidSignature.response
-        case _ => Unknown.response
-      }
-    }
-  }
+  private def broadcastPayment(payment: SignedPayment): JsonResponse =
+    transactionModule.broadcastPayment(payment)
+      .fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
 
   @Deprecated
   private def broadcastPayment(payment: ExternalPayment): JsonResponse = {
@@ -295,16 +261,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     val signedPayment = SignedPayment(payment.timestamp, payment.amount, payment.fee, payment.recipient,
       payment.senderPublicKey, senderAccount.address, Base58.encode(payment.signature))
 
-    transactionModule.broadcastPayment(signedPayment) match {
-      case Right(tx) =>
-        JsonResponse(tx.json, StatusCodes.OK)
-      case Left(e) => e match {
-        case ValidationError.NoBalance => NoBalance.response
-        case ValidationError.InvalidAddress => InvalidAddress.response
-        case ValidationError.InsufficientFee => NegativeFee.response
-        case ValidationError.InvalidSignature => InvalidSignature.response
-        case _ => Unknown.response
-      }
-    }
+    transactionModule.broadcastPayment(signedPayment)
+      .fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
   }
 }

@@ -3,7 +3,6 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Props}
 import akka.persistence.PersistentActor
 import com.wavesplatform.matcher.market.OrderBookActor.{NotFoundPair, OrderBookRequest, OrderRejected}
-import com.wavesplatform.matcher.model.Events.OrderBookCreated
 import com.wavesplatform.settings.WavesSettings
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.TransactionModule
@@ -21,11 +20,14 @@ object MatcherActor {
   def props(storedState: StoredState, wallet: Wallet, settings: WavesSettings,
             transactionModule: TransactionModule[StoredInBlock]): Props =
     Props(new MatcherActor(storedState, wallet, settings, transactionModule))
+
+  case class OrderBookCreated(pair: AssetPair)
 }
 
 class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSettings,
                    transactionModule: TransactionModule[StoredInBlock]
                   ) extends PersistentActor with ScorexLogging {
+  import MatcherActor._
 
   def createOrderBook(pair: AssetPair): ActorRef =
     context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule),
@@ -44,7 +46,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
     }
   }
 
-  def returNotFound(): Unit = {
+  def returnNotFound(): Unit = {
     sender() ! NotFoundPair
   }
 
@@ -65,7 +67,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
     case ob: OrderBookRequest =>
       checkAssetPair(ob) {
         context.child(OrderBookActor.name(ob.assetPair))
-          .fold(returNotFound())(forwardReq(ob))
+          .fold(returnNotFound())(forwardReq(ob))
       }
   }
 

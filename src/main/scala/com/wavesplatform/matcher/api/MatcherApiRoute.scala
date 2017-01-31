@@ -147,20 +147,6 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     }
   }
 
-  val smallRoute: Route =
-    pathPrefix("matcher") {
-      get {
-        pathSingleSlash {
-          complete {
-            "Captain on the bridge!"
-          }
-        } ~
-          path("ping") {
-            complete("PONG!")
-          }
-      }
-    }
-
   @Path("/orders/place")
   @ApiOperation(value = "Place order",
     notes = "Place a new limit order (buy or sell)",
