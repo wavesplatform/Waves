@@ -86,7 +86,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
   }
 
   def forwardToOrderBook: Receive = {
-    case GetMarkets =>
+    case m: GetMarkets =>
       sender() ! GetMarketsResponse(openMarkets)
     case order: Order =>
       checkAssetPair(order) {

@@ -6,6 +6,7 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.settings.WavesSettings
 import io.swagger.annotations._
@@ -38,7 +39,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      place ~ matcherPubKey ~ orderStatus ~ balance ~ orderBook ~ cancel
+      place ~ matcherPubKey ~ orderStatus ~ balance ~ orderBook ~ cancel ~ getMarkets
     }
 
   @Path("/publicKey")
@@ -181,6 +182,17 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
           }.get
         }
       }
+    }
+  }
+
+  @Path("/markets")
+  @ApiOperation(value = "Get the open trading markets",
+    notes = "Get the open trading markets along with trading pairs meta data", httpMethod = "GET")
+  def getMarkets: Route = path("markets") {
+    getJsonRoute {
+      (matcher ? GetMarkets())
+        .mapTo[GetMarketsResponse]
+        .map(r => JsonResponse(r.json, StatusCodes.OK))
     }
   }
 
