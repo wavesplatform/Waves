@@ -23,7 +23,7 @@ class LeaseExtendedState(storage: StateStorageI with LeaseExtendedStateStorageI)
       val leaseOpt = storage.getLeaseTx(tx.leaseId)
       leaseOpt.exists(isActive)
     case tx: LeaseTransaction =>
-      tx.untilBlock >= storage.stateHeight &&
+      tx.untilBlock >= storage.stateHeight + 1000 &&
         effectiveBalance(tx.sender) >= tx.amount
     case _ => true
   }
