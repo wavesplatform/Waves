@@ -31,7 +31,7 @@ object ExchangeTransaction {
                                              sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte])
     extends ExchangeTransaction with BytesSerializable {
 
-    override val transactionType: TransactionType.Value = TransactionType.OrderMatchTransaction
+    override val transactionType: TransactionType.Value = TransactionType.ExchangeTransaction
 
     override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
 
@@ -48,16 +48,13 @@ object ExchangeTransaction {
 
     override def bytes: Array[Byte] = toSign ++ signature
 
-    override def json: JsObject = Json.obj(
+    override def json: JsObject = jsonBase() ++ Json.obj(
       "order1" -> buyOrder.json,
       "order2" -> sellOrder.json,
       "price" -> price,
       "amount" -> amount,
       "buyMatcherFee" -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee,
-      "fee" -> fee,
-      "timestamp" -> timestamp,
-      "signature" -> Base58.encode(signature)
     )
 
     override def balanceChanges(): Seq[BalanceChange] = {
@@ -131,7 +128,7 @@ object ExchangeTransaction {
   }
 
   def parseBytes(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {
-    require(bytes.head == TransactionType.OrderMatchTransaction.id)
+    require(bytes.head == TransactionType.ExchangeTransaction.id)
     parseTail(bytes.tail).get
   }
 
