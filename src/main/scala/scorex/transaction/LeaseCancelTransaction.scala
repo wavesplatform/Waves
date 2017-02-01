@@ -4,54 +4,45 @@ import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.EllipticCurveImpl.SignatureLength
+import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TypedTransaction.{KeyLength, _}
 
 import scala.util.{Failure, Success, Try}
 
 sealed trait LeaseCancelTransaction extends SignedTransaction {
-  def amount: Long
-
   def fee: Long
 
-  def untilBlock: Long
-
-  def recipient: Account
+  def leaseId: Array[Byte]
 }
 
 object LeaseCancelTransaction extends Deser[LeaseCancelTransaction] {
 
   private case class LeaseCancelTransactionImpl(sender: PublicKeyAccount,
-                                          amount: Long,
-                                          fee: Long,
-                                          timestamp: Long,
-                                          untilBlock: Long,
-                                          recipient: Account,
-                                          signature: Array[Byte])
+                                                leaseId: Array[Byte],
+                                                fee: Long,
+                                                timestamp: Long,
+                                                signature: Array[Byte])
     extends LeaseCancelTransaction {
 
     override val transactionType: TransactionType.Value = TransactionType.LeaseCancelTransaction
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
       sender.publicKey,
-      recipient.bytes,
-      Longs.toByteArray(amount),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp),
-      Longs.toByteArray(untilBlock))
+      leaseId)
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "amount" -> amount,
       "fee" -> fee,
       "timestamp" -> timestamp,
-      "untilBlock" -> untilBlock
+      "leaseId" -> Base58.encode(leaseId)
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
     override lazy val balanceChanges: Seq[BalanceChange] = Seq.empty
-    override lazy val effectiveBalanceChanges: Seq[EffectiveBalanceChange] = Seq(
-      EffectiveBalanceChange(sender, amount),
-      EffectiveBalanceChange(recipient, -amount))
 
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
@@ -63,63 +54,46 @@ object LeaseCancelTransaction extends Deser[LeaseCancelTransaction] {
   }
 
   def parseTail(bytes: Array[Byte]): Try[LeaseCancelTransaction] = Try {
-    import EllipticCurveImpl._
     val sender = new PublicKeyAccount(bytes.slice(0, KeyLength))
-    val recipient = new PublicKeyAccount(bytes.slice(KeyLength, KeyLength + Account.AddressLength))
-    val quantityStart = KeyLength + Account.AddressLength
-
-    val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
-    val fee = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
-    val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
-    val untilBlock = Longs.fromByteArray(bytes.slice(quantityStart + 24, quantityStart + 32))
-    val signature = bytes.slice(quantityStart + 32, quantityStart + 32 + SignatureLength)
+    val fee = Longs.fromByteArray(bytes.slice(KeyLength + 8, KeyLength + 16))
+    val timestamp = Longs.fromByteArray(bytes.slice(KeyLength + 16, KeyLength + 24))
+    val leaseId = bytes.slice(KeyLength + 24, KeyLength + 24 + DigestSize)
+    val signature = bytes.slice(KeyLength + 24 + DigestSize, KeyLength + 24 + DigestSize + SignatureLength)
     LeaseCancelTransaction
-      .create(sender, quantity, fee, timestamp, untilBlock, recipient, signature)
+      .create(sender, leaseId, fee, timestamp, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
   private def createUnverified(sender: PublicKeyAccount,
-                               amount: Long,
+                               leaseId: Array[Byte],
                                fee: Long,
                                timestamp: Long,
-                               untilBlock: Long,
-                               recipient: Account,
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseCancelTransactionImpl] = {
-    if (amount <= 0) {
+    if (leaseId.length != DigestSize) {
       Left(ValidationError.NegativeAmount)
-    } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress)
     } else if (!Account.isValid(sender)) {
       Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
-    } else if (untilBlock <= 0) {
-      Left(ValidationError.NegativeUntilBlock)
     } else {
-      Right(LeaseCancelTransactionImpl(sender, amount, fee, timestamp, untilBlock, recipient, signature.orNull))
+      Right(LeaseCancelTransactionImpl(sender, leaseId, fee, timestamp, signature.orNull))
     }
   }
 
   def create(sender: PublicKeyAccount,
-             amount: Long,
+             leaseId: Array[Byte],
              fee: Long,
              timestamp: Long,
-             untilBlock: Long,
-             recipient: Account,
              signature: Array[Byte]): Either[ValidationError, LeaseCancelTransaction] = {
-    createUnverified(sender, amount, fee, timestamp, untilBlock, recipient, Some(signature))
+    createUnverified(sender, leaseId, fee, timestamp, Some(signature))
       .right.flatMap(SignedTransaction.verify)
   }
 
   def create(sender: PrivateKeyAccount,
-             amount: Long,
+             leaseId: Array[Byte],
              fee: Long,
-             timestamp: Long,
-             untilBlock: Long,
-             recipient: Account): Either[ValidationError, LeaseCancelTransaction] = {
-    createUnverified(sender, amount, fee, timestamp, untilBlock, recipient).right.map { unsigned =>
+             timestamp: Long): Either[ValidationError, LeaseCancelTransaction] = {
+    createUnverified(sender, leaseId, fee, timestamp).right.map { unsigned =>
       unsigned.copy(signature = EllipticCurveImpl.sign(sender, unsigned.toSign))
     }
   }
