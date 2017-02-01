@@ -10,5 +10,11 @@ trait LeaseExtendedStateStorageI {
 
   def removeEffectiveBalanceChanges(key: Address, height: Int): Row
 
+  def getLastEffectiveBalanceChangeHeight(a: Address): Option[Int]
+
   def getLeaseTx(leaseTxId: Array[Byte]): Option[LeaseTransaction]
+
+  def getLeasedSum(address: Address): Long
+
+  def updateLeasedSum(address: Address, delta: Long): Unit
 }

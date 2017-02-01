@@ -14,7 +14,7 @@ class EffectiveBalanceChangesBuilder(leaseState: LeaseExtendedStateStorageI) {
   }
 }
 
-class LeaseExtendedState(storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with StateExtension {
+class LeaseExtendedState(storedState: StoredState, storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with StateExtension {
 
   val effectiveBalanceChangesBuilder = new EffectiveBalanceChangesBuilder(storage)
 
@@ -24,7 +24,7 @@ class LeaseExtendedState(storage: StateStorageI with LeaseExtendedStateStorageI)
       leaseOpt.exists(isActive)
     case tx: LeaseTransaction =>
       tx.untilBlock >= storage.stateHeight + 1000 &&
-        effectiveBalance(tx.sender) >= tx.amount
+        storedState.balance(tx.sender) - tx.fee - storage.getLeasedSum(tx.sender.address) >= tx.amount
     case _ => true
   }
 
@@ -35,6 +35,8 @@ class LeaseExtendedState(storage: StateStorageI with LeaseExtendedStateStorageI)
   private def isActive(leaseTransaction: LeaseTransaction): Boolean = {
     storage.stateHeight < leaseTransaction.untilBlock
   }
+
+  def rollbackTo(height: Int): Unit = ???
 
   override def process(tx: Transaction, blockTs: Long, height: Int): Unit = ???
 
