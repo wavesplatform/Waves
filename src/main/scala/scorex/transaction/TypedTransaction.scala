@@ -2,7 +2,8 @@ package scorex.transaction
 
 import scorex.serialization.Deser
 import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.{ExchangeTransaction}
+import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 import scala.util.{Failure, Try}
 
