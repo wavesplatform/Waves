@@ -15,6 +15,7 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.{ChainParameters, Settings}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.assets.{BurnTransaction, _}
+import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
 import scorex.utils._

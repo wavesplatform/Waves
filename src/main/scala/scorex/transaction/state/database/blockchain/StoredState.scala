@@ -27,6 +27,7 @@ import scala.util.control.NonFatal
   * Use fromDB method of StoredState object to create new instance
   */
 class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
+                  val leaseExtendedState: LeaseExtendedState,
                   val assetsExtension: AssetsExtendedState,
                   val incrementingTimestampValidator: IncrementingTimestampValidator,
                   val validators: Seq[StateExtension],
@@ -382,27 +383,29 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     (BigInt(FastCryptographicHash(toString.getBytes)) % Int.MaxValue).toInt
   }
 
+  override def effectiveBalance(account: Account, height: Option[Int]): Long = leaseExtendedState.effectiveBalance(account, height)
 }
 
 object StoredState {
   def fromDB(mvStore: MVStore, settings: ChainParameters): StoredState = {
-    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage {
+    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage with MVStoreLeaseExtendedStateStorage {
       override val db: MVStore = mvStore
       if (db.getStoreVersion > 0) {
         db.rollback()
       }
     }
-    val extendedState = new AssetsExtendedState(storage)
+    val assetExtendedState = new AssetsExtendedState(storage)
+    val leaseExtendedState = new LeaseExtendedState(storage)
     val incrementingTimestampValidator = new IncrementingTimestampValidator(settings, storage)
     val validators = Seq(
-      extendedState,
+      assetExtendedState,
       incrementingTimestampValidator,
       new GenesisValidator,
       new OrderMatchStoredState(storage),
       new IncludedValidator(storage, settings),
       new ActivatedValidator(settings)
     )
-    new StoredState(storage, extendedState, incrementingTimestampValidator, validators, settings)
+    new StoredState(storage, leaseExtendedState, assetExtendedState, incrementingTimestampValidator, validators, settings)
   }
 
 }

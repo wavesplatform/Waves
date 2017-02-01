@@ -14,7 +14,6 @@ trait Transaction extends StateChangeReason with JsonSerializable {
   val timestamp: Long
 
   def balanceChanges(): Seq[BalanceChange]
-  def effectiveBalanceChanges(): Seq[EffectiveBalanceChange] = Seq.empty
 
   override def equals(other: Any): Boolean = other match {
     case tx: Transaction => id.sameElements(tx.id)
