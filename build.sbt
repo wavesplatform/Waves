@@ -1,7 +1,7 @@
 import com.typesafe.config.ConfigFactory
 import sbt.Keys._
 
-val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
+val appConf = ConfigFactory.parseFile(new File("src/main/resources/reference.conf")).resolve().getConfig("app")
 
 inThisBuild(Seq(
   organization in ThisBuild := "com.wavesplatform",
