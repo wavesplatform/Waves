@@ -395,6 +395,7 @@ object StoredState {
       }
     }
     val assetExtendedState = new AssetsExtendedState(storage)
+    val leaseExtendedState = new LeaseExtendedState(???, storage)
     val incrementingTimestampValidator = new IncrementingTimestampValidator(settings, storage)
     val validators = Seq(
       assetExtendedState,
@@ -404,7 +405,7 @@ object StoredState {
       new IncludedValidator(storage, settings),
       new ActivatedValidator(settings)
     )
-    new StoredState(storage, ???, assetExtendedState, incrementingTimestampValidator, validators, settings)
+    new StoredState(storage, leaseExtendedState, assetExtendedState, incrementingTimestampValidator, validators, settings)
   }
 
 }
