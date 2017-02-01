@@ -9,10 +9,10 @@ import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
 import scorex.api.http._
+import scorex.api.http.assets.PaymentRequest
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
 import scorex.transaction.{PaymentTransaction, ValidationError}
-import scorex.transaction.state.wallet.PaymentRequest
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 import scorex.waves.transaction.{ExternalPayment, SignedPayment, WavesTransactionModule}
@@ -49,7 +49,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.PaymentRequest",
+      dataType = "PaymentRequest",
       defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))
@@ -93,7 +93,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.PaymentRequest",
+      dataType = "PaymentRequest",
       defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))

@@ -6,7 +6,7 @@ import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 
 
-class BroadcastRequestsSpec extends FunSuite with Matchers {
+class SignedAssetsRequestsTest extends FunSuite with Matchers {
 
   test("AssetIssueRequest json parsing works") {
     val json =
@@ -23,7 +23,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
           "fee": 100000
         }
       """
-    val req = Json.parse(json).validate[AssetIssueRequest].get
+    val req = Json.parse(json).validate[SignedAssetIssueRequest].get
     req.name shouldBe "string"
     req.quantity shouldBe 100000L
     req.fee shouldBe 100000L
@@ -54,7 +54,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |"signature":"4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[AssetReissueRequest].get
+    val req = Json.parse(json).validate[SignedAssetReissueRequest].get
     req.assetId shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     req.signature shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
     req.fee shouldBe 100000L
@@ -86,7 +86,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |   "attachment":"A"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[AssetTransferRequest].get
+    val req = Json.parse(json).validate[SignedAssetTransferRequest].get
     req.recipient.address shouldBe "3Myss6gmMckKYtka3cKCM563TBJofnxvfD7"
     req.timestamp shouldBe 1479462208828L
     req.assetId shouldBe Some("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u")
@@ -117,7 +117,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |"signature":"H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[AssetBurnRequest].get
+    val req = Json.parse(json).validate[SignedAssetBurnRequest].get
     req.senderPublicKey shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     req.signature shouldBe "H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
     req.fee shouldBe 100000000L

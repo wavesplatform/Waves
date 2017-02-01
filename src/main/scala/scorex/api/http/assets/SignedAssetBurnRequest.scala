@@ -11,17 +11,17 @@ import scorex.transaction.assets._
 
 import scala.util.Try
 
-case class AssetBurnRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+case class SignedAssetBurnRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
                             senderPublicKey: String,
-                            @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
+                                  @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
                             assetId: String,
-                            @ApiModelProperty(required = true, example = "1000000")
+                                  @ApiModelProperty(required = true, example = "1000000")
                             amount: Long,
-                            @ApiModelProperty(required = true)
+                                  @ApiModelProperty(required = true)
                             fee: Long,
-                            @ApiModelProperty(required = true)
+                                  @ApiModelProperty(required = true)
                             timestamp: Long,
-                            @ApiModelProperty(required = true)
+                                  @ApiModelProperty(required = true)
                             signature: String) {
 
   def toTx: Try[BurnTransaction] = Try {
@@ -35,17 +35,17 @@ case class AssetBurnRequest(@ApiModelProperty(value = "Base58 encoded Issuer pub
   }
 }
 
-object AssetBurnRequest {
+object SignedAssetBurnRequest {
 
 
   //TODO put reads/writes together?
-  implicit val assetBurnRequestReads: Reads[AssetBurnRequest] = (
+  implicit val assetBurnRequestReads: Reads[SignedAssetBurnRequest] = (
     (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").read[String] and
       (JsPath \ "quantity").read[Long] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "signature").read[String]
-    ) (AssetBurnRequest.apply _)
+    ) (SignedAssetBurnRequest.apply _)
 
 }

@@ -13,7 +13,7 @@ import scorex.waves.transaction.WavesTransactionModule
 
 import scala.reflect.runtime.universe._
 import com.wavesplatform.actor.RootActorSystem
-import scorex.api.http.assets.AssetsBroadcastApiRoute
+import scorex.api.http.assets.SignedAssetsApiRoute
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.settings.Settings
 import com.wavesplatform.matcher.MatcherApplication
@@ -51,7 +51,7 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     WavesApiRoute(this),
     AssetsApiRoute(this),
     NodeApiRoute(this),
-    AssetsBroadcastApiRoute(this),
+    SignedAssetsApiRoute(this),
     LeaseApiRoute(this)
   )
 
@@ -68,7 +68,7 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     typeOf[WavesApiRoute],
     typeOf[AssetsApiRoute],
     typeOf[NodeApiRoute],
-    typeOf[AssetsBroadcastApiRoute],
+    typeOf[SignedAssetsApiRoute],
     typeOf[LeaseApiRoute]
   )
 

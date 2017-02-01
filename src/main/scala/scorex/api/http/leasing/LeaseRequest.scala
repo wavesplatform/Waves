@@ -1,4 +1,4 @@
-package scorex.api.http.assets
+package scorex.api.http.leasing
 
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._

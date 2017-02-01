@@ -12,23 +12,23 @@ import scala.util.Try
 import scorex.api.http.formats._
 
 @ApiModel(value = "Signed Asset issue transaction")
-case class AssetIssueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+case class SignedAssetIssueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
                              sender: PublicKeyAccount,
-                             @ApiModelProperty(value = "Base58 encoded name of Asset", required = true)
+                                   @ApiModelProperty(value = "Base58 encoded name of Asset", required = true)
                              name: String,
-                             @ApiModelProperty(value = "Base58 encoded description of Asset", required = true)
+                                   @ApiModelProperty(value = "Base58 encoded description of Asset", required = true)
                              description: String,
-                             @ApiModelProperty(required = true, example = "1000000")
+                                   @ApiModelProperty(required = true, example = "1000000")
                              quantity: Long,
-                             @ApiModelProperty(allowableValues = "range[0,8]", example = "8", dataType = "integer", required = true)
+                                   @ApiModelProperty(allowableValues = "range[0,8]", example = "8", dataType = "integer", required = true)
                              decimals: Byte,
-                             @ApiModelProperty(required = true)
+                                   @ApiModelProperty(required = true)
                              reissuable: Boolean,
-                             @ApiModelProperty(required = true)
+                                   @ApiModelProperty(required = true)
                              fee: Long,
-                             @ApiModelProperty(required = true)
+                                   @ApiModelProperty(required = true)
                              timestamp: Long,
-                             @ApiModelProperty(required = true)
+                                   @ApiModelProperty(required = true)
                              signature: String) {
 
   def toTx: Try[IssueTransaction] = Try {
@@ -46,9 +46,9 @@ case class AssetIssueRequest(@ApiModelProperty(value = "Base58 encoded Issuer pu
   }
 }
 
-object AssetIssueRequest {
+object SignedAssetIssueRequest {
 
-  implicit val assetIssueRequestReads: Reads[AssetIssueRequest] = (
+  implicit val assetIssueRequestReads: Reads[SignedAssetIssueRequest] = (
     (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
       (JsPath \ "name").read[String] and
       (JsPath \ "description").read[String] and
@@ -58,6 +58,6 @@ object AssetIssueRequest {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "signature").read[String](SignatureReads)
-    ) (AssetIssueRequest.apply _)
+    ) (SignedAssetIssueRequest.apply _)
 
 }
