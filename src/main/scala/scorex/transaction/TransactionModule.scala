@@ -22,7 +22,7 @@ trait TransactionModule {
 
   def clearFromUnconfirmed(data: Seq[Transaction]): Unit
 
-  def onNewOffchainTransaction(transaction: Transaction): Unit
+  def onNewOffchainTransaction(transaction: Transaction): Boolean
 
   lazy val balancesSupport: Boolean = blockStorage.state match {
     case _: State with BalanceSheet => true
