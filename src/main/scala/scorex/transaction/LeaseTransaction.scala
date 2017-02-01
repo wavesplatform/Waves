@@ -49,9 +49,6 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
     override lazy val balanceChanges: Seq[BalanceChange] = Seq.empty
-    override lazy val effectiveBalanceChanges: Seq[EffectiveBalanceChange] =
-      Seq(EffectiveBalanceChange(sender, -amount), EffectiveBalanceChange(recipient, amount))
-
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
   }
