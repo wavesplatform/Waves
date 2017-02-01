@@ -1,5 +1,6 @@
 package scorex.transaction.state.database.blockchain
 
+import com.google.common.base.Charsets
 import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.transaction.assets.{AssetIssuance, BurnTransaction, IssueTransaction, ReissueTransaction}
@@ -118,4 +119,10 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     } else false
   }
 
+  def getAssetName(assetId: AssetId): String = {
+    storage.getTransaction(assetId).flatMap {
+        case tx: IssueTransaction => Some(tx.asInstanceOf[IssueTransaction])
+        case _ => None
+      }.map(tx => new String(tx.name, Charsets.UTF_8)).getOrElse("Unknown")
+  }
 }
