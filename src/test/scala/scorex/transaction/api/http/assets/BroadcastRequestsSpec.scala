@@ -3,7 +3,6 @@ package scorex.transaction.api.http.assets
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 import scorex.api.http.assets._
-import scorex.api.http.assets.BroadcastResponses.{AssetIssueResponse, AssetReissueResponse, AssetTransferResponse}
 import scorex.crypto.encode.Base58
 
 
@@ -125,25 +124,4 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
     req.amount shouldBe 10000
   }
 
-  test("AssetIssueResponse json format test") {
-    val resp = AssetIssueResponse("id", "assetId", "sndPubKey", "assetName", "desc", 555L, 2.toByte, true, 100L, 132L, "sig")
-    val str = Json.toJson(resp).toString
-    assert(str == "{\"id\":\"id\",\"assetId\":\"assetId\",\"senderPublicKey\":\"sndPubKey\",\"name\":\"assetName\",\"description\":\"desc\",\"quantity\":555,\"decimals\":2,\"reissuable\":true,\"fee\":100,\"timestamp\":132,\"signature\":\"sig\"}")
-  }
-
-  test("AssetReissueResponse json format test") {
-    val resp = AssetReissueResponse("id", "assetId", "sndPubKey", 345L, true, 100L, 1L, "sig")
-    val str = Json.toJson(resp).toString
-    assert(str == "{\"id\":\"id\",\"assetId\":\"assetId\",\"senderPublicKey\":\"sndPubKey\",\"quantity\":345,\"reissuable\":true,\"fee\":100,\"timestamp\":1,\"signature\":\"sig\"}")
-  }
-
-  test("AssetTranferResponse json format test") {
-    val resp = AssetTransferResponse("id", Some("assetId"), "sndPubKey", "recip", 10L, 1L, 1L, None, "sig")
-    val str = Json.toJson(resp).toString
-    assert(str == "{\"id\":\"id\",\"assetId\":\"assetId\",\"senderPublicKey\":\"sndPubKey\",\"recipient\":\"recip\",\"amount\":10,\"fee\":1,\"timestamp\":1,\"signature\":\"sig\"}")
-
-    val respA = AssetTransferResponse("id", Some("assetId"), "sndPubKey", "recip", 10L, 1L, 1L, Some("atch"), "sig")
-    val strA = Json.toJson(respA).toString
-    assert(strA == "{\"id\":\"id\",\"assetId\":\"assetId\",\"senderPublicKey\":\"sndPubKey\",\"recipient\":\"recip\",\"amount\":10,\"fee\":1,\"timestamp\":1,\"attachment\":\"atch\",\"signature\":\"sig\"}")
-  }
 }
