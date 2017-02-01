@@ -8,12 +8,10 @@ import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.api.http.assets.{IssueRequest, TransferRequest}
-import scorex.api.http.assets.wallet.TransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.state.wallet.IssueRequest
 import scorex.utils.NTP
 
 /**

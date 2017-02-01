@@ -6,7 +6,6 @@ import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.api.http.assets._
-import scorex.api.http.assets.wallet._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
@@ -19,7 +18,6 @@ import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
-import scorex.transaction.state.wallet._
 import scorex.utils._
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPayment

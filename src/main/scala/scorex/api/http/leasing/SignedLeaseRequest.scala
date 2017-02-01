@@ -6,17 +6,19 @@ import play.api.libs.json.{JsPath, Reads}
 import scorex.api.http.formats.SignatureReads
 
 case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                 sender: String,
+                              sender: String,
                               @ApiModelProperty(required = true)
-                                 amount: Long,
+                              amount: Long,
                               @ApiModelProperty(required = true)
-                                 fee: Long,
+                              fee: Long,
                               @ApiModelProperty(required = true)
-                                 untilBlock: Long,
+                              untilBlock: Long,
                               @ApiModelProperty(value = "Recipient address", required = true)
-                                 recipient: String,
+                              recipient: String,
                               @ApiModelProperty(required = true)
-                                 signature: String)
+                              timestamp: Long,
+                              @ApiModelProperty(required = true)
+                              signature: String)
 
 object SignedLeaseRequest {
   implicit val broadcastLeaseRequestReads: Reads[SignedLeaseRequest] = (
@@ -25,6 +27,7 @@ object SignedLeaseRequest {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "untilBlock").read[Long] and
       (JsPath \ "recipient").read[String] and
+      (JsPath \ "timestamp").read[Long] and
       (JsPath \ "signature").read[String](SignatureReads)
     ) (SignedLeaseRequest.apply _)
 }

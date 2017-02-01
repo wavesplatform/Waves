@@ -12,19 +12,19 @@ import scorex.api.http.formats._
 
 
 case class SignedAssetReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                               senderPublicKey: PublicKeyAccount,
+                                     senderPublicKey: PublicKeyAccount,
                                      @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
-                               assetId: String,
+                                     assetId: String,
                                      @ApiModelProperty(required = true, example = "1000000")
-                               quantity: Long,
+                                     quantity: Long,
                                      @ApiModelProperty(required = true)
-                               reissuable: Boolean,
+                                     reissuable: Boolean,
                                      @ApiModelProperty(required = true)
-                               fee: Long,
+                                     fee: Long,
                                      @ApiModelProperty(required = true)
-                               timestamp: Long,
+                                     timestamp: Long,
                                      @ApiModelProperty(required = true)
-                               signature: String) {
+                                     signature: String) {
 
   def toTx: Try[ReissueTransaction] = Try {
     ReissueTransaction.create(

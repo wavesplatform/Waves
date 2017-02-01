@@ -6,7 +6,7 @@ import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 
 
-class BroadcastRequestsSpec extends FunSuite with Matchers {
+class SignedAssetsRequestsTest extends FunSuite with Matchers {
 
   test("AssetIssueRequest json parsing works") {
     val json =

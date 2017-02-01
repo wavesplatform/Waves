@@ -9,13 +9,11 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
 import scorex.api.http.assets.{BurnRequest, IssueRequest, ReissueRequest, TransferRequest}
-import scorex.api.http.assets.wallet.{IssueRequest, ReissueRequest, TransferRequest}
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.wallet._
 import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, ValidationError}
 import scorex.transaction.assets.exchange.OrderJson._
 
