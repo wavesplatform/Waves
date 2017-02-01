@@ -11,7 +11,7 @@ case class LeaseRequest(@ApiModelProperty(value = "Base58 encoded sender public 
                         @ApiModelProperty(required = true)
                         fee: Long,
                         @ApiModelProperty(required = true)
-                        untilBlock: Long,
+                        untilBlock: Int,
                         @ApiModelProperty(value = "Recipient address", required = true)
                         recipient: String)
 
@@ -20,7 +20,7 @@ object LeaseRequest {
     (JsPath \ "sender").read[String] and
       (JsPath \ "amount").read[Long] and
       (JsPath \ "fee").read[Long] and
-      (JsPath \ "untilBlock").read[Long] and
+      (JsPath \ "untilBlock").read[Int] and
       (JsPath \ "recipient").read[String]
     ) (LeaseRequest.apply _)
 }

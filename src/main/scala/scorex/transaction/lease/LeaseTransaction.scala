@@ -1,6 +1,6 @@
 package scorex.transaction.lease
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -15,7 +15,7 @@ sealed trait LeaseTransaction extends SignedTransaction {
 
   def fee: Long
 
-  def untilBlock: Long
+  def untilBlock: Int
 
   def recipient: Account
 }
@@ -26,7 +26,7 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
                                           amount: Long,
                                           fee: Long,
                                           timestamp: Long,
-                                          untilBlock: Long,
+                                          untilBlock: Int,
                                           recipient: Account,
                                           signature: Array[Byte])
     extends LeaseTransaction {
@@ -68,7 +68,7 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
     val fee = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
     val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
-    val untilBlock = Longs.fromByteArray(bytes.slice(quantityStart + 24, quantityStart + 32))
+    val untilBlock = Ints.fromByteArray(bytes.slice(quantityStart + 24, quantityStart + 32))
     val signature = bytes.slice(quantityStart + 32, quantityStart + 32 + SignatureLength)
     LeaseTransaction
       .create(sender, quantity, fee, timestamp, untilBlock, recipient, signature)
@@ -79,7 +79,7 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
                                amount: Long,
                                fee: Long,
                                timestamp: Long,
-                               untilBlock: Long,
+                               untilBlock: Int,
                                recipient: Account,
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseTransactionImpl] = {
     if (amount <= 0) {
@@ -103,7 +103,7 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             untilBlock: Long,
+             untilBlock: Int,
              recipient: Account,
              signature: Array[Byte]): Either[ValidationError, LeaseTransaction] = {
     createUnverified(sender, amount, fee, timestamp, untilBlock, recipient, Some(signature))
@@ -114,7 +114,7 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             untilBlock: Long,
+             untilBlock: Int,
              recipient: Account): Either[ValidationError, LeaseTransaction] = {
     createUnverified(sender, amount, fee, timestamp, untilBlock, recipient).right.map { unsigned =>
       unsigned.copy(signature = EllipticCurveImpl.sign(sender, unsigned.toSign))
