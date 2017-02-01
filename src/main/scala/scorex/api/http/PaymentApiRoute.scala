@@ -7,8 +7,10 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
+import scorex.api.http.assets.{PaymentRequest, TransferRequest}
+import scorex.api.http.assets.wallet.TransferRequest
 import scorex.app.RunnableApplication
-import scorex.transaction.state.wallet.{PaymentRequest, TransferRequest}
+import scorex.transaction.state.wallet.PaymentRequest
 import scorex.transaction.{SimpleTransactionModule, ValidationError}
 
 import scala.util.Try
@@ -37,7 +39,7 @@ case class PaymentApiRoute(application: RunnableApplication)(implicit val contex
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.PaymentRequest",
+      dataType = "PaymentRequest",
       defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))

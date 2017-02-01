@@ -11,19 +11,19 @@ import scala.util.Try
 import scorex.api.http.formats._
 
 
-case class AssetReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+case class SignedAssetReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
                                senderPublicKey: PublicKeyAccount,
-                               @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
+                                     @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
                                assetId: String,
-                               @ApiModelProperty(required = true, example = "1000000")
+                                     @ApiModelProperty(required = true, example = "1000000")
                                quantity: Long,
-                               @ApiModelProperty(required = true)
+                                     @ApiModelProperty(required = true)
                                reissuable: Boolean,
-                               @ApiModelProperty(required = true)
+                                     @ApiModelProperty(required = true)
                                fee: Long,
-                               @ApiModelProperty(required = true)
+                                     @ApiModelProperty(required = true)
                                timestamp: Long,
-                               @ApiModelProperty(required = true)
+                                     @ApiModelProperty(required = true)
                                signature: String) {
 
   def toTx: Try[ReissueTransaction] = Try {
@@ -38,9 +38,9 @@ case class AssetReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer 
   }
 }
 
-object AssetReissueRequest {
+object SignedAssetReissueRequest {
 
-  implicit val assetReissueRequestReads: Reads[AssetReissueRequest] = (
+  implicit val assetReissueRequestReads: Reads[SignedAssetReissueRequest] = (
     (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
       (JsPath \ "assetId").read[String] and
       (JsPath \ "quantity").read[Long] and
@@ -48,5 +48,5 @@ object AssetReissueRequest {
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "signature").read[String](SignatureReads)
-    ) (AssetReissueRequest.apply _)
+    ) (SignedAssetReissueRequest.apply _)
 }

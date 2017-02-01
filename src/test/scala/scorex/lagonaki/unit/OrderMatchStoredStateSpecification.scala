@@ -6,6 +6,8 @@ import org.h2.mvstore.MVStore
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{Account, PrivateKeyAccount}
+import scorex.api.http.assets.{IssueRequest, TransferRequest}
+import scorex.api.http.assets.wallet.TransferRequest
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
 import scorex.settings.ChainParameters
@@ -13,7 +15,7 @@ import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.extension.OrderMatchStoredState
-import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
+import scorex.transaction.state.wallet.IssueRequest
 import scorex.transaction.{AssetAcc, AssetId, GenesisTransaction, TransactionGen}
 import scorex.utils.{ByteArrayExtension, NTP}
 import scorex.wallet.Wallet

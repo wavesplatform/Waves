@@ -9,12 +9,14 @@ import org.h2.mvstore.MVStore
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.api.http.assets.{IssueRequest, TransferRequest}
+import scorex.api.http.assets.wallet.TransferRequest
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.BlockMock
-import scorex.settings.{Settings, ChainParameters}
+import scorex.settings.{ChainParameters, Settings}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
+import scorex.transaction.state.wallet.IssueRequest
 import scorex.transaction.{AssetAcc, GenesisTransaction}
 import scorex.wallet.Wallet
 

@@ -8,6 +8,8 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
+import scorex.api.http.assets.{BurnRequest, IssueRequest, ReissueRequest, TransferRequest}
+import scorex.api.http.assets.wallet.{IssueRequest, ReissueRequest, TransferRequest}
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
@@ -77,7 +79,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.TransferRequest",
+      dataType = "TransferRequest",
       defaultValue = "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
     )
   ))
@@ -123,7 +125,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.IssueRequest",
+      dataType = "IssueRequest",
       defaultValue = "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
     )
   ))
@@ -166,7 +168,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.ReissueRequest",
+      dataType = "ReissueRequest",
       defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100000,\"reissuable\":false,\"fee\":1}"
     )
   ))
@@ -209,7 +211,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.BurnRequest",
+      dataType = "BurnRequest",
       defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100,\"fee\":100000}"
     )
   ))

@@ -3,12 +3,14 @@ package scorex.lagonaki.integration
 import com.wavesplatform.settings.Constants
 import org.scalatest._
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.api.http.assets.{IssueRequest, TransferRequest}
+import scorex.api.http.assets.wallet.TransferRequest
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.mocks.BlockMock
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.state.database.state.extension.IncrementingTimestampValidator
-import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
+import scorex.transaction.state.wallet.IssueRequest
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
 import scorex.utils._
 

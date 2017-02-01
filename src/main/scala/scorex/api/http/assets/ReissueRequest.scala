@@ -1,10 +1,7 @@
-package scorex.transaction.state.wallet
+package scorex.api.http.assets
 
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Reads, Writes}
-import scorex.transaction.assets.IssueTransaction
-
-import scala.util.Try
 
 
 case class ReissueRequest(sender: String,

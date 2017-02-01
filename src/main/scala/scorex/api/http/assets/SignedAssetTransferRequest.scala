@@ -11,23 +11,23 @@ import scala.util.Try
 import scorex.api.http.formats._
 
 @ApiModel(value = "Signed Asset transfer transaction")
-case class AssetTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+case class SignedAssetTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                 sender: PublicKeyAccount,
-                                @ApiModelProperty(value = "Base58 encoded Asset ID")
+                                      @ApiModelProperty(value = "Base58 encoded Asset ID")
                                 assetId: Option[String],
-                                @ApiModelProperty(value = "Recipient address", required = true)
+                                      @ApiModelProperty(value = "Recipient address", required = true)
                                 recipient: Account,
-                                @ApiModelProperty(required = true, example = "1000000")
+                                      @ApiModelProperty(required = true, example = "1000000")
                                 amount: Long,
-                                @ApiModelProperty(required = true)
+                                      @ApiModelProperty(required = true)
                                 fee: Long,
-                                @ApiModelProperty(value = "Fee asset ID")
+                                      @ApiModelProperty(value = "Fee asset ID")
                                 feeAssetId: Option[String],
-                                @ApiModelProperty(required = true)
+                                      @ApiModelProperty(required = true)
                                 timestamp: Long,
-                                @ApiModelProperty(value = "Base58 encoded attachment")
+                                      @ApiModelProperty(value = "Base58 encoded attachment")
                                 attachment: Option[String],
-                                @ApiModelProperty(required = true)
+                                      @ApiModelProperty(required = true)
                                 signature: String) {
   def toTx: Try[TransferTransaction] = Try {
     TransferTransaction.create(
@@ -44,9 +44,9 @@ case class AssetTransferRequest(@ApiModelProperty(value = "Base58 encoded sender
 }
 
 
-object AssetTransferRequest {
+object SignedAssetTransferRequest {
 
-  implicit val assetTransferRequestReads: Reads[AssetTransferRequest] = (
+  implicit val assetTransferRequestReads: Reads[SignedAssetTransferRequest] = (
     (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
       (JsPath \ "assetId").readNullable[String] and
       (JsPath \ "recipient").read[Account] and
@@ -56,5 +56,5 @@ object AssetTransferRequest {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "attachment").readNullable[String] and
       (JsPath \ "signature").read[String](SignatureReads)
-    ) (AssetTransferRequest.apply _)
+    ) (SignedAssetTransferRequest.apply _)
 }

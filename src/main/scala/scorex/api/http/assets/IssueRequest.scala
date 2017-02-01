@@ -1,4 +1,4 @@
-package scorex.transaction.state.wallet
+package scorex.api.http.assets
 
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._

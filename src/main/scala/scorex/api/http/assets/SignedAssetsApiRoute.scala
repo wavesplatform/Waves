@@ -16,7 +16,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class AssetsBroadcastApiRoute(application: Application)(implicit val context: ActorRefFactory) extends ApiRoute
+case class SignedAssetsApiRoute(application: Application)(implicit val context: ActorRefFactory) extends ApiRoute
   with CommonTransactionApiFunctions {
   override val settings: Settings = application.settings
   val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
@@ -37,7 +37,7 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
       value = "Json with signed Issue transaction",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.BroadcastRequests$AssetIssueRequest")))
+      dataType = "scorex.api.http.assets.BroadcastRequests$SignedAssetIssueRequest")))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with signed Asset issue transaction contained Asset ID"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
@@ -45,8 +45,8 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
     entity(as[String]) { body =>
       postJsonRoute {
         Try(Json.parse(body)).map { js =>
-          js.validate[AssetIssueRequest] match {
-            case JsSuccess(request: AssetIssueRequest, _) =>
+          js.validate[SignedAssetIssueRequest] match {
+            case JsSuccess(request: SignedAssetIssueRequest, _) =>
               request.toTx.map(broadcast).getOrElse(WrongJson.response)
 
             case _: JsError => WrongJson.response
@@ -68,7 +68,7 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
       value = "Json with signed Reissue transaction",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.BroadcastRequests$AssetReissueRequest")))
+      dataType = "scorex.api.http.assets.SignedAssetReissueRequest")))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with signed Asset reissue transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
@@ -76,8 +76,8 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
     entity(as[String]) { body =>
       postJsonRoute {
         Try(Json.parse(body)).map { js =>
-          js.validate[AssetReissueRequest] match {
-            case JsSuccess(request: AssetReissueRequest, _) =>
+          js.validate[SignedAssetReissueRequest] match {
+            case JsSuccess(request: SignedAssetReissueRequest, _) =>
               request.toTx.map(broadcast).getOrElse(WrongJson.response)
 
             case _: JsError => WrongJson.response
@@ -99,7 +99,7 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
       value = "Json with signed Burn transaction",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.BroadcastRequests$AssetBurnRequest")))
+      dataType = "scorex.api.http.assets.SignedAssetBurnRequest")))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with signed Asset burn transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
@@ -107,8 +107,8 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
     entity(as[String]) { body =>
       postJsonRoute {
         Try(Json.parse(body)).map { js =>
-          js.validate[AssetBurnRequest] match {
-            case JsSuccess(request: AssetBurnRequest, _) =>
+          js.validate[SignedAssetBurnRequest] match {
+            case JsSuccess(request: SignedAssetBurnRequest, _) =>
               request.toTx.map (broadcast)
               .getOrElse(WrongJson.response)
 
@@ -131,7 +131,7 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
       value = "Array json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.BroadcastRequests$AssetTransferRequest",
+      dataType = "scorex.api.http.assets.SignedAssetBurnRequest",
       allowMultiple = true,
       defaultValue = "[{\n  \"assetId\": \"E9yZC4cVhCDfbjFJCc9CqkAtkoFy5KaCe64iaxHM2adG\",\n  \"senderPublicKey\": \"CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw\",\n  \"recipient\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n  \"fee\": 100000,\n  \"amount\": 5500000000,\n  \"attachment\": \"BJa6cfyGUmzBFTj3vvvaew\",\n  \"timestamp\": 1479222433704, \n  \"signature\": \"2TyN8pNS7mS9gfCbX2ktpkWVYckoAmRmDZzKH3K35DKs6sUoXHArzukV5hvveK9t79uzT3cA8CYZ9z3Utj6CnCEo\"\n, {\n  \"assetId\": \"E9yZC4cVhCDfbjFJCc9CqkAtkoFy5KaCe64iaxHM2adG\",\n  \"senderPublicKey\": \"CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw\",\n  \"recipient\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n  \"fee\": 100000,\n  \"amount\": 5500000000,\n  \"attachment\": \"BJa6cfyGUmzBFTj3vvvaew\",\n  \"timestamp\": 1479222433704, \n  \"signature\": \"2TyN8pNS7mS9gfCbX2ktpkWVYckoAmRmDZzKH3K35DKs6sUoXHArzukV5hvveK9t79uzT3cA8CYZ9z3Utj6CnCEo\"\n}]"
     )
@@ -140,10 +140,10 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
     entity(as[String]) { body =>
       postJsonRoute {
         Try(Json.parse(body)).map { js =>
-          js.validate[Array[AssetTransferRequest]] match {
+          js.validate[Array[SignedAssetTransferRequest]] match {
             case err: JsError =>
               WrongTransactionJson(err).response
-            case JsSuccess(requests: Array[AssetTransferRequest], _) =>
+            case JsSuccess(requests: Array[SignedAssetTransferRequest], _) =>
               val validTransactionsOpt = listTry2TryList(requests.map(_.toTx))
               validTransactionsOpt match {
                 case Success(txs) =>
@@ -183,7 +183,7 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
       value = "Json with signed Transfer transaction",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.BroadcastRequests$AssetTransferRequest")))
+      dataType = "scorex.api.http.assets.SignedAssetBurnRequest")))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with signed Asset transfer transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
@@ -191,8 +191,8 @@ case class AssetsBroadcastApiRoute(application: Application)(implicit val contex
     entity(as[String]) { body =>
       postJsonRoute {
         Try(Json.parse(body)).map { js =>
-          js.validate[AssetTransferRequest] match {
-            case JsSuccess(request: AssetTransferRequest, _) =>
+          js.validate[SignedAssetTransferRequest] match {
+            case JsSuccess(request: SignedAssetTransferRequest, _) =>
               request.toTx.map(broadcast).getOrElse(WrongJson.response)
 
             case _: JsError => WrongJson.response
