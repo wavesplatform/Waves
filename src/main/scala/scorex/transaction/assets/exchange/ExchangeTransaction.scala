@@ -54,7 +54,7 @@ object ExchangeTransaction {
       "price" -> price,
       "amount" -> amount,
       "buyMatcherFee" -> buyMatcherFee,
-      "sellMatcherFee" -> sellMatcherFee,
+      "sellMatcherFee" -> sellMatcherFee
     )
 
     override def balanceChanges(): Seq[BalanceChange] = {

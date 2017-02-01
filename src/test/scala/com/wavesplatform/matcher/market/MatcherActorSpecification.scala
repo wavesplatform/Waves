@@ -92,7 +92,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       actor ! order
       expectMsg(OrderAccepted(order))
 
-      actor ! GetMarkets
+      actor ! GetMarkets()
 
       expectMsgPF() {
         case GetMarketsResponse(Seq(MarketData(_, "Unknown","Unknown", _))) =>
