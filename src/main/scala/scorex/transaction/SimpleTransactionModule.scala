@@ -133,12 +133,13 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     txs.diff(valid).foreach(utxStorage.remove)
   }
 
-  override def onNewOffchainTransaction(transaction: Transaction): Unit =
+  override def onNewOffchainTransaction(transaction: Transaction): Boolean =
     if (putUnconfirmedIfNew(transaction)) {
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(transaction), None)
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
-    }
+      true
+    } else false
 
   def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
