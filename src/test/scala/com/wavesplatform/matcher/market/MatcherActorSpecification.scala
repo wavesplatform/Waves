@@ -23,7 +23,7 @@ import scorex.settings.ChainParameters
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest"))
@@ -112,7 +112,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       val pair1 = AssetPair(None, a1)
       val pair2 = AssetPair(a1, a2)
 
-      val now =  LocalDateTime.now().withNano(0)
+      val now =  NTP.correctedTime()
       val json = GetMarketsResponse(Seq(MarketData(pair1, waves, a1Name, now),
         MarketData(pair2, a1Name, a2Name, now))).json
 
@@ -121,7 +121,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       ((json \ "result") (0) \ "firstAssetName").as[String] shouldBe waves
       ((json \ "result") (0) \ "secondAssetId").as[String] shouldBe Base58.encode(a1.get)
       ((json \ "result") (0) \ "secondAssetName").as[String] shouldBe a1Name
-      ((json \ "result") (0) \ "created").as[String] shouldBe now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+      ((json \ "result") (0) \ "created").as[Long] shouldBe now
 
       ((json \ "result") (1) \ "secondAssetName").as[String] shouldBe a2Name
     }

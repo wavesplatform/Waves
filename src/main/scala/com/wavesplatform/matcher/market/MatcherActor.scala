@@ -14,7 +14,7 @@ import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{AssetId, TransactionModule}
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.collection.mutable
@@ -36,12 +36,12 @@ object MatcherActor {
         "firstAssetName" -> m.firstAssetName,
         "secondAssetId" -> m.pair.second.map(Base58.encode),
         "secondAssetName" -> m.secondAssetName,
-        "created" -> m.created.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        "created" -> m.created
       )))
     )
   }
 
-  case class MarketData(pair: AssetPair, firstAssetName: String, secondAssetName: String, created: LocalDateTime)
+  case class MarketData(pair: AssetPair, firstAssetName: String, secondAssetName: String, created: Long)
 }
 
 class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSettings,
@@ -54,7 +54,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
   def createOrderBook(pair: AssetPair): ActorRef = {
     def getAssetName(asset: Option[AssetId]) = asset.map(storedState.assetsExtension.getAssetName).getOrElse("WAVES")
 
-    openMarkets += MarketData(pair, getAssetName(pair.first), getAssetName(pair.second), LocalDateTime.now().withNano(0))
+    openMarkets += MarketData(pair, getAssetName(pair.first), getAssetName(pair.second), NTP.correctedTime())
 
     context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule),
       OrderBookActor.name(pair))
