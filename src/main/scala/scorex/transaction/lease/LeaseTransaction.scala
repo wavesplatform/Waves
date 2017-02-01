@@ -1,4 +1,4 @@
-package scorex.transaction
+package scorex.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
@@ -6,6 +6,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction._
+import scorex.transaction.{AssetId, BalanceChange, SignedTransaction, ValidationError}
 
 import scala.util.{Failure, Success, Try}
 
