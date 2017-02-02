@@ -240,7 +240,7 @@ case class BlocksApiRoute(application: Application) extends ApiRoute with Common
                       JsonResponse(Json.obj("message" -> "Checkpoint broadcasted"), StatusCodes.OK)
                   }
               }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }

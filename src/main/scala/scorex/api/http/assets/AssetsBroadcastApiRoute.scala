@@ -7,12 +7,13 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.api.http._
 import scorex.settings.Settings
-import scorex.transaction.{SimpleTransactionModule, Transaction, ValidationError}
+import scorex.transaction.{Transaction, TransactionModule, ValidationError}
 import akka.http.scaladsl.model.StatusCodes
+import scorex.transaction.SimpleTransactionModule.StoredInBlock
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class AssetsBroadcastApiRoute(settings: Settings, transactionModule: SimpleTransactionModule)
+case class AssetsBroadcastApiRoute(settings: Settings, transactionModule: TransactionModule[StoredInBlock])
   extends ApiRoute with CommonTransactionApiFunctions {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
@@ -174,8 +175,8 @@ case class AssetsBroadcastApiRoute(settings: Settings, transactionModule: Simple
     case Left(e) => e.response
     case Right(r) => JsonResponse(Json.toJson(r), StatusCodes.OK)
   }
-  private def parseToEither(body: String) = Exception.nonFatalCatch.either(Json.parse(body)).left.map(_ => WrongJson)
-  private def doValidate[A: Reads](js: JsValue) = js.validate[A].asEither.left.map(_ => WrongJson)
+  private def parseToEither(body: String) = Exception.nonFatalCatch.either(Json.parse(body)).left.map(t => WrongJson(cause = Some(t)))
+  private def doValidate[A: Reads](js: JsValue) = js.validate[A].asEither.left.map(e => WrongJson(errors = e))
   private def doBroadcast[A <: Transaction](v: Either[ValidationError, A]) =
     v.left.map(ApiError.fromValidationError).flatMap(broadcast)
 

@@ -31,6 +31,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe" % "ssl-config-core_2.12" % "0.2.1",
   "com.typesafe.akka" % "akka-actor_2.12" % "2.4.16",
   "com.typesafe.akka" % "akka-http-core_2.12" % "10.0.1",
+  "com.typesafe.akka" % "akka-http-testkit_2.12" % "10.0.3",
   "com.typesafe.akka" % "akka-http_2.12" % "10.0.1",
   "com.typesafe.akka" % "akka-parsing_2.12" % "10.0.1",
   "com.typesafe.akka" % "akka-persistence-query-experimental_2.12" % "2.4.16",
@@ -89,4 +90,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH 41eb6c35437fdb25d4cad8450bf6de395e47cdb4
+// LIBRARY_DEPENDENCIES_HASH 912a3cc8365167be143b38f8aaa12b796b0b2834

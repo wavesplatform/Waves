@@ -95,15 +95,15 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
                     case Success(txVal) =>
                       txVal match {
                         case Right(tx) => JsonResponse (tx.json, StatusCodes.OK)
-                        case Left(e) =>   WrongJson.response
+                        case Left(e) =>   WrongJson().response
                       }
                         case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
-                      WrongJson.response
+                      WrongJson().response
                   }
               }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }
@@ -143,10 +143,10 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
                     case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
-                      WrongJson.response
+                      WrongJson().response
                   }
               }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }
@@ -186,10 +186,10 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
                     case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
-                      WrongJson.response
+                      WrongJson().response
                   }
               }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }
@@ -229,10 +229,10 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
                     case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
-                      WrongJson.response
+                      WrongJson().response
                   }
               }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }
@@ -307,7 +307,7 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
             }
           }.recover {
             case t =>
-              Future.successful(WrongJson.response)
+              Future.successful(WrongJson().response)
           }.get
         }
       }

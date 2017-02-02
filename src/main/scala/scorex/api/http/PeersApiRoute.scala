@@ -99,7 +99,7 @@ case class PeersApiRoute(application: RunnableApplication) extends ApiRoute {
             application.networkController ! ConnectTo(add)
 
             JsonResponse(Json.obj("hostname" -> add.getHostName, "status" -> "Trying to connect"), StatusCodes.OK)
-          }.getOrElse(WrongJson.response)
+          }.getOrElse(WrongJson().response)
         }
       }
     }

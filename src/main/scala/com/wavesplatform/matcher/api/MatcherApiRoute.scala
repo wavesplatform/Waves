@@ -140,7 +140,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
           }
         }.recover {
           case _ =>
-            Future.successful(WrongJson.response)
+            Future.successful(WrongJson().response)
         }.get
       }
     }
@@ -175,7 +175,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
           }
         }.recover {
           case _ =>
-            Future.successful(WrongJson.response)
+            Future.successful(WrongJson().response)
         }.get
       }
     }
@@ -214,7 +214,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
             }
           }.recover {
             case _ =>
-              Future.successful(WrongJson.response)
+              Future.successful(WrongJson().response)
           }.get
         }
       }
