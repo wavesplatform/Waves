@@ -9,6 +9,7 @@ import scorex.api.http._
 import scorex.settings.Settings
 import scorex.transaction.{Transaction, TransactionModule, ValidationError}
 import akka.http.scaladsl.model.StatusCodes
+import scorex.serialization.JsonSerializable
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 
 @Path("/assets/broadcast")
@@ -46,7 +47,7 @@ case class AssetsBroadcastApiRoute(settings: Settings, transactionModule: Transa
           js <- parseToEither(body)
           i <- doValidate[AssetIssueRequest](js)
           r <- doBroadcast(i.toTx)
-        } yield AssetIssueResponse(r))
+        } yield r)
       }
     }
   }
@@ -74,7 +75,7 @@ case class AssetsBroadcastApiRoute(settings: Settings, transactionModule: Transa
           js <- parseToEither(body)
           ri <- doValidate[AssetReissueRequest](js)
           r <- doBroadcast(ri.toTx)
-        } yield AssetReissueResponse(r))
+        } yield r)
       }
     }
   }
@@ -102,7 +103,7 @@ case class AssetsBroadcastApiRoute(settings: Settings, transactionModule: Transa
           js <- parseToEither(body)
           b <- doValidate[AssetBurnRequest](js)
           r <- doBroadcast(b.toTx)
-        } yield AssetBurnResponse(r))
+        } yield r)
       }
     }
   }
@@ -134,9 +135,9 @@ case class AssetsBroadcastApiRoute(settings: Settings, transactionModule: Transa
 
         transferResult match {
           case Left(e) => e.response
-          case Right(tx) =>
-            val code = if (tx.forall(_.isRight)) StatusCodes.OK else StatusCodes.BadRequest
-            val json = tx.map(_.fold(_.json, t => Json.toJson(AssetTransferResponse(t))))
+          case Right(txs) =>
+            val code = if (txs.forall(_.isRight)) StatusCodes.OK else StatusCodes.BadRequest
+            val json = txs.map(_.fold(_.json, _.json))
             JsonResponse(Json.arr(json), code)
         }
       }
@@ -166,14 +167,14 @@ case class AssetsBroadcastApiRoute(settings: Settings, transactionModule: Transa
           js <- parseToEither(body)
           bt <- doValidate[AssetTransferRequest](js)
           tx <- doBroadcast(bt.toTx)
-        } yield AssetTransferResponse(tx))
+        } yield tx)
       }
     }
   }
 
-  private def mkResponse[A: Writes](result: Either[ApiError, A]): JsonResponse = result match {
+  private def mkResponse[A <: JsonSerializable](result: Either[ApiError, A]): JsonResponse = result match {
     case Left(e) => e.response
-    case Right(r) => JsonResponse(Json.toJson(r), StatusCodes.OK)
+    case Right(r) => JsonResponse(r.json, StatusCodes.OK)
   }
   private def parseToEither(body: String) = Exception.nonFatalCatch.either(Json.parse(body)).left.map(t => WrongJson(cause = Some(t)))
   private def doValidate[A: Reads](js: JsValue) = js.validate[A].asEither.left.map(e => WrongJson(errors = e))
