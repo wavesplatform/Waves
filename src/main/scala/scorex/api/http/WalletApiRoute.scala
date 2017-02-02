@@ -2,7 +2,6 @@ package scorex.api.http
 
 import javax.ws.rs.Path
 
-import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
@@ -12,8 +11,7 @@ import scorex.crypto.encode.Base58
 
 @Path("/wallet")
 @Api(value = "/wallet", description = "Wallet-related calls")
-case class WalletApiRoute(application: Application)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonTransactionApiFunctions {
+case class WalletApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
   val settings = application.settings.restAPISettings
 
   private val wallet = application.wallet

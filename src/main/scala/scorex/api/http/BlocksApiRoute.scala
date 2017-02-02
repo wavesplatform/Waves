@@ -19,8 +19,7 @@ import scala.util.Try
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(application: Application)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonTransactionApiFunctions {
+case class BlocksApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
 
   val MaxBlocksPerRequest = 100
 

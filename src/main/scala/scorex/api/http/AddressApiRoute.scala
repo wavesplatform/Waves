@@ -3,12 +3,11 @@ package scorex.api.http
 import java.nio.charset.StandardCharsets
 import javax.ws.rs.Path
 
-import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PublicKeyAccount}
 import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -17,8 +16,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(application: Application)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonTransactionApiFunctions {
+case class AddressApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
   val MaxAddressesPerRequest = 1000
 
   val settings = application.settings.restAPISettings

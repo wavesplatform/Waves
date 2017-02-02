@@ -1,6 +1,5 @@
 package scorex.api.http
 
-import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode}
 import akka.http.scaladsl.server._
@@ -17,7 +16,6 @@ final case class JsonResponse(response: JsValue, code: StatusCode)
 
 trait ApiRoute extends Directives with CommonApiFunctions {
   val settings: RestAPISettings
-  val context: ActorRefFactory
   val route: Route
 
   implicit val timeout = Timeout(5.seconds)

@@ -26,9 +26,7 @@ import scala.util.Try
 
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(application: Application, matcher: ActorRef, matcherSettings: MatcherSettings)
-                          (implicit val settings: RestAPISettings, implicit val context: ActorRefFactory)
-  extends ApiRoute {
+case class MatcherApiRoute(application: Application, matcher: ActorRef, settings: RestAPISettings, matcherSettings: MatcherSettings) extends ApiRoute {
 
   val wallet: Wallet = application.wallet
   val storedState: StoredState = application.blockStorage.state.asInstanceOf[StoredState]
