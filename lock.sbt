@@ -32,6 +32,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe" % "ssl-config-core_2.12" % "0.2.1",
   "com.typesafe.akka" % "akka-actor_2.12" % "2.4.16",
   "com.typesafe.akka" % "akka-http-core_2.12" % "10.0.1",
+  "com.typesafe.akka" % "akka-http-testkit_2.12" % "10.0.3",
   "com.typesafe.akka" % "akka-http_2.12" % "10.0.1",
   "com.typesafe.akka" % "akka-parsing_2.12" % "10.0.1",
   "com.typesafe.akka" % "akka-persistence-query-experimental_2.12" % "2.4.16",
@@ -43,7 +44,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe.akka" % "akka-testkit_2.12" % "2.4.16",
   "com.typesafe.play" % "play-functional_2.12" % "2.6.0-M1",
   "com.typesafe.play" % "play-json_2.12" % "2.6.0-M1",
-  "commons-net" % "commons-net" % "3.5",
+  "commons-net" % "commons-net" % "3.6",
   "io.dropwizard.metrics" % "metrics-core" % "3.1.2",
   "io.netty" % "netty" % "3.10.0.Final",
   "io.netty" % "netty-buffer" % "4.0.37.Final",
@@ -85,9 +86,9 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scalatest" % "scalatest_2.12" % "3.0.1",
   "org.scalaz" % "scalaz-core_2.12" % "7.2.8",
   "org.scorexfoundation" % "scrypto_2.12" % "1.2.0",
-  "org.slf4j" % "slf4j-api" % "1.7.22",
+  "org.slf4j" % "slf4j-api" % "1.7.23",
   "org.typelevel" % "macro-compat_2.12" % "1.1.1",
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH ed6f60eff37d21329e98f6ba493ba2e243380312
+// LIBRARY_DEPENDENCIES_HASH 1cbd5dfb5c040d31a962e900924686469462f46f

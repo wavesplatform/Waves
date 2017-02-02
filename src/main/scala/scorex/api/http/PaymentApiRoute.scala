@@ -57,7 +57,7 @@ case class PaymentApiRoute(application: RunnableApplication) extends ApiRoute wi
                   paymentVal.fold(ApiError.fromValidationError(_).response, { tx => JsonResponse(tx.json, StatusCodes.OK) })
                 }.getOrElse(InvalidSender.response)
             }
-          }.getOrElse(WrongJson.response)
+          }.getOrElse(WrongJson().response)
         }
       }
     }

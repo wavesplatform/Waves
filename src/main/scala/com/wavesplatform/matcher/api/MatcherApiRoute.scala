@@ -104,7 +104,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
                       .mapTo[MatcherResponse]
                       .map(r => JsonResponse(r.json, r.code))
                 }
-              }.getOrElse(Future.successful(WrongJson.response))
+              }.getOrElse(Future.successful(WrongJson().response))
             }
           }
         }
@@ -144,7 +144,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
                       .mapTo[MatcherResponse]
                       .map(r => JsonResponse(r.json, r.code))
                 }
-              }.getOrElse(Future.successful(WrongJson.response))
+              }.getOrElse(Future.successful(WrongJson().response))
             }.getOrElse(Future.successful(getInvalidPairResponse))
           }
         }

@@ -1,7 +1,7 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsError, JsObject, JsPath, Json, JsonValidationError}
 import scorex.transaction.ValidationError
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -36,10 +36,18 @@ case object Unknown extends ApiError {
   override val message = "Error is unknown"
 }
 
-case object WrongJson extends ApiError {
+case class WrongJson(
+    cause: Option[Throwable] = None,
+    errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
   override val id = 1
   override val code = StatusCodes.BadRequest
-  override val message = "failed to parse json message"
+  override lazy val message = "failed to parse json message"
+  override lazy val json = Json.obj(
+    "error" -> id,
+    "message" -> message,
+    "cause" -> cause.map(_.toString),
+    "validationErrors" -> JsError.toJson(errors)
+  )
 }
 
 //API Auth

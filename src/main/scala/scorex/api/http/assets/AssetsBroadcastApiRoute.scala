@@ -7,7 +7,6 @@ import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.api.http._
-import com.wavesplatform.settings.RestAPISettings
 import scorex.transaction.{SimpleTransactionModule, Transaction, ValidationError}
 import akka.http.scaladsl.model.StatusCodes
 
@@ -175,8 +174,8 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
     case Left(e) => e.response
     case Right(r) => JsonResponse(Json.toJson(r), StatusCodes.OK)
   }
-  private def parseToEither(body: String) = Exception.nonFatalCatch.either(Json.parse(body)).left.map(_ => WrongJson)
-  private def doValidate[A: Reads](js: JsValue) = js.validate[A].asEither.left.map(_ => WrongJson)
+  private def parseToEither(body: String) = Exception.nonFatalCatch.either(Json.parse(body)).left.map(t => WrongJson(cause = Some(t)))
+  private def doValidate[A: Reads](js: JsValue) = js.validate[A].asEither.left.map(e => WrongJson(errors = e))
   private def doBroadcast[A <: Transaction](v: Either[ValidationError, A]) =
     v.left.map(ApiError.fromValidationError).flatMap(broadcast)
 

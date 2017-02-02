@@ -70,7 +70,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
                     })
                   }
             }
-          }.getOrElse(WrongJson.response)
+          }.getOrElse(WrongJson().response)
         }
       }
     }
@@ -115,7 +115,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
                   })
                 }
             }
-          }.getOrElse(WrongJson.response)
+          }.getOrElse(WrongJson().response)
         }
       }
     }
@@ -150,7 +150,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
             case JsSuccess(payment: UnsignedPayment, _) =>
               val senderWalletSeed = Base58.decode(payment.senderWalletSeed).getOrElse(Array.empty)
               if (senderWalletSeed.isEmpty)
-                WrongJson.response
+                WrongJson().response
               else {
                 val senderAccount = Wallet.generateNewAccount(senderWalletSeed, payment.senderAddressNonce)
                 val recipientAccount = new Account(payment.recipient)
@@ -164,7 +164,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
                   })
               }
           }
-        }.getOrElse(WrongJson.response)
+        }.getOrElse(WrongJson().response)
       }
     }
   }
@@ -180,7 +180,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
     } else if (errors.contains("/signature")) {
       InvalidSignature.response
     } else {
-      WrongJson.response
+      WrongJson().response
     }
   }
 
@@ -209,7 +209,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
             case JsSuccess(payment: ExternalPayment, _) =>
               broadcastPayment(payment)
           }
-        }.getOrElse(WrongJson.response)
+        }.getOrElse(WrongJson().response)
       }
     }
   }
@@ -240,7 +240,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
             case JsSuccess(payment: SignedPayment, _) =>
               broadcastPayment(payment)
           }
-        }.getOrElse(WrongJson.response)
+        }.getOrElse(WrongJson().response)
       }
     }
   }

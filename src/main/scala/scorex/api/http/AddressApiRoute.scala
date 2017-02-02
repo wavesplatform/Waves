@@ -278,7 +278,7 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
           Try(Json.parse(jsText)) match {
             case Success(parsed) => parsed.validate[SignedMessage] match {
               case err: JsError =>
-                WrongJson.response
+                WrongJson().response
               case JsSuccess(m: SignedMessage, _) =>
                 if (!Account.isValidAddress(address)) {
                   InvalidAddress.response
@@ -288,7 +288,7 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
                   verifySigned(msg, m.signature, m.publickey, address)
                 }
             }
-            case Failure(_) => WrongJson.response
+            case Failure(_) => WrongJson().response
           }
         }
       }
