@@ -16,17 +16,17 @@ trait ApiError {
 }
 
 object ApiError {
-  def fromValidationError(e: ValidationError) = e match {
-    case ValidationError.InvalidAddress => InvalidAddress.response
-    case ValidationError.NegativeAmount => NegativeAmount.response
-    case ValidationError.InsufficientFee => InsufficientFee.response
-    case ValidationError.NoBalance => NoBalance.response
-    case ValidationError.InvalidName => InvalidName.response
-    case ValidationError.InvalidSignature => InvalidSignature.response
-    case ValidationError.TooBigArray => TooBigArrayAllocation.response
-    case ValidationError.StateCheckFailed => StateCheckFailed.response
-    case ValidationError.OverflowError => OverflowError.response
-    case ValidationError.CustomValidationError(m) => CustomValidationError(m).response
+  def fromValidationError(e: ValidationError): ApiError = e match {
+    case ValidationError.InvalidAddress => InvalidAddress
+    case ValidationError.NegativeAmount => NegativeAmount
+    case ValidationError.InsufficientFee => InsufficientFee
+    case ValidationError.NoBalance => NoBalance
+    case ValidationError.InvalidName => InvalidName
+    case ValidationError.InvalidSignature => InvalidSignature
+    case ValidationError.TooBigArray => TooBigArrayAllocation
+    case ValidationError.StateCheckFailed => StateCheckFailed
+    case ValidationError.OverflowError => OverflowError
+    case ValidationError.CustomValidationError(m) => CustomValidationError(m)
   }
 }
 

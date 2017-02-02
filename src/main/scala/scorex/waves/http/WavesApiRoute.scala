@@ -63,7 +63,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
                 transactionModule
                   .createPayment(payment, wallet)
                   .fold(InvalidSender.response) { paymentVal =>
-                    paymentVal.fold(ApiError.fromValidationError, { tx =>
+                    paymentVal.fold(ApiError.fromValidationError(_).response, { tx =>
                       val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
                         tx.sender, tx.sender.address, Base58.encode(tx.signature))
                       JsonResponse(Json.toJson(signed), StatusCodes.OK)
@@ -108,7 +108,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
                 }
 
                 txOpt.fold(InvalidSender.response) { paymentVal =>
-                  paymentVal.fold(ApiError.fromValidationError, { tx =>
+                  paymentVal.fold(e => ApiError.fromValidationError(e).response, { tx =>
                     val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
                       tx.sender, tx.sender.address, Base58.encode(tx.signature))
                     JsonResponse(Json.toJson(signed), StatusCodes.OK)
@@ -157,7 +157,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
 
                 transactionModule
                   .createSignedPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
-                  .fold(ApiError.fromValidationError, { tx =>
+                  .fold(ApiError.fromValidationError(_).response, { tx =>
                     val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient, tx.sender,
                       tx.sender.address, Base58.encode(tx.signature))
                     JsonResponse(Json.toJson(signedTx), StatusCodes.OK)
@@ -247,7 +247,7 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
 
   private def broadcastPayment(payment: SignedPayment): JsonResponse =
     transactionModule.broadcastPayment(payment)
-      .fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
+      .fold(ApiError.fromValidationError(_).response, { tx => JsonResponse(tx.json, StatusCodes.OK) })
 
   @Deprecated
   private def broadcastPayment(payment: ExternalPayment): JsonResponse = {
@@ -256,6 +256,6 @@ case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with
       payment.senderPublicKey, senderAccount.address, Base58.encode(payment.signature))
 
     transactionModule.broadcastPayment(signedPayment)
-      .fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
+      .fold(ApiError.fromValidationError(_).response, { tx => JsonResponse(tx.json, StatusCodes.OK) })
   }
 }

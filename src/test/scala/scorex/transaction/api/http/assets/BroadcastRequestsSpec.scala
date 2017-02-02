@@ -32,7 +32,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
     req.timestamp shouldBe 1484064349669L
     req.reissuable shouldBe true
 
-    val tx = req.toTx.get
+    val tx = req.toTx.right.get
     Base58.encode(tx.name) shouldBe "zVbyBrMk"
     Base58.encode(tx.description) shouldBe "zVbyBrMk"
     tx.reissuable shouldBe true
@@ -63,7 +63,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
     req.timestamp shouldBe 1234L
     req.reissuable shouldBe true
 
-    val tx = req.toTx.get
+    val tx = req.toTx.right.get
     Base58.encode(tx.assetId) shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     tx.reissuable shouldBe true
     tx.fee shouldBe 100000L
@@ -97,7 +97,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
     req.signature shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
     req.attachment shouldBe Some("A")
 
-    val tx = req.toTx.get
+    val tx = req.toTx.right.get
     Base58.encode(tx.sender.publicKey) shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     tx.timestamp shouldBe 1479462208828L
     tx.attachment shouldBe Base58.decode("A").get

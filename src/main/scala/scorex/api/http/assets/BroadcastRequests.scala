@@ -8,8 +8,8 @@ import scorex.account.{Account, PublicKeyAccount}
 import scorex.api.http.formats._
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
-
-import scala.util.Try
+import scorex.transaction.ValidationError
+import scorex.transaction.ValidationError.InvalidSignature
 
 object BroadcastRequests {
 
@@ -33,19 +33,19 @@ object BroadcastRequests {
                                @ApiModelProperty(required = true)
                                signature: String) {
 
-    def toTx: Try[IssueTransaction] = Try {
-      IssueTransaction.create(
-        sender,
-        name.getBytes(Charsets.UTF_8),
-        description.getBytes(Charsets.UTF_8),
-        quantity,
-        decimals,
-        reissuable,
-        fee,
-        timestamp,
-        Base58.decode(signature).get
-      ).right.get
-    }
+    def toTx: Either[ValidationError, IssueTransaction] =
+      Base58.decode(signature).toEither.left.map(_ => InvalidSignature).flatMap { signature =>
+        IssueTransaction.create(
+          sender,
+          name.getBytes(Charsets.UTF_8),
+          description.getBytes(Charsets.UTF_8),
+          quantity,
+          decimals,
+          reissuable,
+          fee,
+          timestamp,
+          signature)
+      }
   }
 
 
@@ -64,16 +64,14 @@ object BroadcastRequests {
                                  @ApiModelProperty(required = true)
                                  signature: String) {
 
-    def toTx: Try[ReissueTransaction] = Try {
-      ReissueTransaction.create(
+    def toTx: Either[ValidationError, ReissueTransaction] = ReissueTransaction.create(
         senderPublicKey,
         Base58.decode(assetId).get,
         quantity,
         reissuable,
         fee,
         timestamp,
-        Base58.decode(signature).get).right.get
-    }
+        Base58.decode(signature).get)
   }
 
   case class AssetBurnRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
@@ -89,15 +87,13 @@ object BroadcastRequests {
                               @ApiModelProperty(required = true)
                                 signature: String) {
 
-    def toTx: Try[BurnTransaction] = Try {
-      BurnTransaction.create(
+    def toTx: Either[ValidationError, BurnTransaction] = BurnTransaction.create(
         new PublicKeyAccount(Base58.decode(senderPublicKey).get),
         Base58.decode(assetId).get,
         amount,
         fee,
         timestamp,
-        Base58.decode(signature).get).right.get
-    }
+        Base58.decode(signature).get)
   }
 
   @ApiModel(value = "Signed Asset transfer transaction")
@@ -119,7 +115,7 @@ object BroadcastRequests {
                                   attachment: Option[String],
                                   @ApiModelProperty(required = true)
                                   signature: String) {
-    def toTx: Try[TransferTransaction] = Try {
+    def toTx: Either[ValidationError, TransferTransaction] =
       TransferTransaction.create(
         assetId.map(Base58.decode(_).get),
         sender,
@@ -129,8 +125,7 @@ object BroadcastRequests {
         feeAssetId.map(_.getBytes),
         fee,
         attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
-        Base58.decode(signature).get).right.get
-    }
+        Base58.decode(signature).get)
   }
 
   implicit val assetTransferRequestReads: Reads[AssetTransferRequest] = (
@@ -167,7 +162,6 @@ object BroadcastRequests {
       (JsPath \ "signature").read[String](SignatureReads)
     ) (AssetReissueRequest.apply _)
 
-  //TODO put reads/writes together?
   implicit val assetBurnRequestReads: Reads[AssetBurnRequest] = (
     (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").read[String] and
@@ -177,4 +171,3 @@ object BroadcastRequests {
       (JsPath \ "signature").read[String]
     ) (AssetBurnRequest.apply _)
 }
-

@@ -54,7 +54,7 @@ case class PaymentApiRoute(application: RunnableApplication) extends ApiRoute wi
               case JsSuccess(p: Payment, _) =>
                 val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, "", p.recipient)
                 transactionModule.transferAsset(transferRequest, wallet).map { paymentVal =>
-                  paymentVal.fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
+                  paymentVal.fold(ApiError.fromValidationError(_).response, { tx => JsonResponse(tx.json, StatusCodes.OK) })
                 }.getOrElse(InvalidSender.response)
             }
           }.getOrElse(WrongJson.response)

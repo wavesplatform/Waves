@@ -1,8 +1,9 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-
-import akka.actor.ActorRefFactory
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
@@ -11,15 +12,11 @@ import scorex.account.Account
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
+import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
 import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed => TxStateCheckFailed}
-import scorex.transaction.assets.exchange.OrderJson._
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
 
 @Path("/assets")
 @Api(value = "assets")
@@ -61,7 +58,7 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
       getJsonRoute {
         Base58.decode(assetId) match {
           case Success(byteArray) => JsonResponse(Json.toJson(state.assetDistribution(byteArray)), StatusCodes.OK)
-          case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.CustomValidationError("Must be base58-encoded assetId"))
+          case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.CustomValidationError("Must be base58-encoded assetId")).response
         }
       }
     }
