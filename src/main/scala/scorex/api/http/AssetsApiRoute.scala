@@ -11,10 +11,10 @@ import scorex.account.Account
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
-import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, ValidationError}
+import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed => TxStateCheckFailed}
 import scorex.transaction.assets.exchange.OrderJson._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -98,7 +98,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                         case Right(tx) => JsonResponse (tx.json, StatusCodes.OK)
                         case Left(e) =>   WrongJson.response
                       }
-                        case Failure(e: StateCheckFailed) =>
+                        case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
                       WrongJson.response
@@ -141,7 +141,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   txOpt match {
                     case Success(tx) =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
+                    case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
                       WrongJson.response
@@ -184,7 +184,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   txOpt match {
                     case Success(tx) =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
+                    case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
                       WrongJson.response
@@ -227,7 +227,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   txOpt match {
                     case Success(tx) =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
+                    case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
                       WrongJson.response
