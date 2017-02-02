@@ -2,7 +2,6 @@ package scorex.consensus.nxt.api.http
 
 import javax.ws.rs.Path
 
-import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
@@ -10,14 +9,13 @@ import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress, JsonResponse}
 import scorex.app.RunnableApplication
-import scorex.consensus.nxt.{WavesConsensusModule}
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.encode.Base58
 
 
 @Path("/consensus")
 @Api(value = "/consensus")
-class NxtConsensusApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonApiFunctions {
+class NxtConsensusApiRoute(application: RunnableApplication) extends ApiRoute with CommonApiFunctions {
 
   val settings = application.settings
   private val consensusModule = application.consensusModule.asInstanceOf[WavesConsensusModule]

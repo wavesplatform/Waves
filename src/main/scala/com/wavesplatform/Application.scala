@@ -51,7 +51,7 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     WavesApiRoute(this),
     AssetsApiRoute(this),
     NodeApiRoute(this),
-    AssetsBroadcastApiRoute(this)
+    AssetsBroadcastApiRoute(settings, transactionModule)
   )
 
   override lazy val apiTypes = Seq(

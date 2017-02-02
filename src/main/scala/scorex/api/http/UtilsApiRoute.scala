@@ -3,7 +3,6 @@ package scorex.api.http
 import java.security.SecureRandom
 import javax.ws.rs.Path
 
-import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
@@ -14,8 +13,7 @@ import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(application: Application)(implicit val context: ActorRefFactory)
-  extends ApiRoute {
+case class UtilsApiRoute(application: Application) extends ApiRoute {
   val settings = application.settings
   val MaxSeedSize = 1024
   val DefaultSeedSize = 32

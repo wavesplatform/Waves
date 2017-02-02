@@ -3,7 +3,6 @@ package scorex.api.http
 import java.net.{InetAddress, InetSocketAddress}
 import javax.ws.rs.Path
 
-import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
@@ -19,8 +18,7 @@ import scala.util.Try
 
 @Path("/peers")
 @Api(value = "/peers", description = "Get info about peers", position = 2)
-case class PeersApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
-  extends ApiRoute {
+case class PeersApiRoute(application: RunnableApplication) extends ApiRoute {
   val MaxPeersInResponse = 1000
 
   val settings = application.settings

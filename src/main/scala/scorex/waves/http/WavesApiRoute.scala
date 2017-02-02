@@ -2,7 +2,6 @@ package scorex.waves.http
 
 import javax.ws.rs.Path
 
-import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
@@ -11,7 +10,7 @@ import scorex.account.Account
 import scorex.api.http._
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
-import scorex.transaction.{PaymentTransaction, ValidationError}
+import scorex.transaction.PaymentTransaction
 import scorex.transaction.state.wallet.Payment
 import scorex.utils.NTP
 import scorex.wallet.Wallet
@@ -22,8 +21,7 @@ import scala.util.Try
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonTransactionApiFunctions {
+case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with CommonTransactionApiFunctions {
 
   val settings = application.settings
 

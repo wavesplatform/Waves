@@ -16,10 +16,8 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class AssetsBroadcastApiRoute(application: Application)(implicit val context: ActorRefFactory) extends ApiRoute
-  with CommonTransactionApiFunctions {
-  override val settings: Settings = application.settings
-  val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
+case class AssetsBroadcastApiRoute(settings: Settings, transactionModule: SimpleTransactionModule)
+  extends ApiRoute with CommonTransactionApiFunctions {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer

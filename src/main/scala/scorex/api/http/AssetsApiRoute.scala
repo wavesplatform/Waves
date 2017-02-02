@@ -23,8 +23,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(application: Application)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonTransactionApiFunctions {
+case class AssetsApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
   val MaxAddressesPerRequest = 1000
 
   val settings = application.settings

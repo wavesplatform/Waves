@@ -2,7 +2,6 @@ package scorex.api.http
 
 import javax.ws.rs.Path
 
-import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
@@ -17,8 +16,7 @@ import scala.util.{Success, Try}
 
 @Path("/transactions")
 @Api(value = "/transactions", description = "Information about transactions")
-case class TransactionsApiRoute(application: Application)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonApiFunctions {
+case class TransactionsApiRoute(application: Application) extends ApiRoute with CommonApiFunctions {
   val MaxTransactionsPerRequest = 1000
 
   val settings = application.settings
