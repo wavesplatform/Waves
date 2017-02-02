@@ -133,9 +133,9 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
 
         transferResult match {
           case Left(e) => e.response
-          case Right(tx) =>
-            val code = if (tx.forall(_.isRight)) StatusCodes.OK else StatusCodes.BadRequest
-            val json = tx.map(_.fold(_.json, t => Json.toJson(AssetTransferResponse(t))))
+          case Right(txs) =>
+            val code = if (txs.forall(_.isRight)) StatusCodes.OK else StatusCodes.BadRequest
+            val json = txs.map(_.fold(_.json, _.json))
             JsonResponse(Json.arr(json), code)
         }
       }
