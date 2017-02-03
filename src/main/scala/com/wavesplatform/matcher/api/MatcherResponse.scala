@@ -22,3 +22,10 @@ trait GenericMatcherResponse extends MatcherResponse {
   def code: StatusCode = if (success) StatusCodes.OK else StatusCodes.BadRequest
 }
 
+case class StatusCodeMatcherResponse(override val code: StatusCode, message: String) extends GenericMatcherResponse {
+  override def success: Boolean = code == StatusCodes.OK
+}
+
+case class BadMatcherResponse(override val code: StatusCode, message: String) extends GenericMatcherResponse {
+  override def success: Boolean = code == StatusCodes.OK
+}

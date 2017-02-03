@@ -1,11 +1,12 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Props}
+import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.PersistentActor
-import com.wavesplatform.matcher.api.{GenericMatcherResponse, MatcherResponse}
-import com.wavesplatform.matcher.market.OrderBookActor.OrderBookRequest
+import com.wavesplatform.matcher.api.{GenericMatcherResponse, StatusCodeMatcherResponse}
+import com.wavesplatform.matcher.market.OrderBookActor.{GetOrderBookResponse, OrderBookRequest}
 import com.wavesplatform.settings.WavesSettings
-import play.api.libs.json.{JsArray, JsNull, JsValue, Json}
+import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
@@ -37,8 +38,10 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
     Try(msg.assetPair).isSuccess :| "Invalid AssetPair" &&
-      msg.assetPair.first.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :| "Unknown Asset ID" &&
-      msg.assetPair.second.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :| "Unknown Asset ID"
+      msg.assetPair.first.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
+        s"Unknown Asset ID: ${msg.assetPair.first.map(Base58.encode).getOrElse("")}" &&
+      msg.assetPair.second.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
+        s"Unknown Asset ID: ${msg.assetPair.second.map(Base58.encode).getOrElse("")}"
   }
 
   def createAndForward(order: Order): Unit = {
@@ -48,8 +51,8 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
     }
   }
 
-  def returnNotFoundPair(): Unit = {
-    sender() ! GetTradableResponse(false, "Unknown Assets Pair")
+  def returnEmptyOrderBook(pair: AssetPair): Unit = {
+    sender() ! GetOrderBookResponse(pair, Seq(), Seq())
   }
 
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
@@ -57,15 +60,12 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
   def checkAssetPair[A <: { def assetPair: AssetPair }](msg: A)(f: => Unit): Unit = {
     val v = basicValidation(msg)
     if (v) f
-    else sender() ! GetTradableResponse(v.status, v.messages())
+    else sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
   }
 
   def forwardToOrderBook: Receive = {
     case m: GetMarkets =>
       sender() ! GetMarketsResponse(openMarkets)
-    case GetTradable(a1, a2) =>
-      val msg = new {def assetPair = AssetPair(a1, a2)}
-      checkAssetPair(msg) (sender() ! GetTradableResponse(true, s"Pair: ${msg.assetPair} is tradable"))
     case order: Order =>
       checkAssetPair(order) {
         context.child(OrderBookActor.name(order.assetPair))
@@ -74,7 +74,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
     case ob: OrderBookRequest =>
       checkAssetPair(ob) {
         context.child(OrderBookActor.name(ob.assetPair))
-          .fold(returnNotFoundPair())(forwardReq(ob))
+          .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
       }
   }
 
@@ -111,9 +111,6 @@ object MatcherActor {
       ))
     )
   }
-
-  case class GetTradable(asset1: Option[AssetId], asset2: Option[AssetId])
-  case class GetTradableResponse(success: Boolean, message: String) extends GenericMatcherResponse
 
   case class MarketData(pair: AssetPair, firstAssetName: String, secondAssetName: String, created: Long)
 }

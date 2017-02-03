@@ -6,7 +6,7 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, GetTradable}
+import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.settings.WavesSettings
 import io.swagger.annotations._
@@ -31,15 +31,9 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
   val wallet: Wallet = application.wallet
   val storedState: StoredState = application.blockStorage.state.asInstanceOf[StoredState]
 
-  def postJsonRouteAsync(fn: Future[JsonResponse]): Route = {
-    onSuccess(fn) { res: JsonResponse =>
-      complete(res.code -> HttpEntity(ContentTypes.`application/json`, res.response.toString))
-    }
-  }
-
   override lazy val route: Route =
     pathPrefix("matcher") {
-      place ~ matcherPubKey ~ orderStatus ~ balance ~ orderBook ~ cancel ~ getMarkets ~ getTradable
+      place ~ matcherPubKey ~ orderStatus ~ balance ~ orderBook ~ cancel ~ getMarkets
     }
 
   @Path("/publicKey")
@@ -89,29 +83,27 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     }
   }
 
-  @Path("/orderBook")
+  @Path("/{assetPair}")
   @ApiOperation(value = "Get Order Book for a given Asset Pair",
     notes = "Get Order Book for a given Asset Pair", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "asset1", value = "Asset Id", required = true, dataType = "string", paramType = "query"),
-    new ApiImplicitParam(name = "asset2", value = "Asset Id or empty for WAVES", required = false, dataType = "string", paramType = "query"),
+    new ApiImplicitParam(name = "assetPair",
+      value = "Asset Ids separated by '-'. If a pair is against WAVES specify one Asset Id only." , required = false, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "depth", value = "Limit the number of bid/ask records returned", required = false, dataType = "integer", paramType = "query")
   ))
-  def orderBook: Route = {
-    path("orderBook") {
-      parameters('asset1, 'asset2.?, "depth".as[Int].?) { (asset1, asset2, depth) =>
-        getJsonRoute {
+  def orderBook: Route =
+    path(Base58String ~ ("-" ~ Base58String).?) { (a1, a2) =>
+      get {
+        jsonRouteAsync {
           Try {
-            val pair = AssetPair(Base58.decode(asset1).toOption, asset2.flatMap(Base58.decode(_).toOption))
-
-            (matcher ? GetOrderBookRequest(pair, depth))
+            (matcher ? GetOrderBookRequest(AssetPair(Some(a1), a2), None))
               .mapTo[MatcherResponse]
               .map(r => JsonResponse(r.json, r.code))
-          }.getOrElse(Future.successful(WrongJson.response))
+          }.getOrElse(Future.successful(
+            JsonResponse(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset Pair").json, StatusCodes.BadRequest)))
         }
       }
     }
-  }
 
   @Path("/orders/place")
   @ApiOperation(value = "Place order",
@@ -130,7 +122,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
   ))
   def place: Route = path("orders" / "place") {
     entity(as[String]) { body =>
-      postJsonRouteAsync {
+      jsonRouteAsync {
         Try(Json.parse(body)).map { js =>
           js.validate[Order] match {
             case err: JsError =>
@@ -168,7 +160,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
   def cancel: Route = path("orders" / "cancel") {
     parameters('asset1, 'asset2.?) { (asset1, asset2) =>
       entity(as[String]) { body =>
-        postJsonRouteAsync {
+        jsonRouteAsync {
           Try(Json.parse(body)).map { js =>
             js.validate[CancelOrderRequest] match {
               case err: JsError =>
@@ -199,25 +191,4 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     }
   }
 
-  @Path("/markets/tradable")
-  @ApiOperation(value = "Can a given Asset Pair be traded",
-    notes = "Check if a given Asset Pair can be traded", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "asset1", value = "Asset Id Base58-encoded", required = true, dataType = "string", paramType = "query"),
-    new ApiImplicitParam(name = "asset2", value = "Asset Id Base58-encoded or empty for WAVES", required = false, dataType = "string", paramType = "query")
-  ))
-  def getTradable: Route = path("markets" / "tradable") {
-    parameters('asset1, 'asset2.?) { (asset1, asset2) =>
-      getJsonRoute {
-        Try {
-          val a1 = Base58.decode(asset1).toOption
-          val a2 = asset2.flatMap(Base58.decode(_).toOption)
-
-          (matcher ? GetTradable(a1, a2))
-            .mapTo[MatcherResponse]
-            .map(r => JsonResponse(r.json, r.code))
-        }.getOrElse(Future.successful(WrongJson.response))
-      }
-    }
-  }
 }

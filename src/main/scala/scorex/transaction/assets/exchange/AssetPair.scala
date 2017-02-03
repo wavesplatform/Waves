@@ -5,7 +5,6 @@ import scorex.transaction._
 import scorex.utils.ByteArrayExtension
 
 case class AssetPair(private val pair: (Option[AssetId], Option[AssetId])) {
-  require(!ByteArrayExtension.sameOption(pair._1, pair._2))
   val first = if (ByteArrayExtension.compare(pair._1, pair._2) < 0) pair._1 else pair._2
   val second = if (ByteArrayExtension.compare(pair._1, pair._2) < 0) pair._2 else pair._1
 
