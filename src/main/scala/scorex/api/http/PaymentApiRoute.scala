@@ -49,19 +49,17 @@ case class PaymentApiRoute(application: RunnableApplication)(implicit val contex
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[Payment] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(p: Payment, _) =>
-                  val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, "", p.recipient)
-                  transactionModule.transferAsset(transferRequest, wallet).map { paymentVal =>
-                    paymentVal.fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
-                  }.getOrElse(InvalidSender.response)
-              }
-            }.getOrElse(WrongJson.response)
-          }
+          Try(Json.parse(body)).map { js =>
+            js.validate[Payment] match {
+              case err: JsError =>
+                WrongTransactionJson(err).response
+              case JsSuccess(p: Payment, _) =>
+                val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, "", p.recipient)
+                transactionModule.transferAsset(transferRequest, wallet).map { paymentVal =>
+                  paymentVal.fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
+                }.getOrElse(InvalidSender.response)
+            }
+          }.getOrElse(WrongJson.response)
         }
       }
     }

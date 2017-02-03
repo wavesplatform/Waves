@@ -10,12 +10,8 @@ import scorex.wallet.Wallet
 
 trait CommonTransactionApiFunctions extends CommonApiFunctions {
 
-  protected[api] def walletExists()(implicit wallet: Wallet): Option[JsObject] =
-    if (wallet.exists()) Some(WalletAlreadyExists.json) else None
-
   protected[api] def withPrivateKeyAccount(wallet: Wallet, address: String)
                                           (action: Account => JsValue): JsonResponse =
-    walletNotExists(wallet).getOrElse {
       if (!Account.isValidAddress(address)) {
         InvalidAddress.response
       } else {
@@ -24,10 +20,7 @@ trait CommonTransactionApiFunctions extends CommonApiFunctions {
           case Some(account) => JsonResponse(action(account), StatusCodes.OK)
         }
       }
-    }
 
-  protected[api] def walletNotExists(wallet: Wallet): Option[JsonResponse] =
-    if (!wallet.exists()) Some(WalletNotExist.response) else None
 
   def jsonResponse(result: ValidationError): JsonResponse = result match {
     case ValidationError.InsufficientFee => InsufficientFee.response

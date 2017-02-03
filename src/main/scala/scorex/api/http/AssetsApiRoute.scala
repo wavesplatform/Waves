@@ -85,27 +85,25 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[TransferRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(request: TransferRequest, _) =>
-                  val txOpt = transactionModule.transferAsset(request, wallet)
-                  txOpt match {
-                    case Success(txVal) =>
-                      txVal match {
-                        case Right(tx) => JsonResponse (tx.json, StatusCodes.OK)
-                        case Left(e) =>   WrongJson.response
-                      }
-                        case Failure(e: StateCheckFailed) =>
-                      StateCheckFailed.response
-                    case _ =>
-                      WrongJson.response
-                  }
-              }
-            }.getOrElse(WrongJson.response)
-          }
+          Try(Json.parse(body)).map { js =>
+            js.validate[TransferRequest] match {
+              case err: JsError =>
+                WrongTransactionJson(err).response
+              case JsSuccess(request: TransferRequest, _) =>
+                val txOpt = transactionModule.transferAsset(request, wallet)
+                txOpt match {
+                  case Success(txVal) =>
+                    txVal match {
+                      case Right(tx) => JsonResponse(tx.json, StatusCodes.OK)
+                      case Left(e) => WrongJson.response
+                    }
+                  case Failure(e: StateCheckFailed) =>
+                    StateCheckFailed.response
+                  case _ =>
+                    WrongJson.response
+                }
+            }
+          }.getOrElse(WrongJson.response)
         }
       }
     }
@@ -131,24 +129,22 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[IssueRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(issue: IssueRequest, _) =>
-                  val txOpt: Try[IssueTransaction] = transactionModule.issueAsset(issue, wallet)
-                  txOpt match {
-                    case Success(tx) =>
-                          JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
-                      StateCheckFailed.response
-                    case _ =>
-                      WrongJson.response
-                  }
-              }
-            }.getOrElse(WrongJson.response)
-          }
+          Try(Json.parse(body)).map { js =>
+            js.validate[IssueRequest] match {
+              case err: JsError =>
+                WrongTransactionJson(err).response
+              case JsSuccess(issue: IssueRequest, _) =>
+                val txOpt: Try[IssueTransaction] = transactionModule.issueAsset(issue, wallet)
+                txOpt match {
+                  case Success(tx) =>
+                    JsonResponse(tx.json, StatusCodes.OK)
+                  case Failure(e: StateCheckFailed) =>
+                    StateCheckFailed.response
+                  case _ =>
+                    WrongJson.response
+                }
+            }
+          }.getOrElse(WrongJson.response)
         }
       }
     }
@@ -174,24 +170,22 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[ReissueRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(issue: ReissueRequest, _) =>
-                  val txOpt: Try[ReissueTransaction] = transactionModule.reissueAsset(issue, wallet)
-                  txOpt match {
-                    case Success(tx) =>
-                          JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
-                      StateCheckFailed.response
-                    case _ =>
-                      WrongJson.response
-                  }
-              }
-            }.getOrElse(WrongJson.response)
-          }
+          Try(Json.parse(body)).map { js =>
+            js.validate[ReissueRequest] match {
+              case err: JsError =>
+                WrongTransactionJson(err).response
+              case JsSuccess(issue: ReissueRequest, _) =>
+                val txOpt: Try[ReissueTransaction] = transactionModule.reissueAsset(issue, wallet)
+                txOpt match {
+                  case Success(tx) =>
+                    JsonResponse(tx.json, StatusCodes.OK)
+                  case Failure(e: StateCheckFailed) =>
+                    StateCheckFailed.response
+                  case _ =>
+                    WrongJson.response
+                }
+            }
+          }.getOrElse(WrongJson.response)
         }
       }
     }
@@ -217,24 +211,22 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[BurnRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(burnRequest: BurnRequest, _) =>
-                  val txOpt: Try[BurnTransaction] = transactionModule.burnAsset(burnRequest, wallet)
-                  txOpt match {
-                    case Success(tx) =>
-                          JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
-                      StateCheckFailed.response
-                    case _ =>
-                      WrongJson.response
-                  }
-              }
-            }.getOrElse(WrongJson.response)
-          }
+          Try(Json.parse(body)).map { js =>
+            js.validate[BurnRequest] match {
+              case err: JsError =>
+                WrongTransactionJson(err).response
+              case JsSuccess(burnRequest: BurnRequest, _) =>
+                val txOpt: Try[BurnTransaction] = transactionModule.burnAsset(burnRequest, wallet)
+                txOpt match {
+                  case Success(tx) =>
+                    JsonResponse(tx.json, StatusCodes.OK)
+                  case Failure(e: StateCheckFailed) =>
+                    StateCheckFailed.response
+                  case _ =>
+                    WrongJson.response
+                }
+            }
+          }.getOrElse(WrongJson.response)
         }
       }
     }

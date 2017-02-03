@@ -13,7 +13,7 @@ case object WalletNotExist extends ApiError {
 
 case object WalletAddressNotExists extends ApiError {
   override val id: Int = 202
-  override val message: String = "address does not exist in wallet"
+  override val message: String = "private key for the public key does not exist in wallet"
   override val code: StatusCode = StatusCodes.NotFound
 }
 
