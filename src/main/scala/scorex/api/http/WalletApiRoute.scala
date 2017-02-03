@@ -18,7 +18,7 @@ case class WalletApiRoute(application: Application)(implicit val context: ActorR
 
   private val wallet = application.wallet
 
-  override lazy val route = root ~ seed
+  override lazy val route = seed
 
   @Path("/seed")
   @ApiOperation(value = "Seed", notes = "Export wallet seed", httpMethod = "GET")
@@ -28,16 +28,6 @@ case class WalletApiRoute(application: Application)(implicit val context: ActorR
         getJsonRoute {
           JsonResponse(Json.obj("seed" -> Base58.encode(wallet.seed)), StatusCodes.OK)
         }
-      }
-    }
-  }
-
-  @Path("/")
-  @ApiOperation(value = "Wallet", notes = "Display whether wallet exists or not", httpMethod = "GET")
-  def root: Route = {
-    path("wallet") {
-      getJsonRoute {
-        JsonResponse(Json.obj("exists" -> wallet.exists()), StatusCodes.OK)
       }
     }
   }
