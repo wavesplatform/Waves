@@ -134,12 +134,13 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     txs.diff(valid).foreach(utxStorage.remove)
   }
 
-  override def onNewOffchainTransaction(transaction: Transaction): Unit =
+  override def onNewOffchainTransaction(transaction: Transaction): Boolean =
     if (putUnconfirmedIfNew(transaction)) {
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(transaction), None)
       networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
-    }
+      true
+    } else false
 
   def createPayment(payment: PaymentRequest, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
@@ -205,28 +206,6 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       case Left(err) =>
         throw new IllegalArgumentException(err.toString)
 
-    }
-  }
-
-  /**
-    * Validate transaction according to the State and send it to network
-    */
-  def broadcastTransaction(tx: SignedTransaction): Either[ValidationError, Unit] = {
-    if (isValid(tx, tx.timestamp)) {
-      onNewOffchainTransaction(tx)
-      Right(())
-    } else Left(ValidationError.StateCheckFailed)
-  }
-
-  /**
-    * Validate transactions according to the State and send it to network
-    */
-  def broadcastTransactions(txs: Seq[SignedTransaction]): Either[ValidationError, Unit] = {
-    if (txs.nonEmpty && isValid(txs, txs.map(_.timestamp).max)) {
-      txs.foreach(onNewOffchainTransaction)
-      Right(())
-    } else {
-      Left(ValidationError.StateCheckFailed)
     }
   }
 
@@ -309,18 +288,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   /** Check whether tx is valid on current state and not expired yet
     */
-  override def isValid(tx: Transaction, blockTime: Long): Boolean = try {
-    val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-    val notExpired = (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
-    notExpired && blockStorage.state.isValid(tx, blockTime)
-  } catch {
-    case e: UnsupportedOperationException =>
-      log.debug(s"DB can't find last block because of unexpected modification")
-      false
-    case NonFatal(t) =>
-      log.error(s"Unexpected error during validation", t)
-      throw t
-  }
+  override def isValid(tx: Transaction, blockTime: Long): Boolean = isValid(Seq(tx), blockTime)
 
   /** Check whether txs is valid on current state and not expired yet
     */

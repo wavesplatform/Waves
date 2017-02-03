@@ -16,7 +16,7 @@ import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import scorex.waves.transaction.WavesTransactionModule
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 import scala.reflect.runtime.universe._
 import scala.concurrent.duration._
 
@@ -34,7 +34,7 @@ trait MatcherApplication extends ScorexLogging {
   def storedState: StoredState = blockStorage.state.asInstanceOf[StoredState]
 
   lazy val matcherApiRoutes = Seq(
-    MatcherApiRoute(this.asInstanceOf[Application], matcher)
+    MatcherApiRoute(this.asInstanceOf[Application], matcher, this.settings)
   )
 
   lazy val matcherApiTypes = Seq(

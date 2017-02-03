@@ -1,25 +1,21 @@
 package scorex.api.http.assets
 
 import javax.ws.rs.Path
-
-import akka.actor.ActorRefFactory
-import akka.http.scaladsl.model.StatusCodes
+import scala.util.control.Exception
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.api.http._
-import scorex.app.Application
 import scorex.settings.Settings
-import scorex.transaction.{SignedTransaction, SimpleTransactionModule, StateCheckFailed, ValidationError}
-
-import scala.util.{Failure, Success, Try}
+import scorex.transaction.{Transaction, TransactionModule, ValidationError}
+import akka.http.scaladsl.model.StatusCodes
+import scorex.serialization.JsonSerializable
+import scorex.transaction.SimpleTransactionModule.StoredInBlock
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class SignedAssetsApiRoute(application: Application)(implicit val context: ActorRefFactory) extends ApiRoute
-  with CommonTransactionApiFunctions {
-  override val settings: Settings = application.settings
-  val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
+case class SignedAssetsApiRoute(settings: Settings, transactionModule: TransactionModule[StoredInBlock])
+  extends ApiRoute with CommonTransactionApiFunctions {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer
@@ -44,14 +40,11 @@ case class SignedAssetsApiRoute(application: Application)(implicit val context: 
   def issue: Route = path("issue") {
     entity(as[String]) { body =>
       postJsonRoute {
-        Try(Json.parse(body)).map { js =>
-          js.validate[SignedAssetIssueRequest] match {
-            case JsSuccess(request: SignedAssetIssueRequest, _) =>
-              request.toTx.map(broadcast).getOrElse(WrongJson.response)
-
-            case _: JsError => WrongJson.response
-          }
-        }.getOrElse(WrongJson.response)
+        mkResponse(for {
+          js <- parseToEither(body)
+          i <- doValidate[SignedAssetIssueRequest](js)
+          r <- doBroadcast(i.toTx)
+        } yield r)
       }
     }
   }
@@ -75,14 +68,11 @@ case class SignedAssetsApiRoute(application: Application)(implicit val context: 
   def reissue: Route = path("reissue") {
     entity(as[String]) { body =>
       postJsonRoute {
-        Try(Json.parse(body)).map { js =>
-          js.validate[SignedAssetReissueRequest] match {
-            case JsSuccess(request: SignedAssetReissueRequest, _) =>
-              request.toTx.map(broadcast).getOrElse(WrongJson.response)
-
-            case _: JsError => WrongJson.response
-          }
-        }.getOrElse(WrongJson.response)
+        mkResponse(for {
+          js <- parseToEither(body)
+          ri <- doValidate[SignedAssetReissueRequest](js)
+          r <- doBroadcast(ri.toTx)
+        } yield r)
       }
     }
   }
@@ -106,15 +96,11 @@ case class SignedAssetsApiRoute(application: Application)(implicit val context: 
   def burnRoute: Route = path("burn") {
     entity(as[String]) { body =>
       postJsonRoute {
-        Try(Json.parse(body)).map { js =>
-          js.validate[SignedAssetBurnRequest] match {
-            case JsSuccess(request: SignedAssetBurnRequest, _) =>
-              request.toTx.map (broadcast)
-              .getOrElse(WrongJson.response)
-
-            case _: JsError => WrongJson.response
-          }
-        }.getOrElse(WrongJson.response)
+        mkResponse(for {
+          js <- parseToEither(body)
+          b <- doValidate[SignedAssetBurnRequest](js)
+          r <- doBroadcast(b.toTx)
+        } yield r)
       }
     }
   }
@@ -139,35 +125,19 @@ case class SignedAssetsApiRoute(application: Application)(implicit val context: 
   def batchTransfer: Route = path("batch_transfer") {
     entity(as[String]) { body =>
       postJsonRoute {
-        Try(Json.parse(body)).map { js =>
-          js.validate[Array[SignedAssetTransferRequest]] match {
-            case err: JsError =>
-              WrongTransactionJson(err).response
-            case JsSuccess(requests: Array[SignedAssetTransferRequest], _) =>
-              val validTransactionsOpt = listTry2TryList(requests.map(_.toTx))
-              validTransactionsOpt match {
-                case Success(txs) =>
-                  broadcastMany(txs)(txs => JsArray(txs.map(_.json)))
-                case Failure(e: StateCheckFailed) =>
-                  StateCheckFailed.response
-                case _ =>
-                  WrongJson.response
-              }
-          }
-        }.getOrElse(WrongJson.response)
-      }
-    }
-  }
+        val transferResult = for {
+          js <- parseToEither(body)
+          bt <- doValidate[Seq[SignedAssetTransferRequest]](js)
+        } yield bt.map(r => doBroadcast(r.toTx))
 
-  private def listTry2TryList[T <: AnyRef](tries: Iterable[Try[T]]): Try[Seq[T]] = {
-    tries.foldLeft[Try[Seq[T]]](Success(Seq.empty)) {
-      case (foldSeq, resultTry) =>
-        for {
-          seq <- foldSeq
-          t <- resultTry
-        } yield {
-          seq :+ t
+        transferResult match {
+          case Left(e) => e.response
+          case Right(txs) =>
+            val code = if (txs.forall(_.isRight)) StatusCodes.OK else StatusCodes.BadRequest
+            val json = txs.map(_.fold(_.json, _.json))
+            JsonResponse(Json.arr(json), code)
         }
+      }
     }
   }
 
@@ -190,28 +160,24 @@ case class SignedAssetsApiRoute(application: Application)(implicit val context: 
   def transfer: Route = path("transfer") {
     entity(as[String]) { body =>
       postJsonRoute {
-        Try(Json.parse(body)).map { js =>
-          js.validate[SignedAssetTransferRequest] match {
-            case JsSuccess(request: SignedAssetTransferRequest, _) =>
-              request.toTx.map(broadcast).getOrElse(WrongJson.response)
-
-            case _: JsError => WrongJson.response
-          }
-        }.getOrElse(WrongJson.response)
+        mkResponse(for {
+          js <- parseToEither(body)
+          bt <- doValidate[SignedAssetTransferRequest](js)
+          tx <- doBroadcast(bt.toTx)
+        } yield tx)
       }
     }
   }
 
-  private def broadcast[T <: SignedTransaction](tx: T) : JsonResponse =
-    Try(transactionModule.broadcastTransaction(tx)).map {
-      case Right(()) => JsonResponse(tx.json, StatusCodes.OK)
-      case Left(error)=> jsonResponse(error)
-    }.getOrElse(WrongJson.response)
+  private def mkResponse[A <: JsonSerializable](result: Either[ApiError, A]): JsonResponse = result match {
+    case Left(e) => e.response
+    case Right(r) => JsonResponse(r.json, StatusCodes.OK)
+  }
+  private def parseToEither(body: String) = Exception.nonFatalCatch.either(Json.parse(body)).left.map(t => WrongJson(cause = Some(t)))
+  private def doValidate[A: Reads](js: JsValue) = js.validate[A].asEither.left.map(e => WrongJson(errors = e))
+  private def doBroadcast[A <: Transaction](v: Either[ValidationError, A]) =
+    v.left.map(ApiError.fromValidationError).flatMap(broadcast)
 
-  private def broadcastMany[T <: SignedTransaction](txs: Seq[T])(toJson: Seq[T] => JsValue): JsonResponse =
-    Try(transactionModule.broadcastTransactions(txs)).map {
-      case Right(()) => JsonResponse(toJson(txs), StatusCodes.OK)
-      case Left(error) => jsonResponse(error)
-    }.getOrElse(WrongJson.response)
-
+  private def broadcast[T <: Transaction](tx: T): Either[ApiError, T] =
+    if (transactionModule.onNewOffchainTransaction(tx)) Right(tx) else Left(StateCheckFailed)
 }

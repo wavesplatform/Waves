@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.api
 
 import javax.ws.rs.Path
 
-import akka.actor.{ActorRef, ActorRefFactory}
+import akka.actor.ActorRef
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
@@ -24,8 +24,7 @@ import scala.util.Try
 
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit val settings: WavesSettings,
-                                                                        implicit val context: ActorRefFactory) extends ApiRoute {
+case class MatcherApiRoute(application: Application, matcher: ActorRef, settings: WavesSettings) extends ApiRoute {
 
   val wallet: Wallet = application.wallet
   val storedState: StoredState = application.blockStorage.state.asInstanceOf[StoredState]
@@ -141,7 +140,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
           }
         }.recover {
           case _ =>
-            Future.successful(WrongJson.response)
+            Future.successful(WrongJson().response)
         }.get
       }
     }
@@ -176,7 +175,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
           }
         }.recover {
           case _ =>
-            Future.successful(WrongJson.response)
+            Future.successful(WrongJson().response)
         }.get
       }
     }
@@ -215,7 +214,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
             }
           }.recover {
             case _ =>
-              Future.successful(WrongJson.response)
+              Future.successful(WrongJson().response)
           }.get
         }
       }

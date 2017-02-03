@@ -12,9 +12,9 @@ import scorex.api.http.assets.{BurnRequest, IssueRequest, ReissueRequest, Transf
 import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed, ValidationError}
+import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed => TxStateCheckFailed}
 import scorex.transaction.assets.exchange.OrderJson._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -23,8 +23,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(application: Application)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonTransactionApiFunctions {
+case class AssetsApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
   val MaxAddressesPerRequest = 1000
 
   val settings = application.settings
@@ -96,15 +95,15 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                     case Success(txVal) =>
                       txVal match {
                         case Right(tx) => JsonResponse (tx.json, StatusCodes.OK)
-                        case Left(e) =>   WrongJson.response
+                        case Left(e) =>   WrongJson().response
                       }
-                        case Failure(e: StateCheckFailed) =>
+                        case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
-                      WrongJson.response
+                      WrongJson().response
                   }
               }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }
@@ -141,13 +140,13 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   txOpt match {
                     case Success(tx) =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
+                    case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
-                      WrongJson.response
+                      WrongJson().response
                   }
               }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }
@@ -184,13 +183,13 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   txOpt match {
                     case Success(tx) =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
+                    case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
-                      WrongJson.response
+                      WrongJson().response
                   }
               }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }
@@ -227,13 +226,13 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                   txOpt match {
                     case Success(tx) =>
                           JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: StateCheckFailed) =>
+                    case Failure(e: TxStateCheckFailed) =>
                       StateCheckFailed.response
                     case _ =>
-                      WrongJson.response
+                      WrongJson().response
                   }
               }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }
@@ -308,7 +307,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
             }
           }.recover {
             case t =>
-              Future.successful(WrongJson.response)
+              Future.successful(WrongJson().response)
           }.get
         }
       }

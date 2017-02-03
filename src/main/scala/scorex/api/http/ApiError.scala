@@ -1,7 +1,7 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsError, JsObject, JsPath, Json, JsonValidationError}
 import scorex.transaction.ValidationError
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -16,17 +16,17 @@ trait ApiError {
 }
 
 object ApiError {
-  def fromValidationError(e: ValidationError) = e match {
-    case ValidationError.InvalidAddress => InvalidAddress.response
-    case ValidationError.NegativeAmount => NegativeAmount.response
-    case ValidationError.InsufficientFee => InsufficientFee.response
-    case ValidationError.NoBalance => NoBalance.response
-    case ValidationError.InvalidName => InvalidName.response
-    case ValidationError.InvalidSignature => InvalidSignature.response
-    case ValidationError.TooBigArray => TooBigArrayAllocation.response
-    case ValidationError.StateCheckFailed => StateCheckFailed.response
-    case ValidationError.OverflowError => OverflowError.response
-    case ValidationError.CustomValidationError(m) => CustomValidationError(m).response
+  def fromValidationError(e: ValidationError): ApiError = e match {
+    case ValidationError.InvalidAddress => InvalidAddress
+    case ValidationError.NegativeAmount => NegativeAmount
+    case ValidationError.InsufficientFee => InsufficientFee
+    case ValidationError.NoBalance => NoBalance
+    case ValidationError.InvalidName => InvalidName
+    case ValidationError.InvalidSignature => InvalidSignature
+    case ValidationError.TooBigArray => TooBigArrayAllocation
+    case ValidationError.StateCheckFailed => StateCheckFailed
+    case ValidationError.OverflowError => OverflowError
+    case ValidationError.CustomValidationError(m) => CustomValidationError(m)
   }
 }
 
@@ -36,10 +36,18 @@ case object Unknown extends ApiError {
   override val message = "Error is unknown"
 }
 
-case object WrongJson extends ApiError {
+case class WrongJson(
+    cause: Option[Throwable] = None,
+    errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
   override val id = 1
   override val code = StatusCodes.BadRequest
-  override val message = "failed to parse json message"
+  override lazy val message = "failed to parse json message"
+  override lazy val json = Json.obj(
+    "error" -> id,
+    "message" -> message,
+    "cause" -> cause.map(_.toString),
+    "validationErrors" -> JsError.toJson(errors)
+  )
 }
 
 //API Auth

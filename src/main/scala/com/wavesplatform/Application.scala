@@ -51,7 +51,7 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     WavesApiRoute(this),
     AssetsApiRoute(this),
     NodeApiRoute(this),
-    SignedAssetsApiRoute(this),
+    SignedAssetsApiRoute(settings, transactionModule),
     LeaseApiRoute(this)
   )
 

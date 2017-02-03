@@ -2,7 +2,6 @@ package scorex.waves.http
 
 import javax.ws.rs.Path
 
-import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
@@ -12,7 +11,7 @@ import scorex.api.http._
 import scorex.api.http.assets.PaymentRequest
 import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
-import scorex.transaction.{PaymentTransaction, ValidationError}
+import scorex.transaction.PaymentTransaction
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 import scorex.waves.transaction.{ExternalPayment, SignedPayment, WavesTransactionModule}
@@ -22,8 +21,7 @@ import scala.util.Try
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonTransactionApiFunctions {
+case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with CommonTransactionApiFunctions {
 
   val settings = application.settings
 
@@ -66,14 +64,14 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                   transactionModule
                     .createPayment(payment, wallet)
                     .fold(InvalidSender.response) { paymentVal =>
-                      paymentVal.fold(ApiError.fromValidationError, { tx =>
+                      paymentVal.fold(v => ApiError.fromValidationError(v).response, { tx =>
                         val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
                           tx.sender, tx.sender.address, Base58.encode(tx.signature))
                         JsonResponse(Json.toJson(signed), StatusCodes.OK)
                       })
                     }
                 }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }
@@ -114,14 +112,14 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                   }
 
                   txOpt.fold(InvalidSender.response) { paymentVal =>
-                    paymentVal.fold(ApiError.fromValidationError, { tx =>
+                    paymentVal.fold(e => ApiError.fromValidationError(e).response, { tx =>
                       val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
                         tx.sender, tx.sender.address, Base58.encode(tx.signature))
                       JsonResponse(Json.toJson(signed), StatusCodes.OK)
                     })
                   }
               }
-            }.getOrElse(WrongJson.response)
+            }.getOrElse(WrongJson().response)
           }
         }
       }
@@ -157,21 +155,21 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
             case JsSuccess(payment: UnsignedPayment, _) =>
               val senderWalletSeed = Base58.decode(payment.senderWalletSeed).getOrElse(Array.empty)
               if (senderWalletSeed.isEmpty)
-                WrongJson.response
+                WrongJson().response
               else {
                 val senderAccount = Wallet.generateNewAccount(senderWalletSeed, payment.senderAddressNonce)
                 val recipientAccount = new Account(payment.recipient)
 
                 transactionModule
                   .createSignedPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
-                  .fold(ApiError.fromValidationError, { tx =>
+                  .fold(e => ApiError.fromValidationError(e).response, { tx =>
                     val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient, tx.sender,
                       tx.sender.address, Base58.encode(tx.signature))
                     JsonResponse(Json.toJson(signedTx), StatusCodes.OK)
                 })
               }
           }
-        }.getOrElse(WrongJson.response)
+        }.getOrElse(WrongJson().response)
       }
     }
   }
@@ -187,7 +185,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     } else if (errors.contains("/signature")) {
       InvalidSignature.response
     } else {
-      WrongJson.response
+      WrongJson().response
     }
   }
 
@@ -216,7 +214,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
             case JsSuccess(payment: ExternalPayment, _) =>
               broadcastPayment(payment)
           }
-        }.getOrElse(WrongJson.response)
+        }.getOrElse(WrongJson().response)
       }
     }
   }
@@ -247,14 +245,14 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
             case JsSuccess(payment: SignedPayment, _) =>
               broadcastPayment(payment)
           }
-        }.getOrElse(WrongJson.response)
+        }.getOrElse(WrongJson().response)
       }
     }
   }
 
   private def broadcastPayment(payment: SignedPayment): JsonResponse =
     transactionModule.broadcastPayment(payment)
-      .fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
+      .fold(e => ApiError.fromValidationError(e).response, { tx => JsonResponse(tx.json, StatusCodes.OK) })
 
   @Deprecated
   private def broadcastPayment(payment: ExternalPayment): JsonResponse = {
@@ -263,6 +261,6 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
       payment.senderPublicKey, senderAccount.address, Base58.encode(payment.signature))
 
     transactionModule.broadcastPayment(signedPayment)
-      .fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
+      .fold(e => ApiError.fromValidationError(e).response, { tx => JsonResponse(tx.json, StatusCodes.OK) })
   }
 }

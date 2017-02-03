@@ -59,7 +59,7 @@ object formats {
               JsError(s"Invalid length of signature '$base58String': ${base58String.length} != ${SignatureLength}")
             }
           case Failure(f) =>
-            JsError("Invalid base58 string in signature '$base58String'")
+            JsError(s"Invalid base58 string in signature '$base58String'")
         }
       })
     }
