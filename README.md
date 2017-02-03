@@ -34,22 +34,3 @@ Clone this repo and execute
 .deb and .jar packages will be in /package folder. To build testnet packages use
 
 `sbt packageAll -D=network=testnet`
-
-Built on Scorex
-=========================
-
-[![Join the chat at https://gitter.im/input-output-hk/Scorex](https://badges.gitter.im/input-output-hk/Scorex.svg)](https://gitter.im/input-output-hk/Scorex?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
-Features
---------
-
-* Compact, functional code
-* Modular design
-* Scala language
-
-License
--------
-
-To the extent possible under law, the authors have dedicated all copyright and related and neighboring
-rights to this software to the public domain worldwide. This software is distributed without any warranty.
-You can find applied CC0 license legalcode in the [COPYING](COPYING)
