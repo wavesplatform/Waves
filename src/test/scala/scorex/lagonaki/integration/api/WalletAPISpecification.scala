@@ -5,14 +5,9 @@ import scorex.crypto.encode.Base58
 
 class WalletAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
-
   override def beforeAll(): Unit = {
     super.beforeAll()
     stopGeneration(applications)
-  }
-
-  test("/wallet/ API route") {
-    (GET.request("/wallet") \ "exists").as[Boolean] shouldBe true
   }
 
   test("/wallet/seed API route") {
