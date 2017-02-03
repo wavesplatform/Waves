@@ -42,16 +42,14 @@ case class AddressApiRoute(application: Application)(implicit val context: Actor
     path(Segment) { case address =>
       withAuth {
         deleteJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            if (!Account.isValidAddress(address)) {
-              InvalidAddress.response
-            } else {
-              val deleted = wallet.privateKeyAccount(address).exists(account =>
-                wallet.deleteAccount(account))
-              val json = Json.obj("deleted" -> deleted)
+          if (!Account.isValidAddress(address)) {
+            InvalidAddress.response
+          } else {
+            val deleted = wallet.privateKeyAccount(address).exists(account =>
+              wallet.deleteAccount(account))
+            val json = Json.obj("deleted" -> deleted)
 
-              JsonResponse(json, StatusCodes.OK)
-            }
+            JsonResponse(json, StatusCodes.OK)
           }
         }
       }
@@ -226,11 +224,9 @@ case class AddressApiRoute(application: Application)(implicit val context: Actor
   def create: Route = path("addresses") {
     withAuth {
       postJsonRoute {
-        walletNotExists(wallet).getOrElse {
-          wallet.generateNewAccount() match {
-            case Some(pka) => JsonResponse(Json.obj("address" -> pka.address), StatusCodes.OK)
-            case None => Unknown.response
-          }
+        wallet.generateNewAccount() match {
+          case Some(pka) => JsonResponse(Json.obj("address" -> pka.address), StatusCodes.OK)
+          case None => Unknown.response
         }
       }
     }
@@ -254,31 +250,27 @@ case class AddressApiRoute(application: Application)(implicit val context: Actor
     entity(as[String]) { message =>
       withAuth {
         postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            if (!Account.isValidAddress(address)) {
-              InvalidAddress.response
-            } else {
-              wallet.privateKeyAccount(address) match {
-                case None => WalletAddressNotExists.response
-                case Some(account) =>
-                  Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
-                    case Success(signature) =>
-                      val msg = if (encode) Base58.encode(message.getBytes) else message
-                      val json = Json.obj("message" -> msg,
-                        "publicKey" -> Base58.encode(account.publicKey),
-                        "signature" -> Base58.encode(signature))
-                      JsonResponse(json, StatusCodes.OK)
-                    case Failure(t) => JsonResponse(json(t), StatusCodes.InternalServerError)
-                  }
-              }
+          if (!Account.isValidAddress(address)) {
+            InvalidAddress.response
+          } else {
+            wallet.privateKeyAccount(address) match {
+              case None => WalletAddressNotExists.response
+              case Some(account) =>
+                Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
+                  case Success(signature) =>
+                    val msg = if (encode) Base58.encode(message.getBytes) else message
+                    val json = Json.obj("message" -> msg,
+                      "publicKey" -> Base58.encode(account.publicKey),
+                      "signature" -> Base58.encode(signature))
+                    JsonResponse(json, StatusCodes.OK)
+                  case Failure(t) => JsonResponse(json(t), StatusCodes.InternalServerError)
+                }
             }
           }
         }
       }
     }
   }
-
-
 
 
   private def verifyPath(address: String, decode: Boolean) = {
@@ -305,7 +297,7 @@ case class AddressApiRoute(application: Application)(implicit val context: Actor
     }
   }
 
-  private def verifySigned(msg: Try[Array[Byte]], signature : String, publicKey : String, address: String) = {
+  private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: String) = {
     (msg, Base58.decode(signature), Base58.decode(publicKey)) match {
       case (Failure(_), _, _) => InvalidMessage.response
       case (_, Failure(_), _) => InvalidSignature.response

@@ -58,23 +58,21 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[Payment] match {
-                case err: JsError => WrongTransactionJson(err).response
-                case JsSuccess(payment: Payment, _) =>
-                  transactionModule
-                    .createPayment(payment, wallet)
-                    .fold(InvalidSender.response) { paymentVal =>
-                      paymentVal.fold(ApiError.fromValidationError, { tx =>
-                        val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                          tx.sender, tx.sender.address, Base58.encode(tx.signature))
-                        JsonResponse(Json.toJson(signed), StatusCodes.OK)
-                      })
-                    }
-                }
-            }.getOrElse(WrongJson.response)
-          }
+          Try(Json.parse(body)).map { js =>
+            js.validate[Payment] match {
+              case err: JsError => WrongTransactionJson(err).response
+              case JsSuccess(payment: Payment, _) =>
+                transactionModule
+                  .createPayment(payment, wallet)
+                  .fold(InvalidSender.response) { paymentVal =>
+                    paymentVal.fold(ApiError.fromValidationError, { tx =>
+                      val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
+                        tx.sender, tx.sender.address, Base58.encode(tx.signature))
+                      JsonResponse(Json.toJson(signed), StatusCodes.OK)
+                    })
+                  }
+            }
+          }.getOrElse(WrongJson.response)
         }
       }
     }
@@ -102,26 +100,24 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[Payment] match {
-                case err: JsError => WrongTransactionJson(err).response
-                case JsSuccess(payment: Payment, _) =>
-                  val txOpt = wallet.privateKeyAccount(payment.sender).map { sender =>
-                    PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee,
-                      NTP.correctedTime())
-                  }
+          Try(Json.parse(body)).map { js =>
+            js.validate[Payment] match {
+              case err: JsError => WrongTransactionJson(err).response
+              case JsSuccess(payment: Payment, _) =>
+                val txOpt = wallet.privateKeyAccount(payment.sender).map { sender =>
+                  PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee,
+                    NTP.correctedTime())
+                }
 
-                  txOpt.fold(InvalidSender.response) { paymentVal =>
-                    paymentVal.fold(ApiError.fromValidationError, { tx =>
-                      val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                        tx.sender, tx.sender.address, Base58.encode(tx.signature))
-                      JsonResponse(Json.toJson(signed), StatusCodes.OK)
-                    })
-                  }
-              }
-            }.getOrElse(WrongJson.response)
-          }
+                txOpt.fold(InvalidSender.response) { paymentVal =>
+                  paymentVal.fold(ApiError.fromValidationError, { tx =>
+                    val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
+                      tx.sender, tx.sender.address, Base58.encode(tx.signature))
+                    JsonResponse(Json.toJson(signed), StatusCodes.OK)
+                  })
+                }
+            }
+          }.getOrElse(WrongJson.response)
         }
       }
     }
@@ -167,7 +163,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
                     val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient, tx.sender,
                       tx.sender.address, Base58.encode(tx.signature))
                     JsonResponse(Json.toJson(signedTx), StatusCodes.OK)
-                })
+                  })
               }
           }
         }.getOrElse(WrongJson.response)
