@@ -42,7 +42,6 @@ class WalletSpecification extends FunSuite with Matchers {
     w.generateNewAccounts(10)
     val nonce = w.nonce()
     w.close()
-    assert(w.exists())
 
     val w2 = new Wallet(Some(walletFile), "cookies", None)
     w2.privateKeyAccounts().head.address should not be null

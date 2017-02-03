@@ -91,8 +91,6 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
     accountsCache.clear()
   }
 
-  def exists(): Boolean = walletFileOpt.forall(_.exists())
-
   def nonce(): Int = Option(noncePersistence.get(NonceFieldName)).getOrElse(0)
 
   private def getAndIncrementNonce(): Int = synchronized {
