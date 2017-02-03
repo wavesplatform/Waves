@@ -7,32 +7,32 @@ import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.api.http.formats._
 import scorex.crypto.encode.Base58
+import scorex.transaction.ValidationError
 import scorex.transaction.assets._
 
 import scala.util.Try
 
 case class SignedAssetBurnRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                            senderPublicKey: String,
+                                  senderPublicKey: String,
                                   @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
-                            assetId: String,
+                                  assetId: String,
                                   @ApiModelProperty(required = true, example = "1000000")
-                            amount: Long,
+                                  amount: Long,
                                   @ApiModelProperty(required = true)
-                            fee: Long,
+                                  fee: Long,
                                   @ApiModelProperty(required = true)
-                            timestamp: Long,
+                                  timestamp: Long,
                                   @ApiModelProperty(required = true)
-                            signature: String) {
+                                  signature: String) {
 
-  def toTx: Try[BurnTransaction] = Try {
-    BurnTransaction.create(
-      new PublicKeyAccount(Base58.decode(senderPublicKey).get),
-      Base58.decode(assetId).get,
-      amount,
-      fee,
-      timestamp,
-      Base58.decode(signature).get).right.get
-  }
+  def toTx: Either[ValidationError, BurnTransaction] = BurnTransaction.create(
+    new PublicKeyAccount(Base58.decode(senderPublicKey).get),
+    Base58.decode(assetId).get,
+    amount,
+    fee,
+    timestamp,
+    Base58.decode(signature).get)
+
 }
 
 object SignedAssetBurnRequest {

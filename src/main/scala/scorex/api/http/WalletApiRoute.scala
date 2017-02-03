@@ -8,6 +8,7 @@ import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.app.Application
 import scorex.crypto.encode.Base58
+import scorex.transaction.SimpleTransactionModule
 
 @Path("/wallet")
 @Api(value = "/wallet", description = "Wallet-related calls")
@@ -17,6 +18,7 @@ case class WalletApiRoute(application: Application) extends ApiRoute with Common
   private val wallet = application.wallet
 
   override lazy val route = root ~ seed
+  implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
 
   @Path("/seed")
   @ApiOperation(value = "Seed", notes = "Export wallet seed", httpMethod = "GET")

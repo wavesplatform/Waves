@@ -13,6 +13,7 @@ import scorex.consensus.ConsensusModule
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
+import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.TransactionModule
 
 import scala.concurrent.duration._
@@ -100,7 +101,7 @@ abstract class ActorTestingCommons extends TestKitBase
     }
 
   trait ApplicationMock extends Application {
-    implicit val transactionModule = stub[TransactionModule[Unit]]
+    implicit val transactionModule = stub[TransactionModule[StoredInBlock]]
     implicit val consensusModule = stub[ConsensusModule[Unit]]
     final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock

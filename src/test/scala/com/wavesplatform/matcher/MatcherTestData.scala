@@ -111,8 +111,6 @@ trait MatcherTestData {
       new IncludedValidator(storage, settings),
       new ActivatedValidator(settings)
     )
-    new StoredState(storage, ???, extendedState, incrementingTimestampValidator, validators, settings) {
-      override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
-    }
+    ???
   }
 }

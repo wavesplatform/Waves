@@ -14,7 +14,7 @@ import scorex.transaction.SimpleTransactionModule.StoredInBlock
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class SignedAssetsApiRoute(settings: Settings, transactionModule: TransactionModule[StoredInBlock])
+case class SignedAssetsApiRoute(settings: Settings, override val transactionModule: TransactionModule[StoredInBlock])
   extends ApiRoute with CommonTransactionApiFunctions {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
@@ -169,15 +169,4 @@ case class SignedAssetsApiRoute(settings: Settings, transactionModule: Transacti
     }
   }
 
-  private def mkResponse[A <: JsonSerializable](result: Either[ApiError, A]): JsonResponse = result match {
-    case Left(e) => e.response
-    case Right(r) => JsonResponse(r.json, StatusCodes.OK)
-  }
-  private def parseToEither(body: String) = Exception.nonFatalCatch.either(Json.parse(body)).left.map(t => WrongJson(cause = Some(t)))
-  private def doValidate[A: Reads](js: JsValue) = js.validate[A].asEither.left.map(e => WrongJson(errors = e))
-  private def doBroadcast[A <: Transaction](v: Either[ValidationError, A]) =
-    v.left.map(ApiError.fromValidationError).flatMap(broadcast)
-
-  private def broadcast[T <: Transaction](tx: T): Either[ApiError, T] =
-    if (transactionModule.onNewOffchainTransaction(tx)) Right(tx) else Left(StateCheckFailed)
 }

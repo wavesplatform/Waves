@@ -3,15 +3,11 @@ package scorex.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
-import play.api.libs.json._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.app.Application
 import scorex.transaction.SimpleTransactionModule
-
-import scala.util.Try
 
 @Path("/leasing")
 @Api(value = "/lease/")
@@ -21,7 +17,7 @@ case class LeaseApiRoute(application: Application)(implicit val context: ActorRe
   val settings = application.settings
 
   private val wallet = application.wallet
-  private implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
+  implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
 
   override val route =
     pathPrefix("leasing") {
@@ -48,18 +44,11 @@ case class LeaseApiRoute(application: Application)(implicit val context: ActorRe
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[LeaseRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(r: LeaseRequest, _) =>
-                  transactionModule.lease(r, wallet).map {
-                    _.fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
-                  }.getOrElse(InvalidSender.response)
-              }
-            }.getOrElse(WrongJson.response)
-          }
+          mkResponse(for {
+            js <- parseToEither(body)
+            i <- doValidate[LeaseRequest](js)
+            r <- doBroadcast(??? /*i.toTx*/)
+          } yield r)
         }
       }
     }
@@ -84,18 +73,11 @@ case class LeaseApiRoute(application: Application)(implicit val context: ActorRe
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[LeaseCancelRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(r: LeaseCancelRequest, _) =>
-                  transactionModule.leaseCancel(r, wallet).map {
-                    _.fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
-                  }.getOrElse(InvalidSender.response)
-              }
-            }.getOrElse(WrongJson.response)
-          }
+          mkResponse(for {
+            js <- parseToEither(body)
+            ri <- doValidate[LeaseCancelRequest](js)
+            r <- doBroadcast(??? /*ri.toTx*/)
+          } yield r)
         }
       }
     }

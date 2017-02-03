@@ -23,7 +23,7 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
 
   private val wallet = application.wallet
   private val state = application.blockStorage.state
-  private implicit val transactionModule = application.transactionModule
+  implicit val transactionModule = application.transactionModule
 
   override lazy val route =
     pathPrefix("addresses") {

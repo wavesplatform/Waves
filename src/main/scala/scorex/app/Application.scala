@@ -4,6 +4,7 @@ import akka.actor.ActorRef
 import scorex.consensus.ConsensusModule
 import scorex.network.message.BasicMessagesRepo
 import scorex.settings.Settings
+import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.{BlockStorage, History, TransactionModule}
 import scorex.wallet.Wallet
 
@@ -14,7 +15,7 @@ trait Application {
 
   //modules
   implicit def consensusModule: ConsensusModule[_]
-  implicit def transactionModule: TransactionModule[_]
+  implicit def transactionModule: TransactionModule[StoredInBlock]
 
   def applicationName: String
 

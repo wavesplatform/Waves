@@ -1,14 +1,20 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.StatusCodes
-import play.api.libs.json.{JsObject, JsValue}
+import play.api.libs.json.{JsObject, JsValue, Json, Reads}
 import scorex.account.Account
-import scorex.transaction.ValidationError
+import scorex.serialization.JsonSerializable
+import scorex.transaction.SimpleTransactionModule.StoredInBlock
+import scorex.transaction.{Transaction, TransactionModule, ValidationError}
 import scorex.transaction.ValidationError._
 import scorex.wallet.Wallet
 
+import scala.util.control.Exception
+
 
 trait CommonTransactionApiFunctions extends CommonApiFunctions {
+
+  protected val transactionModule : TransactionModule[StoredInBlock]
 
   protected[api] def walletExists()(implicit wallet: Wallet): Option[JsObject] =
     if (wallet.exists()) Some(WalletAlreadyExists.json) else None
@@ -40,4 +46,17 @@ trait CommonTransactionApiFunctions extends CommonApiFunctions {
     case ValidationError.TooBigArray => TooBigArrayAllocation.response
     case _ => Unknown.response
   }
+
+
+  protected def mkResponse[A <: JsonSerializable](result: Either[ApiError, A]): JsonResponse = result match {
+    case Left(e) => e.response
+    case Right(r) => JsonResponse(r.json, StatusCodes.OK)
+  }
+  protected def parseToEither(body: String) = Exception.nonFatalCatch.either(Json.parse(body)).left.map(t => WrongJson(cause = Some(t)))
+  protected def doValidate[A: Reads](js: JsValue): Either[WrongJson, A] = js.validate[A].asEither.left.map(e => WrongJson(errors = e))
+  protected def doBroadcast[A <: Transaction](v: Either[ValidationError, A]) =
+    v.left.map(ApiError.fromValidationError).flatMap(broadcast)
+  protected def broadcast[T <: Transaction](tx: T): Either[ApiError, T] =
+    if (transactionModule.onNewOffchainTransaction(tx)) Right(tx) else Left(StateCheckFailed)
+
 }

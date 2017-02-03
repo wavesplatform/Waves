@@ -7,8 +7,10 @@ import scorex.api.http.formats.SignatureReads
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.ReissueTransaction
 import play.api.libs.functional.syntax._
+
 import scala.util.Try
 import scorex.api.http.formats._
+import scorex.transaction.ValidationError
 
 
 case class SignedAssetReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
@@ -26,17 +28,16 @@ case class SignedAssetReissueRequest(@ApiModelProperty(value = "Base58 encoded I
                                      @ApiModelProperty(required = true)
                                      signature: String) {
 
-  def toTx: Try[ReissueTransaction] = Try {
-    ReissueTransaction.create(
-      senderPublicKey,
-      Base58.decode(assetId).get,
-      quantity,
-      reissuable,
-      fee,
-      timestamp,
-      Base58.decode(signature).get).right.get
-  }
+  def toTx: Either[ValidationError, ReissueTransaction] = ReissueTransaction.create(
+    senderPublicKey,
+    Base58.decode(assetId).get,
+    quantity,
+    reissuable,
+    fee,
+    timestamp,
+    Base58.decode(signature).get)
 }
+
 
 object SignedAssetReissueRequest {
 

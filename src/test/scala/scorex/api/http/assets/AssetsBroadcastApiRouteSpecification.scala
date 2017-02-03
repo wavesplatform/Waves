@@ -12,7 +12,7 @@ import scorex.transaction.TransactionModule
 class AssetsBroadcastApiRouteSpecification extends FreeSpec with Matchers with ScalatestRouteTest with PathMockFactory {
   "/assets/broadcast/issue" ignore {
     val stmMock = mock[TransactionModule[StoredInBlock]]
-    val abar = AssetsBroadcastApiRoute(Settings.empty, stmMock)
+    val abar = SignedAssetsApiRoute(Settings.empty, stmMock)
     val json =
       """{
         |"senderPublicKey":"4c4nAckNxsuafXcg4abFPJ6wBZB6PD7KVNkD1wbVxnxZ",

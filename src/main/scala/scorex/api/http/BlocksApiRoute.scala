@@ -12,7 +12,7 @@ import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.network.Checkpoint
 import scorex.network.Coordinator.BroadcastCheckpoint
-import scorex.transaction.BlockChain
+import scorex.transaction.{BlockChain, SimpleTransactionModule}
 
 import scala.util.Try
 
@@ -21,6 +21,7 @@ import scala.util.Try
 case class BlocksApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
 
   val MaxBlocksPerRequest = 100
+  implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
 
   val settings = application.settings
   private val history = application.history

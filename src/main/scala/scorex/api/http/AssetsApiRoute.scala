@@ -30,7 +30,7 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
 
   private val wallet = application.wallet
   private val state = application.blockStorage.state.asInstanceOf[StoredState]
-  private implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
+  implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
 
   override lazy val route =
     pathPrefix("assets") {

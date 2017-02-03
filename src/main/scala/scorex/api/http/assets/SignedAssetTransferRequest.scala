@@ -9,27 +9,28 @@ import play.api.libs.json.{JsPath, Reads}
 
 import scala.util.Try
 import scorex.api.http.formats._
+import scorex.transaction.ValidationError
 
 @ApiModel(value = "Signed Asset transfer transaction")
 case class SignedAssetTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                sender: PublicKeyAccount,
+                                      sender: PublicKeyAccount,
                                       @ApiModelProperty(value = "Base58 encoded Asset ID")
-                                assetId: Option[String],
+                                      assetId: Option[String],
                                       @ApiModelProperty(value = "Recipient address", required = true)
-                                recipient: Account,
+                                      recipient: Account,
                                       @ApiModelProperty(required = true, example = "1000000")
-                                amount: Long,
+                                      amount: Long,
                                       @ApiModelProperty(required = true)
-                                fee: Long,
+                                      fee: Long,
                                       @ApiModelProperty(value = "Fee asset ID")
-                                feeAssetId: Option[String],
+                                      feeAssetId: Option[String],
                                       @ApiModelProperty(required = true)
-                                timestamp: Long,
+                                      timestamp: Long,
                                       @ApiModelProperty(value = "Base58 encoded attachment")
-                                attachment: Option[String],
+                                      attachment: Option[String],
                                       @ApiModelProperty(required = true)
-                                signature: String) {
-  def toTx: Try[TransferTransaction] = Try {
+                                      signature: String) {
+  def toTx: Either[ValidationError, TransferTransaction] =
     TransferTransaction.create(
       assetId.map(Base58.decode(_).get),
       sender,
@@ -39,8 +40,8 @@ case class SignedAssetTransferRequest(@ApiModelProperty(value = "Base58 encoded 
       feeAssetId.map(_.getBytes),
       fee,
       attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
-      Base58.decode(signature).get).right.get
-  }
+      Base58.decode(signature).get)
+
 }
 
 
