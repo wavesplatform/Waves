@@ -3,12 +3,13 @@ package scorex.transaction.state.database.state.extension
 import scorex.settings.ChainParameters
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 
 class ActivatedValidator(settings: ChainParameters) extends StateExtension {
 
 
-  override def isValid(tx: Transaction, height: Int): Boolean = tx match {
+  override def isValid(storedState: StoredState, tx: Transaction, height: Int): Boolean = tx match {
     case tx: PaymentTransaction => true
     case gtx: GenesisTransaction => true
     case tx: TransferTransaction => true
@@ -20,5 +21,5 @@ class ActivatedValidator(settings: ChainParameters) extends StateExtension {
   }
 
 
-  override def process(tx: Transaction, blockTs: Long, height: Int): Unit = {}
+  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = {}
 }

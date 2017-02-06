@@ -12,6 +12,7 @@ case class Row(state: AccState, reason: ReasonIds, lastRowHeight: Int) extends B
 
   lazy val bytes: Array[Byte] = Ints.toByteArray(lastRowHeight) ++
     Longs.toByteArray(state.balance) ++
+    Longs.toByteArray(state.effectiveBalance) ++
     Ints.toByteArray(reason.length) ++
     reason.foldLeft(Array.empty: Array[Byte]) { (b, scr) =>
       b ++ Ints.toByteArray(scr.length) ++ scr
@@ -35,6 +36,7 @@ object Row {
   def deserialize(b: ByteBuffer): Row = {
     val lrh = b.getInt
     val accBalance = b.getLong
+    val effectiveBalance = b.getLong
     val reasonLength = b.getInt
     val reason: Seq[Array[Byte]] = (0 until reasonLength) map { i =>
       val txSize = b.getInt
@@ -42,7 +44,7 @@ object Row {
       b.get(txId)
       txId
     }
-    Row(AccState(accBalance), reason.toList, lrh)
+    Row(AccState(accBalance, effectiveBalance), reason.toList, lrh)
   }
 }
 

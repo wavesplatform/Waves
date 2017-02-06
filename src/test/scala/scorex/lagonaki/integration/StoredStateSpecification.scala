@@ -90,10 +90,10 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val applyChanges = PrivateMethod[Unit]('applyChanges)
     state.balance(testAcc) shouldBe 0
     val tx = transactionModule.createPayment(acc, testAcc, 1, 1).right.get
-    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(2L), Seq(FeesStateChange(1L), tx))), NTP.correctedTime())
+    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(2L, 0L), Seq(FeesStateChange(1L), tx))), NTP.correctedTime())
     state.balance(testAcc) shouldBe 2
     state.included(tx).value shouldBe state.stateHeight
-    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(0L), Seq(tx))), NTP.correctedTime())
+    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(0L, 0L), Seq(tx))), NTP.correctedTime())
   }
 
   test("validate single transaction") {

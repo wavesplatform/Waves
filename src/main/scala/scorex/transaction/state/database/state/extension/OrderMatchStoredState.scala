@@ -2,18 +2,19 @@ package scorex.transaction.state.database.state.extension
 
 import scorex.crypto.encode.Base58
 import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.{Order, ExchangeTransaction}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.storage.{OrderMatchStorageI, StateStorageI}
 
 class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends StateExtension {
 
 
-  override def isValid(tx: Transaction, height: Int): Boolean = tx match {
+  override def isValid(storedState: StoredState, tx: Transaction, height: Int): Boolean = tx match {
     case om: ExchangeTransaction => OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om))
     case _ => true
   }
 
-  override def process(tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
+  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
     case om: ExchangeTransaction => putOrderMatch(om, blockTs)
     case _ =>
   }
