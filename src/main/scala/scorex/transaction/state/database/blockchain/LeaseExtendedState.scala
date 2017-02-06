@@ -24,7 +24,7 @@ class LeaseExtendedState(storage: StateStorageI with LeaseExtendedStateStorageI)
 
   def effectiveBalanceChanges(tx: Transaction): Seq[EffectiveBalanceChange] = tx match {
     case tx: LeaseTransaction => Seq(EffectiveBalanceChange(tx.sender, -tx.amount), EffectiveBalanceChange(tx.recipient, tx.amount))
-    case tx: LeaseCancelTransaction => storage.getLeaseTx(tx.leaseId).map(effectiveBalanceChanges).getOrElse(Seq.empty)
+    case tx: LeaseCancelTransaction => storage.getLeaseTx(tx.leaseId).map(tx => effectiveBalanceChanges(tx).map(_.reverse)).getOrElse(Seq.empty)
   }
 
   override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = ???
