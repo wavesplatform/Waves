@@ -7,6 +7,7 @@ import org.scalatest.matchers.{BeMatcher, MatchResult}
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.utils.{ByteArrayExtension, NTP}
 
 trait TransactionGen {
@@ -20,6 +21,7 @@ trait TransactionGen {
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
+  val positiveIntGen: Gen[Int] = Gen.choose(1, Int.MaxValue / 3)
   val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)
 
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
@@ -123,6 +125,19 @@ trait TransactionGen {
     (issue, issue2, reissue, burn)
   }
 
+  val leaseGenerator: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
+    sender: PrivateKeyAccount <- accountGen
+    amount <- positiveLongGen
+    fee <- smallFeeGen
+    timestamp <- positiveLongGen
+    untilBlock <- positiveIntGen
+    recipient: PrivateKeyAccount <- accountGen
+    lease = LeaseTransaction.create(sender, amount, fee, timestamp, untilBlock, recipient).right.get
+    fee2 <- smallFeeGen
+    timestamp2 <- positiveLongGen
+    unlease = LeaseCancelTransaction.create(sender, lease.id, fee2, timestamp2).right.get
+  } yield (lease, unlease)
+
 
   val issueGenerator: Gen[IssueTransaction] = issueReissueGenerator.map(_._1)
   val reissueGenerator: Gen[ReissueTransaction] = issueReissueGenerator.map(_._3)
@@ -174,11 +189,6 @@ trait TransactionGen {
     accountGen
   }
 
-  def validOrderMatch = orderMatchGenerator.sample.get
-
-  /**
-    * Implicit to support <code>Containing</code> nature of <code>Validation</code>.
-    */
   implicit val containingNatureOfValidation: Containing[Validation] =
     new Containing[Validation] {
       def contains(v: Validation, ele: Any): Boolean =
@@ -203,6 +213,5 @@ trait TransactionGen {
   }
 
   val valid = new ValidationMatcher
-  val invalid = not(valid)
 
 }

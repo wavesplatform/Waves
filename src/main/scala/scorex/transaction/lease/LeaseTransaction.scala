@@ -4,6 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction._
 import scorex.transaction.{AssetId, BalanceChange, SignedTransaction, ValidationError}
@@ -39,7 +40,7 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
       Longs.toByteArray(amount),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp),
-      Longs.toByteArray(untilBlock))
+      Ints.toByteArray(untilBlock))
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "amount" -> amount,
@@ -62,14 +63,14 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
   def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     import EllipticCurveImpl._
     val sender = new PublicKeyAccount(bytes.slice(0, KeyLength))
-    val recipient = new PublicKeyAccount(bytes.slice(KeyLength, KeyLength + Account.AddressLength))
+    val recipient = new Account(Base58.encode(bytes.slice(KeyLength, KeyLength + Account.AddressLength)))
     val quantityStart = KeyLength + Account.AddressLength
 
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
     val fee = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
     val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
-    val untilBlock = Ints.fromByteArray(bytes.slice(quantityStart + 24, quantityStart + 32))
-    val signature = bytes.slice(quantityStart + 32, quantityStart + 32 + SignatureLength)
+    val untilBlock = Ints.fromByteArray(bytes.slice(quantityStart + 24, quantityStart + 28))
+    val signature = bytes.slice(quantityStart + 28, quantityStart + 28 + SignatureLength)
     LeaseTransaction
       .create(sender, quantity, fee, timestamp, untilBlock, recipient, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
