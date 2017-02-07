@@ -40,14 +40,6 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     JsonResponse(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset Pair").json, StatusCodes.BadRequest)
   }
 
-  private def createAssetPair(asset1: String, asset2: String): Try[AssetPair] = {
-    def tryAssetId(a: String) = Try { if (AssetPair.WavesName == a) None else Some(Base58.decode(a).get) }
-    for {
-      a1 <- tryAssetId(asset1)
-      a2 <- tryAssetId(asset2)
-    } yield AssetPair(a1, a2)
-  }
-
   @Path("/")
   @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET")
   def matcherPublicKey: Route =
@@ -71,7 +63,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     path("orderbook" / Segment / Segment) { (a1, a2) =>
       get {
         jsonRouteAsync {
-          createAssetPair(a1, a2).map { pair =>
+          AssetPair.createAssetPair(a1, a2).map { pair =>
             (matcher ? GetOrderBookRequest(pair, None))
               .mapTo[MatcherResponse]
               .map(r => JsonResponse(r.json, r.code))
@@ -131,7 +123,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
     path("orderbook" / Segment / Segment / Segment) { (a1, a2, orderId) =>
       get {
         jsonRouteAsync {
-          createAssetPair(a1, a2).map { pair =>
+          AssetPair.createAssetPair(a1, a2).map { pair =>
             (matcher ? GetOrderStatus(pair, orderId))
               .mapTo[MatcherResponse]
               .map(r => JsonResponse(r.json, r.code))
@@ -162,7 +154,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
       delete {
         entity(as[String]) { body =>
           jsonRouteAsync {
-            createAssetPair(a1, a2).map { pair =>
+            AssetPair.createAssetPair(a1, a2).map { pair =>
               Try {
                 val js = Json.parse(body)
                 js.validate[CancelOrderRequest] match {
