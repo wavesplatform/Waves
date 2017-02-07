@@ -12,14 +12,9 @@ import scorex.transaction.{Transaction, TransactionModule, TransactionsBlockFiel
 
 import scala.concurrent.duration._
 
-class BlockMock(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyAccount(Array.fill(32)(0))) extends Block(0, 0, Array.fill(SignatureLength)(0: Byte),SignerData(signer, Array.fill(EllipticCurveImpl.SignatureLength)(0))) {
-
-  override lazy val transactions = txs
-
-  override val transactionDataField: BlockField[Seq[Transaction]] = TransactionsBlockField(txs)
+class BlockMock(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyAccount(Array.fill(32)(0))) extends Block(0, 0,
+  Array.fill(SignatureLength)(0: Byte),SignerData(signer, Array.fill(EllipticCurveImpl.SignatureLength)(0)),
+  NxtConsensusBlockField(NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte))),TransactionsBlockField(txs)) {
   override val uniqueId: BlockId = Array.fill(SignatureLength)(0: Byte)
-
-  override lazy val consensusDataField: BlockField[NxtLikeConsensusBlockData] = NxtConsensusBlockField(
-    NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)))
 
 }

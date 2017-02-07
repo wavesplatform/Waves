@@ -10,10 +10,12 @@ import scorex.app.Application
 import scorex.block.Block._
 import scorex.block.{Block, LongBlockField, SignerData}
 import scorex.consensus.ConsensusModule
+import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
-import scorex.transaction.TransactionModule
+import scorex.transaction.{TransactionModule, TransactionsBlockField}
+import scorex.transaction.TypedTransaction.SignatureLength
 
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
@@ -65,7 +67,8 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
   protected def blockMock[Id](id: Id, ts: Long = System.currentTimeMillis())(implicit conv: Id => BlockId): Block = {
-    abstract class BlockMock extends Block(ts,0,conv(id),SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array())) {
+    abstract class BlockMock extends Block(ts,0,conv(id),SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array()),
+      NxtConsensusBlockField(NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte))),TransactionsBlockField(Seq.empty)) {
       override val uniqueId: BlockId = id
     }
     mock[BlockMock]

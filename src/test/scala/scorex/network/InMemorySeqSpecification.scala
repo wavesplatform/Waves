@@ -6,7 +6,10 @@ import scorex.account.PublicKeyAccount
 import scorex.block.{Block, SignerData}
 import scorex.block.Block._
 import scorex.consensus.ConsensusModule
+import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.network.BlockchainSynchronizer.{InnerId, _}
+import scorex.transaction.TransactionsBlockField
+import scorex.transaction.TypedTransaction.SignatureLength
 
 import scala.language.{implicitConversions, postfixOps}
 
@@ -16,14 +19,18 @@ class InMemorySeqSpecification extends FreeSpec
   with MockFactory {
 
   protected def blockIds(ids: Int*): BlockIds = ids.map(toBlockId)
-  protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids:_*)
+
+  protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids: _*)
+
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
   private implicit def toInnerIds(i: Seq[Int]): InnerIds = i.map(toInnerId)
+
   private implicit def toInnerId(i: Int): InnerId = InnerId(toBlockId(i))
 
   private def mockBlock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
-    abstract class BlockMock extends Block(0,1,conv(id),SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array())) {
+    abstract class BlockMock extends Block(0, 1, conv(id), SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array()),
+      NxtConsensusBlockField(NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte))), TransactionsBlockField(Seq.empty)) {
       override val uniqueId: BlockId = id
     }
     mock[BlockMock]
