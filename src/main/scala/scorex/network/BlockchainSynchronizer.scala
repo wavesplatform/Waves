@@ -21,7 +21,9 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
   import BlockchainSynchronizer._
   import Coordinator.SyncFinished._
+
   private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
+
   import basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq(SignaturesSpec, BlockMessageSpec)
@@ -158,7 +160,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         if (forkStorage.addIfNotContained(block)) {
           log.info("Got block: " + block.encodedId)
 
-          val author = Some(connectedPeer).filter(_ => ! peers.activeChanged)
+          val author = Some(connectedPeer).filter(_ => !peers.activeChanged)
           val allBlocksAreLoaded = forkStorage.noIdsWithoutBlock
           val forkScore = forkStorage.cumulativeBlockScore() + initialScore
 
@@ -185,7 +187,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
       case SignaturesFromPeer(_, _) =>
 
-      case t @ TimeoutExceeded(_, _, _, _, _) =>
+      case t@TimeoutExceeded(_, _, _, _, _) =>
         if (timeoutData.exists(!_.isCancelled)) handleTimeout(t)
 
       case GetExtension(_) => // ignore if not idle
@@ -211,7 +213,9 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         log.info(s"New active peer is ${updatedPeerSet.active}" +
           s" (was ${peerSet.map(_.active.toString).getOrElse("no one")})")
 
-        run(i, n, updated, runs + 1) { f }
+        run(i, n, updated, runs + 1) {
+          f
+        }
 
       case None => finishUnsuccessfully()
     }
@@ -219,11 +223,11 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
   private def updatedPeerSet(peerSet: Option[PeerSet]): Option[PeerSet] =
     peerSet.flatMap {
-      case ps @ PeerSet(active, peers, _) =>
+      case ps@PeerSet(active, peers, _) =>
 
         log.debug("Trying to find a new active peer...")
 
-        val peerData @ Peer(score, retries) = peers(active)
+        val peerData@Peer(score, retries) = peers(active)
         val updatedRetries = retries + 1
 
         val updatedPeers = (if (updatedRetries > application.settings.retriesBeforeBlacklisted) {
@@ -239,7 +243,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     }
 
   private def ignoreFor(stopFilter: StopFilter): Receive = {
-    case data @ DataFromPeer(msgId, _, connectedPeer) if stopFilter(msgId, connectedPeer) =>
+    case data@DataFromPeer(msgId, _, connectedPeer) if stopFilter(msgId, connectedPeer) =>
       log.debug(s"Ignoring data: $data")
   }
 
@@ -312,6 +316,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
       } else None
     }
   }
+
 }
 
 object BlockchainSynchronizer {
@@ -345,7 +350,9 @@ object BlockchainSynchronizer {
       import shapeless.syntax.typeable._
       obj.cast[InnerId].exists(_.blockId.sameElements(this.blockId))
     }
+
     override def hashCode(): Int = scala.util.hashing.MurmurHash3.seqHash(blockId)
+
     override def toString: String = encode(blockId)
   }
 
@@ -361,14 +368,19 @@ object BlockchainSynchronizer {
   }
 
   private type StopFilter = (Message.MessageCode, ConnectedPeer) => Boolean
+
   private def noFilter: StopFilter = (_, _) => false
 
   private type RepeatableCodeBlock = PeerSet => Receive
+
   private case class TimeoutExceeded(initial: Status, next: Status, f: RepeatableCodeBlock, peers: Option[PeerSet], runs: Integer)
 
   private case class Peer(score: BlockchainScore, retries: Int = 0)
+
   private type Peers = Map[ConnectedPeer, Peer]
+
   private case class PeerSet(active: ConnectedPeer, peers: Peers, initiallyActive: ConnectedPeer) {
     def activeChanged: Boolean = active != initiallyActive
   }
+
 }
