@@ -1,26 +1,20 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-
+import scala.util.Try
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
-import scorex.app.RunnableApplication
-import scorex.transaction.state.wallet.{Payment, TransferRequest}
 import scorex.transaction.SimpleTransactionModule
-
-import scala.util.Try
+import scorex.transaction.state.wallet.{Payment, TransferRequest}
+import scorex.wallet.Wallet
 
 @Path("/payment")
 @Api(value = "/payment", description = "Payment operations.", position = 1)
 @Deprecated
-case class PaymentApiRoute(application: RunnableApplication) extends ApiRoute with CommonTransactionApiFunctions {
-  val settings = application.settings.restAPISettings
-
-  // TODO asInstanceOf
-  implicit lazy val transactionModule: SimpleTransactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
-  lazy val wallet = application.wallet
+case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactionModule: SimpleTransactionModule) extends ApiRoute with CommonTransactionApiFunctions {
 
   override lazy val route = payment
 
