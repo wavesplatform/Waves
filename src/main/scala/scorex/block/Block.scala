@@ -33,9 +33,6 @@ abstract class Block(timestamp: Long, version: Byte, reference: Block.BlockId, s
   type ConsensusDataType
   type TransactionDataType
 
-  implicit val consensusModule: ConsensusModule[ConsensusDataType]
-  implicit val transactionModule: TransactionModule[TransactionDataType]
-
   val consensusDataField: BlockField[ConsensusDataType]
   val transactionDataField: BlockField[TransactionDataType]
 
@@ -98,6 +95,13 @@ object Block extends ScorexLogging {
 
   val BlockIdLength = SignatureLength
 
+  def feesDistribution(block: Block): Map[AssetAcc, Long] = {
+    val generator = block.signerDataField.value.generator
+    val assetFees = block.transactionDataField.asInstanceOf[TransactionsBlockField].value.map(_.assetFee)
+    assetFees.map(a => AssetAcc(generator, a._1) -> a._2).groupBy(a => a._1).mapValues(_.map(_._2).sum)
+  }
+
+
   //TODO Deser[Block] ??
   def parseBytes[CDT, TDT](bytes: Array[Byte])
                           (implicit consModule: ConsensusModule[CDT],
@@ -136,9 +140,6 @@ object Block extends ScorexLogging {
 
       override val transactionDataField: BlockField[TransactionDataType] = txBlockField
 
-      override implicit val consensusModule: ConsensusModule[ConsensusDataType] = consModule
-      override implicit val transactionModule: TransactionModule[TransactionDataType] = transModule
-
       override val consensusDataField: BlockField[ConsensusDataType] = consBlockField
 
     }
@@ -161,13 +162,9 @@ object Block extends ScorexLogging {
       override type ConsensusDataType = CDT
       override type TransactionDataType = TDT
 
-      override implicit val transactionModule: TransactionModule[TDT] = transModule
-      override implicit val consensusModule: ConsensusModule[CDT] = consModule
-
-
       override val transactionDataField: BlockField[TDT] = transModule.formBlockData(transactionData)
 
-      override val consensusDataField: BlockField[CDT] = consensusModule.formBlockData(consensusData)
+      override val consensusDataField: BlockField[CDT] = consModule.formBlockData(consensusData)
 
 
     }
@@ -218,15 +215,11 @@ object Block extends ScorexLogging {
       reference = reference,
       signerData = SignerData(genesisSigner, signature)) {
 
-
       override type ConsensusDataType = CDT
       override type TransactionDataType = TDT
 
-      override implicit val transactionModule: TransactionModule[TDT] = transModule
-      override implicit val consensusModule: ConsensusModule[CDT] = consModule
-
-      override val transactionDataField: BlockField[TDT] = transactionModule.genesisData
-      override val consensusDataField: BlockField[CDT] = consensusModule.genesisData
+      override val transactionDataField: BlockField[TDT] = transModule.genesisData
+      override val consensusDataField: BlockField[CDT] = consModule.genesisData
 
     }
   }

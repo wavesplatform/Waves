@@ -20,12 +20,6 @@ trait ConsensusModule[ConsensusBlockData] {
   def isValid[TransactionalBlockData](block: Block)(implicit transactionModule: TransactionModule[TransactionalBlockData]): Boolean
 
   /**
-    * Fees could go to a single miner(forger) usually, but can go to many parties, e.g. see
-    * Meni Rosenfeld's Proof-of-Activity proposal http://eprint.iacr.org/2014/452.pdf
-    */
-  def feesDistribution(block: Block): Map[AssetAcc, Long]
-
-  /**
     * Get block producers(miners/forgers). Usually one miner produces a block, but in some proposals not
     * (see e.g. Meni Rosenfeld's Proof-of-Activity paper http://eprint.iacr.org/2014/452.pdf)
     */

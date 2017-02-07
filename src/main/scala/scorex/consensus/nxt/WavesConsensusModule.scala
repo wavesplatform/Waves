@@ -15,7 +15,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration) extends PoSConsensusModule[NxtLikeConsensusBlockData]
-with OneGeneratorConsensusModule with ScorexLogging {
+ with ScorexLogging {
 
   import WavesConsensusModule._
 
