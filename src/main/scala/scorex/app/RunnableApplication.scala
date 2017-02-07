@@ -121,7 +121,7 @@ trait RunnableApplication extends Application with ScorexLogging {
 
   private def checkGenesis(): Unit = {
     if (transactionModule.blockStorage.history.isEmpty) {
-      transactionModule.blockStorage.appendBlock(Block.genesis(settings.genesisTimestamp, settings.genesisSignature))
+      transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, settings.genesisTimestamp, settings.genesisSignature))
       log.info("Genesis block has been added to the state")
     }
   }.ensuring(transactionModule.blockStorage.history.height() >= 1)

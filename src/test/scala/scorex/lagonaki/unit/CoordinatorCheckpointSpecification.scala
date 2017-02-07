@@ -75,7 +75,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     val version = 1: Byte
     val timestamp = System.currentTimeMillis()
     //val reference = Array.fill(Block.BlockIdLength)(id.toByte)
-    val cbd =  NxtLikeConsensusBlockData(score + 1, Array.fill(WavesConsensusModule.GeneratorSignatureLength)(Random.nextInt(100).toByte))
+    val cbd = NxtLikeConsensusBlockData(score + 1, Array.fill(WavesConsensusModule.GeneratorSignatureLength)(Random.nextInt(100).toByte))
     Block.buildAndSign(version, timestamp, reference, cbd, Seq[Transaction](), gen)
   }
 
@@ -84,7 +84,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   private lazy val repo = app.basicMessagesSpecsRepo
   val genesisTimestamp: Long = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.appendBlock(Block.genesis(genesisTimestamp))
+    transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
   }
 
   def before(): Unit = {

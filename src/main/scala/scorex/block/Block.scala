@@ -14,8 +14,8 @@ import scorex.transaction.TypedTransaction._
 
 import scala.util.{Failure, Try}
 
-class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signerData: SignerData,
-            val consensusDataField: BlockField[NxtLikeConsensusBlockData], val transactionDataField: BlockField[Seq[Transaction]]) {
+case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signerData: SignerData,
+                 consensusDataField: BlockField[NxtLikeConsensusBlockData], transactionDataField: BlockField[Seq[Transaction]]) {
 
   val versionField: ByteBlockField = ByteBlockField("version", version)
   val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
@@ -79,8 +79,8 @@ object Block extends ScorexLogging {
   }
 
   def parseBytes(bytes: Array[Byte])
-                          (implicit consModule: ConsensusModule,
-                           transModule: TransactionModule): Try[Block] = Try {
+                (implicit consModule: ConsensusModule,
+                 transModule: TransactionModule): Try[Block] = Try {
 
     val version = bytes.head
 
@@ -139,16 +139,20 @@ object Block extends ScorexLogging {
     build(version, timestamp, reference, consensusData, transactionData, signer, signature)
   }
 
-  def genesis(timestamp: Long = 0L, signatureStringOpt: Option[String] = None)(implicit consModule: ConsensusModule,
-                                                                               transModule: TransactionModule): Block = {
+  def genesis(concensusGenesisData: BlockField[NxtLikeConsensusBlockData],
+              transactionGenesisData: BlockField[Seq[Transaction]],
+              timestamp: Long = 0L,
+              signatureStringOpt: Option[String] = None): Block = {
     val version: Byte = 1
 
     val genesisSigner = new PrivateKeyAccount(Array.empty)
 
-    val txBytesSize = transModule.genesisData.bytes.length
-    val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transModule.genesisData.bytes
-    val cBytesSize = consModule.genesisData.bytes.length
-    val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ consModule.genesisData.bytes
+    //    val transactionGenesisData: BlockField[Seq[Transaction]] = transModule.genesisData
+    //    val concensusGenesisData: BlockField[NxtLikeConsensusBlockData] = consModule.genesisData
+    val txBytesSize = transactionGenesisData.bytes.length
+    val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionGenesisData.bytes
+    val cBytesSize = concensusGenesisData.bytes.length
+    val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ concensusGenesisData.bytes
 
     val reference = Array.fill(BlockIdLength)(-1: Byte)
 
@@ -168,7 +172,7 @@ object Block extends ScorexLogging {
       version = 1,
       reference = reference,
       signerData = SignerData(genesisSigner, signature),
-      consensusDataField = consModule.genesisData,
-      transactionDataField = transModule.genesisData)
+      consensusDataField = concensusGenesisData,
+      transactionDataField = transactionGenesisData)
   }
 }

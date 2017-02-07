@@ -40,7 +40,7 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
   }
 
   test("/transactions/info/{signature} API route") {
-    val genesisTx = Block.genesis().transactionDataField.asInstanceOf[TransactionsBlockField].value.head.asInstanceOf[GenesisTransaction]
+    val genesisTx = Block.genesis(consensusModule.genesisData, transactionModule.genesisData).transactionDataField.asInstanceOf[TransactionsBlockField].value.head.asInstanceOf[GenesisTransaction]
     val tr = GET.request(s"/transactions/info/${Base58.encode(genesisTx.signature)}")
     (tr \ "signature").as[String] shouldBe Base58.encode(genesisTx.signature)
     (tr \ "type").as[Int] shouldBe 1
