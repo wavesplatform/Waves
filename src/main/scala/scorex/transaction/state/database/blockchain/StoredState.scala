@@ -341,6 +341,8 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
+  def assetDistribution(assetId: Array[Byte]): Map[String, Long] = storage.assetDistribution(assetId)
+
   //for debugging purposes only
   override def toString: String = toJson().toString()
 
