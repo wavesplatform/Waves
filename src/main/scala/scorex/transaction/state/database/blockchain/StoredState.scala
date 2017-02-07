@@ -82,7 +82,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   }
 
   override def processBlock(block: Block): Try[State] = Try {
-    val trans = block.transactions
+    val trans = block.transactionDataField.asInstanceOf[TransactionsBlockField].value
     val fees: Map[AssetAcc, (AccState, Reasons)] = block.consensusModule.feesDistribution(block)
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2), List(FeesStateChange(m._2))))
 

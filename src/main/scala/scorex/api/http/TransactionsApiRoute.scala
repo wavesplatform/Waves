@@ -10,7 +10,7 @@ import play.api.libs.json.{JsArray, Json}
 import scorex.account.Account
 import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.transaction.LagonakiState
+import scorex.transaction.{LagonakiState, TransactionsBlockField}
 import scorex.transaction.state.database.blockchain.StoredBlockchain
 
 import scala.util.{Success, Try}
@@ -63,7 +63,7 @@ case class TransactionsApiRoute(application: Application)(implicit val context: 
               case Some(h) =>
                 Try {
                   val block = application.blockStorage.history.asInstanceOf[StoredBlockchain].blockAt(h).get
-                  val tx = block.transactions.filter(_.id sameElements sig).head
+                  val tx = block.transactionDataField.asInstanceOf[TransactionsBlockField].value.filter(_.id sameElements sig).head
                   val json = tx.json + ("height" -> Json.toJson(h))
                   JsonResponse(json, StatusCodes.OK)
                 }.getOrElse(JsonResponse(Json.obj("status" -> "error", "details" -> "Internal error"),

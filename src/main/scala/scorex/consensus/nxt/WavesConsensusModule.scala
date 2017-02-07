@@ -42,7 +42,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
     val history = transactionModule.blockStorage.history
 
     if (block.timestampField.value > forksConfig.requireSortedTransactionsAfter) {
-      require(block.transactions.sorted(TransactionsOrdering) == block.transactions, "Transactions must be sorted correctly")
+      require(block.transactionDataField.asInstanceOf[TransactionsBlockField].value.sorted(TransactionsOrdering) == block.transactionDataField.asInstanceOf[TransactionsBlockField].value, "Transactions must be sorted correctly")
     }
 
     val parentOpt = history.parent(block)

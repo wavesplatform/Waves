@@ -7,7 +7,7 @@ import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionModule
+import scorex.transaction.{AssetAcc, TransactionModule, TransactionsBlockField}
 import scorex.utils.ScorexLogging
 import scorex.transaction.TypedTransaction._
 
@@ -48,9 +48,13 @@ abstract class Block(timestamp: Long, version: Byte, reference: Block.BlockId, s
 
   lazy val encodedId: String = Base58.encode(uniqueId)
 
-  lazy val transactions = transactionModule.transactions(this)
+  lazy val transactions = transactionDataField.asInstanceOf[TransactionsBlockField].value
 
-  lazy val fee = consensusModule.feesDistribution(this).values.sum
+  lazy val fee = {
+    val generator = signerData.generator
+    val assetFees = transactionDataField.asInstanceOf[TransactionsBlockField].value.map(_.assetFee)
+    assetFees.map(a => AssetAcc(generator, a._1) -> a._2).groupBy(a => a._1).mapValues(_.map(_._2).sum)
+  }.values.sum
 
   lazy val json =
     versionField.json ++
@@ -80,27 +84,6 @@ abstract class Block(timestamp: Long, version: Byte, reference: Block.BlockId, s
   }
 
   lazy val bytesWithoutSignature = bytes.dropRight(SignatureLength)
-
-  def isValid: Boolean = {
-    if (transactionModule.blockStorage.history.contains(this)) true //applied blocks are valid
-    else {
-      def history = transactionModule.blockStorage.history.contains(referenceField.value)
-
-      def signature = EllipticCurveImpl.verify(signerDataField.value.signature, bytesWithoutSignature,
-        signerDataField.value.generator.publicKey)
-
-      def consensus = consensusModule.isValid(this)
-
-      def transaction = transactionModule.isValid(this)
-
-      if (!history) log.debug(s"Invalid block $encodedId: no parent block in history")
-      else if (!signature) log.debug(s"Invalid block $encodedId: signature is not valid")
-      else if (!consensus) log.debug(s"Invalid block $encodedId: consensus data is not valid")
-      else if (!transaction) log.debug(s"Invalid block $encodedId: transaction data is not valid")
-
-      history && signature && consensus && transaction
-    }
-  }
 
   override def equals(obj: scala.Any): Boolean = {
     import shapeless.syntax.typeable._

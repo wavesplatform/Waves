@@ -242,13 +242,35 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
         }
     }
 
+  def isBlockValid(b: Block) : Boolean = {
+    if (application.transactionModule.blockStorage.history.contains(b)) true //applied blocks are valid
+    else {
+      def history = application.transactionModule.blockStorage.history.contains(b.referenceField.value)
+
+      def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
+        b.signerDataField.value.generator.publicKey)
+
+      def consensus = application.consensusModule.isValid(b)
+
+      def transaction = application.transactionModule.isValid(b)
+
+      if (!history) log.debug(s"Invalid block ${b.encodedId}: no parent block in history")
+      else if (!signature) log.debug(s"Invalid block ${b.encodedId}: signature is not valid")
+      else if (!consensus) log.debug(s"Invalid block ${b.encodedId}: consensus data is not valid")
+      else if (!transaction) log.debug(s"Invalid block ${b.encodedId}: transaction data is not valid")
+
+      history && signature && consensus && transaction
+    }
+  }
+
+
   private def processNewBlock(block: Block): Boolean = Try {
     val oldHeight = history.height()
     val estimatedHeight = oldHeight + 1
     if (!isValidWithRespectToCheckpoint(block, estimatedHeight)) {
       log.warn(s"Block ${str(block)} [h = $estimatedHeight] is not valid with respect to checkpoint")
       false
-    } else if (block.isValid) {
+    } else if (isBlockValid(block)) {
 
       val oldScore = history.score()
 
