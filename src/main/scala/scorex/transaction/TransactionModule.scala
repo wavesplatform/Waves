@@ -6,8 +6,6 @@ import scala.util.Try
 
 trait TransactionModule {
 
-  def parseBytes(bytes: Array[Byte]): Try[BlockField[Seq[Transaction]]]
-
   def genesisData: BlockField[Seq[Transaction]]
 
   val blockStorage: BlockStorage
