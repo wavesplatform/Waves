@@ -1,21 +1,21 @@
 package com.wavesplatform.matcher.model
 
 import java.io.NotSerializableException
+
 import akka.serialization._
-import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
+import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
+import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import scorex.transaction.AssetId
+import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
+
 import scala.collection.immutable.TreeMap
-import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
-import scorex.crypto.encode.Base58
-import scala.util.{Failure, Success}
 
 class MatcherSerializer extends SerializerWithStringManifest {
   import MatcherSerializer._
@@ -115,29 +115,12 @@ object MatcherSerializer {
     Writes[OrderCanceled](oc => Json.obj("o" -> oc.limitOrder))
   )
 
-  implicit val orderBookCreatedWrites = new Writes[OrderBookCreated] {
-    def writes(e: OrderBookCreated): JsValue = Json.obj(
-      "a1" -> e.pair.firstStr,
-      "a2" -> e.pair.secondStr)
-  }
+  private def mkOrderBookCreated(a1: String, a2: String) = OrderBookCreated(AssetPair.createAssetPair(a1, a2).get)
+  private def orderBookToPair(obc: OrderBookCreated) = (obc.pair.firstStr, obc.pair.firstStr)
 
-  def readOrderBookCreated(a1: Option[Option[AssetId]], a2: Option[Option[AssetId]]) =
-    OrderBookCreated(AssetPair(a1.flatten, a2.flatten))
-
-  implicit val orderBookCreatedReads: Reads[OrderBookCreated] = {
-    val r = ((JsPath \ "a1").read[String] and
-      (JsPath \ "a2").read[String]).apply(AssetPair.createAssetPair _)
-
-    Reads[OrderBookCreated] { json =>
-      r.reads(json) match {
-        case JsSuccess(a, p) => a match {
-          case Success(pair) => JsSuccess(OrderBookCreated(pair))
-          case Failure(ex) => JsError(p, ex.getMessage)
-        }
-        case error: JsError => error
-      }
-    }
-  }
+  implicit val orderBookCreatedFormat: Format[OrderBookCreated] = (
+    (__ \ "a1").format[String] and
+      (__ \ "a2").format[String])(mkOrderBookCreated, orderBookToPair)
 
   implicit val tuple2Format = new Format[(Long, Long)] {
     def writes(o: (Long, Long)): JsValue = Json.arr(o._1, o._2)
