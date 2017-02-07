@@ -12,8 +12,10 @@ import scorex.transaction.assets.exchange.OrderJson._
 case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
                               @ApiModelProperty(dataType = "java.lang.String") orderId: Array[Byte],
                               @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte]) {
+  @ApiModelProperty(hidden = true)
   lazy val toSign: Array[Byte] = senderPublicKey.publicKey ++ orderId
 
+  @ApiModelProperty(hidden = true)
   def isSignatureValid = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
 
   def json: JsObject = Json.obj(

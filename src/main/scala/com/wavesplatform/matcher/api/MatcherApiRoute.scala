@@ -125,7 +125,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "asset1", value = "First Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "asset2", value = "Second Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-    new ApiImplicitParam(name = "id", value = "Order Id", required = true, dataType = "string", paramType = "path")
+    new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
   ))
   def orderStatus: Route =
     path("orderbook" / Segment / Segment / Segment) { (a1, a2, orderId) =>
