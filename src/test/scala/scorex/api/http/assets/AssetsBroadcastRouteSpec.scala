@@ -14,7 +14,7 @@ import scorex.api.http.StateCheckFailed
 import scorex.transaction.{SimpleTransactionModule, Transaction, TransactionGen}
 
 
-class AssetsBroadcastRouteSpec extends FreeSpec with Matchers with ScalatestRouteTest with PathMockFactory
+class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with PathMockFactory
   with TransactionGen with PropertyChecks {
 
   "returns StateCheckFiled when state validation fails" - {
@@ -28,13 +28,13 @@ class AssetsBroadcastRouteSpec extends FreeSpec with Matchers with ScalatestRout
 
     val vt = Table[String, Gen[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
-      ("/assets/broadcast/issue", issueGenerator, identity),
-      ("/assets/broadcast/reissue", reissueGenerator, identity),
-      ("/assets/broadcast/burn", burnGenerator, {
+      (routePath("issue"), issueGenerator, identity),
+      (routePath("reissue"), reissueGenerator, identity),
+      (routePath("burn"), burnGenerator, {
         case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
         case other => other
       }),
-      ("/assets/broadcast/transfer", transferGenerator, {
+      (routePath("transfer"), transferGenerator, {
         case o: JsObject if o.value.contains("feeAsset") =>
           o ++ Json.obj("feeAssetId" -> o.value("feeAsset"), "quantity" -> o.value("amount"))
         case other => other

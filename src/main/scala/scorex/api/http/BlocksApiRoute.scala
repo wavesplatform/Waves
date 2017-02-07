@@ -1,32 +1,25 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-
-import akka.actor.ActorRefFactory
+import scala.util.Try
+import akka.actor.ActorRef
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
-import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.network.Checkpoint
 import scorex.network.Coordinator.BroadcastCheckpoint
-import scorex.transaction.BlockChain
-
-import scala.util.Try
+import scorex.transaction.{BlockChain, History}
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
+case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: CheckpointsSettings, history: History, coordinator: ActorRef) extends ApiRoute with CommonTransactionApiFunctions {
 
   val MaxBlocksPerRequest = 100
-
-  val settings = application.settings.restAPISettings
-  val checkpointsSettings = application.settings.checkpointsSettings
-  private val history = application.history
-  private val coordinator = application.coordinator
 
   override lazy val route =
     pathPrefix("blocks") {

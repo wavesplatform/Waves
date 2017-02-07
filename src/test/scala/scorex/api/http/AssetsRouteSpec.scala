@@ -1,11 +1,6 @@
 package scorex.api.http
 
-import akka.http.scaladsl.testkit.ScalatestRouteTest
-import org.scalatest.{FreeSpec, Matchers}
-
-class AssetsRouteSpec extends FreeSpec with Matchers with ScalatestRouteTest {
-  private def routePath(suffix: String) = s"/assets/$suffix"
-
+class AssetsRouteSpec extends RouteSpec("/assets/") {
   routePath("balance/{address}/{assetId}") in pending
   routePath("balance/{address}") in pending
   routePath("transfer") in pending

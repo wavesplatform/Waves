@@ -1,12 +1,6 @@
 package scorex.api.http
 
-import akka.http.scaladsl.testkit.ScalatestRouteTest
-import org.scalatest.{FreeSpec, Matchers}
-
-class AddressRouteSpec extends FreeSpec with Matchers with ScalatestRouteTest {
-  private val pathPrefix = "/addresses/"
-  private def routePath(suffix: String) = s"$pathPrefix$suffix"
-
+class AddressRouteSpec extends RouteSpec("/addresses/") {
   routePath("") in pending
   routePath("{address}") in pending
   routePath("sign/{address}") in pending
