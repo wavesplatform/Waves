@@ -56,7 +56,7 @@ object formats {
             if (bytes.length == SignatureLength) {
               JsSuccess(Base58.encode(bytes))
             } else {
-              JsError(s"Invalid length of signature '$base58String': ${base58String.length} != ${SignatureLength}")
+              JsError(s"Invalid length of signature '$base58String': ${bytes.length} != $SignatureLength")
             }
           case Failure(f) =>
             JsError(s"Invalid base58 string in signature '$base58String'")
