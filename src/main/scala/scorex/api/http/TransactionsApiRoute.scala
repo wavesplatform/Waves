@@ -1,27 +1,25 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
 import scorex.account.Account
-import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.transaction.{LagonakiState, TransactionsBlockField}
+import scorex.transaction.{History, LagonakiState, SimpleTransactionModule}
 import scorex.transaction.state.database.blockchain.StoredBlockchain
-
 import scala.util.{Success, Try}
+import com.wavesplatform.settings.RestAPISettings
 
 @Path("/transactions")
 @Api(value = "/transactions", description = "Information about transactions")
-case class TransactionsApiRoute(application: Application) extends ApiRoute with CommonApiFunctions {
+case class TransactionsApiRoute(
+    settings: RestAPISettings,
+    state: LagonakiState,
+    history: History,
+    transactionModule: SimpleTransactionModule) extends ApiRoute with CommonApiFunctions {
   val MaxTransactionsPerRequest = 1000
-
-  val settings = application.settings.restAPISettings
-
-  private val state: LagonakiState = application.blockStorage.state
 
   override lazy val route =
     pathPrefix("transactions") {
@@ -53,15 +51,15 @@ case class TransactionsApiRoute(application: Application) extends ApiRoute with 
     new ApiImplicitParam(name = "signature", value = "transaction signature ", required = true, dataType = "string", paramType = "path")
   ))
   def info: Route = {
-    path("info" / Segment) { case encoded =>
+    path("info" / Segment) { encoded =>
       getJsonRoute {
         Base58.decode(encoded) match {
           case Success(sig) =>
             state.included(sig, None) match {
               case Some(h) =>
                 Try {
-                  val block = application.blockStorage.history.asInstanceOf[StoredBlockchain].blockAt(h).get
-                  val tx = block.transactionDataField.asInstanceOf[TransactionsBlockField].value.filter(_.id sameElements sig).head
+                  val block = history.blockAt(h).get
+                  val tx = block.transactionData.filter(_.id sameElements sig).head
                   val json = tx.json + ("height" -> Json.toJson(h))
                   JsonResponse(json, StatusCodes.OK)
                 }.getOrElse(JsonResponse(Json.obj("status" -> "error", "details" -> "Internal error"),
@@ -81,7 +79,7 @@ case class TransactionsApiRoute(application: Application) extends ApiRoute with 
   def unconfirmed: Route = {
     path("unconfirmed") {
       getJsonRoute {
-        val json = JsArray(application.transactionModule.unconfirmedTxs.map(_.json))
+        val json = JsArray(transactionModule.unconfirmedTxs.map(_.json))
         JsonResponse(json, StatusCodes.OK)
       }
     }

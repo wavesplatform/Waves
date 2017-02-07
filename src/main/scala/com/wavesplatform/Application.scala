@@ -47,7 +47,7 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
-    TransactionsApiRoute(this),
+    TransactionsApiRoute(settings.restAPISettings, blockStorage.state, history, transactionModule),
     consensusApiRoute,
     WalletApiRoute(this),
     PaymentApiRoute(settings.restAPISettings, wallet, transactionModule),

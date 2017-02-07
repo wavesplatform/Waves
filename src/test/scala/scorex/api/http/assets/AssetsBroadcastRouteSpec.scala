@@ -9,7 +9,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.api.http.{RouteSpec, StateCheckFailed}
-import scorex.transaction.{SimpleTransactionModule, Transaction, TransactionGen}
+import scorex.transaction.{Transaction, TransactionGen, TransactionModule}
 
 
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with PathMockFactory
@@ -17,7 +17,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Path
 
   "returns StateCheckFiled when state validation fails" - {
     val stmMock = {
-      val m = mock[SimpleTransactionModule]
+      val m = mock[TransactionModule]
       (m.onNewOffchainTransaction _).expects(*).onCall { _: Transaction => false } anyNumberOfTimes()
       m
     }

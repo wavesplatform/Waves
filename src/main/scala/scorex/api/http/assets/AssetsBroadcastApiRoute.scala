@@ -2,17 +2,17 @@ package scorex.api.http.assets
 
 import javax.ws.rs.Path
 import scala.util.control.Exception
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.api.http._
-import scorex.transaction.{SimpleTransactionModule, Transaction, ValidationError}
-import akka.http.scaladsl.model.StatusCodes
+import scorex.transaction.{Transaction, TransactionModule, ValidationError}
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule: SimpleTransactionModule)
+case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule: TransactionModule)
   extends ApiRoute with CommonTransactionApiFunctions {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
