@@ -38,11 +38,11 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
   setDefaultLastBlock()
 
   private def setDefaultLastBlock(): Unit = setLastBlock(testBlock(2))
-  private def setLastBlock(block: Block): Unit = stubApp.setHistory(historyWithLastBlock(block))
-  private def historyWithLastBlock(block: Block): History = {
+  private def setLastBlock(block: Block, desiredHeight : Int = 1): Unit = stubApp.setHistory(historyWithLastBlock(block, desiredHeight))
+  private def historyWithLastBlock(block: Block, desiredHeight : Int ): History = {
     val stubHistory = stub[History]
     (stubHistory.lastBlock _).when().returns(block).anyNumberOfTimes()
-    (stubHistory.height _).when().returns(block.uniqueId.head).anyNumberOfTimes()
+    (stubHistory.height _).when().returns(desiredHeight).anyNumberOfTimes()
     stubHistory
   }
 
@@ -64,7 +64,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "when Idle don't check peers number" in {
-      setLastBlock(testBlock(2, 0))
+      setLastBlock(testBlock(2, 0),2)
       assertStatusIs(Idle)
       actorRef ! SelfCheck
       testPeerManager.expectNoMsg(testDuration)
@@ -109,7 +109,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "StartGeneration command do not change state to generation when should't generate" in {
-      setLastBlock(testBlock(2, 0))
+      setLastBlock(testBlock(2, 0), 2)
       assertStatusIs(Idle)
       actorRef ! StartGeneration
       assertStatusIs(Idle)
