@@ -14,7 +14,7 @@ import scorex.api.http.StateCheckFailed
 import scorex.transaction.{SimpleTransactionModule, Transaction, TransactionGen}
 
 
-class AssetsBroadcastApiRouteSpecification extends FreeSpec with Matchers with ScalatestRouteTest with PathMockFactory
+class AssetsBroadcastRouteSpec extends FreeSpec with Matchers with ScalatestRouteTest with PathMockFactory
   with TransactionGen with PropertyChecks {
 
   "returns StateCheckFiled when state validation fails" - {
