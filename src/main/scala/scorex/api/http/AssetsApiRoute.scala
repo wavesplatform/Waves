@@ -35,7 +35,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ signOrder
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ signOrder ~ balanceDistribution
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -51,6 +51,23 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
       }
     }
   }
+
+  @Path("/{assetId}/distribution")
+  @ApiOperation(value = "Asset balance distribution", notes = "Asset balance distribution by account", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
+  ))
+  def balanceDistribution: Route = {
+    path(Segment / "distribution") { assetId =>
+      getJsonRoute {
+        Base58.decode(assetId) match {
+          case Success(byteArray) => JsonResponse(Json.toJson(state.assetDistribution(byteArray)), StatusCodes.OK)
+          case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.CustomValidationError("Must be base58-encoded assetId"))
+        }
+      }
+    }
+  }
+
 
   @Path("/balance/{address}")
   @ApiOperation(value = "Account's balance", notes = "Account's balances for all assets", httpMethod = "GET")
