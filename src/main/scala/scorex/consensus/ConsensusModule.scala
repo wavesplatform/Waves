@@ -10,8 +10,6 @@ import scala.util.Try
 
 trait ConsensusModule {
 
-  def parseBytes(bytes: Array[Byte]): Try[BlockField[NxtLikeConsensusBlockData]]
-
   def parseBlockFields(blockFields: BlockField[NxtLikeConsensusBlockData]): NxtLikeConsensusBlockData = blockFields.value
 
   def genesisData: BlockField[NxtLikeConsensusBlockData]

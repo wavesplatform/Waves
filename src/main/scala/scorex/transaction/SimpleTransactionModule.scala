@@ -53,36 +53,11 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   val networkController = application.networkController
   private val feeCalculator = new FeeCalculator(settings)
 
-  val TransactionSizeLength = 4
-//  val InitialBalance = 100000000000000L
   val InitialBalance = hardForkParams.initialBalance
 
   override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings)
 
   override val blockStorage = new BlockStorageImpl(settings, hardForkParams)(application.consensusModule, this)
-
-  /**
-    * In Lagonaki, transaction-related data is just sequence of transactions. No Merkle-tree root of txs / state etc
-    *
-    * @param bytes - serialized sequence of transaction
-    * @return
-    */
-  override def parseBytes(bytes: Array[Byte]): Try[TransactionsBlockField] = Try {
-    bytes.isEmpty match {
-      case true => TransactionsBlockField(Seq())
-      case false =>
-        val txData = bytes.tail
-        val txCount = bytes.head // so 255 txs max
-        TransactionsBlockField((1 to txCount).foldLeft((0: Int, Seq[TypedTransaction]())) { case ((pos, txs), _) =>
-          val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
-          val transactionLength = Ints.fromByteArray(transactionLengthBytes)
-          val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
-          val transaction = TypedTransaction.parseBytes(transactionBytes).get
-
-          (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
-        }._2)
-    }
-  }
 
   //TODO asInstanceOf
   override def transactions(block: Block): StoredInBlock =

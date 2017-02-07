@@ -5,10 +5,10 @@ import play.api.libs.json.Json
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
-import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
+import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.{AssetAcc, Transaction, TransactionModule, TransactionsBlockField}
+import scorex.transaction._
 import scorex.utils.ScorexLogging
 import scorex.transaction.TypedTransaction._
 
@@ -78,9 +78,26 @@ object Block extends ScorexLogging {
     assetFees.map(a => AssetAcc(generator, a._1) -> a._2).groupBy(a => a._1).mapValues(_.map(_._2).sum)
   }
 
-  def parseBytes(bytes: Array[Byte])
-                (implicit consModule: ConsensusModule,
-                 transModule: TransactionModule): Try[Block] = Try {
+  val TransactionSizeLength = 4
+
+  def transParseBytes(bytes: Array[Byte]): Try[TransactionsBlockField] = Try {
+    bytes.isEmpty match {
+      case true => TransactionsBlockField(Seq())
+      case false =>
+        val txData = bytes.tail
+        val txCount = bytes.head // so 255 txs max
+        TransactionsBlockField((1 to txCount).foldLeft((0: Int, Seq[TypedTransaction]())) { case ((pos, txs), _) =>
+          val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
+          val transactionLength = Ints.fromByteArray(transactionLengthBytes)
+          val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
+          val transaction = TypedTransaction.parseBytes(transactionBytes).get
+
+          (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
+        }._2)
+    }
+  }
+
+  def parseBytes(bytes: Array[Byte]): Try[Block] = Try {
 
     val version = bytes.head
 
@@ -95,13 +112,13 @@ object Block extends ScorexLogging {
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val cBytes = bytes.slice(position, position + cBytesLength)
-    val consBlockField = consModule.parseBytes(cBytes).get
+    val consBlockField = NxtConsensusBlockField(NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(WavesConsensusModule.BaseTargetLength)), cBytes.takeRight(WavesConsensusModule.GeneratorSignatureLength)))
     position += cBytesLength
 
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val tBytes = bytes.slice(position, position + tBytesLength)
-    val txBlockField = transModule.parseBytes(tBytes).get
+    val txBlockField = transParseBytes(tBytes).get
     position += tBytesLength
 
     val genPK = bytes.slice(position, position + KeyLength)

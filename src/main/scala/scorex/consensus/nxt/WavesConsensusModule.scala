@@ -222,10 +222,6 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     BigInt(prevBlockData.baseTarget) * eta * balance
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[BlockField[NxtLikeConsensusBlockData]] = Try {
-    NxtConsensusBlockField(NxtLikeConsensusBlockData(Longs.fromByteArray(bytes.take(BaseTargetLength)), bytes.takeRight(GeneratorSignatureLength)))
-  }
-
   override def blockScore(block: Block): BigInt = {
     val baseTarget = consensusBlockData(block).baseTarget
     BigInt("18446744073709551616") / baseTarget

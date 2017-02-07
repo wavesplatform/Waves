@@ -20,9 +20,6 @@ trait TransactionModule {
 
   def transactions(block: Block): Seq[Transaction]
 
-  /**
-    * Returns all unconfirmed transactions
-    */
   def unconfirmedTxs: Seq[Transaction]
 
   def putUnconfirmedIfNew(tx: Transaction): Boolean
