@@ -1,15 +1,11 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
-import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
@@ -17,17 +13,17 @@ import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTran
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
 import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed => TxStateCheckFailed}
+import scorex.transaction.assets.exchange.OrderJson._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.util.{Failure, Success, Try}
+import com.wavesplatform.settings.RestAPISettings
+import scorex.wallet.Wallet
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StoredState, transactionModule: SimpleTransactionModule) extends ApiRoute with CommonTransactionApiFunctions {
   val MaxAddressesPerRequest = 1000
-
-  val settings = application.settings.restAPISettings
-
-  private val wallet = application.wallet
-  private val state = application.blockStorage.state.asInstanceOf[StoredState]
-  private implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
 
   override lazy val route =
     pathPrefix("assets") {
