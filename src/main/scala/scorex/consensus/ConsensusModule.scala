@@ -33,11 +33,3 @@ trait ConsensusModule {
                              (implicit transactionModule: TransactionModule): Option[Long]
 
 }
-
-object ConsensusModule {
-
-  /**
-    * A naive but still a way to emphasize that cumulative score is sum of block scores
-    */
-  def cumulativeBlockScore(previousCumulativeScore: BigInt, blockScore: BigInt): BigInt = previousCumulativeScore + blockScore
-}

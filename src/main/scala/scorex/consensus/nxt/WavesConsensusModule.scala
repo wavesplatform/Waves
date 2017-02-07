@@ -3,7 +3,7 @@ package scorex.consensus.nxt
 import com.google.common.primitives.Longs
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField}
-import scorex.consensus.{ConsensusModule, OneGeneratorConsensusModule, PoSConsensusModule, TransactionsOrdering}
+import scorex.consensus.{ConsensusModule, PoSConsensusModule, TransactionsOrdering}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.settings.ChainParameters
@@ -14,7 +14,7 @@ import scala.concurrent.duration._
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration) extends PoSConsensusModule[NxtLikeConsensusBlockData]
+class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration) extends PoSConsensusModule
   with ScorexLogging {
 
   import WavesConsensusModule._
