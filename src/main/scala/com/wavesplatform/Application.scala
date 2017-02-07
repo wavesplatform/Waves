@@ -53,7 +53,7 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
     PaymentApiRoute(this),
     UtilsApiRoute(this),
     PeersApiRoute(this),
-    AddressApiRoute(this),
+    AddressApiRoute(settings.restAPISettings, wallet, blockStorage.state),
     DebugApiRoute(this),
     WavesApiRoute(this),
     AssetsApiRoute(this),
