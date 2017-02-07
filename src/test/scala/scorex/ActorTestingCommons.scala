@@ -67,7 +67,7 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
   protected def testBlock(id: Int, ts: Long = System.currentTimeMillis()) =
-    Block(ts,0,toBlockId(id),SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array(0: Byte)),
+    Block(ts,0,1,SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array(id.toByte)),
       NxtConsensusBlockField(NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte))),TransactionsBlockField(Seq.empty))
 
   protected trait TestDataExtraction[T] {
