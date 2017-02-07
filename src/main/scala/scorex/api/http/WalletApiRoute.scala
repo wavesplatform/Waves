@@ -1,20 +1,18 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.app.Application
 import scorex.crypto.encode.Base58
+import scorex.wallet.Wallet
 
 @Path("/wallet")
 @Api(value = "/wallet", description = "Wallet-related calls")
-case class WalletApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
-  val settings = application.settings.restAPISettings
-
-  private val wallet = application.wallet
+case class WalletApiRoute(settings: RestAPISettings, wallet: Wallet
+) extends ApiRoute with CommonTransactionApiFunctions {
 
   override lazy val route = seed
 
