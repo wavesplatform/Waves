@@ -10,13 +10,9 @@ trait TransactionModule {
 
   val blockStorage: BlockStorage
 
-  val utxStorage: UnconfirmedTransactionsStorage
-
   def isValid(block: Block): Boolean
 
   def isValid(tx: Transaction, blockTime: Long): Boolean
-
-  def transactions(block: Block): Seq[Transaction]
 
   def unconfirmedTxs: Seq[Transaction]
 

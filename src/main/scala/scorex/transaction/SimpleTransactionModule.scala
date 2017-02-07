@@ -55,13 +55,9 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   val InitialBalance = hardForkParams.initialBalance
 
-  override val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings)
+  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings)
 
   override val blockStorage = new BlockStorageImpl(settings, hardForkParams)(application.consensusModule, this)
-
-  //TODO asInstanceOf
-  override def transactions(block: Block): StoredInBlock =
-    block.transactionDataField.asInstanceOf[TransactionsBlockField].value
 
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 

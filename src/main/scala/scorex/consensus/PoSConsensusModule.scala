@@ -17,5 +17,4 @@ trait PoSConsensusModule[ConsensusBlockData] extends ConsensusModule {
     transactionModule.blockStorage.state.asInstanceOf[BalanceSheet]
       .balanceWithConfirmations(account, if (atHeight.exists(h => h >= forksConfig.generatingBalanceDepthFrom50To1000AfterHeight)) 1000 else 50, atHeight)
 
-  override def generators(block: Block): Seq[Account]
 }

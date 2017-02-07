@@ -144,7 +144,7 @@ class StoredBlockchain(db: MVStore)
   override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = {
     (from to to).toStream.flatMap { h =>
       blockAt(h).flatMap { block =>
-        if (consensusModule.generators(block).contains(account)) Some(block) else None
+        if (Seq(block.signerDataField.value.generator).contains(account)) Some(block) else None
       }
     }
   }

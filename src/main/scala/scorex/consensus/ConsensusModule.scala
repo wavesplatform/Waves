@@ -1,26 +1,15 @@
 package scorex.consensus
 
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.block.{Block, BlockField, BlockProcessingModule}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.block.{Block, BlockField}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.transaction.{AssetAcc, TransactionModule}
-
-import scala.util.Try
-
+import scorex.transaction.TransactionModule
 
 trait ConsensusModule {
-
-  def parseBlockFields(blockFields: BlockField[NxtLikeConsensusBlockData]): NxtLikeConsensusBlockData = blockFields.value
 
   def genesisData: BlockField[NxtLikeConsensusBlockData]
 
   def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean
-
-  /**
-    * Get block producers(miners/forgers). Usually one miner produces a block, but in some proposals not
-    * (see e.g. Meni Rosenfeld's Proof-of-Activity paper http://eprint.iacr.org/2014/452.pdf)
-    */
-  def generators(block: Block): Seq[Account]
 
   def blockScore(block: Block): BigInt
 
