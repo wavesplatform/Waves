@@ -1,16 +1,14 @@
 package scorex.api.http.assets
 
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.testkit.ScalatestRouteTest
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.RestAPISettings
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
-import org.scalatest.{FreeSpec, Matchers}
 import play.api.libs.json.{JsObject, JsValue, Json}
-import scorex.api.http.StateCheckFailed
+import scorex.api.http.{RouteSpec, StateCheckFailed}
 import scorex.transaction.{SimpleTransactionModule, Transaction, TransactionGen}
 
 

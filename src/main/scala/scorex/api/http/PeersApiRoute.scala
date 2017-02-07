@@ -2,26 +2,23 @@ package scorex.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
 import javax.ws.rs.Path
-
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Try
+import akka.actor.ActorRef
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, JsString, Json}
-import scorex.app.RunnableApplication
 import scorex.network.Handshake
 import scorex.network.NetworkController.ConnectTo
 import scorex.network.peer.{PeerInfo, PeerManager}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.Try
-
 @Path("/peers")
 @Api(value = "/peers", description = "Get info about peers", position = 2)
-case class PeersApiRoute(application: RunnableApplication) extends ApiRoute {
+case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, networkController: ActorRef) extends ApiRoute {
   val MaxPeersInResponse = 1000
-
-  val settings = application.settings.restAPISettings
 
   override lazy val route =
     pathPrefix("peers") {
@@ -35,7 +32,7 @@ case class PeersApiRoute(application: RunnableApplication) extends ApiRoute {
   ))
   def allPeers: Route = path("all") {
     getJsonRoute {
-      (application.peerManager ? PeerManager.GetAllPeers)
+      (peerManager ? PeerManager.GetAllPeers)
         .mapTo[Map[InetSocketAddress, PeerInfo]]
         .map { peers =>
           JsonResponse(
@@ -60,7 +57,7 @@ case class PeersApiRoute(application: RunnableApplication) extends ApiRoute {
   ))
   def connectedPeers: Route = path("connected") {
     getJsonRoute {
-      (application.peerManager ? PeerManager.GetConnectedPeers)
+      (peerManager ? PeerManager.GetConnectedPeers)
         .mapTo[List[(InetSocketAddress, Handshake)]]
         .map { connectedPeers =>
           val peerData = JsArray(connectedPeers.take(MaxPeersInResponse).map { peer =>
@@ -96,7 +93,7 @@ case class PeersApiRoute(application: RunnableApplication) extends ApiRoute {
             val host = (js \ "host").as[String]
             val port = (js \ "port").as[Int]
             val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(host), port)
-            application.networkController ! ConnectTo(add)
+            networkController ! ConnectTo(add)
 
             JsonResponse(Json.obj("hostname" -> add.getHostName, "status" -> "Trying to connect"), StatusCodes.OK)
           }.getOrElse(WrongJson().response)
@@ -112,7 +109,7 @@ case class PeersApiRoute(application: RunnableApplication) extends ApiRoute {
   ))
   def blacklistedPeers: Route = path("blacklisted") {
     getJsonRoute {
-      (application.peerManager ? PeerManager.GetBlacklistedPeers)
+      (peerManager ? PeerManager.GetBlacklistedPeers)
         .mapTo[Set[String]]
         .map { peers =>
           JsonResponse(JsArray(peers.take(MaxPeersInResponse).map(JsString).toSeq), StatusCodes.OK)
