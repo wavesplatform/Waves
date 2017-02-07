@@ -69,7 +69,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     val v = validateCancelOrder(cancel)
     if (v) {
       OrderBook.cancelOrder(orderBook, cancel.orderId) match {
-        case Some(oc) if cancel.req.sender == oc.limitOrder.order.sender =>
+        case Some(oc) if cancel.req.senderPublicKey == oc.limitOrder.order.senderPublicKey =>
           persist(oc) { _ =>
             handleCancelEvent(oc)
             sender() ! OrderCanceled(cancel.orderId)
@@ -168,8 +168,7 @@ object OrderBookActor {
             wallet: Wallet, settings: WavesSettings, transactionModule: TransactionModule): Props =
     Props(new OrderBookActor(assetPair, storedState, wallet, settings, transactionModule))
 
-  def name(assetPair: AssetPair): String = assetPair.first.map(Base58.encode).getOrElse("WAVES") + "-" +
-    assetPair.second.map(Base58.encode).getOrElse("WAVES")
+  def name(assetPair: AssetPair): String = assetPair.toString
 
   val MaxDepth = 50
 

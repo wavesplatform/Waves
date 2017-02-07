@@ -309,7 +309,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
                 Future.successful(WrongTransactionJson(err).response)
               case JsSuccess(order: Order, _) =>
                 Future {
-                  wallet.privateKeyAccount(order.sender.address).map { sender =>
+                  wallet.privateKeyAccount(order.senderPublicKey.address).map { sender =>
                     val signed = Order.sign(order, sender)
                     JsonResponse(signed.json, StatusCodes.OK)
                   }.getOrElse(InvalidAddress.response)

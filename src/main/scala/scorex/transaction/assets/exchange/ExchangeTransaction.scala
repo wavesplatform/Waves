@@ -38,7 +38,7 @@ object ExchangeTransaction {
     override val assetFee: (Option[AssetId], Long) = (None, fee)
 
     @ApiModelProperty(hidden = true)
-    override val sender: PublicKeyAccount = buyOrder.matcher
+    override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
 
     lazy val toSign: Array[Byte] = Array(transactionType.id.toByte) ++
       Ints.toByteArray(buyOrder.bytes.length) ++ Ints.toByteArray(sellOrder.bytes.length) ++
@@ -59,15 +59,15 @@ object ExchangeTransaction {
 
     override def balanceChanges(): Seq[BalanceChange] = {
 
-      val matcherChange = Seq(BalanceChange(AssetAcc(buyOrder.matcher, None), buyMatcherFee + sellMatcherFee - fee))
-      val buyFeeChange = Seq(BalanceChange(AssetAcc(buyOrder.sender, None), -buyMatcherFee))
-      val sellFeeChange = Seq(BalanceChange(AssetAcc(sellOrder.sender, None), -sellMatcherFee))
+      val matcherChange = Seq(BalanceChange(AssetAcc(buyOrder.matcherPublicKey, None), buyMatcherFee + sellMatcherFee - fee))
+      val buyFeeChange = Seq(BalanceChange(AssetAcc(buyOrder.senderPublicKey, None), -buyMatcherFee))
+      val sellFeeChange = Seq(BalanceChange(AssetAcc(sellOrder.senderPublicKey, None), -sellMatcherFee))
 
       val exchange = Seq(
-        (buyOrder.sender, (buyOrder.spendAssetId, -buyOrder.getSpendAmount(price, amount))),
-        (buyOrder.sender, (buyOrder.receiveAssetId, buyOrder.getReceiveAmount(price, amount))),
-        (sellOrder.sender, (sellOrder.receiveAssetId, sellOrder.getReceiveAmount(price, amount))),
-        (sellOrder.sender, (sellOrder.spendAssetId, -sellOrder.getSpendAmount(price, amount)))
+        (buyOrder.senderPublicKey, (buyOrder.spendAssetId, -buyOrder.getSpendAmount(price, amount))),
+        (buyOrder.senderPublicKey, (buyOrder.receiveAssetId, buyOrder.getReceiveAmount(price, amount))),
+        (sellOrder.senderPublicKey, (sellOrder.receiveAssetId, sellOrder.getReceiveAmount(price, amount))),
+        (sellOrder.senderPublicKey, (sellOrder.spendAssetId, -sellOrder.getSpendAmount(price, amount)))
       )
 
       buyFeeChange ++ sellFeeChange ++ matcherChange ++
@@ -99,7 +99,7 @@ object ExchangeTransaction {
       Left(CustomValidationError("buyOrder should has OrderType.BUY"))
     } else if (sellOrder.orderType != OrderType.SELL) {
       Left(CustomValidationError("sellOrder should has OrderType.SELL"))
-    } else if (buyOrder.matcher != sellOrder.matcher) {
+    } else if (buyOrder.matcherPublicKey != sellOrder.matcherPublicKey) {
       Left(CustomValidationError("buyOrder.matcher should be the same as sellOrder.matcher"))
     } else if (buyOrder.assetPair != sellOrder.assetPair) {
       Left(CustomValidationError("Both orders should have same AssetPair"))

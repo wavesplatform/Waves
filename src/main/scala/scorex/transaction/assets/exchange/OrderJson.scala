@@ -50,8 +50,8 @@ object OrderJson {
   }
 
   implicit val orderReads: Reads[Order] = {
-    val r = (JsPath \ "sender").read[PublicKeyAccount] and
-      (JsPath \ "matcher").read[PublicKeyAccount] and
+    val r = (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
+      (JsPath \ "matcherPublicKey").read[PublicKeyAccount] and
       (JsPath \ "spendAssetId").readNullable[Option[Array[Byte]]] and
       (JsPath \ "receiveAssetId").readNullable[Option[Array[Byte]]] and
       (JsPath \ "price").read[Long] and

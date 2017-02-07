@@ -9,7 +9,7 @@ import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.AssetAcc
-import scorex.transaction.assets.exchange.Order
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.utils.NTP
@@ -103,25 +103,25 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
          |  "amount": $amount,
          |  "timestamp": $created,
          |  "expiration": $timeToLive,
-         |  "matcher": "$MatcherPubKey",
-         |  "sender": "$pubKeyStr"
+         |  "matcherPublicKey": "$MatcherPubKey",
+         |  "senderPublicKey": "$pubKeyStr"
          |}""".stripMargin
     val order = Json.parse(json).validate[Order].get
     val signed = Order.sign(order, acc)
     val signedJson = signed.json
 
-    val resp = matcherPostRequest("/orders/place", body = signedJson.toString)
+    val resp = matcherPostRequest("/orderbook", body = signedJson.toString)
 
     (resp \ "status").as[String] shouldBe expectedStatus
     (resp \ "message" \ "id").toOption.map(_.as[String])
   }
 
   def getOrderBook(asset: Option[String]): JsValue = {
-    matcherGetRequest(s"/orderBook", params = Map("asset1" -> asset.get))
+    matcherGetRequest(s"/orderbook/WAVES/${asset.get}")
   }
 
   def getOrderStatus(asset: Option[String], id: String): JsValue = {
-    matcherGetRequest(s"/orders/status/$id", params = Map("asset1" -> asset.get))
+    matcherGetRequest(s"/orderbook/WAVES/${asset.get}/$id")
   }
 
   def waitForOrderStatus(asset: Option[String], id: String, status: String) = {
@@ -147,8 +147,9 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     val (a1, a2) = if (spendAsset.isDefined) (spendAsset.get, receiveAsset.getOrElse("")) else
       (receiveAsset.get, spendAsset.getOrElse(""))
 
-    val resp = matcherPostRequest("/orders/cancel", body = signedJson.toString,
-      params = Map("asset1" -> a1, "asset2" -> a2))
+    val pair = AssetPair.createAssetPair(spendAsset.getOrElse(AssetPair.WavesName),
+      receiveAsset.getOrElse(AssetPair.WavesName)).get
+    val resp = matcherDeleteRequest(s"/orderbook/${pair.firstStr}/${pair.secondStr}", body = signedJson.toString)
 
     (resp \ "status").as[String] shouldBe expectedStatus
   }
@@ -164,8 +165,8 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     Thread.sleep(1000)
   }
 
-  test("/matcher/publicKey") {
-    val resp = matcherGetRequest("/publicKey")
+  test("/matcher/") {
+    val resp = matcherGetRequest("/")
     resp.as[String] shouldBe MatcherPubKey
   }
 

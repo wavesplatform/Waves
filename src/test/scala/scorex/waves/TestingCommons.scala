@@ -191,6 +191,14 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
     Json.parse(response.getResponseBody)
   }
 
+  def matcherDeleteRequest(path: String, body: String = "",
+                         params: Map[String, String] = Map.empty,
+                         headers: Map[String, String] = Map("api_key" -> "test")): JsValue = {
+    val request = Http(url(matcherUrl() + path).DELETE <:< headers <<? params << body)
+    val response = Await.result(request, 5.seconds)
+    Json.parse(response.getResponseBody)
+  }
+
   def postRequestWithResponse(us: String,
                               params: Map[String, String] = Map.empty,
                               body: String = "",

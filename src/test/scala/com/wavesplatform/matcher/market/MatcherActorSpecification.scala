@@ -4,9 +4,11 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.wavesplatform.matcher.MatcherTestData
+import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
@@ -62,12 +64,12 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   "MatcherActor" should {
 
     "accept orders with wrong AssetPair" in {
-      def sameAssetsOrder(): Order = Order.apply(new PrivateKeyAccount("123".getBytes()), new PrivateKeyAccount("mather".getBytes()),
+      def sameAssetsOrder(): Order = Order.apply(new PrivateKeyAccount("123".getBytes()), MatcherAccount,
         Some.apply("asset1".getBytes), Some.apply("asset1".getBytes), 100000000L, 100L, 1L, 1000L, 100000L)
 
       val invalidOrder = sameAssetsOrder()
       actor ! invalidOrder
-      expectMsg(OrderRejected("Invalid AssetPair"))
+      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid AssetPair"))
     }
 
     "restore OrderBook after restart" in {
@@ -95,7 +97,8 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       actor ! GetMarkets()
 
       expectMsgPF() {
-        case GetMarketsResponse(Seq(MarketData(_, "Unknown","Unknown", _))) =>
+        case GetMarketsResponse(publicKey, Seq(MarketData(_, "Unknown","Unknown", _))) =>
+          publicKey shouldBe MatcherAccount.publicKey
       }
     }
   }
@@ -113,17 +116,17 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       val pair2 = AssetPair(a1, a2)
 
       val now =  NTP.correctedTime()
-      val json = GetMarketsResponse(Seq(MarketData(pair1, waves, a1Name, now),
+      val json = GetMarketsResponse(Array(), Seq(MarketData(pair1, waves, a1Name, now),
         MarketData(pair2, a1Name, a2Name, now))).json
 
       println(Json.prettyPrint(json))
-      ((json \ "result") (0) \ "firstAssetId").get shouldBe JsNull
-      ((json \ "result") (0) \ "firstAssetName").as[String] shouldBe waves
-      ((json \ "result") (0) \ "secondAssetId").as[String] shouldBe Base58.encode(a1.get)
-      ((json \ "result") (0) \ "secondAssetName").as[String] shouldBe a1Name
-      ((json \ "result") (0) \ "created").as[Long] shouldBe now
+      ((json \ "markets") (0) \ "asset1Id").as[String] shouldBe AssetPair.WavesName
+      ((json \ "markets") (0) \ "asset1Name").as[String] shouldBe waves
+      ((json \ "markets") (0) \ "asset2Id").as[String] shouldBe Base58.encode(a1.get)
+      ((json \ "markets") (0) \ "asset2Name").as[String] shouldBe a1Name
+      ((json \ "markets") (0) \ "created").as[Long] shouldBe now
 
-      ((json \ "result") (1) \ "secondAssetName").as[String] shouldBe a2Name
+      ((json \ "markets") (1) \ "asset2Name").as[String] shouldBe a2Name
     }
   }
 }

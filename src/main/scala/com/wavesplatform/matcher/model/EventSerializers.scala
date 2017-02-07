@@ -15,6 +15,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scala.collection.immutable.TreeMap
 import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import scorex.crypto.encode.Base58
+import scala.util.{Failure, Success}
 
 class MatcherSerializer extends SerializerWithStringManifest {
   import MatcherSerializer._
@@ -114,12 +115,29 @@ object MatcherSerializer {
     Writes[OrderCanceled](oc => Json.obj("o" -> oc.limitOrder))
   )
 
-  private def mkOrderBookCreated(a1: Option[AssetId], a2: Option[AssetId]) = OrderBookCreated(AssetPair(a1, a2))
-  private def orderBookToPair(obc: OrderBookCreated) = (obc.pair.first, obc.pair.second)
+  implicit val orderBookCreatedWrites = new Writes[OrderBookCreated] {
+    def writes(e: OrderBookCreated): JsValue = Json.obj(
+      "a1" -> e.pair.firstStr,
+      "a2" -> e.pair.secondStr)
+  }
 
-  implicit val orderBookCreatedFormat: Format[OrderBookCreated] = (
-    (__ \ "a1").format[Option[Array[Byte]]] and
-    (__ \ "a2").format[Option[Array[Byte]]])(mkOrderBookCreated, orderBookToPair)
+  def readOrderBookCreated(a1: Option[Option[AssetId]], a2: Option[Option[AssetId]]) =
+    OrderBookCreated(AssetPair(a1.flatten, a2.flatten))
+
+  implicit val orderBookCreatedReads: Reads[OrderBookCreated] = {
+    val r = ((JsPath \ "a1").read[String] and
+      (JsPath \ "a2").read[String]).apply(AssetPair.createAssetPair _)
+
+    Reads[OrderBookCreated] { json =>
+      r.reads(json) match {
+        case JsSuccess(a, p) => a match {
+          case Success(pair) => JsSuccess(OrderBookCreated(pair))
+          case Failure(ex) => JsError(p, ex.getMessage)
+        }
+        case error: JsError => error
+      }
+    }
+  }
 
   implicit val tuple2Format = new Format[(Long, Long)] {
     def writes(o: (Long, Long)): JsValue = Json.arr(o._1, o._2)

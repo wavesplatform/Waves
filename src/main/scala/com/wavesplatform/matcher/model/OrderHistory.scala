@@ -32,12 +32,12 @@ trait OrderHistory {
 
   private def addAssetsToSpend(lo: LimitOrder) = {
     val order = lo.order
-    val assetAcc = AssetAcc(order.sender, order.spendAssetId)
-    val feeAssetAcc = AssetAcc(order.sender, None)
+    val assetAcc = AssetAcc(order.senderPublicKey, order.spendAssetId)
+    val feeAssetAcc = AssetAcc(order.senderPublicKey, None)
     assetsToSpend(assetAcc.key) = assetsToSpend.getOrElse(assetAcc.key, 0L) + lo.getSpendAmount
     assetsToSpend(feeAssetAcc.key) = assetsToSpend.getOrElse(feeAssetAcc.key, 0L) + lo.feeAmount
 
-    incCount(order.sender.address)
+    incCount(order.senderPublicKey.address)
   }
 
   private def updateRemaining(orderId: String, d: (Long, Long)) = {
@@ -60,8 +60,8 @@ trait OrderHistory {
       }
 
     val order = limitOrder.order
-    val assetAcc = AssetAcc(order.sender, order.spendAssetId)
-    val feeAssetAcc = AssetAcc(order.sender, None)
+    val assetAcc = AssetAcc(order.senderPublicKey, order.spendAssetId)
+    val feeAssetAcc = AssetAcc(order.senderPublicKey, None)
 
     reduce(assetAcc.key, limitOrder.getSpendAmount)
     reduce(feeAssetAcc.key, limitOrder.feeAmount)
@@ -74,7 +74,7 @@ trait OrderHistory {
     updateRemaining(e.submitted.order.idStr, (e.executedAmount, e.executedAmount))
     updateRemaining(e.counter.order.idStr, (0L, e.executedAmount))
 
-    if (e.isCounterFilled) decCount(e.counterExecuted.order.sender.address)
+    if (e.isCounterFilled) decCount(e.counterExecuted.order.senderPublicKey.address)
   }
 
   def didOrderCanceled(orderCanceled: OrderCanceled): Unit = {
@@ -83,7 +83,7 @@ trait OrderHistory {
 
     reduceSpendAssets(orderCanceled.limitOrder)
 
-    decCount(o.sender.address)
+    decCount(o.senderPublicKey.address)
   }
 
   def getOrderStatus(id: String): OrderStatus = {

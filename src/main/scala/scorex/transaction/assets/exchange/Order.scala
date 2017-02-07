@@ -29,8 +29,8 @@ object OrderType {
   * Order to matcher service for asset exchange
   */
 @SerialVersionUID(2455530529543215878L)
-case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: PublicKeyAccount,
-                 @ApiModelProperty(dataType = "java.lang.String", example = "") matcher: PublicKeyAccount,
+case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
+                 @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
                  @ApiModelProperty(dataType = "java.lang.String") spendAssetId: Option[AssetId],
                  @ApiModelProperty(dataType = "java.lang.String") receiveAssetId: Option[AssetId],
                  @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8",
@@ -50,7 +50,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
   def orderType: OrderType = if (ByteArrayExtension.sameOption(receiveAssetId, assetPair.second)) OrderType.BUY else OrderType.SELL
 
   @ApiModelProperty(hidden = true)
-  lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, sender.publicKey)
+  lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
 
   def isValid(atTime: Long): Validation = {
     (amount > 0) :| "amount should be > 0" &&
@@ -69,7 +69,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
   }
 
   @ApiModelProperty(hidden = true)
-  lazy val toSign: Array[Byte] = sender.publicKey ++ matcher.publicKey ++
+  lazy val toSign: Array[Byte] = senderPublicKey.publicKey ++ matcherPublicKey.publicKey ++
     assetIdBytes(spendAssetId) ++ assetIdBytes(receiveAssetId) ++
     Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
     Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
@@ -97,8 +97,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
 
   override def json: JsObject = Json.obj(
     "id" -> Base58.encode(id),
-    "sender" -> Base58.encode(sender.publicKey),
-    "matcher" -> Base58.encode(matcher.publicKey),
+    "senderPublicKey" -> Base58.encode(senderPublicKey.publicKey),
+    "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
     "spendAssetId" -> spendAssetId.map(Base58.encode),
     "receiveAssetId" -> receiveAssetId.map(Base58.encode),
     "price" -> price,
@@ -114,8 +114,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") sender: Public
   override def equals(obj: Any): Boolean = {
     obj match {
       case o: Order => o.canEqual(this) &&
-        sender == o.sender &&
-        matcher == o.matcher &&
+        senderPublicKey == o.senderPublicKey &&
+        matcherPublicKey == o.matcherPublicKey &&
         ByteArrayExtension.sameOption(spendAssetId, o.spendAssetId) &&
         ByteArrayExtension.sameOption(receiveAssetId, o.receiveAssetId) &&
         price == o.price &&
@@ -185,7 +185,7 @@ object Order extends Deser[Order] {
   }
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
-    require(unsigned.sender == sender)
+    require(unsigned.senderPublicKey == sender)
     val sig = EllipticCurveImpl.sign(sender, unsigned.toSign)
     unsigned.copy(signature = sig)
   }

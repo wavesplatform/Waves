@@ -14,8 +14,8 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
       val recovered = Order.parseBytes(order.bytes).get
       recovered.bytes shouldEqual order.bytes
       recovered.id shouldBe order.id
-      recovered.sender shouldBe order.sender
-      recovered.matcher shouldBe order.matcher
+      recovered.senderPublicKey shouldBe order.senderPublicKey
+      recovered.matcherPublicKey shouldBe order.matcherPublicKey
       ByteArrayExtension.sameOption(recovered.spendAssetId, order.spendAssetId) shouldBe true
       ByteArrayExtension.sameOption(recovered.receiveAssetId, order.receiveAssetId) shouldBe true
       recovered.price shouldBe order.price
@@ -81,8 +81,8 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
     forAll { (x: (Order, PrivateKeyAccount), bytes: Array[Byte]) =>
       val (order, pk) = x
       order.isValid(NTP.correctedTime()) shouldBe valid
-      order.copy(sender = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(matcher = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
+      order.copy(senderPublicKey = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
+      order.copy(matcherPublicKey = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(spendAssetId = order.spendAssetId.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte)))).
         isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(receiveAssetId = order.receiveAssetId.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte)))).

@@ -1,9 +1,9 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Props}
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.PersistentActor
-import com.wavesplatform.matcher.api.{GenericMatcherResponse, StatusCodeMatcherResponse}
+import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{GetOrderBookResponse, OrderBookRequest}
 import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsArray, JsValue, Json}
@@ -28,7 +28,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
   val openMarkets: mutable.Buffer[MarketData] = mutable.Buffer.empty[MarketData]
 
   def createOrderBook(pair: AssetPair): ActorRef = {
-    def getAssetName(asset: Option[AssetId]) = asset.map(storedState.assetsExtension.getAssetName).getOrElse("WAVES")
+    def getAssetName(asset: Option[AssetId]) = asset.map(storedState.assetsExtension.getAssetName).getOrElse(AssetPair.WavesName)
 
     openMarkets += MarketData(pair, getAssetName(pair.first), getAssetName(pair.second), NTP.correctedTime())
 
@@ -39,9 +39,9 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
     Try(msg.assetPair).isSuccess :| "Invalid AssetPair" &&
       msg.assetPair.first.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
-        s"Unknown Asset ID: ${msg.assetPair.first.map(Base58.encode).getOrElse("")}" &&
+        s"Unknown Asset ID: ${msg.assetPair.firstStr}" &&
       msg.assetPair.second.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
-        s"Unknown Asset ID: ${msg.assetPair.second.map(Base58.encode).getOrElse("")}"
+        s"Unknown Asset ID: ${msg.assetPair.secondStr}"
   }
 
   def createAndForward(order: Order): Unit = {
@@ -63,9 +63,13 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSett
     else sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
   }
 
+  def getMatcherPublicKey: Array[Byte] = {
+    wallet.privateKeyAccount(settings.matcherAccount).map(_.publicKey).getOrElse(Array())
+  }
+
   def forwardToOrderBook: Receive = {
     case m: GetMarkets =>
-      sender() ! GetMarketsResponse(openMarkets)
+      sender() ! GetMarketsResponse(getMatcherPublicKey, openMarkets)
     case order: Order =>
       checkAssetPair(order) {
         context.child(OrderBookActor.name(order.assetPair))
@@ -99,17 +103,22 @@ object MatcherActor {
 
   case class GetMarkets()
 
-  case class GetMarketsResponse(markets: Seq[MarketData]) extends GenericMatcherResponse {
-    val success = true
-    val message = ""
-    override val result: JsValue = JsArray(markets.map(m => Json.obj(
-        "firstAssetId" -> m.pair.first.map(Base58.encode),
-        "firstAssetName" -> m.firstAssetName,
-        "secondAssetId" -> m.pair.second.map(Base58.encode),
-        "secondAssetName" -> m.secondAssetName,
+  case class GetMarketsResponse(publicKey: Array[Byte], markets: Seq[MarketData]) extends MatcherResponse {
+    def getMarketsJs: JsValue = JsArray(markets.map(m => Json.obj(
+        "asset1Id" -> m.pair.firstStr,
+        "asset1Name" -> m.firstAssetName,
+        "asset2Id" ->  m.pair.secondStr,
+        "asset2Name" -> m.secondAssetName,
         "created" -> m.created
       ))
     )
+
+    def json: JsValue = Json.obj(
+      "matcherPublicKey" -> Base58.encode(publicKey),
+      "markets" -> getMarketsJs
+    )
+
+    def code: StatusCode = StatusCodes.OK
   }
 
   case class MarketData(pair: AssetPair, firstAssetName: String, secondAssetName: String, created: Long)
