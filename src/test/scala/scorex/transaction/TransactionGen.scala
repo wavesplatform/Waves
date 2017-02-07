@@ -18,6 +18,10 @@ trait TransactionGen {
     Gen.choose(minSize, maxSize) flatMap { sz => Gen.listOfN(sz, Arbitrary.arbitrary[Byte]).map(_.toArray) }
   }
 
+  def genBoundedString(minSize: Int, maxSize: Int): Gen[Array[Byte]] = {
+    Gen.choose(minSize, maxSize) flatMap { sz => Gen.listOfN(sz, Gen.choose(0, 0x7f).map(_.toByte)).map(_.toArray) }
+  }
+
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
   val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)
@@ -104,8 +108,8 @@ trait TransactionGen {
 
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
-    assetName <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-    description <- genBoundedBytes(0, IssueTransaction.MaxDescriptionLength)
+    assetName <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+    description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
     quantity <- positiveLongGen
     burnAmount <- Gen.choose(0L, quantity)
     decimals <- Gen.choose(0: Byte, 8: Byte)
