@@ -200,4 +200,12 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val bal3 = state.assetBalance(AssetAcc(new Account("3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY"), None))
     wavesBal should be > 0L
   }
+
+  test("asset distribution") {
+    val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), application.wallet).get
+    val block = new BlockMock(Seq(issueAssetTx))
+    state.processBlock(block)
+    val distribution = state.assetDistribution(issueAssetTx.assetId)
+    distribution shouldBe Map(acc.address -> 1000000)
+  }
 }
