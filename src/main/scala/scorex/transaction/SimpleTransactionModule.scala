@@ -73,7 +73,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       case false =>
         val txData = bytes.tail
         val txCount = bytes.head // so 255 txs max
-        formBlockData((1 to txCount).foldLeft((0: Int, Seq[TypedTransaction]())) { case ((pos, txs), _) =>
+        TransactionsBlockField((1 to txCount).foldLeft((0: Int, Seq[TypedTransaction]())) { case ((pos, txs), _) =>
           val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
           val transactionLength = Ints.fromByteArray(transactionLengthBytes)
           val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
@@ -83,8 +83,6 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
         }._2)
     }
   }
-
-  override def formBlockData(transactions: StoredInBlock): TransactionsBlockField = TransactionsBlockField(transactions)
 
   //TODO asInstanceOf
   override def transactions(block: Block): StoredInBlock =

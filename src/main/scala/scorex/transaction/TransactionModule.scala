@@ -6,13 +6,9 @@ import scala.util.Try
 
 trait TransactionModule {
 
-  type TransactionBlockData = Seq[Transaction]
+  def parseBytes(bytes: Array[Byte]): Try[BlockField[Seq[Transaction]]]
 
-  def parseBytes(bytes: Array[Byte]): Try[BlockField[TransactionBlockData]]
-
-  def genesisData: BlockField[TransactionBlockData]
-
-  def formBlockData(data: TransactionBlockData): BlockField[TransactionBlockData]
+  def genesisData: BlockField[Seq[Transaction]]
 
   val blockStorage: BlockStorage
 
@@ -31,9 +27,9 @@ trait TransactionModule {
 
   def putUnconfirmedIfNew(tx: Transaction): Boolean
 
-  def packUnconfirmed(heightOpt: Option[Int] = None): TransactionBlockData
+  def packUnconfirmed(heightOpt: Option[Int] = None): Seq[Transaction]
 
-  def clearFromUnconfirmed(data: TransactionBlockData): Unit
+  def clearFromUnconfirmed(data: Seq[Transaction]): Unit
 
   def onNewOffchainTransaction(transaction: Transaction): Unit
 

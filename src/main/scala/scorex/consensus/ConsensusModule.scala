@@ -10,17 +10,13 @@ import scala.util.Try
 
 trait ConsensusModule {
 
-  type ConsensusBlockData = NxtLikeConsensusBlockData
+  def parseBytes(bytes: Array[Byte]): Try[BlockField[NxtLikeConsensusBlockData]]
 
-  def parseBytes(bytes: Array[Byte]): Try[BlockField[ConsensusBlockData]]
+  def parseBlockFields(blockFields: BlockField[NxtLikeConsensusBlockData]): NxtLikeConsensusBlockData = blockFields.value
 
-  def parseBlockFields(blockFields: BlockField[ConsensusBlockData]): ConsensusBlockData = blockFields.value
+  def genesisData: BlockField[NxtLikeConsensusBlockData]
 
-  def genesisData: BlockField[ConsensusBlockData]
-
-  def formBlockData(data: ConsensusBlockData): BlockField[ConsensusBlockData]
-
-  def isValid[TransactionalBlockData](block: Block)(implicit transactionModule: TransactionModule): Boolean
+  def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean
 
   /**
     * Get block producers(miners/forgers). Usually one miner produces a block, but in some proposals not
@@ -30,7 +26,7 @@ trait ConsensusModule {
 
   def blockScore(block: Block): BigInt
 
-  def blockOrdering[TransactionalBlockData](implicit transactionModule: TransactionModule): Ordering[(Block)] =
+  def blockOrdering(implicit transactionModule: TransactionModule): Ordering[(Block)] =
     Ordering.by {
       block =>
         val score = blockScore(block)
@@ -41,17 +37,17 @@ trait ConsensusModule {
         (score, -blockCreationTime)
     }
 
-  def generateNextBlock[TransactionalBlockData](account: PrivateKeyAccount)
+  def generateNextBlock(account: PrivateKeyAccount)
                            (implicit transactionModule: TransactionModule): Option[Block]
 
-  def generateNextBlocks[TransactionalBlockData](accounts: Seq[PrivateKeyAccount])
+  def generateNextBlocks(accounts: Seq[PrivateKeyAccount])
                            (implicit transactionModule: TransactionModule): Seq[Block] =
     accounts.flatMap(generateNextBlock(_))
 
   def nextBlockGenerationTime(lastBlock: Block, account: PublicKeyAccount)
                              (implicit transactionModule: TransactionModule): Option[Long]
 
-  def consensusBlockData(block: Block): ConsensusBlockData
+  def consensusBlockData(block: Block): NxtLikeConsensusBlockData
 }
 
 object ConsensusModule {

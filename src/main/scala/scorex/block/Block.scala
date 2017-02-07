@@ -5,7 +5,7 @@ import play.api.libs.json.Json
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.BlockId
 import scorex.consensus.ConsensusModule
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.{AssetAcc, Transaction, TransactionModule, TransactionsBlockField}
@@ -152,12 +152,10 @@ object Block extends ScorexLogging {
                       consensusData: NxtLikeConsensusBlockData,
                       transactionData: Seq[Transaction],
                       generator: PublicKeyAccount,
-                      signature: Array[Byte])
-                     (implicit consModule: ConsensusModule,
-                      transModule: TransactionModule): Block = {
+                      signature: Array[Byte]) : Block = {
     new Block(timestamp, version, reference, SignerData(generator, signature)) {
-      override val transactionDataField: BlockField[Seq[Transaction]] = transModule.formBlockData(transactionData)
-      override val consensusDataField: BlockField[NxtLikeConsensusBlockData] = consModule.formBlockData(consensusData)
+      override val transactionDataField: BlockField[Seq[Transaction]] = TransactionsBlockField(transactionData)
+      override val consensusDataField: BlockField[NxtLikeConsensusBlockData] = NxtConsensusBlockField(consensusData)
     }
   }
 
@@ -166,16 +164,14 @@ object Block extends ScorexLogging {
                              reference: BlockId,
                              consensusData: NxtLikeConsensusBlockData,
                              transactionData: Seq[Transaction],
-                             signer: PrivateKeyAccount)
-                            (implicit consModule: ConsensusModule,
-                             transModule: TransactionModule): Block = {
+                             signer: PrivateKeyAccount): Block = {
     val nonSignedBlock = build(version, timestamp, reference, consensusData, transactionData, signer, Array())
     val toSign = nonSignedBlock.bytes
     val signature = EllipticCurveImpl.sign(signer, toSign)
     build(version, timestamp, reference, consensusData, transactionData, signer, signature)
   }
 
-  def genesis[CDT, TDT](timestamp: Long = 0L, signatureStringOpt: Option[String] = None)(implicit consModule: ConsensusModule,
+  def genesis(timestamp: Long = 0L, signatureStringOpt: Option[String] = None)(implicit consModule: ConsensusModule,
                                                                                          transModule: TransactionModule): Block = {
     val version: Byte = 1
 

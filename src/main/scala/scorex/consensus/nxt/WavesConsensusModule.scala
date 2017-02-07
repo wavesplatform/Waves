@@ -33,7 +33,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
 
   private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
-  override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule): Boolean = try {
+  override def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean = try {
     val blockTime = block.timestampField.value
 
     require((blockTime - NTP.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
@@ -86,7 +86,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
       throw t
   }
 
-  override def generateNextBlock[TT](account: PrivateKeyAccount)
+  override def generateNextBlock(account: PrivateKeyAccount)
                                     (implicit tm: TransactionModule): Option[Block] = try {
 
     val history = tm.blockStorage.history
@@ -235,9 +235,6 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
 
   override def genesisData: BlockField[NxtLikeConsensusBlockData] =
     NxtConsensusBlockField(NxtLikeConsensusBlockData(InitialBaseTarget, Array.fill(32)(0: Byte)))
-
-  override def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] =
-    NxtConsensusBlockField(data)
 
   override def consensusBlockData(block: Block): NxtLikeConsensusBlockData = block.consensusDataField.value match {
     case b: NxtLikeConsensusBlockData => b
