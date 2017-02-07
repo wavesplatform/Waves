@@ -46,7 +46,7 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 
 class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val settings: Settings,
                                                                application: Application)
-  extends TransactionModule[StoredInBlock] with ScorexLogging {
+  extends TransactionModule with ScorexLogging {
 
   import SimpleTransactionModule._
 

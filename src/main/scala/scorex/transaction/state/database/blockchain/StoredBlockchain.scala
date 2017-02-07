@@ -20,8 +20,8 @@ import scala.util.{Failure, Success, Try}
   * If no datafolder provided, blockchain lives in RAM (useful for tests)
   */
 class StoredBlockchain(db: MVStore)
-                      (implicit consensusModule: ConsensusModule[_],
-                       transactionModule: TransactionModule[_])
+                      (implicit consensusModule: ConsensusModule,
+                       transactionModule: TransactionModule)
   extends BlockChain with ScorexLogging {
 
   require(consensusModule != null)

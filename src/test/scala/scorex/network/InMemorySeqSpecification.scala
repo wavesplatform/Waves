@@ -24,15 +24,12 @@ class InMemorySeqSpecification extends FreeSpec
 
   private def mockBlock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
     abstract class BlockMock extends Block(0,1,conv(id),SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array())) {
-      override type ConsensusDataType = Unit
-      override type TransactionDataType = Unit
-
       override val uniqueId: BlockId = id
     }
     mock[BlockMock]
   }
 
-  private implicit val consensusModule = mock[ConsensusModule[Unit]]
+  private implicit val consensusModule = mock[ConsensusModule]
   consensusModule.blockScore _ expects * returns 1 anyNumberOfTimes
 
 

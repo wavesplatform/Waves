@@ -2,12 +2,15 @@ package scorex.consensus
 
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, BlockField, BlockProcessingModule}
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.{AssetAcc, TransactionModule}
 
 import scala.util.Try
 
 
-trait ConsensusModule[ConsensusBlockData] {
+trait ConsensusModule {
+
+  type ConsensusBlockData = NxtLikeConsensusBlockData
 
   def parseBytes(bytes: Array[Byte]): Try[BlockField[ConsensusBlockData]]
 
@@ -17,7 +20,7 @@ trait ConsensusModule[ConsensusBlockData] {
 
   def formBlockData(data: ConsensusBlockData): BlockField[ConsensusBlockData]
 
-  def isValid[TransactionalBlockData](block: Block)(implicit transactionModule: TransactionModule[TransactionalBlockData]): Boolean
+  def isValid[TransactionalBlockData](block: Block)(implicit transactionModule: TransactionModule): Boolean
 
   /**
     * Get block producers(miners/forgers). Usually one miner produces a block, but in some proposals not
@@ -27,7 +30,7 @@ trait ConsensusModule[ConsensusBlockData] {
 
   def blockScore(block: Block): BigInt
 
-  def blockOrdering[TransactionalBlockData](implicit transactionModule: TransactionModule[TransactionalBlockData]): Ordering[(Block)] =
+  def blockOrdering[TransactionalBlockData](implicit transactionModule: TransactionModule): Ordering[(Block)] =
     Ordering.by {
       block =>
         val score = blockScore(block)
@@ -39,14 +42,14 @@ trait ConsensusModule[ConsensusBlockData] {
     }
 
   def generateNextBlock[TransactionalBlockData](account: PrivateKeyAccount)
-                           (implicit transactionModule: TransactionModule[TransactionalBlockData]): Option[Block]
+                           (implicit transactionModule: TransactionModule): Option[Block]
 
   def generateNextBlocks[TransactionalBlockData](accounts: Seq[PrivateKeyAccount])
-                           (implicit transactionModule: TransactionModule[TransactionalBlockData]): Seq[Block] =
+                           (implicit transactionModule: TransactionModule): Seq[Block] =
     accounts.flatMap(generateNextBlock(_))
 
   def nextBlockGenerationTime(lastBlock: Block, account: PublicKeyAccount)
-                             (implicit transactionModule: TransactionModule[_]): Option[Long]
+                             (implicit transactionModule: TransactionModule): Option[Long]
 
   def consensusBlockData(block: Block): ConsensusBlockData
 }

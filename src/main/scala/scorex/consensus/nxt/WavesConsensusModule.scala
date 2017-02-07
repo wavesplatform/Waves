@@ -15,11 +15,11 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration) extends PoSConsensusModule[NxtLikeConsensusBlockData]
- with ScorexLogging {
+  with ScorexLogging {
 
   import WavesConsensusModule._
 
-  implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = this
+  implicit val consensusModule: ConsensusModule = this
 
   val version = 2: Byte
 
@@ -27,14 +27,13 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
   val MaxBlocktimeLimit = normalize(67)
   val BaseTargetGamma = normalize(64)
   val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
-//  val InitialBaseTarget = MaxBaseTarget / 2
   val InitialBaseTarget = 153722867L // for compatibility reason
 
   private def avgDelayInSeconds: Long = AvgDelay.toSeconds
 
   private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
-  override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = try {
+  override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule): Boolean = try {
     val blockTime = block.timestampField.value
 
     require((blockTime - NTP.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
@@ -88,7 +87,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
   }
 
   override def generateNextBlock[TT](account: PrivateKeyAccount)
-                                    (implicit tm: TransactionModule[TT]): Option[Block] = try {
+                                    (implicit tm: TransactionModule): Option[Block] = try {
 
     val history = tm.blockStorage.history
 
@@ -124,10 +123,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
 
       val btg = calcBaseTarget(lastBlock, currentTime)
       val gs = calcGeneratorSignature(lastBlockKernelData, account)
-      val consensusData = new NxtLikeConsensusBlockData {
-        override val generationSignature: Array[Byte] = gs
-        override val baseTarget: Long = btg
-      }
+      val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
       val unconfirmed = tm.packUnconfirmed(Some(height))
       log.debug(s"Build block with ${unconfirmed.asInstanceOf[Seq[Transaction]].size} transactions")
@@ -150,7 +146,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
   }
 
   override def nextBlockGenerationTime(block: Block, account: PublicKeyAccount)
-                                      (implicit tm: TransactionModule[_]): Option[Long] = {
+                                      (implicit tm: TransactionModule): Option[Long] = {
     val history = tm.blockStorage.history
 
     history.heightOf(block.uniqueId)
@@ -186,10 +182,10 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     BigInt(1, calcGeneratorSignature(lastBlockData, generator).take(8).reverse)
 
   /**
-   * BaseTarget calculation algorithm fixing the blocktimes.
-   */
+    * BaseTarget calculation algorithm fixing the blocktimes.
+    */
   private def calcBaseTarget[TT](prevBlock: Block, timestamp: Long)
-                                (implicit transactionModule: TransactionModule[TT]): Long = {
+                                (implicit transactionModule: TransactionModule): Long = {
     val history = transactionModule.blockStorage.history
     val height = history.heightOf(prevBlock).get
     val prevBaseTarget = consensusBlockData(prevBlock).baseTarget
@@ -214,7 +210,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
 
   protected def calcTarget(prevBlock: Block,
                            timestamp: Long,
-                           balance: Long)(implicit transactionModule: TransactionModule[_]): BigInt = {
+                           balance: Long)(implicit transactionModule: TransactionModule): BigInt = {
 
     require(balance >= 0, s"Balance cannot be negative")
 
@@ -227,10 +223,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[BlockField[NxtLikeConsensusBlockData]] = Try {
-    NxtConsensusBlockField(new NxtLikeConsensusBlockData {
-      override val baseTarget: Long = Longs.fromByteArray(bytes.take(BaseTargetLength))
-      override val generationSignature: Array[Byte] = bytes.takeRight(GeneratorSignatureLength)
-    })
+    NxtConsensusBlockField(NxtLikeConsensusBlockData(Longs.fromByteArray(bytes.take(BaseTargetLength)), bytes.takeRight(GeneratorSignatureLength)))
   }
 
   override def blockScore(block: Block): BigInt = {
@@ -241,10 +234,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
   override def generators(block: Block): Seq[Account] = Seq(block.signerDataField.value.generator)
 
   override def genesisData: BlockField[NxtLikeConsensusBlockData] =
-    NxtConsensusBlockField(new NxtLikeConsensusBlockData {
-      override val baseTarget: Long = InitialBaseTarget
-      override val generationSignature: Array[Byte] = Array.fill(32)(0: Byte)
-    })
+    NxtConsensusBlockField(NxtLikeConsensusBlockData(InitialBaseTarget, Array.fill(32)(0: Byte)))
 
   override def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] =
     NxtConsensusBlockField(data)

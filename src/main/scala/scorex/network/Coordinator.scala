@@ -281,7 +281,6 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
             (height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})""")
 
           application.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-
           true
         case Failure(e) => throw e
       }

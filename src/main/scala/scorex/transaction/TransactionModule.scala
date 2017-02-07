@@ -4,7 +4,9 @@ import scorex.block.{Block, BlockField, BlockProcessingModule}
 
 import scala.util.Try
 
-trait TransactionModule[TransactionBlockData] {
+trait TransactionModule {
+
+  type TransactionBlockData = Seq[Transaction]
 
   def parseBytes(bytes: Array[Byte]): Try[BlockField[TransactionBlockData]]
 

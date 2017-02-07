@@ -49,10 +49,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db = new MVStore.Builder().open()
 
   trait TestAppMock extends Application {
-    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new WavesConsensusModule(ChainParameters.Disabled, 5.seconds) {
-      override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = true
+    lazy implicit val consensusModule: ConsensusModule = new WavesConsensusModule(ChainParameters.Disabled, 5.seconds) {
+      override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule): Boolean = true
     }
-    lazy implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule(ChainParameters.Disabled)(TestSettings, this)
+    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(ChainParameters.Disabled)(TestSettings, this)
     lazy val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = TestSettings
@@ -75,16 +75,12 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     val version = 1: Byte
     val timestamp = System.currentTimeMillis()
     //val reference = Array.fill(Block.BlockIdLength)(id.toByte)
-    val cbd = new NxtLikeConsensusBlockData {
-      override val generationSignature: Array[Byte] = Array.fill(WavesConsensusModule.GeneratorSignatureLength)(
-        Random.nextInt(100).toByte)
-      override val baseTarget: Long = score + 1
-    }
+    val cbd =  NxtLikeConsensusBlockData(score + 1, Array.fill(WavesConsensusModule.GeneratorSignatureLength)(Random.nextInt(100).toByte))
     Block.buildAndSign(version, timestamp, reference, cbd, Seq[Transaction](), gen)
   }
 
-  implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = app.consensusModule
-  implicit val transactionModule: TransactionModule[StoredInBlock] = app.transactionModule
+  implicit val consensusModule: ConsensusModule = app.consensusModule
+  implicit val transactionModule: TransactionModule = app.transactionModule
   private lazy val repo = app.basicMessagesSpecsRepo
   val genesisTimestamp: Long = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {

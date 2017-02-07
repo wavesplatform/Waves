@@ -66,9 +66,6 @@ abstract class ActorTestingCommons extends TestKitBase
 
   protected def blockMock[Id](id: Id, ts: Long = System.currentTimeMillis())(implicit conv: Id => BlockId): Block = {
     abstract class BlockMock extends Block(ts,0,conv(id),SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array())) {
-      override type ConsensusDataType = Unit
-      override type TransactionDataType = Unit
-
       override val uniqueId: BlockId = id
     }
     mock[BlockMock]
@@ -100,8 +97,8 @@ abstract class ActorTestingCommons extends TestKitBase
     }
 
   trait ApplicationMock extends Application {
-    implicit val transactionModule = stub[TransactionModule[Unit]]
-    implicit val consensusModule = stub[ConsensusModule[Unit]]
+    implicit val transactionModule = stub[TransactionModule]
+    implicit val consensusModule = stub[ConsensusModule]
     final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock
   }

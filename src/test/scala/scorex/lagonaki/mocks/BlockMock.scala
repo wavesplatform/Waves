@@ -16,16 +16,10 @@ class BlockMock(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyA
 
   override lazy val transactions = txs
 
-  override type ConsensusDataType = NxtLikeConsensusBlockData
-  override type TransactionDataType = Seq[Transaction]
-
-  override val transactionDataField: BlockField[TransactionDataType] = TransactionsBlockField(txs)
+  override val transactionDataField: BlockField[Seq[Transaction]] = TransactionsBlockField(txs)
   override val uniqueId: BlockId = Array.fill(SignatureLength)(0: Byte)
 
-  override lazy val consensusDataField: BlockField[ConsensusDataType] = NxtConsensusBlockField(
-    new NxtLikeConsensusBlockData {
-      val generationSignature: Array[Byte] = Array.fill(SignatureLength)(0: Byte)
-      val baseTarget = 1L
-    })
+  override lazy val consensusDataField: BlockField[NxtLikeConsensusBlockData] = NxtConsensusBlockField(
+    NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)))
 
 }

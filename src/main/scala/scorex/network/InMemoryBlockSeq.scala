@@ -30,7 +30,7 @@ class InMemoryBlockSeq(blockIds: InnerIds) {
     takeWhile(_.isDefined).
     map(_.get).iterator
 
-  def cumulativeBlockScore(initialScore: BlockchainScore, consensusModule: ConsensusModule[_]): BlockchainScore = {
+  def cumulativeBlockScore(initialScore: BlockchainScore, consensusModule: ConsensusModule): BlockchainScore = {
     blocksInOrder.foldLeft(initialScore) {
       (sum, block) => ConsensusModule.cumulativeBlockScore(sum, consensusModule.blockScore(block))
     }
