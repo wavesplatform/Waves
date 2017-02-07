@@ -1,25 +1,22 @@
 package scorex.waves.http
 
 import javax.ws.rs.Path
-
-import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http._
-import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.BlockStorage
+import scorex.wallet.Wallet
 
 @Path("/debug")
 @Api(value = "/debug")
-case class DebugApiRoute(application: RunnableApplication) extends ApiRoute with CommonTransactionApiFunctions {
-
-  val settings = application.settings.restAPISettings
-  implicit lazy val transactionModule = application.transactionModule
-  lazy val wallet = application.wallet
+case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage: BlockStorage)
+  extends ApiRoute with CommonTransactionApiFunctions {
 
   override lazy val route = pathPrefix("debug") {
     blocks ~ state ~ stateAt ~ info ~ getSettings ~ stateWaves
@@ -36,9 +33,9 @@ case class DebugApiRoute(application: RunnableApplication) extends ApiRoute with
       paramType = "path")
   ))
   def blocks: Route = {
-    path("blocks" / IntNumber) { case howMany =>
+    path("blocks" / IntNumber) { howMany =>
       getJsonRoute {
-        val json = Json.arr(application.blockStorage.history.lastBlocks(howMany).map { block =>
+        val json = Json.arr(blockStorage.history.lastBlocks(howMany).map { block =>
           val bytes = block.bytes
           Json.obj(bytes.length.toString -> Base58.encode(FastCryptographicHash(bytes)))
         })
@@ -56,7 +53,7 @@ case class DebugApiRoute(application: RunnableApplication) extends ApiRoute with
   def state: Route = {
     path("state") {
       getJsonRoute {
-        JsonResponse(application.blockStorage.state.asInstanceOf[StoredState].toJson(None), StatusCodes.OK)
+        JsonResponse(blockStorage.state.asInstanceOf[StoredState].toJson(None), StatusCodes.OK)
       }
     }
   }
@@ -69,7 +66,7 @@ case class DebugApiRoute(application: RunnableApplication) extends ApiRoute with
   def stateAt: Route = {
     path("state" / IntNumber) { case height =>
       getJsonRoute {
-        JsonResponse(application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)), StatusCodes.OK)
+        JsonResponse(blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)), StatusCodes.OK)
       }
     }
   }
@@ -82,7 +79,7 @@ case class DebugApiRoute(application: RunnableApplication) extends ApiRoute with
   def stateWaves: Route = {
     path("stateWaves" / IntNumber) { height =>
       getJsonRoute {
-        val res = application.blockStorage.state.asInstanceOf[StoredState].toWavesJson(height)
+        val res = blockStorage.state.asInstanceOf[StoredState].toWavesJson(height)
         JsonResponse(res, StatusCodes.OK)
       }
     }
@@ -96,7 +93,7 @@ case class DebugApiRoute(application: RunnableApplication) extends ApiRoute with
   def info: Route = {
     path("info") {
       getJsonRoute {
-        val state = application.blockStorage.state.asInstanceOf[StoredState]
+        val state = blockStorage.state.asInstanceOf[StoredState]
         val json = Json.obj(
           "stateHeight" -> state.stateHeight,
           "stateHash" -> state.hash
