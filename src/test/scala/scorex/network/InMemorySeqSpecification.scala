@@ -28,45 +28,31 @@ class InMemorySeqSpecification extends FreeSpec
 
   private implicit def toInnerId(i: Int): InnerId = InnerId(toBlockId(i))
 
-  private def mockBlock[Id](id: Id)(implicit conv: Id => BlockId): Block = {
-    abstract class BlockMock extends Block(0, 1, conv(id), SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array()),
-      NxtConsensusBlockField(NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte))), TransactionsBlockField(Seq.empty)) {
-      override val uniqueId: BlockId = id
-    }
-    mock[BlockMock]
-  }
+  private def newBlock[Id](id: Id)(implicit conv: Id => BlockId): Block =
+     Block(0, 1, conv(id), SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array()),
+      NxtConsensusBlockField(NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte))), TransactionsBlockField(Seq.empty))
 
   private implicit val consensusModule = mock[ConsensusModule]
-  consensusModule.blockScore _ expects * returns 1 anyNumberOfTimes
-
 
   "life cycle" in {
     val imMemoryBlockSeq = new InMemoryBlockSeq(Seq(1, 2, 3, 4, 5))
 
-    imMemoryBlockSeq.cumulativeBlockScore(100, consensusModule) shouldBe 100
+    imMemoryBlockSeq.cumulativeBlockScore() shouldBe 100
 
     imMemoryBlockSeq.containsBlockId(1) shouldBe true
     imMemoryBlockSeq.containsBlockId(111) shouldBe false
 
     imMemoryBlockSeq.numberOfBlocks shouldBe 0
 
-    val veryFirstBlock = mockBlock(1)
+    val veryFirstBlock = newBlock(1)
 
     imMemoryBlockSeq.addIfNotContained(veryFirstBlock) shouldBe true
-    imMemoryBlockSeq.addIfNotContained(mockBlock(1)) shouldBe false
+    imMemoryBlockSeq.addIfNotContained(newBlock(1)) shouldBe false
+    imMemoryBlockSeq.addIfNotContained(newBlock(2)) shouldBe true
+    imMemoryBlockSeq.addIfNotContained(newBlock(4)) shouldBe true
+    imMemoryBlockSeq.addIfNotContained(newBlock(3)) shouldBe true
 
-    imMemoryBlockSeq.cumulativeBlockScore(100, consensusModule) shouldBe 101
-
-    imMemoryBlockSeq.addIfNotContained(mockBlock(2)) shouldBe true
-    imMemoryBlockSeq.cumulativeBlockScore(100, consensusModule) shouldBe 102
-
-    imMemoryBlockSeq.addIfNotContained(mockBlock(4)) shouldBe true
-    imMemoryBlockSeq.cumulativeBlockScore(100, consensusModule) shouldBe 102
-
-    imMemoryBlockSeq.addIfNotContained(mockBlock(3)) shouldBe true
-    imMemoryBlockSeq.cumulativeBlockScore(100, consensusModule) shouldBe 104
-
-    val lastBlock = mockBlock(5)
+    val lastBlock = newBlock(5)
     imMemoryBlockSeq.addIfNotContained(lastBlock)
 
     imMemoryBlockSeq.numberOfBlocks shouldBe 5

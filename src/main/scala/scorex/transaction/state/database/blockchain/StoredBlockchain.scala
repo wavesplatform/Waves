@@ -61,8 +61,7 @@ class StoredBlockchain(db: MVStore)
 
     def writeBlock(height: Int, block: Block): Try[Unit] = Try {
       blocks.put(height, block.bytes)
-      val blockScore = consensusModule.blockScore(block)
-      scoreMap.put(height, ConsensusModule.cumulativeBlockScore(score(), blockScore))
+      scoreMap.put(height, score() + block.blockScore())
       signatures.put(height, block.uniqueId)
       signaturesReverse.put(block.uniqueId, height)
     }

@@ -160,7 +160,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
           val author = Some(connectedPeer).filter(_ => ! peers.activeChanged)
           val allBlocksAreLoaded = forkStorage.noIdsWithoutBlock
-          val forkScore = forkStorage.cumulativeBlockScore(initialScore, consensusModule)
+          val forkScore = forkStorage.cumulativeBlockScore() + initialScore
 
           if (forkScore > history.score()) {
             if (partialBlockLoading || allBlocksAreLoaded) {

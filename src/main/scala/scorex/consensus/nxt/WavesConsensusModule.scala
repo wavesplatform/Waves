@@ -53,8 +53,8 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     require(parentHeightOpt.isDefined, s"Can't get parent block with id '${Base58.encode(block.referenceField.value)}' height")
     val parentHeight = parentHeightOpt.get
 
-    val prevBlockData = consensusBlockData(parent)
-    val blockData = consensusBlockData(block)
+    val prevBlockData = parent.consensusDataField.value
+    val blockData = block.consensusDataField.value
 
     //check baseTarget
     val cbt = calcBaseTarget(parent, blockTime)
@@ -100,7 +100,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
       throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffictiveBalanceForGenerator)")
     }
 
-    val lastBlockKernelData = consensusBlockData(lastBlock)
+    val lastBlockKernelData = lastBlock.consensusDataField.value
 
     val lastBlockTime = lastBlock.timestampField.value
 
@@ -152,7 +152,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     history.heightOf(block.uniqueId)
       .map(height => (height, generatingBalance(account, Some(height)))).filter(_._2 > 0)
       .flatMap { case (height, balance) =>
-        val cData = consensusBlockData(block)
+        val cData = block.consensusDataField.value
         val hit = calcHit(cData, account)
         val t = cData.baseTarget
 
@@ -188,7 +188,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
                                 (implicit transactionModule: TransactionModule): Long = {
     val history = transactionModule.blockStorage.history
     val height = history.heightOf(prevBlock).get
-    val prevBaseTarget = consensusBlockData(prevBlock).baseTarget
+    val prevBaseTarget = prevBlock.consensusDataField.value.baseTarget
     if (height % 2 == 0) {
       val blocktimeAverage = history.parent(prevBlock, AvgBlockTimeDepth - 1)
         .map(b => (timestamp - b.timestampField.value) / AvgBlockTimeDepth)
@@ -214,7 +214,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
 
     require(balance >= 0, s"Balance cannot be negative")
 
-    val prevBlockData = consensusBlockData(prevBlock)
+    val prevBlockData = prevBlock.consensusDataField.value
     val prevBlockTimestamp = prevBlock.timestampField.value
 
     val eta = (timestamp - prevBlockTimestamp) / 1000 //in seconds
@@ -222,18 +222,9 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     BigInt(prevBlockData.baseTarget) * eta * balance
   }
 
-  override def blockScore(block: Block): BigInt = {
-    val baseTarget = consensusBlockData(block).baseTarget
-    BigInt("18446744073709551616") / baseTarget
-  }.ensuring(_ > 0)
-
   override def genesisData: BlockField[NxtLikeConsensusBlockData] =
     NxtConsensusBlockField(NxtLikeConsensusBlockData(InitialBaseTarget, Array.fill(32)(0: Byte)))
 
-  override def consensusBlockData(block: Block): NxtLikeConsensusBlockData = block.consensusDataField.value match {
-    case b: NxtLikeConsensusBlockData => b
-    case m => throw new AssertionError(s"Only NxtLikeConsensusBlockData is available, $m given")
-  }
 }
 
 object WavesConsensusModule {

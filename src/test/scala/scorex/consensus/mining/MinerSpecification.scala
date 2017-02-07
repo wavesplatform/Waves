@@ -66,7 +66,7 @@ class MinerSpecification extends ActorTestingCommons {
   }
 
   private def setExpectations(lastBlockId: Int, d: Option[Duration], maybe: Boolean = false): Unit = {
-    val lastBlock = blockMock(lastBlockId)
+    val lastBlock = testBlock(lastBlockId)
 
     inSequence {
       setLastBlockExpectations(lastBlock, maybe)
@@ -88,7 +88,7 @@ class MinerSpecification extends ActorTestingCommons {
 
   testSafely {
 
-    val newBlock = blockMock(111)
+    val newBlock = testBlock(111)
 
     "Simple (fixed time interval) scheduling" - {
 

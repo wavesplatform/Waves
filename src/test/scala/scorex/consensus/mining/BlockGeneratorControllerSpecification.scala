@@ -37,7 +37,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
   val stubApp: App = stub[App]
   setDefaultLastBlock()
 
-  private def setDefaultLastBlock(): Unit = setLastBlock(blockMock(2))
+  private def setDefaultLastBlock(): Unit = setLastBlock(testBlock(2))
   private def setLastBlock(block: Block): Unit = stubApp.setHistory(historyWithLastBlock(block))
   private def historyWithLastBlock(block: Block): History = {
     val stubHistory = stub[History]
@@ -64,7 +64,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "when Idle don't check peers number" in {
-      setLastBlock(blockMock(2, 0))
+      setLastBlock(testBlock(2, 0))
       assertStatusIs(Idle)
       actorRef ! SelfCheck
       testPeerManager.expectNoMsg(testDuration)
@@ -79,7 +79,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "StopGeneration command don't change state from idle" in {
-      setLastBlock(blockMock(2, 0))
+      setLastBlock(testBlock(2, 0))
       actorRef ! StartGeneration
       actorRef ! StopGeneration
       assertStatusIs(Idle)
@@ -89,7 +89,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "StartGeneration command change state to generation when should generate because of genesis block" in {
-      setLastBlock(blockMock(1, System.currentTimeMillis() - 11.minutes.toMillis))
+      setLastBlock(testBlock(1, System.currentTimeMillis() - 11.minutes.toMillis))
       assertStatusIs(Idle)
       actorRef ! StartGeneration
       assertStatusIs(Generating)
@@ -99,7 +99,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "StartGeneration command change state to generation when should generate because of last block time" in {
-      setLastBlock(blockMock(5, System.currentTimeMillis() - 9.minutes.toMillis))
+      setLastBlock(testBlock(5, System.currentTimeMillis() - 9.minutes.toMillis))
       assertStatusIs(Idle)
       actorRef ! StartGeneration
       assertStatusIs(Generating)
@@ -109,7 +109,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "StartGeneration command do not change state to generation when should't generate" in {
-      setLastBlock(blockMock(2, 0))
+      setLastBlock(testBlock(2, 0))
       assertStatusIs(Idle)
       actorRef ! StartGeneration
       assertStatusIs(Idle)

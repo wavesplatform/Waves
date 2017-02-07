@@ -59,6 +59,11 @@ case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signe
 
   lazy val bytesWithoutSignature = bytes.dropRight(SignatureLength)
 
+  def blockScore(): BigInt = {
+    val baseTarget = consensusDataField.value.baseTarget
+    BigInt("18446744073709551616") / baseTarget
+  }.ensuring(_ > 0)
+
   override def equals(obj: scala.Any): Boolean = {
     import shapeless.syntax.typeable._
     obj.cast[Block].exists(_.uniqueId.sameElements(this.uniqueId))

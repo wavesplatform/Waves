@@ -5,7 +5,7 @@ import org.scalatest._
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
-import scorex.lagonaki.mocks.BlockMock
+import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.state.database.state.extension.IncrementingTimestampValidator
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
@@ -57,27 +57,27 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     senderBalance should be > 100L
 
     val txs = Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)
-    val block = new BlockMock(txs)
+    val block = TestBlock(txs)
     state.processBlock(block)
     state.balance(rec) shouldBe 5L
     state.balanceWithConfirmations(rec, 1) shouldBe 0L
 
-    state.processBlock(new BlockMock(Seq()))
+    state.processBlock(TestBlock(Seq()))
     state.balance(rec) shouldBe 5L
     state.balanceWithConfirmations(rec, 1) shouldBe 5L
     state.balanceWithConfirmations(rec, 2) shouldBe 0L
 
-    val spendingBlock = new BlockMock(Seq(transactionModule.createPayment(rec, acc, 2, 1).right.get))
+    val spendingBlock = TestBlock(Seq(transactionModule.createPayment(rec, acc, 2, 1).right.get))
     state.processBlock(spendingBlock)
     state.balance(rec) shouldBe 2L
     state.balanceWithConfirmations(rec, 1) shouldBe 2L
 
-    state.processBlock(new BlockMock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
     state.balance(rec) shouldBe 7L
     state.balanceWithConfirmations(rec, 3) shouldBe 2L
 
 
-    state.processBlock(new BlockMock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
     state.balance(rec) shouldBe 12L
     state.balanceWithConfirmations(rec, 1) shouldBe 7L
     state.balanceWithConfirmations(rec, 2) shouldBe 2L
@@ -112,7 +112,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     doubleSpending.foreach(t => state.isValid(t, t.timestamp) shouldBe true)
     state.isValid(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max) shouldBe false
     state.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max).size shouldBe 1
-    state.processBlock(new BlockMock(doubleSpending)) should be('failure)
+    state.processBlock(TestBlock(doubleSpending)) should be('failure)
   }
 
   test("many transactions") {
@@ -165,7 +165,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val tx2 = transactionModule.createPayment(acc, recipient, amount, 2).right.get
     state.isValid(tx2, tx2.timestamp) shouldBe true
 
-    val block = new BlockMock(Seq(tx1, tx2))
+    val block = TestBlock(Seq(tx1, tx2))
     state.processBlock(block)
 
     val result = state.incrementingTimestampValidator.lastAccountPaymentTransaction(acc)
@@ -177,12 +177,12 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val amount = state.balance(acc) / 1000
     val tx1 = transactionModule.createPayment(acc, recipient, amount, 1).right.get
     val tx2 = transactionModule.createPayment(acc, recipient, amount, 2).right.get
-    val block1 = new BlockMock(Seq(tx2, tx1))
+    val block1 = TestBlock(Seq(tx2, tx1))
     state.processBlock(block1)
 
     val tx3 = transactionModule.createPayment(recipient, acc, amount / 2, 3).right.get
     val tx4 = transactionModule.createPayment(recipient, acc, amount / 2, 4).right.get
-    val block2 = new BlockMock(Seq(tx3, tx4))
+    val block2 = TestBlock(Seq(tx3, tx4))
     state.processBlock(block2)
 
     val result1 = state.incrementingTimestampValidator.lastAccountPaymentTransaction(acc)
@@ -203,7 +203,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
   test("asset distribution") {
     val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), application.wallet).get
-    val block = new BlockMock(Seq(issueAssetTx))
+    val block = TestBlock(Seq(issueAssetTx))
     state.processBlock(block)
     val distribution = state.assetDistribution(issueAssetTx.assetId)
     distribution shouldBe Map(acc.address -> 1000000)
