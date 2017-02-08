@@ -30,7 +30,7 @@ class InMemoryBlockSeq(blockIds: InnerIds) {
     map(_.get).iterator
 
   def cumulativeBlockScore(): BlockchainScore =
-    blocksInOrder.map(_.blockScore()).sum
+    blocksInOrder.map(_.blockScore).sum
 
   def numberOfBlocks: Int = blocks.size
 }

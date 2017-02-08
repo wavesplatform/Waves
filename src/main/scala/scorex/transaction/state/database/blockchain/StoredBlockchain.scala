@@ -61,7 +61,7 @@ class StoredBlockchain(db: MVStore)
 
     def writeBlock(height: Int, block: Block): Try[Unit] = Try {
       blocks.put(height, block.bytes)
-      scoreMap.put(height, score() + block.blockScore())
+      scoreMap.put(height, score() + block.blockScore)
       signatures.put(height, block.uniqueId)
       signaturesReverse.put(block.uniqueId, height)
     }
