@@ -61,7 +61,8 @@ case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signe
 
   lazy val bytesWithoutSignature: Array[Byte] = bytes.dropRight(SignatureLength)
 
-  lazy val blockScore: BigInt = BigInt("18446744073709551616") / consensusData.baseTarget
+  lazy val blockScore: BigInt = (BigInt("18446744073709551616") / consensusData.baseTarget)
+    .ensuring(_ > 0) // until we make smart-constructor validate consensusData.baseTarget to be positive
 
 
   override def equals(obj: scala.Any): Boolean = {
