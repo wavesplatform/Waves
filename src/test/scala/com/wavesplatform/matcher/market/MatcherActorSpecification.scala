@@ -58,7 +58,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
     super.beforeEach()
 
     actor = system.actorOf(Props(new MatcherActor(storedState, wallet, settings,
-      stub[TransactionModule[StoredInBlock]]) with RestartableActor))
+      stub[TransactionModule]) with RestartableActor))
   }
 
   "MatcherActor" should {
