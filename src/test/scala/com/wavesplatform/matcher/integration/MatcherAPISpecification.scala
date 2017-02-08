@@ -149,7 +149,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
 
     val pair = AssetPair.createAssetPair(spendAsset.getOrElse(AssetPair.WavesName),
       receiveAsset.getOrElse(AssetPair.WavesName)).get
-    val resp = matcherDeleteRequest(s"/orderbook/${pair.firstStr}/${pair.secondStr}", body = signedJson.toString)
+    val resp = matcherPostRequest(s"/orderbook/${pair.firstStr}/${pair.secondStr}/cancel", body = signedJson.toString)
 
     (resp \ "status").as[String] shouldBe expectedStatus
   }

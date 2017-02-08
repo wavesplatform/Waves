@@ -110,6 +110,46 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
       }
     }
 
+  @Path("/orderbook/{asset1}/{asset2}/cancel")
+  @ApiOperation(value = "Cancel order",
+    notes = "Cancel previously submitted order if it's not already filled completely",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "asset1", value = "First Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "asset2", value = "Second Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
+    )
+  ))
+  def cancel: Route =
+    path("orderbook" / Segment / Segment / "cancel") { (a1, a2) =>
+      post {
+        entity(as[String]) { body =>
+          jsonRouteAsync {
+            AssetPair.createAssetPair(a1, a2).map { pair =>
+              Try {
+                val js = Json.parse(body)
+                js.validate[CancelOrderRequest] match {
+                  case err: JsError =>
+                    Future.successful(WrongTransactionJson(err).response)
+                  case JsSuccess(req: CancelOrderRequest, _) =>
+                    (matcher ? CancelOrder(pair, req))
+                      .mapTo[MatcherResponse]
+                      .map(r => JsonResponse(r.json, r.code))
+                }
+              }.getOrElse(Future.successful(WrongJson.response))
+            }.getOrElse(Future.successful(getInvalidPairResponse))
+          }
+        }
+      }
+    }
+
   @Path("/orderbook/{asset1}/{asset2}/{orderId}")
   @ApiOperation(value = "Order Status",
     notes = "Get Order status for a given Asset Pair during the last 30 days",
@@ -128,46 +168,6 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
               .mapTo[MatcherResponse]
               .map(r => JsonResponse(r.json, r.code))
           }.getOrElse(Future.successful(getInvalidPairResponse))
-        }
-      }
-    }
-
-  @Path("/orderbook/{asset1}/{asset2}")
-  @ApiOperation(value = "Cancel order",
-    notes = "Cancel previously submitted order if it's not already filled completely",
-    httpMethod = "DELETE",
-    produces = "application/json",
-    consumes = "application/json")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "asset1", value = "First Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-    new ApiImplicitParam(name = "asset2", value = "Second Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-    new ApiImplicitParam(
-      name = "body",
-      value = "Json with data",
-      required = true,
-      paramType = "body",
-      dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
-    )
-  ))
-  def cancel: Route =
-    path("orderbook" / Segment / Segment) { (a1, a2) =>
-      delete {
-        entity(as[String]) { body =>
-          jsonRouteAsync {
-            AssetPair.createAssetPair(a1, a2).map { pair =>
-              Try {
-                val js = Json.parse(body)
-                js.validate[CancelOrderRequest] match {
-                  case err: JsError =>
-                    Future.successful(WrongTransactionJson(err).response)
-                  case JsSuccess(req: CancelOrderRequest, _) =>
-                    (matcher ? CancelOrder(pair, req))
-                      .mapTo[MatcherResponse]
-                      .map(r => JsonResponse(r.json, r.code))
-                }
-              }.getOrElse(Future.successful(WrongJson.response))
-            }.getOrElse(Future.successful(getInvalidPairResponse))
-          }
         }
       }
     }
