@@ -146,7 +146,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
     val height = heightOpt.getOrElse(storage.stateHeight)
 
-    val txs = trans.filter(t => isValid(t, height))
+    val txs = trans.filter(t => isValidAgainstState(t, height).isRight)
 
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
     val validTransactions = if (allowInvalidPaymentTransactionsByTimestamp) {
@@ -298,7 +298,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
-  private[blockchain] def isValid(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
+  private def isValidAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
     validators.foldLeft(Right(transaction): Either[ValidationError, Transaction]) { case (ei, v) =>
       ei match {
         case Right(_) => v.isValid(transaction, height)
