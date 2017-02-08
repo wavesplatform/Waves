@@ -1,20 +1,21 @@
 package com.wavesplatform.matcher.model
 
 import java.io.NotSerializableException
+
 import akka.serialization._
-import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
+import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
+import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
 import com.wavesplatform.matcher.model.Events._
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import scorex.transaction.AssetId
+import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
+
 import scala.collection.immutable.TreeMap
-import com.wavesplatform.matcher.market.{MatcherActor, OrderBookActor}
-import scorex.crypto.encode.Base58
 
 class MatcherSerializer extends SerializerWithStringManifest {
   import MatcherSerializer._
@@ -114,12 +115,12 @@ object MatcherSerializer {
     Writes[OrderCanceled](oc => Json.obj("o" -> oc.limitOrder))
   )
 
-  private def mkOrderBookCreated(a1: Option[AssetId], a2: Option[AssetId]) = OrderBookCreated(AssetPair(a1, a2))
-  private def orderBookToPair(obc: OrderBookCreated) = (obc.pair.first, obc.pair.second)
+  private def mkOrderBookCreated(a1: String, a2: String) = OrderBookCreated(AssetPair.createAssetPair(a1, a2).get)
+  private def orderBookToPair(obc: OrderBookCreated) = (obc.pair.firstStr, obc.pair.secondStr)
 
   implicit val orderBookCreatedFormat: Format[OrderBookCreated] = (
-    (__ \ "a1").format[Option[Array[Byte]]] and
-    (__ \ "a2").format[Option[Array[Byte]]])(mkOrderBookCreated, orderBookToPair)
+    (__ \ "a1").format[String] and
+      (__ \ "a2").format[String])(mkOrderBookCreated, orderBookToPair)
 
   implicit val tuple2Format = new Format[(Long, Long)] {
     def writes(o: (Long, Long)): JsValue = Json.arr(o._1, o._2)

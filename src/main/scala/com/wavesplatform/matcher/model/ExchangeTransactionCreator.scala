@@ -27,7 +27,7 @@ trait ExchangeTransactionCreator {
   }
 
   def createTransaction(submitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
-    val matcher = wallet.privateKeyAccount(submitted.order.matcher.address).get
+    val matcher = wallet.privateKeyAccount(submitted.order.matcherPublicKey.address).get
 
     val price = counter.price
     val amount = math.min(submitted.amount, counter.amount)

@@ -24,7 +24,7 @@ object TypedTransaction extends Deser[TypedTransaction] {
     val TransferTransaction = Value(4)
     val ReissueTransaction = Value(5)
     val BurnTransaction = Value(6)
-    val OrderMatchTransaction = Value(7)
+    val ExchangeTransaction = Value(7)
   }
 
   val TimestampLength = 8
@@ -53,7 +53,7 @@ object TypedTransaction extends Deser[TypedTransaction] {
       case txType: Byte if txType == TransactionType.BurnTransaction.id =>
         BurnTransaction.parseTail(data.tail)
 
-      case txType: Byte if txType == TransactionType.OrderMatchTransaction.id =>
+      case txType: Byte if txType == TransactionType.ExchangeTransaction.id =>
         ExchangeTransaction.parseTail(data.tail)
 
       case txType => Failure(new Exception(s"Invalid transaction type: $txType"))

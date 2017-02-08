@@ -1,15 +1,15 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.Props
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
-import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
 import com.wavesplatform.settings.WavesSettings
-import play.api.libs.json.{JsString, JsValue, Json}
+import play.api.libs.json.{JsString, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.TransactionModule
@@ -69,7 +69,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
     val v = validateCancelOrder(cancel)
     if (v) {
       OrderBook.cancelOrder(orderBook, cancel.orderId) match {
-        case Some(oc) if cancel.req.sender == oc.limitOrder.order.sender =>
+        case Some(oc) if cancel.req.senderPublicKey == oc.limitOrder.order.senderPublicKey =>
           persist(oc) { _ =>
             handleCancelEvent(oc)
             sender() ! OrderCanceled(cancel.orderId)
@@ -168,8 +168,7 @@ object OrderBookActor {
             wallet: Wallet, settings: WavesSettings, transactionModule: TransactionModule): Props =
     Props(new OrderBookActor(assetPair, storedState, wallet, settings, transactionModule))
 
-  def name(assetPair: AssetPair): String = assetPair.first.map(Base58.encode).getOrElse("WAVES") + "-" +
-    assetPair.second.map(Base58.encode).getOrElse("WAVES")
+  def name(assetPair: AssetPair): String = assetPair.toString
 
   val MaxDepth = 50
 
@@ -186,45 +185,32 @@ object OrderBookActor {
     def orderId: String = Base58.encode(req.orderId)
   }
 
-  sealed trait OrderBookResponse {
-    def json: JsValue
-
-    def code: StatusCode
-  }
-
-  sealed trait OrderResponse extends OrderBookResponse
-
-  case class OrderAccepted(order: Order) extends OrderResponse {
+  case class OrderAccepted(order: Order) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json)
     val code = StatusCodes.OK
   }
 
-  case class OrderRejected(message: String) extends OrderResponse {
+  case class OrderRejected(message: String) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderRejected", "message" -> message)
     val code = StatusCodes.BadRequest
   }
 
-  case class OrderCanceled(orderId: String) extends OrderResponse {
+  case class OrderCanceled(orderId: String) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderCanceled", "orderId" -> orderId)
     val code = StatusCodes.OK
   }
 
-  case class OrderCancelRejected(message: String) extends OrderResponse {
+  case class OrderCancelRejected(message: String) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderCancelRejected", "message" -> message)
     val code = StatusCodes.BadRequest
   }
 
-  case object NotFoundPair extends OrderBookResponse {
-    val json = JsString("Unknown Assets Pair")
-    val code = StatusCodes.NotFound
-  }
-
-  case class GetOrderStatusResponse(status: LimitOrder.OrderStatus) extends OrderBookResponse {
+  case class GetOrderStatusResponse(status: LimitOrder.OrderStatus) extends MatcherResponse {
     val json = status.json
     val code = StatusCodes.OK
   }
 
-  case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends OrderBookResponse {
+  case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
     val json = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
     val code = StatusCodes.OK
   }

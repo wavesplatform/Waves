@@ -395,8 +395,8 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val (om, matcher) = x
 
         val pair = om.buyOrder.assetPair
-        val buyer = om.buyOrder.sender
-        val seller = om.sellOrder.sender
+        val buyer = om.buyOrder.senderPublicKey
+        val seller = om.sellOrder.senderPublicKey
 
         val buyerAcc1 = AssetAcc(buyer, pair.first)
         val buyerAcc2 = AssetAcc(buyer, pair.second)
@@ -404,7 +404,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val sellerAcc2 = AssetAcc(seller, pair.second)
         val buyerFeeAcc = AssetAcc(buyer, None)
         val sellerFeeAcc = AssetAcc(seller, None)
-        val matcherFeeAcc = AssetAcc(om.buyOrder.matcher, None)
+        val matcherFeeAcc = AssetAcc(om.buyOrder.matcherPublicKey, None)
 
         val Seq(buyerBal1, buyerBal2, sellerBal1, sellerBal2, buyerFeeBal, sellerFeeBal, matcherFeeBal) =
           getBalances(buyerAcc1, buyerAcc2, sellerAcc1, sellerAcc2, buyerFeeAcc, sellerFeeAcc, matcherFeeAcc)

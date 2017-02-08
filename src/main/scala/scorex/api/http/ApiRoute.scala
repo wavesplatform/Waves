@@ -3,9 +3,10 @@ package scorex.api.http
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode}
-import akka.http.scaladsl.server.{Directive0, Directives, Route}
+import akka.http.scaladsl.server._
 import akka.util.Timeout
 import play.api.libs.json.JsValue
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.settings.Settings
 
@@ -38,6 +39,15 @@ trait ApiRoute extends Directives with CommonApiFunctions {
   def deleteJsonRoute(fn: JsonResponse): Route = jsonRoute(fn, delete)
 
   def deleteJsonRoute(fn: Future[JsonResponse]): Route = jsonRoute(Await.result(fn, timeout.duration), delete)
+
+  def jsonRouteAsync(fn: Future[JsonResponse]): Route = {
+    onSuccess(fn) { res: JsonResponse =>
+      complete(res.code -> HttpEntity(ContentTypes.`application/json`, res.response.toString))
+    }
+  }
+
+  val Base58String: PathMatcher1[Array[Byte]] =
+    PathMatcher("""(\w+)""".r).flatMap { s => Base58.decode(s).toOption }
 
   private def jsonRoute(fn: JsonResponse, method: Directive0): Route = method {
     val resp = complete(fn.code -> HttpEntity(ContentTypes.`application/json`, fn.response.toString))
