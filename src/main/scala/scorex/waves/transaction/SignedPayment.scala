@@ -15,11 +15,11 @@ case class SignedPayment(timestamp: Long,
 
 object SignedPayment {
   implicit val paymentFormat: Format[SignedPayment] = (
-    (__ \ "timestamp").format[Long] and
-    (__ \ "amount").format[Long] and
-    (__ \ "fee").format[Long] and
-    (__ \ "recipient").format[Account] and
-    (__ \ "senderPublicKey").format[PublicKeyAccount](PublicKeyAccountWrites) and
-    (__ \ "sender").format[String] and
+    (__ \ "timestamp").format[Long] ~
+    (__ \ "amount").format[Long] ~
+    (__ \ "fee").format[Long] ~
+    (__ \ "recipient").format[Account] ~
+    (__ \ "senderPublicKey").format[PublicKeyAccount] ~
+    (__ \ "sender").format[String] ~
     (__ \ "signature").format[String]) (SignedPayment.apply, unlift(SignedPayment.unapply))
 }

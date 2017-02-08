@@ -128,46 +128,46 @@ object BroadcastRequests {
         Base58.decode(signature).get)
   }
 
-  implicit val assetTransferRequestReads: Reads[AssetTransferRequest] = (
-    (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
-      (JsPath \ "assetId").readNullable[String] and
-      (JsPath \ "recipient").read[Account] and
-      (JsPath \ "amount").read[Long] and
-      (JsPath \ "fee").read[Long] and
-      (JsPath \ "feeAssetId").readNullable[String] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "attachment").readNullable[String] and
-      (JsPath \ "signature").read[String](SignatureReads)
-    ) (AssetTransferRequest.apply _)
+  implicit val assetTransferRequestFormat: Format[AssetTransferRequest] = (
+    (__ \ "senderPublicKey").format[PublicKeyAccount] ~
+      (__ \ "assetId").formatNullable[String] ~
+      (__ \ "recipient").format[Account] ~
+      (__ \ "amount").format[Long] ~
+      (__ \ "fee").format[Long] ~
+      (__ \ "feeAssetId").formatNullable[String] ~
+      (__ \ "timestamp").format[Long] ~
+      (__ \ "attachment").formatNullable[String] ~
+      (__ \ "signature").format[String]
+    ) (AssetTransferRequest.apply, unlift(AssetTransferRequest.unapply))
 
-  implicit val assetIssueRequestReads: Reads[AssetIssueRequest] = (
-    (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
-      (JsPath \ "name").read[String] and
-      (JsPath \ "description").read[String] and
-      (JsPath \ "quantity").read[Long] and
-      (JsPath \ "decimals").read[Byte] and
-      (JsPath \ "reissuable").read[Boolean] and
-      (JsPath \ "fee").read[Long] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[String](SignatureReads)
-    ) (AssetIssueRequest.apply _)
+  implicit val assetIssueRequestReads: Format[AssetIssueRequest] = (
+    (__ \ "senderPublicKey").format[PublicKeyAccount] ~
+      (__ \ "name").format[String] ~
+      (__ \ "description").format[String] ~
+      (__ \ "quantity").format[Long] ~
+      (__ \ "decimals").format[Byte] ~
+      (__ \ "reissuable").format[Boolean] ~
+      (__ \ "fee").format[Long] ~
+      (__ \ "timestamp").format[Long] ~
+      (__ \ "signature").format[String](SignatureFormat)
+    ) (AssetIssueRequest.apply, unlift(AssetIssueRequest.unapply))
 
-  implicit val assetReissueRequestReads: Reads[AssetReissueRequest] = (
-    (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
-      (JsPath \ "assetId").read[String] and
-      (JsPath \ "quantity").read[Long] and
-      (JsPath \ "reissuable").read[Boolean] and
-      (JsPath \ "fee").read[Long] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[String](SignatureReads)
-    ) (AssetReissueRequest.apply _)
+  implicit val assetReissueRequestReads: Format[AssetReissueRequest] = (
+    (__ \ "senderPublicKey").format[PublicKeyAccount] ~
+      (__ \ "assetId").format[String] ~
+      (__ \ "quantity").format[Long] ~
+      (__ \ "reissuable").format[Boolean] ~
+      (__ \ "fee").format[Long] ~
+      (__ \ "timestamp").format[Long] ~
+      (__ \ "signature").format[String](SignatureFormat)
+    ) (AssetReissueRequest.apply, unlift(AssetReissueRequest.unapply))
 
-  implicit val assetBurnRequestReads: Reads[AssetBurnRequest] = (
-    (JsPath \ "senderPublicKey").read[String] and
-      (JsPath \ "assetId").read[String] and
-      (JsPath \ "quantity").read[Long] and
-      (JsPath \ "fee").read[Long] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[String]
-    ) (AssetBurnRequest.apply _)
+  implicit val assetBurnRequestReads: Format[AssetBurnRequest] = (
+    (__ \ "senderPublicKey").format[String] ~
+      (__ \ "assetId").format[String] ~
+      (__ \ "quantity").format[Long] ~
+      (__ \ "fee").format[Long] ~
+      (__ \ "timestamp").format[Long] ~
+      (__ \ "signature").format[String]
+    ) (AssetBurnRequest.apply, unlift(AssetBurnRequest.unapply))
 }
