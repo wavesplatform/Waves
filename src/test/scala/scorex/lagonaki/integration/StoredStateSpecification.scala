@@ -211,12 +211,12 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
   test("asset distribution 2") {
     val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "1234", "12345", 1000000, 2, reissuable = false, 100000000), application.wallet).get
-    val block = new BlockMock(Seq(issueAssetTx))
+    val block = TestBlock(Seq(issueAssetTx))
     state.processBlock(block)
 
     val transferRequest = TransferRequest(Some(Base58.encode(issueAssetTx.id)), None, 300000, 100000000, acc.address, "", recipient.address)
     val transferAssetTx = transactionModule.transferAsset(transferRequest, application.wallet).get.right.get
-    val block2 = new BlockMock(Seq(transferAssetTx))
+    val block2 = TestBlock(Seq(transferAssetTx))
     state.processBlock(block2)
     val distribution = state.assetDistribution(issueAssetTx.assetId)
     distribution shouldBe Map(acc.address -> 700000, recipient.address -> 300000)
