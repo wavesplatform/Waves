@@ -8,7 +8,7 @@ import scorex.transaction.state.database.state.storage.{OrderMatchStorageI, Stat
 class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends StateExtension {
 
 
-  override def isValid(tx: Transaction, height: Int): Boolean = tx match {
+  override def isValid(tx: Transaction): Boolean = tx match {
     case om: ExchangeTransaction => OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om))
     case _ => true
   }

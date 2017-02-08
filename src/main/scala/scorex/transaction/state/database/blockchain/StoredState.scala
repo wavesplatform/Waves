@@ -142,10 +142,9 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   /**
     * Returns sequence of valid transactions
     */
-  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
-    val height = heightOpt.getOrElse(storage.stateHeight)
+  override final def validate(trans: Seq[Transaction], blockTime: Long): Seq[Transaction] = {
 
-    val txs = trans.filter(t => isValid(t, height))
+    val txs = trans.filter(t => isTValid(t))
 
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
     val validTransactions = if (allowInvalidPaymentTransactionsByTimestamp) {
@@ -192,6 +191,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
             (newState, seq :+ tx)
           } catch {
             case NonFatal(e) =>
+              println(e)
               (currentState, seq)
           }
       }
@@ -297,8 +297,8 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
-  private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = {
-    validators.forall(_.isValid(transaction, height))
+  private[blockchain] def isTValid(transaction: Transaction): Boolean = {
+    validators.forall(_.isValid(transaction))
   }
 
 

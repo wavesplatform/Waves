@@ -18,7 +18,7 @@ class BlockStorageSpecification extends PropSpec with PropertyChecks with Genera
 
   private class MockLagonakiState(v: Try[State]) extends LagonakiState {
     override private[transaction] def processBlock(block: Block): Try[State] = v
-    override def validate(txs: Seq[Transaction], height: Option[Int], blockTime: Long): Seq[Transaction] = ???
+    override def validate(txs: Seq[Transaction], blockTime: Long): Seq[Transaction] = ???
     override def included(signature: Array[Byte]): Option[Int] = ???
     override private[transaction] def rollbackTo(height: Int): State = ???
     override def balance(account: Account, height: Option[Int]): Long = ???

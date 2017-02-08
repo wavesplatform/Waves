@@ -65,7 +65,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
 
 
-
+    /*
   property("validate plenty of transactions") {
     val TxN: Int = 1000
     val InitialBalance: Long = Long.MaxValue / 8
@@ -78,7 +78,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     time should be < 1000L
     result.size should be <= trans.size
   }
-
+*/
   property("Burn assets") {
     forAll(issueReissueGenerator) { pair =>
       withRollbackTest {

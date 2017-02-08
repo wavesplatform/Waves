@@ -7,7 +7,7 @@ import scorex.transaction.{PaymentTransaction, Transaction}
 class IncludedValidator(storage: StateStorageI, settings: ChainParameters) extends StateExtension {
 
 
-  override def isValid(tx: Transaction, height: Int): Boolean = tx match {
+  override def isValid(tx: Transaction): Boolean = tx match {
     case tx: PaymentTransaction if tx.timestamp < settings.requirePaymentUniqueId => true
     case tx: Transaction => storage.included(tx.id, None).isEmpty
   }

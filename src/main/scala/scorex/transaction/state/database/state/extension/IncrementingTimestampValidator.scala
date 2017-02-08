@@ -8,7 +8,7 @@ import scorex.transaction.{PaymentTransaction, Transaction}
 
 class IncrementingTimestampValidator(settings: ChainParameters, storage: StateStorageI) extends StateExtension {
 
-  override def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
+  override def isValid(transaction: Transaction): Boolean = transaction match {
     case tx: PaymentTransaction =>
       tx.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
     case _ => true
