@@ -340,7 +340,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
           NTP.correctedTime())
         state.balance(testAcc) shouldBe balance
         state.assetBalance(testAssetAcc) shouldBe balance
-        state.included(tx).value shouldBe state.stateHeight
+        state.included(tx.id).value shouldBe state.stateHeight
         state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L), Seq(tx))), NTP.correctedTime())
       }
     }

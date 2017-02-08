@@ -55,7 +55,7 @@ case class TransactionsApiRoute(
       getJsonRoute {
         Base58.decode(encoded) match {
           case Success(sig) =>
-            state.included(sig, None) match {
+            state.included(sig) match {
               case Some(h) =>
                 Try {
                   val block = history.blockAt(h).get

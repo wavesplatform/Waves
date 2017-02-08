@@ -32,7 +32,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
                   val validators: Seq[Validator],
                   settings: ChainParameters) extends LagonakiState with ScorexLogging {
 
-  override def included(id: Array[Byte], heightOpt: Option[Int]): Option[Int] = storage.included(id, heightOpt)
+  override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 
   def stateHeight: Int = storage.stateHeight
 
@@ -299,11 +299,9 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   }
 
   private def isValidAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
-    validators.foldLeft(Right(transaction): Either[ValidationError, Transaction]) { case (ei, v) =>
-      ei match {
-        case Right(_) => v.isValid(transaction, height)
-        case l@Left(_) => l
-      }
+    validators.toStream.map(_.isValid(transaction,height)).find(_.isLeft) match {
+      case Some(Left(e)) => Left(e)
+      case None => Right(transaction)
     }
   }
 

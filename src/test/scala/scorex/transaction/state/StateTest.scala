@@ -112,7 +112,7 @@ object StateTestSpec extends Commands {
     type Result = Option[Int]
 
     def run(sut: Sut): Result = sut.synchronized {
-      sut.storedState.included(signature)
+      sut.storedState.included(signature.id)
     }
 
     def nextState(state: State): State = state
