@@ -115,7 +115,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     state.balance(testAcc) shouldBe InitialBalance
 
     val transfers = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
-    transfers.foreach(tx => state.isValid(tx, tx.timestamp) shouldBe true)
+    transfers.foreach(tx => state.allValid(Seq(tx), tx.timestamp) shouldBe true)
 
     state.allValid(transfers, blockTime = transfers.map(_.timestamp).max) shouldBe false
 
@@ -137,13 +137,13 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         //valid transfer
         val tx = TransferTransaction.create(None, testAcc, recipient, balance - fee, System.currentTimeMillis(),
           None, fee, Array()).right.get
-        state.isValid(tx, tx.timestamp) shouldBe true
+        state.allValid(Seq(tx), tx.timestamp) shouldBe true
 
         //transfer asset
         state.balance(testAcc) shouldBe balance
         val invalidtx = TransferTransaction.create(None, testAcc, recipient, balance, System.currentTimeMillis(),
           None, fee, Array()).right.get
-        state.isValid(invalidtx, invalidtx.timestamp) shouldBe false
+        state.allValid(Seq(invalidtx), invalidtx.timestamp) shouldBe false
 
         state.applyChanges(Map(testAssetAcc -> (AccState(0L), List(tx))))
       }
@@ -357,7 +357,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance), Seq(FeesStateChange(balance)))),
           NTP.correctedTime())
         state.balance(account) shouldBe balance
-        state.isValid(tx, System.currentTimeMillis) should be(false)
+        state.allValid(Seq(tx), System.currentTimeMillis) should be(false)
       }
     }
   }
@@ -373,7 +373,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance), Seq(FeesStateChange(balance)))),
           NTP.correctedTime())
         state.assetBalance(assetAccount) shouldBe balance
-        state.isValid(tx, System.currentTimeMillis) should be(false)
+        state.allValid(Seq(tx), System.currentTimeMillis) should be(false)
       }
     }
   }

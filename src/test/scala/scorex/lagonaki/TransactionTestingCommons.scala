@@ -54,7 +54,7 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
       else senderBalance - fee
       val recipient = recipientOpt.getOrElse(randomFrom(applicationNonEmptyAccounts))
       val tx = application.transactionModule.createPayment(senderAcc, recipient, amt, fee).right.get
-      if (application.transactionModule.blockStorage.state.isValid(tx, tx.timestamp)) tx
+      if (application.transactionModule.blockStorage.state.allValid(Seq(tx), tx.timestamp)) tx
       else genValidTransaction(randomAmnt, recipientOpt, senderOpt)
     }
   }
