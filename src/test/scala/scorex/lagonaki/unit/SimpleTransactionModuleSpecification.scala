@@ -33,13 +33,21 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
 
   val forkParameters = new AnyRef with ChainParameters {
     override def allowTemporaryNegativeUntil: Long = 0L
+
     override def requireSortedTransactionsAfter: Long = Long.MaxValue
+
     override def allowInvalidPaymentTransactionsByTimestamp: Long = Long.MaxValue
+
     override def generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MaxValue
+
     override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
+
     override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
+
     override def allowUnissuedAssetsUntil: Long = Long.MaxValue
+
     override def allowBurnTransactionAfterTimestamp: Long = Long.MaxValue
+
     override def requirePaymentUniqueId: Long = Long.MaxValue
 
     override def initialBalance: Long = 100000000000000L
@@ -57,7 +65,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
   implicit val transactionModule = new SimpleTransactionModule(forkParameters)
   val genesisTimestamp = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.appendBlock(Block.genesis(genesisTimestamp))
+    transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
   }
   assert(!transactionModule.blockStorage.history.isEmpty)
 

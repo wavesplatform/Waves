@@ -4,36 +4,23 @@ import scorex.block.{Block, BlockField, BlockProcessingModule}
 
 import scala.util.Try
 
-trait TransactionModule[TransactionBlockData] {
+trait TransactionModule {
 
-  def parseBytes(bytes: Array[Byte]): Try[BlockField[TransactionBlockData]]
-
-  def parseBlockFields(blockFields: BlockField[TransactionBlockData]): TransactionBlockData = blockFields.value
-
-  def genesisData: BlockField[TransactionBlockData]
-
-  def formBlockData(data: TransactionBlockData): BlockField[TransactionBlockData]
+  def genesisData: BlockField[Seq[Transaction]]
 
   val blockStorage: BlockStorage
-
-  val utxStorage: UnconfirmedTransactionsStorage
 
   def isValid(block: Block): Boolean
 
   def isValid(tx: Transaction, blockTime: Long): Boolean
 
-  def transactions(block: Block): Seq[Transaction]
-
-  /**
-    * Returns all unconfirmed transactions
-    */
   def unconfirmedTxs: Seq[Transaction]
 
   def putUnconfirmedIfNew(tx: Transaction): Boolean
 
-  def packUnconfirmed(heightOpt: Option[Int] = None): TransactionBlockData
+  def packUnconfirmed(heightOpt: Option[Int] = None): Seq[Transaction]
 
-  def clearFromUnconfirmed(data: TransactionBlockData): Unit
+  def clearFromUnconfirmed(data: Seq[Transaction]): Unit
 
   def onNewOffchainTransaction(transaction: Transaction): Unit
 

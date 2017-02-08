@@ -41,22 +41,22 @@ class MinerSpecification extends ActorTestingCommons {
   private val calculatedGenDelay = 2000 millis
 
   private val testHistory = mock[History]
-  private val testConsensusModule = mock[ConsensusModule[Unit]]
+  private val testConsensusModule = mock[ConsensusModule]
 
   private val f = mockFunction[Block, String]
   f.expects(*).never
-  (testConsensusModule.blockOrdering(_: TransactionModule[Unit])).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
+  (testConsensusModule.blockOrdering(_: TransactionModule)).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
 
   private def mayBe(b: Boolean): Range = (if (b) 0 else 1) to 1
 
   private def setBlockGenExpectations(expected: Seq[Block], maybe: Boolean = false): Unit =
-    (testConsensusModule.generateNextBlocks(_: Seq[PrivateKeyAccount])(_: TransactionModule[Unit]))
+    (testConsensusModule.generateNextBlocks(_: Seq[PrivateKeyAccount])(_: TransactionModule))
       .expects(Seq(account), *)
       .returns(expected)
       .repeat(mayBe(maybe))
 
   private def setBlockGenTimeExpectations(block: Block, time: Option[Long], maybe: Boolean = false): Unit =
-    (testConsensusModule.nextBlockGenerationTime(_: Block, _: PublicKeyAccount)(_: TransactionModule[Unit]))
+    (testConsensusModule.nextBlockGenerationTime(_: Block, _: PublicKeyAccount)(_: TransactionModule))
       .expects(block, account, *)
       .returns(time)
       .repeat(mayBe(maybe))
@@ -66,7 +66,7 @@ class MinerSpecification extends ActorTestingCommons {
   }
 
   private def setExpectations(lastBlockId: Int, d: Option[Duration], maybe: Boolean = false): Unit = {
-    val lastBlock = blockMock(lastBlockId)
+    val lastBlock = testBlock(lastBlockId)
 
     inSequence {
       setLastBlockExpectations(lastBlock, maybe)
@@ -79,7 +79,7 @@ class MinerSpecification extends ActorTestingCommons {
     override val wallet: Wallet = testWallet
     override val coordinator = testCoordinator.ref
     override val history: History = testHistory
-    override implicit val consensusModule: ConsensusModule[Unit] = testConsensusModule
+    override implicit val consensusModule: ConsensusModule = testConsensusModule
   }
 
   private val genTimeShift = Miner.BlockGenerationTimeShift
@@ -88,7 +88,7 @@ class MinerSpecification extends ActorTestingCommons {
 
   testSafely {
 
-    val newBlock = blockMock(111)
+    val newBlock = testBlock(111)
 
     "Simple (fixed time interval) scheduling" - {
 

@@ -17,8 +17,8 @@ import scorex.transaction.TypedTransaction._
 import scala.util.Try
 
 
-class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule[_],
-                          consensusModule: ConsensusModule[_]) {
+class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule,
+                          consensusModule: ConsensusModule) {
 
   object GetPeersSpec extends MessageSpec[Unit] {
     override val messageCode: Message.MessageCode = 1: Byte

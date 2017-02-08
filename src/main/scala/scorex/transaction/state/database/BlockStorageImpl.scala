@@ -7,7 +7,7 @@ import scorex.transaction._
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 
 class BlockStorageImpl(settings: Settings, forksParams: ChainParameters)
-                      (implicit consensusModule: ConsensusModule[_], transactionModule: TransactionModule[_])
+                      (implicit consensusModule: ConsensusModule, transactionModule: TransactionModule)
   extends BlockStorage {
 
   require(consensusModule != null)

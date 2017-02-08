@@ -52,7 +52,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   val wallet = new Wallet(None, "matcher", Option(WalletSeed))
   wallet.generateNewAccount()
   var actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
-    wallet, settings, stub[TransactionModule[StoredInBlock]]) with RestartableActor))
+    wallet, settings, stub[TransactionModule]) with RestartableActor))
 
 
   override protected def beforeEach() = {
@@ -63,7 +63,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     tp.expectMsg(akka.actor.Status.Success(""))
     super.beforeEach()
 
-    val transactionModule = stub[TransactionModule[StoredInBlock]]
+    val transactionModule = stub[TransactionModule]
     (transactionModule.isValid(_: Transaction, _: Long)).when(*, *).returns(true).anyNumberOfTimes()
 
     actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
@@ -234,7 +234,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     }
 
     "order matched with invalid order should keep matching with others, invalid is removed" in {
-      val transactionModule = stub[TransactionModule[StoredInBlock]]
+      val transactionModule = stub[TransactionModule]
       val ord1 = buy(pair, 100, 20)
       val ord2 = buy(pair, 5000, 1000) // should be invalid
       val ord3 = sell(pair, 100, 10)

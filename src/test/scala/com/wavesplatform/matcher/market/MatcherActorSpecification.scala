@@ -41,7 +41,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   val wallet = new Wallet(None, "matcher", Option(WalletSeed))
   wallet.generateNewAccount()
   val actor: ActorRef = system.actorOf(Props(new MatcherActor(storedState, wallet, settings,
-    stub[TransactionModule[StoredInBlock]]) with RestartableActor))
+    stub[TransactionModule]) with RestartableActor))
 
   override protected def beforeEach() = {
     super.beforeEach()

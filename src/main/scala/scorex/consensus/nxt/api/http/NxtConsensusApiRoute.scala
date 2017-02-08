@@ -58,7 +58,7 @@ class NxtConsensusApiRoute(application: RunnableApplication)(implicit val contex
     path("generationsignature" / Segment) { case encodedSignature =>
       getJsonRoute {
         withBlock(blockStorage.history, encodedSignature) { block =>
-          val gs = consensusModule.consensusBlockData(block).generationSignature
+          val gs = block.consensusDataField.value.generationSignature
           Json.obj(
             "generationSignature" -> Base58.encode(gs)
           )
@@ -73,7 +73,7 @@ class NxtConsensusApiRoute(application: RunnableApplication)(implicit val contex
     path("generationsignature") {
       getJsonRoute {
         val lastBlock = blockStorage.history.lastBlock
-        val gs = consensusModule.consensusBlockData(lastBlock).generationSignature
+        val gs = lastBlock.consensusDataField.value.generationSignature
         JsonResponse(Json.obj("generationSignature" -> Base58.encode(gs)), StatusCodes.OK)
       }
     }
@@ -89,7 +89,7 @@ class NxtConsensusApiRoute(application: RunnableApplication)(implicit val contex
       getJsonRoute {
         withBlock(blockStorage.history, encodedSignature) { block =>
           Json.obj(
-            "baseTarget" -> consensusModule.consensusBlockData(block).baseTarget
+            "baseTarget" -> block.consensusDataField.value.baseTarget
           )
         }
       }
@@ -102,7 +102,7 @@ class NxtConsensusApiRoute(application: RunnableApplication)(implicit val contex
     path("basetarget") {
       getJsonRoute {
         val lastBlock = blockStorage.history.lastBlock
-        val bt = consensusModule.consensusBlockData(lastBlock).baseTarget
+        val bt = lastBlock.consensusDataField.value.baseTarget
         JsonResponse(Json.obj("baseTarget" -> bt), StatusCodes.OK)
       }
     }
