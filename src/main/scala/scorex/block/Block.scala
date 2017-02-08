@@ -1,16 +1,15 @@
 package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.BlockId
-import scorex.consensus.{ConsensusModule, nxt}
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
+import scorex.transaction.TypedTransaction._
 import scorex.transaction._
 import scorex.utils.ScorexLogging
-import scorex.transaction.TypedTransaction._
 
 import scala.util.{Failure, Try}
 
@@ -26,13 +25,14 @@ case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signe
   lazy val transactionDataField = TransactionsBlockField(transactionData)
   lazy val encodedId: String = Base58.encode(uniqueId)
 
-  lazy val fee = {
-    val generator = signerData.generator
-    val assetFees = transactionDataField.asInstanceOf[TransactionsBlockField].value.map(_.assetFee)
-    assetFees.map(a => AssetAcc(generator, a._1) -> a._2).groupBy(a => a._1).mapValues(_.map(_._2).sum)
-  }.values.sum
+  lazy val fee: Long =
+    transactionData.map(_.assetFee)
+      .map(a => AssetAcc(signerData.generator, a._1) -> a._2)
+      .groupBy(a => a._1)
+      .mapValues(_.map(_._2).sum)
+      .values.sum
 
-  lazy val json =
+  lazy val json: JsObject =
     versionField.json ++
       timestampField.json ++
       referenceField.json ++
@@ -44,7 +44,7 @@ case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signe
         "blocksize" -> bytes.length
       )
 
-  lazy val bytes = {
+  lazy val bytes: Array[Byte] = {
     val txBytesSize = transactionDataField.bytes.length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionDataField.bytes
 
@@ -59,12 +59,10 @@ case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signe
       signerDataField.bytes
   }
 
-  lazy val bytesWithoutSignature = bytes.dropRight(SignatureLength)
+  lazy val bytesWithoutSignature: Array[Byte] = bytes.dropRight(SignatureLength)
 
-  def blockScore(): BigInt = {
-    val baseTarget = consensusDataField.value.baseTarget
-    BigInt("18446744073709551616") / baseTarget
-  }.ensuring(_ > 0)
+  lazy val blockScore: BigInt = BigInt("18446744073709551616") / consensusData.baseTarget
+
 
   override def equals(obj: scala.Any): Boolean = {
     import shapeless.syntax.typeable._
@@ -170,7 +168,7 @@ object Block extends ScorexLogging {
     val genesisSigner = new PrivateKeyAccount(Array.empty)
 
     val transactionGenesisDataField = TransactionsBlockField(transactionGenesisData)
-    val concensusGenesisDataField  = NxtConsensusBlockField(concensusGenesisData)
+    val concensusGenesisDataField = NxtConsensusBlockField(concensusGenesisData)
     val txBytesSize = transactionGenesisDataField.bytes.length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionGenesisDataField.bytes
     val cBytesSize = concensusGenesisDataField.bytes.length
