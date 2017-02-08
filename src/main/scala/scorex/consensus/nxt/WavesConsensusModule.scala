@@ -1,8 +1,7 @@
 package scorex.consensus.nxt
 
-import com.google.common.primitives.Longs
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.block.{Block, BlockField}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.block.Block
 import scorex.consensus.{ConsensusModule, PoSConsensusModule, TransactionsOrdering}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
@@ -11,7 +10,6 @@ import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 
 import scala.concurrent.duration._
-import scala.util.Try
 import scala.util.control.NonFatal
 
 class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration) extends PoSConsensusModule
@@ -27,7 +25,6 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
   val MaxBlocktimeLimit = normalize(67)
   val BaseTargetGamma = normalize(64)
   val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
-  val InitialBaseTarget = 153722867L // for compatibility reason
 
   private def avgDelayInSeconds: Long = AvgDelay.toSeconds
 
@@ -87,7 +84,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
   }
 
   override def generateNextBlock(account: PrivateKeyAccount)
-                                    (implicit tm: TransactionModule): Option[Block] = try {
+                                (implicit tm: TransactionModule): Option[Block] = try {
 
     val history = tm.blockStorage.history
 
@@ -222,17 +219,12 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     BigInt(prevBlockData.baseTarget) * eta * balance
   }
 
-  override def genesisData: NxtLikeConsensusBlockData =
-    NxtLikeConsensusBlockData(InitialBaseTarget, Array.fill(32)(0: Byte))
-
 }
 
 object WavesConsensusModule {
   val BaseTargetLength = 8
   val GeneratorSignatureLength = 32
-  // 10000 waves
   val MinimalEffictiveBalanceForGenerator = 1000000000000L
-
   val AvgBlockTimeDepth: Int = 3
   val MaxTimeDrift = 15.seconds
 }

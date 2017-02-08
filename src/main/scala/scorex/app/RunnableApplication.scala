@@ -10,6 +10,7 @@ import akka.util.Timeout
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
@@ -121,8 +122,14 @@ trait RunnableApplication extends Application with ScorexLogging {
 
   private def checkGenesis(): Unit = {
     if (transactionModule.blockStorage.history.isEmpty) {
-      transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, settings.genesisTimestamp, settings.genesisSignature))
+
+      transactionModule.blockStorage.appendBlock(Block.genesis(RunnableApplication.consensusGenesisBlockData, transactionModule.genesisData, settings.genesisTimestamp, settings.genesisSignature))
       log.info("Genesis block has been added to the state")
     }
   }.ensuring(transactionModule.blockStorage.history.height() >= 1)
+}
+
+object RunnableApplication {
+  val InitialBaseTarget = 153722867L
+  val consensusGenesisBlockData = NxtLikeConsensusBlockData(InitialBaseTarget, Array.fill(32)(0: Byte))
 }
