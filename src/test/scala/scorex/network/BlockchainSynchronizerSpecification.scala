@@ -2,7 +2,6 @@ package scorex.network
 
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
-import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
 import scorex.block.Block
 import scorex.block.Block._
@@ -26,6 +25,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   }
 
   private case object BlacklistAssertion
+
   private def setBlacklistExpectations(blacklist: Boolean): Unit = {
     (peer.blacklist _).when().onCall {
       _ => if (blacklist) self ! BlacklistAssertion else fail("No blacklisting should be in this case")
@@ -46,6 +46,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   private val testCoordinator = TestProbe("Coordinator")
 
   private val entireForkLoad = mockFunction[Boolean]
+
   private def setloadEntireForkChunk(value: Boolean) = entireForkLoad expects() returns value anyNumberOfTimes
 
   object TestSettings extends SettingsMock {
@@ -56,8 +57,6 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     override lazy val pinToInitialPeer: Boolean = true
     override lazy val loadEntireChain: Boolean = entireForkLoad()
   }
-
-  private val blockScore = BigInt(100)
 
   private trait App extends ApplicationMock {
 
@@ -97,7 +96,9 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   private def assertPeerNeverGotBlacklisted(): Unit = setBlacklistExpectations(false)
 
   private def expectedGetSignaturesSpec(blockIds: Int*): Unit = expectNetworkMessage(GetSignaturesSpec, blockIds.toSeq)
+
   private def sendBlock(block: Block): Unit = dataFromNetwork(BlockMessageSpec, block)
+
   private def sendSignatures(blockIds: BlockId*): Unit = dataFromNetwork(SignaturesSpec, blockIds.toSeq)
 
   protected override val actorRef = system.actorOf(Props(classOf[BlockchainSynchronizer], app))
@@ -113,7 +114,9 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
       val withElapsedTime = TestSettings.historySynchronizerTimeout.toMillis - (System.currentTimeMillis() - t)
       withElapsedTime * correction toLong
     }
+
     def aBitLessThanTimeout = adjustedTimeout(0.9f) millis
+
     def aBitLongerThanTimeout = adjustedTimeout(1.1f) millis
 
     testHistory.lastBlockIds _ expects TestSettings.MaxRollback returns blockIds(lastHistoryBlockId, 9) // ids come in reverse order
@@ -198,18 +201,20 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
             validateStatus(GettingBlocks)
           }
 
-          "blocks loading" ignore {
+          "blocks loading" - {
 
             assertLatestBlockFromNonSyncPeer()
 
             val numberOfBlocks = finalBlockIdInterval.size
+            val finalBlocks = finalBlockIdInterval.map(testBlock(_))
+            val finalBlocksScoreSum = finalBlocks.map(_.blockScore).sum
 
             def setHistoryScoreExpectations(delta: BigInt): Unit =
-              testHistory.score _ expects() returns (initialScore + (numberOfBlocks * blockScore) + delta) repeat (0 to numberOfBlocks)
+              testHistory.score _ expects() returns (initialScore + (finalBlocksScoreSum) + delta) repeat (0 to numberOfBlocks)
 
             def sendBlocks(): Unit = {
-              finalBlockIdInterval foreach { expectNetworkMessage(GetBlockSpec, _) }
-              Random.shuffle(finalBlockIdInterval) foreach { id => sendBlock(testBlock(id)) }
+              finalBlockIdInterval.foreach(expectNetworkMessage(GetBlockSpec, _))
+              Random.shuffle(finalBlocks).foreach(sendBlock)
             }
 
             def assertThatBlocksLoaded(): Unit = {
@@ -232,7 +237,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               setloadEntireForkChunk(true)
 
               "fork has two blocks better score" in {
-                setHistoryScoreExpectations(-(blockScore * 2 + 1))
+                setHistoryScoreExpectations(-(finalBlocksScoreSum / 2) + 1)
 
                 sendBlocks()
 
@@ -286,6 +291,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     "a (sub)sequience of block ids to download" - {
 
       implicit def toInnerIds(i: Seq[Int]): InnerIds = i.map(toInnerId)
+
       implicit def toInnerId(i: Int): InnerId = InnerId(Array(i.toByte))
 
       def historyContaining(blockIds: Int*): History = {

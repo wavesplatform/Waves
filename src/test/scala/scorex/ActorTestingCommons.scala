@@ -32,6 +32,7 @@ abstract class ActorTestingCommons extends TestKitBase
   implicit final lazy val system = ActorSystem(getClass.getSimpleName)
 
   protected lazy val networkController = TestProbe("NetworkController")
+
   protected def networkControllerMock = networkController.ref
 
   networkController.ignoreMsg {
@@ -63,15 +64,21 @@ abstract class ActorTestingCommons extends TestKitBase
     actorRef ! DataFromPeer(spec.messageCode, data, fromPeer)
 
   protected def blockIds(ids: Int*): BlockIds = ids.map(toBlockId)
-  protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids:_*)
+
+  protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids: _*)
+
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
   protected def testBlock(id: Int, ts: Long = System.currentTimeMillis()) =
-    Block(ts,0,1,SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array(id.toByte)),
-      NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)), Seq.empty)
+    Block(timestamp = ts,
+      version = 0,
+      reference = 1,
+      signerData = SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array(id.toByte)),
+      consensusData = NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
+      transactionData = Seq.empty)
 
   protected trait TestDataExtraction[T] {
-    def extract(actual: T) : Any
+    def extract(actual: T): Any
   }
 
   protected implicit object BlockIdsExtraction extends TestDataExtraction[BlockIds] {
@@ -82,12 +89,14 @@ abstract class ActorTestingCommons extends TestKitBase
     override def extract(blockId: BlockId): Int = blockId(0)
   }
 
-  protected def expectNetworkMessage[Content : TestDataExtraction](expectedSpec: MessageSpec[Content], expectedData: Any): Unit =
-    expectNetworkMessage(expectedSpec, expectedData, { _.asInstanceOf[SendToChosen].chosenPeers.contains(peer) })
+  protected def expectNetworkMessage[Content: TestDataExtraction](expectedSpec: MessageSpec[Content], expectedData: Any): Unit =
+    expectNetworkMessage(expectedSpec, expectedData, {
+      _.asInstanceOf[SendToChosen].chosenPeers.contains(peer)
+    })
 
-  protected def expectNetworkMessage[Content : TestDataExtraction](expectedSpec: MessageSpec[Content],
-                                                                   expectedData: Any,
-                                                                   strategyAssertion: SendingStrategy => Boolean): Unit =
+  protected def expectNetworkMessage[Content: TestDataExtraction](expectedSpec: MessageSpec[Content],
+                                                                  expectedData: Any,
+                                                                  strategyAssertion: SendingStrategy => Boolean): Unit =
     networkController.expectMsgPF(hint = expectedData.toString) {
       case SendToNetwork(Message(spec, Right(data: Content@unchecked), None), st) =>
         strategyAssertion(st) shouldBe true
@@ -101,4 +110,5 @@ abstract class ActorTestingCommons extends TestKitBase
     final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock
   }
+
 }
