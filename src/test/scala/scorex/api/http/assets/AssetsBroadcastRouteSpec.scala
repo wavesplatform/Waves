@@ -70,49 +70,67 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Path
       def _check[A](gen: G[A], f: A => AssetIssueRequest, expected: JsObject) =
         doCheck[A, AssetIssueRequest](route, "issue", gen, f, expected)
 
-      _check[Long](g.wrong.quantity, q => ir.copy(quantity = q), NegativeAmount.json)
-      _check[Byte](g.wrong.decimals, d => ir.copy(decimals = d), TooBigArrayAllocation.json)
+      _check[Long](g.nonPositiveLong, q => ir.copy(quantity = q), NegativeAmount.json)
+      _check[Byte](g.invalidDecimals, d => ir.copy(decimals = d), TooBigArrayAllocation.json)
+      _check[String](g.longDescription, d => ir.copy(description = d), TooBigArrayAllocation.json)
+      _check[String](g.invalidName, name => ir.copy(name = name), InvalidName.json)
+      _check[String](g.invalidBase58, name => ir.copy(name = name), InvalidName.json)
+      // todo: invalid sender
+      _check[Long](g.nonPositiveLong, fee => ir.copy(fee = fee), InsufficientFee.json)
     }
 
     "reissue transaction" in forAll(g.reissueReq) { rr =>
       def _check[A](gen: G[A], f: A => AssetReissueRequest, expected: JsObject) =
         doCheck[A, AssetReissueRequest](route, "reissue", gen, f, expected)
-
-      _check[Long](g.wrong.quantity, q => rr.copy(quantity = q), NegativeAmount.json)
+      // todo: invalid sender
+      _check[Long](g.nonPositiveLong, q => rr.copy(quantity = q), NegativeAmount.json)
+      _check[Long](g.nonPositiveLong, fee => rr.copy(fee = fee), InsufficientFee.json)
     }
 
     "burn transaction" in forAll(g.burnReq) { br =>
       def _check[A](gen: G[A], f: A => AssetBurnRequest, expected: JsObject) =
         doCheck[A, AssetBurnRequest](route, "burn", gen, f, expected)
+      // todo: invalid sender
+      _check[String](g.invalidBase58, pk => br.copy(senderPublicKey = pk), Unknown.json)
+      _check[Long](g.nonPositiveLong, q => br.copy(amount = q), NegativeAmount.json)
+      _check[Long](g.nonPositiveLong, fee => br.copy(fee = fee), InsufficientFee.json)
     }
 
     "transfer transaction" in forAll(g.transferReq) { tr =>
       def _check[A](gen: G[A], f: A => AssetTransferRequest, expected: JsObject) =
         doCheck[A, AssetTransferRequest](route, "transfer", gen, f, expected)
 
-      _check[Long](g.wrong.quantity, q => tr.copy(amount = q), NegativeAmount.json)
-//      todo: invalid sender
+      _check[Long](g.nonPositiveLong, q => tr.copy(amount = q), NegativeAmount.json)
 //      todo: invalid recipient
-//      } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
-//        Left(ValidationError.TooBigArray)
-
+      _check[String](g.invalidBase58, a => tr.copy(assetId = Some(a)), Unknown.json)
+      _check[String](g.longAttachment, a => tr.copy(attachment = Some(a)), TooBigArrayAllocation.json)
       _check[Long](posNum[Long], quantity => tr.copy(amount = quantity, fee = Long.MaxValue), OverflowError.json)
-      _check[Long](choose(Long.MinValue, 0), fee => tr.copy(fee = fee), InsufficientFee.json)
+      _check[Long](g.nonPositiveLong, fee => tr.copy(fee = fee), InsufficientFee.json)
     }
   }
 }
 
 object AssetsBroadcastRouteSpec {
   private[AssetsBroadcastRouteSpec] object g extends TransactionGen {
-    object wrong {
-      val quantity: G[Long] = choose(Long.MinValue, 0)
-      val decimals: G[Byte] = oneOf(choose[Byte](Byte.MinValue, -1), choose((IssueTransaction.MaxDecimals + 1).toByte,
-        Byte.MaxValue))
-      val longAttachment: G[String] = genBoundedBytes(TransferTransaction.MaxAttachmentSize + 1, Int.MaxValue).map(
-        Base58.encode)
-      val invalidBase58: G[String] = listOf(oneOf(alphaNumChar, oneOf('O', '0', 'l'))).map(_.mkString)
-    }
+    val nonPositiveLong: G[Long] = choose(Long.MinValue, 0).label("non-positive value")
+    val invalidDecimals: G[Byte] = oneOf(
+      choose[Byte](Byte.MinValue, -1),
+      choose((IssueTransaction.MaxDecimals + 1).toByte, Byte.MaxValue)
+    ).label("invalid decimals")
 
+    val longAttachment: G[String] =
+      genBoundedBytes(TransferTransaction.MaxAttachmentSize + 1, TransferTransaction.MaxAttachmentSize + 50)
+        .map(Base58.encode)
+    val invalidBase58: G[String] = listOfN(50, oneOf(alphaNumChar, oneOf('O', '0', 'l')))
+      .map(_.mkString)
+      .label("invalid base58")
+    val invalidName: G[String] = oneOf(
+      genBoundedString(0, IssueTransaction.MinAssetNameLength - 1),
+      genBoundedString(IssueTransaction.MaxAssetNameLength + 1, IssueTransaction.MaxAssetNameLength + 1000)
+    ).map(new String(_))
+    val longDescription: G[String] =
+      genBoundedBytes(IssueTransaction.MaxDescriptionLength + 1, IssueTransaction.MaxDescriptionLength + 1000)
+      .map(Base58.encode)
 
     val fee: G[Long] = choose(0, Long.MaxValue)
     val signatureGen: G[String] = listOfN(TypedTransaction.SignatureLength, Arbitrary.arbByte.arbitrary)
