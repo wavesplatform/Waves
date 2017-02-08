@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.model.{BuyLimitOrder, LevelAgg, LimitOrder}
+import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.WavesSettings
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
@@ -14,7 +14,6 @@ import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecL
 import play.api.libs.json.{JsObject, JsString}
 import scorex.account.PrivateKeyAccount
 import scorex.settings.ChainParameters
-import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.ScorexLogging

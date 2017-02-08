@@ -12,7 +12,6 @@ class WavesTransactionModule(chainParams: ChainParameters)(implicit override val
                                                            application: RunnableApplication)
   extends SimpleTransactionModule(chainParams) {
 
-  override def genesisData: BlockField[SimpleTransactionModule.StoredInBlock] = {
-    TransactionsBlockField(chainParams.genesisTxs)
-  }
+  override def genesisData: Seq[Transaction] = chainParams.genesisTxs
+
 }

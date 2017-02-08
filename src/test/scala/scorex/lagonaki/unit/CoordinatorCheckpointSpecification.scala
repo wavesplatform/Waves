@@ -3,8 +3,6 @@ package scorex.lagonaki.unit
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import org.h2.mvstore.MVStore
-import org.scalatest.DoNotDiscover
-import play.api.libs.json.JsObject
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.app.Application
@@ -19,13 +17,11 @@ import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, Message}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.{ChainParameters, SettingsMock}
-import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction._
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.postfixOps
 import scala.util.Random
-import scala.concurrent.duration._
 
 class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 

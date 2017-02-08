@@ -11,8 +11,7 @@ import scorex.consensus.TransactionsOrdering
 import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
-import scorex.settings.{Settings, ChainParameters}
-import scorex.transaction.SimpleTransactionModule.StoredInBlock
+import scorex.settings.{ChainParameters, Settings}
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
@@ -67,7 +66,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     } else false
   }
 
-  override def packUnconfirmed(heightOpt: Option[Int]): StoredInBlock = synchronized {
+  override def packUnconfirmed(heightOpt: Option[Int]): Seq[Transaction] = synchronized {
     clearIncorrectTransactions()
 
     val txs = utxStorage.all().sorted(TransactionsOrdering).take(MaxTransactionsPerBlock)
@@ -80,7 +79,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     valid
   }
 
-  override def clearFromUnconfirmed(data: StoredInBlock): Unit = synchronized {
+  override def clearFromUnconfirmed(data: Seq[Transaction]): Unit = synchronized {
     data.foreach(tx => utxStorage.getBySignature(tx.id) match {
       case Some(unconfirmedTx) => utxStorage.remove(unconfirmedTx)
       case None =>
@@ -235,7 +234,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     pt
   }
 
-  override def genesisData: BlockField[StoredInBlock] = {
+  override def genesisData: Seq[Transaction] = {
     val ipoMembers = List(
       "3N3rfWUDPkFsf2GEZBCLw491A79G46djvQk",
       "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",
@@ -255,7 +254,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       GenesisTransaction.create(recipient, totalBalance / ipoMembers.length, timestamp)
     }.map(_.right.get)
 
-    TransactionsBlockField(txs)
+    txs
   }
 
   /** Check whether tx is valid on current state and not expired yet
@@ -308,7 +307,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   val minimumTxFee = settings.asInstanceOf[WavesSettings].minimumTxFee
 
-  def signPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError,PaymentTransaction]] = {
+  def signPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
     }
@@ -357,7 +356,6 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 }
 
 object SimpleTransactionModule {
-  type StoredInBlock = Seq[Transaction]
 
   val MaxTimeDrift: FiniteDuration = 15.seconds
   val MaxTimeForUnconfirmed: FiniteDuration = 90.minutes

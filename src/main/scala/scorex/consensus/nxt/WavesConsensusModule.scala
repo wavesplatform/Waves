@@ -222,8 +222,8 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     BigInt(prevBlockData.baseTarget) * eta * balance
   }
 
-  override def genesisData: BlockField[NxtLikeConsensusBlockData] =
-    NxtConsensusBlockField(NxtLikeConsensusBlockData(InitialBaseTarget, Array.fill(32)(0: Byte)))
+  override def genesisData: NxtLikeConsensusBlockData =
+    NxtLikeConsensusBlockData(InitialBaseTarget, Array.fill(32)(0: Byte))
 
 }
 
