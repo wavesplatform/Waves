@@ -32,10 +32,7 @@ class BlockSpecification extends FunSuite with Matchers with scorex.waves.Testin
     val tr2: TransferTransaction = TransferTransaction.create(assetId, sender, gen, 5, ts + 2, None, 2, Array()).right.get
 
     val tbd = Seq(tx, tr, tr2)
-    val cbd = new NxtLikeConsensusBlockData {
-      override val generationSignature: Array[Byte] = gs
-      override val baseTarget: Long = bt
-    }
+    val cbd = NxtLikeConsensusBlockData (bt,gs)
 
     val version = 1: Byte
     val timestamp = System.currentTimeMillis()

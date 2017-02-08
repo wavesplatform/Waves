@@ -7,7 +7,7 @@ import org.scalacheck.{Gen, Prop}
 import org.scalatest.prop.Checkers
 import org.scalatest.PropSpec
 import scorex.account.{Account, PrivateKeyAccount}
-import scorex.lagonaki.mocks.BlockMock
+import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 import scorex.utils._
@@ -105,7 +105,7 @@ object StateTestSpec extends Commands {
   case class Sut(fileName: String) {
     val db = new MVStore.Builder().fileName(fileName).compress().open()
     val storedState = StoredState.fromDB(db, ChainParameters.Disabled)
-    storedState.processBlock(new BlockMock(genesisTxs))
+    storedState.processBlock(TestBlock(genesisTxs))
   }
 
   case class CheckTransaction(signature: Transaction) extends Command {
@@ -132,7 +132,7 @@ object StateTestSpec extends Commands {
 
     def run(sut: Sut): Result = sut.synchronized {
       assert(sut.storedState.isValid(txs, blockTime = txs.map(_.timestamp).max))
-      val block = new BlockMock(txs)
+      val block = TestBlock(txs)
       sut.storedState.processBlock(block)
       (sut.storedState.stateHeight, sut.storedState.totalBalance)
     }

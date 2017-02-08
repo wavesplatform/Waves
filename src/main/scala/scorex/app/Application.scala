@@ -13,8 +13,8 @@ import scorex.wallet.Wallet
 trait Application {
 
   //modules
-  implicit def consensusModule: ConsensusModule[_]
-  implicit def transactionModule: TransactionModule[_]
+  implicit def consensusModule: ConsensusModule
+  implicit def transactionModule: TransactionModule
 
   def applicationName: String
 

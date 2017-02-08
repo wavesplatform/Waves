@@ -11,7 +11,7 @@ import scorex.utils.NTP
 import scorex.wallet.Wallet
 
 trait ExchangeTransactionCreator {
-  val transactionModule: TransactionModule[StoredInBlock]
+  val transactionModule: TransactionModule
   val storedState: StoredState
   val wallet: Wallet
   val settings: WavesSettings

@@ -15,7 +15,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 /**
   * Synchronizing transactions that are not in blockchain yet
   */
-class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModule[_], settings: Settings,
+class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModule, settings: Settings,
                                   networkController: ActorRef)
   extends ViewSynchronizer with ScorexLogging {
 

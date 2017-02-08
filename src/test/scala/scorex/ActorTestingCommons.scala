@@ -10,10 +10,12 @@ import scorex.app.Application
 import scorex.block.Block._
 import scorex.block.{Block, LongBlockField, SignerData}
 import scorex.consensus.ConsensusModule
+import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
-import scorex.transaction.TransactionModule
+import scorex.transaction.{TransactionModule, TransactionsBlockField}
+import scorex.transaction.TypedTransaction.SignatureLength
 
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
@@ -64,15 +66,9 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids:_*)
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
-  protected def blockMock[Id](id: Id, ts: Long = System.currentTimeMillis())(implicit conv: Id => BlockId): Block = {
-    abstract class BlockMock extends Block(ts,0,conv(id),SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array())) {
-      override type ConsensusDataType = Unit
-      override type TransactionDataType = Unit
-
-      override val uniqueId: BlockId = id
-    }
-    mock[BlockMock]
-  }
+  protected def testBlock(id: Int, ts: Long = System.currentTimeMillis()) =
+    Block(ts,0,1,SignerData(new PublicKeyAccount(Array.fill(32)(0)),Array(id.toByte)),
+      NxtConsensusBlockField(NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte))),TransactionsBlockField(Seq.empty))
 
   protected trait TestDataExtraction[T] {
     def extract(actual: T) : Any
@@ -100,8 +96,8 @@ abstract class ActorTestingCommons extends TestKitBase
     }
 
   trait ApplicationMock extends Application {
-    implicit val transactionModule = stub[TransactionModule[Unit]]
-    implicit val consensusModule = stub[ConsensusModule[Unit]]
+    implicit val transactionModule = stub[TransactionModule]
+    implicit val consensusModule = stub[ConsensusModule]
     final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock
   }

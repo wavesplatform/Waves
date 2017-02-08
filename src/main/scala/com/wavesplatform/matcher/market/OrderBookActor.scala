@@ -24,7 +24,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
                      val wallet: Wallet, val settings: WavesSettings,
-                     val transactionModule: TransactionModule[StoredInBlock])
+                     val transactionModule: TransactionModule)
   extends PersistentActor
     with ScorexLogging with OrderValidator with OrderHistory with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
@@ -165,7 +165,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
 
 object OrderBookActor {
   def props(assetPair: AssetPair, storedState: StoredState,
-            wallet: Wallet, settings: WavesSettings, transactionModule: TransactionModule[StoredInBlock]): Props =
+            wallet: Wallet, settings: WavesSettings, transactionModule: TransactionModule): Props =
     Props(new OrderBookActor(assetPair, storedState, wallet, settings, transactionModule))
 
   def name(assetPair: AssetPair): String = assetPair.first.map(Base58.encode).getOrElse("WAVES") + "-" +

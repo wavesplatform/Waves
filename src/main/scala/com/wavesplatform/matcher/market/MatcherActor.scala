@@ -18,14 +18,14 @@ import scala.util.Try
 object MatcherActor {
   def name = "matcher"
   def props(storedState: StoredState, wallet: Wallet, settings: WavesSettings,
-            transactionModule: TransactionModule[StoredInBlock]): Props =
+            transactionModule: TransactionModule): Props =
     Props(new MatcherActor(storedState, wallet, settings, transactionModule))
 
   case class OrderBookCreated(pair: AssetPair)
 }
 
 class MatcherActor(storedState: StoredState, wallet: Wallet, settings: WavesSettings,
-                   transactionModule: TransactionModule[StoredInBlock]
+                   transactionModule: TransactionModule
                   ) extends PersistentActor with ScorexLogging {
   import MatcherActor._
 

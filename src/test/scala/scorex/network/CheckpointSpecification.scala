@@ -30,7 +30,7 @@ class CheckpointSpecification extends FreeSpec
   }
 
   "serialization" in {
-    val spec = new BasicMessagesRepo()(stub[TransactionModule[Unit]], stub[ConsensusModule[Unit]]).CheckpointMessageSpec
+    val spec = new BasicMessagesRepo()(stub[TransactionModule], stub[ConsensusModule]).CheckpointMessageSpec
 
     def sig(b: Byte) = Array.fill[Byte](SignatureLength)(b)
 
