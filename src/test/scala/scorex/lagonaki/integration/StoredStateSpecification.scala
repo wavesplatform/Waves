@@ -92,7 +92,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val tx = transactionModule.createPayment(acc, testAcc, 1, 1).right.get
     state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(2L), Seq(FeesStateChange(1L), tx))), NTP.correctedTime())
     state.balance(testAcc) shouldBe 2
-    state.included(tx).value shouldBe state.stateHeight
+    state.included(tx.id).value shouldBe state.stateHeight
     state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(0L), Seq(tx))), NTP.correctedTime())
   }
 
@@ -152,10 +152,10 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   test("included") {
     val incl = includedTransactions(history.lastBlock, history)
     incl.nonEmpty shouldBe true
-    incl.forall(t => state.included(t).isDefined) shouldBe true
+    incl.forall(t => state.included(t.id).isDefined) shouldBe true
 
     val newTx = genValidTransaction()
-    state.included(newTx).isDefined shouldBe false
+    state.included(newTx.id).isDefined shouldBe false
   }
 
   test("last transaction of account one block behind") {

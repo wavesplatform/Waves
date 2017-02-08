@@ -59,7 +59,7 @@ case class TransactionsApiRoute(application: Application)(implicit val context: 
       getJsonRoute {
         Base58.decode(encoded) match {
           case Success(sig) =>
-            state.included(sig, None) match {
+            state.included(sig) match {
               case Some(h) =>
                 Try {
                   val block = application.blockStorage.history.asInstanceOf[StoredBlockchain].blockAt(h).get

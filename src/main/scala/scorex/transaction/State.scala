@@ -16,9 +16,7 @@ trait State {
 
   def validate(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Seq[Transaction]
 
-  def included(signature: Array[Byte], heightOpt: Option[Int]): Option[Int]
-
-  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = included(tx.id, heightOpt)
+  def included(signature: Array[Byte]): Option[Int]
 
   private[transaction] def rollbackTo(height: Int): State
 }

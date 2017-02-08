@@ -32,7 +32,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
                   val validators: Seq[StateExtension],
                   settings: ChainParameters) extends LagonakiState with ScorexLogging {
 
-  override def included(id: Array[Byte], heightOpt: Option[Int]): Option[Int] = storage.included(id, heightOpt)
+  override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 
   def stateHeight: Int = storage.stateHeight
 
