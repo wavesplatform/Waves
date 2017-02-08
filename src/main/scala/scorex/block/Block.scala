@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.Json
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.BlockId
-import scorex.consensus.ConsensusModule
+import scorex.consensus.{ConsensusModule, nxt}
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -15,13 +15,15 @@ import scorex.transaction.TypedTransaction._
 import scala.util.{Failure, Try}
 
 case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signerData: SignerData,
-                 consensusDataField: BlockField[NxtLikeConsensusBlockData], transactionDataField: BlockField[Seq[Transaction]]) {
+                 consensusData: NxtLikeConsensusBlockData, transactionData: Seq[Transaction]) {
 
-  val versionField: ByteBlockField = ByteBlockField("version", version)
-  val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
-  val referenceField: BlockIdField = BlockIdField("reference", reference)
-  val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
-  val uniqueId: BlockId = signerData.signature
+  lazy val versionField: ByteBlockField = ByteBlockField("version", version)
+  lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
+  lazy val referenceField: BlockIdField = BlockIdField("reference", reference)
+  lazy val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
+  lazy val uniqueId: BlockId = signerData.signature
+  lazy val consensusDataField = NxtConsensusBlockField(consensusData)
+  lazy val transactionDataField = TransactionsBlockField(transactionData)
   lazy val encodedId: String = Base58.encode(uniqueId)
 
   lazy val fee = {
@@ -85,20 +87,20 @@ object Block extends ScorexLogging {
 
   val TransactionSizeLength = 4
 
-  def transParseBytes(bytes: Array[Byte]): Try[TransactionsBlockField] = Try {
+  def transParseBytes(bytes: Array[Byte]): Try[Seq[TypedTransaction]] = Try {
     bytes.isEmpty match {
-      case true => TransactionsBlockField(Seq())
+      case true => Seq.empty
       case false =>
         val txData = bytes.tail
         val txCount = bytes.head // so 255 txs max
-        TransactionsBlockField((1 to txCount).foldLeft((0: Int, Seq[TypedTransaction]())) { case ((pos, txs), _) =>
+        (1 to txCount).foldLeft((0: Int, Seq[TypedTransaction]())) { case ((pos, txs), _) =>
           val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
           val transactionLength = Ints.fromByteArray(transactionLengthBytes)
           val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
           val transaction = TypedTransaction.parseBytes(transactionBytes).get
 
           (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
-        }._2)
+        }._2
     }
   }
 
@@ -117,7 +119,7 @@ object Block extends ScorexLogging {
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val cBytes = bytes.slice(position, position + cBytesLength)
-    val consBlockField = NxtConsensusBlockField(NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(WavesConsensusModule.BaseTargetLength)), cBytes.takeRight(WavesConsensusModule.GeneratorSignatureLength)))
+    val consData = NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(WavesConsensusModule.BaseTargetLength)), cBytes.takeRight(WavesConsensusModule.GeneratorSignatureLength))
     position += cBytesLength
 
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
@@ -131,7 +133,7 @@ object Block extends ScorexLogging {
 
     val signature = bytes.slice(position, position + SignatureLength)
 
-    new Block(timestamp, version, reference, SignerData(new PublicKeyAccount(genPK), signature), consBlockField, txBlockField)
+    new Block(timestamp, version, reference, SignerData(new PublicKeyAccount(genPK), signature), consData, txBlockField)
   }.recoverWith { case t: Throwable =>
     log.error("Error when parsing block", t)
     t.printStackTrace()
@@ -144,10 +146,8 @@ object Block extends ScorexLogging {
             consensusData: NxtLikeConsensusBlockData,
             transactionData: Seq[Transaction],
             generator: PublicKeyAccount,
-            signature: Array[Byte]): Block = {
-    new Block(timestamp, version, reference, SignerData(generator, signature), NxtConsensusBlockField(consensusData), TransactionsBlockField(transactionData))
-
-  }
+            signature: Array[Byte])
+  = new Block(timestamp, version, reference, SignerData(generator, signature), consensusData, transactionData)
 
   def buildAndSign(version: Byte,
                    timestamp: Long,
@@ -161,20 +161,20 @@ object Block extends ScorexLogging {
     build(version, timestamp, reference, consensusData, transactionData, signer, signature)
   }
 
-  def genesis(concensusGenesisData: BlockField[NxtLikeConsensusBlockData],
-              transactionGenesisData: BlockField[Seq[Transaction]],
+  def genesis(concensusGenesisData: NxtLikeConsensusBlockData,
+              transactionGenesisData: Seq[Transaction],
               timestamp: Long = 0L,
               signatureStringOpt: Option[String] = None): Block = {
     val version: Byte = 1
 
     val genesisSigner = new PrivateKeyAccount(Array.empty)
 
-    //    val transactionGenesisData: BlockField[Seq[Transaction]] = transModule.genesisData
-    //    val concensusGenesisData: BlockField[NxtLikeConsensusBlockData] = consModule.genesisData
-    val txBytesSize = transactionGenesisData.bytes.length
-    val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionGenesisData.bytes
-    val cBytesSize = concensusGenesisData.bytes.length
-    val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ concensusGenesisData.bytes
+    val transactionGenesisDataField = TransactionsBlockField(transactionGenesisData)
+    val concensusGenesisDataField  = NxtConsensusBlockField(concensusGenesisData)
+    val txBytesSize = transactionGenesisDataField.bytes.length
+    val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionGenesisDataField.bytes
+    val cBytesSize = concensusGenesisDataField.bytes.length
+    val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ concensusGenesisDataField.bytes
 
     val reference = Array.fill(BlockIdLength)(-1: Byte)
 
@@ -194,7 +194,7 @@ object Block extends ScorexLogging {
       version = 1,
       reference = reference,
       signerData = SignerData(genesisSigner, signature),
-      consensusDataField = concensusGenesisData,
-      transactionDataField = transactionGenesisData)
+      consensusData = concensusGenesisData,
+      transactionData = transactionGenesisData)
   }
 }

@@ -17,7 +17,7 @@ class InMemorySeqSpecification extends FreeSpec  with Matchers {
 
   private def newBlock(referenceId: Int) =
      Block(0, 1, toBlockId(referenceId), SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array()),
-      NxtConsensusBlockField(NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte))), TransactionsBlockField(Seq.empty))
+      NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)), Seq.empty)
 
   "life cycle" in {
     val imMemoryBlockSeq = new InMemoryBlockSeq(Seq(1, 2, 3, 4, 5).map(i => InnerId(toBlockId(i))))

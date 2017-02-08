@@ -7,7 +7,7 @@ import scorex.transaction.TransactionModule
 
 trait ConsensusModule {
 
-  def genesisData: BlockField[NxtLikeConsensusBlockData]
+  def genesisData: NxtLikeConsensusBlockData
 
   def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean
 

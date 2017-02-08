@@ -6,7 +6,7 @@ import scala.util.Try
 
 trait TransactionModule {
 
-  def genesisData: BlockField[Seq[Transaction]]
+  def genesisData: Seq[Transaction]
 
   val blockStorage: BlockStorage
 

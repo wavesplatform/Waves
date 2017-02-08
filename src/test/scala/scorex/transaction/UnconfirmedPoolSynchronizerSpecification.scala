@@ -11,7 +11,6 @@ import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
 import scorex.network.message.Message
 import scorex.network.{NetworkController, _}
 import scorex.settings.Settings
-import scorex.transaction.SimpleTransactionModule.StoredInBlock
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
