@@ -29,7 +29,7 @@ import scala.util.control.NonFatal
 class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
                   val assetsExtension: AssetsExtendedState,
                   val incrementingTimestampValidator: IncrementingTimestampValidator,
-                  val validators: Seq[StateExtension],
+                  val validators: Seq[Validator],
                   settings: ChainParameters) extends LagonakiState with ScorexLogging {
 
   override def included(id: Array[Byte], heightOpt: Option[Int]): Option[Int] = storage.included(id, heightOpt)
@@ -132,6 +132,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
               case _ => acc
             }
           }
+
           loop(accHeight, result)
         case _ => result
       }
@@ -297,8 +298,13 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
-  private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = {
-    validators.forall(_.isValid(transaction, height))
+  private[blockchain] def isValid(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
+    validators.foldLeft(Right(transaction): Either[ValidationError, Transaction]) { case (ei, v) =>
+      ei match {
+        case Right(_) => v.isValid(transaction, height)
+        case l@Left(_) => l
+      }
+    }
   }
 
 
@@ -360,14 +366,14 @@ object StoredState {
       if (db.getStoreVersion > 0) db.rollback()
     }
     val extendedState = new AssetsExtendedState(storage)
-    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings, storage)
+    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
     val validators = Seq(
       extendedState,
       incrementingTimestampValidator,
       new GenesisValidator,
       new OrderMatchStoredState(storage),
-      new IncludedValidator(storage, settings),
-      new ActivatedValidator(settings)
+      new IncludedValidator(storage, settings.requirePaymentUniqueId),
+      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp)
     )
     new StoredState(storage, extendedState, incrementingTimestampValidator, validators, settings)
   }
