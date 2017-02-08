@@ -88,12 +88,12 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val senderAmountAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
         state.assetBalance(senderAmountAcc) shouldBe 0
-        state.isValid(issueTx, Int.MaxValue) shouldBe true
+        state.isTValid(issueTx) shouldBe true
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe issueTx.quantity
 
-        state.isValid(burnTx, Int.MaxValue) shouldBe true
+        state.isTValid(burnTx) shouldBe true
 
         state.applyChanges(state.calcNewBalances(Seq(burnTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe (issueTx.quantity - burnTx.amount)
@@ -260,7 +260,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
       state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
-      state.isValid(issueTx2, Int.MaxValue) shouldBe false
+      state.isTValid(issueTx2) shouldBe false
     }
   }
 
@@ -270,13 +270,13 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val issueTx: IssueTransaction = pair._1
         val reissueTx: ReissueTransaction = pair._3
 
-        state.isValid(issueTx, Int.MaxValue) shouldBe true
+        state.isTValid(issueTx) shouldBe true
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
-        state.isValid(issueTx, Int.MaxValue) shouldBe false
+        state.isTValid(issueTx) shouldBe false
 
-        state.isValid(reissueTx, Int.MaxValue) shouldBe issueTx.reissuable
+        state.isTValid(reissueTx) shouldBe issueTx.reissuable
       }
     }
   }

@@ -191,7 +191,6 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
             (newState, seq :+ tx)
           } catch {
             case NonFatal(e) =>
-              println(e)
               (currentState, seq)
           }
       }

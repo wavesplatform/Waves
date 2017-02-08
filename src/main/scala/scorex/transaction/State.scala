@@ -4,9 +4,6 @@ import scorex.block.Block
 
 import scala.util.Try
 
-/**
-  * Abstract functional interface of state which is a result of a sequential blocks applying
-  */
 trait State {
   private[transaction] def processBlock(block: Block): Try[State]
 
@@ -14,7 +11,7 @@ trait State {
 
   def allValid(txs: Seq[Transaction], blockTime: Long): Boolean = validate(txs, blockTime).size == txs.size
 
-  def validate(txs: Seq[Transaction], blockTime: Long): Seq[Transaction ]
+  def validate(txs: Seq[Transaction], blockTime: Long): Seq[Transaction]
 
   def included(signature: Array[Byte]): Option[Int]
 
