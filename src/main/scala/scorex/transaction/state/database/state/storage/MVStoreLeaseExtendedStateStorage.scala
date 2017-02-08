@@ -1,23 +1,42 @@
 package scorex.transaction.state.database.state.storage
 
-import org.h2.mvstore.MVStore
+import org.h2.mvstore.{MVMap, MVStore}
+import scorex.crypto.encode.Base58
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.state.{Address, Row}
+import scorex.utils.LogMVMapBuilder
+
+object MVStoreLeaseExtendedStateStorage {
+  private val ExpiredTableName = "ExpiredLease"
+  private val LeasedSum = "LeasedSum"
+}
 
 trait MVStoreLeaseExtendedStateStorage extends LeaseExtendedStateStorageI {
-  val db: MVStore
+  self: StateStorageI =>
 
-  override def getEffectiveBalanceChanges(key: Address, height: Int): Option[Row] = ???
+  import MVStoreLeaseExtendedStateStorage._
 
-  override def putEffectiveBalanceChanges(key: Address, height: Int, data: Row): Unit = ???
+  def db: MVStore
 
-  override def removeEffectiveBalanceChanges(key: Address, height: Int): Row = ???
+  private lazy val leasedSumTable: MVMap[String, Long] = db.openMap(LeasedSum, new LogMVMapBuilder[String, Long])
 
-  override def getLeaseTx(leaseTxId: Array[Byte]): Option[LeaseTransaction] = ???
+  private lazy val expiredLeaseTable: MVMap[Long, Set[String]] = db.openMap(ExpiredTableName, new LogMVMapBuilder[Long, Set[String]])
 
-  override def getLeasedSum(address: Address): Long = ???
 
-  override def updateLeasedSum(address: Address, delta: Long): Unit = ???
+  override def getLeasedSum(address: Address): Long = {
+    Option(leasedSumTable.get(address)).getOrElse(0L)
+  }
 
-  override def getLastEffectiveBalanceChangeHeight(a: Address): Option[Int] = ???
+  override def updateLeasedSum(address: Address, value: Long): Unit = {
+    leasedSumTable.put(address, value)
+  }
+  override def getExpiredLeaseTransactions(height: Long): Set[LeaseTransaction] = {
+    Option(expiredLeaseTable.get(height))
+      .map(_.map(id => getLeaseTx(Base58.decode(id).get).get))
+      .getOrElse(Set.empty[LeaseTransaction])
+  }
+
+  override def updateExpiredLeaseTransactions(height: Long, txs: Set[LeaseTransaction]): Unit = {
+    expiredLeaseTable.put(height, txs.map(tx => Base58.encode(tx.id)))
+  }
 }

@@ -7,7 +7,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction._
-import scorex.transaction.{AssetId, BalanceChange, SignedTransaction, ValidationError}
+import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
@@ -50,7 +50,7 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override lazy val balanceChanges: Seq[BalanceChange] = Seq.empty
+    override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(sender, None), -fee))
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
   }

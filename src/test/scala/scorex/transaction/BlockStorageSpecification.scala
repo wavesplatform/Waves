@@ -25,6 +25,7 @@ class BlockStorageSpecification extends PropSpec with PropertyChecks with Genera
     override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long = ???
     override def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] = ???
     override def effectiveBalance(account: Account, height: Option[Int]): Long = ???
+    override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long = ???
   }
 
   property("BlockStorage appendBlock should returns failed try when state.processBlock fails") {

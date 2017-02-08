@@ -44,6 +44,22 @@ trait TransactionGen {
     recipient: PrivateKeyAccount <- accountGen
   } yield PaymentTransaction.create(sender, recipient, amount, fee, timestamp).right.get
 
+  val leaseAndCancelGenerator: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
+    amount: Long <- Gen.choose(0, Long.MaxValue)
+    fee: Long <- Gen.choose(0, Long.MaxValue - amount - 1)
+    timestamp: Long <- positiveLongGen
+    untilBlock: Long <- positiveLongGen
+    sender: PrivateKeyAccount <- accountGen
+    recipient: PrivateKeyAccount <- accountGen
+  } yield {
+    val lease = LeaseTransaction.create(sender, amount, fee, timestamp, untilBlock, recipient).right.get
+    val cancel = LeaseCancelTransaction.create(sender, lease.id, fee, timestamp).right.get
+    (lease, cancel)
+  }
+
+  val leaseGenerator: Gen[LeaseTransaction] = leaseAndCancelGenerator.map(_._1)
+  val leaseCancelGenerator: Gen[LeaseCancelTransaction] = leaseAndCancelGenerator.map(_._2)
+
   val selfPaymentGenerator: Gen[PaymentTransaction] = for {
     account: PrivateKeyAccount <- accountGen
     amount: Long <- Gen.choose(0, Long.MaxValue)

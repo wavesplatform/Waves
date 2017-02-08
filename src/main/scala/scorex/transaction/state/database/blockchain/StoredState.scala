@@ -108,8 +108,12 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     balanceByKey(account.key, _.balance, atHeight)
   }
 
+  private def heightWithConfirmations(confirmations: Int): Int = {
+    Math.max(1, storage.stateHeight - confirmations)
+  }
+
   override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
-    balance(account, Some(Math.max(1, heightOpt.getOrElse(storage.stateHeight) - confirmations)))
+    balance(account, Some(heightOpt.getOrElse(heightWithConfirmations(confirmations))))
 
   override def accountTransactions(account: Account, limit: Int = DefaultLimit): Seq[Transaction] = {
     val accountAssets = storage.getAccountAssets(account.address)
@@ -200,7 +204,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
               val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc), effectiveBalance(bc.assetAcc.account)), List.empty))
               val newBalance = safeSum(currentChange._1.balance, bc.delta)
               val newEffectiveBalance = safeSum(currentChange._1.balance, bc.delta)
-              if ((newBalance >= 0 || tx.timestamp < settings.allowTemporaryNegativeUntil) && newEffectiveBalance >= 0) {
+              if (tx.timestamp < settings.allowTemporaryNegativeUntil || (newBalance >= 0 && newEffectiveBalance >= 0)) {
                 iChanges.updated(bc.assetAcc, (AccState(newBalance, newEffectiveBalance), tx.id +: currentChange._2))
               } else {
                 throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}, effective balance: ${currentChange._1.effectiveBalance} + ${bc.delta} = ${currentChange._1.effectiveBalance + bc.delta}")
@@ -211,7 +215,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
               //update effective balances sheet
               val currentChange = iChanges.getOrElse(AssetAcc(bc.account, None), (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
               val newEffectiveBalance = safeSum(currentChange._1.balance, bc.delta)
-              if (newEffectiveBalance >= 0) {
+              if (tx.timestamp < settings.allowTemporaryNegativeUntil || newEffectiveBalance >= 0) {
                 iChanges.updated(AssetAcc(bc.account, None), (AccState(currentChange._1.balance, newEffectiveBalance), tx.id +: currentChange._2))
               } else {
                 throw new Error(s"Transaction leads to negative effective balance: ${currentChange._1.effectiveBalance} + ${bc.delta} = ${currentChange._1.effectiveBalance + bc.delta}")
@@ -249,7 +253,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
           Try(Math.addExact(currentChange._1.effectiveBalance, bc.delta)).getOrElse(Long.MinValue)
         }
 
-        if ((newBalance >= 0 || tx.timestamp < settings.allowTemporaryNegativeUntil) && newEffectiveBalance >= 0) {
+        if (allowTemporaryNegative || (newBalance >= 0 && newEffectiveBalance >= 0)) {
           iChanges.updated(bc.assetAcc, (AccState(newBalance, newEffectiveBalance), tx +: currentChange._2))
         } else {
           throw new Error(s"Transaction leads to negative balance ($newBalance, $newEffectiveBalance): ${tx.json}")
@@ -264,7 +268,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
         } else {
           Try(Math.addExact(currentChange._1.effectiveBalance, bc.delta)).getOrElse(Long.MinValue)
         }
-        if (newEffectiveBalance >= 0) {
+        if (allowTemporaryNegative || newEffectiveBalance >= 0) {
           iChanges.updated(AssetAcc(bc.account, None), (AccState(currentChange._1.balance, newEffectiveBalance), tx +: currentChange._2))
         } else {
           throw new Error(s"Transaction leads to negative effective balance: ${currentChange._1.effectiveBalance} + ${bc.delta} = ${currentChange._1.effectiveBalance + bc.delta}")
@@ -314,7 +318,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
               Try(Math.addExact(currentChange._1.effectiveBalance, bc.delta)).getOrElse(Long.MinValue)
             }
 
-            if ((newBalance < 0 && tx.timestamp >= settings.allowTemporaryNegativeUntil) || newEffectiveBalance < 0) {
+            if (tx.timestamp >= settings.allowTemporaryNegativeUntil || (newBalance < 0 && newEffectiveBalance < 0)) {
               throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
             }
 
@@ -428,6 +432,9 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   override def effectiveBalance(account: Account, height: Option[Int]): Long = {
     balanceByKey(account.address, _.effectiveBalance, height)
   }
+
+  override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
+    effectiveBalance(account, Some(heightOpt.getOrElse(heightWithConfirmations(confirmations))))
 }
 
 object StoredState {

@@ -8,14 +8,14 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
 import scorex.settings.Settings
 import scorex.transaction.assets._
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 
 class FeeCalculatorSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
   with Matchers with TransactionGen {
-
   val WhitelistedAsset = Base58.decode("JAudr64y6YxTgLn9T5giKKqWGkbMfzhdRAxmNNfn6FJN").get
 
-  property("Transfer transaction ") {
+  property("Transfer transaction") {
     val feeCalc = new FeeCalculator(MySettings)
     forAll(transferGenerator) { tx: TransferTransaction =>
       if (tx.feeAssetId.isEmpty) {
@@ -26,31 +26,45 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
     }
   }
 
-  property("Payment transaction ") {
+  property("Payment transaction") {
     val feeCalc = new FeeCalculator(MySettings)
     forAll(paymentGenerator) { tx: PaymentTransaction =>
       feeCalc.enoughFee(tx) shouldBe (tx.fee >= 1000000)
     }
   }
 
-  property("Issue transaction ") {
+  property("Issue transaction") {
     val feeCalc = new FeeCalculator(MySettings)
     forAll(issueGenerator) { tx: IssueTransaction =>
       feeCalc.enoughFee(tx) shouldBe (tx.fee >= 100000000)
     }
   }
 
-  property("Reissue transaction ") {
+  property("Reissue transaction") {
     val feeCalc = new FeeCalculator(MySettings)
     forAll(reissueGenerator) { tx: ReissueTransaction =>
       feeCalc.enoughFee(tx) shouldBe (tx.fee >= 200000)
     }
   }
 
-  property("Burn transaction ") {
+  property("Burn transaction") {
     val feeCalc = new FeeCalculator(MySettings)
     forAll(burnGenerator) { tx: BurnTransaction =>
       feeCalc.enoughFee(tx) shouldBe (tx.fee >= 300000)
+    }
+  }
+
+  property("Lease transaction") {
+    val feeCalc = new FeeCalculator(MySettings)
+    forAll(leaseGenerator) { tx: LeaseTransaction =>
+      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 400000)
+    }
+  }
+
+  property("Lease cancel transaction") {
+    val feeCalc = new FeeCalculator(MySettings)
+    forAll(leaseCancelGenerator) { tx: LeaseCancelTransaction =>
+      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 500000)
     }
   }
 
@@ -72,6 +86,12 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
       |  },
       |  "6": {
       |    "Waves": 300000
+      |  },
+      |  "8": {
+      |    "Waves": 400000
+      |  },
+      |  "9": {
+      |    "Waves": 500000
       |  }
       |}}""".stripMargin
   val feeMapJson: JsObject = Json.parse(str).as[JsObject]

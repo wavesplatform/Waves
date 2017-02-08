@@ -9,7 +9,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.serialization.Deser
 import scorex.transaction.TypedTransaction.{KeyLength, _}
-import scorex.transaction.{AssetId, BalanceChange, SignedTransaction, ValidationError}
+import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
@@ -43,7 +43,7 @@ object LeaseCancelTransaction extends Deser[LeaseCancelTransaction] {
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override lazy val balanceChanges: Seq[BalanceChange] = Seq.empty
+    override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(sender, None), -fee))
 
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 

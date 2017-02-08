@@ -12,6 +12,7 @@ import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.waves.TestingCommons
@@ -190,6 +191,74 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
           newSenderFeeBalance shouldBe senderFeeBalance - tx.fee
         }
 
+      }
+    }
+  }
+
+  private def senderAndRecipientStateBalances(tx: LeaseTransaction): (Long, Long, Long, Long) = {
+    import tx.sender
+    import tx.recipient
+
+    val senderBalance = state.balance(sender)
+    val senderEffectiveBalance = state.effectiveBalance(sender)
+    val recipientBalance = state.balance(recipient)
+    val recipientEffectiveBalance = state.effectiveBalance(recipient)
+    (senderBalance, senderEffectiveBalance, recipientBalance, recipientEffectiveBalance)
+  }
+
+  // todo fail cases for fee and amount
+  property("Lease transaction") {
+    forAll(leaseGenerator) { tx: LeaseTransaction =>
+      withRollbackTest {
+
+        //set some balance
+        val genes = GenesisTransaction.create(tx.sender, tx.amount + tx.fee, tx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes), Map(), allowTemporaryNegative = false))
+
+        val (senderBalance, senderEffectiveBalance, recipientBalance, recipientEffectiveBalance) = senderAndRecipientStateBalances(tx)
+
+        // apply lease tx
+        state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = false))
+
+        val (newSenderBalance, newSenderEffectiveBalance, newRecipientBalance, newRecipientEffectiveBalance) = senderAndRecipientStateBalances(tx)
+
+        newSenderBalance shouldBe (senderBalance - tx.fee)
+        newRecipientBalance shouldBe recipientBalance
+
+        newSenderEffectiveBalance shouldBe (senderEffectiveBalance - tx.amount - tx.fee)
+        newRecipientEffectiveBalance shouldBe (recipientEffectiveBalance + tx.amount)
+      }
+    }
+  }
+
+  // todo fail case
+  // todo test cancel not issue tx
+  property("Lease cancel transaction") {
+    forAll(leaseAndCancelGenerator) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
+      withRollbackTest {
+
+        //set some balance
+        val genes = GenesisTransaction.create(lease.sender, lease.amount + lease.fee + cancel.fee, lease.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes), Map(), allowTemporaryNegative = false))
+
+        val (senderBalance, senderEffectiveBalance, recipientBalance, recipientEffectiveBalance) = senderAndRecipientStateBalances(lease)
+
+        // apply lease tx
+        val balancesAfterLeasing = state.calcNewBalances(Seq(lease), Map(), allowTemporaryNegative = false)
+        state.applyChanges(balancesAfterLeasing)
+//
+//        state.storage.putTransaction(lease, 2)
+
+        // apply cancel lease tx
+        val balancesAfterCancel = state.calcNewBalances(Seq(cancel), Map(), allowTemporaryNegative = false)
+        state.applyChanges(balancesAfterCancel)
+
+        val (newSenderBalance, newSenderEffectiveBalance, newRecipientBalance, newRecipientEffectiveBalance) = senderAndRecipientStateBalances(lease)
+
+        newSenderBalance shouldBe senderBalance - lease.fee - cancel.fee
+        newSenderEffectiveBalance shouldBe senderEffectiveBalance - lease.fee - cancel.fee
+        newRecipientBalance shouldBe recipientBalance
+        newRecipientEffectiveBalance shouldBe recipientEffectiveBalance
       }
     }
   }

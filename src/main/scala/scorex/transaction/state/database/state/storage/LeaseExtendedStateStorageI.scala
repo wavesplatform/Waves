@@ -4,17 +4,18 @@ import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.state.{Address, Row}
 
 trait LeaseExtendedStateStorageI {
-  def getEffectiveBalanceChanges(key: Address, height: Int): Option[Row]
+  self: StateStorageI =>
 
-  def putEffectiveBalanceChanges(key: Address, height: Int, data: Row): Unit
-
-  def removeEffectiveBalanceChanges(key: Address, height: Int): Row
-
-  def getLastEffectiveBalanceChangeHeight(a: Address): Option[Int]
-
-  def getLeaseTx(leaseTxId: Array[Byte]): Option[LeaseTransaction]
+  def getLeaseTx(leaseTxId: Array[Byte]): Option[LeaseTransaction] = self.getTransaction(leaseTxId).flatMap {
+    case tx: LeaseTransaction => Some(tx)
+    case _ => None
+  }
 
   def getLeasedSum(address: Address): Long
 
   def updateLeasedSum(address: Address, delta: Long): Unit
+
+  def getExpiredLeaseTransactions(height: Long): Set[LeaseTransaction]
+
+  def updateExpiredLeaseTransactions(height: Long, txs: Set[LeaseTransaction]): Unit
 }
