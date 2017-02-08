@@ -7,7 +7,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.FunSuite
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.AddressScheme
-import scorex.app.Application
+import scorex.app.{Application, RunnableApplication}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.ConsensusMock
@@ -65,7 +65,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
   implicit val transactionModule = new SimpleTransactionModule(forkParameters)
   val genesisTimestamp = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
+    transactionModule.blockStorage.appendBlock(Block.genesis(RunnableApplication.consensusGenesisBlockData, transactionModule.genesisData, genesisTimestamp))
   }
   assert(!transactionModule.blockStorage.history.isEmpty)
 

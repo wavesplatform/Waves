@@ -1,6 +1,7 @@
 package scorex.lagonaki
 
 import scorex.account.PrivateKeyAccount
+import scorex.app.RunnableApplication
 import scorex.block.Block
 import scorex.transaction.{History, Transaction, TransactionsBlockField}
 import scorex.utils.ScorexLogging
@@ -12,7 +13,7 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
   implicit lazy val transactionModule = application.transactionModule
 
   if (application.transactionModule.blockStorage.history.isEmpty) {
-    application.transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData,transactionModule.genesisData))
+    application.transactionModule.blockStorage.appendBlock(Block.genesis(RunnableApplication.consensusGenesisBlockData,transactionModule.genesisData))
   }
 
   if (application.wallet.privateKeyAccounts().size < 3) {

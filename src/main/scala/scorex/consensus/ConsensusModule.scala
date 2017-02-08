@@ -7,8 +7,6 @@ import scorex.transaction.TransactionModule
 
 trait ConsensusModule {
 
-  def genesisData: NxtLikeConsensusBlockData
-
   def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean
 
   def blockOrdering(implicit transactionModule: TransactionModule): Ordering[(Block)] =
