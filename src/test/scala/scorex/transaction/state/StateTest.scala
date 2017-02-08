@@ -131,7 +131,7 @@ object StateTestSpec extends Commands {
     type Result = (Int, Long)
 
     def run(sut: Sut): Result = sut.synchronized {
-      assert(sut.storedState.isValid(txs, blockTime = txs.map(_.timestamp).max))
+      assert(sut.storedState.allValid(txs, txs.map(_.timestamp).max))
       val block = TestBlock(txs)
       sut.storedState.processBlock(block)
       (sut.storedState.stateHeight, sut.storedState.totalBalance)

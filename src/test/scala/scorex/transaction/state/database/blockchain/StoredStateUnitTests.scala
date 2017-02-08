@@ -117,7 +117,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     val transfers = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
     transfers.foreach(tx => state.isValid(tx, tx.timestamp) shouldBe true)
 
-    state.isValid(transfers, blockTime = transfers.map(_.timestamp).max) shouldBe false
+    state.allValid(transfers, blockTime = transfers.map(_.timestamp).max) shouldBe false
 
     state.applyChanges(Map(testAssetAcc -> (AccState(0L), List())))
   }
@@ -156,7 +156,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val senderAccount = AssetAcc(tx.sender, None)
         val txFee = tx.fee
         state.applyChanges(Map(senderAccount -> (AccState(txFee), List(FeesStateChange(txFee)))))
-        state.isValid(Seq(tx), None, System.currentTimeMillis()) shouldBe false
+        state.allValid(Seq(tx), System.currentTimeMillis()) shouldBe false
       }
     }
   }

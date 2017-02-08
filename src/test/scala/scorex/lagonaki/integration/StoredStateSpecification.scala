@@ -110,7 +110,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val senderBalance = state.balance(acc)
     val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recipient, senderBalance / 2, 1).right.get)
     doubleSpending.foreach(t => state.isValid(t, t.timestamp) shouldBe true)
-    state.isValid(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max) shouldBe false
+    state.allValid(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max) shouldBe false
     state.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max).size shouldBe 1
     state.processBlock(TestBlock(doubleSpending)) should be('failure)
   }

@@ -262,7 +262,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def isValid(tx: Transaction, blockTime: Long): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     val notExpired = (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
-    notExpired && blockStorage.state.isValid(tx, blockTime)
+    notExpired && blockStorage.state.allValid(Seq(tx), blockTime)
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
@@ -279,7 +279,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
       (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
     })
-    notExpiredForAll && blockStorage.state.isValid(txs, None, blockTime)
+    notExpiredForAll && blockStorage.state.allValid(txs, blockTime)
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
@@ -291,8 +291,9 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   override def isValid(block: Block): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-    lazy val txsAreNew = block.transactionDataField.asInstanceOf[TransactionsBlockField].value.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
-    lazy val blockIsValid = blockStorage.state.isValid(block.transactionDataField.asInstanceOf[TransactionsBlockField].value, blockStorage.history.heightOf(block), block.timestampField.value)
+    lazy val txsAreNew = block.transactionData.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
+    assert(blockStorage.history.heightOf(block).isEmpty,"Should not exist, this is new block, right?")
+    lazy val blockIsValid = blockStorage.state.allValid(block.transactionData, block.timestampField.value)
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (!blockIsValid) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs")
     txsAreNew && blockIsValid
@@ -319,7 +320,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
     paymentVal match {
       case Right(payment) => {
-        if (blockStorage.state.isValid(payment, payment.timestamp)) {
+        if (blockStorage.state.allValid(Seq(payment), payment.timestamp)) {
           Right(payment)
         } else Left(ValidationError.NoBalance)
       }
@@ -344,7 +345,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       val txVal = PaymentTransaction.create(senderPubKey, recipientAccount, payment.amount, payment.fee, time, sigBytes)
       txVal match {
         case Right(tx) => {
-          if (blockStorage.state.isValid(tx, tx.timestamp)) {
+          if (blockStorage.state.allValid(Seq(tx), tx.timestamp)) {
             onNewOffchainTransaction(tx)
             Right(tx)
           } else Left(ValidationError.NoBalance)
