@@ -59,7 +59,6 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
       if (currentHeight > rollbackTo) {
         val changes = storage.removeAccountChanges(key, currentHeight)
         changes.reason.foreach(id => {
-          storage.removeTransaction(id)
           storage.getTransaction(id) match {
             case Some(t: AssetIssuance) =>
               assetsExtension.rollbackTo(t.assetId, currentHeight)
@@ -67,6 +66,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
               assetsExtension.rollbackTo(t.assetId, currentHeight)
             case _ =>
           }
+          storage.removeTransaction(id)
         })
         val prevHeight = changes.lastRowHeight
         storage.putLastStates(key, prevHeight)
