@@ -31,7 +31,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("invalidate transaction with forged signature in sequence") {
-    val amount = state.balance(acc) / 1000
+    val amount = state.balance(acc, Int.MaxValue) / 1000
     val ts = System.currentTimeMillis()
     val transactions: Seq[PaymentTransaction] = (1 until 100).map { i =>
       PaymentTransaction.create(acc, recipient, amount, i, ts + i).right.get
@@ -42,7 +42,8 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
       txToForge.amount, txToForge.fee, txToForge.timestamp, forgedSignature).right.get
 
     val transactionsToValidate = transactions :+ forgedTransaction
-    val validTransactions = state.validate(transactionsToValidate, blockTime = transactionsToValidate.map(_.timestamp).max)
+    val timestamp = transactionsToValidate.map(_.timestamp).max
+    val validTransactions = state.validate(transactionsToValidate, timestamp)
 
     validTransactions.count(tx => (tx.id sameElements txToForge.signature) ||
       (tx.id sameElements forgedTransaction.signature)) shouldBe 1
@@ -52,33 +53,33 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
   test("balance confirmations") {
     val rec = new PrivateKeyAccount(randomBytes())
-    val senderBalance = state.balance(acc)
-    state.balance(rec) shouldBe 0L
+    val senderBalance = state.balance(acc, Int.MaxValue)
+    state.balance(rec, Int.MaxValue) shouldBe 0L
     senderBalance should be > 100L
 
     val txs = Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)
     val block = TestBlock(txs)
-    state.processBlock(block)
-    state.balance(rec) shouldBe 5L
+    state.applyBlock(block)
+    state.balance(rec,Int.MaxValue) shouldBe 5L
     state.balanceWithConfirmations(rec, 1) shouldBe 0L
 
-    state.processBlock(TestBlock(Seq()))
-    state.balance(rec) shouldBe 5L
+    state.applyBlock(TestBlock(Seq()))
+    state.balance(rec, Int.MaxValue) shouldBe 5L
     state.balanceWithConfirmations(rec, 1) shouldBe 5L
     state.balanceWithConfirmations(rec, 2) shouldBe 0L
 
     val spendingBlock = TestBlock(Seq(transactionModule.createPayment(rec, acc, 2, 1).right.get))
-    state.processBlock(spendingBlock)
-    state.balance(rec) shouldBe 2L
+    state.applyBlock(spendingBlock)
+    state.balance(rec,Int.MaxValue) shouldBe 2L
     state.balanceWithConfirmations(rec, 1) shouldBe 2L
 
-    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
-    state.balance(rec) shouldBe 7L
+    state.applyBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.balance(rec,Int.MaxValue) shouldBe 7L
     state.balanceWithConfirmations(rec, 3) shouldBe 2L
 
 
-    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
-    state.balance(rec) shouldBe 12L
+    state.applyBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.balance(rec, Int.MaxValue) shouldBe 12L
     state.balanceWithConfirmations(rec, 1) shouldBe 7L
     state.balanceWithConfirmations(rec, 2) shouldBe 2L
     state.balanceWithConfirmations(rec, 4) shouldBe 2L
@@ -88,16 +89,16 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   test("private methods") {
     val testAcc = applicationEmptyAccounts.head
     val applyChanges = PrivateMethod[Unit]('applyChanges)
-    state.balance(testAcc) shouldBe 0
+    state.balance(testAcc, Int.MaxValue) shouldBe 0
     val tx = transactionModule.createPayment(acc, testAcc, 1, 1).right.get
     state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(2L), Seq(FeesStateChange(1L), tx))), NTP.correctedTime())
-    state.balance(testAcc) shouldBe 2
-    state.included(tx).value shouldBe state.stateHeight
+    state.balance(testAcc, Int.MaxValue) shouldBe 2
+    state.included(tx.id).value shouldBe state.stateHeight
     state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(0L), Seq(tx))), NTP.correctedTime())
   }
 
   test("validate single transaction") {
-    val senderBalance = state.balance(acc)
+    val senderBalance = state.balance(acc, Int.MaxValue)
     senderBalance should be > 0L
     val nonValid = transactionModule.createPayment(acc, recipient, senderBalance, 1).right.get
     state.isValid(nonValid, nonValid.timestamp) shouldBe false
@@ -107,16 +108,18 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("double spending") {
-    val senderBalance = state.balance(acc)
+    val senderBalance = state.balance(acc, Int.MaxValue)
     val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recipient, senderBalance / 2, 1).right.get)
     doubleSpending.foreach(t => state.isValid(t, t.timestamp) shouldBe true)
-    state.isValid(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max) shouldBe false
-    state.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max).size shouldBe 1
-    state.processBlock(TestBlock(doubleSpending)) should be('failure)
+
+    val blockTime = doubleSpending.map(_.timestamp).max
+    state.allValid(doubleSpending, blockTime) shouldBe false
+    state.validate(doubleSpending, blockTime).size shouldBe 1
+    state.applyBlock(TestBlock(doubleSpending)) should be('failure)
   }
 
   test("many transactions") {
-    val senderBalance = state.balance(acc)
+    val senderBalance = state.balance(acc, Int.MaxValue)
 
     val recipients = Seq(
       new PrivateKeyAccount(Array(34.toByte, 1.toByte)),
@@ -152,21 +155,21 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   test("included") {
     val incl = includedTransactions(history.lastBlock, history)
     incl.nonEmpty shouldBe true
-    incl.forall(t => state.included(t).isDefined) shouldBe true
+    incl.forall(t => state.included(t.id).isDefined) shouldBe true
 
     val newTx = genValidTransaction()
-    state.included(newTx).isDefined shouldBe false
+    state.included(newTx.id).isDefined shouldBe false
   }
 
   test("last transaction of account one block behind") {
-    val amount = state.balance(acc) / 1000
+    val amount = state.balance(acc, Int.MaxValue) / 1000
     val tx1 = transactionModule.createPayment(acc, recipient, amount, 1).right.get
     state.isValid(tx1, tx1.timestamp) shouldBe true
     val tx2 = transactionModule.createPayment(acc, recipient, amount, 2).right.get
     state.isValid(tx2, tx2.timestamp) shouldBe true
 
     val block = TestBlock(Seq(tx1, tx2))
-    state.processBlock(block)
+    state.applyBlock(block)
 
     val result = state.incrementingTimestampValidator.lastAccountPaymentTransaction(acc)
     result.isDefined shouldBe true
@@ -174,16 +177,16 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("last transaction of account few blocks behind") {
-    val amount = state.balance(acc) / 1000
+    val amount = state.balance(acc, Int.MaxValue) / 1000
     val tx1 = transactionModule.createPayment(acc, recipient, amount, 1).right.get
     val tx2 = transactionModule.createPayment(acc, recipient, amount, 2).right.get
     val block1 = TestBlock(Seq(tx2, tx1))
-    state.processBlock(block1)
+    state.applyBlock(block1)
 
     val tx3 = transactionModule.createPayment(recipient, acc, amount / 2, 3).right.get
     val tx4 = transactionModule.createPayment(recipient, acc, amount / 2, 4).right.get
     val block2 = TestBlock(Seq(tx3, tx4))
-    state.processBlock(block2)
+    state.applyBlock(block2)
 
     val result1 = state.incrementingTimestampValidator.lastAccountPaymentTransaction(acc)
     result1.isDefined shouldBe true
@@ -204,7 +207,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   test("asset distribution initial") {
     val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), application.wallet).get
     val block = TestBlock(Seq(issueAssetTx))
-    state.processBlock(block)
+    state.applyBlock(block)
     val distribution = state.assetDistribution(issueAssetTx.assetId)
     distribution shouldBe Map(acc.address -> 1000000)
   }
@@ -212,12 +215,12 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   test("asset distribution 2") {
     val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "1234", "12345", 1000000, 2, reissuable = false, 100000000), application.wallet).get
     val block = TestBlock(Seq(issueAssetTx))
-    state.processBlock(block)
+    state.applyBlock(block)
 
     val transferRequest = TransferRequest(Some(Base58.encode(issueAssetTx.id)), None, 300000, 100000000, acc.address, "", recipient.address)
     val transferAssetTx = transactionModule.transferAsset(transferRequest, application.wallet).get.right.get
     val block2 = TestBlock(Seq(transferAssetTx))
-    state.processBlock(block2)
+    state.applyBlock(block2)
     val distribution = state.assetDistribution(issueAssetTx.assetId)
     distribution shouldBe Map(acc.address -> 700000, recipient.address -> 300000)
   }

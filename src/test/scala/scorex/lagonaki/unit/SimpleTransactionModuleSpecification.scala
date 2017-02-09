@@ -72,10 +72,10 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
   // account with money
   val walletSeed = Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get
   val privateKeyAccount = Wallet.generateNewAccount(walletSeed, -1)
-  assert(transactionModule.blockStorage.state.balance(privateKeyAccount) > 0L)
+  assert(transactionModule.blockStorage.state.balance(privateKeyAccount, Int.MaxValue) > 0L)
   // account without money
   val noBalanceAccount = Wallet.generateNewAccount(walletSeed, 5)
-  assert(transactionModule.blockStorage.state.balance(noBalanceAccount) == 0L)
+  assert(transactionModule.blockStorage.state.balance(noBalanceAccount,Int.MaxValue) == 0L)
 
 
   test("isValid() checks that tx not too old") {

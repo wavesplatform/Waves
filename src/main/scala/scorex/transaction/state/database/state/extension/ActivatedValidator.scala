@@ -8,7 +8,7 @@ import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 class ActivatedValidator(settings: ChainParameters) extends StateExtension {
 
 
-  override def isValid(tx: Transaction, height: Int): Boolean = tx match {
+  override def isValid(tx: Transaction): Boolean = tx match {
     case tx: PaymentTransaction => true
     case gtx: GenesisTransaction => true
     case tx: TransferTransaction => true

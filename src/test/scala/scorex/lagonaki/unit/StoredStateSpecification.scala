@@ -30,7 +30,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
   val state = StoredState.fromDB(db, ChainParameters.Disabled)
-  state.processBlock(TestBlock(Seq(GenesisTransaction.create(accounts.head, 100000000000L, 0).right.get)))
+  state.applyBlock(TestBlock(Seq(GenesisTransaction.create(accounts.head, 100000000000L, 0).right.get)))
 
   private def createIssueAssetTx(request: IssueRequest, wallet: Wallet): IssueTransaction = {
     val sender = wallet.privateKeyAccount(request.sender).get
@@ -63,7 +63,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
   test("many transfer asset transactions") {
     val acc = accounts.head
-    val startWavesBalance = state.balance(acc)
+    val startWavesBalance = state.balance(acc, Int.MaxValue)
 
     val recipients = Seq(
       new PrivateKeyAccount(Array(34.toByte, 1.toByte)),
@@ -72,24 +72,24 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     val issueAssetTx = createIssueAssetTx(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false,
       100000000), wallet)
-    state.processBlock(TestBlock(Seq(issueAssetTx))) should be('success)
+    state.applyBlock(TestBlock(Seq(issueAssetTx))) should be('success)
     val assetId = Some(Base58.encode(issueAssetTx.assetId))
 
     val txs = recipients.flatMap(r => Seq.fill(10) {
       createTransferAssetTx(TransferRequest(assetId, None, 10, 1, acc.address, "123", r.address), wallet)
     })
 
-    state.processBlock(TestBlock(Random.shuffle(txs))) should be('success)
+    state.applyBlock(TestBlock(Random.shuffle(txs))) should be('success)
 
     recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be(100))
 
     state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
-    state.balance(acc) should be(startWavesBalance - 100000000 - 20)
+    state.balance(acc, Int.MaxValue) should be(startWavesBalance - 100000000 - 20)
 }
 
   test("many transfer waves transactions") {
     val acc = accounts.head
-    val startWavesBalance = state.balance(acc)
+    val startWavesBalance = state.balance(acc, Int.MaxValue)
 
     val recipients = Seq(
       new PrivateKeyAccount(Array(37.toByte, 1.toByte)),
@@ -101,11 +101,11 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
       createTransferAssetTx(TransferRequest(None, None, 10, 1, acc.address, "123", r.address), wallet)
     })
 
-    state.processBlock(TestBlock(Random.shuffle(txs))) should be('success)
+    state.applyBlock(TestBlock(Random.shuffle(txs))) should be('success)
 
     recipients.foreach(r => state.assetBalance(AssetAcc(r, None)) should be(100))
 
-    state.balance(acc) should be(startWavesBalance - 200 - 20)
+    state.balance(acc, Int.MaxValue) should be(startWavesBalance - 200 - 20)
   }
 
   test("issues and many transfer assets with transactions with fee") {
@@ -118,14 +118,14 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     val assetId = wavesTransferForAssets.id
     val assetIdString = Base58.encode(wavesTransferForAssets.id)
-    state.processBlock(TestBlock(Seq(wavesTransferForAssets), new PublicKeyAccount(feeGetter.publicKey))) should be(
+    state.applyBlock(TestBlock(Seq(wavesTransferForAssets), new PublicKeyAccount(feeGetter.publicKey))) should be(
       'success)
 
     val txs = Seq.fill(10) {
       createTransferAssetTx(TransferRequest(Some(assetIdString), Some(assetIdString),
         1000, 1000, sender.address, blahBlahBase58, sender.address), wallet)
     }
-    state.processBlock(TestBlock(txs, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
+    state.applyBlock(TestBlock(txs, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
 
     val senderAssetBalance = state.assetBalance(AssetAcc(new Account(sender.address), Some(assetId)))
     senderAssetBalance shouldBe 10000
@@ -144,7 +144,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     val assetId = wavesTransferForAssets.id
     val assetIdString = Base58.encode(wavesTransferForAssets.id)
-    state.processBlock(TestBlock(Seq(wavesTransferForAssets), new PublicKeyAccount(feeGetter.publicKey))) should be(
+    state.applyBlock(TestBlock(Seq(wavesTransferForAssets), new PublicKeyAccount(feeGetter.publicKey))) should be(
       'success)
 
     val txs = Seq.fill(10) {
@@ -155,7 +155,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
       createTransferAssetTx(TransferRequest(Some(assetIdString), None,
         1000, 1000, sender.address, blahBlahBase58, sender.address), wallet)
     }
-    state.processBlock(TestBlock(txs ++ txs2, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
+    state.applyBlock(TestBlock(txs ++ txs2, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
 
     val senderAssetBalance = state.assetBalance(AssetAcc(new Account(sender.address), Some(assetId)))
     senderAssetBalance shouldBe 10000

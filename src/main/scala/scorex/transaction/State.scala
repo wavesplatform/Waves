@@ -1,24 +1,29 @@
 package scorex.transaction
 
 import scorex.block.Block
-
 import scala.util.Try
+import scala.language.implicitConversions
 
-/**
-  * Abstract functional interface of state which is a result of a sequential blocks applying
-  */
 trait State {
-  private[transaction] def processBlock(block: Block): Try[State]
 
-  def isValid(tx: Transaction, blockTime: Long): Boolean = isValid(Seq(tx), blockTime = blockTime)
+  def validate(txs: Seq[Transaction], blockTime: Long): Seq[Transaction] // Seq[Either[ValidationError,Transaction]]
 
-  def isValid(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Boolean = validate(txs, height, blockTime).size == txs.size
+  def included(signature: Array[Byte]): Option[Int]
 
-  def validate(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Seq[Transaction]
-
-  def included(signature: Array[Byte], heightOpt: Option[Int]): Option[Int]
-
-  def included(tx: Transaction, heightOpt: Option[Int] = None): Option[Int] = included(tx.id, heightOpt)
+  private[transaction] def applyBlock(block: Block): Try[State]
 
   private[transaction] def rollbackTo(height: Int): State
+}
+
+object State {
+  implicit def richState(s: State): RichState = new RichState(s)
+
+  class RichState(s: State) {
+
+    def validateOne(trans: Transaction, blockTime: Long): Option[Transaction] = s.validate(Seq(trans), blockTime).headOption
+
+    def allValid(txs: Seq[Transaction], blockTime: Long): Boolean = s.validate(txs, blockTime).size == txs.size
+
+    def isValid(tx: Transaction, blockTime: Long): Boolean = s.validateOne(tx, blockTime).isDefined
+  }
 }

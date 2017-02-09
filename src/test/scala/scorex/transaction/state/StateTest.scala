@@ -105,14 +105,14 @@ object StateTestSpec extends Commands {
   case class Sut(fileName: String) {
     val db = new MVStore.Builder().fileName(fileName).compress().open()
     val storedState = StoredState.fromDB(db, ChainParameters.Disabled)
-    storedState.processBlock(TestBlock(genesisTxs))
+    storedState.applyBlock(TestBlock(genesisTxs))
   }
 
   case class CheckTransaction(signature: Transaction) extends Command {
     type Result = Option[Int]
 
     def run(sut: Sut): Result = sut.synchronized {
-      sut.storedState.included(signature)
+      sut.storedState.included(signature.id)
     }
 
     def nextState(state: State): State = state
@@ -131,9 +131,9 @@ object StateTestSpec extends Commands {
     type Result = (Int, Long)
 
     def run(sut: Sut): Result = sut.synchronized {
-      assert(sut.storedState.isValid(txs, blockTime = txs.map(_.timestamp).max))
+      assert(sut.storedState.allValid(txs, txs.map(_.timestamp).max))
       val block = TestBlock(txs)
-      sut.storedState.processBlock(block)
+      sut.storedState.applyBlock(block)
       (sut.storedState.stateHeight, sut.storedState.totalBalance)
     }
 
@@ -153,7 +153,8 @@ object StateTestSpec extends Commands {
     type Result = Seq[Transaction]
 
     def run(sut: Sut): Result = sut.synchronized {
-      sut.storedState.validate(txs.map(_._1), blockTime = txs.map(_._1.timestamp).max)
+      val timestamp = txs.map(_._1.timestamp).max
+      sut.storedState.validate(txs.map(_._1), timestamp)
     }
 
     def nextState(state: State): State = state

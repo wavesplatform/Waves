@@ -9,12 +9,9 @@ trait StateStorageI {
 
   def removeTransaction(id: Array[Byte]): Unit
 
-  def included(id: Array[Byte], heightOpt: Option[Int]): Option[Int]
+  def included(id: Array[Byte]): Option[Int]
 
   def getTransactionBytes(id: Array[Byte]): Option[Array[Byte]]
-
-  def getTransaction(id: Array[Byte]): Option[Transaction] = getTransactionBytes(id)
-    .flatMap(b => TypedTransaction.parseBytes(b).toOption)
 
   def getLastStates(a: Address): Option[Int]
 
@@ -26,9 +23,9 @@ trait StateStorageI {
 
   def setStateHeight(height: Int): Unit
 
-  def updateAccountAssets(address: Address, assetId: Option[AssetId]): Unit
+  def updateAccountAssets(address: Address, assetId :AssetId): Unit
 
-  def getAccountAssets(address: Address): Set[String]
+  def accountAssets(address: Address): Set[String]
 
   def getAccountChanges(key: Address, height: Int): Option[Row]
 
@@ -36,5 +33,17 @@ trait StateStorageI {
 
   def removeAccountChanges(key: Address, height: Int): Row
 
-  def assetDistribution(assetId: Array[Byte]): Map[String, Long]
+  def accountAssets(): Map[String, Set[String]]
+}
+
+object StateStorageI {
+
+  implicit def richStateStorageI(s: StateStorageI) = new RichStateStorageI(s)
+
+  class RichStateStorageI(s: StateStorageI) {
+
+    def getTransaction(id: Array[Byte]): Option[Transaction] = s.getTransactionBytes(id)
+      .flatMap(b => TypedTransaction.parseBytes(b).toOption)
+  }
+
 }

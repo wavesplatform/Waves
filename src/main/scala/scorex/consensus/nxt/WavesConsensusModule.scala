@@ -122,7 +122,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
       val gs = calcGeneratorSignature(lastBlockKernelData, account)
       val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
-      val unconfirmed = tm.packUnconfirmed(Some(height))
+      val unconfirmed = tm.packUnconfirmed()
       log.debug(s"Build block with ${unconfirmed.asInstanceOf[Seq[Transaction]].size} transactions")
       log.debug(s"Block time interval is $eta seconds ")
 

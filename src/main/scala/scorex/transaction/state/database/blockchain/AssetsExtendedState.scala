@@ -14,7 +14,7 @@ import scala.util.{Failure, Success}
 class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorageI) extends ScorexLogging
   with StateExtension {
 
-  override def isValid(tx: Transaction, height: Int): Boolean = tx match {
+  override def isValid(tx: Transaction): Boolean = tx match {
     case tx: ReissueTransaction =>
       val reissueValid: Boolean = {
         val sameSender = isIssuerAddress(tx.assetId, tx.sender.address)

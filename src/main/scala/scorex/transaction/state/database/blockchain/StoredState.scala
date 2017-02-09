@@ -26,21 +26,21 @@ import scala.util.control.NonFatal
   *
   * Use fromDB method of StoredState object to create new instance
   */
-class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
+class StoredState(protected val storage: StateStorageI,
                   val assetsExtension: AssetsExtendedState,
                   val incrementingTimestampValidator: IncrementingTimestampValidator,
                   val validators: Seq[StateExtension],
                   settings: ChainParameters) extends LagonakiState with ScorexLogging {
 
-  override def included(id: Array[Byte], heightOpt: Option[Int]): Option[Int] = storage.included(id, heightOpt)
+  override def included(id: Array[Byte]): Option[Int] = storage.included(id)
 
   def stateHeight: Int = storage.stateHeight
 
   def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = {
     val address = account.address
-    storage.getAccountAssets(address).foldLeft(Map.empty[AssetId, (Long, Boolean, Long, IssueTransaction)]) { (result, asset) =>
+    storage.accountAssets(address).foldLeft(Map.empty[AssetId, (Long, Boolean, Long, IssueTransaction)]) { (result, asset) =>
       val triedAssetId = Base58.decode(asset)
-      val balance = balanceByKey(address + asset)
+      val balance = currentBalanceByKey(address + asset)
 
       if (triedAssetId.isSuccess) {
         val assetId = triedAssetId.get
@@ -53,10 +53,10 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
-  def rollbackTo(rollbackTo: Int): State = synchronized {
+  def rollbackTo(height: Int): State = synchronized {
     def deleteNewer(key: Address): Unit = {
       val currentHeight = storage.getLastStates(key).getOrElse(0)
-      if (currentHeight > rollbackTo) {
+      if (currentHeight > height) {
         val changes = storage.removeAccountChanges(key, currentHeight)
         changes.reason.foreach(id => {
           storage.getTransaction(id) match {
@@ -77,16 +77,20 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     storage.lastStatesKeys.foreach { key =>
       deleteNewer(key)
     }
-    storage.setStateHeight(rollbackTo)
+    storage.setStateHeight(height)
     this
   }
 
-  override def processBlock(block: Block): Try[State] = Try {
-    val trans = block.transactionDataField.asInstanceOf[TransactionsBlockField].value
-    val fees: Map[AssetAcc, (AccState, Reasons)] = Block.feesDistribution(block)
-      .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2), List(FeesStateChange(m._2))))
+  override def applyBlock(block: Block): Try[State] = Try {
+    val fees: Map[AssetAcc, (AccState, List[FeesStateChange])] =
+      block.transactionData
+        .map(_.assetFee)
+        .map(a => AssetAcc(block.signerData.generator, a._1) -> a._2)
+        .groupBy(a => a._1)
+        .mapValues(_.map(_._2).sum)
+        .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2), List(FeesStateChange(m._2))))
 
-    val newBalances: Map[AssetAcc, (AccState, Reasons)] = calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil)
+    val newBalances: Map[AssetAcc, (AccState, Reasons)] = calcNewBalances(block.transactionData, fees, block.timestamp < settings.allowTemporaryNegativeUntil)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
     applyChanges(newBalances, block.timestampField.value)
@@ -95,18 +99,18 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     this
   }
 
-  override def balance(account: Account, atHeight: Option[Int] = None): Long =
-    assetBalance(AssetAcc(account, None), atHeight)
+  override def balance(account: Account, atHeight: Int): Long =
+    balanceByKeyAtHeight(AssetAcc(account, None).key, atHeight)
 
-  def assetBalance(account: AssetAcc, atHeight: Option[Int] = None): Long = {
-    balanceByKey(account.key, atHeight)
+  def assetBalance(account: AssetAcc): Long = {
+    currentBalanceByKey(account.key)
   }
 
   override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
-    balance(account, Some(Math.max(1, heightOpt.getOrElse(storage.stateHeight) - confirmations)))
+    balance(account, Math.max(1, heightOpt.getOrElse(storage.stateHeight) - confirmations))
 
   override def accountTransactions(account: Account, limit: Int = DefaultLimit): Seq[Transaction] = {
-    val accountAssets = storage.getAccountAssets(account.address)
+    val accountAssets = storage.accountAssets(account.address)
     val keys = account.address :: accountAssets.map(account.address + _).toList
 
     def getTxSize(m: SortedMap[Int, Set[Transaction]]) = m.foldLeft(0)((size, txs) => size + txs._2.size)
@@ -132,6 +136,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
               case _ => acc
             }
           }
+
           loop(accHeight, result)
         case _ => result
       }
@@ -139,13 +144,9 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }.values.flatten.toList.sortWith(_.timestamp > _.timestamp).take(limit)
   }
 
-  /**
-    * Returns sequence of valid transactions
-    */
-  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
-    val height = heightOpt.getOrElse(storage.stateHeight)
+  def validate(trans: Seq[Transaction], blockTime: Long): Seq[Transaction] = {
 
-    val txs = trans.filter(t => isValid(t, height))
+    val txs = trans.filter(t => isTValid(t))
 
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
     val validTransactions = if (allowInvalidPaymentTransactionsByTimestamp) {
@@ -234,12 +235,11 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
           validators.foreach(_.process(tx, blockTs, h))
         case _ =>
       }
-      storage.updateAccountAssets(ch._1.account.address, ch._1.assetId)
+      ch._1.assetId.foreach(storage.updateAccountAssets(ch._1.account.address, _))
     }
   }
 
-  private[blockchain] def filterValidTransactions(trans: Seq[Transaction]):
-  Seq[Transaction] = {
+  private[blockchain] def filterValidTransactions(trans: Seq[Transaction]): Seq[Transaction] = {
     trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Transaction])) {
       case ((currentState, validTxs), tx) =>
         try {
@@ -263,17 +263,18 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }._2
   }
 
-  private def balanceByKey(key: String, atHeight: Option[Int] = None): Long = {
+  private def currentBalanceByKey(key: String): Long = balanceByKeyAtHeight(key, storage.stateHeight)
+
+  private def balanceByKeyAtHeight(key: String, atHeight: Int): Long = {
     storage.getLastStates(key) match {
       case Some(h) if h > 0 =>
-        val requiredHeight = atHeight.getOrElse(storage.stateHeight)
-        require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
+        require(atHeight >= 0, s"Height should not be negative, $atHeight given")
 
         def loop(hh: Int, min: Long = Long.MaxValue): Long = {
           val rowOpt = storage.getAccountChanges(key, hh)
           require(rowOpt.isDefined, s"accountChanges($key).get($hh) is null. lastStates.get(address)=$h")
           val row = rowOpt.get
-          if (hh <= requiredHeight) Math.min(row.state.balance, min)
+          if (hh <= atHeight) Math.min(row.state.balance, min)
           else if (row.lastRowHeight == 0) 0L
           else loop(row.lastRowHeight, Math.min(row.state.balance, min))
         }
@@ -297,8 +298,8 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
-  private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = {
-    validators.forall(_.isValid(transaction, height))
+  private[blockchain] def isTValid(transaction: Transaction): Boolean = {
+    validators.forall(_.isValid(transaction))
   }
 
 
@@ -307,11 +308,14 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
 
 
   //for debugging purposes only
-  def totalBalance: Long = storage.lastStatesKeys.map(address => balanceByKey(address)).sum
+  def totalBalance: Long = storage.lastStatesKeys.map(address => currentBalanceByKey(address)).sum
 
   //for debugging purposes only
-  def toJson(heightOpt: Option[Int] = None): JsObject = {
-    val ls = storage.lastStatesKeys.map(add => add -> balanceByKey(add, heightOpt))
+  def toJson(heightOpt: Option[Int]): JsObject = {
+    val ls = storage.lastStatesKeys.map(add => add -> (heightOpt match {
+      case Some(h) => balanceByKeyAtHeight(add, h);
+      case None => currentBalanceByKey(add)
+    }))
       .filter(b => b._2 != 0).sortBy(_._1)
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
@@ -341,10 +345,20 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
-  def assetDistribution(assetId: Array[Byte]): Map[String, Long] = storage.assetDistribution(assetId)
+  def assetDistribution(assetId: Array[Byte]): Map[String, Long] = {
+    val encodedAssetId = Base58.encode(assetId)
+    storage.accountAssets()
+      .filter(e => e._2.contains(encodedAssetId))
+      .map(e => {
+        val assetAcc: AssetAcc = AssetAcc(new Account(e._1), Some(assetId))
+        val key = assetAcc.key
+        val balance = storage.getAccountChanges(key, storage.getLastStates(key).get).get.state.balance
+        (e._1, balance)
+      })
+  }
 
   //for debugging purposes only
-  override def toString: String = toJson().toString()
+  override def toString: String = toJson(None).toString()
 
   //for debugging purposes only
   def hash: Int = {

@@ -22,7 +22,7 @@ trait BlockStorage extends ScorexLogging {
     //TODO Rollback state for blocktree
     history.appendBlock(block).map { blocks =>
       blocks foreach { b =>
-        state.processBlock(b) match {
+        state.applyBlock(b) match {
           case Failure(e) =>
             log.error("Failed to apply block to state", e)
             db.rollback()

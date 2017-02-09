@@ -4,7 +4,7 @@ import scorex.account.Account
 
 
 trait BalanceSheet {
-  def balance(account: Account, height: Option[Int] = None): Long
+  def balance(account: Account, height: Int): Long
 
   /**
    *

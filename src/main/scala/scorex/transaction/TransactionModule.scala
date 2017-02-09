@@ -18,7 +18,7 @@ trait TransactionModule {
 
   def putUnconfirmedIfNew(tx: Transaction): Boolean
 
-  def packUnconfirmed(heightOpt: Option[Int] = None): Seq[Transaction]
+  def packUnconfirmed(): Seq[Transaction]
 
   def clearFromUnconfirmed(data: Seq[Transaction]): Unit
 
