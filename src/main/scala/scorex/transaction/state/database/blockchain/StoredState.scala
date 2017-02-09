@@ -96,10 +96,10 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   }
 
   override def balance(account: Account, atHeight: Int): Long =
-    assetBalance(AssetAcc(account, None), Some(atHeight))
+    balanceByKey(AssetAcc(account, None).key, Some(atHeight))
 
-  def assetBalance(account: AssetAcc, atHeight: Option[Int] = None): Long = {
-    balanceByKey(account.key, atHeight)
+  def assetBalance(account: AssetAcc): Long = {
+    balanceByKey(account.key, None)
   }
 
   override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
