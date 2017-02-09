@@ -40,7 +40,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     val address = account.address
     storage.getAccountAssets(address).foldLeft(Map.empty[AssetId, (Long, Boolean, Long, IssueTransaction)]) { (result, asset) =>
       val triedAssetId = Base58.decode(asset)
-      val balance = balanceByKey(address + asset)
+      val balance = currentBalanceByKey(address + asset)
 
       if (triedAssetId.isSuccess) {
         val assetId = triedAssetId.get
@@ -96,10 +96,10 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   }
 
   override def balance(account: Account, atHeight: Int): Long =
-    balanceByKey(AssetAcc(account, None).key, Some(atHeight))
+    balanceByKeyAtHeight(AssetAcc(account, None).key, atHeight)
 
   def assetBalance(account: AssetAcc): Long = {
-    balanceByKey(account.key, None)
+    currentBalanceByKey(account.key)
   }
 
   override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
@@ -259,17 +259,17 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }._2
   }
 
-  private def balanceByKey(key: String, atHeight: Option[Int] = None): Long = {
+  private def currentBalanceByKey(key: String): Long = balanceByKeyAtHeight(key, storage.stateHeight)
+
+  private def balanceByKeyAtHeight(key: String, atHeight: Int) : Long = {
     storage.getLastStates(key) match {
       case Some(h) if h > 0 =>
-        val requiredHeight = atHeight.getOrElse(storage.stateHeight)
-        require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
-
+        require(atHeight >= 0, s"Height should not be negative, $atHeight given")
         def loop(hh: Int, min: Long = Long.MaxValue): Long = {
           val rowOpt = storage.getAccountChanges(key, hh)
           require(rowOpt.isDefined, s"accountChanges($key).get($hh) is null. lastStates.get(address)=$h")
           val row = rowOpt.get
-          if (hh <= requiredHeight) Math.min(row.state.balance, min)
+          if (hh <= atHeight) Math.min(row.state.balance, min)
           else if (row.lastRowHeight == 0) 0L
           else loop(row.lastRowHeight, Math.min(row.state.balance, min))
         }
@@ -303,11 +303,11 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
 
 
   //for debugging purposes only
-  def totalBalance: Long = storage.lastStatesKeys.map(address => balanceByKey(address)).sum
+  def totalBalance: Long = storage.lastStatesKeys.map(address => currentBalanceByKey(address)).sum
 
   //for debugging purposes only
-  def toJson(heightOpt: Option[Int] = None): JsObject = {
-    val ls = storage.lastStatesKeys.map(add => add -> balanceByKey(add, heightOpt))
+  def toJson(heightOpt: Option[Int]): JsObject = {
+    val ls = storage.lastStatesKeys.map(add => add -> (heightOpt match { case Some(h) => balanceByKeyAtHeight(add, h); case None => currentBalanceByKey(add) }))
       .filter(b => b._2 != 0).sortBy(_._1)
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
@@ -340,7 +340,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   def assetDistribution(assetId: Array[Byte]): Map[String, Long] = storage.assetDistribution(assetId)
 
   //for debugging purposes only
-  override def toString: String = toJson().toString()
+  override def toString: String = toJson(None).toString()
 
   //for debugging purposes only
   def hash: Int = {
