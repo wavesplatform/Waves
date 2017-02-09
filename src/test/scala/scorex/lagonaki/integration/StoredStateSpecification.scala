@@ -59,26 +59,26 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
     val txs = Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)
     val block = TestBlock(txs)
-    state.processBlock(block)
+    state.applyBlock(block)
     state.balance(rec,Int.MaxValue) shouldBe 5L
     state.balanceWithConfirmations(rec, 1) shouldBe 0L
 
-    state.processBlock(TestBlock(Seq()))
+    state.applyBlock(TestBlock(Seq()))
     state.balance(rec, Int.MaxValue) shouldBe 5L
     state.balanceWithConfirmations(rec, 1) shouldBe 5L
     state.balanceWithConfirmations(rec, 2) shouldBe 0L
 
     val spendingBlock = TestBlock(Seq(transactionModule.createPayment(rec, acc, 2, 1).right.get))
-    state.processBlock(spendingBlock)
+    state.applyBlock(spendingBlock)
     state.balance(rec,Int.MaxValue) shouldBe 2L
     state.balanceWithConfirmations(rec, 1) shouldBe 2L
 
-    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.applyBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
     state.balance(rec,Int.MaxValue) shouldBe 7L
     state.balanceWithConfirmations(rec, 3) shouldBe 2L
 
 
-    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.applyBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
     state.balance(rec, Int.MaxValue) shouldBe 12L
     state.balanceWithConfirmations(rec, 1) shouldBe 7L
     state.balanceWithConfirmations(rec, 2) shouldBe 2L
@@ -115,7 +115,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val blockTime = doubleSpending.map(_.timestamp).max
     state.allValid(doubleSpending, blockTime) shouldBe false
     state.validate(doubleSpending, blockTime).size shouldBe 1
-    state.processBlock(TestBlock(doubleSpending)) should be('failure)
+    state.applyBlock(TestBlock(doubleSpending)) should be('failure)
   }
 
   test("many transactions") {
@@ -169,7 +169,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     state.isValid(tx2, tx2.timestamp) shouldBe true
 
     val block = TestBlock(Seq(tx1, tx2))
-    state.processBlock(block)
+    state.applyBlock(block)
 
     val result = state.incrementingTimestampValidator.lastAccountPaymentTransaction(acc)
     result.isDefined shouldBe true
@@ -181,12 +181,12 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val tx1 = transactionModule.createPayment(acc, recipient, amount, 1).right.get
     val tx2 = transactionModule.createPayment(acc, recipient, amount, 2).right.get
     val block1 = TestBlock(Seq(tx2, tx1))
-    state.processBlock(block1)
+    state.applyBlock(block1)
 
     val tx3 = transactionModule.createPayment(recipient, acc, amount / 2, 3).right.get
     val tx4 = transactionModule.createPayment(recipient, acc, amount / 2, 4).right.get
     val block2 = TestBlock(Seq(tx3, tx4))
-    state.processBlock(block2)
+    state.applyBlock(block2)
 
     val result1 = state.incrementingTimestampValidator.lastAccountPaymentTransaction(acc)
     result1.isDefined shouldBe true
@@ -207,7 +207,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   test("asset distribution initial") {
     val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false, 100000000), application.wallet).get
     val block = TestBlock(Seq(issueAssetTx))
-    state.processBlock(block)
+    state.applyBlock(block)
     val distribution = state.assetDistribution(issueAssetTx.assetId)
     distribution shouldBe Map(acc.address -> 1000000)
   }
@@ -215,12 +215,12 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   test("asset distribution 2") {
     val issueAssetTx = transactionModule.issueAsset(IssueRequest(acc.address, "1234", "12345", 1000000, 2, reissuable = false, 100000000), application.wallet).get
     val block = TestBlock(Seq(issueAssetTx))
-    state.processBlock(block)
+    state.applyBlock(block)
 
     val transferRequest = TransferRequest(Some(Base58.encode(issueAssetTx.id)), None, 300000, 100000000, acc.address, "", recipient.address)
     val transferAssetTx = transactionModule.transferAsset(transferRequest, application.wallet).get.right.get
     val block2 = TestBlock(Seq(transferAssetTx))
-    state.processBlock(block2)
+    state.applyBlock(block2)
     val distribution = state.assetDistribution(issueAssetTx.assetId)
     distribution shouldBe Map(acc.address -> 700000, recipient.address -> 300000)
   }

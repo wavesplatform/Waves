@@ -81,7 +81,7 @@ class StoredState(protected val storage: StateStorageI,
     this
   }
 
-  override def processBlock(block: Block): Try[State] = Try {
+  override def applyBlock(block: Block): Try[State] = Try {
     val fees: Map[AssetAcc, (AccState, List[FeesStateChange])] =
       block.transactionData
         .map(_.assetFee)

@@ -105,7 +105,7 @@ object StateTestSpec extends Commands {
   case class Sut(fileName: String) {
     val db = new MVStore.Builder().fileName(fileName).compress().open()
     val storedState = StoredState.fromDB(db, ChainParameters.Disabled)
-    storedState.processBlock(TestBlock(genesisTxs))
+    storedState.applyBlock(TestBlock(genesisTxs))
   }
 
   case class CheckTransaction(signature: Transaction) extends Command {
@@ -133,7 +133,7 @@ object StateTestSpec extends Commands {
     def run(sut: Sut): Result = sut.synchronized {
       assert(sut.storedState.allValid(txs, txs.map(_.timestamp).max))
       val block = TestBlock(txs)
-      sut.storedState.processBlock(block)
+      sut.storedState.applyBlock(block)
       (sut.storedState.stateHeight, sut.storedState.totalBalance)
     }
 

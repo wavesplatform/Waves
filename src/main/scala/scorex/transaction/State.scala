@@ -10,7 +10,7 @@ trait State {
 
   def included(signature: Array[Byte]): Option[Int]
 
-  private[transaction] def processBlock(block: Block): Try[State]
+  private[transaction] def applyBlock(block: Block): Try[State]
 
   private[transaction] def rollbackTo(height: Int): State
 }

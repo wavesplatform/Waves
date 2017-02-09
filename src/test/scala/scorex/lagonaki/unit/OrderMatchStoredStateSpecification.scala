@@ -30,7 +30,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
   val db = new MVStore.Builder().fileName(stateFile.toString).compress().open()
   val state = StoredState.fromDB(db, ChainParameters.Enabled)
-  state.processBlock(TestBlock(Seq(GenesisTransaction.create(acc1, 1000 * WAVES_UNITS, 0).right.get,
+  state.applyBlock(TestBlock(Seq(GenesisTransaction.create(acc1, 1000 * WAVES_UNITS, 0).right.get,
     GenesisTransaction.create(acc2, 100 * WAVES_UNITS, 0).right.get)))
 
   override protected def afterAll(): Unit = {
@@ -95,7 +95,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   def addInitialAssets(acc: PrivateKeyAccount, assetName: String, amount: Long): Option[AssetId] = {
     val issueAssetTx = issueAsset(IssueRequest(acc.address, Base58.encode(assetName.getBytes),
       Base58.encode(assetName.getBytes), amount * WAVES_UNITS, 2, reissuable = false, 1 * WAVES_UNITS), wallet)
-    state.processBlock(TestBlock(Seq(issueAssetTx))) should be('success)
+    state.applyBlock(TestBlock(Seq(issueAssetTx))) should be('success)
     Some(issueAssetTx.assetId)
   }
 
@@ -151,7 +151,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val om1 = createExchangeTransaction(buy1, sell1, price, 5 * WAVES_UNITS, buy1Fee, sell1.matcherFee, matcherTxFee)
 
     state.isValid(om1, om1.timestamp) should be(true)
-    state.processBlock(TestBlock(Seq(om1))) should be('success)
+    state.applyBlock(TestBlock(Seq(om1))) should be('success)
 
     //buyAcc buy1
     val (om1buyW, om1buy1, om1buy2) = getBalances(buyAcc, pair)
@@ -178,7 +178,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val notEnoughBalOm = createExchangeTransaction(buy2, sell3, price, om1buy1 + 1, matcherTxFee)
 
     state.isValid(notEnoughBalOm, notEnoughBalOm.timestamp) should be(false)
-    state.processBlock(TestBlock(Seq(notEnoughBalOm))) should be('failure)
+    state.applyBlock(TestBlock(Seq(notEnoughBalOm))) should be('failure)
 
     val sell4 = Order
       .sell(sellAcc, matcher, pair, price, 5 * Order.PriceConstant, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * WAVES_UNITS)
@@ -186,7 +186,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
       sell4.matcherFee, matcherTxFee)
 
     state.isValid(om2, om2.timestamp) should be(true)
-    state.processBlock(TestBlock(Seq(om2))) should be('success)
+    state.applyBlock(TestBlock(Seq(om2))) should be('success)
 
     //buyAcc buy1 - executed om2
     val (om2buyW, om2buy1, om2buy2) = getBalances(buyAcc, pair)
@@ -225,9 +225,9 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
     state.isValid(spendTx, spendTx.timestamp) should be(true)
     state.isValid(validOm, validOm.timestamp) should be(true)
-    state.processBlock(TestBlock(Seq(spendTx, validOm))) should be('failure)
+    state.applyBlock(TestBlock(Seq(spendTx, validOm))) should be('failure)
 
-    state.processBlock(TestBlock(Seq(spendTx))) should be('success)
+    state.applyBlock(TestBlock(Seq(spendTx))) should be('success)
     state.isValid(validOm, validOm.timestamp) should be(false)
 
   }
@@ -253,7 +253,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
       if (i < 11) {
         withCheckBalances(pair, buyAcc, sellAcc, om) {
           state.isValid(om, om.timestamp) should be(true)
-          state.processBlock(TestBlock(Seq(om))) should be('success)
+          state.applyBlock(TestBlock(Seq(om))) should be('success)
         }
       } else state.isValid(om, om.timestamp) should be(false)
     }
