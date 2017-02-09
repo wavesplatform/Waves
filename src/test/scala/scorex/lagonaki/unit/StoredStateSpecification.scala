@@ -63,7 +63,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
   test("many transfer asset transactions") {
     val acc = accounts.head
-    val startWavesBalance = state.balance(acc)
+    val startWavesBalance = state.balance(acc, Int.MaxValue)
 
     val recipients = Seq(
       new PrivateKeyAccount(Array(34.toByte, 1.toByte)),
@@ -84,12 +84,12 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
     recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be(100))
 
     state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
-    state.balance(acc) should be(startWavesBalance - 100000000 - 20)
+    state.balance(acc, Int.MaxValue) should be(startWavesBalance - 100000000 - 20)
 }
 
   test("many transfer waves transactions") {
     val acc = accounts.head
-    val startWavesBalance = state.balance(acc)
+    val startWavesBalance = state.balance(acc, Int.MaxValue)
 
     val recipients = Seq(
       new PrivateKeyAccount(Array(37.toByte, 1.toByte)),
@@ -105,7 +105,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     recipients.foreach(r => state.assetBalance(AssetAcc(r, None)) should be(100))
 
-    state.balance(acc) should be(startWavesBalance - 200 - 20)
+    state.balance(acc, Int.MaxValue) should be(startWavesBalance - 200 - 20)
   }
 
   test("issues and many transfer assets with transactions with fee") {
