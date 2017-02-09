@@ -9,10 +9,10 @@ import scorex.transaction.TypedTransaction.{KeyLength, SignatureLength}
 package object formats {
   implicit val AccountFormat: Format[Account] = Format(
     (json: JsValue) => json.validate[String] flatMap { address =>
-      if (address.length == 35) {
+      if (Account.isValidAddress(address)) {
         JsSuccess(new Account(address))
       } else {
-        JsError(s"Invalid length of address '$address': ${address.length} != 35")
+        JsError(s"Invalid address '$address'")
       }
     },
     (a: Account) => JsString(a.address)
