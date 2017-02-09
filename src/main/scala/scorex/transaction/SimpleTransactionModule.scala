@@ -70,7 +70,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     clearIncorrectTransactions()
 
     val txs = utxStorage.all().sorted(TransactionsOrdering).take(MaxTransactionsPerBlock)
-    val valid =txs.flatMap(tx => blockStorage.state.validateOne(tx, NTP.correctedTime()))
+    val valid = blockStorage.state.validate(txs, NTP.correctedTime())
 
     if (valid.size != txs.size) {
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
@@ -96,7 +96,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val txs = utxStorage.all()
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeForUnconfirmed }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeDrift }
-    val valid = notFromFuture.flatMap(nff => blockStorage.state.validateOne(nff, currentTime))
+    val valid = blockStorage.state.validate(notFromFuture, currentTime)
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
   }

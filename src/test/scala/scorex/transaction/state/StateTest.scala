@@ -154,7 +154,7 @@ object StateTestSpec extends Commands {
 
     def run(sut: Sut): Result = sut.synchronized {
       val timestamp = txs.map(_._1.timestamp).max
-      txs.map(_._1).flatMap(t => sut.storedState.validateOne(t, timestamp))
+      sut.storedState.validate(txs.map(_._1), timestamp)
     }
 
     def nextState(state: State): State = state

@@ -26,6 +26,4 @@ object State {
 
     def isValid(tx: Transaction, blockTime: Long): Boolean = s.validateOne(tx, blockTime).isDefined
   }
-
-
 }
