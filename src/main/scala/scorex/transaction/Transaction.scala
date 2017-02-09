@@ -25,6 +25,4 @@ trait Transaction extends StateChangeReason with JsonSerializable {
 }
 
 case class BalanceChange(assetAcc: AssetAcc, delta: Long)
-case class EffectiveBalanceChange(account: Account, delta: Long) {
-  def reverse: EffectiveBalanceChange = EffectiveBalanceChange(account, -delta)
-}
+case class EffectiveBalanceChange(account: Account, amount: Long)

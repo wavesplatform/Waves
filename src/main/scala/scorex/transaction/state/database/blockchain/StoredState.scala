@@ -9,6 +9,7 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets._
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.extension._
 import scorex.transaction.state.database.state.storage._
@@ -26,7 +27,7 @@ import scala.util.control.NonFatal
   *
   * Use fromDB method of StoredState object to create new instance
   */
-class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
+class StoredState(protected[blockchain] val storage: StateStorageI with OrderMatchStorageI,
                   val leaseExtendedState: LeaseExtendedState,
                   val assetsExtension: AssetsExtendedState,
                   val incrementingTimestampValidator: IncrementingTimestampValidator,
@@ -64,14 +65,18 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
       if (currentHeight > rollbackTo) {
         val changes = storage.removeAccountChanges(key, currentHeight)
         changes.reason.foreach(id => {
-          storage.removeTransaction(id)
           storage.getTransaction(id) match {
             case Some(t: AssetIssuance) =>
               assetsExtension.rollbackTo(t.assetId, currentHeight)
             case Some(t: BurnTransaction) =>
               assetsExtension.rollbackTo(t.assetId, currentHeight)
+            case Some(t: LeaseTransaction) =>
+              leaseExtendedState.cancelLease(t)
+            case Some(t: LeaseCancelTransaction) =>
+              leaseExtendedState.cancelLeaseCancel(t)
             case _ =>
           }
+          storage.removeTransaction(id)
         })
         val prevHeight = changes.lastRowHeight
         storage.putLastStates(key, prevHeight)
@@ -203,27 +208,27 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
 
               val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc), effectiveBalance(bc.assetAcc.account)), List.empty))
               val newBalance = safeSum(currentChange._1.balance, bc.delta)
-              val newEffectiveBalance = safeSum(currentChange._1.balance, bc.delta)
-              if (tx.timestamp < settings.allowTemporaryNegativeUntil || (newBalance >= 0 && newEffectiveBalance >= 0)) {
-                iChanges.updated(bc.assetAcc, (AccState(newBalance, newEffectiveBalance), tx.id +: currentChange._2))
+              if (tx.timestamp < settings.allowTemporaryNegativeUntil || newBalance >= 0) {
+                iChanges.updated(bc.assetAcc, (AccState(newBalance, currentChange._1.effectiveBalance), tx.id +: currentChange._2))
               } else {
-                throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}, effective balance: ${currentChange._1.effectiveBalance} + ${bc.delta} = ${currentChange._1.effectiveBalance + bc.delta}")
+                throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
               }
             }
 
             val newStateAfterEffectiveBalanceChanges = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(newStateAfterBalanceUpdates) {     case (iChanges, bc) =>
               //update effective balances sheet
               val currentChange = iChanges.getOrElse(AssetAcc(bc.account, None), (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
-              val newEffectiveBalance = safeSum(currentChange._1.balance, bc.delta)
+              val newEffectiveBalance = safeSum(currentChange._1.effectiveBalance, bc.amount)
               if (tx.timestamp < settings.allowTemporaryNegativeUntil || newEffectiveBalance >= 0) {
-                iChanges.updated(AssetAcc(bc.account, None), (AccState(currentChange._1.balance, newEffectiveBalance), tx.id +: currentChange._2))
+                iChanges.updated(AssetAcc(bc.account, None), (AccState(currentChange._1.balance, newEffectiveBalance), currentChange._2))
               } else {
-                throw new Error(s"Transaction leads to negative effective balance: ${currentChange._1.effectiveBalance} + ${bc.delta} = ${currentChange._1.effectiveBalance + bc.delta}")
+                throw new Error(s"Transaction leads to negative effective balance: ${currentChange._1.effectiveBalance} + ${bc.amount} = ${currentChange._1.effectiveBalance + bc.amount}")
               }
             }
             (newStateAfterEffectiveBalanceChanges, seq :+ tx)
           } catch {
             case NonFatal(e) =>
+              log.debug(e.getMessage)
               (currentState, seq)
           }
       }
@@ -247,16 +252,10 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
           Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
         }
 
-        val newEffectiveBalance = if (currentChange._1.effectiveBalance == Long.MinValue) {
-          Long.MinValue
+        if (allowTemporaryNegative || newBalance >= 0) {
+          iChanges.updated(bc.assetAcc, (AccState(newBalance, currentChange._1.effectiveBalance), tx +: currentChange._2))
         } else {
-          Try(Math.addExact(currentChange._1.effectiveBalance, bc.delta)).getOrElse(Long.MinValue)
-        }
-
-        if (allowTemporaryNegative || (newBalance >= 0 && newEffectiveBalance >= 0)) {
-          iChanges.updated(bc.assetAcc, (AccState(newBalance, newEffectiveBalance), tx +: currentChange._2))
-        } else {
-          throw new Error(s"Transaction leads to negative balance ($newBalance, $newEffectiveBalance): ${tx.json}")
+          throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
         }
       }
 
@@ -266,12 +265,12 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
         val newEffectiveBalance = if (currentChange._1.effectiveBalance == Long.MinValue) {
           Long.MinValue
         } else {
-          Try(Math.addExact(currentChange._1.effectiveBalance, bc.delta)).getOrElse(Long.MinValue)
+          Try(Math.addExact(currentChange._1.effectiveBalance, bc.amount)).getOrElse(Long.MinValue)
         }
         if (allowTemporaryNegative || newEffectiveBalance >= 0) {
-          iChanges.updated(AssetAcc(bc.account, None), (AccState(currentChange._1.balance, newEffectiveBalance), tx +: currentChange._2))
+          iChanges.updated(AssetAcc(bc.account, None), (AccState(currentChange._1.balance, newEffectiveBalance), currentChange._2))
         } else {
-          throw new Error(s"Transaction leads to negative effective balance: ${currentChange._1.effectiveBalance} + ${bc.delta} = ${currentChange._1.effectiveBalance + bc.delta}")
+          throw new Error(s"Transaction leads to negative effective balance: ${currentChange._1.effectiveBalance} + ${bc.amount} = ${currentChange._1.effectiveBalance + bc.amount}")
         }
       }
       newStateAfterEffectiveBalanceChanges
@@ -302,7 +301,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Transaction])) {
       case ((currentState, validTxs), tx) =>
         try {
-          val newState = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
+          val stateAfterBalanceUpdates = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
             //update balances sheet
             val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc), effectiveBalance(bc.assetAcc.account)), List.empty))
 
@@ -312,20 +311,29 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
               Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
             }
 
-            val newEffectiveBalance = if (currentChange._1.effectiveBalance == Long.MinValue) {
-              Long.MinValue
-            } else {
-              Try(Math.addExact(currentChange._1.effectiveBalance, bc.delta)).getOrElse(Long.MinValue)
-            }
-
-            if (tx.timestamp >= settings.allowTemporaryNegativeUntil || (newBalance < 0 && newEffectiveBalance < 0)) {
+            if (tx.timestamp >= settings.allowTemporaryNegativeUntil || newBalance < 0) {
               throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
             }
 
-            iChanges.updated(bc.assetAcc, (AccState(newBalance, newEffectiveBalance), tx.id +: currentChange._2))
+            iChanges.updated(bc.assetAcc, (AccState(newBalance, currentChange._1.effectiveBalance), tx.id +: currentChange._2))
           }
-          // todo effectiveBalanceChange
-          (newState, validTxs :+ tx)
+
+          val stateAfterEffectiveBalanceUpdates = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(stateAfterBalanceUpdates) { case (iChanges, bc) =>
+            val currentChange = iChanges.getOrElse(AssetAcc(bc.account, None), (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
+
+            val newEffectiveBalance = if (currentChange._1.effectiveBalance == Long.MinValue) {
+              Long.MinValue
+            } else {
+              Try(Math.addExact(currentChange._1.balance, bc.amount)).getOrElse(Long.MinValue)
+            }
+
+            if (tx.timestamp >= settings.allowTemporaryNegativeUntil || newEffectiveBalance < 0) {
+              throw new Error(s"Transaction leads to negative effective balance ($newEffectiveBalance): ${tx.json}")
+            }
+
+            iChanges.updated(AssetAcc(bc.account, None), (AccState(currentChange._1.balance, newEffectiveBalance), currentChange._2))
+          }
+          (stateAfterEffectiveBalanceUpdates, validTxs :+ tx)
         } catch {
           case NonFatal(e) =>
             (currentState, validTxs)
@@ -373,7 +381,12 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   }
 
   private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = {
-    validators.forall(_.isValid(this, transaction, height))
+    val isValid =
+      validators.forall(_.isValid(this, transaction, height))
+    if (!isValid) {
+      log.debug(s"Failed validators for tx '${transaction.json}': ${validators.filterNot(_.isValid(this, transaction, height)).map(_.getClass.getSimpleName)}")
+    }
+    isValid
   }
 
 

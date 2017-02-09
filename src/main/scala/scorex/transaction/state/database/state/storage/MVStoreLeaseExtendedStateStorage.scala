@@ -22,7 +22,6 @@ trait MVStoreLeaseExtendedStateStorage extends LeaseExtendedStateStorageI {
 
   private lazy val expiredLeaseTable: MVMap[Long, Set[String]] = db.openMap(ExpiredTableName, new LogMVMapBuilder[Long, Set[String]])
 
-
   override def getLeasedSum(address: Address): Long = {
     Option(leasedSumTable.get(address)).getOrElse(0L)
   }
@@ -30,13 +29,24 @@ trait MVStoreLeaseExtendedStateStorage extends LeaseExtendedStateStorageI {
   override def updateLeasedSum(address: Address, value: Long): Unit = {
     leasedSumTable.put(address, value)
   }
+
   override def getExpiredLeaseTransactions(height: Long): Set[LeaseTransaction] = {
     Option(expiredLeaseTable.get(height))
       .map(_.map(id => getLeaseTx(Base58.decode(id).get).get))
       .getOrElse(Set.empty[LeaseTransaction])
   }
 
-  override def updateExpiredLeaseTransactions(height: Long, txs: Set[LeaseTransaction]): Unit = {
-    expiredLeaseTable.put(height, txs.map(tx => Base58.encode(tx.id)))
+  override def addExpirationForLeaseTransactions(tx: LeaseTransaction): Unit = {
+    val oldSet = Option(expiredLeaseTable.get(tx.untilBlock)).getOrElse(Set.empty)
+    expiredLeaseTable.put(tx.untilBlock, oldSet + Base58.encode(tx.id))
+  }
+
+  override def removeAllLeaseExpirations(tx: LeaseTransaction): Unit = {
+    expiredLeaseTable.remove(tx.untilBlock)
+  }
+
+  override def removeLeaseTransactionExpiration(tx: LeaseTransaction): Unit = {
+    val oldSet = Option(expiredLeaseTable.get(tx.untilBlock)).getOrElse(Set.empty)
+    expiredLeaseTable.remove(tx.untilBlock, oldSet - Base58.encode(tx.id))
   }
 }

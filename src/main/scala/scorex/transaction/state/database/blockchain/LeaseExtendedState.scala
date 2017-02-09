@@ -1,14 +1,13 @@
 package scorex.transaction.state.database.blockchain
 
 import scorex.account.Account
-import scorex.crypto.encode.Base58
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state.extension.StateExtension
 import scorex.transaction.state.database.state.storage.{LeaseExtendedStateStorageI, StateStorageI}
 import scorex.transaction.{EffectiveBalanceChange, Transaction}
 import scorex.utils.ScorexLogging
 
-class LeaseExtendedState(storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with StateExtension {
+class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with StateExtension {
 
   private def isActive(leaseTransaction: LeaseTransaction): Boolean = {
     storage.stateHeight < leaseTransaction.untilBlock
@@ -17,7 +16,7 @@ class LeaseExtendedState(storage: StateStorageI with LeaseExtendedStateStorageI)
   override def isValid(storedState: StoredState, tx: Transaction, height: Int): Boolean = tx match {
     case tx: LeaseCancelTransaction =>
       val leaseOpt = storage.getLeaseTx(tx.leaseId)
-      leaseOpt.exists(isActive)
+      leaseOpt.exists(leaseTx => isActive(leaseTx) && tx.sender.publicKey.sameElements(leaseTx.sender.publicKey))
     case tx: LeaseTransaction =>
       tx.untilBlock >= storage.stateHeight + 1000 &&
         storedState.balance(tx.sender) - tx.fee - storage.getLeasedSum(tx.sender.address) >= tx.amount
@@ -26,10 +25,16 @@ class LeaseExtendedState(storage: StateStorageI with LeaseExtendedStateStorageI)
 
   def effectiveBalanceChanges(tx: Transaction): Seq[EffectiveBalanceChange] = tx match {
     case tx: LeaseTransaction =>
-      Seq(EffectiveBalanceChange(tx.sender, -tx.amount), EffectiveBalanceChange(tx.recipient, tx.amount))
+      Seq(EffectiveBalanceChange(tx.sender, -tx.amount - tx.fee),
+        EffectiveBalanceChange(tx.recipient, tx.amount))
     case tx: LeaseCancelTransaction =>
-      storage.getLeaseTx(tx.leaseId).map(tx => effectiveBalanceChanges(tx).map(_.reverse)).getOrElse(Seq.empty)
-    case _ => Seq.empty
+      val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
+      Seq(
+        EffectiveBalanceChange(tx.sender, leaseTx.amount - tx.fee),
+        EffectiveBalanceChange(leaseTx.recipient, -leaseTx.amount))
+    case _ => tx.balanceChanges().map(bc => {
+      EffectiveBalanceChange(bc.assetAcc.account, bc.delta)
+    })
   }
 
   private def updateLeasedSum(account: Account, update: Long => Long): Unit = {
@@ -38,18 +43,28 @@ class LeaseExtendedState(storage: StateStorageI with LeaseExtendedStateStorageI)
     storage.updateLeasedSum(address, newLeasedBalance)
   }
 
+  def applyLease(tx: LeaseTransaction): Unit = {
+    updateLeasedSum(tx.sender, _ + tx.amount)
+    storage.addExpirationForLeaseTransactions(tx)
+  }
+
+  def cancelLease(tx: LeaseTransaction): Unit = {
+    updateLeasedSum(tx.sender, _ - tx.amount)
+    storage.removeLeaseTransactionExpiration(tx)
+  }
+
+  def cancelLeaseCancel(tx: LeaseCancelTransaction): Unit = {
+    val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
+    applyLease(leaseTx)
+  }
+
   // todo create indexes?
-  // todo cancel expired leasing on apply a new block
   override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
     case tx: LeaseCancelTransaction =>
-      storage.getLeaseTx(tx.leaseId) match {
-        case Some(leaseTx) =>
-          updateLeasedSum(tx.sender, _ - leaseTx.amount)
-        case None =>
-          log.warn(s"There are no lease tx with id ${Base58.encode(tx.leaseId)}")
-      }
+      val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
+      cancelLease(leaseTx)
     case tx: LeaseTransaction =>
-      updateLeasedSum(tx.sender, _ + tx.amount)
+      applyLease(tx)
     case _ =>
   }
 }
