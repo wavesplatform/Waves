@@ -70,7 +70,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     clearIncorrectTransactions()
 
     val txs = utxStorage.all().sorted(TransactionsOrdering).take(MaxTransactionsPerBlock)
-    val valid = blockStorage.state.validate(txs, NTP.correctedTime())
+    val valid =txs.flatMap(tx => blockStorage.state.validateOne(tx, NTP.correctedTime()))
 
     if (valid.size != txs.size) {
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
@@ -96,7 +96,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val txs = utxStorage.all()
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeForUnconfirmed }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeDrift }
-    val valid = blockStorage.state.validate(notFromFuture, currentTime)
+    val valid = notFromFuture.flatMap(nff => blockStorage.state.validateOne(nff, currentTime))
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
   }
@@ -262,7 +262,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def isValid(tx: Transaction, blockTime: Long): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     val notExpired = (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
-    notExpired && blockStorage.state.allValid(Seq(tx), blockTime)
+    notExpired && blockStorage.state.isValid(tx, blockTime)
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
@@ -320,7 +320,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
     paymentVal match {
       case Right(payment) => {
-        if (blockStorage.state.allValid(Seq(payment), payment.timestamp)) {
+        if (blockStorage.state.isValid(payment, payment.timestamp)) {
           Right(payment)
         } else Left(ValidationError.NoBalance)
       }
@@ -345,7 +345,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       val txVal = PaymentTransaction.create(senderPubKey, recipientAccount, payment.amount, payment.fee, time, sigBytes)
       txVal match {
         case Right(tx) => {
-          if (blockStorage.state.allValid(Seq(tx), tx.timestamp)) {
+          if (blockStorage.state.isValid(tx, tx.timestamp)) {
             onNewOffchainTransaction(tx)
             Right(tx)
           } else Left(ValidationError.NoBalance)

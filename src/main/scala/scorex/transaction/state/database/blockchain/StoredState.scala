@@ -139,10 +139,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }.values.flatten.toList.sortWith(_.timestamp > _.timestamp).take(limit)
   }
 
-  /**
-    * Returns sequence of valid transactions
-    */
-  override final def validate(trans: Seq[Transaction], blockTime: Long): Seq[Transaction] = {
+  def validate(trans: Seq[Transaction], blockTime: Long): Seq[Transaction] = {
 
     val txs = trans.filter(t => isTValid(t))
 
