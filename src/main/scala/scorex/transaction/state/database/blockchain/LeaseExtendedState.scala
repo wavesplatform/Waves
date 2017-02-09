@@ -2,23 +2,19 @@ package scorex.transaction.state.database.blockchain
 
 import scorex.account.Account
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.state.database.state.{AccState, Reasons}
 import scorex.transaction.state.database.state.extension.StateExtension
 import scorex.transaction.state.database.state.storage.{LeaseExtendedStateStorageI, StateStorageI}
-import scorex.transaction.{EffectiveBalanceChange, Transaction}
+import scorex.transaction.{AssetAcc, EffectiveBalanceChange, Transaction}
 import scorex.utils.ScorexLogging
 
 class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with StateExtension {
 
-  private def isActive(leaseTransaction: LeaseTransaction): Boolean = {
-    storage.stateHeight < leaseTransaction.untilBlock
-  }
-
   override def isValid(storedState: StoredState, tx: Transaction, height: Int): Boolean = tx match {
     case tx: LeaseCancelTransaction =>
       val leaseOpt = storage.getLeaseTx(tx.leaseId)
-      leaseOpt.exists(leaseTx => isActive(leaseTx) && tx.sender.publicKey.sameElements(leaseTx.sender.publicKey))
+      leaseOpt.exists(leaseTx => tx.sender.publicKey.sameElements(leaseTx.sender.publicKey))
     case tx: LeaseTransaction =>
-      tx.untilBlock >= storage.stateHeight + 1000 &&
         storedState.balance(tx.sender) - tx.fee - storage.getLeasedSum(tx.sender.address) >= tx.amount
     case _ => true
   }
@@ -45,12 +41,10 @@ class LeaseExtendedState(private[blockchain] val storage: StateStorageI with Lea
 
   def applyLease(tx: LeaseTransaction): Unit = {
     updateLeasedSum(tx.sender, _ + tx.amount)
-    storage.addExpirationForLeaseTransactions(tx)
   }
 
   def cancelLease(tx: LeaseTransaction): Unit = {
     updateLeasedSum(tx.sender, _ - tx.amount)
-    storage.removeLeaseTransactionExpiration(tx)
   }
 
   def cancelLeaseCancel(tx: LeaseCancelTransaction): Unit = {

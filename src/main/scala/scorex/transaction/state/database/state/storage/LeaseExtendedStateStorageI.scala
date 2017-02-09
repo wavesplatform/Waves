@@ -20,12 +20,4 @@ trait LeaseExtendedStateStorageI {
   def getLeasedSum(address: Address): Long
 
   def updateLeasedSum(address: Address, value: Long): Unit
-
-  def getExpiredLeaseTransactions(height: Long): Set[LeaseTransaction]
-
-  def addExpirationForLeaseTransactions(tx: LeaseTransaction): Unit
-
-  def removeAllLeaseExpirations(tx: LeaseTransaction): Unit
-
-  def removeLeaseTransactionExpiration(tx: LeaseTransaction): Unit
 }

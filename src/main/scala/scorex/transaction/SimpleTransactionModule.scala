@@ -173,7 +173,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   def lease(request: LeaseRequest, wallet: Wallet): Try[Either[ValidationError, LeaseTransaction]] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
 
-    val leaseTransactionVal = LeaseTransaction.create(sender, request.amount, request.fee, getTimestamp, request.untilBlock, new Account(request.recipient))
+    val leaseTransactionVal = LeaseTransaction.create(sender, request.amount, request.fee, getTimestamp, new Account(request.recipient))
     leaseTransactionVal match {
       case Right(tx) =>
         if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)

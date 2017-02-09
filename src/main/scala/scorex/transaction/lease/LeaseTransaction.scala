@@ -16,8 +16,6 @@ sealed trait LeaseTransaction extends SignedTransaction {
 
   def fee: Long
 
-  def untilBlock: Int
-
   def recipient: Account
 }
 
@@ -27,7 +25,6 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
                                           amount: Long,
                                           fee: Long,
                                           timestamp: Long,
-                                          untilBlock: Int,
                                           recipient: Account,
                                           signature: Array[Byte])
     extends LeaseTransaction {
@@ -39,14 +36,12 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
       recipient.bytes,
       Longs.toByteArray(amount),
       Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp),
-      Ints.toByteArray(untilBlock))
+      Longs.toByteArray(timestamp))
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "amount" -> amount,
       "fee" -> fee,
-      "timestamp" -> timestamp,
-      "untilBlock" -> untilBlock
+      "timestamp" -> timestamp
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
@@ -69,10 +64,9 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
     val fee = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
     val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
-    val untilBlock = Ints.fromByteArray(bytes.slice(quantityStart + 24, quantityStart + 28))
-    val signature = bytes.slice(quantityStart + 28, quantityStart + 28 + SignatureLength)
+    val signature = bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength)
     LeaseTransaction
-      .create(sender, quantity, fee, timestamp, untilBlock, recipient, signature)
+      .create(sender, quantity, fee, timestamp, recipient, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
@@ -80,7 +74,6 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
                                amount: Long,
                                fee: Long,
                                timestamp: Long,
-                               untilBlock: Int,
                                recipient: Account,
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseTransactionImpl] = {
     if (amount <= 0) {
@@ -93,10 +86,8 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
       Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
-    } else if (untilBlock <= 0) {
-      Left(ValidationError.NegativeUntilBlock)
     } else {
-      Right(LeaseTransactionImpl(sender, amount, fee, timestamp, untilBlock, recipient, signature.orNull))
+      Right(LeaseTransactionImpl(sender, amount, fee, timestamp, recipient, signature.orNull))
     }
   }
 
@@ -104,10 +95,9 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             untilBlock: Int,
              recipient: Account,
              signature: Array[Byte]): Either[ValidationError, LeaseTransaction] = {
-    createUnverified(sender, amount, fee, timestamp, untilBlock, recipient, Some(signature))
+    createUnverified(sender, amount, fee, timestamp, recipient, Some(signature))
       .right.flatMap(SignedTransaction.verify)
   }
 
@@ -115,9 +105,8 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             untilBlock: Int,
              recipient: Account): Either[ValidationError, LeaseTransaction] = {
-    createUnverified(sender, amount, fee, timestamp, untilBlock, recipient).right.map { unsigned =>
+    createUnverified(sender, amount, fee, timestamp, recipient).right.map { unsigned =>
       unsigned.copy(signature = EllipticCurveImpl.sign(sender, unsigned.toSign))
     }
   }

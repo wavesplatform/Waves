@@ -11,8 +11,6 @@ case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender p
                               amount: Long,
                               @ApiModelProperty(required = true)
                               fee: Long,
-                              @ApiModelProperty(required = true)
-                              untilBlock: Int,
                               @ApiModelProperty(value = "Recipient address", required = true)
                               recipient: String,
                               @ApiModelProperty(required = true)
@@ -25,7 +23,6 @@ object SignedLeaseRequest {
     (JsPath \ "sender").read[String] and
       (JsPath \ "amount").read[Long] and
       (JsPath \ "fee").read[Long] and
-      (JsPath \ "untilBlock").read[Int] and
       (JsPath \ "recipient").read[String] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "signature").read[String](SignatureReads)
