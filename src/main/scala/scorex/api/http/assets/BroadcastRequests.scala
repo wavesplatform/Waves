@@ -2,20 +2,26 @@ package scorex.api.http.assets
 
 import com.google.common.base.Charsets
 import io.swagger.annotations._
-import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.api.http.formats._
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets._
 import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.InvalidSignature
+import scorex.transaction.ValidationError.InvalidAddress
+import scorex.transaction.assets._
 
 object BroadcastRequests {
+  private def parseBase58(v: String, error: String): Either[ValidationError, Array[Byte]] =
+    Base58.decode(v).toEither.left.map(_ => ValidationError.CustomValidationError(error))
+
+  private def parseBase58(v: Option[String], error: String): Either[ValidationError, Array[Byte]] =
+    v.fold[Either[ValidationError, Array[Byte]]](Right(Array.emptyByteArray))(_v => parseBase58(_v, error))
+
+  private def parseBase58ToOption(v: Option[String], error: String): Either[ValidationError, Option[Array[Byte]]] =
+    v.fold[Either[ValidationError, Option[Array[Byte]]]](Right(None)) { s => parseBase58(s, error).map(b => Option(b)) }
 
   @ApiModel(value = "Signed Asset issue transaction")
   case class AssetIssueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                               sender: PublicKeyAccount,
+                               senderPublicKey: String,
                                @ApiModelProperty(value = "Base58 encoded name of Asset", required = true)
                                name: String,
                                @ApiModelProperty(value = "Base58 encoded description of Asset", required = true)
@@ -33,24 +39,16 @@ object BroadcastRequests {
                                @ApiModelProperty(required = true)
                                signature: String) {
 
-    def toTx: Either[ValidationError, IssueTransaction] =
-      Base58.decode(signature).toEither.left.map(_ => InvalidSignature).flatMap { signature =>
-        IssueTransaction.create(
-          sender,
-          name.getBytes(Charsets.UTF_8),
-          description.getBytes(Charsets.UTF_8),
-          quantity,
-          decimals,
-          reissuable,
-          fee,
-          timestamp,
-          signature)
-      }
+    def toTx: Either[ValidationError, IssueTransaction] = for {
+      _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _signature <- parseBase58(signature, "invalid signature")
+      _t <- IssueTransaction.create(_sender, name.getBytes(Charsets.UTF_8), description.getBytes(Charsets.UTF_8),
+        quantity, decimals, reissuable, fee, timestamp, _signature)
+    } yield _t
   }
 
-
   case class AssetReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                                 senderPublicKey: PublicKeyAccount,
+                                 senderPublicKey: String,
                                  @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
                                  assetId: String,
                                  @ApiModelProperty(required = true, example = "1000000")
@@ -64,14 +62,12 @@ object BroadcastRequests {
                                  @ApiModelProperty(required = true)
                                  signature: String) {
 
-    def toTx: Either[ValidationError, ReissueTransaction] = ReissueTransaction.create(
-        senderPublicKey,
-        Base58.decode(assetId).get,
-        quantity,
-        reissuable,
-        fee,
-        timestamp,
-        Base58.decode(signature).get)
+    def toTx: Either[ValidationError, ReissueTransaction] = for {
+      _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _signature <- parseBase58(signature, "invalid.signature")
+      _assetId <- parseBase58(assetId, "invalid.assetId")
+      _t <- ReissueTransaction.create(_sender, _assetId, quantity, reissuable, fee, timestamp, _signature)
+    } yield _t
   }
 
   case class AssetBurnRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
@@ -79,7 +75,7 @@ object BroadcastRequests {
                               @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
                                 assetId: String,
                               @ApiModelProperty(required = true, example = "1000000")
-                                amount: Long,
+                                quantity: Long,
                               @ApiModelProperty(required = true)
                                 fee: Long,
                               @ApiModelProperty(required = true)
@@ -87,22 +83,21 @@ object BroadcastRequests {
                               @ApiModelProperty(required = true)
                                 signature: String) {
 
-    def toTx: Either[ValidationError, BurnTransaction] = BurnTransaction.create(
-        new PublicKeyAccount(Base58.decode(senderPublicKey).get),
-        Base58.decode(assetId).get,
-        amount,
-        fee,
-        timestamp,
-        Base58.decode(signature).get)
+    def toTx: Either[ValidationError, BurnTransaction] = for {
+      _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _assetId <- parseBase58(assetId, "invalid.signature")
+      _signature <- parseBase58(signature, "invalid.signature")
+      _t <- BurnTransaction.create(_sender, _assetId, quantity, fee, timestamp, _signature)
+    } yield _t
   }
 
   @ApiModel(value = "Signed Asset transfer transaction")
   case class AssetTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                  sender: PublicKeyAccount,
+                                  senderPublicKey: String,
                                   @ApiModelProperty(value = "Base58 encoded Asset ID")
                                   assetId: Option[String],
                                   @ApiModelProperty(value = "Recipient address", required = true)
-                                  recipient: Account,
+                                  recipient: String,
                                   @ApiModelProperty(required = true, example = "1000000")
                                   amount: Long,
                                   @ApiModelProperty(required = true)
@@ -115,59 +110,20 @@ object BroadcastRequests {
                                   attachment: Option[String],
                                   @ApiModelProperty(required = true)
                                   signature: String) {
-    def toTx: Either[ValidationError, TransferTransaction] =
-      TransferTransaction.create(
-        assetId.map(Base58.decode(_).get),
-        sender,
-        recipient,
-        amount,
-        timestamp,
-        feeAssetId.map(Base58.decode(_).get),
-        fee,
-        attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray),
-        Base58.decode(signature).get)
+    def toTx: Either[ValidationError, TransferTransaction] = for {
+      _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
+      _assetId <- parseBase58ToOption(assetId, "invalid.assetId")
+      _feeAssetId <- parseBase58ToOption(feeAssetId, "invalid.feeAssetId")
+      _signature <- parseBase58(signature, "invalid.signature")
+      _attachment <- parseBase58(attachment, "invalid.attachment")
+      _account <- if (Account.isValidAddress(recipient)) Right(new Account(recipient)) else Left(InvalidAddress)
+      _t <- TransferTransaction.create(_assetId, _sender, _account, amount, timestamp, _feeAssetId, fee, _attachment,
+        _signature)
+    } yield _t
   }
 
-  implicit val assetTransferRequestFormat: Format[AssetTransferRequest] = (
-    (__ \ "senderPublicKey").format[PublicKeyAccount] ~
-      (__ \ "assetId").formatNullable[String] ~
-      (__ \ "recipient").format[Account] ~
-      (__ \ "amount").format[Long] ~
-      (__ \ "fee").format[Long] ~
-      (__ \ "feeAssetId").formatNullable[String] ~
-      (__ \ "timestamp").format[Long] ~
-      (__ \ "attachment").formatNullable[String] ~
-      (__ \ "signature").format[String]
-    ) (AssetTransferRequest.apply, unlift(AssetTransferRequest.unapply))
-
-  implicit val assetIssueRequestReads: Format[AssetIssueRequest] = (
-    (__ \ "senderPublicKey").format[PublicKeyAccount] ~
-      (__ \ "name").format[String] ~
-      (__ \ "description").format[String] ~
-      (__ \ "quantity").format[Long] ~
-      (__ \ "decimals").format[Byte] ~
-      (__ \ "reissuable").format[Boolean] ~
-      (__ \ "fee").format[Long] ~
-      (__ \ "timestamp").format[Long] ~
-      (__ \ "signature").format[String](SignatureFormat)
-    ) (AssetIssueRequest.apply, unlift(AssetIssueRequest.unapply))
-
-  implicit val assetReissueRequestReads: Format[AssetReissueRequest] = (
-    (__ \ "senderPublicKey").format[PublicKeyAccount] ~
-      (__ \ "assetId").format[String] ~
-      (__ \ "quantity").format[Long] ~
-      (__ \ "reissuable").format[Boolean] ~
-      (__ \ "fee").format[Long] ~
-      (__ \ "timestamp").format[Long] ~
-      (__ \ "signature").format[String](SignatureFormat)
-    ) (AssetReissueRequest.apply, unlift(AssetReissueRequest.unapply))
-
-  implicit val assetBurnRequestReads: Format[AssetBurnRequest] = (
-    (__ \ "senderPublicKey").format[String] ~
-      (__ \ "assetId").format[String] ~
-      (__ \ "quantity").format[Long] ~
-      (__ \ "fee").format[Long] ~
-      (__ \ "timestamp").format[Long] ~
-      (__ \ "signature").format[String]
-    ) (AssetBurnRequest.apply, unlift(AssetBurnRequest.unapply))
+  implicit val assetTransferRequestFormat: Format[AssetTransferRequest] = Json.format
+  implicit val assetIssueRequestReads: Format[AssetIssueRequest] = Json.format
+  implicit val assetReissueRequestReads: Format[AssetReissueRequest] = Json.format
+  implicit val assetBurnRequestReads: Format[AssetBurnRequest] = Json.format
 }

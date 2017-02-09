@@ -1,13 +1,12 @@
 package scorex.api.http.assets
 
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import akka.http.scaladsl.server.Route
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.RestAPISettings
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen => G}
 import org.scalamock.scalatest.PathMockFactory
+import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
@@ -21,15 +20,21 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Path
 
   import AssetsBroadcastRouteSpec._
 
-  private def doCheck[A, B: Writes](route: Route, url: String, gen: G[A], f: (A) => B, expected: JsObject, expectedCode: StatusCode = StatusCodes.BadRequest): Unit = {
-    forAll(gen) { v =>
-      val post = Post(routePath(url), Json.toJson(f(v)))
-      post ~> route ~> check {
-        status shouldEqual expectedCode
-        responseAs[JsObject] shouldEqual expected
+  class ProduceError(error: ApiError) extends Matcher[RouteTestResult] {
+    override def apply(left: RouteTestResult): MatchResult = left ~> check {
+      if (response.status != error.code) {
+        MatchResult(false, "got unexpected status code", "got expected status code")
+      } else {
+        val responseJson = responseAs[JsObject]
+        MatchResult(responseJson == error.json,
+          "expected {0}, but instead got {1}",
+          "expected not to get {0}, but instead did get it",
+          IndexedSeq(error.json, responseJson))
       }
     }
   }
+
+  def produce(error: ApiError) = new ProduceError(error)
 
   private val settings = RestAPISettings.fromConfig(ConfigFactory.parseString(""))
 
@@ -57,8 +62,12 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Path
       })
     )
 
+    def posting(url: String, v: JsValue) = Post(routePath(url), v) ~> route
+
     forAll(vt) { (url, gen, transform) =>
-      url in doCheck[Transaction, JsValue](route, url, gen, v => transform(v.json), StateCheckFailed.json)
+      forAll(gen) { t =>
+        posting(url, transform(t.json)) should produce(StateCheckFailed)
+      }
     }
   }
 
@@ -67,45 +76,44 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Path
 
 
     "issue transaction" in forAll(g.issueReq) { ir =>
-      def _check[A](gen: G[A], f: A => AssetIssueRequest, expected: JsObject) =
-        doCheck[A, AssetIssueRequest](route, "issue", gen, f, expected)
+      def posting[A: Writes](v: A) = Post(routePath("issue"), v) ~> route
 
-      _check[Long](g.nonPositiveLong, q => ir.copy(quantity = q), NegativeAmount.json)
-      _check[Byte](g.invalidDecimals, d => ir.copy(decimals = d), TooBigArrayAllocation.json)
-      _check[String](g.longDescription, d => ir.copy(description = d), TooBigArrayAllocation.json)
-      _check[String](g.invalidName, name => ir.copy(name = name), InvalidName.json)
-      _check[String](g.invalidBase58, name => ir.copy(name = name), InvalidName.json)
-      // todo: invalid sender
-      _check[Long](g.nonPositiveLong, fee => ir.copy(fee = fee), InsufficientFee.json)
+      forAll(g.nonPositiveLong) { q => posting(ir.copy(fee = q)) should produce (InsufficientFee) }
+      forAll(g.nonPositiveLong) { q => posting(ir.copy(quantity = q)) should produce (NegativeAmount) }
+      forAll(g.invalidDecimals) { d => posting(ir.copy(decimals = d)) should produce (TooBigArrayAllocation) }
+      forAll(g.longDescription) { d => posting(ir.copy(description = d)) should produce (TooBigArrayAllocation) }
+      forAll(g.invalidName) { name => posting(ir.copy(name = name)) should produce (InvalidName) }
+      forAll(g.invalidBase58) { name => posting(ir.copy(name = name)) should produce (InvalidName) }
+      forAll(g.nonPositiveLong) { fee => posting(ir.copy(fee = fee)) should produce (InsufficientFee) }
     }
 
     "reissue transaction" in forAll(g.reissueReq) { rr =>
-      def _check[A](gen: G[A], f: A => AssetReissueRequest, expected: JsObject) =
-        doCheck[A, AssetReissueRequest](route, "reissue", gen, f, expected)
+      def posting[A: Writes](v: A) = Post(routePath("reissue"), v) ~> route
+
       // todo: invalid sender
-      _check[Long](g.nonPositiveLong, q => rr.copy(quantity = q), NegativeAmount.json)
-      _check[Long](g.nonPositiveLong, fee => rr.copy(fee = fee), InsufficientFee.json)
+      forAll(g.nonPositiveLong) { q => posting(rr.copy(quantity = q)) should produce (NegativeAmount) }
+      forAll(g.nonPositiveLong) { fee => posting(rr.copy(fee = fee)) should produce (InsufficientFee) }
     }
 
     "burn transaction" in forAll(g.burnReq) { br =>
-      def _check[A](gen: G[A], f: A => AssetBurnRequest, expected: JsObject) =
-        doCheck[A, AssetBurnRequest](route, "burn", gen, f, expected)
-      // todo: invalid sender
-      _check[String](g.invalidBase58, pk => br.copy(senderPublicKey = pk), Unknown.json)
-      _check[Long](g.nonPositiveLong, q => br.copy(amount = q), NegativeAmount.json)
-      _check[Long](g.nonPositiveLong, fee => br.copy(fee = fee), InsufficientFee.json)
+      def posting[A: Writes](v: A) = Post(routePath("burn"), v) ~> route
+
+      forAll(g.invalidBase58) { pk => posting(br.copy(senderPublicKey = pk)) should produce (InvalidAddress) }
+      forAll(g.nonPositiveLong) { q => posting(br.copy(quantity = q)) should produce (NegativeAmount) }
+      forAll(g.nonPositiveLong) { fee => posting(br.copy(fee = fee)) should produce (InsufficientFee) }
     }
 
     "transfer transaction" in forAll(g.transferReq) { tr =>
-      def _check[A](gen: G[A], f: A => AssetTransferRequest, expected: JsObject) =
-        doCheck[A, AssetTransferRequest](route, "transfer", gen, f, expected)
+      def posting[A: Writes](v: A) = Post(routePath("transfer"), v) ~> route
 
-      _check[Long](g.nonPositiveLong, q => tr.copy(amount = q), NegativeAmount.json)
-//      todo: invalid recipient
-      _check[String](g.invalidBase58, a => tr.copy(assetId = Some(a)), Unknown.json)
-      _check[String](g.longAttachment, a => tr.copy(attachment = Some(a)), TooBigArrayAllocation.json)
-      _check[Long](posNum[Long], quantity => tr.copy(amount = quantity, fee = Long.MaxValue), OverflowError.json)
-      _check[Long](g.nonPositiveLong, fee => tr.copy(fee = fee), InsufficientFee.json)
+      forAll(g.nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce (NegativeAmount) }
+      forAll(g.invalidBase58) { pk => posting(tr.copy(senderPublicKey = pk)) should produce (InvalidAddress) }
+      forAll(g.invalidBase58) { pk => posting(tr.copy(recipient = pk)) should produce (InvalidAddress) }
+      forAll(g.invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce (CustomValidationError("invalid.assetId")) }
+      forAll(g.invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce (CustomValidationError("invalid.feeAssetId")) }
+      forAll(g.longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce (TooBigArrayAllocation) }
+      forAll(posNum[Long]) { quantity => posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce (OverflowError) }
+      forAll(g.nonPositiveLong) { fee => posting(tr.copy(fee = fee)) should produce (InsufficientFee) }
     }
   }
 }
@@ -126,19 +134,20 @@ object AssetsBroadcastRouteSpec {
       .label("invalid base58")
     val invalidName: G[String] = oneOf(
       genBoundedString(0, IssueTransaction.MinAssetNameLength - 1),
-      genBoundedString(IssueTransaction.MaxAssetNameLength + 1, IssueTransaction.MaxAssetNameLength + 1000)
+      genBoundedString(IssueTransaction.MaxAssetNameLength + 1, IssueTransaction.MaxAssetNameLength + 50)
     ).map(new String(_))
     val longDescription: G[String] =
-      genBoundedBytes(IssueTransaction.MaxDescriptionLength + 1, IssueTransaction.MaxDescriptionLength + 1000)
+      genBoundedBytes(IssueTransaction.MaxDescriptionLength + 1, IssueTransaction.MaxDescriptionLength + 50)
       .map(Base58.encode)
 
+    val addressGen: G[String] = listOfN(32, Arbitrary.arbByte.arbitrary).map(b => Base58.encode(b.toArray))
     val fee: G[Long] = choose(0, Long.MaxValue)
     val signatureGen: G[String] = listOfN(TypedTransaction.SignatureLength, Arbitrary.arbByte.arbitrary)
       .map(b => Base58.encode(b.toArray))
     private val assetIdStringGen = assetIdGen.map(_.map(Base58.encode))
 
     private val commonFields = for {
-      _account <- accountGen
+      _account <- addressGen
       _fee <- fee
       _timestamp <- timestampGen
       _signature <- signatureGen
@@ -167,11 +176,11 @@ object AssetsBroadcastRouteSpec {
     val burnReq: G[AssetBurnRequest] = for {
       (account, fee, timestamp, signature) <- commonFields
       (assetId, quantity) <- reissueBurnFields
-    } yield AssetBurnRequest(account.address, assetId, quantity, fee, timestamp, signature)
+    } yield AssetBurnRequest(account, assetId, quantity, fee, timestamp, signature)
 
     val transferReq: G[AssetTransferRequest] = for {
       (account, fee, timestamp, signature) <- commonFields
-      recipient <- accountGen
+      recipient <- accountGen.map(_.address)
       amount <- positiveLongGen
       assetId <- assetIdStringGen
       feeAssetId <- assetIdStringGen

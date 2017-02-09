@@ -88,12 +88,12 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |}
       """.stripMargin
     val req = Json.parse(json).validate[AssetTransferRequest].get
-    req.recipient.address shouldBe "3Myss6gmMckKYtka3cKCM563TBJofnxvfD7"
+    req.recipient shouldBe "3Myss6gmMckKYtka3cKCM563TBJofnxvfD7"
     req.timestamp shouldBe 1479462208828L
     req.assetId shouldBe Some("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u")
     req.amount shouldBe 100000
     req.fee shouldBe 100000
-    Base58.encode(req.sender.publicKey) shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
+    req.senderPublicKey shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     req.signature shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
     req.attachment shouldBe Some("A")
 
@@ -122,7 +122,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
     req.senderPublicKey shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     req.signature shouldBe "H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
     req.fee shouldBe 100000000L
-    req.amount shouldBe 10000
+    req.quantity shouldBe 10000
   }
 
   test("AssetIssueResponse json format test") {
