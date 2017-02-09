@@ -1,7 +1,6 @@
 package scorex.transaction.state.database.state.storage
 
 import org.h2.mvstore.{MVMap, MVStore}
-import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.transaction.state.database.state._
@@ -43,17 +42,16 @@ trait MVStoreStateStorage extends StateStorageI {
   private lazy val accountAssetsMap: MVMap[String, Set[String]] = db.openMap(AccountAssets,
     new LogMVMapBuilder[String, Set[String]])
 
-  def updateAccountAssets(address: Address, assetId: Option[AssetId]): Unit = {
-    if (assetId.isDefined) {
-      val asset = Base58.encode(assetId.get)
-      val assets = Option(accountAssetsMap.get(address)).getOrElse(Set.empty[String])
-      accountAssetsMap.put(address, assets + asset)
-    }
+  def updateAccountAssets(address: Address, assetId: AssetId): Unit = {
+    val asset = Base58.encode(assetId)
+    val assets = Option(accountAssetsMap.get(address)).getOrElse(Set.empty[String])
+    accountAssetsMap.put(address, assets + asset)
   }
 
-  def getAccountAssets(address: Address): Set[String] =
+  def accountAssets(address: Address): Set[String] =
     Option(accountAssetsMap.get(address)).getOrElse(Set.empty[String])
 
+  def accountAssets(): Map[String, Set[String]] = accountAssetsMap.entrySet().asScala.map(p => (p.getKey, p.getValue)).toMap
 
   // ============= transactions
   private lazy val AllTxs = "IssueTxs"
@@ -80,8 +78,8 @@ trait MVStoreStateStorage extends StateStorageI {
     transactionsMap.remove(id)
   }
 
-  override def included(id: Array[Byte], heightOpt: Option[Int]): Option[Int] =
-    Option(includedTx.get(id)).filter(_ < heightOpt.getOrElse(Int.MaxValue))
+  override def included(id: Array[Byte]): Option[Int] =
+    Option(includedTx.get(id))
 
 
   // ============= state height
@@ -92,17 +90,5 @@ trait MVStoreStateStorage extends StateStorageI {
 
   def setStateHeight(height: Int): Unit = heightMap.put(HeightKey, height)
 
-  def assetDistribution(assetId: Array[Byte]): Map[String, Long] = {
-    val encodedAssetId = Base58.encode(assetId)
-
-    accountAssetsMap.entrySet().asScala
-      .filter(e => e.getValue.contains(encodedAssetId))
-      .map(e => {
-        val assetAcc: AssetAcc = AssetAcc(new Account(e.getKey),Some(assetId))
-        val key = assetAcc.key
-        val balance = getAccountChanges(key, getLastStates(key).get).get.state.balance
-        (e.getKey, balance)
-      }).toMap
-  }
 
 }

@@ -77,13 +77,6 @@ object Block extends ScorexLogging {
   type BlockIds = Seq[BlockId]
 
   val BlockIdLength = SignatureLength
-
-  def feesDistribution(block: Block): Map[AssetAcc, Long] = {
-    val generator = block.signerDataField.value.generator
-    val assetFees = block.transactionDataField.asInstanceOf[TransactionsBlockField].value.map(_.assetFee)
-    assetFees.map(a => AssetAcc(generator, a._1) -> a._2).groupBy(a => a._1).mapValues(_.map(_._2).sum)
-  }
-
   val TransactionSizeLength = 4
 
   def transParseBytes(bytes: Array[Byte]): Try[Seq[TypedTransaction]] = Try {
