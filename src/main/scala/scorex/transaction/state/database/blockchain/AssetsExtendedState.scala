@@ -12,7 +12,7 @@ import scorex.utils.ScorexLogging
 class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorageI) extends ScorexLogging
   with Validator {
 
-  override def isValid(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
+  override def validate(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: ReissueTransaction =>
       isIssuerAddress(tx.assetId, tx).flatMap(t =>
         if (isReissuable(tx.assetId)) Right(t) else Left(StateValidationError("Asset is not reissuable")))

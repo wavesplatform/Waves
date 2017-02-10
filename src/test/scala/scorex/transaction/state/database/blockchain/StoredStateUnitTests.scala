@@ -65,7 +65,6 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
 
 
-
   property("validate plenty of transactions") {
     val TxN: Int = 1000
     val InitialBalance: Long = Long.MaxValue / 8
@@ -88,12 +87,12 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val senderAmountAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
         state.assetBalance(senderAmountAcc) shouldBe 0
-        state.isValid(issueTx, Int.MaxValue) shouldBe true
+        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Right[_, _]]
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe issueTx.quantity
 
-        state.isValid(burnTx, Int.MaxValue) shouldBe true
+        state.validateAgainstState(burnTx, Int.MaxValue) shouldBe an[Right[_, _]]
 
         state.applyChanges(state.calcNewBalances(Seq(burnTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe (issueTx.quantity - burnTx.amount)
@@ -260,7 +259,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
       state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
-      state.isValid(issueTx2, Int.MaxValue) shouldBe false
+      state.validateAgainstState(issueTx2, Int.MaxValue) shouldBe an[Left[_, _]]
     }
   }
 
@@ -270,13 +269,17 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val issueTx: IssueTransaction = pair._1
         val reissueTx: ReissueTransaction = pair._3
 
-        state.isValid(issueTx, Int.MaxValue) shouldBe true
+        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Right[_, _]]
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
-        state.isValid(issueTx, Int.MaxValue) shouldBe false
+        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Left[_, _]]
 
-        state.isValid(reissueTx, Int.MaxValue) shouldBe issueTx.reissuable
+        val state1 = state.validateAgainstState(reissueTx, Int.MaxValue)
+        issueTx.reissuable match {
+          case true => state1 shouldBe an[Right[_, _]]
+          case false => state1 shouldBe an[Left[_, _]]
+        }
       }
     }
   }

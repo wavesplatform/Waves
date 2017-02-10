@@ -147,7 +147,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
     val height = heightOpt.getOrElse(storage.stateHeight)
 
-    val txs = trans.filter(t => isValidAgainstState(t, height).isRight)
+    val txs = trans.filter(t => validateAgainstState(t, height).isRight)
 
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
     val validTransactions = if (allowInvalidPaymentTransactionsByTimestamp) {
@@ -299,8 +299,8 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
-  private def isValidAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
-    validators.toStream.map(_.isValid(transaction,height)).find(_.isLeft) match {
+  def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
+    validators.toStream.map(_.validate(transaction,height)).find(_.isLeft) match {
       case Some(Left(e)) => Left(e)
       case _ => Right(transaction)
     }

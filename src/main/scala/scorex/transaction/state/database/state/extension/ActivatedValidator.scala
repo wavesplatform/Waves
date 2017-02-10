@@ -8,7 +8,7 @@ import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 class ActivatedValidator(allowBurnTransactionAfterTimestamp: Long) extends Validator {
 
 
-  override def isValid(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
+  override def validate(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: BurnTransaction if tx.timestamp <= allowBurnTransactionAfterTimestamp =>
       Left(StateValidationError(s"BurnTranaction(time: ${tx.timestamp}) must not appear before time=$allowBurnTransactionAfterTimestamp"))
     case _: PaymentTransaction => Right(tx)

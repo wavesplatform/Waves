@@ -8,7 +8,7 @@ import scorex.transaction.{Transaction, ValidationError}
 
 class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends Validator {
 
-  override def isValid(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
+  override def validate(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case om: ExchangeTransaction => OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om))
     case _ => Right(tx)
   }
