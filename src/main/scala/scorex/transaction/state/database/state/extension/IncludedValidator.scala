@@ -1,16 +1,16 @@
 package scorex.transaction.state.database.state.extension
 
-import scorex.transaction.ValidationError.CustomValidationError
+import scorex.transaction.ValidationError.{CustomValidationError, StateValidationError}
 import scorex.transaction.state.database.state.storage.StateStorageI
 import scorex.transaction.{PaymentTransaction, Transaction, ValidationError}
 
 class IncludedValidator(storage: StateStorageI, requirePaymentUniqueId: Long) extends Validator {
 
 
-  override def isValid(tx: Transaction, height: Int): Either[ValidationError, Transaction] = tx match {
+  override def isValid(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: PaymentTransaction if tx.timestamp < requirePaymentUniqueId => Right(tx)
     case tx: Transaction => if (storage.included(tx.id, None).isEmpty) Right(tx)
-    else Left(CustomValidationError(s"Transaction(except for some cases of PaymentTransaction) cannot be duplicated"))
+    else Left(StateValidationError(s"Transaction(except for some cases of PaymentTransaction) cannot be duplicated"))
   }
 
 

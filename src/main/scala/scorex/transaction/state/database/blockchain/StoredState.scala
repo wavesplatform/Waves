@@ -7,6 +7,7 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
+import scorex.transaction.ValidationError.StateValidationError
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.state.database.state._
@@ -301,7 +302,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   private def isValidAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
     validators.toStream.map(_.isValid(transaction,height)).find(_.isLeft) match {
       case Some(Left(e)) => Left(e)
-      case None => Right(transaction)
+      case _ => Right(transaction)
     }
   }
 

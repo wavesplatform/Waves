@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import scorex.block.Block
+import scorex.transaction.ValidationError.StateValidationError
 
 import scala.util.Try
 
