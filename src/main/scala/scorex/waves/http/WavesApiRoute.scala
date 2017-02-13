@@ -54,13 +54,11 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
               case JsSuccess(payment: Payment, _) =>
                 transactionModule
                   .createPayment(payment, wallet)
-                  .fold(InvalidSender.response) { paymentVal =>
-                    paymentVal.fold(ApiError.fromValidationError(_).response, { tx =>
+                  .fold(ApiError.fromValidationError(_).response, { tx =>
                       val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
                         tx.sender, tx.sender.address, Base58.encode(tx.signature))
                       JsonResponse(Json.toJson(signed), StatusCodes.OK)
                     })
-                  }
             }
           }.getOrElse(WrongJson().response)
         }

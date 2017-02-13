@@ -2,7 +2,7 @@ package scorex.transaction
 
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
-import scala.util.{Left, Right, Try}
+import scala.util.{Left, Right}
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
@@ -15,6 +15,7 @@ import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.ChainParameters
+import scorex.transaction.ValidationError.StateCheckFailed
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
@@ -107,92 +108,45 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       true
     } else false
 
-  override def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
-    wallet.privateKeyAccount(payment.sender).map { sender =>
-      createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
-    }
+
+  override def createPayment(payment: Payment, wallet: Wallet): Either[ValidationError, PaymentTransaction] = {
+    createPayment(wallet.privateKeyAccount(payment.sender).get, new Account(payment.recipient), payment.amount, payment.fee)
   }
 
-  override def transferAsset(request: TransferRequest, wallet: Wallet): Try[Either[ValidationError, TransferTransaction]] = Try {
+  override def transferAsset(request: TransferRequest, wallet: Wallet): Either[ValidationError, TransferTransaction] = {
     val sender = wallet.privateKeyAccount(request.sender).get
-
-    val transferVal = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
-      sender: PrivateKeyAccount,
-      new Account(request.recipient),
-      request.amount,
-      getTimestamp,
-      request.feeAssetId.map(s => Base58.decode(s).get),
-      request.fee,
-      request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
-
-    transferVal match {
-      case Right(tx) =>
-        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-        else throw new StateCheckFailed("Invalid transfer transaction generated: " + tx.json)
-      case Left(err) =>
-        throw new IllegalArgumentException(err.toString)
-    }
-    transferVal
+    TransferTransaction
+      .create(request.assetId.map(s => Base58.decode(s).get),
+        sender: PrivateKeyAccount,
+        new Account(request.recipient),
+        request.amount,
+        getTimestamp,
+        request.feeAssetId.map(s => Base58.decode(s).get),
+        request.fee,
+        request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
+      .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
   }
 
-  override def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
+  override def issueAsset(request: IssueRequest, wallet: Wallet): Either[ValidationError, IssueTransaction] = {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val issueVal = IssueTransaction.create(sender,
-      request.name.getBytes(Charsets.UTF_8),
-      request.description.getBytes(Charsets.UTF_8),
-      request.quantity,
-      request.decimals,
-      request.reissuable,
-      request.fee,
-      getTimestamp)
-
-    issueVal match {
-      case Right(tx) =>
-        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-        else throw new StateCheckFailed("Invalid issue transaction generated: " + tx.json)
-        tx
-      case Left(err) =>
-        throw new IllegalArgumentException(err.toString)
-
-    }
+    IssueTransaction
+      .create(sender, request.name.getBytes(Charsets.UTF_8), request.description.getBytes(Charsets.UTF_8), request.quantity, request.decimals, request.reissuable, request.fee, getTimestamp)
+      .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
   }
 
-  override def reissueAsset(request: ReissueRequest, wallet: Wallet): Try[ReissueTransaction] = Try {
+  override def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction] = {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val reissueVal = ReissueTransaction.create(sender,
-      Base58.decode(request.assetId).get,
-      request.quantity,
-      request.reissuable,
-      request.fee,
-      getTimestamp)
-
-    reissueVal match {
-      case Right(tx) =>
-        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-        else throw new StateCheckFailed("Invalid reissue transaction generated: " + tx.json)
-        tx
-      case Left(err) =>
-        throw new IllegalArgumentException(err.toString)
-    }
+    ReissueTransaction
+      .create(sender, Base58.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, getTimestamp)
+      .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
   }
 
-  override def burnAsset(request: BurnRequest, wallet: Wallet): Try[BurnTransaction] = Try {
+  override def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction] = {
     val sender = wallet.privateKeyAccount(request.sender).get
-    val txVal: Either[ValidationError, BurnTransaction] = BurnTransaction.create(sender,
-      Base58.decode(request.assetId).get,
-      request.quantity,
-      request.fee,
-      getTimestamp)
 
-    txVal match {
-      case Right(tx) =>
-        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-        else throw new StateCheckFailed("Invalid delete transaction generated: " + tx.json)
-        tx
-      case Left(err) =>
-        throw new IllegalArgumentException(err.toString)
-
-    }
+    BurnTransaction
+      .create(sender, Base58.decode(request.assetId).get, request.quantity, request.fee, getTimestamp)
+      .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
   }
 
   private var txTime: Long = 0
@@ -202,14 +156,10 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     txTime
   }
 
-  override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction] = {
-    val pt = PaymentTransaction.create(sender, recipient, amount, fee, getTimestamp)
-    pt match {
-      case Right(t) => onNewOffchainTransaction(t)
-      case _ =>
-    }
-    pt
-  }
+  override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction] =
+    PaymentTransaction
+      .create(sender, recipient, amount, fee, getTimestamp)
+      .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
 
   override def genesisData: Seq[Transaction] = hardForkParams.genesisTxs
 
@@ -252,10 +202,8 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   val minimumTxFee = 100000 // TODO: remove later
 
-  override def signPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
-    wallet.privateKeyAccount(payment.sender).map { sender =>
-      PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
-    }
+  override def signPayment(payment: Payment, wallet: Wallet): Either[ValidationError, PaymentTransaction] = {
+    PaymentTransaction.create(wallet.privateKeyAccount(payment.sender).get, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
   }
 
   override def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
