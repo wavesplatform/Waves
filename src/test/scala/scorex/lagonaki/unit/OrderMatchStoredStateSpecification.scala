@@ -1,14 +1,13 @@
 package scorex.lagonaki.unit
 
 import java.nio.file.{Files, Paths}
-
 import org.h2.mvstore.MVStore
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.ChainParameters
+import scorex.settings.TestChainParameters
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
@@ -29,7 +28,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   val WAVES_UNITS = Order.PriceConstant
 
   val db = new MVStore.Builder().fileName(stateFile.toString).compress().open()
-  val state = StoredState.fromDB(db, ChainParameters.Enabled)
+  val state = StoredState.fromDB(db, TestChainParameters.Enabled)
   state.processBlock(TestBlock(Seq(GenesisTransaction.create(acc1, 1000 * WAVES_UNITS, 0).right.get,
     GenesisTransaction.create(acc2, 100 * WAVES_UNITS, 0).right.get)))
 

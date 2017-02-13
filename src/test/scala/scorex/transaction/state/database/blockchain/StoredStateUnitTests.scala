@@ -2,13 +2,14 @@ package scorex.transaction.state.database.blockchain
 
 import java.io.File
 import java.util.UUID
-
+import scala.util.Random
+import scala.util.control.NonFatal
 import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.{Account, AddressScheme, PrivateKeyAccount}
-import scorex.settings.ChainParameters
+import scorex.settings.{ChainParameters, TestChainParameters}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
@@ -16,13 +17,10 @@ import scorex.transaction.state.database.state._
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.waves.TestingCommons
 
-import scala.util.Random
-import scala.util.control.NonFatal
-
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging with TestingCommons {
 
-  val forkParametersWithEnableUnissuedAssetsCheck = new AnyRef with ChainParameters {
+  val forkParametersWithEnableUnissuedAssetsCheck = new ChainParameters with TestChainParameters.GenesisData {
     override def allowTemporaryNegativeUntil: Long = 0L
 
     override def requireSortedTransactionsAfter: Long = Long.MaxValue
@@ -44,8 +42,6 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     override def initialBalance: Long = ???
 
     override def genesisTimestamp: Long = ???
-
-    override def genesisTxs: Seq[Transaction] = ???
 
     override def addressScheme: AddressScheme = ???
   }

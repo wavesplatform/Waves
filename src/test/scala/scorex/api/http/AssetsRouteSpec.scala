@@ -2,12 +2,13 @@ package scorex.api.http
 
 import java.io.File
 import akka.http.scaladsl.model.headers.RawHeader
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.RestAPISettings
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import org.scalacheck.Gen._
 import play.api.libs.json.Json
 import scorex.wallet.Wallet
-import scorex.settings.Settings
 import scorex.transaction.{SimpleTransactionModule, TransactionGen}
 import scorex.transaction.state.wallet.TransferRequest
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
@@ -19,7 +20,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
   private val wallet = {
     val file = File.createTempFile("wallet", ".dat")
     file.deleteOnExit()
-    new Wallet(Some(file), "123", None)
+    new Wallet(Some(file.getCanonicalPath), "123", None)
   }
 
   routePath("balance/{address}/{assetId}") in pending
@@ -68,9 +69,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
 
 object AssetsRouteSpec {
   private[AssetsRouteSpec] val apiKey = ""
-  private[AssetsRouteSpec] val settings = new Settings {
-    override def settingsJSON = Json.obj("apiKeyHash" -> apiKey)
-  }
+  private[AssetsRouteSpec] val settings = RestAPISettings.fromConfig(ConfigFactory.parseString(""))
 
   private[AssetsRouteSpec] object g extends TransactionGen {
 

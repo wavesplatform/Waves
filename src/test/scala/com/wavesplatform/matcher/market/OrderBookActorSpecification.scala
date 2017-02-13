@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.market
 
+import scala.concurrent.duration._
 import akka.actor.{ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
@@ -12,13 +13,11 @@ import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrde
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import scorex.settings.ChainParameters
+import scorex.settings.TestChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
-
-import scala.concurrent.duration._
 
 class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   with WordSpecLike
@@ -38,7 +37,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
   val db = new MVStore.Builder().compress().open()
-  val storedState = fromDBWithUnlimitedBalance(db, ChainParameters.Disabled)
+  val storedState = fromDBWithUnlimitedBalance(db, TestChainParameters.Disabled)
 
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
