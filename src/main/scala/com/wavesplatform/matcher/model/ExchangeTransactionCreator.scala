@@ -1,12 +1,10 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.settings.WavesSettings
-import scorex.transaction.SimpleTransactionModule._
-import scorex.transaction.ValidationError
-import scorex.transaction.{SignedTransaction, TransactionModule}
+import com.wavesplatform.matcher.MatcherSettings
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.extension.OrderMatchStoredState
+import scorex.transaction.{SignedTransaction, TransactionModule, ValidationError}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
@@ -14,7 +12,7 @@ trait ExchangeTransactionCreator {
   val transactionModule: TransactionModule
   val storedState: StoredState
   val wallet: Wallet
-  val settings: WavesSettings
+  val settings: MatcherSettings
   //TODO ???
   val omss = storedState.validators.filter(_.isInstanceOf[OrderMatchStoredState]).head
     .asInstanceOf[OrderMatchStoredState]
@@ -32,16 +30,17 @@ trait ExchangeTransactionCreator {
     val price = counter.price
     val amount = math.min(submitted.amount, counter.amount)
     val (buy, sell) = Order.splitByType(submitted.order, counter.order)
-    val (buyFee, sellFee) =  calculateMatcherFee(buy, sell, amount: Long)
+    val (buyFee, sellFee) = calculateMatcherFee(buy, sell, amount: Long)
     ExchangeTransaction.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
   }
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
     def calcFee(o: Order, amount: Long): Long = {
       omss.findPrevOrderMatchTxs(o)
-      val p = BigInt(amount) * o.matcherFee  / o.amount
+      val p = BigInt(amount) * o.matcherFee / o.amount
       p.toLong
     }
+
     (calcFee(buy, amount), calcFee(sell, amount))
   }
 

@@ -3,7 +3,8 @@ package com.wavesplatform.matcher.market
 import akka.actor.Props
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
-import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
+import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
@@ -23,7 +24,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
-                     val wallet: Wallet, val settings: WavesSettings,
+                     val wallet: Wallet, val settings: MatcherSettings,
                      val transactionModule: TransactionModule)
   extends PersistentActor
     with ScorexLogging with OrderValidator with OrderHistory with ExchangeTransactionCreator {
@@ -31,7 +32,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
 
   private var orderBook = OrderBook.empty
 
-  context.system.scheduler.schedule(settings.snapshotInterval, settings.snapshotInterval, self, SaveSnapshot)
+  context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
 
   override def postStop(): Unit = {
     log.info(context.self.toString() + " - postStop method")
@@ -165,7 +166,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
 
 object OrderBookActor {
   def props(assetPair: AssetPair, storedState: StoredState,
-            wallet: Wallet, settings: WavesSettings, transactionModule: TransactionModule): Props =
+            wallet: Wallet, settings: MatcherSettings, transactionModule: TransactionModule): Props =
     Props(new OrderBookActor(assetPair, storedState, wallet, settings, transactionModule))
 
   def name(assetPair: AssetPair): String = assetPair.toString

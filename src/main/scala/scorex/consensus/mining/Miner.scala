@@ -14,7 +14,7 @@ import scala.util.{Failure, Try}
 class Miner(application: Application) extends Actor with ScorexLogging {
 
   private lazy val blockGenerationDelay =
-    math.max(application.settings.blockGenerationDelay.toMillis, BlockGenerationTimeShift.toMillis) millis
+    math.max(application.settings.minerSettings.generationDelay.toMillis, BlockGenerationTimeShift.toMillis) millis
 
   private implicit lazy val transactionModule = application.transactionModule
   private lazy val consensusModule = application.consensusModule
@@ -59,7 +59,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
   protected def preciseTime: Long = NTP.correctedTime()
 
   private def scheduleBlockGeneration(): Unit = try {
-    val schedule = if (application.settings.tflikeScheduling) {
+    val schedule = if (application.settings.minerSettings.tfLikeScheduling) {
       val lastBlock = application.history.lastBlock
       val currentTime = preciseTime
 

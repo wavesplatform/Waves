@@ -7,6 +7,7 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.mining.BlockGeneratorController.{LastBlockChanged, StartGeneration}
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
 import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus, Status}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
@@ -38,7 +39,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   private def currentCheckpoint(): Option[Checkpoint] = history.getCheckpoint
 
-  context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, BroadcastCurrentScore)
+  context.system.scheduler.schedule(1.second, application.settings.synchronizationSettings.scoreBroadcastInterval, self, BroadcastCurrentScore)
 
   application.blockGenerator ! StartGeneration
 
@@ -59,7 +60,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       }
 
     case ConnectedPeers(peers) =>
-      val quorumSize = application.settings.quorum
+      val quorumSize = application.settings.minerSettings.quorum
       val actualSize = peers.intersect(peerScores.keySet).size
       if (actualSize < quorumSize) {
         log.debug(s"Quorum to download blocks is not reached: $actualSize peers but should be $quorumSize")
@@ -116,7 +117,9 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   private def handleCheckpoint(checkpoint: Checkpoint, from: Option[ConnectedPeer]): Unit =
     if (currentCheckpoint.forall(c => !(c.signature sameElements checkpoint.signature))) {
-      application.settings.checkpointPublicKey foreach {
+      val maybePublicKeyBytes = Base58.decode(application.settings.checkpointsSettings.publicKey).toOption
+
+      maybePublicKeyBytes foreach {
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
             history.setCheckpoint(Some(checkpoint))

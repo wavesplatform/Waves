@@ -14,7 +14,7 @@ import scorex.crypto.encode.Base58
 @Api(value = "/wallet", description = "Wallet-related calls")
 case class WalletApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
 
   private val wallet = application.wallet
 

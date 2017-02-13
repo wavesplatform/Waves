@@ -25,9 +25,10 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.google.code.findbugs" % "annotations" % "2.0.1",
   "com.google.guava" % "guava" % "19.0",
   "com.h2database" % "h2-mvstore" % "1.4.193",
+  "com.iheart" % "ficus_2.12" % "1.4.0",
   "com.ning" % "async-http-client" % "1.9.11",
   "com.thoughtworks.paranamer" % "paranamer" % "2.8",
-  "com.typesafe" % "config" % "1.3.0",
+  "com.typesafe" % "config" % "1.3.1",
   "com.typesafe" % "ssl-config-core_2.12" % "0.2.1",
   "com.typesafe.akka" % "akka-actor_2.12" % "2.4.16",
   "com.typesafe.akka" % "akka-http-core_2.12" % "10.0.1",
@@ -89,4 +90,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH 41eb6c35437fdb25d4cad8450bf6de395e47cdb4
+// LIBRARY_DEPENDENCIES_HASH ed6f60eff37d21329e98f6ba493ba2e243380312

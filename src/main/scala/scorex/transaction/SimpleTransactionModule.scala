@@ -2,7 +2,7 @@ package scorex.transaction
 
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.app.Application
@@ -11,7 +11,7 @@ import scorex.consensus.TransactionsOrdering
 import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
-import scorex.settings.{ChainParameters, Settings}
+import scorex.settings.ChainParameters
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
@@ -43,20 +43,20 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
 }
 
 
-class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val settings: Settings,
+class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val settings: WavesSettings,
                                                                application: Application)
   extends TransactionModule with ScorexLogging {
 
   import SimpleTransactionModule._
 
   val networkController = application.networkController
-  private val feeCalculator = new FeeCalculator(settings)
+  private val feeCalculator = new FeeCalculator(settings.feesSettings)
 
   val InitialBalance = hardForkParams.initialBalance
 
-  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings)
+  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
 
-  override val blockStorage = new BlockStorageImpl(settings, hardForkParams)(application.consensusModule, this)
+  override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)(application.consensusModule, this)
 
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 
@@ -305,7 +305,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       throw t
   }
 
-  val minimumTxFee = settings.asInstanceOf[WavesSettings].minimumTxFee
+  val minimumTxFee = 100000 // TODO: remove later
 
   def signPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
@@ -332,7 +332,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     */
   def broadcastPayment(payment: SignedPayment): Either[ValidationError, PaymentTransaction] = {
     val maybeSignatureBytes = Base58.decode(payment.signature).toOption
-    if (payment.fee < minimumTxFee)
+    if (payment.fee < minimumTxFee) // TODO: remove this check later
       Left(ValidationError.InsufficientFee)
     else if (maybeSignatureBytes.isEmpty)
       Left(ValidationError.InvalidSignature)

@@ -21,7 +21,7 @@ case class TransactionsApiRoute(application: Application)(implicit val context: 
   extends ApiRoute with CommonApiFunctions {
   val MaxTransactionsPerRequest = 1000
 
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
 
   private val state: LagonakiState = application.blockStorage.state
 

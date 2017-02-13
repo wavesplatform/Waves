@@ -1,3 +1,4 @@
+/*
 package scorex.settings
 
 import java.net.InetSocketAddress
@@ -211,3 +212,4 @@ object Settings extends ScorexLogging {
     }
   }
 }
+*/

@@ -2,6 +2,7 @@ package com.wavesplatform.actor
 
 import akka.actor.{ActorSystem, AllForOneStrategy, SupervisorStrategy, SupervisorStrategyConfigurator}
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
+import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.settings.WavesSettings
 import scorex.utils.ScorexLogging
 
@@ -20,11 +21,11 @@ object RootActorSystem extends ScorexLogging {
     }
   }
 
-  def start(id: String, settings: WavesSettings)(init: ActorSystem => Unit): Unit = {
+  def start(id: String, settings: MatcherSettings)(init: ActorSystem => Unit): Unit = {
     val system = ActorSystem(id, ConfigFactory.load().withValue("akka.actor.guardian-supervisor-strategy",
       ConfigValueFactory.fromAnyRef("com.wavesplatform.actor.RootActorSystem$EscalatingStrategy"))
-      .withValue("akka.persistence.journal.leveldb.dir", ConfigValueFactory.fromAnyRef(settings.matcherJournalDataDir))
-      .withValue("akka.persistence.snapshot-store.local.dir", ConfigValueFactory.fromAnyRef(settings.matcherSnapshotsDataDir)))
+      .withValue("akka.persistence.journal.leveldb.dir", ConfigValueFactory.fromAnyRef(settings.journalDataDir))
+      .withValue("akka.persistence.snapshot-store.local.dir", ConfigValueFactory.fromAnyRef(settings.snapshotsDataDir)))
 
     try {
       init(system)

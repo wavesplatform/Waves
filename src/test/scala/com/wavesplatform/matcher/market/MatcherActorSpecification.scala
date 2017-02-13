@@ -4,9 +4,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.http.scaladsl.model.StatusCodes
-import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import akka.testkit.{ImplicitSender, TestKit}
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
@@ -24,7 +22,7 @@ import scorex.crypto.encode.Base58
 import scorex.settings.ChainParameters
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
 class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest"))
@@ -40,11 +38,8 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   val db = new MVStore.Builder().compress().open()
   val storedState = fromDBWithUnlimitedBalance(db, ChainParameters.Disabled)
 
-  val settings = new WavesSettings(JsObject(Seq(
-    "matcher" -> JsObject(
-      Seq("account" -> JsString(MatcherAccount.address))
-    )
-  )))
+  val settings = matcherSettings.copy(account = MatcherAccount.address)
+
   val wallet = new Wallet(None, "matcher", Option(WalletSeed))
   wallet.generateNewAccount()
   var actor: ActorRef = system.actorOf(Props(new MatcherActor(storedState, wallet, settings,
@@ -80,7 +75,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
       actor ! RestartActor
       actor ! GetOrderBookRequest(pair, None)
-      expectMsg(GetOrderBookResponse(pair, Seq(LevelAgg(100000000,2000)), Seq()))
+      expectMsg(GetOrderBookResponse(pair, Seq(LevelAgg(100000000, 2000)), Seq()))
     }
 
     "return all open markets" in {

@@ -1,36 +1,31 @@
 package scorex.consensus.mining
 
-import scala.concurrent.duration.FiniteDuration
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.WavesSettings
 import scorex.ActorTestingCommons
+import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.network.ConnectedPeer
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.settings.SettingsMock
-import scala.language.postfixOps
-import scorex.block.Block
 import scorex.transaction.History
+
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class BlockGeneratorControllerSpecification extends ActorTestingCommons {
 
-  val offlineGen = stubFunction[Boolean]
-  def setOfflineGeneration(value: Boolean) = offlineGen when() returns value
-
-  object TestSettings extends SettingsMock {
-    override lazy val quorum: Int = 1
-    override lazy val offlineGeneration: Boolean = offlineGen()
-    override lazy val allowedGenerationTimeFromLastBlockInterval: FiniteDuration = 10 minutes
-  }
+  def setOfflineGeneration(value: Boolean): Unit = wavesSettings.copy(minerSettings = wavesSettings.minerSettings.copy(offline = value))
 
   val testPeerManager = TestProbe("PeerManager")
 
   trait App extends ApplicationMock {
-    override lazy val settings = TestSettings
+    override lazy val settings = wavesSettings
     override val peerManager: ActorRef = testPeerManager.ref
     @volatile
     var history: History = _
+
     private[BlockGeneratorControllerSpecification] def setHistory(history: History) = this.history = history
   }
 
@@ -38,8 +33,10 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
   setDefaultLastBlock()
 
   private def setDefaultLastBlock(): Unit = setLastBlock(testBlock(2))
-  private def setLastBlock(block: Block, desiredHeight : Int = 1): Unit = stubApp.setHistory(historyWithLastBlock(block, desiredHeight))
-  private def historyWithLastBlock(block: Block, desiredHeight : Int ): History = {
+
+  private def setLastBlock(block: Block, desiredHeight: Int = 1): Unit = stubApp.setHistory(historyWithLastBlock(block, desiredHeight))
+
+  private def historyWithLastBlock(block: Block, desiredHeight: Int): History = {
     val stubHistory = stub[History]
     (stubHistory.lastBlock _).when().returns(block).anyNumberOfTimes()
     (stubHistory.height _).when().returns(desiredHeight).anyNumberOfTimes()
@@ -64,7 +61,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     }
 
     "when Idle don't check peers number" in {
-      setLastBlock(testBlock(2, 0),2)
+      setLastBlock(testBlock(2, 0), 2)
       assertStatusIs(Idle)
       actorRef ! SelfCheck
       testPeerManager.expectNoMsg(testDuration)

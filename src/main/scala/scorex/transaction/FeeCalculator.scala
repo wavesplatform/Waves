@@ -1,14 +1,22 @@
 package scorex.transaction
 
+import com.wavesplatform.settings.FeesSettings
 import scorex.crypto.encode.Base58
-import scorex.settings.Settings
 
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
   */
-class FeeCalculator(settings: Settings) {
+class FeeCalculator(settings: FeesSettings) {
 
-  private val map: Map[String, Long] = settings.feeMap
+  private val map: Map[String, Long] = {
+    settings.fees.map { fs =>
+      val transactionType = fs.transactionType
+      val maybeAsset = if (fs.asset.toUpperCase == "WAVES") None else Base58.decode(fs.asset).toOption
+      val fee = fs.fee
+
+      TransactionAssetFee(transactionType, maybeAsset).key -> fee
+    }.toMap
+  }
 
   def enoughFee(tx: Transaction): Boolean = tx match {
     case ttx: TypedTransaction =>

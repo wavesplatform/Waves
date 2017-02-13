@@ -33,11 +33,11 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
   private lazy val coordinator = application.coordinator
   private lazy val history = application.history
 
-  private lazy val timeout = application.settings.historySynchronizerTimeout
-  private lazy val maxChainLength = application.settings.maxChain
-  private lazy val operationRetries = application.settings.operationRetries
-  private lazy val pinToInitialPeer = application.settings.pinToInitialPeer
-  private lazy val partialBlockLoading = !application.settings.loadEntireChain
+  private lazy val timeout = application.settings.synchronizationSettings.synchronizationTimeout
+  private lazy val maxChainLength = application.settings.synchronizationSettings.maxChainLength
+  private lazy val operationRetries = application.settings.synchronizationSettings.operationRetries
+  private lazy val pinToInitialPeer = application.settings.synchronizationSettings.pinToInitialPeer
+  private lazy val partialBlockLoading = !application.settings.synchronizationSettings.loadEntireChain
 
   private var timeoutData = Option.empty[Cancellable]
 
@@ -47,7 +47,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     case GetExtension(peerScores) =>
       start(GettingExtension) { _ =>
 
-        val lastIds = history.lastBlockIds(application.settings.MaxRollback)
+        val lastIds = history.lastBlockIds(application.settings.synchronizationSettings.maxRollback)
 
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peerScores.keys.toSeq))
@@ -230,7 +230,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         val peerData@Peer(score, retries) = peers(active)
         val updatedRetries = retries + 1
 
-        val updatedPeers = (if (updatedRetries > application.settings.retriesBeforeBlacklisted) {
+        val updatedPeers = (if (updatedRetries > application.settings.synchronizationSettings.retriesBeforeBlacklisting) {
           if (!ps.activeChanged) blacklistPeer("Timeout exceeded", active)
           peers - active
         } else peers + (active -> peerData.copy(retries = updatedRetries))).filterNot(_._2.score < score)

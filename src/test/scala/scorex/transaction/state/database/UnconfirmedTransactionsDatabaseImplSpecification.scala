@@ -1,11 +1,12 @@
 package scorex.transaction.state.database
 
+import com.wavesplatform.settings.UTXSettings
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
-import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
-import scorex.settings.Settings
 import scorex.transaction.{GenesisTransaction, Transaction}
+
+import scala.concurrent.duration._
 
 class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
   with Matchers
@@ -15,18 +16,12 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
   "utx database" - {
 
     val validator = mockFunction[Transaction, Boolean]
-    val defaultSizedUtxSettings = new Settings {
-      override lazy val utxSize = 1000
-      override def settingsJSON: JsObject = Json.obj()
-    }
+    val defaultSizedUtxSettings = UTXSettings(1000, 2.seconds)
 
 
     "do nothing if tx db becomes full" in {
 
-      val smallSizedUTXSettings = new Settings {
-        override lazy val utxSize = 1
-        override def settingsJSON: JsObject = Json.obj()
-      }
+      val smallSizedUTXSettings = UTXSettings(1, 1.second)
 
       val db = new UnconfirmedTransactionsDatabaseImpl(smallSizedUTXSettings)
 

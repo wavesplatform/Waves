@@ -1,21 +1,23 @@
 package scorex.transaction.state.database
 
+import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.settings.BlockchainSettingsExtension._
 import org.h2.mvstore.MVStore
 import scorex.consensus.ConsensusModule
-import scorex.settings.{Settings, ChainParameters}
 import scorex.transaction._
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 
-class BlockStorageImpl(settings: Settings, forksParams: ChainParameters)
-                      (implicit consensusModule: ConsensusModule, transactionModule: TransactionModule)
+class BlockStorageImpl(settings: BlockchainSettings)(implicit consensusModule: ConsensusModule, transactionModule: TransactionModule)
   extends BlockStorage {
 
   require(consensusModule != null)
 
-  private val database: MVStore = createMVStore(Option("blockchain.dat"))
+  private def stringToOption(s: String) = Option(s).filter(_.trim.nonEmpty)
 
-  def createMVStore(fileName: Option[String]): MVStore = {
-    settings.dataDirOpt.flatMap(dir => fileName.map(dir + '/' + _)) match {
+  private val database: MVStore = createMVStore(settings.file)
+
+  def createMVStore(fileName: String): MVStore = {
+    stringToOption(fileName) match {
       case Some(pathToDataFile) =>
         new MVStore.Builder().fileName(pathToDataFile).compress().open()
       case None =>
@@ -25,14 +27,8 @@ class BlockStorageImpl(settings: Settings, forksParams: ChainParameters)
 
   protected[this] override val db: MVStore = database
 
-  override val history: History = settings.history match {
-    case s: String if s.equalsIgnoreCase("blockchain") =>
-      new StoredBlockchain(db)(consensusModule, transactionModule)
-    case s =>
-      log.error(s"Unknown history storage: $s. Use StoredBlockchain...")
-      new StoredBlockchain(db)(consensusModule, transactionModule)
-  }
+  override val history: History = new StoredBlockchain(db)(consensusModule, transactionModule)
 
-  override val state: StoredState = StoredState.fromDB(db, forksParams)
+  override val state: StoredState = StoredState.fromDB(db, settings.asChainParameters)
 
 }

@@ -23,7 +23,7 @@ case class PeersApiRoute(application: RunnableApplication)(implicit val context:
   extends ApiRoute {
   val MaxPeersInResponse = 1000
 
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
 
   override lazy val route =
     pathPrefix("peers") {

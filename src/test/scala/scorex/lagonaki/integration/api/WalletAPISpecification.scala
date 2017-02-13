@@ -14,6 +14,6 @@ class WalletAPISpecification extends FunSuite with Matchers with scorex.waves.Te
     GET.incorrectApiKeyTest("/wallet/seed")
 
     val response = GET.request("/wallet/seed", headers = Map("api_key" -> "test"))
-    (response \ "seed").as[String] shouldBe Base58.encode(application.settings.walletSeed.get)
+    (response \ "seed").as[String] shouldBe application.settings.walletSettings.seed
   }
 }

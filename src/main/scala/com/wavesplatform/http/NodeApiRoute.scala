@@ -23,7 +23,7 @@ import scala.concurrent.Future
 case class NodeApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions with ScorexLogging {
 
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
   override lazy val route =
     pathPrefix("node") {
       stop ~ status ~ version

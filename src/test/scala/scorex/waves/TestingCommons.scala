@@ -4,15 +4,16 @@ import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.util.Timeout
 import com.ning.http.client.Response
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.Application
 import com.wavesplatform.settings.{Constants, WavesSettings}
-import com.wavesplatform.{Application, TestNetParams}
 import dispatch.{Http, url}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 import scorex.account.{Account, AddressScheme}
 import scorex.api.http.ApiKeyNotValid
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
-import scorex.settings.{ChainParameters, Settings}
+import scorex.settings.ChainParameters
 import scorex.transaction.{GenesisTransaction, Transaction}
 import scorex.utils._
 
@@ -71,9 +72,11 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
     stop()
   }
 
-  implicit object TestTransactionLayerSettings extends Settings {
-    override val settingsJSON: JsObject = Json.obj()
-  }
+  /*
+    implicit object TestTransactionLayerSettings extends Settings {
+      override val settingsJSON: JsObject = Json.obj()
+    }
+  */
 
   def randomFrom[T](seq: Seq[T]): T = {
     require(seq.nonEmpty)
@@ -82,27 +85,71 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
 
   implicit val timeout = Timeout(1.second)
 
-  AddressScheme.current = TestNetParams.addressScheme
+  private val config1 = ConfigFactory.parseString(
+    """
+      |waves {
+      |  miner {
+      |    enable: yes
+      |    offline: yes
+      |    quorum: 1
+      |    block-generation-delay: 1s
+      |    interval-after-last-block-then-generation-is-allowed: 10m
+      |    tf-like-scheduling: yes
+      |  }
+      |}
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+  val wavesSettings1: WavesSettings = WavesSettings.fromConfig(config1)
+
+  private val config2 = ConfigFactory.parseString(
+    """
+      |waves {
+      |  miner {
+      |    enable: yes
+      |    offline: yes
+      |    quorum: 1
+      |    block-generation-delay: 1s
+      |    interval-after-last-block-then-generation-is-allowed: 10m
+      |    tf-like-scheduling: yes
+      |  }
+      |}
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+  val wavesSettings2: WavesSettings = WavesSettings.fromConfig(config2)
+
+  private val config3 = ConfigFactory.parseString(
+    """
+      |waves {
+      |  miner {
+      |    enable: yes
+      |    offline: yes
+      |    quorum: 1
+      |    block-generation-delay: 1s
+      |    interval-after-last-block-then-generation-is-allowed: 10m
+      |    tf-like-scheduling: yes
+      |  }
+      |}
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+  val wavesSettings3: WavesSettings = WavesSettings.fromConfig(config3)
+
 
   val applications = List(
-    new Application(ActorSystem("test0"), new WavesSettings(Settings.readSettingsJson("settings-test.json")) {
+    new Application(ActorSystem("test0"), WavesSettings.fromConfig(config1)) /* {
       override lazy val chainParams = UnitTestNetParams
       override lazy val walletDirOpt = None
       override lazy val dataDirOpt = None
       override lazy val nodeNonce = 111L
-    }),
-    new Application(ActorSystem("test1"), new WavesSettings(Settings.readSettingsJson("settings-local1.json")) {
+    })*/ ,
+    new Application(ActorSystem("test1"), WavesSettings.fromConfig(config2)) /*Settings.readSettingsJson("settings-local1.json")) {
       override lazy val chainParams = UnitTestNetParams
       override lazy val walletDirOpt = None
       override lazy val dataDirOpt = None
       override lazy val nodeNonce = 222L
-    }),
-    new Application(ActorSystem("test2"), new WavesSettings(Settings.readSettingsJson("settings-local2.json")) {
+    })*/ ,
+    new Application(ActorSystem("test2"), WavesSettings.fromConfig(config3)) /*Settings.readSettingsJson("settings-local2.json")) {
       override lazy val chainParams = UnitTestNetParams
       override lazy val walletDirOpt = None
       override lazy val dataDirOpt = None
       override lazy val nodeNonce = 333L
-    })
+    })*/
   )
   applications.foreach(_.run())
   applications.foreach { a =>
@@ -121,10 +168,10 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   def stop(): Unit = {
     applications.foreach(a => {
 
-      if (a.settings.isRunMatcher) {
+      if (a.settings.matcherSettings.enable) {
         a.shutdownMatcher()
       }
-        a.shutdown()
+      a.shutdown()
     })
   }
 
@@ -155,10 +202,10 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   }
 
   def peerUrl(a: Application = application): String =
-    "http://" + a.settings.bindAddress + ":" + a.settings.rpcPort
+    "http://" + a.settings.restAPISettings.bindAddress + ":" + a.settings.restAPISettings.port
 
   def matcherUrl(a: Application = application): String =
-    "http://" + a.settings.matcherHost + ":" + a.settings.matcherPort + "/matcher"
+    "http://" + a.settings.restAPISettings.bindAddress + ":" + a.settings.restAPISettings.port + "/matcher"
 
   def getRequest(us: String, peer: String = peerUrl(application),
                  headers: Map[String, String] = Map.empty): JsValue = {

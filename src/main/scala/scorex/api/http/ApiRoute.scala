@@ -5,10 +5,10 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode}
 import akka.http.scaladsl.server._
 import akka.util.Timeout
+import com.wavesplatform.settings.RestAPISettings
 import play.api.libs.json.JsValue
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
-import scorex.settings.Settings
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -16,14 +16,14 @@ import scala.concurrent.{Await, Future}
 final case class JsonResponse(response: JsValue, code: StatusCode)
 
 trait ApiRoute extends Directives with CommonApiFunctions {
-  val settings: Settings
+  val settings: RestAPISettings
   val context: ActorRefFactory
   val route: Route
 
   implicit val timeout = Timeout(5.seconds)
 
-  lazy val corsAllowed = settings.corsAllowed
-  lazy val apiKeyHash = settings.apiKeyHash
+  lazy val corsAllowed = settings.cors
+  lazy val apiKeyHash = Base58.decode(settings.apiKeyHash).toOption
 
   //def actorRefFactory: ActorRefFactory = context
 

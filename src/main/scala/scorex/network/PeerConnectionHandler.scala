@@ -24,7 +24,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
 
   private lazy val peerManager = application.peerManager
 
-  private lazy val outboundBufferSize = application.settings.outboundBufferSize
+  private lazy val outboundBufferSize = application.settings.networkSettings.outboundBufferSize
 
   private var outboundBuffer = Vector.empty[ByteString]
 
@@ -32,7 +32,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
   private var handshakeSent = false
 
   private val timeout = context.system.scheduler.scheduleOnce(
-    application.settings.connectionTimeout seconds, self, HandshakeTimeout)
+    application.settings.networkSettings.connectionTimeout, self, HandshakeTimeout)
 
   connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
 

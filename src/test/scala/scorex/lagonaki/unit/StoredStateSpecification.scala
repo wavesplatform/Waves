@@ -4,19 +4,20 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
-import scala.util.Random
 import org.h2.mvstore.MVStore
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.{Settings, ChainParameters}
+import scorex.settings.ChainParameters
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, GenesisTransaction}
 import scorex.wallet.Wallet
+
+import scala.util.Random
 
 class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPropertyChecks {
 
@@ -45,6 +46,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
   }
 
   private val i = new AtomicInteger
+
   private def createTransferAssetTx(request: TransferRequest, wallet: Wallet): TransferTransaction = {
     val sender = wallet.privateKeyAccount(request.sender).get
     TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
@@ -85,7 +87,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
     state.balance(acc) should be(startWavesBalance - 100000000 - 20)
-}
+  }
 
   test("many transfer waves transactions") {
     val acc = accounts.head

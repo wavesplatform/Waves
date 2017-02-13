@@ -29,12 +29,12 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
 
   lazy val ownSocketAddress = getDeclaredHost.flatMap(host => Try(InetAddress.getByName(host)).toOption)
     .orElse {
-      if (settings.upnpEnabled) application.upnp.externalAddress else None
-    }.map(inetAddress => new InetSocketAddress(inetAddress, getDeclaredPort.getOrElse(application.settings.port)))
+      if (settings.uPnPSettings.enable) application.upnp.externalAddress else None
+    }.map(inetAddress => new InetSocketAddress(inetAddress, getDeclaredPort.getOrElse(settings.port)))
 
-  lazy val connTimeout = Some(new FiniteDuration(settings.connectionTimeout, SECONDS))
+  lazy val connTimeout = Some(settings.connectionTimeout)
 
-  private lazy val settings = application.settings
+  private lazy val settings = application.settings.networkSettings
 
   // there is not recovery for broken connections
   override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
@@ -64,7 +64,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
         } match {
           case true => true
           case false =>
-            if (settings.upnpEnabled) {
+            if (settings.uPnPSettings.enable) {
               val externalAddress = application.upnp.externalAddress
               myAddress.contains(externalAddress)
             } else false
@@ -107,7 +107,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
       }
 
     case stn@SendToNetwork(_, _) =>
-      val delay = if (settings.fuzzingDelay > 0) Random.nextInt(settings.fuzzingDelay) else 0
+      val delay = 0
       system.scheduler.scheduleOnce(delay.millis) {
         peerManager ! stn
       }
@@ -159,8 +159,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
       log.warn(s"NetworkController: got something strange $nonsense")
   }
 
-  private def getDeclaredUri: Option[URI] =
-    settings.declaredAddress.flatMap(declaredAddress => Try(new URI(s"http://$declaredAddress")).toOption)
+  private def getDeclaredUri: Option[URI] = Try(new URI(s"http://${settings.declaredAddress}")).toOption
 
   private def getDeclaredHost: Option[String] = getDeclaredUri.map(_.getHost)
 

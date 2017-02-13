@@ -2,17 +2,23 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.NetworkSettings
 import org.scalatest.{FeatureSpec, GivenWhenThen, ParallelTestExecution}
-import play.api.libs.json.{JsObject, Json}
 import scorex.network.peer.PeerDatabaseImpl
-import scorex.settings.Settings
 
 class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with ParallelTestExecution {
 
-  object TestSettings extends Settings {
-    override lazy val settingsJSON: JsObject = Json.obj()
-    override lazy val blacklistResidenceTimeMilliseconds = 1000L
-  }
+  private val config = ConfigFactory.parseString(
+    """
+      |waves {
+      |  network {
+      |    black-list-residence-time: 1s
+      |  }
+      |}
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+
+  private val networkSettings = NetworkSettings.fromConfig(config)
 
   info("As a Peer")
   info("I want to blacklist other peers for certain time")
@@ -20,7 +26,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
 
   feature("Blacklist") {
 
-    val peerDatabase = new PeerDatabaseImpl(TestSettings, None)
+    val peerDatabase = new PeerDatabaseImpl(networkSettings, None)
 
     val host1 = "1.1.1.1"
     val host2 = "2.2.2.2"
@@ -50,7 +56,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(!peerDatabase.getKnownPeers.contains(address1))
 
       And("Peer waits for some time")
-      Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds)
+      Thread.sleep(networkSettings.blackListResidenceTime.toMillis)
 
       Then("Another peer disappear from blacklist")
       assert(!isBlacklisted(address1))
@@ -82,13 +88,13 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(isBlacklisted(address3))
 
       And("Peer waits half period")
-      Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds / 2)
+      Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
 
       And("Adds one peer to blacklist one more time")
       peerDatabase.blacklistHost(address2.getHostName)
 
       And("Waits another half of period")
-      Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds / 2)
+      Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
 
       Then("Two peers disappear from blacklist")
       assert(!isBlacklisted(address1))
@@ -96,7 +102,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(!isBlacklisted(address3))
 
       And("Then waits another half of period")
-      Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds / 2)
+      Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
 
       And("All peers not in blacklist")
       assert(!isBlacklisted(address1))

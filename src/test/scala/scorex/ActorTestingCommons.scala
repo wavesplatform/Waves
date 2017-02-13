@@ -3,19 +3,21 @@ package scorex
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
+import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.settings.WavesSettings
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{FreeSpecLike, Matchers}
+import org.scalatest.Matchers
 import scorex.account.PublicKeyAccount
 import scorex.app.Application
 import scorex.block.Block._
-import scorex.block.{Block, LongBlockField, SignerData}
+import scorex.block.{Block, SignerData}
 import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
-import scorex.transaction.{TransactionModule, TransactionsBlockField}
 import scorex.transaction.TypedTransaction.SignatureLength
+import scorex.transaction.{TransactionModule, TransactionsBlockField}
 
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
@@ -25,6 +27,24 @@ abstract class ActorTestingCommons extends TestKitBase
   with Matchers
   with ImplicitSender
   with PathMockFactory {
+
+  protected val testConfig: Config = ConfigFactory.parseString(
+    """
+      |waves {
+      |  miner {
+      |    enable: yes
+      |    offline: yes
+      |    quorum: 1
+      |    block-generation-delay: 1s
+      |    interval-after-last-block-then-generation-is-allowed: 10m
+      |    tf-like-scheduling: yes
+      |  }
+      |}
+    """.stripMargin)
+
+  protected val config: Config = testConfig.withFallback(ConfigFactory.load()).resolve()
+
+  val wavesSettings: WavesSettings = WavesSettings.fromConfig(config)
 
   protected implicit val testTimeout = Timeout(2000.milliseconds)
   protected val testDuration = testTimeout.duration
@@ -70,12 +90,8 @@ abstract class ActorTestingCommons extends TestKitBase
   protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
 
   protected def testBlock(id: Int, ts: Long = System.currentTimeMillis()) =
-    Block(timestamp = ts,
-      version = 0,
-      reference = 1,
-      signerData = SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array(id.toByte)),
-      consensusData = NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
-      transactionData = Seq.empty)
+    Block(ts, 0, 1, SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array(id.toByte)),
+      NxtConsensusBlockField(NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte))), TransactionsBlockField(Seq.empty))
 
   protected trait TestDataExtraction[T] {
     def extract(actual: T): Any

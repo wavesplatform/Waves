@@ -21,7 +21,7 @@ case class AddressApiRoute(application: Application)(implicit val context: Actor
   extends ApiRoute with CommonTransactionApiFunctions {
   val MaxAddressesPerRequest = 1000
 
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
 
   private val wallet = application.wallet
   private val state = application.blockStorage.state

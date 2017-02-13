@@ -8,7 +8,6 @@ import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.network.Coordinator.AddBlock
-import scorex.settings.SettingsMock
 import scorex.transaction.{History, TransactionModule}
 import scorex.wallet.Wallet
 
@@ -25,13 +24,7 @@ class MinerSpecification extends ActorTestingCommons {
 
   import Miner._
 
-  private val tf = mockFunction[Boolean]
-  private def setTF(value: Boolean) = tf expects() returns value anyNumberOfTimes()
-
-  private object TestSettings extends SettingsMock {
-    override lazy val blockGenerationDelay: FiniteDuration = 1500 millis
-    override lazy val tflikeScheduling: Boolean = tf()
-  }
+  private def setTF(value: Boolean) = wavesSettings.copy(minerSettings = wavesSettings.minerSettings.copy(tfLikeScheduling = value))
 
   private val testWallet = new Wallet(None, "", Option("seed".getBytes()))
   private val account = testWallet.generateNewAccount().get
@@ -75,7 +68,7 @@ class MinerSpecification extends ActorTestingCommons {
   }
 
   private trait App extends ApplicationMock {
-    override val settings = TestSettings
+    override val settings = wavesSettings
     override val wallet: Wallet = testWallet
     override val coordinator = testCoordinator.ref
     override val history: History = testHistory
@@ -103,7 +96,7 @@ class MinerSpecification extends ActorTestingCommons {
 
         actorRef ! GuessABlock(false)
 
-        testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay * 2)
+        testCoordinator.expectNoMsg(wavesSettings.minerSettings.generationDelay * 2)
         testCoordinator.expectMsg(AddBlock(newBlock, None))
         testCoordinator.expectNoMsg()
       }
@@ -182,9 +175,9 @@ class MinerSpecification extends ActorTestingCommons {
 
           actorRef ! GuessABlock(false)
 
-          testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
+          testCoordinator.expectNoMsg(wavesSettings.minerSettings.generationDelay)
           testCoordinator.expectMsg(AddBlock(newBlock, None))
-          testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay + genTimeShift)
+          testCoordinator.expectNoMsg(wavesSettings.minerSettings.generationDelay + genTimeShift)
         }
 
         "past" in {

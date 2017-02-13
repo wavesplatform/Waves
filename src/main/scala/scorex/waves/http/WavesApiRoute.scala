@@ -25,7 +25,7 @@ import scala.util.Try
 case class WavesApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
 
   lazy val wallet = application.wallet
 

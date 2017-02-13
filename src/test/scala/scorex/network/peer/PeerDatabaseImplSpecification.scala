@@ -2,16 +2,38 @@ package scorex.network.peer
 
 import java.net.InetSocketAddress
 
-import org.scalatest.{DoNotDiscover, Matchers, path}
-import scorex.settings.SettingsMock
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.NetworkSettings
+import org.scalatest.{Matchers, path}
 
-import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.{implicitConversions, postfixOps}
 
 class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
-  val database = new PeerDatabaseImpl(TestSettings, None)
-  val database2 = new PeerDatabaseImpl(TestSettings2, None)
+  private val config1 = ConfigFactory.parseString(
+    """
+      |waves {
+      |  network {
+      |    file: ""
+      |    peers-data-residence-time: 1s
+      |  }
+      |}
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+  private val settings1 = NetworkSettings.fromConfig(config1)
+
+  private val config2 = ConfigFactory.parseString(
+    """
+      |waves {
+      |  network {
+      |    file: ""
+      |    peers-data-residence-time: 10s
+      |  }
+      |}
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+  private val settings2 = NetworkSettings.fromConfig(config2)
+
+  val database = new PeerDatabaseImpl(settings1, None)
+  val database2 = new PeerDatabaseImpl(settings2, None)
   val host1 = "1.1.1.1"
   val host2 = "2.2.2.2"
   val address1 = new InetSocketAddress(host1, 1)
@@ -100,15 +122,5 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
   private def sleepLong() = Thread.sleep(1200)
 
   private def sleepShort() = Thread.sleep(200)
-
-  object TestSettings extends SettingsMock {
-    override lazy val dataDirOpt: Option[String] = None
-    override lazy val peersDataResidenceTime: FiniteDuration = 1.seconds
-  }
-
-  object TestSettings2 extends SettingsMock {
-    override lazy val dataDirOpt: Option[String] = None
-    override lazy val peersDataResidenceTime: FiniteDuration = 10.seconds
-  }
 
 }

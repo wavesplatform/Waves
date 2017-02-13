@@ -10,6 +10,7 @@ import play.api.libs.json._
 import scorex.account.Account
 import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
 import scorex.network.Checkpoint
 import scorex.network.Coordinator.BroadcastCheckpoint
 import scorex.transaction.BlockChain
@@ -23,7 +24,8 @@ case class BlocksApiRoute(application: Application)(implicit val context: ActorR
 
   val MaxBlocksPerRequest = 100
 
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
+  val checkpointsSettings = application.settings.checkpointsSettings
   private val history = application.history
   private val coordinator = application.coordinator
 
@@ -219,7 +221,8 @@ case class BlocksApiRoute(application: Application)(implicit val context: ActorR
   ))
   def checkpoint: Route = {
     def validateCheckpoint(checkpoint: Checkpoint): Option[ApiError] = {
-      settings.checkpointPublicKey.map {publicKey =>
+      val maybePublicKeyBytes = Base58.decode(checkpointsSettings.publicKey)
+      maybePublicKeyBytes.map {publicKey =>
         if (!EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) Some(InvalidSignature)
         else None
       }.getOrElse(Some(InvalidMessage))

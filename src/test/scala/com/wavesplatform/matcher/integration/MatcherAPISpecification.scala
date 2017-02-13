@@ -31,7 +31,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   private val storedState = application.storedState
   private var orderIdToCancel = Option.empty[String]
 
-  private val MatcherPubKey = application.wallet.privateKeyAccount(application.settings.matcherAccount).
+  private val MatcherPubKey = application.wallet.privateKeyAccount(application.settings.matcherSettings.account).
     map(a => Base58.encode(a.publicKey)).get
 
   def initBalances() = {
