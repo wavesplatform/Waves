@@ -57,7 +57,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
       request.feeAssetId.map(s => Base58.decode(s).get),
       request.fee,
       if (request.attachment.nonEmpty) {
-        Base58.decode(request.attachment).get
+        request.attachment.flatMap(Base58.decode(_).toOption).get
       } else {
         Array.empty
       }).right.get
@@ -78,7 +78,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
     val assetId = Some(Base58.encode(issueAssetTx.assetId))
 
     val txs = recipients.flatMap(r => Seq.fill(10) {
-      createTransferAssetTx(TransferRequest(assetId, None, 10, 1, acc.address, "123", r.address), wallet)
+      createTransferAssetTx(TransferRequest(assetId, None, 10, 1, acc.address, Some("123"), r.address), wallet)
     })
 
     state.processBlock(TestBlock(Random.shuffle(txs))) should be('success)
@@ -100,7 +100,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     val txs = recipients.flatMap(r => Seq.fill(10) {
       Thread.sleep(1)
-      createTransferAssetTx(TransferRequest(None, None, 10, 1, acc.address, "123", r.address), wallet)
+      createTransferAssetTx(TransferRequest(None, None, 10, 1, acc.address, Some("123"), r.address), wallet)
     })
 
     state.processBlock(TestBlock(Random.shuffle(txs))) should be('success)
@@ -125,7 +125,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     val txs = Seq.fill(10) {
       createTransferAssetTx(TransferRequest(Some(assetIdString), Some(assetIdString),
-        1000, 1000, sender.address, blahBlahBase58, sender.address), wallet)
+        1000, 1000, sender.address, Some(blahBlahBase58), sender.address), wallet)
     }
     state.processBlock(TestBlock(txs, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
 
@@ -151,11 +151,11 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     val txs = Seq.fill(10) {
       createTransferAssetTx(TransferRequest(Some(assetIdString), Some(assetIdString),
-        1000, 1000, sender.address, blahBlahBase58, sender.address), wallet)
+        1000, 1000, sender.address, Some(blahBlahBase58), sender.address), wallet)
     }
     val txs2 = Seq.fill(10) {
       createTransferAssetTx(TransferRequest(Some(assetIdString), None,
-        1000, 1000, sender.address, blahBlahBase58, sender.address), wallet)
+        1000, 1000, sender.address, Some(blahBlahBase58), sender.address), wallet)
     }
     state.processBlock(TestBlock(txs ++ txs2, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
 

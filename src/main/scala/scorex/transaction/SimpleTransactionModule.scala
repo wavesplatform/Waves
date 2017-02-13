@@ -125,7 +125,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       getTimestamp,
       request.feeAssetId.map(s => Base58.decode(s).get),
       request.fee,
-      Option(request.attachment).filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
+      request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
 
     transferVal match {
       case Right(tx) =>
@@ -213,28 +213,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     pt
   }
 
-  override def genesisData: Seq[Transaction] = {
-    val ipoMembers = List(
-      "3N3rfWUDPkFsf2GEZBCLw491A79G46djvQk",
-      "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",
-      "3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY"
-      /*
-            "3Mb4mR4taeYS3wci78SntztFwLoaS6iiKY9",
-            "3MbWTyn6Tg7zL6XbdN8TLcFMfhWX76fGNCz",
-            "3Mn3UAtrpGY3cwiqLYf973q29oDR2Kw7UyV"
-      */
-    )
-
-    val timestamp = 0L
-    val totalBalance = InitialBalance
-
-    val txs = ipoMembers.map { addr =>
-      val recipient = new Account(addr)
-      GenesisTransaction.create(recipient, totalBalance / ipoMembers.length, timestamp)
-    }.map(_.right.get)
-
-    txs
-  }
+  override def genesisData: Seq[Transaction] = hardForkParams.genesisTxs
 
   /** Check whether tx is valid on current state and not expired yet
     */

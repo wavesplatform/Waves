@@ -73,7 +73,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
       getTimestamp,
       request.feeAssetId.map(s => Base58.decode(s).get),
       request.fee,
-      Base58.decode(request.attachment).get).right.get
+      Base58.decode(request.attachment.getOrElse("")).get).right.get
   }
 
   def createExchangeTransaction(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
@@ -218,7 +218,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
     // Spend waves on buy acc
     val spendTx = transferAsset(TransferRequest(None, None, prevBuyBalW - buyFee, 1,
-      buyAcc.address, "spend", sellAcc.address), wallet)
+      buyAcc.address, Some("spend"), sellAcc.address), wallet)
     //state.processBlock(new BlockMock(Seq(spendTx))) should be('success)
 
     val validOm = createExchangeTransaction(buy, sell, price, 5 * Order.PriceConstant, buyFee, sellFee, matcherTxFee)

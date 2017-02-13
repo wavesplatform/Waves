@@ -135,7 +135,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
     val txs = recipients.flatMap(r => Seq.fill(10)({
       Thread.sleep(1000)
-      transactionModule.transferAsset(TransferRequest(assetId, None, 10, 100000, acc.address, "123", r.address), application.wallet).get
+      transactionModule.transferAsset(TransferRequest(assetId, None, 10, 100000, acc.address, Some("123"), r.address), application.wallet).get
     }))
 
     txs.size should be(20)
@@ -216,7 +216,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val block = TestBlock(Seq(issueAssetTx))
     state.processBlock(block)
 
-    val transferRequest = TransferRequest(Some(Base58.encode(issueAssetTx.id)), None, 300000, 100000000, acc.address, "", recipient.address)
+    val transferRequest = TransferRequest(Some(Base58.encode(issueAssetTx.id)), None, 300000, 100000000, acc.address, None, recipient.address)
     val transferAssetTx = transactionModule.transferAsset(transferRequest, application.wallet).get.right.get
     val block2 = TestBlock(Seq(transferAssetTx))
     state.processBlock(block2)

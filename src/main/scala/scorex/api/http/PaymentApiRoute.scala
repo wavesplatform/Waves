@@ -46,7 +46,7 @@ case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactio
               case err: JsError =>
                 WrongTransactionJson(err).response
               case JsSuccess(p: Payment, _) =>
-                val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, "", p.recipient)
+                val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, None, p.recipient)
                 transactionModule.transferAsset(transferRequest, wallet).map { paymentVal =>
                   paymentVal.fold(ApiError.fromValidationError(_).response, { tx => JsonResponse(tx.json, StatusCodes.OK) })
                 }.getOrElse(InvalidSender.response)
