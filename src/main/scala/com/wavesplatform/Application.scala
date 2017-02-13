@@ -79,10 +79,6 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
 
-  //checks
-  require(transactionModule.balancesSupport)
-  require(transactionModule.accountWatchingSupport)
-
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings.utxSettings, networkController))
 
   override def run(): Unit = {
