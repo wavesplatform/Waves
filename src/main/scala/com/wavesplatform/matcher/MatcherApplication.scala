@@ -9,12 +9,10 @@ import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.settings.RestAPISettings
 import scorex.api.http.CompositeHttpService
 import scorex.app.Application
-import scorex.transaction.BlockStorage
+import scorex.transaction.{BlockStorage, TransactionModule}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
-import scorex.waves.transaction.WavesTransactionModule
-
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
@@ -26,7 +24,7 @@ trait MatcherApplication extends ScorexLogging {
 
   implicit def restAPISettings: RestAPISettings
 
-  def transactionModule: WavesTransactionModule
+  def transactionModule: TransactionModule
 
   def blockStorage: BlockStorage
 

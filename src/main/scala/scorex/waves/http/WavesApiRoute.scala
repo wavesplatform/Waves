@@ -1,35 +1,27 @@
 package scorex.waves.http
 
 import javax.ws.rs.Path
-
+import scala.util.Try
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
 import scorex.api.http._
-import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
-import scorex.transaction.PaymentTransaction
 import scorex.transaction.state.wallet.Payment
+import scorex.transaction.{PaymentTransaction, TransactionOperations}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
-import scorex.waves.transaction.{ExternalPayment, SignedPayment, WavesTransactionModule}
-
-import scala.util.Try
+import scorex.waves.transaction.{ExternalPayment, SignedPayment}
 
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(application: RunnableApplication) extends ApiRoute with CommonTransactionApiFunctions {
-
-  val settings = application.settings.restAPISettings
-
-  lazy val wallet = application.wallet
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transactionModule: TransactionOperations) extends ApiRoute with CommonTransactionApiFunctions {
 
   // TODO asInstanceOf
-  implicit lazy val transactionModule: WavesTransactionModule = application.transactionModule.asInstanceOf[WavesTransactionModule]
-
   override lazy val route = pathPrefix("waves") {
     externalPayment ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
   }

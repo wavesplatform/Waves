@@ -8,7 +8,6 @@ import play.api.libs.json._
 import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
-import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
@@ -19,10 +18,12 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 import com.wavesplatform.settings.RestAPISettings
 import scorex.wallet.Wallet
+import scorex.transaction.assets.exchange.OrderJson._
+import scorex.transaction.{AssetAcc, TransactionOperations, StateCheckFailed => TxStateCheckFailed}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StoredState, transactionModule: SimpleTransactionModule) extends ApiRoute with CommonTransactionApiFunctions {
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StoredState, transactionModule: TransactionOperations) extends ApiRoute with CommonTransactionApiFunctions {
   val MaxAddressesPerRequest = 1000
 
   override lazy val route =

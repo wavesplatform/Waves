@@ -7,8 +7,8 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
-import com.wavesplatform.settings.BlockchainSettingsExtension._
 import com.wavesplatform.settings._
+import com.wavesplatform.settings.BlockchainSettingsExtension._
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.assets.AssetsBroadcastApiRoute
@@ -16,9 +16,10 @@ import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
+import scorex.transaction.SimpleTransactionModule
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
-import scorex.waves.transaction.WavesTransactionModule
+import com.typesafe.config._
 
 import scala.reflect.runtime.universe._
 
@@ -39,7 +40,7 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 
   override implicit lazy val consensusModule = new WavesConsensusModule(settings.blockchainSettings.asChainParameters, Constants.AvgBlockDelay)
 
-  override implicit lazy val transactionModule = new WavesTransactionModule(settings.blockchainSettings.asChainParameters)(settings, this)
+  override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.asChainParameters)(settings, this)
 
   override lazy val blockStorage = transactionModule.blockStorage
 
@@ -55,7 +56,7 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
     PeersApiRoute(settings.restAPISettings, peerManager, networkController),
     AddressApiRoute(settings.restAPISettings, wallet, blockStorage.state),
     DebugApiRoute(settings.restAPISettings, wallet, blockStorage),
-    WavesApiRoute(this),
+    WavesApiRoute(settings.restAPISettings, wallet, transactionModule),
     AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.state, transactionModule),
     NodeApiRoute(this),
     AssetsBroadcastApiRoute(settings.restAPISettings, transactionModule)

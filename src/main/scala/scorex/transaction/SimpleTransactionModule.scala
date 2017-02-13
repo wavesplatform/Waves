@@ -1,5 +1,8 @@
 package scorex.transaction
 
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
+import scala.util.{Left, Right, Try}
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
@@ -18,10 +21,6 @@ import scorex.transaction.state.wallet._
 import scorex.utils._
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPayment
-
-import scala.concurrent.duration._
-import scala.util.control.NonFatal
-import scala.util.{Left, Right, Try}
 
 @SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -42,10 +41,9 @@ case class TransactionsBlockField(override val value: Seq[Transaction])
   }
 }
 
-
 class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val settings: WavesSettings,
                                                                application: Application)
-  extends TransactionModule with ScorexLogging {
+  extends TransactionModule with TransactionOperations with ScorexLogging {
 
   import SimpleTransactionModule._
 
@@ -109,13 +107,13 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       true
     } else false
 
-  def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
+  override def createPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       createPayment(sender, new Account(payment.recipient), payment.amount, payment.fee)
     }
   }
 
-  def transferAsset(request: TransferRequest, wallet: Wallet): Try[Either[ValidationError, TransferTransaction]] = Try {
+  override def transferAsset(request: TransferRequest, wallet: Wallet): Try[Either[ValidationError, TransferTransaction]] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
 
     val transferVal = TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
@@ -137,7 +135,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     transferVal
   }
 
-  def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
+  override def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
     val issueVal = IssueTransaction.create(sender,
       request.name.getBytes(Charsets.UTF_8),
@@ -159,7 +157,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     }
   }
 
-  def reissueAsset(request: ReissueRequest, wallet: Wallet): Try[ReissueTransaction] = Try {
+  override def reissueAsset(request: ReissueRequest, wallet: Wallet): Try[ReissueTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
     val reissueVal = ReissueTransaction.create(sender,
       Base58.decode(request.assetId).get,
@@ -178,7 +176,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     }
   }
 
-  def burnAsset(request: BurnRequest, wallet: Wallet): Try[BurnTransaction] = Try {
+  override def burnAsset(request: BurnRequest, wallet: Wallet): Try[BurnTransaction] = Try {
     val sender = wallet.privateKeyAccount(request.sender).get
     val txVal: Either[ValidationError, BurnTransaction] = BurnTransaction.create(sender,
       Base58.decode(request.assetId).get,
@@ -204,7 +202,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     txTime
   }
 
-  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction] = {
+  override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction] = {
     val pt = PaymentTransaction.create(sender, recipient, amount, fee, getTimestamp)
     pt match {
       case Right(t) => onNewOffchainTransaction(t)
@@ -254,13 +252,13 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   val minimumTxFee = 100000 // TODO: remove later
 
-  def signPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
+  override def signPayment(payment: Payment, wallet: Wallet): Option[Either[ValidationError, PaymentTransaction]] = {
     wallet.privateKeyAccount(payment.sender).map { sender =>
       PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
     }
   }
 
-  def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
+  override def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
 
     val paymentVal = PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
 
@@ -277,7 +275,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   /**
     * Publish signed payment transaction which generated outside node
     */
-  def broadcastPayment(payment: SignedPayment): Either[ValidationError, PaymentTransaction] = {
+  override def broadcastPayment(payment: SignedPayment): Either[ValidationError, PaymentTransaction] = {
     val maybeSignatureBytes = Base58.decode(payment.signature).toOption
     if (payment.fee < minimumTxFee) // TODO: remove this check later
       Left(ValidationError.InsufficientFee)
@@ -303,7 +301,6 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 }
 
 object SimpleTransactionModule {
-
   val MaxTimeDrift: FiniteDuration = 15.seconds
   val MaxTimeForUnconfirmed: FiniteDuration = 90.minutes
   val MaxTxAndBlockDiff: FiniteDuration = 2.hour
