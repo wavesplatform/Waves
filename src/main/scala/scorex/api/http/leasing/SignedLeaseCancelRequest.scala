@@ -1,27 +1,32 @@
 package scorex.api.http.leasing
 
-import java.security.Timestamp
-
 import io.swagger.annotations.ApiModelProperty
-import play.api.libs.functional.syntax._
-import play.api.libs.json.{JsPath, Reads}
-import scorex.api.http.formats.SignatureReads
+import play.api.libs.json.{Format, Json}
+import scorex.account.PublicKeyAccount
+import scorex.crypto.encode.Base58
+import scorex.transaction.ValidationError
+import scorex.transaction.assets.ReissueTransaction
+import scorex.transaction.lease.LeaseCancelTransaction
 
 case class SignedLeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                    sender: String,
+                                    sender: PublicKeyAccount,
                                     @ApiModelProperty(value = "Base58 encoded lease transaction id", required = true)
                                     txId: String,
                                     @ApiModelProperty(required = true)
                                     timestamp: Long,
                                     @ApiModelProperty(required = true)
-                                    signature: String)
+                                    signature: String,
+                                    @ApiModelProperty(required = true)
+                                    fee: Long) {
+  def toTx: Either[ValidationError, LeaseCancelTransaction] = LeaseCancelTransaction.create(
+    sender,
+    Base58.decode(txId).get,
+    fee,
+    timestamp,
+    Base58.decode(signature).get)
+}
 
 object SignedLeaseCancelRequest {
-  implicit val leaseCancelRequest: Reads[SignedLeaseCancelRequest] = (
-    (JsPath \ "sender").read[String] and
-      (JsPath \ "txId").read[String] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[String](SignatureReads)
-    ) (SignedLeaseCancelRequest.apply _)
+  implicit val leaseCancelRequestFormat: Format[SignedLeaseCancelRequest] = Json.format
 }
 

@@ -1,30 +1,34 @@
 package scorex.api.http.leasing
 
 import io.swagger.annotations.ApiModelProperty
-import play.api.libs.functional.syntax._
-import play.api.libs.json.{JsPath, Reads}
-import scorex.api.http.formats.SignatureReads
+import play.api.libs.json.{Format, Json}
+import scorex.account.{Account, PublicKeyAccount}
+import scorex.crypto.encode.Base58
+import scorex.transaction.ValidationError
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                              sender: String,
+                              sender: PublicKeyAccount,
                               @ApiModelProperty(required = true)
                               amount: Long,
                               @ApiModelProperty(required = true)
                               fee: Long,
                               @ApiModelProperty(value = "Recipient address", required = true)
-                              recipient: String,
+                              recipient: Account,
                               @ApiModelProperty(required = true)
                               timestamp: Long,
                               @ApiModelProperty(required = true)
-                              signature: String)
+                              signature: String) {
+  def toTx: Either[ValidationError, LeaseTransaction] = LeaseTransaction.create(
+    sender,
+    amount,
+    fee,
+    timestamp,
+    recipient,
+    Base58.decode(signature).get
+  )
+}
 
 object SignedLeaseRequest {
-  implicit val broadcastLeaseRequestReads: Reads[SignedLeaseRequest] = (
-    (JsPath \ "sender").read[String] and
-      (JsPath \ "amount").read[Long] and
-      (JsPath \ "fee").read[Long] and
-      (JsPath \ "recipient").read[String] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[String](SignatureReads)
-    ) (SignedLeaseRequest.apply _)
+  implicit val broadcastLeaseRequestReadsFormat: Format[SignedLeaseRequest] = Json.format
 }
