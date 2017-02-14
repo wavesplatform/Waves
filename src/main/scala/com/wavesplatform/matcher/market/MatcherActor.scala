@@ -4,11 +4,10 @@ import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.PersistentActor
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.market.OrderBookActor.{NotFoundPair, OrderBookRequest, OrderRejected}
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
+import com.wavesplatform.matcher.market.OrderBookActor.{GetOrderBookResponse, OrderBookRequest}
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
-import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
@@ -20,18 +19,10 @@ import scala.collection.mutable
 import scala.language.reflectiveCalls
 import scala.util.Try
 
-object MatcherActor {
-  def name = "matcher"
-  def props(storedState: StoredState, wallet: Wallet, settings: MatcherSettings,
-            transactionModule: TransactionModule): Props =
-    Props(new MatcherActor(storedState, wallet, settings, transactionModule))
-
-  case class OrderBookCreated(pair: AssetPair)
-}
-
 class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSettings,
                    transactionModule: TransactionModule
                   ) extends PersistentActor with ScorexLogging {
+
   import MatcherActor._
 
   val openMarkets: mutable.Buffer[MarketData] = mutable.Buffer.empty[MarketData]
@@ -66,18 +57,18 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSe
 
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
 
-  def checkAssetPair[A <: { def assetPair: AssetPair }](msg: A)(f: => Unit): Unit = {
+  def checkAssetPair[A <: {def assetPair : AssetPair}](msg: A)(f: => Unit): Unit = {
     val v = basicValidation(msg)
     if (v) f
     else sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
   }
 
   def getMatcherPublicKey: Array[Byte] = {
-    wallet.privateKeyAccount(settings.matcherAccount).map(_.publicKey).getOrElse(Array())
+    wallet.privateKeyAccount(settings.account).map(_.publicKey).getOrElse(Array())
   }
 
   def forwardToOrderBook: Receive = {
-    case m: GetMarkets =>
+    case _: GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, openMarkets)
     case order: Order =>
       checkAssetPair(order) {
@@ -104,7 +95,8 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSe
 
 object MatcherActor {
   def name = "matcher"
-  def props(storedState: StoredState, wallet: Wallet, settings: WavesSettings,
+
+  def props(storedState: StoredState, wallet: Wallet, settings: MatcherSettings,
             transactionModule: TransactionModule): Props =
     Props(new MatcherActor(storedState, wallet, settings, transactionModule))
 
@@ -114,12 +106,12 @@ object MatcherActor {
 
   case class GetMarketsResponse(publicKey: Array[Byte], markets: Seq[MarketData]) extends MatcherResponse {
     def getMarketsJs: JsValue = JsArray(markets.map(m => Json.obj(
-        "asset1Id" -> m.pair.firstStr,
-        "asset1Name" -> m.firstAssetName,
-        "asset2Id" ->  m.pair.secondStr,
-        "asset2Name" -> m.secondAssetName,
-        "created" -> m.created
-      ))
+      "asset1Id" -> m.pair.firstStr,
+      "asset1Name" -> m.firstAssetName,
+      "asset2Id" -> m.pair.secondStr,
+      "asset2Name" -> m.secondAssetName,
+      "created" -> m.created
+    ))
     )
 
     def json: JsValue = Json.obj(
@@ -131,4 +123,5 @@ object MatcherActor {
   }
 
   case class MarketData(pair: AssetPair, firstAssetName: String, secondAssetName: String, created: Long)
+
 }

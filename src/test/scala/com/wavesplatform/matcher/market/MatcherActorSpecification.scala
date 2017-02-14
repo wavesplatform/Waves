@@ -1,10 +1,9 @@
 package com.wavesplatform.matcher.market
 
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-
 import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit}
+import akka.http.scaladsl.model.StatusCodes
+import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
@@ -12,17 +11,15 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.LevelAgg
-import com.wavesplatform.settings.WavesSettings
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import play.api.libs.json.{JsNull, JsObject, JsString, Json}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
 import scorex.settings.ChainParameters
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest"))
@@ -91,7 +88,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       actor ! GetMarkets()
 
       expectMsgPF() {
-        case GetMarketsResponse(publicKey, Seq(MarketData(_, "Unknown","Unknown", _))) =>
+        case GetMarketsResponse(publicKey, Seq(MarketData(_, "Unknown", "Unknown", _))) =>
           publicKey shouldBe MatcherAccount.publicKey
       }
     }
@@ -109,11 +106,10 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       val pair1 = AssetPair(None, a1)
       val pair2 = AssetPair(a1, a2)
 
-      val now =  NTP.correctedTime()
+      val now = NTP.correctedTime()
       val json = GetMarketsResponse(Array(), Seq(MarketData(pair1, waves, a1Name, now),
         MarketData(pair2, a1Name, a2Name, now))).json
 
-      println(Json.prettyPrint(json))
       ((json \ "markets") (0) \ "asset1Id").as[String] shouldBe AssetPair.WavesName
       ((json \ "markets") (0) \ "asset1Name").as[String] shouldBe waves
       ((json \ "markets") (0) \ "asset2Id").as[String] shouldBe Base58.encode(a1.get)

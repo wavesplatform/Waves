@@ -32,16 +32,16 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   private val localConfig = ConfigFactory.parseString(
     s"""
-      |waves {
-      |  synchronization {
-      |    max-rollback: 10
-      |    max-chain-length: 11
-      |    score-broadcast-interval: 1000s
-      |  }
-      |  checkpoints {
-      |    public-key: "${Base58.encode(pk.publicKey)}"
-      |  }
-      |}
+       |waves {
+       |  synchronization {
+       |    max-rollback: 10
+       |    max-chain-length: 11
+       |    score-broadcast-interval: 1000s
+       |  }
+       |  checkpoints {
+       |    public-key: "${Base58.encode(pk.publicKey)}"
+       |  }
+       |}
     """.stripMargin).withFallback(baseTestConfig).resolve()
 
   val wavesSettings: WavesSettings = WavesSettings.fromConfig(localConfig)

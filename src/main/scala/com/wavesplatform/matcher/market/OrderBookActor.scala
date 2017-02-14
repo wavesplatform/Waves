@@ -4,15 +4,13 @@ import akka.actor.Props
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
-import com.wavesplatform.settings.WavesSettings
-import play.api.libs.json.{JsString, Json}
+import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
-import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange._
 import scorex.transaction.state.database.blockchain.StoredState

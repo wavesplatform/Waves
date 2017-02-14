@@ -23,6 +23,7 @@ trait MatcherApplication extends ScorexLogging {
   implicit def actorSystem: ActorSystem
 
   implicit def matcherSettings: MatcherSettings
+
   implicit def restAPISettings: RestAPISettings
 
   def transactionModule: WavesTransactionModule

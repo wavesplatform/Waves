@@ -29,9 +29,9 @@ trait OrderValidator {
   }
 
   def validateNewOrder(order: Order): Validation = {
-    (openOrdersCount.getOrElse(order.sender.address, 0) <= settings.maxOpenOrders) :|
+    (openOrdersCount.getOrElse(order.matcherPublicKey.address, 0) <= settings.maxOpenOrders) :|
       s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
-      (order.matcher == matcherPubKey) :| "Incorrect matcher public key" &&
+      (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
       order.isValid(NTP.correctedTime()) &&
       (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
       !ordersRemainingAmount.contains(order.idStr) :| "Order is already accepted" &&
