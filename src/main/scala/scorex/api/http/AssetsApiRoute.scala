@@ -1,12 +1,12 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.util.control.Exception
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{RejectionHandler, Route, ValidationRejection}
+import com.wavesplatform.http.PlayJsonException
+import com.wavesplatform.http.PlayJsonSupport._
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -14,10 +14,9 @@ import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
-import scorex.transaction.{AssetAcc, Transaction, TransactionOperations, ValidationError}
+import scorex.transaction.{AssetAcc, TransactionOperations}
 import scorex.wallet.Wallet
 
 @Path("/assets")
@@ -25,8 +24,17 @@ import scorex.wallet.Wallet
 case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StoredState, transactionModule: TransactionOperations) extends ApiRoute with CommonTransactionApiFunctions {
   val MaxAddressesPerRequest = 1000
 
+  private def processRequest[A: Reads](pathMatcher: String, f: A => ToResponseMarshallable) =
+    (path(pathMatcher) & post & withAuth) {
+      process[A](f)
+    }
+
+  private val defaultRejectionHandler = RejectionHandler.newBuilder().handle {
+    case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors))
+  }.result()
+
   override lazy val route =
-    pathPrefix("assets") {
+    (handleRejections(defaultRejectionHandler) & pathPrefix("assets")) {
       balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ signOrder ~ balanceDistribution
     }
 
@@ -74,20 +82,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
     }
   }
 
-  private def processRequest[A: Reads, T <: Transaction](thePath: String, f: A => Either[ValidationError, T]) = path(thePath) {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          (for {
-            js <- Exception.nonFatalCatch.either(Json.parse(body)).left.map(t => WrongJson(cause = Some(t)))
-            request <- js.validate[A].asEither.left.map(e => WrongJson(errors = e))
-            tx <- f(request).left.map(ApiError.fromValidationError)
-          } yield JsonResponse(tx.json, StatusCodes.OK)).fold(_.response, identity)
-        }
-      }
-    }
-  }
-
   @Path("/transfer")
   @ApiOperation(value = "Transfer asset",
     notes = "Transfer asset to new address",
@@ -105,7 +99,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
     )
   ))
   def transfer: Route =
-    processRequest[TransferRequest, TransferTransaction]("transfer", transactionModule.transferAsset(_, wallet))
+    processRequest("transfer", (t: TransferRequest) => transactionModule.transferAsset(t, wallet))
 
   @Path("/issue")
   @ApiOperation(value = "Issue Asset",
@@ -124,7 +118,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
     )
   ))
   def issue: Route =
-    processRequest[IssueRequest, IssueTransaction]("issue", transactionModule.issueAsset(_, wallet))
+    processRequest("issue", (i: IssueRequest) => transactionModule.issueAsset(i, wallet))
 
   @Path("/reissue")
   @ApiOperation(value = "Issue Asset",
@@ -143,7 +137,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
     )
   ))
   def reissue: Route =
-    processRequest[ReissueRequest, ReissueTransaction]("reissue", transactionModule.reissueAsset(_, wallet))
+    processRequest("reissue", (r: ReissueRequest) => transactionModule.reissueAsset(r, wallet))
 
   @Path("/burn")
   @ApiOperation(value = "Burn Asset",
@@ -162,7 +156,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
     )
   ))
   def burnRoute: Route =
-    processRequest[BurnRequest, BurnTransaction]("burn", transactionModule.burnAsset(_, wallet))
+    processRequest("burn", (b: BurnRequest) => transactionModule.burnAsset(b, wallet))
 
 
   private def balanceJson(address: String, assetIdStr: String): JsonResponse = {
@@ -214,28 +208,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
       dataType = "scorex.transaction.assets.exchange.Order"
     )
   ))
-  def signOrder: Route = path("order") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[Order] match {
-              case err: JsError =>
-                Future.successful(WrongTransactionJson(err).response)
-              case JsSuccess(order: Order, _) =>
-                Future {
-                  wallet.privateKeyAccount(order.senderPublicKey.address).map { sender =>
-                    val signed = Order.sign(order, sender)
-                    JsonResponse(signed.json, StatusCodes.OK)
-                  }.getOrElse(InvalidAddress.response)
-                }
-            }
-          }.recover {
-            case _ => Future.successful(WrongJson().response)
-          }.get
-        }
-      }
+  def signOrder: Route = processRequest("order", (order: Order) => {
+    wallet.privateKeyAccount(order.senderPublicKey.address) match {
+      case Some(sender) => Order.sign(order, sender)
+      case None => InvalidAddress
     }
-  }
-
+  })
 }

@@ -4,6 +4,7 @@ import javax.ws.rs.Path
 import scala.util.Try
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.http.PlayJsonSupport._
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.{JsError, JsSuccess, Json}
@@ -44,23 +45,12 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def payment: Route = path("payment") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[Payment] match {
-              case err: JsError => WrongTransactionJson(err).response
-              case JsSuccess(payment: Payment, _) =>
-                transactionModule
-                  .createPayment(payment, wallet)
-                  .fold(ApiError.fromValidationError(_).response, { tx =>
-                      val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                        tx.sender, tx.sender.address, Base58.encode(tx.signature))
-                      JsonResponse(Json.toJson(signed), StatusCodes.OK)
-                    })
-            }
-          }.getOrElse(WrongJson().response)
+  def payment: Route = withAuth {
+    (path("payment") & post) {
+      process[Payment] { payment =>
+        transactionModule.createPayment(payment, wallet).map { tx =>
+          SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
+            tx.sender, tx.sender.address, Base58.encode(tx.signature))
         }
       }
     }

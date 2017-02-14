@@ -2,14 +2,17 @@ package scorex.api.http
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode}
 import akka.http.scaladsl.server._
 import akka.util.Timeout
+import com.wavesplatform.http.PlayJsonSupport._
 import com.wavesplatform.settings.RestAPISettings
-import play.api.libs.json.JsValue
+import play.api.libs.json.{JsValue, Reads, Writes}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
+import scorex.transaction.{Transaction, ValidationError}
 
 final case class JsonResponse(response: JsValue, code: StatusCode)
 
@@ -22,7 +25,17 @@ trait ApiRoute extends Directives with CommonApiFunctions {
   lazy val corsAllowed = settings.cors
   lazy val apiKeyHash = Base58.decode(settings.apiKeyHash).toOption
 
-  //def actorRefFactory: ActorRefFactory = context
+  type TRM[A] = ToResponseMarshaller[A]
+
+  import akka.http.scaladsl.marshalling.PredefinedToResponseMarshallers._
+  implicit val aem: TRM[ApiError] = fromStatusCodeAndValue[StatusCode, JsValue].compose { ae => ae.code -> ae.json }
+  implicit val vem: TRM[ValidationError] = aem.compose(ve => ApiError.fromValidationError(ve))
+
+  implicit val tw: Writes[Transaction] = Writes(_.json)
+
+  def process[A: Reads](f: A => ToResponseMarshallable) = entity(as[A]) { a =>
+    complete(f(a))
+  }
 
   def getJsonRoute(fn: Future[JsonResponse]): Route =
     jsonRoute(Await.result(fn, timeout.duration), get)
@@ -51,28 +64,12 @@ trait ApiRoute extends Directives with CommonApiFunctions {
     withCors(resp)
   }
 
-  def withAuth(route: => Route): Route = {
-    optionalHeaderValueByName("api_key") { keyOpt =>
-      if (isValid(keyOpt)) route
-      else {
-        val resp = complete(ApiKeyNotValid.code -> HttpEntity(ContentTypes.`application/json`, ApiKeyNotValid.json.toString))
-        withCors(resp)
-      }
+  def withAuth: Directive0 = apiKeyHash.fold(pass) { hashFromSettings =>
+    optionalHeaderValueByName("api_key").flatMap {
+      case Some(apiKey) if SecureCryptographicHash(apiKey) sameElements hashFromSettings => pass
+      case other => complete(ApiKeyNotValid)
     }
   }
 
-  private def withCors(fn: => Route): Route = {
-    if (corsAllowed) respondWithHeaders(RawHeader("Access-Control-Allow-Origin", "*"))(fn)
-    else fn
-  }
-
-  private def isValid(keyOpt: Option[String]): Boolean = {
-    lazy val keyHash = keyOpt.map(SecureCryptographicHash(_))
-    (apiKeyHash, keyHash) match {
-      case (None, _) => true
-      case (Some(expected), Some(passed)) => expected sameElements passed
-      case _ => false
-    }
-  }
-
+  def withCors: Directive0 = if (corsAllowed) respondWithHeader(`Access-Control-Allow-Origin`.*) else pass
 }
