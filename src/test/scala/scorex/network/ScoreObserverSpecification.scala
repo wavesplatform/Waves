@@ -24,9 +24,9 @@ class ScoreObserverSpecification extends ActorTestingCommons {
       |    score-ttl: 1s
       |  }
       |}
-    """.stripMargin).withFallback(config).resolve()
+    """.stripMargin).withFallback(baseTestConfig).resolve()
 
-  override val wavesSettings = WavesSettings.fromConfig(localConfig)
+  val wavesSettings = WavesSettings.fromConfig(localConfig)
 
   trait App extends ApplicationMock {
     override lazy val settings = wavesSettings

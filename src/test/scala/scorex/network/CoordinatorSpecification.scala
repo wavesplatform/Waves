@@ -3,6 +3,7 @@ package scorex.network
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
+import com.wavesplatform.settings.WavesSettings
 import scorex.ActorTestingCommons
 import scorex.consensus.mining.BlockGeneratorController.StartGeneration
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus}
@@ -24,7 +25,7 @@ class CoordinatorSpecification extends ActorTestingCommons {
   val testHistory = stub[History]
 
   trait App extends ApplicationMock {
-    override lazy val settings = wavesSettings
+    override lazy val settings = WavesSettings.fromConfig(baseTestConfig)
     override lazy val blockGenerator: ActorRef = testblockGenerator.ref
     override lazy val blockchainSynchronizer: ActorRef = testBlockchainSynchronizer.ref
     override lazy val peerManager: ActorRef = testPeerManager.ref

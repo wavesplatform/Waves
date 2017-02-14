@@ -33,9 +33,9 @@ class PeerSynchronizerSpecification extends ActorTestingCommons
       |    max-connections: 10
       |  }
       |}
-    """.stripMargin).withFallback(config).resolve()
+    """.stripMargin).withFallback(baseTestConfig).resolve()
 
-  override val wavesSettings = WavesSettings.fromConfig(localConfig)
+  val wavesSettings = WavesSettings.fromConfig(localConfig)
   val testPeerManager = TestProbe("peerManager")
 
   trait App extends ApplicationMock {

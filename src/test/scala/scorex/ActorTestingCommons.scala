@@ -28,9 +28,19 @@ abstract class ActorTestingCommons extends TestKitBase
   with ImplicitSender
   with PathMockFactory {
 
-  protected val testConfig: Config = ConfigFactory.parseString(
+  protected val baseTestConfig: Config = ConfigFactory.parseString(
     """
       |waves {
+      |  directory: ""
+      |  blockchain {
+      |    file: ""
+      |  }
+      |  network {
+      |    file: ""
+      |  }
+      |  wallet {
+      |    file: ""
+      |  }
       |  miner {
       |    enable: yes
       |    offline: yes
@@ -40,11 +50,26 @@ abstract class ActorTestingCommons extends TestKitBase
       |    tf-like-scheduling: yes
       |  }
       |}
-    """.stripMargin)
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
 
-  protected val config: Config = testConfig.withFallback(ConfigFactory.load()).resolve()
+  protected val testConfigOfflineGenerationOff: Config = ConfigFactory.parseString(
+    """
+      |waves {
+      |  miner {
+      |    offline: no
+      |  }
+      |}
+    """.stripMargin).withFallback(baseTestConfig).resolve()
 
-  val wavesSettings: WavesSettings = WavesSettings.fromConfig(config)
+  protected val testConfigTFLikeOff: Config = ConfigFactory.parseString(
+    """
+      |waves {
+      |  miner {
+      |    tf-like-scheduling: no
+      |  }
+      |}
+    """.stripMargin).withFallback(baseTestConfig).resolve()
+
 
   protected implicit val testTimeout = Timeout(2000.milliseconds)
   protected val testDuration = testTimeout.duration

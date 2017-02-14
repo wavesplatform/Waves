@@ -30,9 +30,9 @@ class HistoryReplierSpecification extends ActorTestingCommons {
       |    max-chain-length: 5
       |  }
       |}
-    """.stripMargin).withFallback(config).resolve()
+    """.stripMargin).withFallback(baseTestConfig).resolve()
 
-  override val wavesSettings = WavesSettings.fromConfig(localConfig)
+  val wavesSettings = WavesSettings.fromConfig(localConfig)
 
   private val lastHistoryBlockId = 20
   private val h = mockHistory(1 to lastHistoryBlockId)

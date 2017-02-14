@@ -42,9 +42,9 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
       |    public-key: "${Base58.encode(pk.publicKey)}"
       |  }
       |}
-    """.stripMargin).withFallback(config).resolve()
+    """.stripMargin).withFallback(baseTestConfig).resolve()
 
-  override val wavesSettings: WavesSettings = WavesSettings.fromConfig(localConfig)
+  val wavesSettings: WavesSettings = WavesSettings.fromConfig(localConfig)
 
   val testBlockGenerator = TestProbe("blockGenerator")
   val testBlockchainSynchronizer = TestProbe("BlockChainSynchronizer")

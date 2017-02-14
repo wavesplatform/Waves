@@ -63,9 +63,9 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
        |    operation-retires: 13930975
        |  }
        |}
-    """.stripMargin).withFallback(config).resolve()
+    """.stripMargin).withFallback(baseTestConfig).resolve()
 
-  override val wavesSettings = WavesSettings.fromConfig(localConfig)
+  val wavesSettings = WavesSettings.fromConfig(localConfig)
 
   private trait App extends ApplicationMock {
 

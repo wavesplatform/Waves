@@ -2,10 +2,10 @@ package scorex.consensus.mining
 
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
+import com.wavesplatform.settings.WavesSettings
 import scorex.ActorTestingCommons
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
-import scorex.network.ConnectedPeer
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History
 
@@ -14,12 +14,10 @@ import scala.language.postfixOps
 
 class BlockGeneratorControllerSpecification extends ActorTestingCommons {
 
-//  def setOfflineGeneration(value: Boolean): Unit = wavesSettings.copy(minerSettings = wavesSettings.minerSettings.copy(offline = value))
-
   val testPeerManager = TestProbe("PeerManager")
 
   trait App extends ApplicationMock {
-    override lazy val settings = wavesSettings
+    override lazy val settings: WavesSettings = WavesSettings.fromConfig(baseTestConfig)
     override val peerManager: ActorRef = testPeerManager.ref
     @volatile
     var history: History = _
@@ -28,6 +26,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
   }
 
   val stubApp: App = stub[App]
+
   setDefaultLastBlock()
 
   private def setDefaultLastBlock(): Unit = setLastBlock(testBlock(2))
@@ -116,24 +115,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
 
       testPeerManager.expectMsg(GetConnectedPeersTyped)
 
-      "offlineGeneration = false" - {
-
-//        setOfflineGeneration(false)
-
-        "gen allowed" in {
-          testPeerManager.reply(ConnectedPeers(Set(stub[ConnectedPeer])))
-          assertStatusIs(Generating)
-        }
-
-        "gen suspended" in {
-          testPeerManager.reply(ConnectedPeers(Set.empty))
-          assertStatusIs(Suspended)
-        }
-      }
-
       "offlineGeneration = true" - {
-
-//        setOfflineGeneration(true)
 
         "gen allowed even if no peers" in {
           testPeerManager.reply(ConnectedPeers(Set.empty))
