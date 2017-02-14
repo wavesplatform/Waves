@@ -9,7 +9,9 @@ trait ApiErrorMatchers { this: RouteTest =>
   class ProduceError(error: ApiError) extends Matcher[RouteTestResult] {
     override def apply(left: RouteTestResult): MatchResult = left ~> check {
       if (response.status != error.code) {
-        MatchResult(false, "got unexpected status code", "got expected status code")
+        MatchResult(false, "got {0} while expecting {1}, response was {2}",
+          "got expected status code {0}",
+          IndexedSeq(response.status, error.code, response.entity))
       } else {
         val responseJson = responseAs[JsObject]
         MatchResult(responseJson == error.json,

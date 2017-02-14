@@ -1,25 +1,24 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.util.control.Exception
+import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
+import scorex.transaction.assets.exchange.OrderJson._
+import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
-import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed => TxStateCheckFailed}
-import scorex.transaction.assets.exchange.OrderJson._
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
-import com.wavesplatform.settings.RestAPISettings
+import scorex.transaction.{AssetAcc, Transaction, TransactionOperations, ValidationError}
 import scorex.wallet.Wallet
-import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.{AssetAcc, TransactionOperations, StateCheckFailed => TxStateCheckFailed}
 
 @Path("/assets")
 @Api(value = "assets")
@@ -75,6 +74,20 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
     }
   }
 
+  private def processRequest[A: Reads, T <: Transaction](thePath: String, f: A => Either[ValidationError, T]) = path(thePath) {
+    entity(as[String]) { body =>
+      withAuth {
+        postJsonRoute {
+          (for {
+            js <- Exception.nonFatalCatch.either(Json.parse(body)).left.map(t => WrongJson(cause = Some(t)))
+            request <- js.validate[A].asEither.left.map(e => WrongJson(errors = e))
+            tx <- f(request).left.map(ApiError.fromValidationError)
+          } yield JsonResponse(tx.json, StatusCodes.OK)).fold(_.response, identity)
+        }
+      }
+    }
+  }
+
   @Path("/transfer")
   @ApiOperation(value = "Transfer asset",
     notes = "Transfer asset to new address",
@@ -91,33 +104,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
       defaultValue = "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
     )
   ))
-  def transfer: Route = path("transfer") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[TransferRequest] match {
-              case err: JsError =>
-                WrongTransactionJson(err).response
-              case JsSuccess(request: TransferRequest, _) =>
-                val txOpt = transactionModule.transferAsset(request, wallet)
-                txOpt match {
-                  case Success(txVal) =>
-                    txVal match {
-                      case Right(tx) => JsonResponse(tx.json, StatusCodes.OK)
-                      case Left(e) => WrongJson().response
-                    }
-                  case Failure(e: TxStateCheckFailed) =>
-                    StateCheckFailed.response
-                  case _ =>
-                    WrongJson().response
-                }
-            }
-          }.getOrElse(WrongJson().response)
-        }
-      }
-    }
-  }
+  def transfer: Route =
+    processRequest[TransferRequest, TransferTransaction]("transfer", transactionModule.transferAsset(_, wallet))
 
   @Path("/issue")
   @ApiOperation(value = "Issue Asset",
@@ -135,30 +123,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
       defaultValue = "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
     )
   ))
-  def issue: Route = path("issue") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[IssueRequest] match {
-              case err: JsError =>
-                WrongTransactionJson(err).response
-              case JsSuccess(issue: IssueRequest, _) =>
-                val txOpt: Try[IssueTransaction] = transactionModule.issueAsset(issue, wallet)
-                txOpt match {
-                  case Success(tx) =>
-                    JsonResponse(tx.json, StatusCodes.OK)
-                  case Failure(e: TxStateCheckFailed) =>
-                    StateCheckFailed.response
-                  case _ =>
-                    WrongJson().response
-                }
-            }
-          }.getOrElse(WrongJson().response)
-        }
-      }
-    }
-  }
+  def issue: Route =
+    processRequest[IssueRequest, IssueTransaction]("issue", transactionModule.issueAsset(_, wallet))
 
   @Path("/reissue")
   @ApiOperation(value = "Issue Asset",
@@ -176,30 +142,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
       defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100000,\"reissuable\":false,\"fee\":1}"
     )
   ))
-  def reissue: Route = path("reissue") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[ReissueRequest] match {
-              case err: JsError =>
-                WrongTransactionJson(err).response
-              case JsSuccess(issue: ReissueRequest, _) =>
-                val txOpt: Try[ReissueTransaction] = transactionModule.reissueAsset(issue, wallet)
-                txOpt match {
-                  case Success(tx) =>
-                    JsonResponse(tx.json, StatusCodes.OK)
-                  case Failure(e: TxStateCheckFailed) =>
-                    StateCheckFailed.response
-                  case _ =>
-                    WrongJson().response
-                }
-            }
-          }.getOrElse(WrongJson().response)
-        }
-      }
-    }
-  }
+  def reissue: Route =
+    processRequest[ReissueRequest, ReissueTransaction]("reissue", transactionModule.reissueAsset(_, wallet))
 
   @Path("/burn")
   @ApiOperation(value = "Burn Asset",
@@ -217,30 +161,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
       defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100,\"fee\":100000}"
     )
   ))
-  def burnRoute: Route = path("burn") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[BurnRequest] match {
-              case err: JsError =>
-                WrongTransactionJson(err).response
-              case JsSuccess(burnRequest: BurnRequest, _) =>
-                val txOpt: Try[BurnTransaction] = transactionModule.burnAsset(burnRequest, wallet)
-                txOpt match {
-                  case Success(tx) =>
-                    JsonResponse(tx.json, StatusCodes.OK)
-                  case Failure(e: TxStateCheckFailed) =>
-                    StateCheckFailed.response
-                  case _ =>
-                    WrongJson().response
-                }
-            }
-          }.getOrElse(WrongJson().response)
-        }
-      }
-    }
-  }
+  def burnRoute: Route =
+    processRequest[BurnRequest, BurnTransaction]("burn", transactionModule.burnAsset(_, wallet))
 
 
   private def balanceJson(address: String, assetIdStr: String): JsonResponse = {
@@ -309,8 +231,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
                 }
             }
           }.recover {
-            case t =>
-              Future.successful(WrongJson().response)
+            case _ => Future.successful(WrongJson().response)
           }.get
         }
       }

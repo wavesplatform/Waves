@@ -27,6 +27,7 @@ object ApiError {
     case ValidationError.StateCheckFailed => StateCheckFailed
     case ValidationError.OverflowError => OverflowError
     case ValidationError.CustomValidationError(m) => CustomValidationError(m)
+    case ValidationError.StateValidationError(_) => StateCheckFailed
   }
 }
 

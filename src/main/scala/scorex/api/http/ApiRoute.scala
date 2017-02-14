@@ -1,5 +1,7 @@
 package scorex.api.http
 
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCode}
 import akka.http.scaladsl.server._
@@ -8,9 +10,6 @@ import com.wavesplatform.settings.RestAPISettings
 import play.api.libs.json.JsValue
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
-
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 final case class JsonResponse(response: JsValue, code: StatusCode)
 
@@ -53,7 +52,7 @@ trait ApiRoute extends Directives with CommonApiFunctions {
   }
 
   def withAuth(route: => Route): Route = {
-    optionalHeaderValueByName("api_key") { case keyOpt =>
+    optionalHeaderValueByName("api_key") { keyOpt =>
       if (isValid(keyOpt)) route
       else {
         val resp = complete(ApiKeyNotValid.code -> HttpEntity(ContentTypes.`application/json`, ApiKeyNotValid.json.toString))

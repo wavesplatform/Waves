@@ -4,15 +4,14 @@ import java.io.File
 import akka.http.scaladsl.model.headers.RawHeader
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.RestAPISettings
+import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
+import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
-import org.scalacheck.Gen._
 import play.api.libs.json.Json
-import scorex.wallet.Wallet
-import scorex.transaction.{SimpleTransactionModule, TransactionGen}
-import scorex.transaction.state.wallet.TransferRequest
-import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
 import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.{TransactionOperations, ValidationError}
+import scorex.wallet.Wallet
 
 class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMockFactory with PropertyChecks {
   import AssetsRouteSpec._
@@ -23,44 +22,51 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     new Wallet(Some(file.getCanonicalPath), "123", None)
   }
 
+  private def mkMock(expectedError: ValidationError) = {
+    val m = mock[TransactionOperations]
+    (m.transferAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
+    (m.issueAsset    _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
+    (m.reissueAsset  _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
+    (m.burnAsset     _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
+    m
+  }
+
+  private val errorGen: Gen[ValidationError] = Gen.oneOf(
+    ValidationError.InvalidAddress,
+    ValidationError.NegativeAmount,
+    ValidationError.InsufficientFee,
+    ValidationError.NoBalance,
+    ValidationError.TooBigArray,
+    ValidationError.InvalidSignature,
+    ValidationError.InvalidName,
+    ValidationError.StateCheckFailed,
+    ValidationError.OverflowError,
+    ValidationError.CustomValidationError("custom.error"),
+    ValidationError.StateValidationError("state.validation.error")
+  )
+
   routePath("balance/{address}/{assetId}") in pending
   routePath("balance/{address}") in pending
-  routePath("transfer") in {
 
-    val route = AssetsApiRoute(settings, wallet, mock[StoredState], mock[SimpleTransactionModule]).route
-    def posting(r: TransferRequest, apiKey: Option[String] = Some(AssetsRouteSpec.apiKey)) =
-      apiKey.fold(Post(routePath("transfer"), Json.toJson(r))) { apiKeyValue =>
-        Post(routePath("transfer"), Json.toJson(r)).addHeader(RawHeader("apiKey", apiKeyValue))
-      } ~> route
 
-    forAll(transferReq) { tr =>
-      forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce (NegativeAmount) }
-      forAll(invalidBase58) { pk => posting(tr.copy(sender = pk)) should produce (InvalidAddress) }
-      forAll(invalidBase58) { pk => posting(tr.copy(recipient = pk)) should produce (InvalidAddress) }
-      forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce (CustomValidationError("invalid.assetId")) }
-      forAll(invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce (CustomValidationError("invalid.feeAssetId")) }
-      forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce (TooBigArrayAllocation) }
-      forAll(posNum[Long]) { quantity => posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce (OverflowError) }
-      forAll(nonPositiveLong) { fee => posting(tr.copy(fee = fee)) should produce (InsufficientFee) }
-    }
+  for ((path, gen) <- Seq(
+    "transfer" -> transferReq.map(v => Json.toJson(v)),
+    "issue" -> issueReq.map(v => Json.toJson(v)),
+    "reissue"-> reissueReq.map(v => Json.toJson(v)),
+    "burn" -> burnReq.map(v => Json.toJson(v))
+  )) {
+    val currentPath = routePath(path)
+    currentPath in {
+      forAll(errorGen) { e =>
+        val route = AssetsApiRoute(settings, wallet, mock[StoredState], mkMock(e)).route
 
-  }
+        forAll(gen) { tr =>
+          val p = Post(currentPath, tr)
 
-  routePath("issue") in {
-    forAll(issueReq) { ir =>
-
-    }
-  }
-
-  routePath("reissue") in {
-    forAll(reissueReq) { rr =>
-
-    }
-  }
-
-  routePath("burn") in {
-    forAll(burnReq) { br =>
-
+          p ~> route should produce(ApiKeyNotValid)
+          p.addHeader(RawHeader("api_key", apiKey)) ~> route should produce(ApiError.fromValidationError(e))
+        }
+      }
     }
   }
 
@@ -70,8 +76,4 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
 object AssetsRouteSpec {
   private[AssetsRouteSpec] val apiKey = ""
   private[AssetsRouteSpec] val settings = RestAPISettings.fromConfig(ConfigFactory.parseString(""))
-
-  private[AssetsRouteSpec] object g extends TransactionGen {
-
-  }
 }
