@@ -5,7 +5,7 @@ import javax.ws.rs.Path
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
-import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseRequest}
+import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.app.Application
 import scorex.transaction.SimpleTransactionModule
 
@@ -75,8 +75,8 @@ case class BroadcastLeaseApiRoute(application: Application)(implicit val context
         postJsonRoute {
           mkResponse(for {
             js <- parseToEither(body)
-            ri <- doValidate[LeaseCancelRequest](js)
-            r <- doBroadcast(i.toTx)
+            ri <- doValidate[SignedLeaseCancelRequest](js)
+            r <- doBroadcast(ri.toTx)
           } yield r)
         }
       }
