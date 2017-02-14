@@ -2,8 +2,6 @@ package scorex.consensus.mining
 
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.WavesSettings
 import scorex.ActorTestingCommons
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
@@ -16,7 +14,7 @@ import scala.language.postfixOps
 
 class BlockGeneratorControllerSpecification extends ActorTestingCommons {
 
-  def setOfflineGeneration(value: Boolean): Unit = wavesSettings.copy(minerSettings = wavesSettings.minerSettings.copy(offline = value))
+//  def setOfflineGeneration(value: Boolean): Unit = wavesSettings.copy(minerSettings = wavesSettings.minerSettings.copy(offline = value))
 
   val testPeerManager = TestProbe("PeerManager")
 
@@ -120,7 +118,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
 
       "offlineGeneration = false" - {
 
-        setOfflineGeneration(false)
+//        setOfflineGeneration(false)
 
         "gen allowed" in {
           testPeerManager.reply(ConnectedPeers(Set(stub[ConnectedPeer])))
@@ -135,7 +133,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
 
       "offlineGeneration = true" - {
 
-        setOfflineGeneration(true)
+//        setOfflineGeneration(true)
 
         "gen allowed even if no peers" in {
           testPeerManager.reply(ConnectedPeers(Set.empty))

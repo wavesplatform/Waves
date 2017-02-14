@@ -15,6 +15,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       |waves {
       |  network {
       |    file: ""
+      |    known-peers = []
       |    peers-data-residence-time: 1s
       |  }
       |}
@@ -26,6 +27,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       |waves {
       |  network {
       |    file: ""
+      |    known-peers = []
       |    peers-data-residence-time: 10s
       |  }
       |}
@@ -83,23 +85,23 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.addPeer(address1, Some(0), None)
       database.getKnownPeers.keys should contain(address1)
       database.removePeer(address1)
-      database.getKnownPeers.keys shouldBe empty
+      database.getKnownPeers.keys should be(empty)
     }
 
     "blacklisted peer should disappear from internal buffer and database" in {
       database.addPeer(address1, Some(0), None)
       database.addPeer(address2, None, None)
       database.getKnownPeers.keys should contain(address1)
-      database.getKnownPeers.keys should not contain (address2)
+      database.getKnownPeers.keys should not contain address2
 
       database.blacklistHost(host1)
-      database.getKnownPeers.keys should not contain (address1)
-      database.getKnownPeers shouldBe empty
+      database.getKnownPeers.keys should not contain address1
+      database.getKnownPeers should be(empty)
 
       database.getRandomPeer(Set()) should contain(address2)
       database.blacklistHost(host2)
-      database.getRandomPeer(Set()) should not contain (address2)
-      database.getRandomPeer(Set()) shouldBe empty
+      database.getRandomPeer(Set()) should not contain address2
+      database.getRandomPeer(Set()) should be(empty)
     }
 
   }

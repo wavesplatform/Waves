@@ -37,9 +37,9 @@ trait RunnableApplication extends Application with ScorexLogging {
 
   // wallet, needs strict evaluation
   override val wallet: Wallet = {
-    val walletFileOpt = Some(new java.io.File(settings.walletSettings.file))
+    val maybeWalletFilename = Option(settings.walletSettings.file).filter(_.trim.nonEmpty)
     val seed = Base58.decode(settings.walletSettings.seed).toOption
-    new Wallet(walletFileOpt, settings.walletSettings.password, seed)
+    new Wallet(maybeWalletFilename, settings.walletSettings.password, seed)
   }
 
   //p2p

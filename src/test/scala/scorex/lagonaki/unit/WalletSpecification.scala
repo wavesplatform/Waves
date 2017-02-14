@@ -36,14 +36,14 @@ class WalletSpecification extends FunSuite with Matchers {
   test("reopening") {
 
     //todo read folder from settings
-    val walletFile = new java.io.File(s"/tmp/wallet${Random.nextLong()}.dat")
+    val maybeWalletFilename = Some(s"/tmp/wallet${Random.nextLong()}.dat")
 
-    val w = new Wallet(Some(walletFile), "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption)
+    val w = new Wallet(maybeWalletFilename, "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption)
     w.generateNewAccounts(10)
     val nonce = w.nonce()
     w.close()
 
-    val w2 = new Wallet(Some(walletFile), "cookies", None)
+    val w2 = new Wallet(maybeWalletFilename, "cookies", None)
     w2.privateKeyAccounts().head.address should not be null
     w2.nonce() shouldBe nonce
   }

@@ -35,25 +35,26 @@ trait MatcherTestData {
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
   val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(NTP.correctedTime() - _)
 
-  val config =
+  val config = ConfigFactory.parseString(
     """
       |waves {
+      |  directory: "/tmp/waves-test"
       |  matcher {
       |    enable: yes
       |    account: ""
       |    bind-address: "127.0.0.1"
       |    port: 6886
-      |    min-order-fee: 100K
-      |    order-match-tx-fee: 100K
+      |    min-order-fee: 100000
+      |    order-match-tx-fee: 100000
       |    journal-directory: ${waves.directory}"/journal"
       |    snapshots-directory: ${waves.directory}"/snapshots"
       |    snapshots-interval: 1d
       |    max-open-orders: 1000
       |  }
       |}
-    """.stripMargin
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
 
-  val matcherSettings = MatcherSettings.fromConfig(ConfigFactory.parseString(config))
+  val matcherSettings = MatcherSettings.fromConfig(config)
 
   def valueFromGen[T](gen: Gen[T]): T = {
     var value = gen.sample

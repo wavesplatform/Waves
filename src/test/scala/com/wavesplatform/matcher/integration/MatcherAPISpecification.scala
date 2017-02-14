@@ -84,6 +84,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None): Unit = {
     val assetId = asset.flatMap(Base58.decode(_).toOption)
     eventually(timeout(5.seconds), interval(500.millis)) {
+      Thread.sleep(100)
       storedState.assetBalance(
         AssetAcc(acc, assetId)) should be(balance)
     }
@@ -154,13 +155,9 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     (resp \ "status").as[String] shouldBe expectedStatus
   }
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    Thread.sleep(1000)
-  }
-
   test("start") {
     // don't move this to `beforeAll`! if this fails, `afterAll` never happens, leading to ports remain open
+    Thread.sleep(1000)
     initBalances()
     Thread.sleep(1000)
   }

@@ -25,9 +25,13 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
   private val config = ConfigFactory.parseString(
     """
       |waves {
+      |  directory: ""
       |  network {
-      |    file: none
+      |    file: ""
       |    known-peers = []
+      |  }
+      |  blockchain {
+      |    file: ""
       |  }
       |}
     """.stripMargin).withFallback(ConfigFactory.load()).resolve()
