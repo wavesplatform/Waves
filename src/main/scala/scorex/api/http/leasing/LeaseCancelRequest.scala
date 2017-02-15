@@ -1,17 +1,17 @@
 package scorex.api.http.leasing
 
 import io.swagger.annotations.ApiModelProperty
-import play.api.libs.functional.syntax._
-import play.api.libs.json.{JsPath, Reads}
+import play.api.libs.json.{Format, Json}
+import scorex.account.PublicKeyAccount
+import scorex.api.http.formats._
 
 case class LeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                              sender: String,
+                              sender: PublicKeyAccount,
                               @ApiModelProperty(value = "Base58 encoded lease transaction id", required = true)
-                              txId: String)
+                              txId: String,
+                              @ApiModelProperty(required = true)
+                              fee: Long)
 
 object LeaseCancelRequest {
-  implicit val leaseCancelRequest: Reads[LeaseCancelRequest] = (
-    (JsPath \ "sender").read[String] and
-      (JsPath \ "txId").read[String]
-    ) (LeaseCancelRequest.apply _)
+  implicit val leaseCancelRequestFormat = Json.format[LeaseCancelRequest]
 }

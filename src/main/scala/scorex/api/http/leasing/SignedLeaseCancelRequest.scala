@@ -5,8 +5,8 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError
-import scorex.transaction.assets.ReissueTransaction
 import scorex.transaction.lease.LeaseCancelTransaction
+import scorex.api.http.formats._
 
 case class SignedLeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                     sender: PublicKeyAccount,
@@ -27,6 +27,6 @@ case class SignedLeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded se
 }
 
 object SignedLeaseCancelRequest {
-  implicit val leaseCancelRequestFormat: Format[SignedLeaseCancelRequest] = Json.format
+  implicit val leaseCancelRequestFormat = Json.format[SignedLeaseCancelRequest]
 }
 

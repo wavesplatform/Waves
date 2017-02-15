@@ -16,7 +16,7 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.{ChainParameters, Settings}
 import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.assets.{BurnTransaction, _}
-import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.utils._
 import scorex.wallet.Wallet
@@ -171,9 +171,9 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   }
 
   def lease(request: LeaseRequest, wallet: Wallet): Try[Either[ValidationError, LeaseTransaction]] = Try {
-    val sender = wallet.privateKeyAccount(request.sender).get
+    val sender = wallet.privateKeyAccount(request.sender.address).get
 
-    val leaseTransactionVal = LeaseTransaction.create(sender, request.amount, request.fee, getTimestamp, new Account(request.recipient))
+    val leaseTransactionVal = LeaseTransaction.create(sender, request.amount, request.fee, getTimestamp, request.recipient)
     leaseTransactionVal match {
       case Right(tx) =>
         if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
@@ -184,7 +184,19 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     leaseTransactionVal
   }
 
-  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Try[Either[ValidationError, LeaseTransaction]] = ???
+  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Try[Either[ValidationError, LeaseCancelTransaction]] = Try {
+    val sender = wallet.privateKeyAccount(request.sender.address).get
+
+    val leaseCancelTransactionVal = LeaseCancelTransaction.create(sender, Base58.decode(request.txId).get, request.fee, getTimestamp)
+    leaseCancelTransactionVal match {
+      case Right(tx) =>
+        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+        else throw new StateCheckFailed("Invalid transfer transaction generated: " + tx.json)
+      case Left(err) =>
+        throw new IllegalArgumentException(err.toString)
+    }
+    leaseCancelTransactionVal
+  }
 
 
   def issueAsset(request: IssueRequest, wallet: Wallet): Try[IssueTransaction] = Try {

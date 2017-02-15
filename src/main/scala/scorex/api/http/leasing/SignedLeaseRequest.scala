@@ -6,6 +6,7 @@ import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.api.http.formats._
 
 case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                               sender: PublicKeyAccount,
@@ -30,5 +31,5 @@ case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender p
 }
 
 object SignedLeaseRequest {
-  implicit val broadcastLeaseRequestReadsFormat: Format[SignedLeaseRequest] = Json.format
+  implicit val broadcastLeaseRequestReadsFormat = Json.format[SignedLeaseRequest]
 }

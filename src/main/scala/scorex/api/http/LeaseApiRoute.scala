@@ -3,14 +3,18 @@ package scorex.api.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRefFactory
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
+import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.app.Application
-import scorex.transaction.SimpleTransactionModule
+import scorex.transaction.{SimpleTransactionModule, StateCheckFailed}
+
+import scala.util.{Failure, Success, Try}
 
 @Path("/leasing")
-@Api(value = "/lease/")
+@Api(value = "/leasing/")
 case class LeaseApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
@@ -44,17 +48,32 @@ case class LeaseApiRoute(application: Application)(implicit val context: ActorRe
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          mkResponse(for {
-            js <- parseToEither(body)
-            i <- doValidate[LeaseRequest](js)
-            r <- doBroadcast(??? /*i.toTx*/)
-          } yield r)
+          walletNotExists(wallet).getOrElse {
+            Try(Json.parse(body)).map { js =>
+              js.validate[LeaseRequest] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).response
+                case JsSuccess(lease: LeaseRequest, _) =>
+                  transactionModule.lease(lease, wallet) match {
+                    case Success(txVal) =>
+                      txVal match {
+                        case Right(tx) => JsonResponse(tx.json, StatusCodes.OK)
+                        case Left(e) => WrongJson().response
+                      }
+                    case Failure(e: StateCheckFailed) =>
+                      StateCheckFailed.response
+                    case _ =>
+                      WrongJson().response
+                  }
+              }
+            }.getOrElse(WrongJson().response)
+          }
         }
       }
     }
   }
 
-  @Path("/lease")
+  @Path("/cancel")
   @ApiOperation(value = "Interrupt a lease",
     httpMethod = "POST",
     produces = "application/json",
@@ -73,11 +92,26 @@ case class LeaseApiRoute(application: Application)(implicit val context: ActorRe
     entity(as[String]) { body =>
       withAuth {
         postJsonRoute {
-          mkResponse(for {
-            js <- parseToEither(body)
-            ri <- doValidate[LeaseCancelRequest](js)
-            r <- doBroadcast(??? /*ri.toTx*/)
-          } yield r)
+          walletNotExists(wallet).getOrElse {
+            Try(Json.parse(body)).map { js =>
+              js.validate[LeaseCancelRequest] match {
+                case err: JsError =>
+                  WrongTransactionJson(err).response
+                case JsSuccess(lease: LeaseCancelRequest, _) =>
+                  transactionModule.leaseCancel(lease, wallet) match {
+                    case Success(txVal) =>
+                      txVal match {
+                        case Right(tx) => JsonResponse(tx.json, StatusCodes.OK)
+                        case Left(e) => WrongJson().response
+                      }
+                    case Failure(e: StateCheckFailed) =>
+                      StateCheckFailed.response
+                    case _ =>
+                      WrongJson().response
+                  }
+              }
+            }.getOrElse(WrongJson().response)
+          }
         }
       }
     }

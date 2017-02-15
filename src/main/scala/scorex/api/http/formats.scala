@@ -9,7 +9,7 @@ import scala.util.{Failure, Success}
 
 object formats {
 
-  implicit object AccountReads extends Reads[Account] {
+  object AccountReads extends Reads[Account] {
     override def reads(json: JsValue): JsResult[Account] = {
       json.validate[String].flatMap(address => {
         if (address.length == 35) {
@@ -21,11 +21,13 @@ object formats {
     }
   }
 
-  implicit object AccountWrites extends Writes[Account] {
+  object AccountWrites extends Writes[Account] {
     override def writes(o: Account): JsValue = JsString(o.address)
   }
 
-  implicit object PublicKeyAccountReads extends Reads[PublicKeyAccount] {
+  implicit val accountFormat = Format(AccountReads, AccountWrites)
+
+  object PublicKeyAccountReads extends Reads[PublicKeyAccount] {
     override def reads(json: JsValue): JsResult[PublicKeyAccount] = {
       json.validate[String].flatMap(base58String => {
         val bytesT = Base58.decode(base58String)
@@ -43,9 +45,11 @@ object formats {
     }
   }
 
-  implicit object PublicKeyAccountWrites extends Writes[PublicKeyAccount] {
+  object PublicKeyAccountWrites extends Writes[PublicKeyAccount] {
     override def writes(o: PublicKeyAccount): JsValue = JsString(Base58.encode(o.publicKey))
   }
+
+  implicit val publicKeyAccountFormat = Format(PublicKeyAccountReads, PublicKeyAccountWrites)
 
   object SignatureReads extends Reads[String] {
     override def reads(json: JsValue): JsResult[String] = {
@@ -64,5 +68,7 @@ object formats {
       })
     }
   }
+
+  implicit val signatureFormat = Format(SignatureReads, ???)
 
 }
