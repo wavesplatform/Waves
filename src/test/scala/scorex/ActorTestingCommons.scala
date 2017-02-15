@@ -44,7 +44,7 @@ abstract class ActorTestingCommons extends TestKitBase
       |    enable: yes
       |    offline: yes
       |    quorum: 1
-      |    block-generation-delay: 1s
+      |    generation-delay: 1s
       |    interval-after-last-block-then-generation-is-allowed: 10m
       |    tf-like-scheduling: yes
       |  }

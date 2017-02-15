@@ -14,14 +14,24 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
 
   private val configString =
     """waves {
-      |  fees = [
-      |    {transaction-type: 2, asset: WAVES, fee: 100000}
-      |    {transaction-type: 3, asset: WAVES, fee: 100000000}
-      |    {transaction-type: 4, asset: WAVES, fee: 100000}
-      |    {transaction-type: 4, asset: "JAudr64y6YxTgLn9T5giKKqWGkbMfzhdRAxmNNfn6FJN", fee: 1002}
-      |    {transaction-type: 5, asset: WAVES, fee: 200000}
-      |    {transaction-type: 6, asset: WAVES, fee: 300000}
-      |  ]
+      |  fees {
+      |    payment {
+      |      WAVES = 100000
+      |    }
+      |    issue {
+      |      WAVES = 100000000
+      |    }
+      |    transfer {
+      |      WAVES = 100000
+      |      "JAudr64y6YxTgLn9T5giKKqWGkbMfzhdRAxmNNfn6FJN" = 1002
+      |    }
+      |    reissue {
+      |      WAVES = 200000
+      |    }
+      |    burn {
+      |      WAVES = 300000
+      |    }
+      |  }
       |}""".stripMargin
 
   private val config = ConfigFactory.parseString(configString)

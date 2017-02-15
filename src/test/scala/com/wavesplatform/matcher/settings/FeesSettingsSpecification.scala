@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.settings
 
+import com.typesafe.config.ConfigException.{BadValue, NotResolved}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.{FeeSettings, FeesSettings}
 import org.scalatest.{FlatSpec, Matchers}
@@ -9,57 +10,79 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
     val config = ConfigFactory.parseString(
       """
         |waves {
-        |  fees = [
-        |    {transaction-type: 2, asset: WAVES, fee: 100000}
-        |    {transaction-type: 3, asset: WAVES, fee: 100000000}
-        |    {transaction-type: 4, asset: WAVES, fee: 100000}
-        |    {transaction-type: 5, asset: WAVES, fee: 100000}
-        |    {transaction-type: 6, asset: WAVES, fee: 100000}
-        |    {transaction-type: 7, asset: WAVES, fee: 100000}
-        |    {transaction-type: 8, asset: WAVES, fee: 100000}
-        |  ]
+        |  network {
+        |    file = "xxx"
+        |  }
+        |  fees {
+        |    payment {
+        |      WAVES = 100000
+        |    }
+        |    issue {
+        |      WAVES = 100000000
+        |    }
+        |    transfer {
+        |      WAVES = 100000
+        |    }
+        |    reissue {
+        |      WAVES = 100000
+        |    }
+        |    burn {
+        |      WAVES = 100000
+        |    }
+        |    exchange {
+        |      WAVES = 100000
+        |    }
+        |  }
+        |  miner {
+        |    timeout = 10
+        |  }
         |}
       """.stripMargin).resolve()
 
     val settings = FeesSettings.fromConfig(config)
-    settings.fees.size should be(7)
-    settings.fees.head should be(FeeSettings(2, "WAVES", 100000))
-    settings.fees.tail.head should be(FeeSettings(3, "WAVES", 100000000))
-    settings.fees.tail.tail.head should be (FeeSettings(4, "WAVES", 100000))
-    settings.fees.tail.tail.tail.head should be (FeeSettings(5, "WAVES", 100000))
-    settings.fees.tail.tail.tail.tail.head should be (FeeSettings(6, "WAVES", 100000))
-    settings.fees.tail.tail.tail.tail.tail.head should be (FeeSettings(7, "WAVES", 100000))
-    settings.fees.tail.tail.tail.tail.tail.tail.head should be (FeeSettings(8, "WAVES", 100000))
+    settings.fees.size should be(6)
+
+    settings.fees(2) should be(List(FeeSettings("WAVES", 100000)))
+    settings.fees(3) should be(List(FeeSettings("WAVES", 100000000)))
+    settings.fees(4) should be(List(FeeSettings("WAVES", 100000)))
+    settings.fees(5) should be(List(FeeSettings("WAVES", 100000)))
+    settings.fees(6) should be(List(FeeSettings("WAVES", 100000)))
+    settings.fees(7) should be(List(FeeSettings("WAVES", 100000)))
   }
 
   it should "combine read few fees for one transaction type" in {
     val config = ConfigFactory.parseString(
       """
         |waves {
-        |  fees = [
-        |    {transaction-type: 1, asset: WAVES0, fee: 000}
-        |    {transaction-type: 2, asset: WAVES1, fee: 111}
-        |    {transaction-type: 2, asset: WAVES2, fee: 222}
-        |    {transaction-type: 2, asset: WAVES3, fee: 333}
-        |    {transaction-type: 3, asset: WAVES4, fee: 444}
-        |  ]
+        |  fees {
+        |    payment {
+        |      WAVES0 = 0
+        |    }
+        |    issue {
+        |      WAVES1 = 111
+        |      WAVES2 = 222
+        |      WAVES3 = 333
+        |    }
+        |    transfer {
+        |      WAVES4 = 444
+        |    }
+        |  }
         |}
       """.stripMargin).resolve()
 
     val settings = FeesSettings.fromConfig(config)
-    settings.fees.size should be(5)
-    settings.fees.head should be(FeeSettings(1, "WAVES0", 0))
-    settings.fees.tail.head should be(FeeSettings(2, "WAVES1", 111))
-    settings.fees.tail.tail.head should be (FeeSettings(2, "WAVES2", 222))
-    settings.fees.tail.tail.tail.head should be (FeeSettings(2, "WAVES3", 333))
-    settings.fees.tail.tail.tail.tail.head should be (FeeSettings(3, "WAVES4", 444))
+    settings.fees.size should be(3)
+    settings.fees(2).toSet should equal(Set(FeeSettings("WAVES0", 0)))
+    settings.fees(3).toSet should equal(Set(FeeSettings("WAVES1", 111), FeeSettings("WAVES2", 222), FeeSettings("WAVES3", 333)))
+    settings.fees(4).toSet should equal(Set(FeeSettings("WAVES4", 444)))
   }
 
   it should "allow empty list" in {
     val config = ConfigFactory.parseString(
       """
         |waves {
-        |  fees = []
+        |  fees {
+        |  }
         |}
       """.stripMargin).resolve()
 
@@ -71,29 +94,74 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
     val config = ConfigFactory.parseString(
       """
         |waves {
-        |  fees = [
-        |    {transaction-type: 1, asset: WAVES1, fee: 1111}
-        |    {transaction-type: 5, asset: WAVES5, fee: 0}
-        |  ]
+        |  fees.payment.WAVES1 = 1111
+        |  fees.reissue.WAVES5 = 0
         |}
       """.stripMargin).withFallback(
       ConfigFactory.parseString(
         """
           |waves {
-          |  fees = [
-          |    {transaction-type: 1, asset: WAVES1, fee: 111}
-          |    {transaction-type: 2, asset: WAVES2, fee: 222}
-          |    {transaction-type: 3, asset: WAVES3, fee: 333}
-          |    {transaction-type: 4, asset: WAVES4, fee: 444}
-          |    {transaction-type: 5, asset: WAVES5, fee: 555}
-          |  ]
+          |  fees {
+          |    payment {
+          |      WAVES = 100000
+          |    }
+          |    issue {
+          |      WAVES = 100000000
+          |    }
+          |    transfer {
+          |      WAVES = 100000
+          |    }
+          |    reissue {
+          |      WAVES = 100000
+          |    }
+          |    burn {
+          |      WAVES = 100000
+          |    }
+          |    exchange {
+          |      WAVES = 100000
+          |    }
+          |  }
           |}
         """.stripMargin)
     ).resolve()
 
     val settings = FeesSettings.fromConfig(config)
-    settings.fees.size should be(2)
-    settings.fees.head should be(FeeSettings(1, "WAVES1", 1111))
-    settings.fees.tail.head should be(FeeSettings(5, "WAVES5", 0))
+    settings.fees.size should be(6)
+    settings.fees(2).toSet should equal(Set(FeeSettings("WAVES", 100000), FeeSettings("WAVES1", 1111)))
+    settings.fees(5).toSet should equal(Set(FeeSettings("WAVES", 100000), FeeSettings("WAVES5", 0)))
+  }
+
+  it should "fail on incorrect long values" in {
+    val config = ConfigFactory.parseString(
+      """
+        |waves {
+        |  fees {
+        |    payment {
+        |      WAVES=N/A
+        |    }
+        |  }
+        |}
+      """.stripMargin).resolve()
+
+    intercept[BadValue] {
+      FeesSettings.fromConfig(config)
+    }
+  }
+
+  it should "fail on unknown transaction type" in {
+    val config = ConfigFactory.parseString(
+      """
+        |waves {
+        |  fees {
+        |    shmayment {
+        |      WAVES=100
+        |    }
+        |  }
+        |}
+      """.stripMargin).resolve()
+
+    intercept[NotResolved] {
+      FeesSettings.fromConfig(config)
+    }
   }
 }

@@ -1,5 +1,7 @@
 package scorex.transaction.state.database
 
+import java.io.File
+
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.settings.BlockchainSettingsExtension._
 import org.h2.mvstore.MVStore
@@ -18,8 +20,11 @@ class BlockStorageImpl(settings: BlockchainSettings)(implicit consensusModule: C
 
   def createMVStore(fileName: String): MVStore = {
     stringToOption(fileName) match {
-      case Some(pathToDataFile) =>
-        new MVStore.Builder().fileName(pathToDataFile).compress().open()
+      case Some(s) =>
+        val file = new File(s)
+        file.getParentFile.mkdirs().ensuring(file.getParentFile.exists())
+
+        new MVStore.Builder().fileName(s).compress().open()
       case None =>
         new MVStore.Builder().open()
     }

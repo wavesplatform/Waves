@@ -9,13 +9,15 @@ import scorex.crypto.encode.Base58
 class FeeCalculator(settings: FeesSettings) {
 
   private val map: Map[String, Long] = {
-    settings.fees.map { fs =>
-      val transactionType = fs.transactionType
-      val maybeAsset = if (fs.asset.toUpperCase == "WAVES") None else Base58.decode(fs.asset).toOption
-      val fee = fs.fee
+    settings.fees.flatMap { fs =>
+      val transactionType = fs._1
+      fs._2.map { v =>
+        val maybeAsset = if (v.asset.toUpperCase == "WAVES") None else Base58.decode(v.asset).toOption
+        val fee = v.fee
 
-      TransactionAssetFee(transactionType, maybeAsset).key -> fee
-    }.toMap
+        TransactionAssetFee(transactionType, maybeAsset).key -> fee
+      }
+    }
   }
 
   def enoughFee(tx: Transaction): Boolean = tx match {
@@ -30,7 +32,7 @@ case class TransactionAssetFee(txType: Int, assetId: Option[AssetId]) {
 
   override def equals(obj: Any): Boolean = obj match {
     case o: TransactionAssetFee => o.key == this.key
-    case e => false
+    case _ => false
   }
 
   val key = s"TransactionAssetFee($txType, ${assetId.map(Base58.encode)})"

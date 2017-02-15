@@ -1,5 +1,6 @@
 package scorex.network.peer
 
+import java.io.File
 import java.net.InetSocketAddress
 
 import com.wavesplatform.settings.NetworkSettings
@@ -12,7 +13,12 @@ import scala.util.Random
 class PeerDatabaseImpl(settings: NetworkSettings, filename: Option[String]) extends PeerDatabase {
 
   private val database = filename match {
-    case Some(file) => new MVStore.Builder().fileName(file).compress().open()
+    case Some(s) => {
+      val file = new File(s)
+      file.getParentFile.mkdirs().ensuring(file.getParentFile.exists())
+
+      new MVStore.Builder().fileName(s).compress().open()
+    }
     case None => new MVStore.Builder().open()
   }
 

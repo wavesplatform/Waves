@@ -93,15 +93,26 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |  checkpoints {
       |    public-key: ""
       |  }
-      |  fees = [
-      |    {transaction-type: 2, asset: WAVES, fee: 0}
-      |    {transaction-type: 3, asset: WAVES, fee: 10000000}
-      |    {transaction-type: 4, asset: WAVES, fee: 100000}
-      |    {transaction-type: 5, asset: WAVES, fee: 100000}
-      |    {transaction-type: 6, asset: WAVES, fee: 100000}
-      |    {transaction-type: 7, asset: WAVES, fee: 100000}
-      |    {transaction-type: 8, asset: WAVES, fee: 100000}
-      |  ]
+      |  fees {
+      |    payment {
+      |      WAVES = 0
+      |    }
+      |    issue {
+      |      WAVES = 10000000
+      |    }
+      |    transfer {
+      |      WAVES = 100000
+      |    }
+      |    reissue {
+      |      WAVES = 100000
+      |    }
+      |    burn {
+      |      WAVES = 100000
+      |    }
+      |    exchange {
+      |      WAVES = 100000
+      |    }
+      |  }
       |  matcher {
       |    enable: yes
       |    account: "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K"
@@ -298,6 +309,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   applications.foreach { a =>
     if (a.wallet.privateKeyAccounts().isEmpty) a.wallet.generateNewAccounts(3)
     untilTimeout(20.seconds, 1.second) {
+      Thread.sleep(100)
       val request = Http(url(peerUrl(a) + "/consensus/algo").GET)
       val response = Await.result(request, 10.seconds)
       val json = Json.parse(response.getResponseBody).as[JsObject]
@@ -320,6 +332,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
     val history = application.transactionModule.blockStorage.history
     val initialHeight = history.height()
     untilTimeout(15.seconds) {
+      Thread.sleep(100)
       require(history.height() > initialHeight)
     }
   }
@@ -333,6 +346,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
 
   def waitForSingleConnection(application: Application): Unit = {
     untilTimeout(30.seconds) {
+      Thread.sleep(100)
       require(getConnectedPeersCount(application) > 0)
     }
   }
@@ -395,6 +409,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   def stopGeneration(nodes: Seq[Application]): Unit = {
     nodes.foreach(_.blockGenerator ! StopGeneration)
     untilTimeout(5.seconds) {
+      Thread.sleep(100)
       nodes.foreach { p =>
         require(Await.result(p.blockGenerator ? GetBlockGenerationStatus, timeout.duration) == Idle.name)
       }
