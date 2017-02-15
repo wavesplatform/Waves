@@ -6,6 +6,7 @@ import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import akka.util.ByteString
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -87,7 +88,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Lag
     )
   ))
   def verify: Route = {
-    path("verify" / Segment) { case address =>
+    path("verify" / Segment) { address =>
       verifyPath(address, decode = true)
     }
   }
@@ -212,7 +213,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Lag
   }
 
   private def signPath(address: String, encode: Boolean) = {
-    (post & entity(as[String])) { message =>
+    (post & entity(as[ByteString])) { message =>
       withAuth {
         if (!Account.isValidAddress(address)) {
           complete(InvalidAddress)
@@ -220,9 +221,9 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Lag
           wallet.privateKeyAccount(address) match {
             case None => complete(WalletAddressNotExists)
             case Some(account) =>
-              Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
+              Try(EllipticCurveImpl.sign(account, message.toArray)) match {
                 case Success(signature) =>
-                  val msg = if (encode) Base58.encode(message.getBytes) else message
+                  val msg = if (encode) Base58.encode(message.toArray) else message.decodeString(StandardCharsets.UTF_8)
                   val json = Json.obj("message" -> msg,
                     "publicKey" -> Base58.encode(account.publicKey),
                     "signature" -> Base58.encode(signature))
@@ -234,7 +235,6 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Lag
       }
     }
   }
-
 
   private def verifyPath(address: String, decode: Boolean) = withAuth {
     json[SignedMessage] { m =>
