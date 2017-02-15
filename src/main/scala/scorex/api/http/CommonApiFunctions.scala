@@ -1,22 +1,17 @@
 package scorex.api.http
 
-import akka.http.scaladsl.model.StatusCodes
-import play.api.libs.json.{JsObject, JsValue, Json}
+import akka.http.scaladsl.server.Directive1
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.transaction.History
 
 
-trait CommonApiFunctions {
-
-  def json(t: Throwable): JsObject = Json.obj("error" -> Unknown.id, "message" -> t.getMessage)
-
-  protected[api] def withBlock(history: History, encodedSignature: String)
-                              (action: Block => JsValue): JsonResponse =
-    Base58.decode(encodedSignature).toOption.map { signature =>
-      history.blockById(signature) match {
-        case Some(block) => JsonResponse(action(block), StatusCodes.OK)
-        case None => BlockNotExists.response
-      }
-    }.getOrElse(InvalidSignature.response)
+trait CommonApiFunctions { this: ApiRoute =>
+  protected[api] def withBlock(history: History, encodedSignature: String): Directive1[Block] = {
+    Base58.decode(encodedSignature).toOption.toRight(InvalidSignature)
+        .flatMap(s => history.blockById(s).toRight(BlockNotExists)) match {
+      case Right(b) => provide(b)
+      case Left(e) => complete(e)
+    }
+  }
 }

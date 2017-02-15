@@ -3,10 +3,7 @@ package scorex.api.http
 import javax.ws.rs.Path
 import scala.util.{Failure, Success}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.{RejectionHandler, Route, ValidationRejection}
-import com.wavesplatform.http.PlayJsonException
-import com.wavesplatform.http.PlayJsonSupport._
+import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -21,20 +18,18 @@ import scorex.wallet.Wallet
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StoredState, transactionModule: TransactionOperations) extends ApiRoute with CommonTransactionApiFunctions {
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StoredState, transactionModule: TransactionOperations) extends ApiRoute {
   val MaxAddressesPerRequest = 1000
 
   private def processRequest[A: Reads](pathMatcher: String, f: A => ToResponseMarshallable) =
     (path(pathMatcher) & post & withAuth) {
-      process[A](f)
+      json[A](f)
     }
 
-  private val defaultRejectionHandler = RejectionHandler.newBuilder().handle {
-    case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors))
-  }.result()
+
 
   override lazy val route =
-    (handleRejections(defaultRejectionHandler) & pathPrefix("assets")) {
+    pathPrefix("assets") {
       balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ signOrder ~ balanceDistribution
     }
 
@@ -44,29 +39,25 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
   ))
-  def balance: Route = {
-    path("balance" / Segment / Segment) { case (address, assetId) =>
-      getJsonRoute {
-        balanceJson(address, assetId)
-      }
+  def balance: Route =
+    (get & path("balance" / Segment / Segment)) { (address, assetId) =>
+      complete(balanceJson(address, assetId))
     }
-  }
 
   @Path("/{assetId}/distribution")
   @ApiOperation(value = "Asset balance distribution", notes = "Asset balance distribution by account", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
   ))
-  def balanceDistribution: Route = {
-    path(Segment / "distribution") { assetId =>
-      getJsonRoute {
+  def balanceDistribution: Route =
+    (get & path(Segment / "distribution")) { assetId =>
+      complete {
         Base58.decode(assetId) match {
-          case Success(byteArray) => JsonResponse(Json.toJson(state.assetDistribution(byteArray)), StatusCodes.OK)
-          case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.CustomValidationError("Must be base58-encoded assetId")).response
+          case Success(byteArray) => Json.toJson(state.assetDistribution(byteArray))
+          case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.CustomValidationError("Must be base58-encoded assetId"))
         }
       }
     }
-  }
 
 
   @Path("/balance/{address}")
@@ -74,13 +65,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
-  def balances: Route = {
-    path("balance" / Segment) { address =>
-      getJsonRoute {
-        balanceJson(address)
-      }
+  def balances: Route =
+    (get & path("balance" / Segment)) { address =>
+      complete(balanceJson(address))
     }
-  }
 
   @Path("/transfer")
   @ApiOperation(value = "Transfer asset",
@@ -159,7 +147,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
     processRequest("burn", (b: BurnRequest) => transactionModule.burnAsset(b, wallet))
 
 
-  private def balanceJson(address: String, assetIdStr: String): JsonResponse = {
+  private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
     val account = new Account(address)
     Base58.decode(assetIdStr) match {
       case Success(assetId) if Account.isValid(account) =>
@@ -168,12 +156,12 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
           "assetId" -> assetIdStr,
           "balance" -> state.assetBalance(AssetAcc(account, Some(assetId)))
         )
-        JsonResponse(json, StatusCodes.OK)
-      case _ => InvalidAddress.response
+        Right(json)
+      case _ => Left(InvalidAddress)
     }
   }
 
-  private def balanceJson(address: String): JsonResponse = {
+  private def balanceJson(address: String): Either[ApiError, JsObject] = {
     val account = new Account(address)
     if (Account.isValid(account)) {
       val balances: Seq[JsObject] = state.getAccountBalance(account).map { p =>
@@ -189,8 +177,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
         "address" -> account.address,
         "balances" -> JsArray(balances)
       )
-      JsonResponse(json, StatusCodes.OK)
-    } else InvalidAddress.response
+      Right(json)
+    } else Left(InvalidAddress)
   }
 
   @Path("/order")

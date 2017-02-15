@@ -1,20 +1,17 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-import scala.util.Try
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
-import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.transaction.SimpleTransactionModule
 import scorex.transaction.state.wallet.{Payment, TransferRequest}
 import scorex.wallet.Wallet
 
 @Path("/payment")
-@Api(value = "/payment", description = "Payment operations.", position = 1)
+@Api(value = "/payment")
 @Deprecated
-case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactionModule: SimpleTransactionModule) extends ApiRoute with CommonTransactionApiFunctions {
+case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactionModule: SimpleTransactionModule) extends ApiRoute {
 
   override lazy val route = payment
 
@@ -38,22 +35,11 @@ case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactio
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
   def payment: Route = path("payment") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[Payment] match {
-              case err: JsError =>
-                WrongTransactionJson(err).response
-              case JsSuccess(p: Payment, _) =>
-                val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, None, p.recipient)
-                transactionModule
-                  .transferAsset(transferRequest, wallet)
-                  .fold(ApiError.fromValidationError(_).response, { tx => JsonResponse(tx.json, StatusCodes.OK) })
-            }
-          }.getOrElse(WrongJson().response)
-        }
-      }
+    json[Payment] { p =>
+      val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, None, p.recipient)
+      transactionModule
+        .transferAsset(transferRequest, wallet)
+        .map(_.json)
     }
   }
 }
