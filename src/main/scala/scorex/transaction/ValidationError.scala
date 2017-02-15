@@ -14,6 +14,7 @@ object ValidationError {
   case object InvalidName extends ValidationError
   case object StateCheckFailed extends ValidationError
   case object OverflowError extends ValidationError
+  case object ToSelf extends ValidationError
 
   case class CustomValidationError(err: String) extends ValidationError
 

@@ -9,7 +9,7 @@ import scorex.transaction.lease.LeaseCancelTransaction
 import scorex.api.http.formats._
 
 case class SignedLeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                    sender: PublicKeyAccount,
+                                    senderPublicKey: PublicKeyAccount,
                                     @ApiModelProperty(value = "Base58 encoded lease transaction id", required = true)
                                     txId: String,
                                     @ApiModelProperty(required = true)
@@ -19,7 +19,7 @@ case class SignedLeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded se
                                     @ApiModelProperty(required = true)
                                     fee: Long) {
   def toTx: Either[ValidationError, LeaseCancelTransaction] = LeaseCancelTransaction.create(
-    sender,
+    senderPublicKey,
     Base58.decode(txId).get,
     fee,
     timestamp,

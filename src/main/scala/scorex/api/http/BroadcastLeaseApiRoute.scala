@@ -65,7 +65,7 @@ case class BroadcastLeaseApiRoute(application: Application)(implicit val context
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.SLeaseCancelRequest",
+      dataType = "scorex.transaction.state.wallet.LeaseCancelRequest",
       defaultValue = "{\n\t\"sender\":\"senderId\",\n\t\"txId\":\"leaseTranscationId\"\n}"
     )
   ))

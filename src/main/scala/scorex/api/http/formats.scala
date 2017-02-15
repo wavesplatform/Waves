@@ -69,6 +69,4 @@ object formats {
     }
   }
 
-  implicit val signatureFormat = Format(SignatureReads, ???)
-
 }
