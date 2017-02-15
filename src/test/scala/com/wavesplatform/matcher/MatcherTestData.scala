@@ -9,9 +9,9 @@ import scorex.crypto.hash.SecureCryptographicHash
 import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.transaction.state.database.blockchain.{AssetsExtendedState, StoredState}
+import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState, StoredState}
 import scorex.transaction.state.database.state.extension._
-import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
+import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreLeaseExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
 import scorex.utils.{ByteArrayExtension, NTP}
 
 trait MatcherTestData {
@@ -93,7 +93,8 @@ trait MatcherTestData {
   } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
   def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): StoredState = {
-    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage {
+    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage
+      with MVStoreLeaseExtendedStateStorage {
       override val db: MVStore = mvStore
       if (db.getStoreVersion > 0) db.rollback()
     }
@@ -103,6 +104,7 @@ trait MatcherTestData {
     }
 
     val incrementingTimestampValidator = new IncrementingTimestampValidator(settings, storage)
+    val leaseExtendedState = new LeaseExtendedState(storage)
     val validators = Seq(
       extendedState,
       incrementingTimestampValidator,
@@ -111,6 +113,8 @@ trait MatcherTestData {
       new IncludedValidator(storage, settings),
       new ActivatedValidator(settings)
     )
-    ???
+    new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
+      override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
+    }
   }
 }
