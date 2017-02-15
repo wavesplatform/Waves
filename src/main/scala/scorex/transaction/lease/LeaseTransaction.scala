@@ -40,6 +40,7 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "amount" -> amount,
+      "recipient" -> recipient.address,
       "fee" -> fee,
       "timestamp" -> timestamp
     )
@@ -78,6 +79,8 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseTransactionImpl] = {
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount)
+    } else if (sender.address == recipient.address) {
+      Left(ValidationError.ToSelf)
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else if (!Account.isValid(recipient)) {

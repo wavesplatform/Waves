@@ -153,7 +153,8 @@ trait Settings extends ScorexLogging {
     TransactionAssetFee(5, None).key -> 100000,
     TransactionAssetFee(6, None).key -> 100000,
     TransactionAssetFee(7, None).key -> 100000,
-    TransactionAssetFee(8, None).key -> 100000
+    TransactionAssetFee(8, None).key -> 100000,
+    TransactionAssetFee(9, None).key -> 100000
   )
 
   private val DefaultHistory = "blockchain"

@@ -52,7 +52,6 @@ class LeaseExtendedState(private[blockchain] val storage: StateStorageI with Lea
     applyLease(leaseTx)
   }
 
-  // todo create indexes?
   override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
     case tx: LeaseCancelTransaction =>
       val leaseTx = storage.getExistedLeaseTx(tx.leaseId)

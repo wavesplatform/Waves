@@ -113,12 +113,12 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     balanceByKey(account.key, _.balance, atHeight)
   }
 
-  private def heightWithConfirmations(confirmations: Int): Int = {
-    Math.max(1, storage.stateHeight - confirmations)
+  private def heightWithConfirmations(heightOpt: Option[Int], confirmations: Int): Int = {
+    Math.max(1, heightOpt.getOrElse(storage.stateHeight) - confirmations)
   }
 
   override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
-    balance(account, Some(heightOpt.getOrElse(heightWithConfirmations(confirmations))))
+    balance(account, Some(heightWithConfirmations(heightOpt, confirmations)))
 
   override def accountTransactions(account: Account, limit: Int = DefaultLimit): Seq[Transaction] = {
     val accountAssets = storage.getAccountAssets(account.address)
@@ -447,7 +447,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   }
 
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
-    effectiveBalance(account, Some(heightOpt.getOrElse(heightWithConfirmations(confirmations))))
+    effectiveBalance(account, Some(heightWithConfirmations(heightOpt, confirmations)))
 }
 
 object StoredState {
