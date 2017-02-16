@@ -16,7 +16,7 @@ import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
 case class UtilsApiRoute(application: Application)(implicit val context: ActorRefFactory)
   extends ApiRoute {
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
   val MaxSeedSize = 1024
   val DefaultSeedSize = 32
 

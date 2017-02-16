@@ -25,7 +25,9 @@ libraryDependencies ++=
   Dependencies.testKit ++
   Dependencies.logging ++
   Dependencies.matcher ++
-  Dependencies.p2p ++ Seq(
+  Dependencies.p2p ++
+  Seq(
+    "com.iheart" %% "ficus" % "1.4.0",
     "org.scorexfoundation" %% "scrypto" % "1.2.0",
     "commons-net" % "commons-net" % "3.+",
     "com.github.pathikrit" %% "better-files" % "2.17.+"

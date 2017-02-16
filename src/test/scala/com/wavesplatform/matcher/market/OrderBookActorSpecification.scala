@@ -9,13 +9,10 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
-import com.wavesplatform.settings.WavesSettings
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import play.api.libs.json.{JsObject, JsString}
 import scorex.settings.ChainParameters
-import scorex.transaction.SimpleTransactionModule._
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction}
 import scorex.utils.ScorexLogging
@@ -44,11 +41,8 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   val storedState = fromDBWithUnlimitedBalance(db, ChainParameters.Disabled)
 
 
-  val settings = new WavesSettings(JsObject(Seq(
-    "matcher" -> JsObject(
-      Seq("account" -> JsString(MatcherAccount.address))
-    )
-  )))
+  val settings = matcherSettings.copy(account = MatcherAccount.address)
+
   val wallet = new Wallet(None, "matcher", Option(WalletSeed))
   wallet.generateNewAccount()
   var actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
@@ -236,7 +230,8 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     "order matched with invalid order should keep matching with others, invalid is removed" in {
       val transactionModule = stub[TransactionModule]
       val ord1 = buy(pair, 100, 20)
-      val ord2 = buy(pair, 5000, 1000) // should be invalid
+      val ord2 = buy(pair, 5000, 1000)
+      // should be invalid
       val ord3 = sell(pair, 100, 10)
 
       actor = system.actorOf(Props(new OrderBookActor(pair, storedState,

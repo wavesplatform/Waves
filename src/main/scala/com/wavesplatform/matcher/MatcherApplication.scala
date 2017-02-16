@@ -6,24 +6,25 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.MatcherActor
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.RestAPISettings
 import scorex.api.http.CompositeHttpService
 import scorex.app.Application
-import scorex.settings.Settings
 import scorex.transaction.BlockStorage
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 import scorex.waves.transaction.WavesTransactionModule
 
-import scala.concurrent.{Await, Future}
-import scala.reflect.runtime.universe._
+import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.reflect.runtime.universe._
 
 trait MatcherApplication extends ScorexLogging {
   implicit def actorSystem: ActorSystem
 
-  implicit def settings: WavesSettings
+  implicit def matcherSettings: MatcherSettings
+
+  implicit def restAPISettings: RestAPISettings
 
   def transactionModule: WavesTransactionModule
 
@@ -34,14 +35,14 @@ trait MatcherApplication extends ScorexLogging {
   def storedState: StoredState = blockStorage.state.asInstanceOf[StoredState]
 
   lazy val matcherApiRoutes = Seq(
-    MatcherApiRoute(this.asInstanceOf[Application], matcher)
+    MatcherApiRoute(this.asInstanceOf[Application], matcher, matcherSettings)
   )
 
   lazy val matcherApiTypes = Seq(
     typeOf[MatcherApiRoute]
   )
 
-  lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(storedState, wallet, settings,
+  lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(storedState, wallet, matcherSettings,
     transactionModule), MatcherActor.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
@@ -51,12 +52,13 @@ trait MatcherApplication extends ScorexLogging {
   }
 
   def runMatcher() {
-    log.info(s"Starting matcher on: ${settings.matcherHost}:${settings.matcherPort} ...")
+    log.info(s"Starting matcher on: ${matcherSettings.bindAddress}:${matcherSettings.port} ...")
 
     implicit val materializer = ActorMaterializer()
 
-    val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, settings.asInstanceOf[Settings]).compositeRoute
-    matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, settings.matcherHost, settings.matcherPort), 5.seconds)
+    val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, restAPISettings).compositeRoute
+    matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, matcherSettings.bindAddress,
+      matcherSettings.port), 5.seconds)
 
     implicit val ec = actorSystem.dispatcher
     log.info(s"Matcher bound to ${matcherServerBinding.localAddress} ")

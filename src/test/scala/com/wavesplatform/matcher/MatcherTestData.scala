@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
 import org.h2.mvstore.MVStore
 import org.scalacheck.{Arbitrary, Gen}
@@ -33,6 +34,27 @@ trait MatcherTestData {
 
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
   val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(NTP.correctedTime() - _)
+
+  val config = ConfigFactory.parseString(
+    """
+      |waves {
+      |  directory: "/tmp/waves-test"
+      |  matcher {
+      |    enable: yes
+      |    account: ""
+      |    bind-address: "127.0.0.1"
+      |    port: 6886
+      |    min-order-fee: 100000
+      |    order-match-tx-fee: 100000
+      |    journal-directory: ${waves.directory}"/journal"
+      |    snapshots-directory: ${waves.directory}"/snapshots"
+      |    snapshots-interval: 1d
+      |    max-open-orders: 1000
+      |  }
+      |}
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+
+  val matcherSettings = MatcherSettings.fromConfig(config)
 
   def valueFromGen[T](gen: Gen[T]): T = {
     var value = gen.sample

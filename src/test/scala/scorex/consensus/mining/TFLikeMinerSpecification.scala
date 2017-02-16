@@ -2,13 +2,13 @@ package scorex.consensus.mining
 
 import akka.actor.Props
 import akka.testkit.TestProbe
+import com.wavesplatform.settings.WavesSettings
 import scorex.ActorTestingCommons
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.network.Coordinator.AddBlock
-import scorex.settings.SettingsMock
 import scorex.transaction.{History, TransactionModule}
 import scorex.wallet.Wallet
 
@@ -19,19 +19,11 @@ class MinerMock(app: Application) extends Miner(app) {
   override protected def preciseTime: Long = System.currentTimeMillis()
 }
 
-class MinerSpecification extends ActorTestingCommons {
+class TFLikeMinerSpecification extends ActorTestingCommons {
 
   import System.currentTimeMillis
 
   import Miner._
-
-  private val tf = mockFunction[Boolean]
-  private def setTF(value: Boolean) = tf expects() returns value anyNumberOfTimes()
-
-  private object TestSettings extends SettingsMock {
-    override lazy val blockGenerationDelay: FiniteDuration = 1500 millis
-    override lazy val tflikeScheduling: Boolean = tf()
-  }
 
   private val testWallet = new Wallet(None, "", Option("seed".getBytes()))
   private val account = testWallet.generateNewAccount().get
@@ -74,8 +66,10 @@ class MinerSpecification extends ActorTestingCommons {
     }
   }
 
+  val wavesSettings = WavesSettings.fromConfig(baseTestConfig)
+
   private trait App extends ApplicationMock {
-    override val settings = TestSettings
+    override val settings = wavesSettings
     override val wallet: Wallet = testWallet
     override val coordinator = testCoordinator.ref
     override val history: History = testHistory
@@ -90,28 +84,7 @@ class MinerSpecification extends ActorTestingCommons {
 
     val newBlock = testBlock(111)
 
-    "Simple (fixed time interval) scheduling" - {
-
-      setTF(false)
-
-      "block generating" in {
-
-        inSequence {
-          setBlockGenExpectations(Seq.empty)
-          setBlockGenExpectations(Seq(newBlock))
-        }
-
-        actorRef ! GuessABlock(false)
-
-        testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay * 2)
-        testCoordinator.expectMsg(AddBlock(newBlock, None))
-        testCoordinator.expectNoMsg()
-      }
-    }
-
     "TF-like scheduling approach" - {
-
-      setTF(true)
 
       "block generating" - {
 
@@ -182,9 +155,9 @@ class MinerSpecification extends ActorTestingCommons {
 
           actorRef ! GuessABlock(false)
 
-          testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay)
+          testCoordinator.expectNoMsg(wavesSettings.minerSettings.generationDelay)
           testCoordinator.expectMsg(AddBlock(newBlock, None))
-          testCoordinator.expectNoMsg(TestSettings.blockGenerationDelay + genTimeShift)
+          testCoordinator.expectNoMsg(wavesSettings.minerSettings.generationDelay + genTimeShift)
         }
 
         "past" in {
@@ -194,6 +167,88 @@ class MinerSpecification extends ActorTestingCommons {
         "far future" in {
           incorrectScheduleScenario(MaxBlockGenerationDelay.toMillis + 174305)
         }
+      }
+    }
+  }
+}
+
+class SimpleMinerSpecification extends ActorTestingCommons {
+
+  import System.currentTimeMillis
+
+  import Miner._
+
+  private val testWallet = new Wallet(None, "", Option("seed".getBytes()))
+  private val account = testWallet.generateNewAccount().get
+
+  val testCoordinator = TestProbe("Coordinator")
+
+  private val testHistory = mock[History]
+  private val testConsensusModule = mock[ConsensusModule]
+
+  private val f = mockFunction[Block, String]
+  f.expects(*).never
+  (testConsensusModule.blockOrdering(_: TransactionModule)).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
+
+  private def mayBe(b: Boolean): Range = (if (b) 0 else 1) to 1
+
+  private def setBlockGenExpectations(expected: Seq[Block], maybe: Boolean = false): Unit =
+    (testConsensusModule.generateNextBlocks(_: Seq[PrivateKeyAccount])(_: TransactionModule))
+      .expects(Seq(account), *)
+      .returns(expected)
+      .repeat(mayBe(maybe))
+
+  private def setBlockGenTimeExpectations(block: Block, time: Option[Long], maybe: Boolean = false): Unit =
+    (testConsensusModule.nextBlockGenerationTime(_: Block, _: PublicKeyAccount)(_: TransactionModule))
+      .expects(block, account, *)
+      .returns(time)
+      .repeat(mayBe(maybe))
+
+  private def setLastBlockExpectations(block: Block, maybe: Boolean = false): Unit = {
+    (testHistory.lastBlock _).expects().returns(block).repeat(mayBe(maybe))
+  }
+
+  private def setExpectations(lastBlockId: Int, d: Option[Duration], maybe: Boolean = false): Unit = {
+    val lastBlock = testBlock(lastBlockId)
+
+    inSequence {
+      setLastBlockExpectations(lastBlock, maybe)
+      setBlockGenTimeExpectations(lastBlock, d.map(currentTimeMillis + _.toMillis), maybe)
+    }
+  }
+
+  val wavesSettings = WavesSettings.fromConfig(testConfigTFLikeOff)
+
+  private trait App extends ApplicationMock {
+    override val settings = wavesSettings
+    override val wallet: Wallet = testWallet
+    override val coordinator = testCoordinator.ref
+    override val history: History = testHistory
+    override implicit val consensusModule: ConsensusModule = testConsensusModule
+  }
+
+  private val genTimeShift = Miner.BlockGenerationTimeShift
+
+  protected override val actorRef = system.actorOf(Props(classOf[MinerMock], mock[App]))
+
+  testSafely {
+
+    val newBlock = testBlock(111)
+
+    "Simple (fixed time interval) scheduling" - {
+
+      "block generating" in {
+
+        inSequence {
+          setBlockGenExpectations(Seq.empty)
+          setBlockGenExpectations(Seq(newBlock))
+        }
+
+        actorRef ! GuessABlock(false)
+
+        testCoordinator.expectNoMsg(wavesSettings.minerSettings.generationDelay * 2)
+        testCoordinator.expectMsg(AddBlock(newBlock, None))
+        testCoordinator.expectNoMsg()
       }
     }
   }

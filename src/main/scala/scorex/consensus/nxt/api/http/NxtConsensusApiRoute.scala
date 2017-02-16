@@ -19,7 +19,7 @@ import scorex.crypto.encode.Base58
 class NxtConsensusApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonApiFunctions {
 
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
   private val consensusModule = application.consensusModule.asInstanceOf[WavesConsensusModule]
   private val blockStorage = application.blockStorage
 

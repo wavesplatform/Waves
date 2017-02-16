@@ -31,10 +31,11 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   private val storedState = application.storedState
   private var orderIdToCancel = Option.empty[String]
 
-  private val MatcherPubKey = application.wallet.privateKeyAccount(application.settings.matcherAccount).
+  private val MatcherPubKey = application.wallet.privateKeyAccount(application.settings.matcherSettings.account).
     map(a => Base58.encode(a.publicKey)).get
 
   def initBalances() = {
+    Thread.sleep(1000)
     assetTransfer(AccountM, AccountA, 2000 * Constants.UnitsInWave)
     Asset1 = Some(issueAsset(AccountM, 1000 * Constants.UnitsInWave))
     MBalance = storedState.assetBalance(AssetAcc(AccountM, None))
@@ -84,6 +85,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None): Unit = {
     val assetId = asset.flatMap(Base58.decode(_).toOption)
     eventually(timeout(5.seconds), interval(500.millis)) {
+      Thread.sleep(100)
       storedState.assetBalance(
         AssetAcc(acc, assetId)) should be(balance)
     }
@@ -154,13 +156,10 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     (resp \ "status").as[String] shouldBe expectedStatus
   }
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    Thread.sleep(1000)
-  }
-
   test("start") {
     // don't move this to `beforeAll`! if this fails, `afterAll` never happens, leading to ports remain open
+    waitForSingleConnection(application)
+    waitForNextBlock(application)
     initBalances()
     Thread.sleep(1000)
   }

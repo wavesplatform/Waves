@@ -3,18 +3,19 @@ package scorex
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
+import com.typesafe.config.{Config, ConfigFactory}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{FreeSpecLike, Matchers}
+import org.scalatest.Matchers
 import scorex.account.PublicKeyAccount
 import scorex.app.Application
 import scorex.block.Block._
-import scorex.block.{Block, LongBlockField, SignerData}
+import scorex.block.{Block, SignerData}
 import scorex.consensus.ConsensusModule
-import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
-import scorex.transaction.{TransactionModule, TransactionsBlockField}
+import scorex.transaction.TransactionModule
 import scorex.transaction.TypedTransaction.SignatureLength
 
 import scala.concurrent.duration._
@@ -25,6 +26,49 @@ abstract class ActorTestingCommons extends TestKitBase
   with Matchers
   with ImplicitSender
   with PathMockFactory {
+
+  protected val baseTestConfig: Config = ConfigFactory.parseString(
+    """
+      |waves {
+      |  directory: ""
+      |  blockchain {
+      |    file: ""
+      |  }
+      |  network {
+      |    file: ""
+      |  }
+      |  wallet {
+      |    file: ""
+      |  }
+      |  miner {
+      |    enable: yes
+      |    offline: yes
+      |    quorum: 1
+      |    generation-delay: 1s
+      |    interval-after-last-block-then-generation-is-allowed: 10m
+      |    tf-like-scheduling: yes
+      |  }
+      |}
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+
+  protected val testConfigOfflineGenerationOff: Config = ConfigFactory.parseString(
+    """
+      |waves {
+      |  miner {
+      |    offline: no
+      |  }
+      |}
+    """.stripMargin).withFallback(baseTestConfig).resolve()
+
+  protected val testConfigTFLikeOff: Config = ConfigFactory.parseString(
+    """
+      |waves {
+      |  miner {
+      |    tf-like-scheduling: no
+      |  }
+      |}
+    """.stripMargin).withFallback(baseTestConfig).resolve()
+
 
   protected implicit val testTimeout = Timeout(2000.milliseconds)
   protected val testDuration = testTimeout.duration

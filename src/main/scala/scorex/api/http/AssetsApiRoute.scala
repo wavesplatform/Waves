@@ -27,7 +27,7 @@ case class AssetsApiRoute(application: Application)(implicit val context: ActorR
   extends ApiRoute with CommonTransactionApiFunctions {
   val MaxAddressesPerRequest = 1000
 
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
 
   private val wallet = application.wallet
   private val state = application.blockStorage.state.asInstanceOf[StoredState]

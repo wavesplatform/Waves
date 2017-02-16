@@ -16,14 +16,14 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
   private var miner: Option[ActorRef] = None
 
   override def preStart(): Unit = {
-    if (application.settings.minerEnabled) {
+    if (application.settings.minerSettings.enable) {
       context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
     }
   }
 
   override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
-  override def receive: Receive = if (application.settings.minerEnabled) idle else Actor.ignoringBehavior
+  override def receive: Receive = if (application.settings.minerSettings.enable) idle else Actor.ignoringBehavior
 
   def idle: Receive = state {
 
@@ -87,8 +87,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
   private def isLastBlockTsInAllowedToGenerationInterval: Boolean = try {
     val lastBlockTimestamp = application.history.lastBlock.timestampField.value
     val currentTime = NTP.correctedTime()
-    val doNotGenerateUntilLastBlockTs = currentTime - application.settings.allowedGenerationTimeFromLastBlockInterval
-      .toMillis
+    val doNotGenerateUntilLastBlockTs = currentTime - application.settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
     lastBlockTimestamp >= doNotGenerateUntilLastBlockTs
   } catch {
     case e: UnsupportedOperationException =>
@@ -107,7 +106,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       log.info(s"Resume block generation")
       context become generating(active = true)
     }
-    if (peersNumber >= application.settings.quorum || application.settings.offlineGeneration) {
+    if (peersNumber >= application.settings.minerSettings.quorum || application.settings.minerSettings.offline) {
       if (ifShouldGenerateNow) {
         startMiner()
         if (!active) {

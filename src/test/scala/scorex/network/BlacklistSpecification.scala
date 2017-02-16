@@ -2,17 +2,22 @@ package scorex.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.NetworkSettings
 import org.scalatest.{FeatureSpec, GivenWhenThen}
-import play.api.libs.json.{JsObject, Json}
 import scorex.network.peer.PeerDatabaseImpl
-import scorex.settings.Settings
 
 class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
+  private val config = ConfigFactory.parseString(
+    """
+      |waves {
+      |  network {
+      |    black-list-residence-time: 1s
+      |  }
+      |}
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
 
-  object TestSettings extends Settings {
-    override lazy val settingsJSON: JsObject = Json.obj()
-    override lazy val blacklistResidenceTimeMilliseconds = 1000L
-  }
+  private val networkSettings = NetworkSettings.fromConfig(config)
 
   info("As a Peer")
   info("I want to blacklist other peers for certain time")
@@ -22,7 +27,8 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
     scenario("Peer blacklist another peer") {
 
       Given("Peer database is empty")
-      val peerDatabase = new PeerDatabaseImpl(TestSettings, None)
+      val peerDatabase = new PeerDatabaseImpl(networkSettings, None)
+
       def isBlacklisted(address: InetSocketAddress) = peerDatabase.getBlacklist.contains(address.getHostName)
 
       assert(peerDatabase.getKnownPeers.isEmpty)
@@ -40,7 +46,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       assert(!peerDatabase.getKnownPeers.contains(address))
 
       And("Peer waits for some time")
-      Thread.sleep(TestSettings.blacklistResidenceTimeMilliseconds)
+      Thread.sleep(networkSettings.blackListResidenceTime.toMillis)
 
       Then("Another peer disappear from blacklist")
       assert(!isBlacklisted(address))

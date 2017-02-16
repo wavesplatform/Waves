@@ -22,7 +22,7 @@ class ScoreObserver(application: Application) extends ViewSynchronizer with Scor
   protected lazy override val networkControllerRef = application.networkController
   private val coordinator = application.coordinator
 
-  private val scoreTTL = application.settings.scoreTTL
+  private val scoreTTL = application.settings.synchronizationSettings.scoreTTL
 
   private var candidates: Candidates = Map.empty
 

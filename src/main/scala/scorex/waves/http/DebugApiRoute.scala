@@ -18,7 +18,7 @@ import scorex.transaction.state.database.blockchain.StoredState
 case class DebugApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
 
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
   implicit lazy val transactionModule = application.transactionModule
   lazy val wallet = application.wallet
 

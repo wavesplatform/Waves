@@ -18,7 +18,7 @@ import scala.util.Try
 @Deprecated
 case class PaymentApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
   extends ApiRoute with CommonTransactionApiFunctions {
-  val settings = application.settings
+  val settings = application.settings.restAPISettings
 
   // TODO asInstanceOf
   implicit lazy val transactionModule: SimpleTransactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]

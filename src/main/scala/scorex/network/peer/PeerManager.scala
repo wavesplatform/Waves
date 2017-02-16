@@ -2,11 +2,9 @@ package scorex.network.peer
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{Actor, ActorRef, Status}
-import akka.pattern._
-import akka.util.Timeout
+import akka.actor.{Actor, ActorRef}
 import scorex.app.Application
-import scorex.network.NetworkController.{NetworkShutdownComplete, SendToNetwork}
+import scorex.network.NetworkController.SendToNetwork
 import scorex.network._
 import scorex.network.message.MessageHandler.RawNetworkData
 import scorex.network.message.{Message, MessageSpec}
@@ -14,9 +12,7 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.util.Random
+import scala.util.{Random, Try}
 
 /**
   * Must be singleton
@@ -25,29 +21,43 @@ import scala.util.Random
   */
 class PeerManager(application: Application) extends Actor with ScorexLogging {
 
-  private lazy val settings = application.settings
+  private lazy val settings = application.settings.networkSettings
 
   import PeerConnectionHandler._
   import PeerManager._
 
   private lazy val networkController = application.networkController
-  val blacklistResendInterval = settings.blacklistResidenceTimeMilliseconds.milliseconds / 10
+  val blacklistResendInterval = settings.blackListResidenceTime / 10
   private implicit val system = context.system
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerConnection]()
   private val suspects = mutable.Map.empty[InetSocketAddress, Int]
-  private val peerDatabase: PeerDatabase = new PeerDatabaseImpl(settings, settings.dataDirOpt.map(f => f + "/peers.dat"))
+  private val maybeFilename = Option(settings.file).filter(_.trim.nonEmpty)
+  private val peerDatabase: PeerDatabase = new PeerDatabaseImpl(settings, maybeFilename)
 
-  private val visitPeersInterval = application.settings.peersDataResidenceTime / 10
+  private val visitPeersInterval = settings.peersDataResidenceTime / 10
   context.system.scheduler.schedule(visitPeersInterval, visitPeersInterval, self, MarkConnectedPeersVisited)
   private val blacklistListeners: scala.collection.mutable.Set[ActorRef] = scala.collection.mutable.Set.empty[ActorRef]
   context.system.scheduler.schedule(blacklistResendInterval, blacklistResendInterval, self, BlacklistResendRequired)
 
-  settings.knownPeers.foreach {
-    peerDatabase.addPeer(_, Some(0), None)
-  }
+  private val knownPeersAddresses = getKnownPeersAddresses(settings.knownPeers)
+
+  knownPeersAddresses.foreach(peerDatabase.addPeer(_, Some(0), None))
+
   private var connectingPeer: Option[InetSocketAddress] = None
 
   private var maybeShutdownRequester: Option[ActorRef] = None
+
+  private val DefaultPort = 6863
+
+  private def getKnownPeersAddresses(knownPeers: List[String]): Seq[InetSocketAddress] = {
+    Try {
+      knownPeers.map { peer =>
+        val addressParts = peer.split(":").map(_.trim)
+        val port = if (addressParts.length == 2) addressParts(1).toInt else DefaultPort
+        new InetSocketAddress(addressParts(0), port)
+      }
+    }.getOrElse(Seq[InetSocketAddress]())
+  }
 
   override def receive: Receive = ({
     case CheckPeers =>
@@ -138,6 +148,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     case GetBlacklistedPeers => sender() ! peerDatabase.getBlacklist
   }
 
+  val AllowedConnectionsFromOneHost = 5
+
   private def handleNewConnection(remote: InetSocketAddress,
                                   handlerRef: ActorRef,
                                   ownSocketAddress: Option[InetSocketAddress],
@@ -148,9 +160,9 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
       handlerRef ! CloseConnection
     } else {
       val connectionFromHostCount = connectedPeers.keys.count(_.getHostName == remote.getHostName)
-      if (settings.AllowedConnectionsFromOneHost > connectionFromHostCount) {
+      if (AllowedConnectionsFromOneHost > connectionFromHostCount) {
         val handshake = Handshake(application.applicationName, application.appVersion, settings.nodeName,
-          application.settings.nodeNonce, ownSocketAddress, System.currentTimeMillis() / 1000)
+          settings.nonce, ownSocketAddress, System.currentTimeMillis() / 1000)
 
         handlerRef ! handshake
 
@@ -226,7 +238,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
           application.applicationName.dropRight(1) != handshake.applicationName) {
           log.debug(s"Different application name: ${handshake.applicationName} from $address")
           self ! AddToBlacklist(address)
-        } else if (settings.nodeNonce == handshake.nodeNonce) {
+        } else if (settings.nonce == handshake.nodeNonce) {
           log.info("Drop connection to self")
           connectedPeers.remove(address)
           peerDatabase.removePeer(address)
@@ -269,7 +281,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     case Suspect(address) =>
       val count = suspects.getOrElse(address, 0)
       suspects.put(address, count + 1)
-      if (count >= settings.blacklistThreshold) {
+      if (count >= settings.blackListThreshold) {
         suspects.remove(address)
         addPeerToBlacklist(address)
       }

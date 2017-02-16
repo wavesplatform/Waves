@@ -34,7 +34,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(SignatureLength)(0.toByte)
-    val payment = ExternalPayment(timestamp, amount, 400L, senderPublicKey, recipient, signature)
+    val payment = ExternalPayment(timestamp, amount, 100000L, senderPublicKey, recipient, signature)
     val json = Json.toJson(payment).toString
 
     val response = postRequest(us = "/waves/external-payment", body = json)
@@ -47,7 +47,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(SignatureLength)(0.toByte)
-    val payment = ExternalPayment(timestamp, amount, 400L, senderPublicKey, recipient, signature)
+    val payment = ExternalPayment(timestamp, amount, 100000L, senderPublicKey, recipient, signature)
     val json = Json.toJson(payment).toString
 
     val response = postRequest(us = "/waves/external-payment", body = json)
@@ -60,7 +60,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(SignatureLength)(0.toByte)
-    val payment = ExternalPayment(timestamp, amount, 400L, senderPublicKey, recipient, signature)
+    val payment = ExternalPayment(timestamp, amount, 100000L, senderPublicKey, recipient, signature)
     val json = Json.toJson(payment).toString
 
     val response = postRequest(us = "/waves/external-payment", body = json)
@@ -73,7 +73,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(SignatureLength - 1)(0.toByte)
-    val payment = ExternalPayment(timestamp, amount, 400L, senderPublicKey, recipient, signature)
+    val payment = ExternalPayment(timestamp, amount, 100000L, senderPublicKey, recipient, signature)
     val json = Json.toJson(payment).toString
 
     val response = postRequest(us = "/waves/external-payment", body = json)
@@ -88,7 +88,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val amount = 10000000000000L
     // see application.conf: http.server.parsing.max-content-length = 1m
     val signature = Array.fill(1 * 1024 * 1024 + 1)(0.toByte)
-    val payment = ExternalPayment(timestamp, amount, 400L, senderPublicKey, recipient, signature)
+    val payment = ExternalPayment(timestamp, amount, 100000L, senderPublicKey, recipient, signature)
     val json = Json.toJson(payment).toString
 
     val response = postRequestWithResponse(us = "/waves/external-payment", body = json)
@@ -102,7 +102,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(SignatureLength)(0.toByte)
-    val payment = SignedPayment(timestamp, amount, 400L, recipient, senderPublicKey, "", Base58.encode(signature))
+    val payment = SignedPayment(timestamp, amount, 100000L, recipient, senderPublicKey, "", Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
     val response = postRequest(us = "/waves/broadcast-signed-payment", body = json)
@@ -115,7 +115,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val timestamp = 1465391445252L
     val amount = 10000000000000L
     val signature = Array.fill(SignatureLength)(0.toByte)
-    val payment = SignedPayment(timestamp, amount, 4L, recipient, senderPublicKey, "", Base58.encode(signature))
+    val payment = SignedPayment(timestamp, amount, 1L, recipient, senderPublicKey, "", Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
     val response = postRequest(us = "/waves/broadcast-signed-payment", body = json)

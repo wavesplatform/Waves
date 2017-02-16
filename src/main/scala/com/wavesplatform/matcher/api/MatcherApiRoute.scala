@@ -6,9 +6,10 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.api.http._
@@ -25,15 +26,16 @@ import scala.util.Try
 
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit val settings: WavesSettings,
-                                                                        implicit val context: ActorRefFactory) extends ApiRoute {
+case class MatcherApiRoute(application: Application, matcher: ActorRef, matcherSettings: MatcherSettings)
+                          (implicit val settings: RestAPISettings, implicit val context: ActorRefFactory)
+  extends ApiRoute {
 
   val wallet: Wallet = application.wallet
   val storedState: StoredState = application.blockStorage.state.asInstanceOf[StoredState]
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ orderBook ~  place ~ orderStatus ~ cancel ~ orderbooks
+      matcherPublicKey ~ orderBook ~ place ~ orderStatus ~ cancel ~ orderbooks
     }
 
   private def getInvalidPairResponse: JsonResponse = {
@@ -45,11 +47,12 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef)(implicit
   def matcherPublicKey: Route =
     pathEndOrSingleSlash {
       getJsonRoute {
-        val json = wallet.privateKeyAccount(settings.matcherAccount).map(a => JsString(Base58.encode(a.publicKey))).
+        val json = wallet.privateKeyAccount(matcherSettings.account).map(a => JsString(Base58.encode(a.publicKey))).
           getOrElse(JsString(""))
         JsonResponse(json, StatusCodes.OK)
       }
     }
+
 
   @Path("/orderbook/{asset1}/{asset2}")
   @ApiOperation(value = "Get Order Book for a given Asset Pair",

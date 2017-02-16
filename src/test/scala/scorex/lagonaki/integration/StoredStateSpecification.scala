@@ -26,8 +26,10 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
   override def beforeAll(): Unit = {
     super.beforeAll()
+    Thread.sleep(1000)
     waitForSingleConnection(application)
     waitForNextBlock(application)
+    Thread.sleep(1000)
   }
 
   test("invalidate transaction with forged signature in sequence") {

@@ -1,10 +1,11 @@
 package scorex.network
 
 import akka.actor.Props
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.WavesSettings
 import scorex.ActorTestingCommons
 import scorex.block.Block._
 import scorex.network.BlockchainSynchronizer.{InnerId, InnerIds}
-import scorex.settings.SettingsMock
 import scorex.transaction.History
 
 import scala.language.implicitConversions
@@ -15,22 +16,29 @@ class HistoryReplierSpecification extends ActorTestingCommons {
 
   private def mockHistory(blockIds: InnerIds): History = {
     val history = mock[History]
-    history.lookForward _ expects (*,*) onCall {
+    history.lookForward _ expects(*, *) onCall {
       (parentSignature, howMany) =>
         blockIds.dropWhile(_ != InnerId(parentSignature)).slice(1, howMany + 1).map(_.blockId)
     } anyNumberOfTimes()
     history
   }
 
-  private object TestSettings extends SettingsMock {
-    override lazy val maxChain = 5
-  }
+  private val localConfig = ConfigFactory.parseString(
+    """
+      |waves {
+      |  synchronization {
+      |    max-chain-length: 5
+      |  }
+      |}
+    """.stripMargin).withFallback(baseTestConfig).resolve()
+
+  val wavesSettings = WavesSettings.fromConfig(localConfig)
 
   private val lastHistoryBlockId = 20
   private val h = mockHistory(1 to lastHistoryBlockId)
 
   private trait App extends ApplicationMock {
-    override lazy val settings = TestSettings
+    override lazy val settings = wavesSettings
     override lazy val history: History = h
   }
 
@@ -50,7 +58,7 @@ class HistoryReplierSpecification extends ActorTestingCommons {
     "return block signatures" in {
       val last = 10
       sendSignatures(last, 8) // according to the protocol ids come in reverse order!
-      expectedSignaturesSpec(last to last + TestSettings.maxChain)
+      expectedSignaturesSpec(last to last + wavesSettings.synchronizationSettings.maxChainLength)
     }
 
     "history contains less block signatures than requested" in {
