@@ -1,3 +1,4 @@
+/*
 import java.io.File
 
 lazy val JarPath = "target/scala-2.11/waves.jar"
@@ -41,3 +42,4 @@ def runPeer(jarPath: String, configName: String, params: String*): Unit = {
   val config = new File(configName)
   s"java -jar $jarPath ${config.getAbsolutePath} ${params.mkString(" ")}".!
 }
+*/

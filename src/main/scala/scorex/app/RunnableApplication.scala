@@ -119,9 +119,6 @@ trait RunnableApplication extends Application with ScorexLogging {
   }
 
   private def checkGenesis(): Unit = {
-    val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-
-
     if (transactionModule.blockStorage.history.isEmpty) {
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
       transactionModule.blockStorage.appendBlock(Block.genesis(RunnableApplication.consensusGenesisBlockData,
