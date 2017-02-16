@@ -187,11 +187,6 @@ object Block extends ScorexLogging {
     val signature = signatureStringOpt.map(Base58.decode(_).get)
       .getOrElse(EllipticCurveImpl.sign(genesisSigner, toSign))
 
-    println("!!!---===---!!!")
-    println(Base58.encode(signature))
-    println(Base58.encode(toSign))
-    println(Base58.encode(genesisSigner.publicKey))
-    println("!!!---===---!!!")
     require(EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey), "Passed genesis signature is not valid")
 
     new Block(timestamp = timestamp,
