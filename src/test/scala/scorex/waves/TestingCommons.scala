@@ -308,8 +308,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   applications.foreach(_.run())
   applications.foreach { a =>
     if (a.wallet.privateKeyAccounts().isEmpty) a.wallet.generateNewAccounts(3)
-    untilTimeout(20.seconds, 1.second) {
-      Thread.sleep(100)
+    untilTimeout(30.seconds, 3.second) {
       val request = Http(url(peerUrl(a) + "/consensus/algo").GET)
       val response = Await.result(request, 10.seconds)
       val json = Json.parse(response.getResponseBody).as[JsObject]
@@ -331,8 +330,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   def waitForNextBlock(application: Application): Unit = {
     val history = application.transactionModule.blockStorage.history
     val initialHeight = history.height()
-    untilTimeout(15.seconds) {
-      Thread.sleep(100)
+    untilTimeout(15.seconds, 1.second) {
       require(history.height() > initialHeight)
     }
   }
@@ -345,8 +343,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   }
 
   def waitForSingleConnection(application: Application): Unit = {
-    untilTimeout(30.seconds) {
-      Thread.sleep(100)
+    untilTimeout(30.seconds, 1.second) {
       require(getConnectedPeersCount(application) > 0)
     }
   }

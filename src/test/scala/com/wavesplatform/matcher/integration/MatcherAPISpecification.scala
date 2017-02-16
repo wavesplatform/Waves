@@ -35,6 +35,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     map(a => Base58.encode(a.publicKey)).get
 
   def initBalances() = {
+    Thread.sleep(1000)
     assetTransfer(AccountM, AccountA, 2000 * Constants.UnitsInWave)
     Asset1 = Some(issueAsset(AccountM, 1000 * Constants.UnitsInWave))
     MBalance = storedState.assetBalance(AssetAcc(AccountM, None))
@@ -157,7 +158,8 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
 
   test("start") {
     // don't move this to `beforeAll`! if this fails, `afterAll` never happens, leading to ports remain open
-    Thread.sleep(1000)
+    waitForSingleConnection(application)
+    waitForNextBlock(application)
     initBalances()
     Thread.sleep(1000)
   }
