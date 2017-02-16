@@ -20,6 +20,7 @@ import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import scorex.waves.transaction.WavesTransactionModule
 
+import scala.Option.option2Iterable
 import scala.reflect.runtime.universe._
 
 class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
@@ -96,15 +97,16 @@ object Application extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     log.info("Starting...")
 
-    val maybeConfigurationFilename = args.headOption
-    val config = if (maybeConfigurationFilename.isDefined && new File(maybeConfigurationFilename.get).exists) {
-      log.info(s"Additional configuration will be loaded from ${maybeConfigurationFilename.get}")
-      ConfigFactory.parseFile(new File(maybeConfigurationFilename.get)).withFallback(ConfigFactory.load())
+    val maybeUserConfig = for {
+      maybeFilename <- args.headOption
+      file = new File(maybeFilename)
+      if file.exists
+    } yield ConfigFactory.parseFile(file)
 
-    } else ConfigFactory.load()
-
-
+    val config = maybeUserConfig.foldLeft(ConfigFactory.load()) { (default, user) => user.withFallback(default) }
+    
     val settings = WavesSettings.fromConfig(config.resolve)
+
     RootActorSystem.start("wavesplatform", settings.matcherSettings) { actorSystem =>
       configureLogging(settings)
 
