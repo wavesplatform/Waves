@@ -11,8 +11,7 @@ object Dependencies {
     "org.mockito" % "mockito-all" % "1.10.19",
     "net.databinder.dispatch" %% "dispatch-core" % "+",
     "org.scalamock" %% "scalamock-scalatest-support" % "3.5.+",
-    "com.typesafe.akka" %% "akka-http-testkit" % "10.0.3",
-    "de.heikoseeberger" %% "akka-http-play-json" % "1.12.0" // todo: promote it to a compile-time dep and improve s11n
+    "com.typesafe.akka" %% "akka-http-testkit" % "10.0.3"
   ) map (_ % "test")
 
   lazy val serialization = Seq(

@@ -3,8 +3,8 @@ package scorex.api.http
 import java.io.File
 import akka.http.scaladsl.model.headers.RawHeader
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.http.PlayJsonSupport._
 import com.wavesplatform.settings.RestAPISettings
-import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks

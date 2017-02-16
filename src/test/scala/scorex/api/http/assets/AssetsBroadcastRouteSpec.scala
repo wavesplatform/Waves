@@ -1,8 +1,8 @@
 package scorex.api.http.assets
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.http.PlayJsonSupport._
 import com.wavesplatform.settings.RestAPISettings
-import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
