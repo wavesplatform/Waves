@@ -52,8 +52,7 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     AssetsApiRoute(this),
     NodeApiRoute(this),
     SignedAssetsApiRoute(settings, transactionModule),
-    LeaseApiRoute(this),
-    BroadcastLeaseApiRoute(this)
+    LeaseApiRoute(this)
   )
 
   override lazy val apiTypes = Seq(
@@ -70,8 +69,7 @@ class Application(as: ActorSystem, appSettings: WavesSettings) extends {
     typeOf[AssetsApiRoute],
     typeOf[NodeApiRoute],
     typeOf[SignedAssetsApiRoute],
-    typeOf[LeaseApiRoute],
-    typeOf[BroadcastLeaseApiRoute]
+    typeOf[LeaseApiRoute]
   )
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
