@@ -89,26 +89,26 @@ val debianSettings = Seq(
          |mkdir -p /home/${packageName.value} &&
          |mkdir -p /home/${packageName.value}/wallet &&
          |mkdir -p /home/${packageName.value}/data &&
-         |(mv -n /usr/share/${packageName.value}/settings.json /etc/${packageName.value}.json 2>/dev/null || (rm -f /usr/share/${packageName.value}/settings.json && cp -n /usr/share/${packageName.value}/settings.json.default /etc/${packageName.value}.json)) &&
-         |ln -s /etc/${packageName.value}.json /usr/share/${packageName.value}/settings.json &&
+         |(mv -n /usr/share/${packageName.value}/settings.conf /etc/${packageName.value}.conf 2>/dev/null || (rm -f /usr/share/${packageName.value}/settings.conf && cp -n /usr/share/${packageName.value}/settings.conf.default /etc/${packageName.value}.conf)) &&
+         |ln -s /etc/${packageName.value}.conf /usr/share/${packageName.value}/settings.conf &&
          |chmod -R 750 /home/${packageName.value} &&
          |chmod -R 750 /usr/share/${packageName.value} &&
          |chmod -R 750 /etc/${packageName.value} &&
-         |chmod 750 /etc/${packageName.value}.json &&
-         |chown -R ${packageName.value}:${packageName.value} /etc/${packageName.value}.json &&
+         |chmod 750 /etc/${packageName.value}.conf &&
+         |chown -R ${packageName.value}:${packageName.value} /etc/${packageName.value}.conf &&
          |chown -R ${packageName.value}:${packageName.value} /usr/share/${packageName.value} &&
          |chown -R ${packageName.value}:${packageName.value} /home/${packageName.value}""".stripMargin),
   debianPackageDependencies in Debian += "java8-runtime-headless",
   mappings in Universal ++= {
     if (network == "mainnet") {
-      Seq((baseDirectory in root).value / "waves-mainnet.json" -> "settings.json.default")
+      Seq((baseDirectory in root).value / "waves-mainnet.conf" -> "settings.conf.default")
     } else if (network == "testnet") {
-      Seq((baseDirectory in root).value / "waves-testnet.json" -> "settings.json.default")
+      Seq((baseDirectory in root).value / "waves-testnet.conf" -> "settings.conf.default")
     } else {
       throw new IllegalStateException("invalid network")
     }
   },
-  bashScriptExtraDefines += s"""addApp "/etc/${packageName.value}.json"""",
+  bashScriptExtraDefines += s"""addApp "/etc/${packageName.value}.conf"""",
   mappings in Universal ++= contentOf((baseDirectory in root).value / "src" / "main" / "resources").map(to => (to._1, "conf/" + to._2)),
   serviceAutostart in Debian := false,
   executableScriptName := packageName.value

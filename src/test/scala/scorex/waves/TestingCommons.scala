@@ -78,7 +78,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |      }
       |      genesis {
       |        timestamp: 1478000000000
-      |        signature: "2rvMTb2XE5sneiqhoAcJiFGhUnYRHU3r6fQth4Ujx2FcqvTGU3JB6Fn2cNg93prshD75fZCYwiPNZ92nc9njq9H9"
+      |        signature: "s1ohWATVbaej8m8wKC9jec5NjZTGR3f4DUtSUoVnmSBwetPcfwYrBLFuWM4bnRXa8gJKcWgAzdyie6fqxLUuDiY"
       |        initial-balance: 10000000000000000
       |        transactions = [
       |          {recipient: "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", amount: 400000000000000}
@@ -182,7 +182,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |      }
       |      genesis {
       |        timestamp: 1478000000000
-      |        signature: "2rvMTb2XE5sneiqhoAcJiFGhUnYRHU3r6fQth4Ujx2FcqvTGU3JB6Fn2cNg93prshD75fZCYwiPNZ92nc9njq9H9"
+      |        signature: "s1ohWATVbaej8m8wKC9jec5NjZTGR3f4DUtSUoVnmSBwetPcfwYrBLFuWM4bnRXa8gJKcWgAzdyie6fqxLUuDiY"
       |        initial-balance: 10000000000000000
       |        transactions = [
       |          {recipient: "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", amount: 400000000000000}
@@ -261,7 +261,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |      }
       |      genesis {
       |        timestamp: 1478000000000
-      |        signature: "2rvMTb2XE5sneiqhoAcJiFGhUnYRHU3r6fQth4Ujx2FcqvTGU3JB6Fn2cNg93prshD75fZCYwiPNZ92nc9njq9H9"
+      |        signature: "s1ohWATVbaej8m8wKC9jec5NjZTGR3f4DUtSUoVnmSBwetPcfwYrBLFuWM4bnRXa8gJKcWgAzdyie6fqxLUuDiY"
       |        initial-balance: 10000000000000000
       |        transactions = [
       |          {recipient: "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", amount: 400000000000000}

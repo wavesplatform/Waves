@@ -7,6 +7,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import com.wavesplatform.settings.Constants
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
@@ -119,13 +120,10 @@ trait RunnableApplication extends Application with ScorexLogging {
   }
 
   private def checkGenesis(): Unit = {
-    val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-
-
     if (transactionModule.blockStorage.history.isEmpty) {
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
       transactionModule.blockStorage.appendBlock(Block.genesis(RunnableApplication.consensusGenesisBlockData,
-        transactionModule.genesisData, settings.blockchainSettings.genesisSettings.timestamp, maybeGenesisSignature))
+        transactionModule.genesisData, Constants.genesisTimestamp, maybeGenesisSignature))
       log.info("Genesis block has been added to the state")
     }
   }.ensuring(transactionModule.blockStorage.history.height() >= 1)

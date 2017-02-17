@@ -1,10 +1,13 @@
 package com.wavesplatform
 
+import java.io.File
+
 import akka.actor.{ActorSystem, Props}
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
+import com.wavesplatform.settings.BlockchainSettingsExtension._
 import com.wavesplatform.settings._
 import scorex.account.AddressScheme
 import scorex.api.http._
@@ -16,7 +19,6 @@ import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import scorex.waves.transaction.WavesTransactionModule
-import BlockchainSettingsExtension._
 
 import scala.reflect.runtime.universe._
 
@@ -93,8 +95,17 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 object Application extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     log.info("Starting...")
-    val config: Config = ConfigFactory.load()
-    val settings = WavesSettings.fromConfig(config)
+
+    val maybeUserConfig = for {
+      maybeFilename <- args.headOption
+      file = new File(maybeFilename)
+      if file.exists
+    } yield ConfigFactory.parseFile(file)
+
+    val config = maybeUserConfig.foldLeft(ConfigFactory.load()) { (default, user) => user.withFallback(default) }
+
+    val settings = WavesSettings.fromConfig(config.resolve)
+
     RootActorSystem.start("wavesplatform", settings.matcherSettings) { actorSystem =>
       configureLogging(settings)
 
