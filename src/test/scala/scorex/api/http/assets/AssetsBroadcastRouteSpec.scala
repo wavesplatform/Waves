@@ -1,7 +1,7 @@
 package scorex.api.http.assets
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.http.PlayJsonSupport._
+import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}

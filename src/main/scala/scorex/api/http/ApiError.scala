@@ -1,7 +1,7 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import play.api.libs.json.{JsError, JsObject, JsPath, Json, JsonValidationError}
+import play.api.libs.json.{JsError, JsPath, Json, JsonValidationError}
 import scorex.transaction.ValidationError
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -12,7 +12,6 @@ trait ApiError {
   val code: StatusCode
 
   lazy val json = Json.obj("error" -> id, "message" -> message)
-  lazy val response = JsonResponse(json, code)
 }
 
 object ApiError {

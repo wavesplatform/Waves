@@ -3,7 +3,7 @@ package scorex.api.http
 import akka.http.scaladsl.testkit.RouteTest
 import org.scalatest.matchers.{MatchResult, Matcher}
 import play.api.libs.json._
-import com.wavesplatform.http.PlayJsonSupport._
+import com.wavesplatform.http.ApiMarshallers._
 
 trait ApiErrorMatchers { this: RouteTest =>
   class ProduceError(error: ApiError) extends Matcher[RouteTestResult] {

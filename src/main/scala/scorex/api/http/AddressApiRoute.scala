@@ -6,7 +6,6 @@ import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import akka.util.ByteString
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -213,7 +212,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Lag
   }
 
   private def signPath(address: String, encode: Boolean) = {
-    (post & entity(as[ByteString])) { message =>
+    (post & entity(as[String])) { message =>
       withAuth {
         if (!Account.isValidAddress(address)) {
           complete(InvalidAddress)
@@ -221,9 +220,10 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Lag
           wallet.privateKeyAccount(address) match {
             case None => complete(WalletAddressNotExists)
             case Some(account) =>
-              Try(EllipticCurveImpl.sign(account, message.toArray)) match {
+              val messageBytes = message.getBytes(StandardCharsets.UTF_8)
+              Try(EllipticCurveImpl.sign(account, messageBytes)) match {
                 case Success(signature) =>
-                  val msg = if (encode) Base58.encode(message.toArray) else message.decodeString(StandardCharsets.UTF_8)
+                  val msg = if (encode) Base58.encode(messageBytes) else message
                   val json = Json.obj("message" -> msg,
                     "publicKey" -> Base58.encode(account.publicKey),
                     "signature" -> Base58.encode(signature))

@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{Directive0, RejectionHandler, ValidationRejection}
 import akka.stream.ActorMaterializer
 import com.wavesplatform.http.PlayJsonException
-import com.wavesplatform.http.PlayJsonSupport._
+import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import scorex.api.http.swagger.SwaggerDocService
 
