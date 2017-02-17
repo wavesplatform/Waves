@@ -20,7 +20,6 @@ import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import scorex.waves.transaction.WavesTransactionModule
 
-import scala.Option.option2Iterable
 import scala.reflect.runtime.universe._
 
 class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
@@ -104,7 +103,7 @@ object Application extends ScorexLogging {
     } yield ConfigFactory.parseFile(file)
 
     val config = maybeUserConfig.foldLeft(ConfigFactory.load()) { (default, user) => user.withFallback(default) }
-    
+
     val settings = WavesSettings.fromConfig(config.resolve)
 
     RootActorSystem.start("wavesplatform", settings.matcherSettings) { actorSystem =>
