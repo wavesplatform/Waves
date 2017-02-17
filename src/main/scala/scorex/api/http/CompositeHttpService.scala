@@ -7,8 +7,8 @@ import akka.http.scaladsl.model.headers.`Access-Control-Allow-Origin`
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{Directive0, RejectionHandler, ValidationRejection}
 import akka.stream.ActorMaterializer
+import com.wavesplatform.http.PlayJsonException
 import com.wavesplatform.http.PlayJsonSupport._
-import com.wavesplatform.http.{PlayJsonException, TestRoute}
 import com.wavesplatform.settings.RestAPISettings
 import scorex.api.http.swagger.SwaggerDocService
 
@@ -24,7 +24,7 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
 
   val compositeRoute =
     handleRejections(defaultRejectionHandler) {
-      withCors(routes.map(_.route).reduce(_ ~ _) ~ TestRoute.r)
+      withCors(routes.map(_.route).reduce(_ ~ _))
     } ~
     swaggerService.routes ~
     (pathEndOrSingleSlash | path("swagger")) {
