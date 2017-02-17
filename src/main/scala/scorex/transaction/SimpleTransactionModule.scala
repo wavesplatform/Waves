@@ -5,9 +5,9 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right}
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
+import com.wavesplatform.settings.WavesSettings
 import play.api.libs.json.{JsArray, JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.{Block, BlockField}
 import scorex.consensus.TransactionsOrdering
@@ -15,7 +15,7 @@ import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.StateCheckFailed
+import scorex.transaction.ValidationError.{InvalidAddress, StateCheckFailed}
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.transaction.state.wallet._
@@ -211,11 +211,10 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val paymentVal = PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
 
     paymentVal match {
-      case Right(payment) => {
+      case Right(payment) =>
         if (blockStorage.state.isValid(payment, payment.timestamp)) {
           Right(payment)
         } else Left(ValidationError.NoBalance)
-      }
       case Left(err) => Left(err)
     }
   }
@@ -224,27 +223,14 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     * Publish signed payment transaction which generated outside node
     */
   override def broadcastPayment(payment: SignedPayment): Either[ValidationError, PaymentTransaction] = {
-    val maybeSignatureBytes = Base58.decode(payment.signature).toOption
-    if (payment.fee < minimumTxFee) // TODO: remove this check later
-      Left(ValidationError.InsufficientFee)
-    else if (maybeSignatureBytes.isEmpty)
-      Left(ValidationError.InvalidSignature)
-    else {
-      val time = payment.timestamp
-      val sigBytes = maybeSignatureBytes.get
-      val senderPubKey = payment.senderPublicKey
-      val recipientAccount = payment.recipient
-      val txVal = PaymentTransaction.create(senderPubKey, recipientAccount, payment.amount, payment.fee, time, sigBytes)
-      txVal match {
-        case Right(tx) => {
-          if (blockStorage.state.isValid(tx, tx.timestamp)) {
-            onNewOffchainTransaction(tx)
-            Right(tx)
-          } else Left(ValidationError.NoBalance)
-        }
-        case Left(err) => Left(err)
-      }
-    }
+    val paymentTx = for {
+      _signature <- Base58.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
+      _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
+      _account <- if (Account.isValidAddress(payment.recipient)) Right(new Account(payment.recipient)) else Left(InvalidAddress)
+      tx <- PaymentTransaction.create(_sender, _account, payment.amount, payment.fee, payment.timestamp, _signature)
+    } yield tx
+
+    paymentTx.filterOrElse(onNewOffchainTransaction, ValidationError.StateValidationError("State validation failed"))
   }
 }
 

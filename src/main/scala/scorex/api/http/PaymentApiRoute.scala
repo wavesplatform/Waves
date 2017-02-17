@@ -34,7 +34,7 @@ case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactio
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
-  def payment: Route = path("payment") {
+  def payment: Route = (path("payment") & post & withAuth) {
     json[Payment] { p =>
       val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, None, p.recipient)
       transactionModule

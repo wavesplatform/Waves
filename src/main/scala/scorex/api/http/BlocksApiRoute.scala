@@ -92,12 +92,11 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   ))
   def at: Route = (path("at" / IntNumber) & get) { height =>
     history match {
-      case blockchain: BlockChain => {
+      case blockchain: BlockChain =>
         blockchain.blockAt(height).map(_.json) match {
-          case Some(json) => complete(json)
+          case Some(json) => complete(json + ("height" -> JsNumber(height)))
           case None => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
         }
-      }
       case _ =>
         complete(Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain"))
     }

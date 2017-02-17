@@ -16,7 +16,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       |  network {
       |    file: ""
       |    known-peers = []
-      |    peers-data-residence-time: 1s
+      |    peers-data-residence-time: 2s
       |  }
       |}
     """.stripMargin).withFallback(ConfigFactory.load()).resolve()
@@ -121,7 +121,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
     }
   }
 
-  private def sleepLong() = Thread.sleep(1200)
+  private def sleepLong() = Thread.sleep(2200)
 
   private def sleepShort() = Thread.sleep(200)
 

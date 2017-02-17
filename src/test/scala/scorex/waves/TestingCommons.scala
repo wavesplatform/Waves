@@ -392,7 +392,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   def postRequestWithResponse(us: String,
                               params: Map[String, String] = Map.empty,
                               body: String = "",
-                              headers: Map[String, String] = Map("api_key" -> "test"),
+                              headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
                               peer: String = peerUrl(application)): Response = {
     val request = Http(url(peer + us).POST << params <:< headers << body)
     Await.result(request, 5.seconds)

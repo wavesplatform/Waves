@@ -13,12 +13,11 @@ import scala.util.Random
 class PeerDatabaseImpl(settings: NetworkSettings, filename: Option[String]) extends PeerDatabase {
 
   private val database = filename match {
-    case Some(s) => {
+    case Some(s) =>
       val file = new File(s)
       file.getParentFile.mkdirs().ensuring(file.getParentFile.exists())
 
       new MVStore.Builder().fileName(s).compress().open()
-    }
     case None => new MVStore.Builder().open()
   }
 
@@ -89,10 +88,10 @@ class PeerDatabaseImpl(settings: NetworkSettings, filename: Option[String]) exte
   private def withoutObsoleteRecords[K, T](map: MVMap[K, T], timestamp: T => Long, residenceTimeInMillis: Long) = {
     val t = System.currentTimeMillis()
 
-    val obsoletePeers = map.asScala.toArray
+    val obsoletePeers = map.asScala
       .filter { case (_, value) =>
-        timestamp(value) <= System.currentTimeMillis() - residenceTimeInMillis
-      }.map(_._1)
+        timestamp(value) <= t - residenceTimeInMillis
+      }.keys
 
     if (obsoletePeers.nonEmpty) {
       obsoletePeers.foreach(map.remove)

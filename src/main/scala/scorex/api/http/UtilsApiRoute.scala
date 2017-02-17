@@ -3,6 +3,7 @@ package scorex.api.http
 import java.security.SecureRandom
 import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers}
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.Json
@@ -54,6 +55,8 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
   def hashFast: Route = (path("hash" / "secure") & post) {
+    // this is a hack to override PlayJsonSupport default unmarshaller
+    implicit val sm: FromEntityUnmarshaller[String] = PredefinedFromEntityUnmarshallers.stringUnmarshaller
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message))))
     }
@@ -68,6 +71,8 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
   def hashSecure: Route = (path("hash" / "fast") & post) {
+    // this is a hack to override PlayJsonSupport default unmarshaller
+    implicit val sm: FromEntityUnmarshaller[String] = PredefinedFromEntityUnmarshallers.stringUnmarshaller
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message))))
     }

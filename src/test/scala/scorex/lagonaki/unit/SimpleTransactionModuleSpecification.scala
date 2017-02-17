@@ -11,7 +11,7 @@ import scorex.app.{Application, RunnableApplication}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.ConsensusMock
-import scorex.settings.ChainParameters
+import scorex.settings.{ChainParameters, TestChainParameters}
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 import scorex.wallet.Wallet
 
@@ -39,7 +39,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     override implicit val consensusModule = new ConsensusMock
   }
 
-  val forkParameters = new ChainParameters {
+  val forkParameters = new ChainParameters with TestChainParameters.GenesisData {
     override def allowTemporaryNegativeUntil: Long = 0L
 
     override def requireSortedTransactionsAfter: Long = Long.MaxValue
@@ -61,8 +61,6 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     override def initialBalance: Long = 100000000000000L
 
     override def genesisTimestamp: Long = ???
-
-    override def genesisTxs: Seq[Transaction] = ???
 
     override def addressScheme: AddressScheme = ???
   }

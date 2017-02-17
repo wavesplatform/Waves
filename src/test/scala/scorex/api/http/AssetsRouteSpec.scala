@@ -9,6 +9,8 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
+import scorex.crypto.encode.Base58
+import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{TransactionOperations, ValidationError}
 import scorex.wallet.Wallet
@@ -74,6 +76,13 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
 }
 
 object AssetsRouteSpec {
-  private[AssetsRouteSpec] val apiKey = ""
-  private[AssetsRouteSpec] val settings = RestAPISettings.fromConfig(ConfigFactory.parseString(""))
+  private[AssetsRouteSpec] val apiKey = "test"
+
+  private[AssetsRouteSpec] val settings = {
+    val keyHash = Base58.encode(SecureCryptographicHash(apiKey))
+    RestAPISettings.fromConfig(
+      ConfigFactory
+        .parseString(s"waves.rest-api.api-key-hash = $keyHash")
+        .withFallback(ConfigFactory.load()))
+  }
 }

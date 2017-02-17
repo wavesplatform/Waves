@@ -13,7 +13,8 @@ class PeersAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
   test("/peers/connect API route") {
     POST.incorrectApiKeyTest("/peers/connect")
 
-    val req = POST.request("/peers/connect", body = "{\"host\":\"127.0.0.1\",\"port\":123}")
+    val req = POST.request("/peers/connect", body = "{\"host\":\"127.0.0.1\",\"port\":123}",
+      headers = Map("api_key" -> "test", "Content-type" -> "application/json"))
     (req \ s"status").as[String] shouldBe "Trying to connect"
     (req \ "hostname").asOpt[String].isDefined shouldBe true
   }

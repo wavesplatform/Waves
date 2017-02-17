@@ -35,6 +35,7 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
     complete((peerManager ? PeerManager.GetAllPeers)
       .mapTo[Map[InetSocketAddress, PeerInfo]]
       .map { peers =>
+        Json.obj("peers" ->
           JsArray(peers.take(MaxPeersInResponse).map { case (address, peerInfo) =>
             Json.obj(
               "address" -> address.toString,
@@ -42,7 +43,7 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
               "nodeNonce" -> peerInfo.nonce.toString,
               "lastSeen" -> peerInfo.timestamp
             )
-          }.toList)
+          }.toList))
       })
   }
 
@@ -55,6 +56,7 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
     complete((peerManager ? PeerManager.GetConnectedPeers)
       .mapTo[List[(InetSocketAddress, Handshake)]]
       .map { connectedPeers =>
+        Json.obj("peers" ->
         JsArray(connectedPeers.take(MaxPeersInResponse).map { peer =>
           Json.obj(
             "address" -> peer._1.toString,
@@ -62,7 +64,7 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
             "peerName" -> peer._2.nodeName,
             "peerNonce" -> peer._2.nodeNonce
           )
-        })
+        }))
       })
   }
 
@@ -78,7 +80,7 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
       defaultValue = "{\n\t\"host\":\"127.0.0.1\",\n\t\"port\":\"9084\"\n}"
     )
   ))
-  def connect: Route = (path("connect") & post) {
+  def connect: Route = (path("connect") & post & withAuth) {
     json[JsObject] { js =>
       val host = (js \ "host").as[String]
       val port = (js \ "port").as[Int]
