@@ -38,13 +38,15 @@ case class DebugApiRoute(application: RunnableApplication)(implicit val context:
   ))
   def blocks: Route = {
     path("blocks" / IntNumber) { case howMany =>
-      getJsonRoute {
-        val json = Json.arr(application.blockStorage.history.lastBlocks(howMany).map { block =>
-          val bytes = block.bytes
-          Json.obj(bytes.length.toString -> Base58.encode(FastCryptographicHash(bytes)))
-        })
+      withAuth {
+        getJsonRoute {
+          val json = Json.arr(application.blockStorage.history.lastBlocks(howMany).map { block =>
+            val bytes = block.bytes
+            Json.obj(bytes.length.toString -> Base58.encode(FastCryptographicHash(bytes)))
+          })
 
-        JsonResponse(json, StatusCodes.OK)
+          JsonResponse(json, StatusCodes.OK)
+        }
       }
     }
   }
@@ -56,8 +58,10 @@ case class DebugApiRoute(application: RunnableApplication)(implicit val context:
   ))
   def state: Route = {
     path("state") {
-      getJsonRoute {
-        JsonResponse(application.blockStorage.state.asInstanceOf[StoredState].toJson(None), StatusCodes.OK)
+      withAuth {
+        getJsonRoute {
+          JsonResponse(application.blockStorage.state.asInstanceOf[StoredState].toJson(None), StatusCodes.OK)
+        }
       }
     }
   }
@@ -69,8 +73,10 @@ case class DebugApiRoute(application: RunnableApplication)(implicit val context:
   ))
   def stateAt: Route = {
     path("state" / IntNumber) { case height =>
-      getJsonRoute {
-        JsonResponse(application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)), StatusCodes.OK)
+      withAuth {
+        getJsonRoute {
+          JsonResponse(application.blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)), StatusCodes.OK)
+        }
       }
     }
   }
@@ -96,14 +102,16 @@ case class DebugApiRoute(application: RunnableApplication)(implicit val context:
   ))
   def info: Route = {
     path("info") {
-      getJsonRoute {
-        val state = application.blockStorage.state.asInstanceOf[StoredState]
-        val json = Json.obj(
-          "stateHeight" -> state.stateHeight,
-          "stateHash" -> state.hash
-        )
+      withAuth {
+        getJsonRoute {
+          val state = application.blockStorage.state.asInstanceOf[StoredState]
+          val json = Json.obj(
+            "stateHeight" -> state.stateHeight,
+            "stateHash" -> state.hash
+          )
 
-        JsonResponse(json, StatusCodes.OK)
+          JsonResponse(json, StatusCodes.OK)
+        }
       }
     }
   }
