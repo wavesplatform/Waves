@@ -3,7 +3,7 @@ package scorex.transaction
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
-import scorex.transaction.assets.exchange._
+import scorex.transaction.assets.exchange.{Order, _}
 import scorex.utils._
 
 class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -23,8 +23,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       (sender1: PrivateKeyAccount, sender2: PrivateKeyAccount, matcher: PrivateKeyAccount, pair: AssetPair) =>
         val time = NTP.correctedTime()
         val expirationTimestamp = time + Order.MaxLiveTime
-        val buyPrice = 60
-        val sellPrice = 50
+        val buyPrice = 60*Order.PriceConstant
+        val sellPrice = 50*Order.PriceConstant
         val buyAmount = 2
         val sellAmount = 3
         val mf1 = 1

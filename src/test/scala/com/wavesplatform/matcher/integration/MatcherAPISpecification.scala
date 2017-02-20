@@ -35,8 +35,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     map(a => Base58.encode(a.publicKey)).get
 
   def initBalances() = {
-    Thread.sleep(1000)
-    assetTransfer(AccountM, AccountA, 2000 * Constants.UnitsInWave)
+    assetTransfer(AccountM, AccountA, 5000 * Constants.UnitsInWave)
     Asset1 = Some(issueAsset(AccountM, 1000 * Constants.UnitsInWave))
     MBalance = storedState.assetBalance(AssetAcc(AccountM, None))
     MBalance1 = storedState.assetBalance(AssetAcc(AccountM, Asset1.flatMap(Base58.decode(_).toOption)))
@@ -182,47 +181,48 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     ((ob \ "asks") (0) \ "amount").as[Long] shouldBe 300 * Constants.UnitsInWave
 
     val executedFee = 100000L
-    MBalance += 200 * Constants.UnitsInWave + executedFee
+    MBalance += 2 * 200 * Constants.UnitsInWave + executedFee
     waitForBalance(MBalance, AccountM, None)
-    ABalance -= 200 * Constants.UnitsInWave + executedFee
+    ABalance -= 2 * 200 * Constants.UnitsInWave + executedFee
     waitForBalance(ABalance, AccountA, None)
 
-    MBalance1 -= 100 * Constants.UnitsInWave
+    MBalance1 -= 200 * Constants.UnitsInWave
     waitForBalance(MBalance1, AccountM, Asset1)
-    ABalance1 += 100 * Constants.UnitsInWave
+    ABalance1 += 200 * Constants.UnitsInWave
     waitForBalance(ABalance1, AccountA, Asset1)
 
     (getOrderStatus(Asset1, id.get) \ "status").as[String] should be("Filled")
   }
 
   test("submit more orders than available assets including open") {
-    waitForBalance(900 * Constants.UnitsInWave, AccountM, Asset1) // And 300 by 2 is open = 150
-    // Should be available Asset1 = 900 - 150 = 750*1.5 = 1125 WAVES
-    placeOrder(AccountM, Asset1, None, 1.5, 1126 * Constants.UnitsInWave, "OrderRejected")
-    placeOrder(AccountM, Asset1, None, 1.5, 1125 * Constants.UnitsInWave, "OrderAccepted")
+    waitForBalance(800 * Constants.UnitsInWave, AccountM, Asset1) // And 300 by price = 2 is open
+    // Should be available Asset1 = 800 - 300 = 500 Asset1
+    placeOrder(AccountM, Asset1, None, 1.5, 501 * Constants.UnitsInWave, "OrderRejected")
+    placeOrder(AccountM, Asset1, None, 1.5, 500 * Constants.UnitsInWave, "OrderAccepted")
 
     val ob = getOrderBook(Asset1)
     ((ob \ "asks") (0) \ "price").as[Long] shouldBe (1.5 * Order.PriceConstant).toLong
-    ((ob \ "asks") (0) \ "amount").as[Long] shouldBe 1125 * Constants.UnitsInWave
+    ((ob \ "asks") (0) \ "amount").as[Long] shouldBe 500 * Constants.UnitsInWave
     ((ob \ "asks") (1) \ "price").as[Long] shouldBe (2 * Order.PriceConstant).toLong
     ((ob \ "asks") (1) \ "amount").as[Long] shouldBe 300 * Constants.UnitsInWave
   }
 
   test("buy order match several price levels") {
-    val id = placeOrder(AccountA, None, Asset1, 2.5, 1225 * Constants.UnitsInWave, "OrderAccepted")
+    val id = placeOrder(AccountA, None, Asset1, 2.5, 700 * Constants.UnitsInWave, "OrderAccepted")
     waitForOrderStatus(Asset1, id.get, "Filled")
 
-    val executedFee = 100000L * 1125 / 1225 + 100000L * 100 / 1225
-    MBalance += 1225 * Constants.UnitsInWave + executedFee
+    val wavesAmount = (1.5 * 500 + 2 * 200).toLong * Constants.UnitsInWave
+    val executedFee =  100000L * 500 / 700 + 100000L * 200 / 700
+    MBalance += wavesAmount + executedFee
     waitForBalance(MBalance, AccountM, None)
-    ABalance -= 1225 * Constants.UnitsInWave + executedFee //shouldBe 574.99800001
+    ABalance -= wavesAmount + executedFee
     waitForBalance(ABalance, AccountA, None)
 
     val ob = getOrderBook(Asset1)
     ((ob \ "asks") (0) \ "price").as[Long] shouldBe (2 * Order.PriceConstant).toLong
-    ((ob \ "asks") (0) \ "amount").as[Long] shouldBe 200 * Constants.UnitsInWave
+    ((ob \ "asks") (0) \ "amount").as[Long] shouldBe 100 * Constants.UnitsInWave
 
-    val assetAmount = (1125 * Constants.UnitsInWave / 1.5).toLong + 100 * Constants.UnitsInWave / 2
+    val assetAmount = (500 + 200) * Constants.UnitsInWave
     MBalance1 -= assetAmount // shouldBe 100
     waitForBalance(MBalance1, AccountM, Asset1)
     ABalance1 += assetAmount // shouldBe 900
@@ -231,22 +231,22 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
 
   test("cancel order and resubmit a new one") {
     cancelOrder(AccountM, Asset1, None, orderIdToCancel.get)
-    placeOrder(AccountM, Asset1, None, 5, 500 * Constants.UnitsInWave, "OrderAccepted")
+    placeOrder(AccountM, Asset1, None, 5, 100 * Constants.UnitsInWave, "OrderAccepted")
   }
 
   test("buy order should execute all open orders and put remaining in OrderBook") {
     waitForBalance(ABalance, AccountA, None)
-    placeOrder(AccountA, None, Asset1, 5.5, 550 * Constants.UnitsInWave, "OrderAccepted")
+    placeOrder(AccountA, None, Asset1, 5.5, 250 * Constants.UnitsInWave, "OrderAccepted")
     MBalance1 = 0
     waitForBalance(MBalance1, AccountM, Asset1)
     ABalance1 = 1000 * Constants.UnitsInWave
     waitForBalance(ABalance1, AccountA, Asset1)
-    ABalance -= 500 * Constants.UnitsInWave + (TxFee * 500 / 550)
+    ABalance -= 500 * Constants.UnitsInWave + (TxFee * 100 / 250)
     waitForBalance(ABalance, AccountA, None)
 
     val ob = getOrderBook(Asset1)
     ((ob \ "bids") (0) \ "price").as[Long] shouldBe (5.5 * Order.PriceConstant).toLong
-    ((ob \ "bids") (0) \ "amount").as[Long] shouldBe 50 * Constants.UnitsInWave
+    ((ob \ "bids") (0) \ "amount").as[Long] shouldBe 150 * Constants.UnitsInWave
     (ob \ "asks").get.asInstanceOf[JsArray].value.size shouldBe 0
   }
 }

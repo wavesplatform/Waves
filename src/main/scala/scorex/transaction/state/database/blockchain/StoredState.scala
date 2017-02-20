@@ -323,8 +323,8 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
 
   //for debugging purposes only
   def toWavesJson(heightOpt: Int): JsObject = {
-    val ls = storage.lastStatesKeys.map(add => add -> balanceAtHeight(add, heightOpt))
-      .filter(b => b._1.length == 35 && b._2 != 0).sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
+    val ls = storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add, heightOpt))
+      .filter(b => b._2 != 0).sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
     JsObject(ls)
   }
 
