@@ -75,5 +75,5 @@ class IncrementingTimestampValidator(allowInvalidPaymentTransactionsByTimestamp:
   }
 
 
-  override def process(tx: Transaction, blockTs: Long, height: Int): Unit = {}
+  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = {}
 }

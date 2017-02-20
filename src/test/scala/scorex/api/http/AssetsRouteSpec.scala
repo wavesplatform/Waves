@@ -3,6 +3,7 @@ package scorex.api.http
 import java.io.File
 import akka.http.scaladsl.model.headers.RawHeader
 import com.typesafe.config.ConfigFactory
+import akka.http.scaladsl.testkit._
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import org.scalacheck.Gen

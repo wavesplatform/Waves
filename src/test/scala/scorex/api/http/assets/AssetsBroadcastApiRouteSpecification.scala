@@ -1,18 +1,17 @@
 package scorex.api.http.assets
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
-import akka.http.scaladsl.testkit.ScalatestRouteTest
+import com.wavesplatform.settings.RestAPISettings
+import akka.http.scaladsl.testkit._
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.settings.Settings
-import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.TransactionModule
 
 
 class AssetsBroadcastApiRouteSpecification extends FreeSpec with Matchers with ScalatestRouteTest with PathMockFactory {
   "/assets/broadcast/issue" ignore {
-    val stmMock = mock[TransactionModule[StoredInBlock]]
-    val abar = SignedAssetsApiRoute(Settings.empty, stmMock)
+    val stmMock = mock[TransactionModule]
+    val abar = AssetsBroadcastApiRoute(???, stmMock)
     val json =
       """{
         |"senderPublicKey":"4c4nAckNxsuafXcg4abFPJ6wBZB6PD7KVNkD1wbVxnxZ",

@@ -15,7 +15,6 @@ import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
-import scorex.transaction.SimpleTransactionModule.StoredInBlock
 import scorex.transaction.TransactionModule
 import scorex.transaction.TypedTransaction.SignatureLength
 

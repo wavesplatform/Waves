@@ -16,7 +16,7 @@ class IncludedValidator(storage: StateStorageI, requirePaymentUniqueId: Long) ex
   }
 
 
-  override def process(tx: Transaction, blockTs: Long, height: Int): Unit = {
+  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = {
     storage.putTransaction(tx, height)
   }
 }

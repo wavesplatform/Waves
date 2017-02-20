@@ -2,6 +2,7 @@ package scorex.api.http
 
 import org.scalacheck.{Arbitrary, Gen => G}
 import org.scalacheck.Gen.{alphaNumChar, choose, listOfN, oneOf}
+import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 import scorex.transaction.{TransactionGen, TypedTransaction}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
@@ -48,11 +49,11 @@ trait RequestGen extends TransactionGen {
     reissuable <- G.oneOf(true, false)
   } yield IssueRequest(account, new String(name), new String(description), quantity, decimals, reissuable, fee)
 
-  val broadcastIssueReq: G[AssetIssueRequest] = for {
+  val broadcastIssueReq: G[SignedAssetIssueRequest] = for {
     _signature <- signatureGen
     _timestamp <- timestampGen
     _ir <- issueReq
-  } yield AssetIssueRequest(_ir.sender, _ir.name, _ir.description, _ir.quantity, _ir.decimals, _ir.reissuable, _ir.fee,
+  } yield SignedAssetIssueRequest(_ir.sender, _ir.name, _ir.description, _ir.quantity, _ir.decimals, _ir.reissuable, _ir.fee,
     _timestamp, _signature)
 
   private val reissueBurnFields = for {
@@ -66,22 +67,22 @@ trait RequestGen extends TransactionGen {
     reissuable <- G.oneOf(true, false)
   } yield ReissueRequest(account, assetId, quantity, reissuable, fee)
 
-  val broadcastReissueReq: G[AssetReissueRequest] = for {
+  val broadcastReissueReq: G[SignedAssetReissueRequest] = for {
     _signature <- signatureGen
     _timestamp <- timestampGen
     _rr <- reissueReq
-  } yield AssetReissueRequest(_rr.sender, _rr.assetId, _rr.quantity, _rr.reissuable, _rr.fee, _timestamp, _signature)
+  } yield SignedAssetReissueRequest(_rr.sender, _rr.assetId, _rr.quantity, _rr.reissuable, _rr.fee, _timestamp, _signature)
 
   val burnReq: G[BurnRequest] = for {
     (account, fee) <- commonFields
     (assetId, quantity) <- reissueBurnFields
   } yield BurnRequest(account, assetId, quantity, fee)
 
-  val broadcastBurnReq: G[AssetBurnRequest] = for {
+  val broadcastBurnReq: G[SignedAssetBurnRequest] = for {
     _signature <- signatureGen
     _timestamp <- timestampGen
     _br <- burnReq
-  } yield AssetBurnRequest(_br.sender, _br.assetId, _br.quantity, _br.fee, _timestamp, _signature)
+  } yield SignedAssetBurnRequest(_br.sender, _br.assetId, _br.quantity, _br.fee, _timestamp, _signature)
 
   val transferReq: G[TransferRequest] = for {
     (account, fee) <- commonFields
@@ -92,10 +93,10 @@ trait RequestGen extends TransactionGen {
     attachment <- genBoundedString(1, 20).map(b => Some(Base58.encode(b)))
   } yield TransferRequest(assetId, feeAssetId, amount, fee, account, attachment, recipient)
 
-  val broadcastTransferReq: G[AssetTransferRequest] = for {
+  val broadcastTransferReq: G[SignedAssetTransferRequest] = for {
     _signature <- signatureGen
     _timestamp <- timestampGen
     _tr <- transferReq
-  } yield AssetTransferRequest(_tr.sender, _tr.assetId, _tr.recipient, _tr.amount, _tr.fee, _tr.feeAssetId, _timestamp,
+  } yield SignedAssetTransferRequest(_tr.sender, _tr.assetId, _tr.recipient, _tr.amount, _tr.fee, _tr.feeAssetId, _timestamp,
     _tr.attachment, _signature)
 }

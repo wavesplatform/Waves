@@ -192,9 +192,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       .create(sender, recipient, amount, fee, getTimestamp)
       .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
 
-  override def genesisData: Seq[Transaction]
-
-  = hardForkParams.genesisTxs
+  override def genesisData: Seq[Transaction] = hardForkParams.genesisTxs
 
   /** Check whether tx is valid on current state and not expired yet
     */
