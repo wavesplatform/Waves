@@ -413,14 +413,14 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val Seq(newBuyerBal1, newBuyerBal2, newSellerBal1, newSellerBal2, newBuyerFeeBal, newSellerFeeBal, newMatcherFeeBal) =
           getBalances(buyerAcc1, buyerAcc2, sellerAcc1, sellerAcc2, buyerFeeAcc, sellerFeeAcc, matcherFeeAcc)
 
-        newBuyerBal1 should be(buyerBal1 - om.amount - feeInAsset(om.buyMatcherFee, buyerAcc1.assetId))
-        newBuyerBal2 should be(buyerBal2 + BigInt(om.amount) * Order.PriceConstant / om.price -
+        newBuyerBal1 should be(buyerBal1 - (BigInt(om.amount) * om.price / Order.PriceConstant).toLong - feeInAsset(om.buyMatcherFee, buyerAcc1.assetId))
+        newBuyerBal2 should be(buyerBal2 + om.amount -
           feeInAsset(om.buyMatcherFee, buyerAcc2.assetId))
-        newSellerBal1 should be(sellerBal1 + om.amount - feeInAsset(om.sellMatcherFee, sellerAcc1.assetId))
-        newSellerBal2 should be(sellerBal2 - BigInt(om.amount) * Order.PriceConstant / om.price -
+        newSellerBal1 should be(sellerBal1 + (BigInt(om.amount) * om.price / Order.PriceConstant).toLong - feeInAsset(om.sellMatcherFee, sellerAcc1.assetId))
+        newSellerBal2 should be(sellerBal2 - om.amount -
           feeInAsset(om.sellMatcherFee, sellerAcc2.assetId))
-        newBuyerFeeBal should be(buyerFeeBal - om.buyMatcherFee + amountInWaves(om.amount, om.buyOrder))
-        newSellerFeeBal should be(sellerFeeBal - om.sellMatcherFee + amountInWaves(om.amount, om.sellOrder))
+        newBuyerFeeBal should be(buyerFeeBal - om.buyMatcherFee + amountInWaves((BigInt(om.amount) * om.price / Order.PriceConstant).toLong, om.buyOrder))
+        newSellerFeeBal should be(sellerFeeBal - om.sellMatcherFee + amountInWaves((BigInt(om.amount) * om.price / Order.PriceConstant).toLong, om.sellOrder))
         newMatcherFeeBal should be(matcherFeeBal + om.buyMatcherFee + om.sellMatcherFee - om.fee)
       }
     }

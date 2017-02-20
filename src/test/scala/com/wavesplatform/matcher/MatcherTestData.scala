@@ -80,9 +80,9 @@ trait MatcherTestData {
       matcherFee: Long <- maxWavesAnountGen
     } yield (Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee), sender)
 
-  def buy(pair: AssetPair, price: Long, amount: Long): Order = valueFromGen(buyGenerator(pair, price, amount))._1
+  def buy(pair: AssetPair, price: Long, amount: Long): Order = valueFromGen(buyGenerator(pair, price*Order.PriceConstant, amount))._1
 
-  def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price, amount))._1
+  def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price*Order.PriceConstant, amount))._1
 
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
