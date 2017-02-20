@@ -29,8 +29,6 @@ trait TransactionGen {
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
   val timestampGen: Gen[Long] = Gen.choose(1, 1000).map(NTP.correctedTime() - _)
 
-  val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
-
   val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
   val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen)))
 
@@ -95,15 +93,19 @@ trait TransactionGen {
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
   } yield TransferTransaction.create(assetId, account, account, amount, timestamp, None, feeAmount, attachment).right.get
 
+  val priceGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
+  val amountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
+  val feeAmountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
+
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
     pair: AssetPair <- assetPairGen
-    price: Long <- maxWavesAnountGen
-    amount: Long <- maxWavesAnountGen
+    price: Long <- priceGen
+    amount: Long <- amountGen
     timestamp: Long <- timestampGen
     expiration: Long <- maxTimeGen
-    matcherFee: Long <- maxWavesAnountGen
+    matcherFee: Long <- feeAmountGen
   } yield (Order(sender, matcher, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee), sender)
 
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
@@ -150,13 +152,13 @@ trait TransactionGen {
     assetPair <- assetPairGen
     spendAssetID: Array[Byte] <- bytes32gen
     receiveAssetID: Array[Byte] <- bytes32gen
-    price: Long <- maxWavesAnountGen
-    amount1: Long <- maxWavesAnountGen
-    amount2: Long <- maxWavesAnountGen
+    price: Long <- priceGen
+    amount1: Long <- amountGen
+    amount2: Long <- amountGen
     matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2, Math.min(amount1, amount2))
     timestamp: Long <- timestampGen
     expiration: Long <- maxTimeGen
-    matcherFee: Long <- maxWavesAnountGen
+    matcherFee: Long <- feeAmountGen
   } yield {
     val o1 = Order.buy(sender1, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
     val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
