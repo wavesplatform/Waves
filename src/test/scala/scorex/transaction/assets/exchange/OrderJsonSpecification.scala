@@ -17,8 +17,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     val json = Json.parse(
       s"""
         {
-          "sender": "${pubKeyStr}",
-          "matcher": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
+          "senderPublicKey": "${pubKeyStr}",
+          "matcherPublicKey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
           "spendAssetId": "29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b",
           "receiveAssetId": "GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44",
           "amount": 0,
@@ -34,8 +34,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         fail("Error: " + JsError.toJson(e).toString())
       case s: JsSuccess[Order] =>
         val o = s.get
-        o.sender shouldBe new PublicKeyAccount(pk.publicKey)
-        o.matcher shouldBe new PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
+        o.senderPublicKey shouldBe new PublicKeyAccount(pk.publicKey)
+        o.matcherPublicKey shouldBe new PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.spendAssetId.get shouldBe Base58.decode("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
         o.receiveAssetId.get shouldBe Base58.decode("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
         o.price shouldBe 0
@@ -52,7 +52,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     val json = Json.parse(
       """
         {
-          "sender": " ",
+          "senderPublicKey": " ",
           "spendAssetId": "string",
           "receiveAssetId": "string",
           "amount": 0,
@@ -66,7 +66,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     json.validate[Order] match {
       case e: JsError =>
         val paths = e.errors.map(_._1)
-        paths should contain allOf(JsPath \ "matcher", JsPath \ "sender")
+        paths should contain allOf(JsPath \ "matcherPublicKey", JsPath \ "senderPublicKey")
       case _ =>
         fail("Should be JsError")
     }
@@ -123,8 +123,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     val json = Json.parse(
       s"""
         {
-          "sender": "${pubKeyStr}",
-          "matcher": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
+          "senderPublicKey": "${pubKeyStr}",
+          "matcherPublicKey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
           "spendAssetId": "",
           "receiveAssetId": "",
           "amount": 0,

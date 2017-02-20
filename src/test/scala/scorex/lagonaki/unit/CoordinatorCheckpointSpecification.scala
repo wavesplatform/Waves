@@ -1,13 +1,14 @@
 package scorex.lagonaki.unit
 
+import scala.concurrent.duration.{FiniteDuration, _}
+import scala.language.postfixOps
+import scala.util.Random
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import org.h2.mvstore.MVStore
-import org.scalatest.DoNotDiscover
-import play.api.libs.json.JsObject
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
-import scorex.app.Application
+import scorex.app.{Application, RunnableApplication}
 import scorex.block.Block
 import scorex.consensus.ConsensusModule
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
@@ -18,27 +19,34 @@ import scorex.network.ScoreObserver.CurrentScore
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, Message}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.settings.{ChainParameters, SettingsMock}
-import scorex.transaction.SimpleTransactionModule.StoredInBlock
+import scorex.settings.{ChainParameters, TestChainParameters}
 import scorex.transaction._
-
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Random
-import scala.concurrent.duration._
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.WavesSettings
+import scorex.crypto.encode.Base58
 
 class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
-  val pk = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(100).toByte))
+  val pk: PrivateKeyAccount = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(100).toByte))
 
-  object TestSettings extends SettingsMock {
-    override lazy val quorum: Int = 1
-    override lazy val scoreBroadcastDelay: FiniteDuration = 1000.seconds
-    override lazy val MaxRollback: Int = 10
+  private val localConfig = ConfigFactory.parseString(
+    s"""
+       |waves {
+       |  synchronization {
+       |    max-rollback: 10
+       |    max-chain-length: 11
+       |    score-broadcast-interval: 1000s
+       |  }
+       |  checkpoints {
+       |    public-key: "${Base58.encode(pk.publicKey)}"
+       |  }
+       |}
+    """.stripMargin).withFallback(baseTestConfig).resolve()
 
-    override lazy val checkpointPublicKey: Option[Array[Byte]] = Some(pk.publicKey)
-
-  }
+  val wavesSettings: WavesSettings = WavesSettings.fromConfig(localConfig)
 
   val testBlockGenerator = TestProbe("blockGenerator")
   val testBlockchainSynchronizer = TestProbe("BlockChainSynchronizer")
@@ -46,16 +54,16 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val testPeerManager = TestProbe("PeerManager")
   val connectedPeer: ConnectedPeer = stub[ConnectedPeer]
 
-  val db = new MVStore.Builder().open()
+  val db: MVStore = new MVStore.Builder().open()
 
   trait TestAppMock extends Application {
-    lazy implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = new WavesConsensusModule(ChainParameters.Disabled, 5.seconds) {
-      override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = true
+    lazy implicit val consensusModule: ConsensusModule = new WavesConsensusModule(TestChainParameters.Disabled, 5.seconds) {
+      override def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean = true
     }
-    lazy implicit val transactionModule: TransactionModule[StoredInBlock] = new SimpleTransactionModule(ChainParameters.Disabled)(TestSettings, this)
+    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(TestChainParameters.Disabled)(wavesSettings, this)
     lazy val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     lazy val networkController: ActorRef = networkControllerMock
-    lazy val settings = TestSettings
+    lazy val settings = wavesSettings
     lazy val blockGenerator: ActorRef = testBlockGenerator.ref
     lazy val blockchainSynchronizer: ActorRef = testBlockchainSynchronizer.ref
     lazy val peerManager: ActorRef = testPeerManager.ref
@@ -75,20 +83,16 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     val version = 1: Byte
     val timestamp = System.currentTimeMillis()
     //val reference = Array.fill(Block.BlockIdLength)(id.toByte)
-    val cbd = new NxtLikeConsensusBlockData {
-      override val generationSignature: Array[Byte] = Array.fill(WavesConsensusModule.GeneratorSignatureLength)(
-        Random.nextInt(100).toByte)
-      override val baseTarget: Long = score + 1
-    }
+    val cbd = NxtLikeConsensusBlockData(score + 1, Array.fill(WavesConsensusModule.GeneratorSignatureLength)(Random.nextInt(100).toByte))
     Block.buildAndSign(version, timestamp, reference, cbd, Seq[Transaction](), gen)
   }
 
-  implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = app.consensusModule
-  implicit val transactionModule: TransactionModule[StoredInBlock] = app.transactionModule
+  implicit val consensusModule: ConsensusModule = app.consensusModule
+  implicit val transactionModule: TransactionModule = app.transactionModule
   private lazy val repo = app.basicMessagesSpecsRepo
   val genesisTimestamp: Long = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.appendBlock(Block.genesis(genesisTimestamp))
+    transactionModule.blockStorage.appendBlock(Block.genesis(RunnableApplication.consensusGenesisBlockData, transactionModule.genesisData, genesisTimestamp))
   }
 
   def before(): Unit = {

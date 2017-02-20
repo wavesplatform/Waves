@@ -36,4 +36,5 @@ trait StateStorageI {
 
   def removeAccountChanges(key: Address, height: Int): Row
 
+  def assetDistribution(assetId: Array[Byte]): Map[String, Long]
 }

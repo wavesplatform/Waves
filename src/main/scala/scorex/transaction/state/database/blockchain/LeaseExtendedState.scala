@@ -1,22 +1,31 @@
 package scorex.transaction.state.database.blockchain
 
 import scorex.account.Account
+import scorex.transaction.ValidationError.StateValidationError
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state.{AccState, Reasons}
-import scorex.transaction.state.database.state.extension.StateExtension
+import scorex.transaction.state.database.state.extension.Validator
 import scorex.transaction.state.database.state.storage.{LeaseExtendedStateStorageI, StateStorageI}
 import scorex.transaction.{AssetAcc, EffectiveBalanceChange, Transaction}
 import scorex.utils.ScorexLogging
 
-class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with StateExtension {
+class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with Validator {
 
-  override def isValid(storedState: StoredState, tx: Transaction, height: Int): Boolean = tx match {
+  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: LeaseCancelTransaction =>
       val leaseOpt = storage.getLeaseTx(tx.leaseId)
-      leaseOpt.exists(leaseTx => tx.sender.publicKey.sameElements(leaseTx.sender.publicKey))
+      leaseOpt match {
+        case Some(leaseTx) if leaseTx.sender.publicKey.sameElements(leaseTx.sender.publicKey) => Right(tx)
+        case Some(leaseTx) => Left(StateValidationError(s"LeaseTransaction was leased by other sender: $tx"))
+        case None => Left(StateValidationError(s"LeaseTransaction not found for $tx"))
+      }
     case tx: LeaseTransaction =>
-        storedState.balance(tx.sender) - tx.fee - storage.getLeasedSum(tx.sender.address) >= tx.amount
-    case _ => true
+      if (storedState.balance(tx.sender) - tx.fee - storage.getLeasedSum(tx.sender.address) >= tx.amount) {
+        Right(tx)
+      } else {
+        Left(StateValidationError(s"Not enough effective balance to lease for tx $tx"))
+      }
+    case _ => Right(tx)
   }
 
   def effectiveBalanceChanges(tx: Transaction): Seq[EffectiveBalanceChange] = tx match {

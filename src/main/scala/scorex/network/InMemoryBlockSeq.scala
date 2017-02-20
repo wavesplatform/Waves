@@ -2,7 +2,6 @@ package scorex.network
 
 import scorex.block.Block
 import scorex.block.Block._
-import scorex.consensus.ConsensusModule
 import scorex.crypto.encode.Base58
 import scorex.network.BlockchainSynchronizer.InnerIds
 import scorex.transaction.History._
@@ -30,11 +29,8 @@ class InMemoryBlockSeq(blockIds: InnerIds) {
     takeWhile(_.isDefined).
     map(_.get).iterator
 
-  def cumulativeBlockScore(initialScore: BlockchainScore, consensusModule: ConsensusModule[_]): BlockchainScore = {
-    blocksInOrder.foldLeft(initialScore) {
-      (sum, block) => ConsensusModule.cumulativeBlockScore(sum, consensusModule.blockScore(block))
-    }
-  }
+  def cumulativeBlockScore(): BlockchainScore =
+    blocksInOrder.map(_.blockScore).sum
 
   def numberOfBlocks: Int = blocks.size
 }

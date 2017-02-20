@@ -1,31 +1,23 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-
-import akka.actor.ActorRefFactory
-import akka.http.scaladsl.model.StatusCodes
+import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
-import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
 import scorex.network.Checkpoint
 import scorex.network.Coordinator.BroadcastCheckpoint
-import scorex.transaction.{BlockChain, SimpleTransactionModule}
-
-import scala.util.Try
+import scorex.transaction.{BlockChain, History}
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
+case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: CheckpointsSettings, history: History, coordinator: ActorRef) extends ApiRoute {
 
   val MaxBlocksPerRequest = 100
-  implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
-
-  val settings = application.settings
-  private val history = application.history
-  private val coordinator = application.coordinator
 
   override lazy val route =
     pathPrefix("blocks") {
@@ -39,15 +31,10 @@ case class BlocksApiRoute(application: Application) extends ApiRoute with Common
     new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path"),
     new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path")
   ))
-  def address: Route = {
-    path("address" / Segment / IntNumber / IntNumber) { case (address, start, end) =>
-      getJsonRoute {
-        if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
-          val json = JsArray(history.generatedBy(new Account(address), start, end).map(_.json))
-          JsonResponse(json, StatusCodes.OK)
-        } else TooBigArrayAllocation.response
-      }
-    }
+  def address: Route = (path("address" / Segment / IntNumber / IntNumber) & get) { case (address, start, end) =>
+    if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
+      complete(JsArray(history.generatedBy(new Account(address), start, end).map(_.json)))
+    } else complete(TooBigArrayAllocation)
   }
 
   @Path("/child/{signature}")
@@ -55,18 +42,14 @@ case class BlocksApiRoute(application: Application) extends ApiRoute with Common
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path")
   ))
-  def child: Route = {
-    path("child" / Segment) { case encodedSignature =>
-      getJsonRoute {
-        withBlock(history, encodedSignature) { block =>
-          history match {
-            case blockchain: BlockChain =>
-              blockchain.children(block).headOption.map(_.json).getOrElse(
-                Json.obj("status" -> "error", "details" -> "No child blocks"))
-            case _ =>
-              Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")
-          }
-        }
+  def child: Route = (path("child" / Segment) & get) { encodedSignature =>
+    withBlock(history, encodedSignature) { block =>
+      history match {
+        case blockchain: BlockChain =>
+          complete(blockchain.children(block).headOption.map(_.json).getOrElse[JsObject](
+            Json.obj("status" -> "error", "details" -> "No child blocks")))
+        case _ =>
+          complete(Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain"))
       }
     }
   }
@@ -78,14 +61,10 @@ case class BlocksApiRoute(application: Application) extends ApiRoute with Common
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "string", paramType = "path")
   ))
-  def delay: Route = {
-    path("delay" / Segment / IntNumber) { case (encodedSignature, count) =>
-      getJsonRoute {
-        withBlock(history, encodedSignature) { block =>
-          history.averageDelay(block, count).map(d => Json.obj("delay" -> d))
-            .getOrElse(Json.obj("status" -> "error", "details" -> "Internal error"))
-        }
-      }
+  def delay: Route = (path("delay" / Segment / IntNumber) & get) { (encodedSignature, count) =>
+    withBlock(history, encodedSignature) { block =>
+      complete(history.averageDelay(block, count).map(d => Json.obj("delay" -> d))
+        .getOrElse[JsObject](Json.obj("status" -> "error", "details" -> "Internal error")))
     }
   }
 
@@ -94,25 +73,16 @@ case class BlocksApiRoute(application: Application) extends ApiRoute with Common
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path")
   ))
-  def heightEncoded: Route = {
-    path("height" / Segment) { case encodedSignature =>
-      getJsonRoute {
-        withBlock(history, encodedSignature) { block =>
-          Json.obj("height" -> history.heightOf(block))
-        }
-      }
+  def heightEncoded: Route = (path("height" / Segment) & get) { encodedSignature =>
+    withBlock(history, encodedSignature) { block =>
+      complete(Json.obj("height" -> history.heightOf(block)))
     }
   }
 
   @Path("/height")
   @ApiOperation(value = "Height", notes = "Get blockchain height", httpMethod = "GET")
-  def height: Route = {
-    path("height") {
-      getJsonRoute {
-        val json = Json.obj("height" -> history.height())
-        JsonResponse(json, StatusCodes.OK)
-      }
-    }
+  def height: Route = (path("height") & get) {
+    complete(Json.obj("height" -> history.height()))
   }
 
   @Path("/at/{height}")
@@ -120,25 +90,15 @@ case class BlocksApiRoute(application: Application) extends ApiRoute with Common
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "height", value = "Block height", required = true, dataType = "integer", paramType = "path")
   ))
-  def at: Route = {
-    path("at" / IntNumber) { case height =>
-      getJsonRoute {
-        history match {
-          case blockchain: BlockChain => {
-            blockchain.blockAt(height).map(_.json) match {
-              case Some(json) => JsonResponse(json + ("height" -> Json.toJson(height)), StatusCodes.OK)
-              case None => {
-                val json = Json.obj("status" -> "error", "details" -> "No block for this height")
-                JsonResponse(json, StatusCodes.NotFound)
-              }
-            }
-          }
-          case _ =>
-            val json =
-              Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain")
-            JsonResponse(json, StatusCodes.NotFound)
+  def at: Route = (path("at" / IntNumber) & get) { height =>
+    history match {
+      case blockchain: BlockChain =>
+        blockchain.blockAt(height).map(_.json) match {
+          case Some(json) => complete(json + ("height" -> JsNumber(height)))
+          case None => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
         }
-      }
+      case _ =>
+        complete(Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain"))
     }
   }
 
@@ -148,47 +108,32 @@ case class BlocksApiRoute(application: Application) extends ApiRoute with Common
     new ApiImplicitParam(name = "from", value = "Start block height", required = true, dataType = "integer", paramType = "path"),
     new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path")
   ))
-  def seq: Route = {
-    path("seq" / IntNumber / IntNumber) { case (start, end) =>
-      getJsonRoute {
-        history match {
-          case blockchain: BlockChain =>
-            if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
-              val json = JsArray(
-                (start to end).map { height =>
-                  blockchain.blockAt(height).map(_.json + ("height" -> Json.toJson(height)))
-                    .getOrElse(Json.obj("error" -> s"No block at height $height"))
-                })
-              JsonResponse(json, StatusCodes.OK)
-            } else TooBigArrayAllocation.response
-          case _ =>
-            JsonResponse(
-              Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain"),
-              StatusCodes.BadRequest)
-        }
-      }
+  def seq: Route = (path("seq" / IntNumber / IntNumber) & get) { (start, end) =>
+    history match {
+      case blockchain: BlockChain =>
+        if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
+          complete(JsArray(
+            (start to end).map { height =>
+              blockchain.blockAt(height).map(_.json + ("height" -> Json.toJson(height)))
+                .getOrElse(Json.obj("error" -> s"No block at height $height"))
+            }))
+        } else complete(TooBigArrayAllocation)
+      case _ =>
+        complete(Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain"))
     }
   }
 
 
   @Path("/last")
   @ApiOperation(value = "Last", notes = "Get last block data", httpMethod = "GET")
-  def last: Route = {
-    path("last") {
-      getJsonRoute {
-        JsonResponse(history.lastBlock.json, StatusCodes.OK)
-      }
-    }
+  def last: Route = (path("last") & get) {
+    complete(history.lastBlock.json)
   }
 
   @Path("/first")
   @ApiOperation(value = "First", notes = "Get genesis block data", httpMethod = "GET")
-  def first: Route = {
-    path("first") {
-      getJsonRoute {
-        JsonResponse(history.genesis.json + ("height" -> Json.toJson(1)), StatusCodes.OK)
-      }
-    }
+  def first: Route = (path("first") & get) {
+    complete(history.genesis.json + ("height" -> Json.toJson(1)))
   }
 
   @Path("/signature/{signature}")
@@ -196,15 +141,11 @@ case class BlocksApiRoute(application: Application) extends ApiRoute with Common
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path")
   ))
-  def signature: Route = {
-    path("signature" / Segment) { encodedSignature =>
-      getJsonRoute {
-        withBlock(history, encodedSignature) { block =>
-          val height = history.heightOf(block.uniqueId).map(Json.toJson(_))
-            .getOrElse(JsNull)
-          block.json + ("height" -> height)
-        }
-      }
+  def signature: Route = (path("signature" / Segment) & get) { encodedSignature =>
+    withBlock(history, encodedSignature) { block =>
+      val height = history.heightOf(block.uniqueId).map(Json.toJson(_))
+        .getOrElse(JsNull)
+      complete(block.json + ("height" -> height))
     }
   }
 
@@ -219,30 +160,20 @@ case class BlocksApiRoute(application: Application) extends ApiRoute with Common
   ))
   def checkpoint: Route = {
     def validateCheckpoint(checkpoint: Checkpoint): Option[ApiError] = {
-      settings.checkpointPublicKey.map {publicKey =>
+      val maybePublicKeyBytes = Base58.decode(checkpointsSettings.publicKey)
+      maybePublicKeyBytes.map {publicKey =>
         if (!EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) Some(InvalidSignature)
         else None
       }.getOrElse(Some(InvalidMessage))
     }
 
     path("checkpoint") {
-      entity(as[String]) { body =>
-        withAuth {
-          postJsonRoute {
-            Try(Json.parse(body)).map { js =>
-              js.validate[Checkpoint] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(checkpoint: Checkpoint, _) =>
-                  validateCheckpoint(checkpoint) match {
-                    case Some(apiError) => apiError.response
-                    case None =>
-                      coordinator ! BroadcastCheckpoint(checkpoint)
-                      JsonResponse(Json.obj("message" -> "Checkpoint broadcasted"), StatusCodes.OK)
-                  }
-              }
-            }.getOrElse(WrongJson().response)
-          }
+      json[Checkpoint] { checkpoint =>
+        validateCheckpoint(checkpoint) match {
+          case Some(apiError) => apiError
+          case None =>
+            coordinator ! BroadcastCheckpoint(checkpoint)
+            Json.obj("message" -> "Checkpoint broadcasted")
         }
       }
     }

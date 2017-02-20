@@ -16,10 +16,10 @@ trait OrderValidator {
   val settings: MatcherSettings
   val wallet: Wallet
 
-  lazy val matcherPubKey: PublicKeyAccount = wallet.privateKeyAccount(settings.matcherAccount).get
+  lazy val matcherPubKey: PublicKeyAccount = wallet.privateKeyAccount(settings.account).get
 
   def isBalanceWithOpenOrdersEnough(order: Order): Boolean = {
-    val (acc, feeAcc) = (AssetAcc(order.sender, order.spendAssetId), AssetAcc(order.sender, None))
+    val (acc, feeAcc) = (AssetAcc(order.senderPublicKey, order.spendAssetId), AssetAcc(order.senderPublicKey, None))
 
     val (assBal, feeBal) = (storedState.assetBalance(acc) - assetsToSpend.getOrElse(acc.key, 0L),
       storedState.assetBalance(feeAcc) - assetsToSpend.getOrElse(feeAcc.key, 0L))
@@ -29,9 +29,9 @@ trait OrderValidator {
   }
 
   def validateNewOrder(order: Order): Validation = {
-    (openOrdersCount.getOrElse(order.sender.address, 0) <= settings.maxOpenOrdersCount) :|
-      s"Open orders count limit exceeded (Max = ${settings.maxOpenOrdersCount})" &&
-      (order.matcher == matcherPubKey) :| "Incorrect matcher public key" &&
+    (openOrdersCount.getOrElse(order.matcherPublicKey.address, 0) <= settings.maxOpenOrders) :|
+      s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
+      (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
       order.isValid(NTP.correctedTime()) &&
       (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
       !ordersRemainingAmount.contains(order.idStr) :| "Order is already accepted" &&

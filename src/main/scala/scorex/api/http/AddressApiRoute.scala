@@ -2,28 +2,23 @@ package scorex.api.http
 
 import java.nio.charset.StandardCharsets
 import javax.ws.rs.Path
-
+import scala.util.{Failure, Success, Try}
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-
-import scala.util.{Failure, Success, Try}
+import scorex.transaction.LagonakiState
+import scorex.wallet.Wallet
 
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: LagonakiState) extends ApiRoute {
   val MaxAddressesPerRequest = 1000
-
-  val settings = application.settings
-
-  private val wallet = application.wallet
-  private val state = application.blockStorage.state
-  implicit val transactionModule = application.transactionModule
 
   override lazy val route =
     pathPrefix("addresses") {
@@ -36,22 +31,14 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
-  def deleteAddress: Route = {
-    path(Segment) { case address =>
-      withAuth {
-        deleteJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            if (!Account.isValidAddress(address)) {
-              InvalidAddress.response
-            } else {
-              val deleted = wallet.privateKeyAccount(address).exists(account =>
-                wallet.deleteAccount(account))
-              val json = Json.obj("deleted" -> deleted)
-
-              JsonResponse(json, StatusCodes.OK)
-            }
-          }
-        }
+  def deleteAddress: Route = path(Segment) { address =>
+    (delete & withAuth) {
+      if (!Account.isValidAddress(address)) {
+        complete(InvalidAddress)
+      } else {
+        val deleted = wallet.privateKeyAccount(address).exists(account =>
+          wallet.deleteAccount(account))
+        complete(Json.obj("deleted" -> deleted))
       }
     }
   }
@@ -66,7 +53,7 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"Base58-encoded\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
   ))
   def sign: Route = {
-    path("sign" / Segment) { case address =>
+    path("sign" / Segment) { address =>
       signPath(address, encode = true)
     }
   }
@@ -81,7 +68,7 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"plain text\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}")
   ))
   def signText: Route = {
-    path("signText" / Segment) { case address =>
+    path("signText" / Segment) { address =>
       signPath(address, encode = false)
     }
   }
@@ -100,7 +87,7 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
     )
   ))
   def verify: Route = {
-    path("verify" / Segment) { case address =>
+    path("verify" / Segment) { address =>
       verifyPath(address, decode = true)
     }
   }
@@ -118,10 +105,8 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
       defaultValue = "{\n\t\"message\":\"Plain message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
     )
   ))
-  def verifyText: Route = {
-    path("verifyText" / Segment) { case address =>
-      verifyPath(address, decode = false)
-    }
+  def verifyText: Route = path("verifyText" / Segment) { address =>
+    verifyPath(address, decode = false)
   }
 
   @Path("/balance/{address}")
@@ -129,12 +114,8 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
-  def balance: Route = {
-    path("balance" / Segment) { case address =>
-      getJsonRoute {
-        balanceJson(address, 0)
-      }
-    }
+  def balance: Route = (path("balance" / Segment) & get) { address =>
+    complete(balanceJson(address, 0))
   }
 
   @Path("/balance/{address}/{confirmations}")
@@ -144,10 +125,8 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
     new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
   ))
   def balanceWithConfirmations: Route = {
-    path("balance" / Segment / IntNumber) { case (address, confirmations) =>
-      getJsonRoute {
-        balanceJson(address, confirmations)
-      }
+    (path("balance" / Segment / IntNumber) & get) { case (address, confirmations) =>
+      complete(balanceJson(address, confirmations))
     }
   }
 
@@ -158,10 +137,8 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def effectiveBalance: Route = {
-    path("effectiveBalance" / Segment) { case address =>
-      getJsonRoute {
-        effectiveBalanceJson(address, 0)
-      }
+    path("effectiveBalance" / Segment) { address =>
+      complete (effectiveBalanceJson(address, 0))
     }
   }
 
@@ -173,9 +150,9 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
   ))
   def effectiveBalanceWithConfirmations: Route = {
     path("effectiveBalance" / Segment / IntNumber) { case (address, confirmations) =>
-      getJsonRoute {
+      complete (
         effectiveBalanceJson(address, confirmations)
-      }
+      )
     }
   }
 
@@ -185,16 +162,17 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def seed: Route = {
-    path("seed" / Segment) { case address =>
-      withAuth {
-        getJsonRoute {
-          //TODO CHECK IF WALLET EXISTS
-          withPrivateKeyAccount(wallet, address) { account =>
+    (path("seed" / Segment) & get & withAuth) { address =>
+      if (!Account.isValidAddress(address)) {
+        complete(InvalidAddress)
+      } else {
+        wallet.privateKeyAccount(address) match {
+          case None => complete(WalletAddressNotExists)
+          case Some(account) =>
             wallet.exportAccountSeed(account.address) match {
-              case None => WalletSeedExportFailed.json
-              case Some(seed) => Json.obj("address" -> address, "seed" -> Base58.encode(seed))
+              case None => complete(WalletSeedExportFailed)
+              case Some(seed) => complete(Json.obj("address" -> address, "seed" -> Base58.encode(seed)))
             }
-          }
         }
       }
     }
@@ -205,25 +183,16 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
-  def validate: Route = {
-    path("validate" / Segment) { case address =>
-      getJsonRoute {
-        val json = Json.obj("address" -> address, "valid" -> Account.isValidAddress(address))
-        JsonResponse(json, StatusCodes.OK)
-      }
-    }
+  def validate: Route = (path("validate" / Segment) & get) { address =>
+    complete(Json.obj("address" -> address, "valid" -> Account.isValidAddress(address)))
   }
 
   @Path("/")
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
-  def root: Route = {
-    path("addresses") {
-      getJsonRoute {
-        val accounts = wallet.privateKeyAccounts()
-        val json = JsArray(accounts.map(a => JsString(a.address)))
-        JsonResponse(json, StatusCodes.OK)
-      }
-    }
+  def root: Route = (path("addresses") & get) {
+    val accounts = wallet.privateKeyAccounts()
+    val json = JsArray(accounts.map(a => JsString(a.address)))
+    complete(json)
   }
 
   @Path("/seq/{from}/{to}")
@@ -233,126 +202,96 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
     new ApiImplicitParam(name = "to", value = "address", required = true, dataType = "integer", paramType = "path")
   ))
   def seq: Route = {
-    path("seq" / IntNumber / IntNumber) { case (start, end) =>
-      getJsonRoute {
-        if (start >= 0 && end >= 0 && start - end < MaxAddressesPerRequest) {
-          val json = JsArray(
-            wallet.privateKeyAccounts().map(a => JsString(a.address)).slice(start, end)
-          )
+    (path("seq" / IntNumber / IntNumber) & get) { case (start, end) =>
+      if (start >= 0 && end >= 0 && start - end < MaxAddressesPerRequest) {
+        val json = JsArray(
+          wallet.privateKeyAccounts().map(a => JsString(a.address)).slice(start, end)
+        )
 
-          JsonResponse(json, StatusCodes.OK)
-        } else TooBigArrayAllocation.response
-      }
+        complete(json)
+      } else complete(TooBigArrayAllocation)
     }
   }
 
   @Path("/")
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
-  def create: Route = path("addresses") {
+  def create: Route = (path("addresses") & post) {
     withAuth {
-      postJsonRoute {
-        walletNotExists(wallet).getOrElse {
-          wallet.generateNewAccount() match {
-            case Some(pka) => JsonResponse(Json.obj("address" -> pka.address), StatusCodes.OK)
-            case None => Unknown.response
-          }
-        }
+      wallet.generateNewAccount() match {
+        case Some(pka) => complete(Json.obj("address" -> pka.address))
+        case None => complete(Unknown)
       }
     }
   }
 
-  private def balanceJson(address: String, confirmations: Int): JsonResponse = {
+  private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     val account = new Account(address)
     if (!Account.isValid(account)) {
-      InvalidAddress.response
+      InvalidAddress
     } else {
-      val json = Json.obj(
+      Json.obj(
         "address" -> account.address,
         "confirmations" -> confirmations,
-        "balance" -> state.balanceWithConfirmations(account, confirmations)
-      )
-      JsonResponse(json, StatusCodes.OK)
+        "balance" -> state.balanceWithConfirmations(account, confirmations))
     }
   }
 
-  private def effectiveBalanceJson(address: String, confirmations: Int): JsonResponse = {
+  private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     val account = new Account(address)
     if (!Account.isValid(account)) {
-      InvalidAddress.response
+      InvalidAddress
     } else {
-      val json = Json.obj(
+      Json.obj(
         "address" -> account.address,
         "confirmations" -> confirmations,
-        "balance" -> state.effectiveBalanceWithConfirmations(account, confirmations)
-      )
-      JsonResponse(json, StatusCodes.OK)
+        "balance" -> state.effectiveBalanceWithConfirmations(account, confirmations))
     }
   }
 
   private def signPath(address: String, encode: Boolean) = {
-    entity(as[String]) { message =>
+    (post & entity(as[String])) { message =>
       withAuth {
-        postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            if (!Account.isValidAddress(address)) {
-              InvalidAddress.response
-            } else {
-              wallet.privateKeyAccount(address) match {
-                case None => WalletAddressNotExists.response
-                case Some(account) =>
-                  Try(EllipticCurveImpl.sign(account, message.getBytes(StandardCharsets.UTF_8))) match {
-                    case Success(signature) =>
-                      val msg = if (encode) Base58.encode(message.getBytes) else message
-                      val json = Json.obj("message" -> msg,
-                        "publicKey" -> Base58.encode(account.publicKey),
-                        "signature" -> Base58.encode(signature))
-                      JsonResponse(json, StatusCodes.OK)
-                    case Failure(t) => JsonResponse(json(t), StatusCodes.InternalServerError)
-                  }
+        if (!Account.isValidAddress(address)) {
+          complete(InvalidAddress)
+        } else {
+          wallet.privateKeyAccount(address) match {
+            case None => complete(WalletAddressNotExists)
+            case Some(account) =>
+              val messageBytes = message.getBytes(StandardCharsets.UTF_8)
+              Try(EllipticCurveImpl.sign(account, messageBytes)) match {
+                case Success(signature) =>
+                  val msg = if (encode) Base58.encode(messageBytes) else message
+                  val json = Json.obj("message" -> msg,
+                    "publicKey" -> Base58.encode(account.publicKey),
+                    "signature" -> Base58.encode(signature))
+                  complete(json)
+                case Failure(t) => complete(StatusCodes.InternalServerError)
               }
-            }
           }
         }
       }
     }
   }
 
-
-
-
-  private def verifyPath(address: String, decode: Boolean) = {
-    entity(as[String]) { jsText =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(jsText)) match {
-            case Success(parsed) => parsed.validate[SignedMessage] match {
-              case err: JsError =>
-                WrongJson().response
-              case JsSuccess(m: SignedMessage, _) =>
-                if (!Account.isValidAddress(address)) {
-                  InvalidAddress.response
-                } else {
-                  //DECODE SIGNATURE
-                  val msg: Try[Array[Byte]] = if (decode) Base58.decode(m.message) else Success(m.message.getBytes)
-                  verifySigned(msg, m.signature, m.publickey, address)
-                }
-            }
-            case Failure(_) => WrongJson().response
-          }
-        }
+  private def verifyPath(address: String, decode: Boolean) = withAuth {
+    json[SignedMessage] { m =>
+      if (!Account.isValidAddress(address)) {
+        InvalidAddress
+      } else {
+        //DECODE SIGNATURE
+        val msg: Try[Array[Byte]] = if (decode) Base58.decode(m.message) else Success(m.message.getBytes)
+        verifySigned(msg, m.signature, m.publickey, address)
       }
     }
   }
 
-  private def verifySigned(msg: Try[Array[Byte]], signature : String, publicKey : String, address: String) = {
+  private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: String) = {
     (msg, Base58.decode(signature), Base58.decode(publicKey)) match {
-      case (Failure(_), _, _) => InvalidMessage.response
-      case (_, Failure(_), _) => InvalidSignature.response
-      case (_, _, Failure(_)) => InvalidPublicKey.response
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = new PublicKeyAccount(pubKeyBytes)
         val isValid = account.address == address && EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
-        JsonResponse(Json.obj("valid" -> isValid), StatusCodes.OK)
+        Right(Json.obj("valid" -> isValid))
+      case _ => Left(InvalidMessage)
     }
   }
 
@@ -362,17 +301,13 @@ case class AddressApiRoute(application: Application) extends ApiRoute with Commo
       paramType = "path", dataType = "string")
   ))
   @ApiOperation(value = "Address from Public Key", notes = "Generate a address from public key", httpMethod = "GET")
-  def publicKey: Route =
-    path("publicKey" / Segment) { publicKey =>
-      getJsonRoute {
-        Base58.decode(publicKey) match {
-          case Success(pubKeyBytes) => {
-            val account = Account.fromPublicKey(pubKeyBytes)
-            JsonResponse(Json.obj("address" -> account.address), StatusCodes.OK)
-          }
-          case Failure(e) => JsonResponse(InvalidPublicKey.json, InvalidPublicKey.code)
-        }
+  def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
+    Base58.decode(publicKey) match {
+      case Success(pubKeyBytes) => {
+        val account = Account.fromPublicKey(pubKeyBytes)
+        complete(Json.obj("address" -> account.address))
       }
+      case Failure(e) => complete(InvalidPublicKey)
     }
-
+  }
 }

@@ -15,9 +15,9 @@ object OrderJson {
     def reads(json: JsValue) = json match {
       case JsString(s) => Base58.decode(s) match {
         case Success(bytes) => JsSuccess(bytes)
-        case Failure(_) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
+        case Failure(_) => JsError(JsPath, JsonValidationError("error.incorrect.base58"))
       }
-      case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
+      case _ => JsError(JsPath, JsonValidationError("error.expected.jsstring"))
     }
   }
 
@@ -50,8 +50,8 @@ object OrderJson {
   }
 
   implicit val orderReads: Reads[Order] = {
-    val r = (JsPath \ "sender").read[PublicKeyAccount] and
-      (JsPath \ "matcher").read[PublicKeyAccount] and
+    val r = (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
+      (JsPath \ "matcherPublicKey").read[PublicKeyAccount] and
       (JsPath \ "spendAssetId").readNullable[Option[Array[Byte]]] and
       (JsPath \ "receiveAssetId").readNullable[Option[Array[Byte]]] and
       (JsPath \ "price").read[Long] and
@@ -62,5 +62,7 @@ object OrderJson {
       (JsPath \ "signature").readNullable[Array[Byte]]
     r(readOrder _)
   }
+
+  implicit val orderFormat: Format[Order] = Format(orderReads, Writes[Order](_.json))
 
 }

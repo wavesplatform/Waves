@@ -1,21 +1,16 @@
 package scorex.api.http.assets
 
 import javax.ws.rs.Path
-import scala.util.control.Exception
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
-import play.api.libs.json._
 import scorex.api.http._
-import scorex.settings.Settings
 import scorex.transaction.{Transaction, TransactionModule, ValidationError}
-import akka.http.scaladsl.model.StatusCodes
-import scorex.serialization.JsonSerializable
-import scorex.transaction.SimpleTransactionModule.StoredInBlock
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class SignedAssetsApiRoute(settings: Settings, override val transactionModule: TransactionModule[StoredInBlock])
-  extends ApiRoute with CommonTransactionApiFunctions {
+case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule: TransactionModule)
+  extends ApiRoute {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer
@@ -33,19 +28,13 @@ case class SignedAssetsApiRoute(settings: Settings, override val transactionModu
       value = "Json with signed Issue transaction",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.BroadcastRequests$SignedAssetIssueRequest")))
+      dataType = "scorex.api.http.assets.BroadcastRequests$AssetIssueRequest")))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with signed Asset issue transaction contained Asset ID"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
-  def issue: Route = path("issue") {
-    entity(as[String]) { body =>
-      postJsonRoute {
-        mkResponse(for {
-          js <- parseToEither(body)
-          i <- doValidate[SignedAssetIssueRequest](js)
-          r <- doBroadcast(i.toTx)
-        } yield r)
-      }
+  def issue: Route = (path("issue") & post) {
+    json[SignedAssetIssueRequest] { issueReq =>
+      doBroadcast(issueReq.toTx)
     }
   }
 
@@ -61,19 +50,13 @@ case class SignedAssetsApiRoute(settings: Settings, override val transactionModu
       value = "Json with signed Reissue transaction",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.SignedAssetReissueRequest")))
+      dataType = "scorex.api.http.assets.BroadcastRequests$AssetReissueRequest")))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with signed Asset reissue transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
-  def reissue: Route = path("reissue") {
-    entity(as[String]) { body =>
-      postJsonRoute {
-        mkResponse(for {
-          js <- parseToEither(body)
-          ri <- doValidate[SignedAssetReissueRequest](js)
-          r <- doBroadcast(ri.toTx)
-        } yield r)
-      }
+  def reissue: Route = (path("reissue") & post) {
+    json[SignedAssetReissueRequest] { reissueReq =>
+      doBroadcast(reissueReq.toTx)
     }
   }
 
@@ -89,23 +72,17 @@ case class SignedAssetsApiRoute(settings: Settings, override val transactionModu
       value = "Json with signed Burn transaction",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.SignedAssetBurnRequest")))
+      dataType = "scorex.api.http.assets.BroadcastRequests$AssetBurnRequest")))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with signed Asset burn transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
-  def burnRoute: Route = path("burn") {
-    entity(as[String]) { body =>
-      postJsonRoute {
-        mkResponse(for {
-          js <- parseToEither(body)
-          b <- doValidate[SignedAssetBurnRequest](js)
-          r <- doBroadcast(b.toTx)
-        } yield r)
-      }
+  def burnRoute: Route = (path("burn") & post) {
+    json[SignedAssetBurnRequest] { burnReq =>
+      doBroadcast(burnReq.toTx)
     }
   }
 
-  @Path("/batch_transfer")
+  @Path("/batch-transfer")
   @ApiOperation(value = "Batch transfer operation",
     notes = "Transfer assets to new addresses",
     httpMethod = "POST",
@@ -117,27 +94,15 @@ case class SignedAssetsApiRoute(settings: Settings, override val transactionModu
       value = "Array json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.SignedAssetBurnRequest",
+      dataType = "scorex.api.http.assets.BroadcastRequests$AssetTransferRequest",
       allowMultiple = true,
       defaultValue = "[{\n  \"assetId\": \"E9yZC4cVhCDfbjFJCc9CqkAtkoFy5KaCe64iaxHM2adG\",\n  \"senderPublicKey\": \"CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw\",\n  \"recipient\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n  \"fee\": 100000,\n  \"amount\": 5500000000,\n  \"attachment\": \"BJa6cfyGUmzBFTj3vvvaew\",\n  \"timestamp\": 1479222433704, \n  \"signature\": \"2TyN8pNS7mS9gfCbX2ktpkWVYckoAmRmDZzKH3K35DKs6sUoXHArzukV5hvveK9t79uzT3cA8CYZ9z3Utj6CnCEo\"\n, {\n  \"assetId\": \"E9yZC4cVhCDfbjFJCc9CqkAtkoFy5KaCe64iaxHM2adG\",\n  \"senderPublicKey\": \"CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw\",\n  \"recipient\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n  \"fee\": 100000,\n  \"amount\": 5500000000,\n  \"attachment\": \"BJa6cfyGUmzBFTj3vvvaew\",\n  \"timestamp\": 1479222433704, \n  \"signature\": \"2TyN8pNS7mS9gfCbX2ktpkWVYckoAmRmDZzKH3K35DKs6sUoXHArzukV5hvveK9t79uzT3cA8CYZ9z3Utj6CnCEo\"\n}]"
     )
   ))
-  def batchTransfer: Route = path("batch_transfer") {
-    entity(as[String]) { body =>
-      postJsonRoute {
-        val transferResult = for {
-          js <- parseToEither(body)
-          bt <- doValidate[Seq[SignedAssetTransferRequest]](js)
-        } yield bt.map(r => doBroadcast(r.toTx))
-
-        transferResult match {
-          case Left(e) => e.response
-          case Right(txs) =>
-            val code = if (txs.forall(_.isRight)) StatusCodes.OK else StatusCodes.BadRequest
-            val json = txs.map(_.fold(_.json, _.json))
-            JsonResponse(Json.arr(json), code)
-        }
-      }
+  def batchTransfer: Route = (path("batch-transfer") & post) {
+    json[Seq[SignedAssetTransferRequest]] { reqs =>
+      val tr = reqs.map(r => doBroadcast(r.toTx))
+      tr.map(_.fold(_.json, _.json))
     }
   }
 
@@ -153,20 +118,19 @@ case class SignedAssetsApiRoute(settings: Settings, override val transactionModu
       value = "Json with signed Transfer transaction",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.SignedAssetBurnRequest")))
+      dataType = "scorex.api.http.assets.BroadcastRequests$AssetTransferRequest")))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with signed Asset transfer transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
-  def transfer: Route = path("transfer") {
-    entity(as[String]) { body =>
-      postJsonRoute {
-        mkResponse(for {
-          js <- parseToEither(body)
-          bt <- doValidate[SignedAssetTransferRequest](js)
-          tx <- doBroadcast(bt.toTx)
-        } yield tx)
-      }
+  def transfer: Route = (path("transfer") & post) {
+    json[SignedAssetTransferRequest] { transferReq =>
+      doBroadcast(transferReq.toTx)
     }
   }
 
+  private def doBroadcast[A <: Transaction](v: Either[ValidationError, A]) =
+    v.left.map(ApiError.fromValidationError).flatMap(broadcast)
+
+  private def broadcast[T <: Transaction](tx: T): Either[ApiError, T] =
+    if (transactionModule.onNewOffchainTransaction(tx)) Right(tx) else Left(StateCheckFailed)
 }

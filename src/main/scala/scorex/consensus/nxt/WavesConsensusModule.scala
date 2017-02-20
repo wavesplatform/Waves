@@ -1,9 +1,8 @@
 package scorex.consensus.nxt
 
-import com.google.common.primitives.Longs
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
-import scorex.block.{Block, BlockField}
-import scorex.consensus.{ConsensusModule, OneGeneratorConsensusModule, PoSConsensusModule, TransactionsOrdering}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.block.Block
+import scorex.consensus.{ConsensusModule, PoSConsensusModule, TransactionsOrdering}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.settings.ChainParameters
@@ -11,15 +10,14 @@ import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 
 import scala.concurrent.duration._
-import scala.util.Try
 import scala.util.control.NonFatal
 
-class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration) extends PoSConsensusModule[NxtLikeConsensusBlockData]
-with OneGeneratorConsensusModule with ScorexLogging {
+class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration) extends PoSConsensusModule
+  with ScorexLogging {
 
   import WavesConsensusModule._
 
-  implicit val consensusModule: ConsensusModule[NxtLikeConsensusBlockData] = this
+  implicit val consensusModule: ConsensusModule = this
 
   val version = 2: Byte
 
@@ -27,14 +25,12 @@ with OneGeneratorConsensusModule with ScorexLogging {
   val MaxBlocktimeLimit = normalize(67)
   val BaseTargetGamma = normalize(64)
   val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
-//  val InitialBaseTarget = MaxBaseTarget / 2
-  val InitialBaseTarget = 153722867L // for compatibility reason
 
   private def avgDelayInSeconds: Long = AvgDelay.toSeconds
 
   private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
-  override def isValid[TT](block: Block)(implicit transactionModule: TransactionModule[TT]): Boolean = try {
+  override def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean = try {
     val blockTime = block.timestampField.value
 
     require((blockTime - NTP.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
@@ -42,7 +38,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
     val history = transactionModule.blockStorage.history
 
     if (block.timestampField.value > forksConfig.requireSortedTransactionsAfter) {
-      require(block.transactions.sorted(TransactionsOrdering) == block.transactions, "Transactions must be sorted correctly")
+      require(block.transactionDataField.asInstanceOf[TransactionsBlockField].value.sorted(TransactionsOrdering) == block.transactionDataField.asInstanceOf[TransactionsBlockField].value, "Transactions must be sorted correctly")
     }
 
     val parentOpt = history.parent(block)
@@ -54,8 +50,8 @@ with OneGeneratorConsensusModule with ScorexLogging {
     require(parentHeightOpt.isDefined, s"Can't get parent block with id '${Base58.encode(block.referenceField.value)}' height")
     val parentHeight = parentHeightOpt.get
 
-    val prevBlockData = consensusBlockData(parent)
-    val blockData = consensusBlockData(block)
+    val prevBlockData = parent.consensusDataField.value
+    val blockData = block.consensusDataField.value
 
     //check baseTarget
     val cbt = calcBaseTarget(parent, blockTime)
@@ -87,8 +83,8 @@ with OneGeneratorConsensusModule with ScorexLogging {
       throw t
   }
 
-  override def generateNextBlock[TT](account: PrivateKeyAccount)
-                                    (implicit tm: TransactionModule[TT]): Option[Block] = try {
+  override def generateNextBlock(account: PrivateKeyAccount)
+                                (implicit tm: TransactionModule): Option[Block] = try {
 
     val history = tm.blockStorage.history
 
@@ -101,7 +97,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
       throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
     }
 
-    val lastBlockKernelData = consensusBlockData(lastBlock)
+    val lastBlockKernelData = lastBlock.consensusDataField.value
 
     val lastBlockTime = lastBlock.timestampField.value
 
@@ -124,10 +120,7 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
       val btg = calcBaseTarget(lastBlock, currentTime)
       val gs = calcGeneratorSignature(lastBlockKernelData, account)
-      val consensusData = new NxtLikeConsensusBlockData {
-        override val generationSignature: Array[Byte] = gs
-        override val baseTarget: Long = btg
-      }
+      val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
       val unconfirmed = tm.packUnconfirmed(Some(height))
       log.debug(s"Build block with ${unconfirmed.asInstanceOf[Seq[Transaction]].size} transactions")
@@ -150,13 +143,13 @@ with OneGeneratorConsensusModule with ScorexLogging {
   }
 
   override def nextBlockGenerationTime(block: Block, account: PublicKeyAccount)
-                                      (implicit tm: TransactionModule[_]): Option[Long] = {
+                                      (implicit tm: TransactionModule): Option[Long] = {
     val history = tm.blockStorage.history
 
     history.heightOf(block.uniqueId)
       .map(height => (height, generatingBalance(account, Some(height)))).filter(_._2 > 0)
       .flatMap { case (height, balance) =>
-        val cData = consensusBlockData(block)
+        val cData = block.consensusDataField.value
         val hit = calcHit(cData, account)
         val t = cData.baseTarget
 
@@ -186,13 +179,13 @@ with OneGeneratorConsensusModule with ScorexLogging {
     BigInt(1, calcGeneratorSignature(lastBlockData, generator).take(8).reverse)
 
   /**
-   * BaseTarget calculation algorithm fixing the blocktimes.
-   */
+    * BaseTarget calculation algorithm fixing the blocktimes.
+    */
   private def calcBaseTarget[TT](prevBlock: Block, timestamp: Long)
-                                (implicit transactionModule: TransactionModule[TT]): Long = {
+                                (implicit transactionModule: TransactionModule): Long = {
     val history = transactionModule.blockStorage.history
     val height = history.heightOf(prevBlock).get
-    val prevBaseTarget = consensusBlockData(prevBlock).baseTarget
+    val prevBaseTarget = prevBlock.consensusDataField.value.baseTarget
     if (height % 2 == 0) {
       val blocktimeAverage = history.parent(prevBlock, AvgBlockTimeDepth - 1)
         .map(b => (timestamp - b.timestampField.value) / AvgBlockTimeDepth)
@@ -214,11 +207,11 @@ with OneGeneratorConsensusModule with ScorexLogging {
 
   protected def calcTarget(prevBlock: Block,
                            timestamp: Long,
-                           balance: Long)(implicit transactionModule: TransactionModule[_]): BigInt = {
+                           balance: Long)(implicit transactionModule: TransactionModule): BigInt = {
 
     require(balance >= 0, s"Balance cannot be negative")
 
-    val prevBlockData = consensusBlockData(prevBlock)
+    val prevBlockData = prevBlock.consensusDataField.value
     val prevBlockTimestamp = prevBlock.timestampField.value
 
     val eta = (timestamp - prevBlockTimestamp) / 1000 //in seconds
@@ -226,41 +219,12 @@ with OneGeneratorConsensusModule with ScorexLogging {
     BigInt(prevBlockData.baseTarget) * eta * balance
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[BlockField[NxtLikeConsensusBlockData]] = Try {
-    NxtConsensusBlockField(new NxtLikeConsensusBlockData {
-      override val baseTarget: Long = Longs.fromByteArray(bytes.take(BaseTargetLength))
-      override val generationSignature: Array[Byte] = bytes.takeRight(GeneratorSignatureLength)
-    })
-  }
-
-  override def blockScore(block: Block): BigInt = {
-    val baseTarget = consensusBlockData(block).baseTarget
-    BigInt("18446744073709551616") / baseTarget
-  }.ensuring(_ > 0)
-
-  override def generators(block: Block): Seq[Account] = Seq(block.signerDataField.value.generator)
-
-  override def genesisData: BlockField[NxtLikeConsensusBlockData] =
-    NxtConsensusBlockField(new NxtLikeConsensusBlockData {
-      override val baseTarget: Long = InitialBaseTarget
-      override val generationSignature: Array[Byte] = Array.fill(32)(0: Byte)
-    })
-
-  override def formBlockData(data: NxtLikeConsensusBlockData): BlockField[NxtLikeConsensusBlockData] =
-    NxtConsensusBlockField(data)
-
-  override def consensusBlockData(block: Block): NxtLikeConsensusBlockData = block.consensusDataField.value match {
-    case b: NxtLikeConsensusBlockData => b
-    case m => throw new AssertionError(s"Only NxtLikeConsensusBlockData is available, $m given")
-  }
 }
 
 object WavesConsensusModule {
   val BaseTargetLength = 8
   val GeneratorSignatureLength = 32
-  // 10000 waves
   val MinimalEffectiveBalanceForGenerator = 1000000000000L
-
   val AvgBlockTimeDepth: Int = 3
   val MaxTimeDrift = 15.seconds
 }

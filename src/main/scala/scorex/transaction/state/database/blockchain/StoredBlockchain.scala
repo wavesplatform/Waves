@@ -20,8 +20,8 @@ import scala.util.{Failure, Success, Try}
   * If no datafolder provided, blockchain lives in RAM (useful for tests)
   */
 class StoredBlockchain(db: MVStore)
-                      (implicit consensusModule: ConsensusModule[_],
-                       transactionModule: TransactionModule[_])
+                      (implicit consensusModule: ConsensusModule,
+                       transactionModule: TransactionModule)
   extends BlockChain with ScorexLogging {
 
   require(consensusModule != null)
@@ -61,8 +61,7 @@ class StoredBlockchain(db: MVStore)
 
     def writeBlock(height: Int, block: Block): Try[Unit] = Try {
       blocks.put(height, block.bytes)
-      val blockScore = consensusModule.blockScore(block)
-      scoreMap.put(height, ConsensusModule.cumulativeBlockScore(score(), blockScore))
+      scoreMap.put(height, score() + block.blockScore)
       signatures.put(height, block.uniqueId)
       signaturesReverse.put(block.uniqueId, height)
     }
@@ -144,7 +143,7 @@ class StoredBlockchain(db: MVStore)
   override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = {
     (from to to).toStream.flatMap { h =>
       blockAt(h).flatMap { block =>
-        if (consensusModule.generators(block).contains(account)) Some(block) else None
+        if (Seq(block.signerDataField.value.generator).contains(account)) Some(block) else None
       }
     }
   }

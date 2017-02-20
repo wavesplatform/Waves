@@ -4,15 +4,15 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props, Scheduler}
 import akka.testkit.TestProbe
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.WavesSettings
 import org.scalatest.mockito.MockitoSugar
 import scorex.ActorTestingCommons
 import scorex.app.{Application, ApplicationVersion}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.PeerSynchronizer.RequestDataFromPeer
 import scorex.network.peer.PeerManager
-import scorex.settings.SettingsMock
 
-import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.postfixOps
 
 class TestPeerSynchronizer(app: Application) extends PeerSynchronizer(app) {
@@ -22,18 +22,24 @@ class TestPeerSynchronizer(app: Application) extends PeerSynchronizer(app) {
 class PeerSynchronizerSpecification extends ActorTestingCommons
   with MockitoSugar {
 
-  object TestSettings extends SettingsMock {
-    override lazy val dataDirOpt: Option[String] = None
-    override lazy val nodeNonce: Long = 123456789
-    override lazy val maxConnections: Int = 10
-    override lazy val peersDataResidenceTime: FiniteDuration = 100.seconds
-    override lazy val blacklistResidenceTimeMilliseconds: Long = 1000
-  }
+  private val localConfig = ConfigFactory.parseString(
+    """
+      |waves {
+      |  network {
+      |    file: none
+      |    nonce: 123456789
+      |    peers-data-residence-time: 100s
+      |    black-list-residence-time: 1000
+      |    max-connections: 10
+      |  }
+      |}
+    """.stripMargin).withFallback(baseTestConfig).resolve()
 
+  val wavesSettings = WavesSettings.fromConfig(localConfig)
   val testPeerManager = TestProbe("peerManager")
 
   trait App extends ApplicationMock {
-    override lazy val settings = new SettingsMock {}
+    override lazy val settings = wavesSettings
     override val applicationName: String = "test"
     override val appVersion: ApplicationVersion = ApplicationVersion(7, 7, 7)
     override val peerManager: ActorRef = testPeerManager.ref

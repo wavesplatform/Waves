@@ -5,6 +5,8 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.Props
 import akka.pattern.ask
 import akka.testkit.TestProbe
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.WavesSettings
 import scorex.ActorTestingCommons
 import scorex.app.ApplicationVersion
 import scorex.network.NetworkController.SendToNetwork
@@ -12,10 +14,9 @@ import scorex.network.PeerConnectionHandler.CloseConnection
 import scorex.network._
 import scorex.network.message.Message
 import scorex.network.message.MessageHandler.RawNetworkData
-import scorex.settings.SettingsMock
 
 import scala.concurrent.Await
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Left
 
@@ -28,18 +29,25 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
   val timeout = 6.seconds
 
-  object TestSettings extends SettingsMock {
-    override lazy val dataDirOpt: Option[String] = None
-    override lazy val knownPeers: Seq[InetSocketAddress] = Seq(knownAddress)
-    override lazy val nodeNonce: Long = 123456789
-    override lazy val maxConnections: Int = 10
-    override lazy val peersDataResidenceTime: FiniteDuration = 100.seconds
-    override lazy val blacklistResidenceTimeMilliseconds: Long = 1000
-    override lazy val blacklistThreshold = 2
-  }
+  private val localConfig = ConfigFactory.parseString(
+    """
+      |waves {
+      |  network {
+      |    file: ""
+      |    known-peers = ["127.0.0.1:6789"]
+      |    nonce: 123456789
+      |    max-connections: 10
+      |    black-list-residence-time: 1000
+      |    peers-data-residence-time: 100s
+      |    black-list-threshold: 2
+      |  }
+      |}
+    """.stripMargin).withFallback(baseTestConfig).resolve()
+
+  val wavesSettings = WavesSettings.fromConfig(localConfig)
 
   trait App extends ApplicationMock {
-    override lazy val settings = TestSettings
+    override lazy val settings = wavesSettings
     override val applicationName: String = "test"
     override val appVersion: ApplicationVersion = ApplicationVersion(7, 7, 7)
   }
@@ -84,7 +92,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       actorRef ! Disconnected(knownAddress)
       getActiveConnections shouldBe empty
 
-      val t = (TestSettings.blacklistResidenceTimeMilliseconds / 2) millis
+      val t = wavesSettings.networkSettings.blackListResidenceTime / 2
 
       actorRef ! CheckPeers
 
@@ -188,7 +196,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
     }
 
     "connect to self is forbidden" in {
-      connect(new InetSocketAddress("localhost", 45980), TestSettings.nodeNonce)
+      connect(new InetSocketAddress("localhost", 45980), wavesSettings.networkSettings.nonce)
       peerConnectionHandler.expectMsg(CloseConnection)
       getActiveConnections shouldBe empty
     }
@@ -309,11 +317,11 @@ class PeerManagerSpecification extends ActorTestingCommons {
         handler
       }
 
-      (1 to TestSettings.maxConnections).foreach { i =>
+      (1 to wavesSettings.networkSettings.maxConnections).foreach { i =>
         val h = connect(i, true)
         h.expectMsgType[Handshake](15.seconds)
       }
-      (1 to TestSettings.maxConnections).foreach { i =>
+      (1 to wavesSettings.networkSettings.maxConnections).foreach { i =>
         val h1 = connect(i, true)
         h1.expectMsg(timeout, CloseConnection)
         val h2 = connect(100 + i, false)

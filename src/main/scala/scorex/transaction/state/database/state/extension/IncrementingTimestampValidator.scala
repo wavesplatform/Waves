@@ -2,17 +2,21 @@ package scorex.transaction.state.database.state.extension
 
 import scorex.account.Account
 import scorex.settings.ChainParameters
+import scorex.transaction.ValidationError.StateValidationError
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.storage.StateStorageI
 import scorex.transaction.{PaymentTransaction, Transaction}
 
-class IncrementingTimestampValidator(settings: ChainParameters, storage: StateStorageI) extends StateExtension {
+class IncrementingTimestampValidator(allowInvalidPaymentTransactionsByTimestamp: Long, storage: StateStorageI) extends Validator {
 
-  override def isValid(storedState: StoredState, transaction: Transaction, height: Int): Boolean = transaction match {
+  override def validate(storedState: StoredState, transaction: Transaction, height: Int): Either[StateValidationError, Transaction] = transaction match {
     case tx: PaymentTransaction =>
-      tx.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
-    case _ => true
+      val isCorrect = tx.timestamp < allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
+      if (isCorrect) Right(tx)
+      else Left(StateValidationError(
+        s"PaymentTransaction is earlier than previous transaction after time=$allowInvalidPaymentTransactionsByTimestamp"))
+    case _ => Right(transaction)
   }
 
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
@@ -58,11 +62,8 @@ class IncrementingTimestampValidator(settings: ChainParameters, storage: StateSt
             .filter(_.isInstanceOf[PaymentTransaction])
             .map(_.asInstanceOf[PaymentTransaction])
             .filter(_.sender.address == address)
-          if (accountTransactions.nonEmpty) {
-            Some(accountTransactions.maxBy(_.timestamp))
-          } else {
-            loop(row.lastRowHeight, address)
-          }
+          if (accountTransactions.nonEmpty) Some(accountTransactions.maxBy(_.timestamp))
+          else loop(row.lastRowHeight, address)
         case _ => None
       }
     }
@@ -74,5 +75,5 @@ class IncrementingTimestampValidator(settings: ChainParameters, storage: StateSt
   }
 
 
-  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = {}
+  override def process(tx: Transaction, blockTs: Long, height: Int): Unit = {}
 }

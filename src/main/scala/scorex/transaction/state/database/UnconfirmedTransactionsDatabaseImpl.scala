@@ -1,6 +1,6 @@
 package scorex.transaction.state.database
 
-import scorex.settings.Settings
+import com.wavesplatform.settings.UTXSettings
 import scorex.transaction.{Transaction, UnconfirmedTransactionsStorage}
 import scorex.utils.ScorexLogging
 
@@ -8,7 +8,7 @@ import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 
 
-class UnconfirmedTransactionsDatabaseImpl(settings: Settings) extends UnconfirmedTransactionsStorage with ScorexLogging {
+class UnconfirmedTransactionsDatabaseImpl(settings: UTXSettings) extends UnconfirmedTransactionsStorage with ScorexLogging {
 
   private type TxKey = mutable.WrappedArray.ofByte
 
@@ -19,7 +19,7 @@ class UnconfirmedTransactionsDatabaseImpl(settings: Settings) extends Unconfirme
   private def key(tx: Transaction): TxKey = key(tx.id)
 
   override def putIfNew(tx: Transaction, txValidator: Transaction => Boolean): Boolean =
-    if (transactions.size < settings.utxSize) {
+    if (transactions.size < settings.size) {
       val txKey = key(tx)
       if (transactions.contains(txKey)) {
         false

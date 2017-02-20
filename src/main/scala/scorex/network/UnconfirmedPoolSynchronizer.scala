@@ -1,11 +1,11 @@
 package scorex.network
 
 import akka.actor.ActorRef
+import com.wavesplatform.settings.UTXSettings
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
 import scorex.network.UnconfirmedPoolSynchronizer.BroadcastRandom
 import scorex.network.message.Message
-import scorex.settings.Settings
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
@@ -15,14 +15,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 /**
   * Synchronizing transactions that are not in blockchain yet
   */
-class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModule[_], settings: Settings,
+class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModule, settings: UTXSettings,
                                   networkController: ActorRef)
   extends ViewSynchronizer with ScorexLogging {
 
   override val messageSpecs = Seq(TransactionMessageSpec)
   protected override lazy val networkControllerRef = networkController
 
-  private val rndBroadcastInterval = settings.utxRebroadcastInterval
+  private val rndBroadcastInterval = settings.broadcastInterval
 
   context.system.scheduler.schedule(rndBroadcastInterval, rndBroadcastInterval, self, BroadcastRandom)
 

@@ -1,32 +1,26 @@
 package scorex.api.http.swagger
 
+import scala.reflect.runtime.universe.Type
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import com.github.swagger.akka.model.{Contact, Info, License}
+import com.github.swagger.akka.model.{Info, License}
 import com.github.swagger.akka.{HasActorSystem, SwaggerHttpService}
+import com.wavesplatform.settings.{Constants, RestAPISettings}
 import io.swagger.models.Swagger
-import scorex.settings.Settings
 
-import scala.reflect.runtime.universe.Type
-
-
-class SwaggerDocService(system: ActorSystem, val apiTypes: Seq[Type], settings: Settings)
+class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMaterializer, val apiTypes: Seq[Type], settings: RestAPISettings)
   extends SwaggerHttpService with HasActorSystem {
 
-  override implicit val actorSystem: ActorSystem = system
-  override implicit val materializer: ActorMaterializer = ActorMaterializer()
-
-  override val host = settings.bindAddress + ":" + settings.rpcPort
-  override val apiDocsPath: String = "swagger"
-
-  override val info: Info = Info("The Web Interface to the Scorex API",
-    "1.2.7",
-    "Scorex API",
-    "License: Creative Commons CC0",
-    Some(Contact("Alex", "https://scorex-dev.groups.io/g/main", "alex.chepurnoy@iohk.io")),
-    Some(License("License: Creative Commons CC0", "https://github.com/ScorexProject/Scorex/blob/master/COPYING"))
+  override val host: String = settings.bindAddress + ":" + settings.port
+  override val basePath: String = "api-docs"
+  override val info: Info = Info("The Web Interface to the Waves Full Node API",
+    Constants.VersionString,
+    "Waves Full Node",
+    "License: Apache License, Version 2.0",
+    None,
+    Some(License("Apache License, Version 2.0", "https://github.com/wavesplatform/Waves/blob/master/LICENSE"))
   )
 
   //Let swagger-ui determine the host and port
-  override val swaggerConfig = new Swagger().basePath(prependSlashIfNecessary(basePath)).info(info).scheme(scheme)
+  override val swaggerConfig: Swagger = new Swagger().basePath(prependSlashIfNecessary(basePath)).info(info).scheme(scheme)
 }

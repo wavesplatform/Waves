@@ -1,26 +1,29 @@
 package scorex.wallet
 
 import java.io.File
+
 import com.google.common.primitives.{Bytes, Ints}
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.utils.{LogMVMapBuilder, ScorexLogging, randomBytes}
+
 import scala.collection.JavaConverters._
 import scala.collection.concurrent.TrieMap
 
 //todo: add accs txs?
-class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Array[Byte]]) extends ScorexLogging {
+class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Array[Byte]]) extends ScorexLogging {
 
   private val NonceFieldName = "nonce"
 
-  private val database: MVStore = walletFileOpt match {
-    case Some(walletFile) =>
-      //create parent folders then check their existence
+  private val database: MVStore = maybeFilename match {
+    case Some(walletFilename) => {
+      val walletFile = new File(walletFilename)
       walletFile.getParentFile.mkdirs().ensuring(walletFile.getParentFile.exists())
-      new MVStore.Builder().fileName(walletFile.getAbsolutePath).encryptionKey(password.toCharArray).compress().open()
 
+      new MVStore.Builder().fileName(walletFile.getAbsolutePath).encryptionKey(password.toCharArray).compress().open()
+    }
     case None => new MVStore.Builder().open()
   }
 
@@ -34,7 +37,7 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
       val SeedSize = 64
       lazy val randomSeed = randomBytes(SeedSize)
       lazy val encodedSeed = Base58.encode(randomSeed)
-      println(s"You random generated seed is $encodedSeed")
+      log.debug(s"You random generated seed is $encodedSeed")
       randomSeed
     }
     seedPersistence.put("seed", seed)
@@ -90,8 +93,6 @@ class Wallet(walletFileOpt: Option[File], password: String, seedOpt: Option[Arra
     database.close()
     accountsCache.clear()
   }
-
-  def exists(): Boolean = walletFileOpt.forall(_.exists())
 
   def nonce(): Int = Option(noncePersistence.get(NonceFieldName)).getOrElse(0)
 

@@ -31,10 +31,10 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
                   val leaseExtendedState: LeaseExtendedState,
                   val assetsExtension: AssetsExtendedState,
                   val incrementingTimestampValidator: IncrementingTimestampValidator,
-                  val validators: Seq[StateExtension],
+                  val validators: Seq[Validator],
                   settings: ChainParameters) extends LagonakiState with ScorexLogging {
 
-  override def included(id: Array[Byte], heightOpt: Option[Int]): Option[Int] = storage.included(id, heightOpt)
+  override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 
   def stateHeight: Int = storage.stateHeight
 
@@ -92,8 +92,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   }
 
   override def processBlock(block: Block): Try[State] = Try {
-    val trans = block.transactions
-    val fees: Map[AssetAcc, (AccState, Reasons)] = block.consensusModule.feesDistribution(block)
+    val trans = block.transactionData
+    val fees: Map[AssetAcc, (AccState, Reasons)] = Block.feesDistribution(block)
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2, effectiveBalance(m._1.account) + m._2), List(FeesStateChange(m._2))))
 
     val newBalances: Map[AssetAcc, (AccState, Reasons)] =
@@ -164,7 +164,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
     val height = heightOpt.getOrElse(storage.stateHeight)
 
-    val txs = trans.filter(t => isValid(t, height))
+    val txs = trans.filter(t => validateAgainstState(t, height).isRight)
 
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty &&
       txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
@@ -381,13 +381,11 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     }
   }
 
-  private[blockchain] def isValid(transaction: Transaction, height: Int): Boolean = {
-    val isValid =
-      validators.forall(_.isValid(this, transaction, height))
-    if (!isValid) {
-      log.debug(s"Failed validators for tx '${transaction.json}': ${validators.filterNot(_.isValid(this, transaction, height)).map(_.getClass.getSimpleName)}")
+  def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
+    validators.toStream.map(_.validate(this, transaction,height)).find(_.isLeft) match {
+      case Some(Left(e)) => Left(e)
+      case _ => Right(transaction)
     }
-    isValid
   }
 
 
@@ -435,6 +433,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     }
   }
 
+  def assetDistribution(assetId: Array[Byte]): Map[String, Long] = storage.assetDistribution(assetId)
+
   //for debugging purposes only
   override def toString: String = toJson().toString()
 
@@ -461,15 +461,15 @@ object StoredState {
     }
     val assetExtendedState = new AssetsExtendedState(storage)
     val leaseExtendedState = new LeaseExtendedState(storage)
-    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings, storage)
+    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
     val validators = Seq(
       assetExtendedState,
       incrementingTimestampValidator,
       leaseExtendedState,
       new GenesisValidator,
       new OrderMatchStoredState(storage),
-      new IncludedValidator(storage, settings),
-      new ActivatedValidator(settings)
+      new IncludedValidator(storage, settings.requirePaymentUniqueId),
+      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp)
     )
     new StoredState(storage, leaseExtendedState, assetExtendedState, incrementingTimestampValidator, validators, settings)
   }

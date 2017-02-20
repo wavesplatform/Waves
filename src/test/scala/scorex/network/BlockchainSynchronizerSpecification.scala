@@ -2,15 +2,15 @@ package scorex.network
 
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
-import org.h2.mvstore.MVStore
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.WavesSettings
 import scorex.ActorTestingCommons
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.network.NetworkController.DataFromPeer
-import scorex.settings.SettingsMock
 import scorex.transaction.{BlockStorage, History}
 
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 import scala.util.Random
 
@@ -26,6 +26,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   }
 
   private case object BlacklistAssertion
+
   private def setBlacklistExpectations(blacklist: Boolean): Unit = {
     (peer.blacklist _).when().onCall {
       _ => if (blacklist) self ! BlacklistAssertion else fail("No blacklisting should be in this case")
@@ -46,26 +47,31 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   private val testCoordinator = TestProbe("Coordinator")
 
   private val entireForkLoad = mockFunction[Boolean]
+
   private def setloadEntireForkChunk(value: Boolean) = entireForkLoad expects() returns value anyNumberOfTimes
 
-  object TestSettings extends SettingsMock {
-    override lazy val historySynchronizerTimeout: FiniteDuration = testDuration * 2
-    override lazy val MaxRollback: Int = lastHistoryBlockId - 1
-    override lazy val retriesBeforeBlacklisted: Int = 0
-    override lazy val operationRetries: Int = retriesBeforeBlacklisted + 13930975
-    override lazy val pinToInitialPeer: Boolean = true
-    override lazy val loadEntireChain: Boolean = entireForkLoad()
-  }
+  private val localConfig = ConfigFactory.parseString(
+    s"""
+       |waves {
+       |  synchronization {
+       |    max-rollback: ${lastHistoryBlockId - 1}
+       |    max-chain-length: $lastHistoryBlockId
+       |    load-entire-chain: yes
+       |    synchronization-timeout: ${testDuration * 2}
+       |    pin-to-initial-peer: yes
+       |    retries-before-blacklisting: 0
+       |    operation-retires: 13930975
+       |  }
+       |}
+    """.stripMargin).withFallback(baseTestConfig).resolve()
 
-  private val blockScore = BigInt(100)
+  val wavesSettings = WavesSettings.fromConfig(localConfig)
 
   private trait App extends ApplicationMock {
 
     private val testBlockStorage = mock[BlockStorage]
 
-    consensusModule.blockScore _ when * returns blockScore
-
-    override lazy val settings = TestSettings
+    override lazy val settings = wavesSettings
     override lazy val coordinator: ActorRef = testCoordinator.ref
     override lazy val history: History = testHistory
     override val blockStorage: BlockStorage = testBlockStorage
@@ -75,7 +81,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
   import app.basicMessagesSpecsRepo._
 
-  private def reasonableTimeInterval = (TestSettings.historySynchronizerTimeout.toMillis / 2) millis
+  private def reasonableTimeInterval = wavesSettings.synchronizationSettings.synchronizationTimeout / 2
 
   private def validateStatus(status: Status): Unit = {
     actorRef ! GetSyncStatus
@@ -85,7 +91,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   private def assertLatestBlockFromNonSyncPeer(): Unit = {
     val peer = stub[ConnectedPeer]
 
-    val block = blockMock(lastHistoryBlockId + 3729047)
+    val block = testBlock(lastHistoryBlockId + 3729047)
     actorRef ! DataFromPeer(BlockMessageSpec.messageCode, block, peer)
     testCoordinator.expectMsg(AddBlock(block, Some(peer)))
   }
@@ -99,7 +105,9 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   private def assertPeerNeverGotBlacklisted(): Unit = setBlacklistExpectations(false)
 
   private def expectedGetSignaturesSpec(blockIds: Int*): Unit = expectNetworkMessage(GetSignaturesSpec, blockIds.toSeq)
+
   private def sendBlock(block: Block): Unit = dataFromNetwork(BlockMessageSpec, block)
+
   private def sendSignatures(blockIds: BlockId*): Unit = dataFromNetwork(SignaturesSpec, blockIds.toSeq)
 
   protected override val actorRef = system.actorOf(Props(classOf[BlockchainSynchronizer], app))
@@ -112,13 +120,15 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     val t = System.currentTimeMillis()
 
     def adjustedTimeout(correction: Float): Long = {
-      val withElapsedTime = TestSettings.historySynchronizerTimeout.toMillis - (System.currentTimeMillis() - t)
+      val withElapsedTime = wavesSettings.synchronizationSettings.synchronizationTimeout.toMillis - (System.currentTimeMillis() - t)
       withElapsedTime * correction toLong
     }
+
     def aBitLessThanTimeout = adjustedTimeout(0.9f) millis
+
     def aBitLongerThanTimeout = adjustedTimeout(1.1f) millis
 
-    testHistory.lastBlockIds _ expects TestSettings.MaxRollback returns blockIds(lastHistoryBlockId, 9) // ids come in reverse order
+    testHistory.lastBlockIds _ expects wavesSettings.synchronizationSettings.maxRollback returns blockIds(lastHistoryBlockId, 9) // ids come in reverse order
     actorRef ! GetExtension(Map(peer -> 0))
     expectedGetSignaturesSpec(lastHistoryBlockId, 9)
 
@@ -205,13 +215,17 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
             assertLatestBlockFromNonSyncPeer()
 
             val numberOfBlocks = finalBlockIdInterval.size
+            val finalBlocks = finalBlockIdInterval.map(testBlock(_))
+            val finalBlocksScoreSum = finalBlocks.map(_.blockScore).sum
 
             def setHistoryScoreExpectations(delta: BigInt): Unit =
-              testHistory.score _ expects() returns (initialScore + (numberOfBlocks * blockScore) + delta) repeat (0 to numberOfBlocks)
+              testHistory.score _ expects() returns (initialScore + (finalBlocksScoreSum) + delta) repeat (0 to numberOfBlocks)
 
             def sendBlocks(): Unit = {
-              finalBlockIdInterval foreach { expectNetworkMessage(GetBlockSpec, _) }
-              Random.shuffle(finalBlockIdInterval) foreach { id => sendBlock(blockMock(id)) }
+              finalBlockIdInterval foreach {
+                expectNetworkMessage(GetBlockSpec, _)
+              }
+              Random.shuffle(finalBlockIdInterval) foreach { id => sendBlock(testBlock(id)) }
             }
 
             def assertThatBlocksLoaded(): Unit = {
@@ -234,7 +248,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
               setloadEntireForkChunk(true)
 
               "fork has two blocks better score" in {
-                setHistoryScoreExpectations(-(blockScore * 2 + 1))
+                setHistoryScoreExpectations(-(finalBlocksScoreSum / 2) + 1)
 
                 sendBlocks()
 
@@ -265,11 +279,11 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
                 "same block twice should not reset timeout" in {
                   val firstSubsequentBlockId = finalBlockIdInterval.head
 
-                  sendBlock(blockMock(firstSubsequentBlockId))
+                  sendBlock(testBlock(firstSubsequentBlockId))
 
                   Thread sleep aBitLessThanTimeout.toMillis
 
-                  sendBlock(blockMock(firstSubsequentBlockId))
+                  sendBlock(testBlock(firstSubsequentBlockId))
 
                   assertThatPeerGotBlacklisted()
                 }
@@ -288,6 +302,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
     "a (sub)sequience of block ids to download" - {
 
       implicit def toInnerIds(i: Seq[Int]): InnerIds = i.map(toInnerId)
+
       implicit def toInnerId(i: Int): InnerId = InnerId(Array(i.toByte))
 
       def historyContaining(blockIds: Int*): History = {

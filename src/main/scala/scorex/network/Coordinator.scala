@@ -7,6 +7,7 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.mining.BlockGeneratorController.{LastBlockChanged, StartGeneration}
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
 import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus, Status}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
@@ -38,7 +39,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   private def currentCheckpoint(): Option[Checkpoint] = history.getCheckpoint
 
-  context.system.scheduler.schedule(1.second, application.settings.scoreBroadcastDelay, self, BroadcastCurrentScore)
+  context.system.scheduler.schedule(1.second, application.settings.synchronizationSettings.scoreBroadcastInterval, self, BroadcastCurrentScore)
 
   application.blockGenerator ! StartGeneration
 
@@ -59,7 +60,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       }
 
     case ConnectedPeers(peers) =>
-      val quorumSize = application.settings.quorum
+      val quorumSize = application.settings.minerSettings.quorum
       val actualSize = peers.intersect(peerScores.keySet).size
       if (actualSize < quorumSize) {
         log.debug(s"Quorum to download blocks is not reached: $actualSize peers but should be $quorumSize")
@@ -116,7 +117,9 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   private def handleCheckpoint(checkpoint: Checkpoint, from: Option[ConnectedPeer]): Unit =
     if (currentCheckpoint.forall(c => !(c.signature sameElements checkpoint.signature))) {
-      application.settings.checkpointPublicKey foreach {
+      val maybePublicKeyBytes = Base58.decode(application.settings.checkpointsSettings.publicKey).toOption
+
+      maybePublicKeyBytes foreach {
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
             history.setCheckpoint(Some(checkpoint))
@@ -242,13 +245,35 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
         }
     }
 
+  def isBlockValid(b: Block) : Boolean = {
+    if (application.transactionModule.blockStorage.history.contains(b)) true //applied blocks are valid
+    else {
+      def history = application.transactionModule.blockStorage.history.contains(b.referenceField.value)
+
+      def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
+        b.signerDataField.value.generator.publicKey)
+
+      def consensus = application.consensusModule.isValid(b)
+
+      def transaction = application.transactionModule.isValid(b)
+
+      if (!history) log.debug(s"Invalid block ${b.encodedId}: no parent block in history")
+      else if (!signature) log.debug(s"Invalid block ${b.encodedId}: signature is not valid")
+      else if (!consensus) log.debug(s"Invalid block ${b.encodedId}: consensus data is not valid")
+      else if (!transaction) log.debug(s"Invalid block ${b.encodedId}: transaction data is not valid")
+
+      history && signature && consensus && transaction
+    }
+  }
+
+
   private def processNewBlock(block: Block): Boolean = Try {
     val oldHeight = history.height()
     val estimatedHeight = oldHeight + 1
     if (!isValidWithRespectToCheckpoint(block, estimatedHeight)) {
       log.warn(s"Block ${str(block)} [h = $estimatedHeight] is not valid with respect to checkpoint")
       false
-    } else if (block.isValid) {
+    } else if (isBlockValid(block)) {
 
       val oldScore = history.score()
 
@@ -258,8 +283,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
             s"""Block ${block.encodedId} appended:
             (height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})""")
 
-          block.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-
+          application.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
           true
         case Failure(e) => throw e
       }

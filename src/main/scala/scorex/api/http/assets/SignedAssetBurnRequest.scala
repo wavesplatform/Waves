@@ -5,6 +5,7 @@ import io.swagger.annotations._
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
+import scorex.api.http.Base58Parser
 import scorex.api.http.formats._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError
@@ -17,7 +18,7 @@ case class SignedAssetBurnRequest(@ApiModelProperty(value = "Base58 encoded Issu
                                   @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
                                   assetId: String,
                                   @ApiModelProperty(required = true, example = "1000000")
-                                  amount: Long,
+                                  quantity: Long,
                                   @ApiModelProperty(required = true)
                                   fee: Long,
                                   @ApiModelProperty(required = true)
@@ -25,27 +26,17 @@ case class SignedAssetBurnRequest(@ApiModelProperty(value = "Base58 encoded Issu
                                   @ApiModelProperty(required = true)
                                   signature: String) {
 
-  def toTx: Either[ValidationError, BurnTransaction] = BurnTransaction.create(
-    new PublicKeyAccount(Base58.decode(senderPublicKey).get),
-    Base58.decode(assetId).get,
-    amount,
-    fee,
-    timestamp,
-    Base58.decode(signature).get)
-
+  def toTx: Either[ValidationError, BurnTransaction] = for {
+    _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
+    _assetId <- Base58Parser.parseBase58(assetId, "invalid.signature")
+    _signature <- Base58Parser.parseBase58(signature, "invalid.signature")
+    _t <- BurnTransaction.create(_sender, _assetId, quantity, fee, timestamp, _signature)
+  } yield _t
 }
 
 object SignedAssetBurnRequest {
 
+  implicit val assetBurnRequestReads: Format[SignedAssetBurnRequest] = Json.format
 
-  //TODO put reads/writes together?
-  implicit val assetBurnRequestReads: Reads[SignedAssetBurnRequest] = (
-    (JsPath \ "senderPublicKey").read[String] and
-      (JsPath \ "assetId").read[String] and
-      (JsPath \ "quantity").read[Long] and
-      (JsPath \ "fee").read[Long] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[String]
-    ) (SignedAssetBurnRequest.apply _)
 
 }

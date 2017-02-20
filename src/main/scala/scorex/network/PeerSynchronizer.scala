@@ -28,7 +28,7 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
   private implicit val timeout = Timeout(5.seconds)
   private val maxPeersToBroadcast = 3
   private val peerManager = application.peerManager
-  private val peersDataBroadcastDelay = application.settings.peersDataBroadcastDelay
+  private val peersDataBroadcastDelay = application.settings.networkSettings.peersBroadcastInterval
   private val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(()), None), SendToRandom)
   private var hasRequested = false
   private var unrequestedPacketsCount = 0
@@ -48,14 +48,14 @@ class PeerSynchronizer(application: Application) extends ViewSynchronizer with S
 
       if (peers.size <= maxPeersToBroadcast) {
         peers
-          .filter(_.getPort < application.settings.minEphemeralPortNumber)
+          .filter(_.getPort < application.settings.networkSettings.minEphemeralPortNumber)
           .foreach(isa => peerManager ! PeerManager.AddPeer(isa))
       }
 
     case DataFromPeer(msgId, _, remote)
       if !hasRequested && msgId == PeersSpec.messageCode =>
       unrequestedPacketsCount = unrequestedPacketsCount + 1
-      if (unrequestedPacketsCount >= application.settings.UnrequestedPacketsThreshold) {
+      if (unrequestedPacketsCount >= application.settings.networkSettings.unrequestedPacketsThreshold) {
         log.warn(s"Received too many data without requesting it from $remote")
         remote.blacklist()
       }

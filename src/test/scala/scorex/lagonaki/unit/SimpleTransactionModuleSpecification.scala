@@ -1,63 +1,77 @@
 package scorex.lagonaki.unit
 
-import java.net.InetSocketAddress
-
+import scala.concurrent.duration._
+import scala.language.postfixOps
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.WavesSettings
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.FunSuite
-import play.api.libs.json.{JsObject, Json}
 import scorex.account.AddressScheme
-import scorex.app.Application
+import scorex.app.{Application, RunnableApplication}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.ConsensusMock
-import scorex.settings.{ChainParameters, Settings}
+import scorex.settings.{ChainParameters, TestChainParameters}
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 import scorex.wallet.Wallet
-
-import scala.concurrent.duration._
-import scala.language.postfixOps
 
 //TODO: gagarin55 - Can't move it to appropriate module due to dependancy on some ConsesusModule impl
 class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
 
-  object MySettings extends WavesSettings(Json.obj()) {
-    override lazy val dataDirOpt: Option[String] = None
-    override lazy val knownPeers = Seq.empty[InetSocketAddress]
-  }
+  private val config = ConfigFactory.parseString(
+    """
+      |waves {
+      |  directory: ""
+      |  network {
+      |    file: ""
+      |    known-peers = []
+      |  }
+      |  blockchain {
+      |    file: ""
+      |  }
+      |}
+    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+
+  val wavesSettings = WavesSettings.fromConfig(config)
 
   trait MyApp extends Application {
-    override val settings: Settings = MySettings
+    override val settings: WavesSettings = wavesSettings
     override implicit val consensusModule = new ConsensusMock
   }
 
-  val forkParameters = new AnyRef with ChainParameters {
+  val forkParameters = new ChainParameters with TestChainParameters.GenesisData {
     override def allowTemporaryNegativeUntil: Long = 0L
+
     override def requireSortedTransactionsAfter: Long = Long.MaxValue
+
     override def allowInvalidPaymentTransactionsByTimestamp: Long = Long.MaxValue
+
     override def generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MaxValue
+
     override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
+
     override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
+
     override def allowUnissuedAssetsUntil: Long = Long.MaxValue
+
     override def allowBurnTransactionAfterTimestamp: Long = Long.MaxValue
+
     override def requirePaymentUniqueId: Long = Long.MaxValue
 
     override def initialBalance: Long = 100000000000000L
 
     override def genesisTimestamp: Long = ???
 
-    override def genesisTxs: Seq[Transaction] = ???
-
     override def addressScheme: AddressScheme = ???
   }
 
   implicit val app = stub[MyApp]
-  implicit val settings = MySettings
+  implicit val settings = wavesSettings
   implicit val consensusModule = app.consensusModule
   implicit val transactionModule = new SimpleTransactionModule(forkParameters)
   val genesisTimestamp = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.appendBlock(Block.genesis(genesisTimestamp))
+    transactionModule.blockStorage.appendBlock(Block.genesis(RunnableApplication.consensusGenesisBlockData, transactionModule.genesisData, genesisTimestamp))
   }
   assert(!transactionModule.blockStorage.history.isEmpty)
 

@@ -2,28 +2,22 @@ package scorex.api.http
 
 import javax.ws.rs.Path
 
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
-import play.api.libs.json.{JsError, JsSuccess, Json}
-import scorex.api.http.assets.{PaymentRequest, TransferRequest}
-import scorex.app.RunnableApplication
+import scorex.api.http.assets.TransferRequest
 import scorex.transaction.SimpleTransactionModule
-
-import scala.util.Try
+import scorex.transaction.state.wallet.Payment
+import scorex.wallet.Wallet
 
 @Path("/payment")
-@Api(value = "/payment", description = "Payment operations.", position = 1)
+@Api(value = "/payment")
 @Deprecated
-case class PaymentApiRoute(application: RunnableApplication) extends ApiRoute with CommonTransactionApiFunctions {
-  val settings = application.settings
-
-  // TODO asInstanceOf
-  implicit lazy val transactionModule: SimpleTransactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
-  lazy val wallet = application.wallet
+case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactionModule: SimpleTransactionModule) extends ApiRoute {
 
   override lazy val route = payment
 
+  @Deprecated
   @ApiOperation(value = "Send payment. Deprecated: use /assets/transfer instead",
     notes = "Send payment to another wallet. Deprecated: use /assets/transfer instead",
     httpMethod = "POST",
@@ -35,32 +29,19 @@ case class PaymentApiRoute(application: RunnableApplication) extends ApiRoute wi
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "PaymentRequest",
+      dataType = "scorex.transaction.state.wallet.Payment",
       defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
-  def payment: Route = path("payment") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[PaymentRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(p: PaymentRequest, _) =>
-                  val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, "", p.recipient)
-                  transactionModule.transferAsset(transferRequest, wallet).map { paymentVal =>
-                    paymentVal.fold(e => ApiError.fromValidationError(e).response, { tx => JsonResponse(tx.json, StatusCodes.OK) })
-                  }.getOrElse(InvalidSender.response)
-              }
-            }.getOrElse(WrongJson().response)
-          }
-        }
-      }
+  def payment: Route = (path("payment") & post & withAuth) {
+    json[Payment] { p =>
+      val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, None, p.recipient)
+      transactionModule
+        .transferAsset(transferRequest, wallet)
+        .map(_.json)
     }
   }
 }

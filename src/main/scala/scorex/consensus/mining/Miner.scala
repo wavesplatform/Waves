@@ -14,7 +14,7 @@ import scala.util.{Failure, Try}
 class Miner(application: Application) extends Actor with ScorexLogging {
 
   private lazy val blockGenerationDelay =
-    math.max(application.settings.blockGenerationDelay.toMillis, BlockGenerationTimeShift.toMillis) millis
+    math.max(application.settings.minerSettings.generationDelay.toMillis, BlockGenerationTimeShift.toMillis) millis
 
   private implicit lazy val transactionModule = application.transactionModule
   private lazy val consensusModule = application.consensusModule
@@ -43,7 +43,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
   override def postStop(): Unit = { cancel() }
 
   private def tryToGenerateABlock(): Boolean = Try {
-    log.info("Trying to generate a new block")
+    log.debug("Trying to generate a new block")
 
     val blocks = application.consensusModule.generateNextBlocks(accounts)
     if (blocks.nonEmpty) {
@@ -52,14 +52,14 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       true
     } else false
   } recoverWith { case e =>
-      log.debug(s"Failed to generate new block: ${e.getMessage}")
+      log.warn(s"Failed to generate new block: ${e.getMessage}")
       Failure(e)
   } getOrElse false
 
   protected def preciseTime: Long = NTP.correctedTime()
 
   private def scheduleBlockGeneration(): Unit = try {
-    val schedule = if (application.settings.tflikeScheduling) {
+    val schedule = if (application.settings.minerSettings.tfLikeScheduling) {
       val lastBlock = application.history.lastBlock
       val currentTime = preciseTime
 
@@ -72,7 +72,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
     } else Seq.empty
 
     val tasks = if (schedule.isEmpty) {
-      log.info(s"Next block generation will start in $blockGenerationDelay")
+      log.debug(s"Next block generation will start in $blockGenerationDelay")
       setSchedule(Seq(blockGenerationDelay))
     } else {
       val firstN = 3

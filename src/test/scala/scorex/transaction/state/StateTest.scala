@@ -1,18 +1,18 @@
 package scorex.transaction.state
 
 import java.io.File
+import scala.util.{Random, Success, Try}
 import org.h2.mvstore.MVStore
 import org.scalacheck.commands.Commands
 import org.scalacheck.{Gen, Prop}
-import org.scalatest.prop.Checkers
 import org.scalatest.PropSpec
+import org.scalatest.prop.Checkers
 import scorex.account.{Account, PrivateKeyAccount}
-import scorex.lagonaki.mocks.BlockMock
+import scorex.lagonaki.mocks.TestBlock
+import scorex.settings.TestChainParameters
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 import scorex.utils._
-import scala.util.{Random, Success, Try}
-import scorex.settings.ChainParameters
 
 class StateTest extends PropSpec with Checkers {
   property("state test") {
@@ -104,15 +104,15 @@ object StateTestSpec extends Commands {
 
   case class Sut(fileName: String) {
     val db = new MVStore.Builder().fileName(fileName).compress().open()
-    val storedState = StoredState.fromDB(db, ChainParameters.Disabled)
-    storedState.processBlock(new BlockMock(genesisTxs))
+    val storedState = StoredState.fromDB(db, TestChainParameters.Disabled)
+    storedState.processBlock(TestBlock(genesisTxs))
   }
 
   case class CheckTransaction(signature: Transaction) extends Command {
     type Result = Option[Int]
 
     def run(sut: Sut): Result = sut.synchronized {
-      sut.storedState.included(signature)
+      sut.storedState.included(signature.id)
     }
 
     def nextState(state: State): State = state
@@ -132,7 +132,7 @@ object StateTestSpec extends Commands {
 
     def run(sut: Sut): Result = sut.synchronized {
       assert(sut.storedState.isValid(txs, blockTime = txs.map(_.timestamp).max))
-      val block = new BlockMock(txs)
+      val block = TestBlock(txs)
       sut.storedState.processBlock(block)
       (sut.storedState.stateHeight, sut.storedState.totalBalance)
     }

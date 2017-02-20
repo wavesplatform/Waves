@@ -25,7 +25,7 @@ object TypedTransaction extends Deser[TypedTransaction] {
     val TransferTransaction = Value(4)
     val ReissueTransaction = Value(5)
     val BurnTransaction = Value(6)
-    val OrderMatchTransaction = Value(7)
+    val ExchangeTransaction = Value(7)
     val LeaseTransaction = Value(8)
     val LeaseCancelTransaction = Value(9)
   }
@@ -56,7 +56,7 @@ object TypedTransaction extends Deser[TypedTransaction] {
       case txType: Byte if txType == TransactionType.BurnTransaction.id =>
         BurnTransaction.parseTail(data.tail)
 
-      case txType: Byte if txType == TransactionType.OrderMatchTransaction.id =>
+      case txType: Byte if txType == TransactionType.ExchangeTransaction.id =>
         ExchangeTransaction.parseTail(data.tail)
 
       case txType: Byte if txType == TransactionType.LeaseTransaction.id =>

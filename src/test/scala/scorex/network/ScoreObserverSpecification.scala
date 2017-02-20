@@ -3,9 +3,10 @@ package scorex.network
 import akka.actor.{ActorRef, Props}
 import akka.pattern.ask
 import akka.testkit.TestProbe
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.settings.WavesSettings
 import scorex.ActorTestingCommons
 import scorex.network.ScoreObserver.{CurrentScore, GetScore, UpdateScore}
-import scorex.settings.SettingsMock
 import scorex.transaction.History.BlockchainScore
 
 import scala.concurrent.Await
@@ -16,12 +17,19 @@ class ScoreObserverSpecification extends ActorTestingCommons {
 
   val testCoordinator = TestProbe("Coordinator")
 
-  object TestSettings extends SettingsMock {
-    override lazy val scoreTTL: FiniteDuration = 1 second
-  }
+  val localConfig = ConfigFactory.parseString(
+    """
+      |waves {
+      |  synchronization {
+      |    score-ttl: 1s
+      |  }
+      |}
+    """.stripMargin).withFallback(baseTestConfig).resolve()
+
+  val wavesSettings = WavesSettings.fromConfig(localConfig)
 
   trait App extends ApplicationMock {
-    override lazy val settings = TestSettings
+    override lazy val settings = wavesSettings
     override lazy val coordinator: ActorRef = testCoordinator.ref
   }
 
@@ -61,7 +69,7 @@ class ScoreObserverSpecification extends ActorTestingCommons {
       }
 
       "clean old scores on timeout" in {
-        def sleepHalfTTL(): Unit = Thread sleep TestSettings.scoreTTL.toMillis / 2 + 100
+        def sleepHalfTTL(): Unit = Thread sleep wavesSettings.synchronizationSettings.scoreTTL.toMillis / 2 + 100
 
         sleepHalfTTL()
 

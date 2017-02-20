@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.market
 
+import scala.concurrent.duration._
 import akka.actor.{ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
@@ -9,19 +10,14 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
-import com.wavesplatform.settings.WavesSettings
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import play.api.libs.json.{JsObject, JsString}
-import scorex.settings.ChainParameters
-import scorex.transaction.SimpleTransactionModule._
+import scorex.settings.TestChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
-
-import scala.concurrent.duration._
 
 class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   with WordSpecLike
@@ -41,18 +37,15 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
   val db = new MVStore.Builder().compress().open()
-  val storedState = fromDBWithUnlimitedBalance(db, ChainParameters.Disabled)
+  val storedState = fromDBWithUnlimitedBalance(db, TestChainParameters.Disabled)
 
 
-  val settings = new WavesSettings(JsObject(Seq(
-    "matcher" -> JsObject(
-      Seq("account" -> JsString(MatcherAccount.address))
-    )
-  )))
+  val settings = matcherSettings.copy(account = MatcherAccount.address)
+
   val wallet = new Wallet(None, "matcher", Option(WalletSeed))
   wallet.generateNewAccount()
   var actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
-    wallet, settings, stub[TransactionModule[StoredInBlock]]) with RestartableActor))
+    wallet, settings, stub[TransactionModule]) with RestartableActor))
 
 
   override protected def beforeEach() = {
@@ -63,7 +56,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     tp.expectMsg(akka.actor.Status.Success(""))
     super.beforeEach()
 
-    val transactionModule = stub[TransactionModule[StoredInBlock]]
+    val transactionModule = stub[TransactionModule]
     (transactionModule.isValid(_: Transaction, _: Long)).when(*, *).returns(true).anyNumberOfTimes()
 
     actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
@@ -234,9 +227,10 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     }
 
     "order matched with invalid order should keep matching with others, invalid is removed" in {
-      val transactionModule = stub[TransactionModule[StoredInBlock]]
+      val transactionModule = stub[TransactionModule]
       val ord1 = buy(pair, 100, 20)
-      val ord2 = buy(pair, 5000, 1000) // should be invalid
+      val ord2 = buy(pair, 5000, 1000)
+      // should be invalid
       val ord3 = sell(pair, 100, 10)
 
       actor = system.actorOf(Props(new OrderBookActor(pair, storedState,

@@ -1,30 +1,39 @@
 package com.wavesplatform.matcher
 
-import com.wavesplatform.settings.WavesSettings
-import play.api.libs.json.JsObject
+import com.typesafe.config.Config
+import net.ceedubs.ficus.Ficus._
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.FiniteDuration
 
-trait MatcherSettings {
-  this: WavesSettings =>
-  def settingsJSON: JsObject
+case class MatcherSettings(enable: Boolean,
+                           account: String,
+                           bindAddress: String,
+                           port: Int,
+                           minOrderFee: Long,
+                           orderMatchTxFee: Long,
+                           journalDataDir: String,
+                           snapshotsDataDir: String,
+                           snapshotsInterval: FiniteDuration,
+                           maxOpenOrders: Int
+                          )
 
-  private val DefaultMatcherHost = "127.0.0.1"
-  private val DefaultMatcherPort = 6886
-  private val DefaultOrderMatchTxFee = 100000
-  private val DefaultMaxOpenOrderCount = 1000
 
-  lazy val matcherSettings = settingsJSON \ "matcher"
-  lazy val isRunMatcher = matcherSettings.toOption.isDefined
-  lazy val matcherAccount = (matcherSettings \ "account").as[String]
-  lazy val matcherHost = (matcherSettings \ "host").asOpt[String].getOrElse(DefaultMatcherHost)
-  lazy val matcherPort = (matcherSettings \ "port").asOpt[Int].getOrElse(DefaultMatcherPort)
-  lazy val minOrderFee = (matcherSettings \ "minOrderFee").asOpt[Int].getOrElse(DefaultOrderMatchTxFee)
-  lazy val minCancelOrderFee = (matcherSettings \ "minCancelOrderFee").asOpt[Int].getOrElse(DefaultOrderMatchTxFee)
-  lazy val orderMatchTxFee = (matcherSettings \ "orderMatchTxFee").asOpt[Int].getOrElse(DefaultOrderMatchTxFee)
-  lazy val orderCanceTxFee = (matcherSettings \ "orderCanceTxFee").asOpt[Int].getOrElse(DefaultOrderMatchTxFee)
-  lazy val matcherJournalDataDir = (matcherSettings \ "journalDataDir").asOpt[String].getOrElse(getDir("dataDir", "journal").get)
-  lazy val matcherSnapshotsDataDir = (matcherSettings \ "snapshotsDataDir").asOpt[String].getOrElse(getDir("dataDir", "snapshots").get)
-  lazy val snapshotInterval = (matcherSettings \ "snapshotInterval").asOpt[Int].map(x => FiniteDuration(x, MINUTES)).getOrElse(1.day)
-  lazy val maxOpenOrdersCount = (matcherSettings \ "maxOpenOrdersCount").asOpt[Int].getOrElse(DefaultMaxOpenOrderCount)
+object MatcherSettings {
+  val configPath: String = "waves.matcher"
+
+  def fromConfig(config: Config): MatcherSettings = {
+    val enabled = config.as[Boolean](s"$configPath.enable")
+    val account = config.as[String](s"$configPath.account")
+    val bindAddress = config.as[String](s"$configPath.bind-address")
+    val port = config.as[Int](s"$configPath.port")
+    val minOrderFee = config.as[Long](s"$configPath.min-order-fee")
+    val orderMatchTxFee = config.as[Long](s"$configPath.order-match-tx-fee")
+    val journalDirectory = config.as[String](s"$configPath.journal-directory")
+    val snapshotsDirectory = config.as[String](s"$configPath.snapshots-directory")
+    val snapshotsInterval = config.as[FiniteDuration](s"$configPath.snapshots-interval")
+    val maxOpenOrders = config.as[Int](s"$configPath.max-open-orders")
+
+    MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
+      snapshotsDirectory, snapshotsInterval, maxOpenOrders)
+  }
 }

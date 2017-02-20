@@ -2,39 +2,37 @@ package scorex.api.http
 
 import javax.ws.rs.Path
 
-import akka.actor.ActorRefFactory
-import akka.http.scaladsl.model.StatusCodes
+import scala.util.{Failure, Success}
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
-import scorex.api.http.assets.{BurnRequest, IssueRequest, ReissueRequest, TransferRequest}
-import scorex.app.Application
+import scorex.api.http.assets.{BurnRequest, IssueRequest, TransferRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
-import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{AssetAcc, SimpleTransactionModule, StateCheckFailed => TxStateCheckFailed}
 import scorex.transaction.assets.exchange.OrderJson._
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
+import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.state.wallet._
+import scorex.transaction.{AssetAcc, TransactionOperations}
+import scorex.wallet.Wallet
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(application: Application) extends ApiRoute with CommonTransactionApiFunctions {
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StoredState, transactionModule: TransactionOperations) extends ApiRoute {
   val MaxAddressesPerRequest = 1000
 
-  val settings = application.settings
+  private def processRequest[A: Reads](pathMatcher: String, f: A => ToResponseMarshallable) =
+    (path(pathMatcher) & post & withAuth) {
+      json[A](f)
+    }
 
-  private val wallet = application.wallet
-  private val state = application.blockStorage.state.asInstanceOf[StoredState]
-  implicit val transactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
+
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ signOrder
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ signOrder ~ balanceDistribution
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -43,26 +41,36 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
   ))
-  def balance: Route = {
-    path("balance" / Segment / Segment) { case (address, assetId) =>
-      getJsonRoute {
-        balanceJson(address, assetId)
+  def balance: Route =
+    (get & path("balance" / Segment / Segment)) { (address, assetId) =>
+      complete(balanceJson(address, assetId))
+    }
+
+  @Path("/{assetId}/distribution")
+  @ApiOperation(value = "Asset balance distribution", notes = "Asset balance distribution by account", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
+  ))
+  def balanceDistribution: Route =
+    (get & path(Segment / "distribution")) { assetId =>
+      complete {
+        Base58.decode(assetId) match {
+          case Success(byteArray) => Json.toJson(state.assetDistribution(byteArray))
+          case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.CustomValidationError("Must be base58-encoded assetId"))
+        }
       }
     }
-  }
+
 
   @Path("/balance/{address}")
   @ApiOperation(value = "Account's balance", notes = "Account's balances for all assets", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
-  def balances: Route = {
-    path("balance" / Segment) { address =>
-      getJsonRoute {
-        balanceJson(address)
-      }
+  def balances: Route =
+    (get & path("balance" / Segment)) { address =>
+      complete(balanceJson(address))
     }
-  }
 
   @Path("/transfer")
   @ApiOperation(value = "Transfer asset",
@@ -76,39 +84,12 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "TransferRequest",
+      dataType = "scorex.transaction.state.wallet.TransferRequest",
       defaultValue = "{\"sender\":\"3Mn6xomsZZepJj1GL1QaW6CaCJAq8B3oPef\",\"recipient\":\"3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk\",\"assetId\":null,\"amount\":5813874260609385500,\"feeAssetId\":\"3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc\",\"fee\":1579331567487095949,\"timestamp\":4231642878298810008}"
     )
   ))
-  def transfer: Route = path("transfer") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[TransferRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(request: TransferRequest, _) =>
-                  val txOpt = transactionModule.transferAsset(request, wallet)
-                  txOpt match {
-                    case Success(txVal) =>
-                      txVal match {
-                        case Right(tx) => JsonResponse (tx.json, StatusCodes.OK)
-                        case Left(e) =>   WrongJson().response
-                      }
-                        case Failure(e: TxStateCheckFailed) =>
-                      StateCheckFailed.response
-                    case _ =>
-                      WrongJson().response
-                  }
-              }
-            }.getOrElse(WrongJson().response)
-          }
-        }
-      }
-    }
-  }
+  def transfer: Route =
+    processRequest("transfer", (t: TransferRequest) => transactionModule.transferAsset(t, wallet))
 
   @Path("/issue")
   @ApiOperation(value = "Issue Asset",
@@ -122,36 +103,12 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "IssueRequest",
+      dataType = "scorex.transaction.state.wallet.IssueRequest",
       defaultValue = "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
     )
   ))
-  def issue: Route = path("issue") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[IssueRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(issue: IssueRequest, _) =>
-                  val txOpt: Try[IssueTransaction] = transactionModule.issueAsset(issue, wallet)
-                  txOpt match {
-                    case Success(tx) =>
-                          JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: TxStateCheckFailed) =>
-                      StateCheckFailed.response
-                    case _ =>
-                      WrongJson().response
-                  }
-              }
-            }.getOrElse(WrongJson().response)
-          }
-        }
-      }
-    }
-  }
+  def issue: Route =
+    processRequest("issue", (i: IssueRequest) => transactionModule.issueAsset(i, wallet))
 
   @Path("/reissue")
   @ApiOperation(value = "Issue Asset",
@@ -165,36 +122,12 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "ReissueRequest",
+      dataType = "scorex.transaction.state.wallet.ReissueRequest",
       defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100000,\"reissuable\":false,\"fee\":1}"
     )
   ))
-  def reissue: Route = path("reissue") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[ReissueRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(issue: ReissueRequest, _) =>
-                  val txOpt: Try[ReissueTransaction] = transactionModule.reissueAsset(issue, wallet)
-                  txOpt match {
-                    case Success(tx) =>
-                          JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: TxStateCheckFailed) =>
-                      StateCheckFailed.response
-                    case _ =>
-                      WrongJson().response
-                  }
-              }
-            }.getOrElse(WrongJson().response)
-          }
-        }
-      }
-    }
-  }
+  def reissue: Route =
+    processRequest("reissue", (r: ReissueRequest) => transactionModule.reissueAsset(r, wallet))
 
   @Path("/burn")
   @ApiOperation(value = "Burn Asset",
@@ -208,39 +141,15 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "BurnRequest",
+      dataType = "scorex.transaction.state.wallet.BurnRequest",
       defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"quantity\":100,\"fee\":100000}"
     )
   ))
-  def burnRoute: Route = path("burn") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          walletNotExists(wallet).getOrElse {
-            Try(Json.parse(body)).map { js =>
-              js.validate[BurnRequest] match {
-                case err: JsError =>
-                  WrongTransactionJson(err).response
-                case JsSuccess(burnRequest: BurnRequest, _) =>
-                  val txOpt: Try[BurnTransaction] = transactionModule.burnAsset(burnRequest, wallet)
-                  txOpt match {
-                    case Success(tx) =>
-                          JsonResponse(tx.json, StatusCodes.OK)
-                    case Failure(e: TxStateCheckFailed) =>
-                      StateCheckFailed.response
-                    case _ =>
-                      WrongJson().response
-                  }
-              }
-            }.getOrElse(WrongJson().response)
-          }
-        }
-      }
-    }
-  }
+  def burnRoute: Route =
+    processRequest("burn", (b: BurnRequest) => transactionModule.burnAsset(b, wallet))
 
 
-  private def balanceJson(address: String, assetIdStr: String): JsonResponse = {
+  private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
     val account = new Account(address)
     Base58.decode(assetIdStr) match {
       case Success(assetId) if Account.isValid(account) =>
@@ -249,12 +158,12 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
           "assetId" -> assetIdStr,
           "balance" -> state.assetBalance(AssetAcc(account, Some(assetId)))
         )
-        JsonResponse(json, StatusCodes.OK)
-      case _ => InvalidAddress.response
+        Right(json)
+      case _ => Left(InvalidAddress)
     }
   }
 
-  private def balanceJson(address: String): JsonResponse = {
+  private def balanceJson(address: String): Either[ApiError, JsObject] = {
     val account = new Account(address)
     if (Account.isValid(account)) {
       val balances: Seq[JsObject] = state.getAccountBalance(account).map { p =>
@@ -270,8 +179,8 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
         "address" -> account.address,
         "balances" -> JsArray(balances)
       )
-      JsonResponse(json, StatusCodes.OK)
-    } else InvalidAddress.response
+      Right(json)
+    } else Left(InvalidAddress)
   }
 
   @Path("/order")
@@ -289,29 +198,10 @@ case class AssetsApiRoute(application: Application) extends ApiRoute with Common
       dataType = "scorex.transaction.assets.exchange.Order"
     )
   ))
-  def signOrder: Route = path("order") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[Order] match {
-              case err: JsError =>
-                Future.successful(WrongTransactionJson(err).response)
-              case JsSuccess(order: Order, _) =>
-                Future {
-                  wallet.privateKeyAccount(order.sender.address).map { sender =>
-                    val signed = Order.sign(order, sender)
-                    JsonResponse(signed.json, StatusCodes.OK)
-                  }.getOrElse(InvalidAddress.response)
-                }
-            }
-          }.recover {
-            case t =>
-              Future.successful(WrongJson().response)
-          }.get
-        }
-      }
+  def signOrder: Route = processRequest("order", (order: Order) => {
+    wallet.privateKeyAccount(order.senderPublicKey.address) match {
+      case Some(sender) => Order.sign(order, sender)
+      case None => InvalidAddress
     }
-  }
-
+  })
 }

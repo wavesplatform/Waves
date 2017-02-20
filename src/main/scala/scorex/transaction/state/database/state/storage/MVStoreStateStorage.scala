@@ -1,6 +1,7 @@
 package scorex.transaction.state.database.state.storage
 
 import org.h2.mvstore.{MVMap, MVStore}
+import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.transaction.state.database.state._
@@ -90,5 +91,18 @@ trait MVStoreStateStorage extends StateStorageI {
   def stateHeight: Int = Option(heightMap.get(HeightKey)).getOrElse(0)
 
   def setStateHeight(height: Int): Unit = heightMap.put(HeightKey, height)
+
+  def assetDistribution(assetId: Array[Byte]): Map[String, Long] = {
+    val encodedAssetId = Base58.encode(assetId)
+
+    accountAssetsMap.entrySet().asScala
+      .filter(e => e.getValue.contains(encodedAssetId))
+      .map(e => {
+        val assetAcc: AssetAcc = AssetAcc(new Account(e.getKey),Some(assetId))
+        val key = assetAcc.key
+        val balance = getAccountChanges(key, getLastStates(key).get).get.state.balance
+        (e.getKey, balance)
+      }).toMap
+  }
 
 }

@@ -2,16 +2,14 @@ package scorex.transaction
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
+import com.wavesplatform.settings.UTXSettings
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
-import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
 import scorex.network.message.Message
 import scorex.network.{NetworkController, _}
-import scorex.settings.Settings
-import scorex.transaction.SimpleTransactionModule.StoredInBlock
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -27,15 +25,10 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
 
   "An UnconfirmedPoolSynchronizer actor" must {
 
-    val transactionModule = mock[TransactionModule[StoredInBlock]]
+    val transactionModule = mock[TransactionModule]
 
     def createPoolSynchronizer(broadcastInterval: FiniteDuration) = {
-      val settings = new Settings {
-        override val settingsJSON: JsObject = Json.obj()
-        override lazy val utxRebroadcastInterval = broadcastInterval
-      }
-
-      TestActorRef(new UnconfirmedPoolSynchronizer(transactionModule, settings, testActor))
+      TestActorRef(new UnconfirmedPoolSynchronizer(transactionModule, UTXSettings(1000, broadcastInterval), testActor))
     }
 
     val defaultRecipient = new PublicKeyAccount(Array.fill(32)(0: Byte))

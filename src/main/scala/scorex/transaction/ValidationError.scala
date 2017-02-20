@@ -1,8 +1,6 @@
 package scorex.transaction
 
-sealed trait ValidationError {
-
-}
+sealed trait ValidationError
 
 object ValidationError {
   case object InvalidAddress extends ValidationError
@@ -17,5 +15,7 @@ object ValidationError {
   case object ToSelf extends ValidationError
 
   case class CustomValidationError(err: String) extends ValidationError
+
+  case class StateValidationError(err: String) extends ValidationError
 
 }

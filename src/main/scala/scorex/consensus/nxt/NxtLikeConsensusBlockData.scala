@@ -1,6 +1,3 @@
 package scorex.consensus.nxt
 
-trait NxtLikeConsensusBlockData {
-  val baseTarget: Long
-  val generationSignature: Array[Byte]
-}
+case class NxtLikeConsensusBlockData(baseTarget: Long, generationSignature: Array[Byte])

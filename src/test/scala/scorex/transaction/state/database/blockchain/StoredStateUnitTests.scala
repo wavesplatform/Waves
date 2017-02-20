@@ -2,13 +2,14 @@ package scorex.transaction.state.database.blockchain
 
 import java.io.File
 import java.util.UUID
-
+import scala.util.Random
+import scala.util.control.NonFatal
 import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.{Account, AddressScheme, PrivateKeyAccount}
-import scorex.settings.ChainParameters
+import scorex.settings.{ChainParameters, TestChainParameters}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
@@ -17,13 +18,10 @@ import scorex.transaction.state.database.state._
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.waves.TestingCommons
 
-import scala.util.Random
-import scala.util.control.NonFatal
-
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging with TestingCommons {
 
-  val forkParametersWithEnableUnissuedAssetsCheck = new AnyRef with ChainParameters {
+  val forkParametersWithEnableUnissuedAssetsCheck = new ChainParameters with TestChainParameters.GenesisData {
     override def allowTemporaryNegativeUntil: Long = 0L
 
     override def requireSortedTransactionsAfter: Long = Long.MaxValue
@@ -46,8 +44,6 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     override def genesisTimestamp: Long = ???
 
-    override def genesisTxs: Seq[Transaction] = ???
-
     override def addressScheme: AddressScheme = ???
   }
 
@@ -64,7 +60,6 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   val applyChanges = PrivateMethod[Unit]('applyChanges)
   val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
-
 
 
   property("validate plenty of transactions") {
@@ -89,12 +84,12 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val senderAmountAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
         state.assetBalance(senderAmountAcc) shouldBe 0
-        state.isValid(issueTx, Int.MaxValue) shouldBe true
+        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Right[_, _]]
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe issueTx.quantity
 
-        state.isValid(burnTx, Int.MaxValue) shouldBe true
+        state.validateAgainstState(burnTx, Int.MaxValue) shouldBe an[Right[_, _]]
 
         state.applyChanges(state.calcNewBalances(Seq(burnTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe (issueTx.quantity - burnTx.amount)
@@ -443,7 +438,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
       state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
-      state.isValid(issueTx2, Int.MaxValue) shouldBe false
+      state.validateAgainstState(issueTx2, Int.MaxValue) shouldBe an[Left[_, _]]
     }
   }
 
@@ -453,13 +448,17 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val issueTx: IssueTransaction = pair._1
         val reissueTx: ReissueTransaction = pair._3
 
-        state.isValid(issueTx, Int.MaxValue) shouldBe true
+        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Right[_, _]]
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
-        state.isValid(issueTx, Int.MaxValue) shouldBe false
+        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Left[_, _]]
 
-        state.isValid(reissueTx, Int.MaxValue) shouldBe issueTx.reissuable
+        val state1 = state.validateAgainstState(reissueTx, Int.MaxValue)
+        issueTx.reissuable match {
+          case true => state1 shouldBe an[Right[_, _]]
+          case false => state1 shouldBe an[Left[_, _]]
+        }
       }
     }
   }
@@ -523,7 +522,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
           NTP.correctedTime())
         state.balance(testAcc) shouldBe balance
         state.assetBalance(testAssetAcc) shouldBe balance
-        state.included(tx).value shouldBe state.stateHeight
+        state.included(tx.id).value shouldBe state.stateHeight
         state invokePrivate applyChanges(Map(testAssetAcc -> (AccState(0L, 0L), Seq(tx))), NTP.correctedTime())
       }
     }
@@ -578,8 +577,8 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val (om, matcher) = x
 
         val pair = om.buyOrder.assetPair
-        val buyer = om.buyOrder.sender
-        val seller = om.sellOrder.sender
+        val buyer = om.buyOrder.senderPublicKey
+        val seller = om.sellOrder.senderPublicKey
 
         val buyerAcc1 = AssetAcc(buyer, pair.first)
         val buyerAcc2 = AssetAcc(buyer, pair.second)
@@ -587,7 +586,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val sellerAcc2 = AssetAcc(seller, pair.second)
         val buyerFeeAcc = AssetAcc(buyer, None)
         val sellerFeeAcc = AssetAcc(seller, None)
-        val matcherFeeAcc = AssetAcc(om.buyOrder.matcher, None)
+        val matcherFeeAcc = AssetAcc(om.buyOrder.matcherPublicKey, None)
 
         val Seq(buyerBal1, buyerBal2, sellerBal1, sellerBal2, buyerFeeBal, sellerFeeBal, matcherFeeBal) =
           getBalances(buyerAcc1, buyerAcc2, sellerAcc1, sellerAcc2, buyerFeeAcc, sellerFeeAcc, matcherFeeAcc)

@@ -1,8 +1,9 @@
 package scorex.lagonaki
 
 import scorex.account.PrivateKeyAccount
+import scorex.app.RunnableApplication
 import scorex.block.Block
-import scorex.transaction.{History, Transaction}
+import scorex.transaction.{History, Transaction, TransactionsBlockField}
 import scorex.utils.ScorexLogging
 
 import scala.util.Random
@@ -12,7 +13,7 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
   implicit lazy val transactionModule = application.transactionModule
 
   if (application.transactionModule.blockStorage.history.isEmpty) {
-    application.transactionModule.blockStorage.appendBlock(Block.genesis())
+    application.transactionModule.blockStorage.appendBlock(Block.genesis(RunnableApplication.consensusGenesisBlockData,transactionModule.genesisData))
   }
 
   if (application.wallet.privateKeyAccounts().size < 3) {
@@ -30,7 +31,8 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
 
   def genValidBlock(): Block = {
     application.consensusModule.generateNextBlocks(applicationNonEmptyAccounts)(application.transactionModule).headOption match {
-      case Some(block: Block) if block.isValid => block
+        // TODO: isBlockValid is a method of actor, need to refactor that?
+      case Some(block: Block) => block // if application.coordinator.isBlockValid(block) => block
       case None =>
         Thread.sleep(500)
         genValidBlock()
@@ -58,8 +60,8 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
   }
 
   def includedTransactions(b: Block, history: History): Seq[Transaction] = {
-    if (b.transactions.isEmpty) includedTransactions(history.parent(b).get, history)
-    else b.transactions
+    if (b.transactionDataField.asInstanceOf[TransactionsBlockField].value.isEmpty) includedTransactions(history.parent(b).get, history)
+    else b.transactionDataField.asInstanceOf[TransactionsBlockField].value
   }
 
 }

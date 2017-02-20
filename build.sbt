@@ -1,7 +1,7 @@
 import com.typesafe.config.ConfigFactory
 import sbt.Keys._
 
-val appConf = ConfigFactory.parseFile(new File("src/main/resources/application.conf")).resolve().getConfig("app")
+val appConf = ConfigFactory.parseFile(new File("src/main/resources/reference.conf")).resolve().getConfig("app")
 
 inThisBuild(Seq(
   organization in ThisBuild := "com.wavesplatform",
@@ -25,7 +25,9 @@ libraryDependencies ++=
   Dependencies.testKit ++
   Dependencies.logging ++
   Dependencies.matcher ++
-  Dependencies.p2p ++ Seq(
+  Dependencies.p2p ++
+  Seq(
+    "com.iheart" %% "ficus" % "1.4.0",
     "org.scorexfoundation" %% "scrypto" % "1.2.0",
     "commons-net" % "commons-net" % "3.+",
     "com.github.pathikrit" %% "better-files" % "2.17.+"

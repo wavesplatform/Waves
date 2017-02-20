@@ -1,20 +1,15 @@
 package scorex.api.http.assets
 
 import io.swagger.annotations.ApiModelProperty
-import play.api.libs.json.{JsPath, Reads}
+import play.api.libs.json.{Format, Json}
 import scorex.account.PublicKeyAccount
-import scorex.api.http.formats.SignatureReads
-import scorex.crypto.encode.Base58
-import scorex.transaction.assets.ReissueTransaction
-import play.api.libs.functional.syntax._
-
-import scala.util.Try
-import scorex.api.http.formats._
+import scorex.api.http.Base58Parser
 import scorex.transaction.ValidationError
+import scorex.transaction.assets.ReissueTransaction
 
 
 case class SignedAssetReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                                     senderPublicKey: PublicKeyAccount,
+                                     senderPublicKey: String,
                                      @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
                                      assetId: String,
                                      @ApiModelProperty(required = true, example = "1000000")
@@ -28,26 +23,16 @@ case class SignedAssetReissueRequest(@ApiModelProperty(value = "Base58 encoded I
                                      @ApiModelProperty(required = true)
                                      signature: String) {
 
-  def toTx: Either[ValidationError, ReissueTransaction] = ReissueTransaction.create(
-    senderPublicKey,
-    Base58.decode(assetId).get,
-    quantity,
-    reissuable,
-    fee,
-    timestamp,
-    Base58.decode(signature).get)
+  def toTx: Either[ValidationError, ReissueTransaction] = for {
+    _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
+    _signature <- Base58Parser.parseBase58(signature, "invalid.signature")
+    _assetId <- Base58Parser.parseBase58(assetId, "invalid.assetId")
+    _t <- ReissueTransaction.create(_sender, _assetId, quantity, reissuable, fee, timestamp, _signature)
+  } yield _t
 }
 
 
 object SignedAssetReissueRequest {
+  implicit val assetReissueRequestReads: Format[SignedAssetReissueRequest] = Json.format
 
-  implicit val assetReissueRequestReads: Reads[SignedAssetReissueRequest] = (
-    (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
-      (JsPath \ "assetId").read[String] and
-      (JsPath \ "quantity").read[Long] and
-      (JsPath \ "reissuable").read[Boolean] and
-      (JsPath \ "fee").read[Long] and
-      (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "signature").read[String](SignatureReads)
-    ) (SignedAssetReissueRequest.apply _)
 }
