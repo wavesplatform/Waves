@@ -46,7 +46,7 @@ object Account extends ScorexLogging {
 
   def isValid(account: Account): Boolean = isValidAddress(account.address)
 
-  def isValidAddress(address: String): Boolean =
+  def isValidAddress(address: String): Boolean = (address.length <= AddressStringLength) &&
     Base58.decode(address).map { addressBytes =>
       val version = addressBytes.head
       val network = addressBytes.tail.head
