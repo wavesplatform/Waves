@@ -7,8 +7,8 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
-import com.wavesplatform.settings._
 import com.wavesplatform.settings.BlockchainSettingsExtension._
+import com.wavesplatform.settings._
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.assets.AssetsBroadcastApiRoute
@@ -19,7 +19,6 @@ import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.transaction.SimpleTransactionModule
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
-import com.typesafe.config._
 
 import scala.reflect.runtime.universe._
 
@@ -99,7 +98,9 @@ object Application extends ScorexLogging {
       if file.exists
     } yield ConfigFactory.parseFile(file)
 
-    val config = maybeUserConfig.foldLeft(ConfigFactory.load()) { (default, user) => user.withFallback(default) }
+    val config = maybeUserConfig.foldLeft(ConfigFactory.defaultApplication().withFallback(ConfigFactory.load())) {
+      (default, user) => user.withFallback(default)
+    }
 
     val settings = WavesSettings.fromConfig(config.resolve)
 
