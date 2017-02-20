@@ -198,7 +198,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("validate single transaction") {
-    val senderBalance = state.balance(acc)
+    val senderBalance = math.min(state.balance(acc), state.effectiveBalance(acc))
     senderBalance should be > 0L
 
     transactionModule.createPayment(acc, recipient, senderBalance, 1) shouldBe 'left
