@@ -40,6 +40,8 @@ object TestChainParameters {
     override def genesisTimestamp: Long = ???
 
     override def addressScheme: AddressScheme = ???
+
+    override def allowExchangeTransactionAfter: Long = Long.MaxValue
   }
 
   val Enabled = new ChainParameters with GenesisData {
@@ -59,5 +61,7 @@ object TestChainParameters {
     override def genesisTimestamp: Long = ???
 
     override def addressScheme: AddressScheme = ???
+
+    override def allowExchangeTransactionAfter: Long = 0L
   }
 }

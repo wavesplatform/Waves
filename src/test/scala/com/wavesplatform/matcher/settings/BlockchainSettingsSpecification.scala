@@ -26,6 +26,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        allow-burn-transaction-after: 8
         |        require-payment-unique-id-after: 9
         |        allow-lease-transaction-after: 10
+        |        allow-exchange-transaction-after: 11
         |      }
         |      genesis {
         |        timestamp: 1460678400000
