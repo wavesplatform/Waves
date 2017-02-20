@@ -15,7 +15,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import scorex.settings.TestChainParameters
 import scorex.transaction._
-import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction}
+import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
@@ -253,7 +253,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       actor ! RestartActor
 
       actor ! GetBidOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100, 10, ord1))))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100*Order.PriceConstant, 10, ord1))))
 
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))

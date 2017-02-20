@@ -25,13 +25,13 @@ sealed trait  LimitOrder {
 
 case class BuyLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Price): LimitOrder = copy(amount = amount)
-  def getReceiveAmount: Long = (BigInt(amount) * Order.PriceConstant / price).longValue()
-  def getSpendAmount: Long = amount
+  def getReceiveAmount: Long = amount
+  def getSpendAmount: Long = (BigInt(amount) * price / Order.PriceConstant ).bigInteger.longValueExact()
 }
 case class SellLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Price): LimitOrder = copy(amount = amount)
-  def getSpendAmount: Long = (BigInt(amount) * Order.PriceConstant / price).longValue()
-  def getReceiveAmount: Long = amount
+  def getSpendAmount: Long = amount
+  def getReceiveAmount: Long = (BigInt(amount) * price / Order.PriceConstant).bigInteger.longValueExact()
 }
 
 

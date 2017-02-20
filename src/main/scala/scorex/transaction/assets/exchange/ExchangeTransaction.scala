@@ -64,10 +64,10 @@ object ExchangeTransaction {
       val sellFeeChange = Seq(BalanceChange(AssetAcc(sellOrder.senderPublicKey, None), -sellMatcherFee))
 
       val exchange = Seq(
-        (buyOrder.senderPublicKey, (buyOrder.spendAssetId, -buyOrder.getSpendAmount(price, amount))),
-        (buyOrder.senderPublicKey, (buyOrder.receiveAssetId, buyOrder.getReceiveAmount(price, amount))),
-        (sellOrder.senderPublicKey, (sellOrder.receiveAssetId, sellOrder.getReceiveAmount(price, amount))),
-        (sellOrder.senderPublicKey, (sellOrder.spendAssetId, -sellOrder.getSpendAmount(price, amount)))
+        (buyOrder.senderPublicKey, (buyOrder.spendAssetId, -buyOrder.getSpendAmount(price, amount).get)),
+        (buyOrder.senderPublicKey, (buyOrder.receiveAssetId, buyOrder.getReceiveAmount(price, amount).get)),
+        (sellOrder.senderPublicKey, (sellOrder.receiveAssetId, sellOrder.getReceiveAmount(price, amount).get)),
+        (sellOrder.senderPublicKey, (sellOrder.spendAssetId, -sellOrder.getSpendAmount(price, amount).get))
       )
 
       buyFeeChange ++ sellFeeChange ++ matcherChange ++

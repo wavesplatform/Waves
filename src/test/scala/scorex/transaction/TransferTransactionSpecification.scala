@@ -2,7 +2,6 @@ package scorex.transaction
 
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.crypto.encode.Base58
 import scorex.transaction.assets.TransferTransaction
 
 class TransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
