@@ -7,12 +7,17 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 
-class ActivatedValidator(allowBurnTransactionAfterTimestamp: Long) extends Validator {
+class ActivatedValidator(
+                          allowBurnTransactionAfterTimestamp: Long,
+                          allowLeaseTransactionAfterTimestamp: Long
+                        ) extends Validator {
 
 
   override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: BurnTransaction if tx.timestamp <= allowBurnTransactionAfterTimestamp =>
-      Left(StateValidationError(s"BurnTranaction(time: ${tx.timestamp}) must not appear before time=$allowBurnTransactionAfterTimestamp"))
+      Left(StateValidationError(s"BurnTransaction(time: ${tx.timestamp}) must not appear before time=$allowBurnTransactionAfterTimestamp"))
+    case tx: LeaseTransaction if tx.timestamp <= allowLeaseTransactionAfterTimestamp =>
+      Left(StateValidationError(s"LeaseTransaction(time: ${tx.timestamp}) must not appear before time=$allowLeaseTransactionAfterTimestamp"))
     case _: BurnTransaction => Right(tx)
     case _: PaymentTransaction => Right(tx)
     case _: GenesisTransaction => Right(tx)

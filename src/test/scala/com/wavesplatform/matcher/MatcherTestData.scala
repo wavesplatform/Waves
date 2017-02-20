@@ -133,7 +133,8 @@ trait MatcherTestData {
       new GenesisValidator,
       new OrderMatchStoredState(storage),
       new IncludedValidator(storage, settings.requirePaymentUniqueId),
-      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp)
+      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
+        settings.allowLeaseTransactionAfterTimestamp)
     )
     new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
       override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
