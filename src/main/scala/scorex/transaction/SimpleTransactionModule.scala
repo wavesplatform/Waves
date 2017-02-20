@@ -137,7 +137,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
   }
 
-  def lease(request: LeaseRequest, wallet: Wallet): Try[Either[ValidationError, LeaseTransaction]] = Try {
+  def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction] = {
     val sender = wallet.privateKeyAccount(request.sender.address).get
 
     val leaseTransactionVal = LeaseTransaction.create(sender, request.amount, request.fee, getTimestamp, request.recipient)
@@ -151,7 +151,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     leaseTransactionVal
   }
 
-  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Try[Either[ValidationError, LeaseCancelTransaction]] = Try {
+  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction] = {
     val sender = wallet.privateKeyAccount(request.sender.address).get
 
     val leaseCancelTransactionVal = LeaseCancelTransaction.create(sender, Base58.decode(request.txId).get, request.fee, getTimestamp)

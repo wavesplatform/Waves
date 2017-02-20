@@ -1,6 +1,7 @@
 package scorex.api.http
 
 import java.io.File
+
 import akka.http.scaladsl.model.headers.RawHeader
 import com.typesafe.config.ConfigFactory
 import akka.http.scaladsl.testkit._
@@ -10,6 +11,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json
+import scorex.api.http.assets.AssetsApiRoute
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.state.database.blockchain.StoredState

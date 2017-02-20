@@ -11,7 +11,7 @@ import com.wavesplatform.settings._
 import com.wavesplatform.settings.BlockchainSettingsExtension._
 import scorex.account.AddressScheme
 import scorex.api.http._
-import scorex.api.http.assets.AssetsBroadcastApiRoute
+import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
@@ -20,6 +20,7 @@ import scorex.transaction.SimpleTransactionModule
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import com.typesafe.config._
+import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
 
 import scala.reflect.runtime.universe._
 
@@ -60,7 +61,8 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
     AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.state, transactionModule),
     NodeApiRoute(this),
     AssetsBroadcastApiRoute(settings.restAPISettings, transactionModule),
-    LeaseApiRoute(this)
+    LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.state, transactionModule),
+    LeaseBroadcastApiRoute(settings.restAPISettings, transactionModule)
   )
 
   override lazy val apiTypes = Seq(

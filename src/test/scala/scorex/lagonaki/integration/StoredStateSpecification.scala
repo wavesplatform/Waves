@@ -130,7 +130,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
     val oldSenderEffectiveBalance = state.effectiveBalance(acc)
     val oldSenderBalance = state.effectiveBalance(acc)
-    state.processBlock(TestBlock(Seq(transactionModule.lease(LeaseRequest(acc, 5, 1, rec), application.wallet).get.right.get)))
+    state.processBlock(TestBlock(Seq(transactionModule.lease(LeaseRequest(acc, 5, 1, rec), application.wallet).right.get)))
     state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - 6
     state.effectiveBalanceWithConfirmations(acc, 1) shouldBe oldSenderEffectiveBalance - 6
     state.balance(rec) shouldBe 0L

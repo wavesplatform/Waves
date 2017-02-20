@@ -1,16 +1,18 @@
 package scorex.api.http.assets
 
 import javax.ws.rs.Path
+
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
+import scorex.BroadcastRoute
 import scorex.api.http._
 import scorex.transaction.{Transaction, TransactionModule, ValidationError}
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
 case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule: TransactionModule)
-  extends ApiRoute {
+  extends ApiRoute with BroadcastRoute {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer
@@ -127,10 +129,4 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
       doBroadcast(transferReq.toTx)
     }
   }
-
-  private def doBroadcast[A <: Transaction](v: Either[ValidationError, A]) =
-    v.left.map(ApiError.fromValidationError).flatMap(broadcast)
-
-  private def broadcast[T <: Transaction](tx: T): Either[ApiError, T] =
-    if (transactionModule.onNewOffchainTransaction(tx)) Right(tx) else Left(StateCheckFailed)
 }
