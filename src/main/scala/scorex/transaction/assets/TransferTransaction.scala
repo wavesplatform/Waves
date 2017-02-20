@@ -1,16 +1,15 @@
 package scorex.transaction.assets
 
+import scala.util.{Failure, Success, Try}
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.utils.base58Length
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TypedTransaction._
-import scorex.transaction.ValidationError
-import scorex.transaction._
-
-import scala.util.{Failure, Success, Try}
+import scorex.transaction.{ValidationError, _}
 
 sealed trait TransferTransaction extends SignedTransaction {
   def assetId: Option[AssetId]
@@ -80,6 +79,7 @@ object TransferTransaction extends Deser[TransferTransaction] {
   }
 
   val MaxAttachmentSize = 140
+  val MaxAttachmentStringSize = base58Length(MaxAttachmentSize)
 
   override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
     require(bytes.head == TransactionType.TransferTransaction.id)

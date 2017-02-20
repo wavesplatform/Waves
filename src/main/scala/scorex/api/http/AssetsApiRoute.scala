@@ -13,7 +13,7 @@ import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
-import scorex.transaction.{AssetAcc, TransactionOperations}
+import scorex.transaction.{AssetAcc, AssetIdStringLength, TransactionOperations}
 import scorex.wallet.Wallet
 
 @Path("/assets")
@@ -52,7 +52,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
   def balanceDistribution: Route =
     (get & path(Segment / "distribution")) { assetId =>
       complete {
-        Base58.decode(assetId) match {
+        Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) => Json.toJson(state.assetDistribution(byteArray))
           case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.CustomValidationError("Must be base58-encoded assetId"))
         }

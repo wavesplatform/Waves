@@ -88,7 +88,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       forAll(invalidBase58) { pk => posting(tr.copy(recipient = pk)) should produce (InvalidAddress) }
       forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce (CustomValidationError("invalid.assetId")) }
       forAll(invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce (CustomValidationError("invalid.feeAssetId")) }
-      forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce (TooBigArrayAllocation) }
+      forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce (CustomValidationError("invalid.attachment")) }
       forAll(posNum[Long]) { quantity => posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce (OverflowError) }
       forAll(nonPositiveLong) { fee => posting(tr.copy(fee = fee)) should produce (InsufficientFee) }
     }
