@@ -1,30 +1,24 @@
 package scorex.api.http.swagger
 
+import scala.reflect.runtime.universe.Type
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import com.github.swagger.akka.model.{Info, License}
 import com.github.swagger.akka.{HasActorSystem, SwaggerHttpService}
-import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.settings.{Constants, RestAPISettings}
 import io.swagger.models.Swagger
 
-import scala.reflect.runtime.universe.Type
-
-
-class SwaggerDocService(system: ActorSystem, val apiTypes: Seq[Type], settings: RestAPISettings)
+class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMaterializer, val apiTypes: Seq[Type], settings: RestAPISettings)
   extends SwaggerHttpService with HasActorSystem {
 
-  override implicit val actorSystem: ActorSystem = system
-  override implicit val materializer: ActorMaterializer = ActorMaterializer()
-
-  override val host = s"${settings.bindAddress}:${settings.port}"
-  override val apiDocsPath: String = "swagger"
-
-  override val info: Info = Info("The Web Interface to the Waves API",
-    "0.5.0",
-    "Waves API",
-    "License: Creative Commons CC0",
+  override val host: String = settings.bindAddress + ":" + settings.port
+  override val basePath: String = "api-docs"
+  override val info: Info = Info("The Web Interface to the Waves Full Node API",
+    Constants.VersionString,
+    "Waves Full Node",
+    "License: Apache License, Version 2.0",
     None,
-    Some(License("License: Creative Commons CC0", "https://github.com/ScorexProject/Scorex/blob/master/COPYING"))
+    Some(License("Apache License, Version 2.0", "https://github.com/wavesplatform/Waves/blob/master/LICENSE"))
   )
 
   //Let swagger-ui determine the host and port

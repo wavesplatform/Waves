@@ -1,5 +1,9 @@
 package scorex.waves
 
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.Random
 import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.util.Timeout
@@ -13,11 +17,6 @@ import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 import scorex.api.http.ApiKeyNotValid
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
 import scorex.utils._
-
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.util.Random
 
 trait TestingCommons extends Suite with BeforeAndAfterAll {
 
@@ -376,7 +375,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   def postRequest(us: String,
                   params: Map[String, String] = Map.empty,
                   body: String = "",
-                  headers: Map[String, String] = Map("api_key" -> "test"),
+                  headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
                   peer: String = peerUrl(application)): JsValue = {
     val response = postRequestWithResponse(us, params, body, headers, peer)
     Json.parse(response.getResponseBody)
@@ -384,7 +383,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
 
   def matcherPostRequest(path: String, body: String = "",
                          params: Map[String, String] = Map.empty,
-                         headers: Map[String, String] = Map("api_key" -> "test")): JsValue = {
+                         headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json")): JsValue = {
     val request = Http(url(matcherUrl() + path).POST <:< headers <<? params << body)
     val response = Await.result(request, 5.seconds)
     Json.parse(response.getResponseBody)
@@ -393,7 +392,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   def postRequestWithResponse(us: String,
                               params: Map[String, String] = Map.empty,
                               body: String = "",
-                              headers: Map[String, String] = Map("api_key" -> "test"),
+                              headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
                               peer: String = peerUrl(application)): Response = {
     val request = Http(url(peer + us).POST << params <:< headers << body)
     Await.result(request, 5.seconds)
@@ -452,6 +451,16 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   }
 
   case object POST extends RequestType {
+    def requestJson(us: String,
+        params: Map[String, String] = Map.empty,
+        body: String = "",
+        headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
+        peer: String = peerUrl(application)): JsValue = {
+      val request = Http(url(peer + us).POST << params <:< headers << body)
+      val response = Await.result(request, 5.seconds)
+      Json.parse(response.getResponseBody)
+    }
+
     def request(us: String,
                 params: Map[String, String] = Map.empty,
                 body: String = "",

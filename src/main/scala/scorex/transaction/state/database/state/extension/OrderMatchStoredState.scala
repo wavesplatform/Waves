@@ -1,24 +1,22 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.crypto.encode.Base58
-import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.{Order, ExchangeTransaction}
+import scorex.transaction.ValidationError.StateValidationError
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.state.storage.{OrderMatchStorageI, StateStorageI}
+import scorex.transaction.{Transaction, ValidationError}
 
-class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends StateExtension {
+class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends Validator {
 
-
-  override def isValid(tx: Transaction, height: Int): Boolean = tx match {
+  override def validate(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case om: ExchangeTransaction => OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om))
-    case _ => true
+    case _ => Right(tx)
   }
 
   override def process(tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
     case om: ExchangeTransaction => putOrderMatch(om, blockTs)
     case _ =>
   }
-
-  val MaxLiveDays = (Order.MaxLiveTime / 24L * 60L * 60L * 1000L).toInt
 
   private def putOrderMatch(om: ExchangeTransaction, blockTs: Long): Unit = {
     def isSaveNeeded(order: Order): Boolean = {
@@ -80,7 +78,7 @@ class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) exte
 
 
 object OrderMatchStoredState {
-  def isOrderMatchValid(exTrans: ExchangeTransaction, previousMatches: Set[ExchangeTransaction]): Boolean = {
+  def isOrderMatchValid(exTrans: ExchangeTransaction, previousMatches: Set[ExchangeTransaction]): Either[StateValidationError, ExchangeTransaction] = {
 
     lazy val buyTransactions = previousMatches.filter { om =>
       om.buyOrder.id sameElements exTrans.buyOrder.id
@@ -106,8 +104,11 @@ object OrderMatchStoredState {
         feeTotal <= BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
     }
 
-    amountIsValid &&
-      isFeeValid(exTrans.buyMatcherFee, buyFeeTotal, buyTotal, exTrans.buyOrder.matcherFee, exTrans.buyOrder.amount) &&
-      isFeeValid(exTrans.sellMatcherFee, sellFeeTotal, sellTotal, exTrans.sellOrder.matcherFee, exTrans.sellOrder.amount)
+    if (!amountIsValid) {
+      Left(StateValidationError("Insufficient amount to buy or sell"))
+    } else if (!isFeeValid(exTrans.buyMatcherFee, buyFeeTotal, buyTotal, exTrans.buyOrder.matcherFee, exTrans.buyOrder.amount) ||
+      !isFeeValid(exTrans.sellMatcherFee, sellFeeTotal, sellTotal, exTrans.sellOrder.matcherFee, exTrans.sellOrder.amount)) {
+      Left(StateValidationError("Insufficient fee"))
+    } else Right(exTrans)
   }
 }

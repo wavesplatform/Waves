@@ -1,36 +1,22 @@
 package scorex.waves.http
 
 import javax.ws.rs.Path
-
-import akka.actor.ActorRefFactory
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
-import play.api.libs.json.{JsError, JsSuccess, Json}
 import scorex.account.Account
 import scorex.api.http._
-import scorex.app.RunnableApplication
 import scorex.crypto.encode.Base58
-import scorex.transaction.{PaymentTransaction, ValidationError}
 import scorex.transaction.state.wallet.Payment
+import scorex.transaction.{PaymentTransaction, TransactionOperations}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
-import scorex.waves.transaction.{ExternalPayment, SignedPayment, WavesTransactionModule}
-
-import scala.util.Try
+import scorex.waves.transaction.SignedPayment
 
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonTransactionApiFunctions {
-
-  val settings = application.settings.restAPISettings
-
-  lazy val wallet = application.wallet
-
-  // TODO asInstanceOf
-  implicit lazy val transactionModule: WavesTransactionModule = application.transactionModule.asInstanceOf[WavesTransactionModule]
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transactionModule: TransactionOperations) extends ApiRoute {
 
   override lazy val route = pathPrefix("waves") {
     externalPayment ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
@@ -54,25 +40,12 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def payment: Route = path("payment") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[Payment] match {
-              case err: JsError => WrongTransactionJson(err).response
-              case JsSuccess(payment: Payment, _) =>
-                transactionModule
-                  .createPayment(payment, wallet)
-                  .fold(InvalidSender.response) { paymentVal =>
-                    paymentVal.fold(ApiError.fromValidationError, { tx =>
-                      val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                        tx.sender, tx.sender.address, Base58.encode(tx.signature))
-                      JsonResponse(Json.toJson(signed), StatusCodes.OK)
-                    })
-                  }
-            }
-          }.getOrElse(WrongJson.response)
+  def payment: Route = withAuth {
+    (path("payment") & post) {
+      json[Payment] { payment =>
+        transactionModule.createPayment(payment, wallet).map { tx =>
+          SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.address,
+            Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
         }
       }
     }
@@ -96,30 +69,18 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def signPayment: Route = path("payment" / "signature") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[Payment] match {
-              case err: JsError => WrongTransactionJson(err).response
-              case JsSuccess(payment: Payment, _) =>
-                val txOpt = wallet.privateKeyAccount(payment.sender).map { sender =>
-                  PaymentTransaction.create(sender, new Account(payment.recipient), payment.amount, payment.fee,
-                    NTP.correctedTime())
-                }
-
-                txOpt.fold(InvalidSender.response) { paymentVal =>
-                  paymentVal.fold(ApiError.fromValidationError, { tx =>
-                    val signed = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient,
-                      tx.sender, tx.sender.address, Base58.encode(tx.signature))
-                    JsonResponse(Json.toJson(signed), StatusCodes.OK)
-                  })
-                }
-            }
-          }.getOrElse(WrongJson.response)
+  def signPayment: Route = (post & path("payment" / "signature")) {
+    json[Payment] { payment =>
+      wallet
+        .privateKeyAccount(payment.sender).toRight[ApiError](InvalidSender)
+        .flatMap { sender =>
+          PaymentTransaction
+            .create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
+            .left.map(ApiError.fromValidationError)
         }
-      }
+        .map { t =>
+          SignedPayment(t.timestamp, t.amount, t.fee, t.recipient.address, Base58.encode(t.sender.publicKey), t.sender.address, Base58.encode(t.signature))
+        }
     }
   }
 
@@ -142,47 +103,23 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
-  def createdSignedPayment: Route = path("create-signed-payment") {
-    entity(as[String]) { body =>
-      postJsonRoute {
-        Try(Json.parse(body)).map { js =>
-          js.validate[UnsignedPayment] match {
-            case err: JsError =>
-              WrongTransactionJson(err).response
-            case JsSuccess(payment: UnsignedPayment, _) =>
-              val senderWalletSeed = Base58.decode(payment.senderWalletSeed).getOrElse(Array.empty)
-              if (senderWalletSeed.isEmpty)
-                WrongJson.response
-              else {
-                val senderAccount = Wallet.generateNewAccount(senderWalletSeed, payment.senderAddressNonce)
-                val recipientAccount = new Account(payment.recipient)
-
-                transactionModule
-                  .createSignedPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
-                  .fold(ApiError.fromValidationError, { tx =>
-                    val signedTx = SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient, tx.sender,
-                      tx.sender.address, Base58.encode(tx.signature))
-                    JsonResponse(Json.toJson(signedTx), StatusCodes.OK)
-                  })
-              }
-          }
-        }.getOrElse(WrongJson.response)
-      }
+  def createdSignedPayment: Route = post { path("create-signed-payment")  {
+    json[UnsignedPayment] { payment =>
+      for {
+        _seed <- Base58.decode(payment.senderWalletSeed).toOption.toRight(InvalidSeed)
+        senderAccount = Wallet.generateNewAccount(_seed, payment.senderAddressNonce)
+        recipientAccount = new Account(payment.recipient)
+        _tx <- transactionModule
+          .createSignedPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
+          .left.map(ApiError.fromValidationError)
+      } yield SignedPayment(_tx.timestamp, _tx.amount, _tx.fee, _tx.recipient.address, Base58.encode(_tx.sender.publicKey),
+        _tx.sender.address, Base58.encode(_tx.signature))
     }
-  }
+  }}
 
-  private def toErrorResponce(error: JsError): JsonResponse = {
-    val errors = error.errors.map(_._1.toString).toSet
-    if (errors.contains("/recipient")) {
-      InvalidRecipient.response
-    } else if (errors.contains("/sender")) {
-      InvalidSender.response
-    } else if (errors.contains("/senderPublicKey")) {
-      InvalidSender.response
-    } else if (errors.contains("/signature")) {
-      InvalidSignature.response
-    } else {
-      WrongJson.response
+  private def broadcastPaymentRoute(suffix: String): Route = (path(suffix) & post) {
+    json[SignedPayment] { payment =>
+      transactionModule.broadcastPayment(payment)
     }
   }
 
@@ -200,21 +137,7 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def externalPayment: Route = path("external-payment") {
-    entity(as[String]) { body =>
-      postJsonRoute {
-        Try {
-          val js = Json.parse(body)
-          js.validate[ExternalPayment] match {
-            case error: JsError =>
-              toErrorResponce(error)
-            case JsSuccess(payment: ExternalPayment, _) =>
-              broadcastPayment(payment)
-          }
-        }.getOrElse(WrongJson.response)
-      }
-    }
-  }
+  def externalPayment: Route = broadcastPaymentRoute("external-payment")
 
   @Deprecated()
   @Path("/broadcast-signed-payment")
@@ -232,32 +155,5 @@ case class WavesApiRoute(application: RunnableApplication)(implicit val context:
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def broadcastSignedPayment: Route = path("broadcast-signed-payment") {
-    entity(as[String]) { body =>
-      postJsonRoute {
-        Try(Json.parse(body)).map { js =>
-          js.validate[SignedPayment] match {
-            case error: JsError =>
-              toErrorResponce(error)
-            case JsSuccess(payment: SignedPayment, _) =>
-              broadcastPayment(payment)
-          }
-        }.getOrElse(WrongJson.response)
-      }
-    }
-  }
-
-  private def broadcastPayment(payment: SignedPayment): JsonResponse =
-    transactionModule.broadcastPayment(payment)
-      .fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
-
-  @Deprecated
-  private def broadcastPayment(payment: ExternalPayment): JsonResponse = {
-    val senderAccount = payment.senderPublicKey
-    val signedPayment = SignedPayment(payment.timestamp, payment.amount, payment.fee, payment.recipient,
-      payment.senderPublicKey, senderAccount.address, Base58.encode(payment.signature))
-
-    transactionModule.broadcastPayment(signedPayment)
-      .fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
-  }
+  def broadcastSignedPayment: Route = broadcastPaymentRoute("broadcast-signed-payment")
 }

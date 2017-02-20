@@ -95,7 +95,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
         |  "publickey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
         |  "signature": "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC"
         |}""".stripMargin
-    (POST.request(s"/addresses/verifyText/$address", body = signed) \ "valid").as[Boolean] shouldBe true
+    (POST.requestJson(s"/addresses/verifyText/$address", body = signed) \ "valid").as[Boolean] shouldBe true
 
     val incorrect =
       """{
@@ -103,7 +103,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
         |  "publickey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
         |  "signature": "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC"
         |}""".stripMargin
-    (POST.request(s"/addresses/verifyText/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
+    (POST.requestJson(s"/addresses/verifyText/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
   }
 
   test("POST /addresses/signText/{address} API route") {
@@ -148,7 +148,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
         |  "publickey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
         |  "signature": "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC"
         |}""".stripMargin
-    (POST.request(s"/addresses/verify/$address", body = signed) \ "valid").as[Boolean] shouldBe true
+    (POST.requestJson(s"/addresses/verify/$address", body = signed) \ "valid").as[Boolean] shouldBe true
 
     val incorrect =
       """{
@@ -156,7 +156,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
         |  "publickey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
         |  "signature": "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC"
         |}""".stripMargin
-    (POST.request(s"/addresses/verify/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
+    (POST.requestJson(s"/addresses/verify/$address", body = incorrect) \ "valid").as[Boolean] shouldBe false
   }
 
 }

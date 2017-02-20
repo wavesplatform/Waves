@@ -68,7 +68,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSe
   }
 
   def forwardToOrderBook: Receive = {
-    case _: GetMarkets =>
+    case GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, openMarkets)
     case order: Order =>
       checkAssetPair(order) {
@@ -102,7 +102,7 @@ object MatcherActor {
 
   case class OrderBookCreated(pair: AssetPair)
 
-  case class GetMarkets()
+  case object GetMarkets
 
   case class GetMarketsResponse(publicKey: Array[Byte], markets: Seq[MarketData]) extends MatcherResponse {
     def getMarketsJs: JsValue = JsArray(markets.map(m => Json.obj(

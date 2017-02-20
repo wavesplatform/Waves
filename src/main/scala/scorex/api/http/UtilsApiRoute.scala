@@ -2,29 +2,24 @@ package scorex.api.http
 
 import java.security.SecureRandom
 import javax.ws.rs.Path
-
-import akka.actor.ActorRefFactory
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers}
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
-case class UtilsApiRoute(application: Application)(implicit val context: ActorRefFactory)
-  extends ApiRoute {
-  val settings = application.settings.restAPISettings
+case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   val MaxSeedSize = 1024
   val DefaultSeedSize = 32
 
-  private def seed(length: Int): JsonResponse = {
+  private def seed(length: Int) = {
     val seed = new Array[Byte](length)
     new SecureRandom().nextBytes(seed) //seed mutated here!
-    val json = Json.obj("seed" -> Base58.encode(seed))
-    JsonResponse(json, StatusCodes.OK)
+    Json.obj("seed" -> Base58.encode(seed))
   }
 
   override val route = pathPrefix("utils") {
@@ -36,10 +31,8 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
-  def seedRoute: Route = path("seed") {
-    getJsonRoute {
-      seed(DefaultSeedSize)
-    }
+  def seedRoute: Route = (path("seed") & get) {
+    complete(seed(DefaultSeedSize))
   }
 
   @Path("/seed/{length}")
@@ -48,11 +41,9 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
     new ApiImplicitParam(name = "length", value = "Seed length ", required = true, dataType = "integer", paramType = "path")
   ))
   @ApiResponse(code = 200, message = "Json with error message")
-  def length: Route = path("seed" / IntNumber) { case length =>
-    getJsonRoute {
-      if (length <= MaxSeedSize) seed(length)
-      else TooBigArrayAllocation.response
-    }
+  def length: Route = (path("seed" / IntNumber) & get) { length =>
+      if (length <= MaxSeedSize) complete(seed(length))
+      else complete(TooBigArrayAllocation)
   }
 
   @Path("/hash/secure")
@@ -63,14 +54,9 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
-  def hashFast: Route = {
-    path("hash" / "secure") {
-      entity(as[String]) { message =>
-        postJsonRoute {
-          val json = Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message)))
-          JsonResponse(json, StatusCodes.OK)
-        }
-      }
+  def hashFast: Route = (path("hash" / "secure") & post) {
+    entity(as[String]) { message =>
+      complete(Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message))))
     }
   }
 
@@ -82,15 +68,9 @@ case class UtilsApiRoute(application: Application)(implicit val context: ActorRe
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
-  def hashSecure: Route = {
-    path("hash" / "fast") {
-      entity(as[String]) { message =>
-        postJsonRoute {
-          val json = Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message)))
-          JsonResponse(json, StatusCodes.OK)
-        }
-      }
+  def hashSecure: Route = (path("hash" / "fast") & post) {
+    entity(as[String]) { message =>
+      complete(Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message))))
     }
   }
-
 }

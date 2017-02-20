@@ -3,21 +3,19 @@ package scorex.lagonaki.unit
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
-
+import scala.util.Random
 import org.h2.mvstore.MVStore
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.ChainParameters
+import scorex.settings.TestChainParameters
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, GenesisTransaction}
 import scorex.wallet.Wallet
-
-import scala.util.Random
 
 class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPropertyChecks {
 
@@ -30,7 +28,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
   val accounts = wallet.generateNewAccounts(3)
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
-  val state = StoredState.fromDB(db, ChainParameters.Disabled)
+  val state = StoredState.fromDB(db, TestChainParameters.Disabled)
   state.processBlock(TestBlock(Seq(GenesisTransaction.create(accounts.head, 100000000000L, 0).right.get)))
 
   private def createIssueAssetTx(request: IssueRequest, wallet: Wallet): IssueTransaction = {
@@ -57,7 +55,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
       request.feeAssetId.map(s => Base58.decode(s).get),
       request.fee,
       if (request.attachment.nonEmpty) {
-        Base58.decode(request.attachment).get
+        request.attachment.flatMap(Base58.decode(_).toOption).get
       } else {
         Array.empty
       }).right.get
@@ -78,7 +76,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
     val assetId = Some(Base58.encode(issueAssetTx.assetId))
 
     val txs = recipients.flatMap(r => Seq.fill(10) {
-      createTransferAssetTx(TransferRequest(assetId, None, 10, 1, acc.address, "123", r.address), wallet)
+      createTransferAssetTx(TransferRequest(assetId, None, 10, 1, acc.address, Some("123"), r.address), wallet)
     })
 
     state.processBlock(TestBlock(Random.shuffle(txs))) should be('success)
@@ -100,7 +98,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     val txs = recipients.flatMap(r => Seq.fill(10) {
       Thread.sleep(1)
-      createTransferAssetTx(TransferRequest(None, None, 10, 1, acc.address, "123", r.address), wallet)
+      createTransferAssetTx(TransferRequest(None, None, 10, 1, acc.address, Some("123"), r.address), wallet)
     })
 
     state.processBlock(TestBlock(Random.shuffle(txs))) should be('success)
@@ -125,7 +123,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     val txs = Seq.fill(10) {
       createTransferAssetTx(TransferRequest(Some(assetIdString), Some(assetIdString),
-        1000, 1000, sender.address, blahBlahBase58, sender.address), wallet)
+        1000, 1000, sender.address, Some(blahBlahBase58), sender.address), wallet)
     }
     state.processBlock(TestBlock(txs, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
 
@@ -151,11 +149,11 @@ class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPr
 
     val txs = Seq.fill(10) {
       createTransferAssetTx(TransferRequest(Some(assetIdString), Some(assetIdString),
-        1000, 1000, sender.address, blahBlahBase58, sender.address), wallet)
+        1000, 1000, sender.address, Some(blahBlahBase58), sender.address), wallet)
     }
     val txs2 = Seq.fill(10) {
       createTransferAssetTx(TransferRequest(Some(assetIdString), None,
-        1000, 1000, sender.address, blahBlahBase58, sender.address), wallet)
+        1000, 1000, sender.address, Some(blahBlahBase58), sender.address), wallet)
     }
     state.processBlock(TestBlock(txs ++ txs2, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
 

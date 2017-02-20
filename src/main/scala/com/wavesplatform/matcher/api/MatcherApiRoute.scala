@@ -1,11 +1,14 @@
 package com.wavesplatform.matcher.api
 
 import javax.ws.rs.Path
-
-import akka.actor.{ActorRef, ActorRefFactory}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+import akka.actor.ActorRef
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Directive1, Route}
 import akka.pattern.ask
+import akka.util.Timeout
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -20,15 +23,10 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.util.Try
-
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(application: Application, matcher: ActorRef, matcherSettings: MatcherSettings)
-                          (implicit val settings: RestAPISettings, implicit val context: ActorRefFactory)
-  extends ApiRoute {
+case class MatcherApiRoute(application: Application, matcher: ActorRef, settings: RestAPISettings, matcherSettings: MatcherSettings) extends ApiRoute {
+  private implicit val timeout: Timeout = 5.seconds
 
   val wallet: Wallet = application.wallet
   val storedState: StoredState = application.blockStorage.state.asInstanceOf[StoredState]
@@ -38,21 +36,20 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, matcherS
       matcherPublicKey ~ orderBook ~ place ~ orderStatus ~ cancel ~ orderbooks
     }
 
-  private def getInvalidPairResponse: JsonResponse = {
-    JsonResponse(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset Pair").json, StatusCodes.BadRequest)
+  def withAssetPair(a1: String, a2: String): Directive1[AssetPair] = {
+    AssetPair.createAssetPair(a1, a2) match {
+      case Success(p) => provide(p)
+      case Failure(e) => complete(StatusCodes.BadRequest -> Json.obj("message" -> "Invalid asset pair"))
+    }
   }
 
   @Path("/")
   @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET")
-  def matcherPublicKey: Route =
-    pathEndOrSingleSlash {
-      getJsonRoute {
-        val json = wallet.privateKeyAccount(matcherSettings.account).map(a => JsString(Base58.encode(a.publicKey))).
-          getOrElse(JsString(""))
-        JsonResponse(json, StatusCodes.OK)
-      }
-    }
-
+  def matcherPublicKey: Route = (pathEndOrSingleSlash & get) {
+    complete(wallet.privateKeyAccount(matcherSettings.account)
+      .map(a => JsString(Base58.encode(a.publicKey)))
+      .getOrElse[JsValue](JsString("")))
+  }
 
   @Path("/orderbook/{asset1}/{asset2}")
   @ApiOperation(value = "Get Order Book for a given Asset Pair",
@@ -62,18 +59,13 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, matcherS
     new ApiImplicitParam(name = "asset2", value = "Second Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "depth", value = "Limit the number of bid/ask records returned", required = false, dataType = "integer", paramType = "query")
   ))
-  def orderBook: Route =
-    path("orderbook" / Segment / Segment) { (a1, a2) =>
-      get {
-        jsonRouteAsync {
-          AssetPair.createAssetPair(a1, a2).map { pair =>
-            (matcher ? GetOrderBookRequest(pair, None))
-              .mapTo[MatcherResponse]
-              .map(r => JsonResponse(r.json, r.code))
-          }.getOrElse(Future.successful(getInvalidPairResponse))
-        }
-      }
+  def orderBook: Route = (path("orderbook" / Segment / Segment) & get) { (a1, a2) =>
+    withAssetPair(a1, a2) { pair =>
+      complete((matcher ? GetOrderBookRequest(pair, None))
+        .mapTo[MatcherResponse]
+        .map(r => r.code -> r.json))
     }
+  }
 
   @Path("/orderbook")
   @ApiOperation(value = "Place order",
@@ -90,28 +82,15 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, matcherS
       dataType = "scorex.transaction.assets.exchange.Order"
     )
   ))
-  def place: Route =
-    path("orderbook") {
-      pathEndOrSingleSlash {
-        post {
-          entity(as[String]) { body =>
-            jsonRouteAsync {
-              Try {
-                val js = Json.parse(body)
-                js.validate[Order] match {
-                  case err: JsError =>
-                    Future.successful(WrongTransactionJson(err).response)
-                  case JsSuccess(order: Order, _) =>
-                    (matcher ? order)
-                      .mapTo[MatcherResponse]
-                      .map(r => JsonResponse(r.json, r.code))
-                }
-              }.getOrElse(Future.successful(WrongJson.response))
-            }
-          }
-        }
+  def place: Route = path("orderbook") {
+    (pathEndOrSingleSlash & post) {
+      json[Order] { order =>
+        (matcher ? order)
+          .mapTo[MatcherResponse]
+          .map(r => r.code -> r.json)
       }
     }
+  }
 
   @Path("/orderbook/{asset1}/{asset2}/cancel")
   @ApiOperation(value = "Cancel order",
@@ -130,28 +109,15 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, matcherS
       dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
     )
   ))
-  def cancel: Route =
-    path("orderbook" / Segment / Segment / "cancel") { (a1, a2) =>
-      post {
-        entity(as[String]) { body =>
-          jsonRouteAsync {
-            AssetPair.createAssetPair(a1, a2).map { pair =>
-              Try {
-                val js = Json.parse(body)
-                js.validate[CancelOrderRequest] match {
-                  case err: JsError =>
-                    Future.successful(WrongTransactionJson(err).response)
-                  case JsSuccess(req: CancelOrderRequest, _) =>
-                    (matcher ? CancelOrder(pair, req))
-                      .mapTo[MatcherResponse]
-                      .map(r => JsonResponse(r.json, r.code))
-                }
-              }.getOrElse(Future.successful(WrongJson.response))
-            }.getOrElse(Future.successful(getInvalidPairResponse))
-          }
-        }
+  def cancel: Route = (path("orderbook" / Segment / Segment / "cancel") & post) { (a1, a2) =>
+    withAssetPair(a1, a2) { pair =>
+      json[CancelOrderRequest] { req =>
+        (matcher ? CancelOrder(pair, req))
+          .mapTo[MatcherResponse]
+          .map(r => r.code -> r.json)
       }
     }
+  }
 
   @Path("/orderbook/{asset1}/{asset2}/{orderId}")
   @ApiOperation(value = "Order Status",
@@ -162,31 +128,22 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, matcherS
     new ApiImplicitParam(name = "asset2", value = "Second Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
   ))
-  def orderStatus: Route =
-    path("orderbook" / Segment / Segment / Segment) { (a1, a2, orderId) =>
-      get {
-        jsonRouteAsync {
-          AssetPair.createAssetPair(a1, a2).map { pair =>
-            (matcher ? GetOrderStatus(pair, orderId))
-              .mapTo[MatcherResponse]
-              .map(r => JsonResponse(r.json, r.code))
-          }.getOrElse(Future.successful(getInvalidPairResponse))
-        }
-      }
+  def orderStatus: Route = (path("orderbook" / Segment / Segment / Segment) & get) { (a1, a2, orderId) =>
+    withAssetPair(a1, a2) { pair =>
+      complete((matcher ? GetOrderStatus(pair, orderId))
+        .mapTo[MatcherResponse]
+        .map(r => r.code -> r.json))
     }
+  }
 
   @Path("/orderbook")
   @ApiOperation(value = "Get the open trading markets",
     notes = "Get the open trading markets along with trading pairs meta data", httpMethod = "GET")
-  def orderbooks: Route =
-    path("orderbook") {
-      pathEndOrSingleSlash {
-        getJsonRoute {
-          (matcher ? GetMarkets())
-            .mapTo[GetMarketsResponse]
-            .map(r => JsonResponse(r.json, StatusCodes.OK))
-        }
-      }
+  def orderbooks: Route = path("orderbook") {
+    (pathEndOrSingleSlash & get) {
+      complete((matcher ? GetMarkets)
+        .mapTo[GetMarketsResponse]
+        .map(r => r.json))
     }
-
+  }
 }

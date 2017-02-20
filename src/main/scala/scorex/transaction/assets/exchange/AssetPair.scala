@@ -3,8 +3,7 @@ package scorex.transaction.assets.exchange
 import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.utils.ByteArrayExtension
-
-import scala.util.Try
+import scala.util.{Success, Try}
 
 case class AssetPair(private val pair: (Option[AssetId], Option[AssetId])) {
   require(!ByteArrayExtension.sameOption(pair._1, pair._2))
@@ -30,11 +29,14 @@ case class AssetPair(private val pair: (Option[AssetId], Option[AssetId])) {
 object AssetPair {
   val WavesName = "WAVES"
 
-  def createAssetPair(asset1: String, asset2: String): Try[AssetPair] = {
-    def tryAssetId(a: String) = Try { if (WavesName == a) None else Some(Base58.decode(a).get) }
-    (for {
-      a1 <- tryAssetId(asset1)
-      a2 <- tryAssetId(asset2)
-    } yield Try(AssetPair(a1, a2))).flatten
+  private def extractAssetId(a: String): Try[Option[AssetId]] = a match {
+    case `WavesName` => Success(None)
+    case other => Base58.decode(other).map(Option(_))
   }
+
+  def createAssetPair(asset1: String, asset2: String): Try[AssetPair] =
+    for {
+      a1 <- extractAssetId(asset1)
+      a2 <- extractAssetId(asset2)
+    } yield AssetPair(a1, a2)
 }

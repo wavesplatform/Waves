@@ -2,29 +2,23 @@ package scorex.transaction.state.database.blockchain
 
 import com.google.common.base.Charsets
 import scorex.crypto.encode.Base58
+import scorex.transaction.ValidationError.StateValidationError
 import scorex.transaction._
 import scorex.transaction.assets.{AssetIssuance, BurnTransaction, IssueTransaction, ReissueTransaction}
-import scorex.transaction.state.database.state.extension.StateExtension
+import scorex.transaction.state.database.state.extension.Validator
 import scorex.transaction.state.database.state.storage.{AssetsExtendedStateStorageI, StateStorageI}
 import scorex.utils.ScorexLogging
 
-import scala.util.{Failure, Success}
-
-//TODO move to state.extension package
 class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorageI) extends ScorexLogging
-  with StateExtension {
+  with Validator {
 
-  override def isValid(tx: Transaction, height: Int): Boolean = tx match {
+  override def validate(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: ReissueTransaction =>
-      val reissueValid: Boolean = {
-        val sameSender = isIssuerAddress(tx.assetId, tx.sender.address)
-        val reissuable = isReissuable(tx.assetId)
-        sameSender && reissuable
-      }
-      reissueValid
+      isIssuerAddress(tx.assetId, tx).flatMap(t =>
+        if (isReissuable(tx.assetId)) Right(t) else Left(StateValidationError("Asset is not reissuable")))
     case tx: BurnTransaction =>
-      isIssuerAddress(tx.assetId, tx.sender.address)
-    case _ => true
+      isIssuerAddress(tx.assetId, tx)
+    case _ => Right(tx)
   }
 
   override def process(tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
@@ -35,17 +29,15 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     case _ =>
   }
 
-  private def isIssuerAddress(assetId: Array[Byte], address: String): Boolean = {
-    storage.getTransactionBytes(assetId).exists(b =>
-      IssueTransaction.parseBytes(b) match {
-        case Success(issue) =>
-          issue.sender.address == address
-        case Failure(f) =>
-          log.debug(s"Can't deserialise issue tx", f)
-          false
-      })
+  private def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[StateValidationError, SignedTransaction] = {
+    storage.getTransaction(assetId) match {
+      case None => Left(StateValidationError("Referenced assetId not found"))
+      case Some(it: IssueTransaction) =>
+        if (it.sender.address == tx.sender.address) Right(tx)
+        else Left(StateValidationError("Asset was issued by other address"))
+      case _ => Left(StateValidationError("Referenced transaction is not IssueTransaction"))
+    }
   }
-
 
   private[blockchain] def addAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long, reissuable: Boolean): Unit = {
     val asset = Base58.encode(assetId)

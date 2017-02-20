@@ -16,7 +16,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
-import scorex.settings.ChainParameters
+import scorex.settings.TestChainParameters
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.{NTP, ScorexLogging}
@@ -33,7 +33,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   with PathMockFactory {
 
   val db = new MVStore.Builder().compress().open()
-  val storedState = fromDBWithUnlimitedBalance(db, ChainParameters.Disabled)
+  val storedState = fromDBWithUnlimitedBalance(db, TestChainParameters.Disabled)
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 
@@ -85,7 +85,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       actor ! order
       expectMsg(OrderAccepted(order))
 
-      actor ! GetMarkets()
+      actor ! GetMarkets
 
       expectMsgPF() {
         case GetMarketsResponse(publicKey, Seq(MarketData(_, "Unknown", "Unknown", _))) =>

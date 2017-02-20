@@ -15,14 +15,14 @@ class PaymentAPISpecification extends FunSuite with Matchers with TransactionTes
     val s = applicationNonEmptyAccounts.head.address
     val r = applicationNonEmptyAccounts.last.address
     val amount = 2
-    val fee = 1
+    val fee = 100000
 
     val json = "{\"amount\":" + amount + ",\"fee\":" + fee + ",\"sender\":\"" + s + "\",\"recipient\":\"" + r + "\"\n}"
-    val req = POST.request("/payment", body = json)
+    val req = POST.request("/payment", body = json, headers = Map("api_key" -> "test", "Content-type" -> "application/json"))
     (req \ "assetId").asOpt[String] shouldBe None
     (req \ "feeAsset").asOpt[String] shouldBe None
     (req \ "type").as[Int] shouldBe 4
-    (req \ "fee").as[Int] shouldBe 1
+    (req \ "fee").as[Int] shouldBe fee
     (req \ "amount").as[Int] shouldBe amount
     (req \ "timestamp").asOpt[Long].isDefined shouldBe true
     (req \ "signature").asOpt[String].isDefined shouldBe true

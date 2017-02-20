@@ -1,28 +1,17 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
-
-import akka.actor.ActorRefFactory
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
-import play.api.libs.json.{JsError, JsSuccess, Json}
-import scorex.app.RunnableApplication
+import scorex.transaction.SimpleTransactionModule
 import scorex.transaction.state.wallet.{Payment, TransferRequest}
-import scorex.transaction.{SimpleTransactionModule, ValidationError}
-
-import scala.util.Try
+import scorex.wallet.Wallet
 
 @Path("/payment")
-@Api(value = "/payment", description = "Payment operations.", position = 1)
+@Api(value = "/payment")
 @Deprecated
-case class PaymentApiRoute(application: RunnableApplication)(implicit val context: ActorRefFactory)
-  extends ApiRoute with CommonTransactionApiFunctions {
-  val settings = application.settings.restAPISettings
-
-  // TODO asInstanceOf
-  implicit lazy val transactionModule: SimpleTransactionModule = application.transactionModule.asInstanceOf[SimpleTransactionModule]
-  lazy val wallet = application.wallet
+case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactionModule: SimpleTransactionModule) extends ApiRoute {
 
   override lazy val route = payment
 
@@ -45,23 +34,12 @@ case class PaymentApiRoute(application: RunnableApplication)(implicit val contex
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
-  def payment: Route = path("payment") {
-    entity(as[String]) { body =>
-      withAuth {
-        postJsonRoute {
-          Try(Json.parse(body)).map { js =>
-            js.validate[Payment] match {
-              case err: JsError =>
-                WrongTransactionJson(err).response
-              case JsSuccess(p: Payment, _) =>
-                val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, "", p.recipient)
-                transactionModule.transferAsset(transferRequest, wallet).map { paymentVal =>
-                  paymentVal.fold(ApiError.fromValidationError, { tx => JsonResponse(tx.json, StatusCodes.OK) })
-                }.getOrElse(InvalidSender.response)
-            }
-          }.getOrElse(WrongJson.response)
-        }
-      }
+  def payment: Route = (path("payment") & post & withAuth) {
+    json[Payment] { p =>
+      val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, None, p.recipient)
+      transactionModule
+        .transferAsset(transferRequest, wallet)
+        .map(_.json)
     }
   }
 }

@@ -1,17 +1,20 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.account.Account
-import scorex.settings.ChainParameters
+import scorex.transaction.ValidationError.StateValidationError
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.storage.StateStorageI
 import scorex.transaction.{PaymentTransaction, Transaction}
 
-class IncrementingTimestampValidator(settings: ChainParameters, storage: StateStorageI) extends StateExtension {
+class IncrementingTimestampValidator(allowInvalidPaymentTransactionsByTimestamp: Long, storage: StateStorageI) extends Validator {
 
-  override def isValid(transaction: Transaction, height: Int): Boolean = transaction match {
+  override def validate(transaction: Transaction, height: Int): Either[StateValidationError, Transaction] = transaction match {
     case tx: PaymentTransaction =>
-      tx.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
-    case _ => true
+      val isCorrect = tx.timestamp < allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
+      if (isCorrect) Right(tx)
+      else Left(StateValidationError(
+        s"PaymentTransaction is earlier than previous transaction after time=$allowInvalidPaymentTransactionsByTimestamp"))
+    case _ => Right(transaction)
   }
 
   private def isTimestampCorrect(tx: PaymentTransaction): Boolean = {

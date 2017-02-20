@@ -1,23 +1,19 @@
 package scorex.lagonaki.unit
 
-import java.net.InetSocketAddress
-
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.WavesSettings
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.FunSuite
-import play.api.libs.json.Json
 import scorex.account.AddressScheme
 import scorex.app.{Application, RunnableApplication}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.ConsensusMock
-import scorex.settings.ChainParameters
+import scorex.settings.{ChainParameters, TestChainParameters}
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 import scorex.wallet.Wallet
-
-import scala.concurrent.duration._
-import scala.language.postfixOps
 
 //TODO: gagarin55 - Can't move it to appropriate module due to dependancy on some ConsesusModule impl
 class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
@@ -43,7 +39,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     override implicit val consensusModule = new ConsensusMock
   }
 
-  val forkParameters = new AnyRef with ChainParameters {
+  val forkParameters = new ChainParameters with TestChainParameters.GenesisData {
     override def allowTemporaryNegativeUntil: Long = 0L
 
     override def requireSortedTransactionsAfter: Long = Long.MaxValue
@@ -65,8 +61,6 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     override def initialBalance: Long = 100000000000000L
 
     override def genesisTimestamp: Long = ???
-
-    override def genesisTxs: Seq[Transaction] = ???
 
     override def addressScheme: AddressScheme = ???
   }

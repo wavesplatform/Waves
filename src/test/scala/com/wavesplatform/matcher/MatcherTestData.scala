@@ -124,14 +124,14 @@ trait MatcherTestData {
       override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
     }
 
-    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings, storage)
+    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
     val validators = Seq(
       extendedState,
       incrementingTimestampValidator,
       new GenesisValidator,
       new OrderMatchStoredState(storage),
-      new IncludedValidator(storage, settings),
-      new ActivatedValidator(settings)
+      new IncludedValidator(storage, settings.requirePaymentUniqueId),
+      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp)
     )
     new StoredState(storage, extendedState, incrementingTimestampValidator, validators, settings) {
       override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
