@@ -21,7 +21,7 @@ import scorex.waves.TestingCommons
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging with TestingCommons {
 
-  val forkParametersWithEnableUnissuedAssetsCheck = new ChainParameters with TestChainParameters.GenesisData {
+  val forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck = new ChainParameters with TestChainParameters.GenesisData {
     override def allowTemporaryNegativeUntil: Long = 0L
 
     override def requireSortedTransactionsAfter: Long = Long.MaxValue
@@ -33,6 +33,8 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
 
     override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
+
+    override def allowLeaseTransactionAfterTimestamp: Long = Long.MinValue
 
     override def allowUnissuedAssetsUntil: Long = 0L
 
@@ -53,7 +55,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   new File(stateFile).delete()
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
-  val state = StoredState.fromDB(db, forkParametersWithEnableUnissuedAssetsCheck)
+  val state = StoredState.fromDB(db, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
   val testAcc = new PrivateKeyAccount(scorex.utils.randomBytes(64))
   val testAssetAcc = AssetAcc(testAcc, None)
   val testAdd = testAcc.address

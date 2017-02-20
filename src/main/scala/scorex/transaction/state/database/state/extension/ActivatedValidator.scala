@@ -18,6 +18,8 @@ class ActivatedValidator(
       Left(StateValidationError(s"BurnTransaction(time: ${tx.timestamp}) must not appear before time=$allowBurnTransactionAfterTimestamp"))
     case tx: LeaseTransaction if tx.timestamp <= allowLeaseTransactionAfterTimestamp =>
       Left(StateValidationError(s"LeaseTransaction(time: ${tx.timestamp}) must not appear before time=$allowLeaseTransactionAfterTimestamp"))
+    case tx: LeaseCancelTransaction if tx.timestamp <= allowLeaseTransactionAfterTimestamp =>
+      Left(StateValidationError(s"LeaseCancelTransaction(time: ${tx.timestamp}) must not appear before time=$allowLeaseTransactionAfterTimestamp"))
     case _: BurnTransaction => Right(tx)
     case _: PaymentTransaction => Right(tx)
     case _: GenesisTransaction => Right(tx)

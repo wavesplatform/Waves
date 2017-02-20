@@ -56,6 +56,8 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
 
     override def allowBurnTransactionAfterTimestamp: Long = Long.MaxValue
 
+    override def allowLeaseTransactionAfterTimestamp: Long = Long.MaxValue
+
     override def requirePaymentUniqueId: Long = Long.MaxValue
 
     override def initialBalance: Long = 100000000000000L
