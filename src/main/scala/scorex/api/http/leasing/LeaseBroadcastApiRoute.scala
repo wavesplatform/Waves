@@ -18,7 +18,7 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, transactionModule: 
   }
 
   @Path("/lease")
-  @ApiOperation(value = "Creates a lease",
+  @ApiOperation(value = "Broadcasts a signed lease transaction",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
@@ -38,7 +38,7 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, transactionModule: 
   }
 
   @Path("/cancel")
-  @ApiOperation(value = "Interrupt a lease",
+  @ApiOperation(value = "Broadcasts a signed lease cancel transaction",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
