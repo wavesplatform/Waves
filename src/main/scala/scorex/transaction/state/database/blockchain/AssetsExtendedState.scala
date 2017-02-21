@@ -11,7 +11,6 @@ import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success}
 
-//TODO move to state.extension package
 class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorageI) extends ScorexLogging
   with Validator {
 

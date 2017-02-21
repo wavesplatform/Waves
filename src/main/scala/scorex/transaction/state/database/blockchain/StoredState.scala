@@ -244,7 +244,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         }
       }
 
-      val newStateAfterEffectiveBalanceChanges = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(newStateAfterBalanceUpdates) {     case (iChanges, bc) =>
+      val newStateAfterEffectiveBalanceChanges = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
         //update effective balances sheet
         val wavesAcc = AssetAcc(bc.account, None)
         val currentChange = iChanges.getOrElse(wavesAcc, (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
@@ -267,7 +267,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   def totalAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
 
   def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)],
-                                       blockTs: Long = NTP.correctedTime()): Unit = synchronized {
+                   blockTs: Long = NTP.correctedTime()): Unit = synchronized {
     storage.setStateHeight(storage.stateHeight + 1)
     val h = storage.stateHeight
     changes.foreach { ch =>
@@ -281,50 +281,6 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       }
       storage.updateAccountAssets(ch._1.account.address, ch._1.assetId)
     }
-  }
-
-  private[blockchain] def filterValidTransactions(trans: Seq[Transaction]): Seq[Transaction] = {
-    trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Transaction])) {
-      case ((currentState, validTxs), tx) =>
-        try {
-          val stateAfterBalanceUpdates = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
-            //update balances sheet
-            val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc), effectiveBalance(bc.assetAcc.account)), List.empty))
-
-            val newBalance = if (currentChange._1.balance == Long.MinValue) {
-              Long.MinValue
-            } else {
-              Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
-            }
-
-            if (tx.timestamp >= settings.allowTemporaryNegativeUntil || newBalance < 0) {
-              throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
-            }
-
-            iChanges.updated(bc.assetAcc, (AccState(newBalance, currentChange._1.effectiveBalance), tx.id +: currentChange._2))
-          }
-
-          val stateAfterEffectiveBalanceUpdates = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(stateAfterBalanceUpdates) { case (iChanges, bc) =>
-            val currentChange = iChanges.getOrElse(AssetAcc(bc.account, None), (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
-
-            val newEffectiveBalance = if (currentChange._1.effectiveBalance == Long.MinValue) {
-              Long.MinValue
-            } else {
-              Try(Math.addExact(currentChange._1.balance, bc.amount)).getOrElse(Long.MinValue)
-            }
-
-            if (tx.timestamp >= settings.allowTemporaryNegativeUntil || newEffectiveBalance < 0) {
-              throw new Error(s"Transaction leads to negative effective balance ($newEffectiveBalance): ${tx.json}")
-            }
-
-            iChanges.updated(AssetAcc(bc.account, None), (AccState(currentChange._1.balance, newEffectiveBalance), currentChange._2))
-          }
-          (stateAfterEffectiveBalanceUpdates, validTxs :+ tx)
-        } catch {
-          case NonFatal(e) =>
-            (currentState, validTxs)
-        }
-    }._2
   }
 
   private def balanceByKey(key: String, calculatedBalance: AccState => Long, atHeight: Option[Int] = None): Long = {
@@ -354,7 +310,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   }
 
   def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
-    validators.toStream.map(_.validate(this, transaction,height)).find(_.isLeft) match {
+    validators.toStream.map(_.validate(this, transaction, height)).find(_.isLeft) match {
       case Some(Left(e)) => Left(e)
       case _ => Right(transaction)
     }
@@ -422,12 +378,12 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   override def orderMatchStoredState: OrderMatchStoredState = validators.filter(_.isInstanceOf[OrderMatchStoredState])
     .head.asInstanceOf[OrderMatchStoredState]
 
+}
 
 object StoredState {
+
   def fromDB(mvStore: MVStore, settings: ChainParameters): State = {
     val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage with MVStoreLeaseExtendedStateStorage {
-  def fromDB(mvStore: MVStore, settings: ChainParameters): State = {
-    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage {
       override val db: MVStore = mvStore
       if (db.getStoreVersion > 0) {
         db.rollback()
