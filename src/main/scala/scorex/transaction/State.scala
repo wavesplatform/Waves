@@ -1,13 +1,10 @@
 package scorex.transaction
 
+import scorex.account.Account
 import scorex.block.Block
-import scorex.transaction.ValidationError.StateValidationError
 
 import scala.util.Try
 
-/**
-  * Abstract functional interface of state which is a result of a sequential blocks applying
-  */
 trait State {
   private[transaction] def processBlock(block: Block): Try[State]
 
@@ -20,4 +17,10 @@ trait State {
   def included(signature: Array[Byte]): Option[Int]
 
   private[transaction] def rollbackTo(height: Int): State
+
+  def balance(account: Account, height: Option[Int] = None): Long
+
+  def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
+
+  def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction]
 }

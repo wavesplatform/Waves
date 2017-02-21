@@ -31,7 +31,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
                   val assetsExtension: AssetsExtendedState,
                   val incrementingTimestampValidator: IncrementingTimestampValidator,
                   val validators: Seq[Validator],
-                  settings: ChainParameters) extends LagonakiState with ScorexLogging {
+                  settings: ChainParameters) extends State with ScorexLogging {
 
   override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 

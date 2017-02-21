@@ -16,7 +16,7 @@ class BlockStorageSpecification extends PropSpec with PropertyChecks with Genera
     history
   }
 
-  private class MockLagonakiState(v: Try[State]) extends LagonakiState {
+  private class MockLagonakiState(v: Try[State]) extends State {
     override private[transaction] def processBlock(block: Block): Try[State] = v
     override def validate(txs: Seq[Transaction], height: Option[Int], blockTime: Long): Seq[Transaction] = ???
     override private[transaction] def rollbackTo(height: Int): State = ???
@@ -32,7 +32,7 @@ class BlockStorageSpecification extends PropSpec with PropertyChecks with Genera
     new BlockStorage {
       override val history: History = mockHistory
       override protected[this] val db: MVStore = new MVStore.Builder().open()
-      override val state: LagonakiState = new MockLagonakiState(f)
+      override val state: State = new MockLagonakiState(f)
     }.appendBlock(/*i'm a block*/null) shouldBe f
   }
 }
