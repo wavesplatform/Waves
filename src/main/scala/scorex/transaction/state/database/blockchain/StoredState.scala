@@ -7,7 +7,7 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.StateValidationError
+import scorex.transaction.ValidationError.{CustomValidationError, StateValidationError}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.state.database.state._
@@ -136,24 +136,31 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }.values.flatten.toList.sortWith(_.timestamp > _.timestamp).take(limit)
   }
 
-  private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Transaction] = txs.filter(t => validateAgainstState(t, height).isRight)
+  private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = txs.map(t => validateAgainstState(t, height))
 
-  private def filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(txs: Seq[Transaction]): Seq[Transaction] = {
+  private def filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
     if (allowInvalidPaymentTransactionsByTimestamp) {
-      txs
+      txs.map(Right(_))
     } else {
       val invalidPaymentTransactionsByTimestamp = incrementingTimestampValidator.invalidatePaymentTransactionsByTimestamp(txs)
-      excludeTransactions(txs, invalidPaymentTransactionsByTimestamp)
+      txs.map(t1 => if (!invalidPaymentTransactionsByTimestamp.exists(t2 => t2.id sameElements t1.id))
+        Right(t1)
+      else Left(StateValidationError(s"$t1 is invalid due to one of previous transactions in the sequence is PaymentTransaction with a greater timestamp")))
     }
   }
 
-  private def filterFromTooFarFuture(trans: Seq[Transaction], blockTime: Long): Seq[Transaction] = {
+  private def filterTooOldTransactions(trans: Seq[Transaction], blockTime: Long): Seq[Either[ValidationError, Transaction]] = {
     val allowTransactionsFromFutureByTimestamp = trans.nonEmpty && trans.map(_.timestamp).max < settings.allowTransactionsFromFutureUntil
     if (allowTransactionsFromFutureByTimestamp) {
-      trans
+      trans.map(Right(_))
     } else {
-      filterTransactionsFromFuture(trans, blockTime)
+      trans.map {
+        tx =>
+          if ((tx.timestamp - blockTime).millis <= SimpleTransactionModule.MaxTimeForUnconfirmed)
+            Right(tx)
+          else Left(CustomValidationError(s"$tx is too old. BlockTime: $blockTime"))
+      }
     }
   }
 
@@ -189,17 +196,18 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
     validTxs
   }
+
   /**
     * Returns sequence of valid transactions
     */
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
     val height = heightOpt.getOrElse(storage.stateHeight)
 
-    val validOneByOne = validAgainstStateOneByOne(height, trans)
+    val validOneByOne = validAgainstStateOneByOne(height, trans).filter(_.isRight).map(_.right.get)
 
-    val validAgainstConsecutivePayments = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne)
+    val validAgainstConsecutivePayments = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).filter(_.isRight).map(_.right.get)
 
-    val filteredFromFuture = filterFromTooFarFuture(validAgainstConsecutivePayments, blockTime)
+    val filteredFromFuture = filterTooOldTransactions(validAgainstConsecutivePayments, blockTime).filter(_.isRight).map(_.right.get)
 
     val allowUnissuedAssets = filteredFromFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
 
@@ -244,31 +252,6 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
-  private[blockchain] def filterValidTransactions(trans: Seq[Transaction]):
-  Seq[Transaction] = {
-    trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Transaction])) {
-      case ((currentState, validTxs), tx) =>
-        try {
-          val newState = tx.balanceChanges().foldLeft(currentState) { case (iChanges, bc) =>
-            //update balances sheet
-            val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
-            val newBalance = if (currentChange._1.balance == Long.MinValue) Long.MinValue
-            else Try(Math.addExact(currentChange._1.balance, bc.delta)).getOrElse(Long.MinValue)
-
-            if (newBalance < 0 && tx.timestamp >= settings.allowTemporaryNegativeUntil) {
-              throw new Error(s"Transaction leads to negative balance ($newBalance): ${tx.json}")
-            }
-
-            iChanges.updated(bc.assetAcc, (AccState(newBalance), tx.id +: currentChange._2))
-          }
-          (newState, validTxs :+ tx)
-        } catch {
-          case NonFatal(e) =>
-            (currentState, validTxs)
-        }
-    }._2
-  }
-
   private def balanceByKey(key: String, atHeight: Option[Int] = None): Long = {
     storage.getLastStates(key) match {
       case Some(h) if h > 0 =>
@@ -290,19 +273,8 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
-
-  private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
-    transactions.filter(t1 => !exclude.exists(t2 => t2.id sameElements t1.id))
-
-
-  private def filterTransactionsFromFuture(transactions: Seq[Transaction], blockTime: Long): Seq[Transaction] = {
-    transactions.filter {
-      tx => (tx.timestamp - blockTime).millis <= SimpleTransactionModule.MaxTimeForUnconfirmed
-    }
-  }
-
   def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
-    validators.toStream.map(_.validate(transaction, height)).find(_.isLeft) match {
+    validators.view.map(_.validate(transaction, height)).find(_.isLeft) match {
       case Some(Left(e)) => Left(e)
       case _ => Right(transaction)
     }
@@ -351,11 +323,8 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   def assetDistribution(assetId: Array[Byte]): Map[String, Long] = storage.assetDistribution(assetId)
 
   //for debugging purposes only
-  override def toString: String = toJson().toString()
-
-  //for debugging purposes only
   def hash: Int = {
-    (BigInt(FastCryptographicHash(toString.getBytes)) % Int.MaxValue).toInt
+    (BigInt(FastCryptographicHash(toJson().toString().getBytes)) % Int.MaxValue).toInt
   }
 
   override def orderMatchStoredState: OrderMatchStoredState = validators.filter(_.isInstanceOf[OrderMatchStoredState])
