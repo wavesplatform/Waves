@@ -97,11 +97,19 @@ object Application extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     log.info("Starting...")
 
-    val maybeUserConfig = for {
+    val maybeConfigFile = for {
       maybeFilename <- args.headOption
       file = new File(maybeFilename)
       if file.exists
-    } yield ConfigFactory.parseFile(file)
+    } yield file
+
+    val maybeUserConfig = maybeConfigFile collect {
+      case file if file.getName.endsWith(".json") =>
+        log.warn("JSON configuration file is deprecated and will be removed in the future version. " +
+          s"The node will try to read settings from ${file.getAbsolutePath} for now.")
+        LegacyConfigTransformer.transform(ConfigFactory.parseFile(file))
+      case file => ConfigFactory.parseFile(file)
+    }
 
     val config = maybeUserConfig.foldLeft(ConfigFactory.defaultApplication().withFallback(ConfigFactory.load())) {
       (default, user) => user.withFallback(default)
