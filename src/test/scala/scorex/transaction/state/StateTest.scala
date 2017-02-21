@@ -153,7 +153,7 @@ object StateTestSpec extends Commands {
     type Result = Seq[Transaction]
 
     def run(sut: Sut): Result = sut.synchronized {
-      sut.storedState.validate(txs.map(_._1), blockTime = txs.map(_._1.timestamp).max)
+      sut.storedState.validate(txs.map(_._1), blockTime = txs.map(_._1.timestamp).max)._2
     }
 
     def nextState(state: State): State = state

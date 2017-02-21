@@ -234,14 +234,14 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       eis.filter(_.isRight).map(_.right.get))
   }
 
-  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
+  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): (Seq[ValidationError], Seq[Transaction]) = {
     val height = heightOpt.getOrElse(storage.stateHeight)
     val (err0, validOneByOne) = validAgainstStateOneByOne(height, trans).segregate()
     val (err1, validAgainstConsecutivePayments) = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).segregate()
     val (err2, filterExpired) = filterTooOldTransactions(validAgainstConsecutivePayments, blockTime).segregate()
     val allowUnissuedAssets = filterExpired.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
     val (err3, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filterExpired).segregate()
-    result
+    (err0 ++ err1 ++ err2 ++ err3, result)
   }
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {

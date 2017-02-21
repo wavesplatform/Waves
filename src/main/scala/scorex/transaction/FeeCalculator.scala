@@ -21,7 +21,7 @@ class FeeCalculator(settings: FeesSettings) {
     }
   }
 
-  def enoughFee(tx: Transaction): Either[InsufficientFee.type, Transaction] = tx match {
+  def enoughFee[T <: Transaction](tx: T): Either[ValidationError, T] = tx match {
     case ttx: TypedTransaction if map.get(TransactionAssetFee(ttx.transactionType.id, ttx.assetFee._1).key).exists(_ <= ttx.assetFee._2) => Right(tx)
     case _ => Left(InsufficientFee)
   }

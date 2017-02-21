@@ -57,7 +57,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     super.beforeEach()
 
     val transactionModule = stub[TransactionModule]
-    (transactionModule.isValid(_: Transaction, _: Long)).when(*, *).returns(true).anyNumberOfTimes()
+    (transactionModule.validate(_: Transaction)).when(*).onCall((tr: Transaction) => Right[ValidationError, Transaction](tr)).anyNumberOfTimes()
 
     actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
       wallet, settings, transactionModule) with RestartableActor))
@@ -253,7 +253,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       actor ! RestartActor
 
       actor ! GetBidOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100*Order.PriceConstant, 10, ord1))))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100 * Order.PriceConstant, 10, ord1))))
 
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))

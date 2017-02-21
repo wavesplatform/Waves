@@ -41,7 +41,7 @@ trait ExchangeTransactionCreator {
   }
 
   def isValid(orderMatch: ExchangeTransaction): Boolean = {
-    transactionModule.isValid(orderMatch, orderMatch.timestamp)
+    transactionModule.validate(orderMatch).isRight
   }
 
   def sendToNetwork(tx: SignedTransaction): Unit = {

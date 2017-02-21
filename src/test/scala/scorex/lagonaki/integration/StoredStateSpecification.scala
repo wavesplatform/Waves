@@ -43,7 +43,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
       txToForge.amount, txToForge.fee, txToForge.timestamp, forgedSignature).right.get
 
     val transactionsToValidate = transactions :+ forgedTransaction
-    val validTransactions = state.validate(transactionsToValidate, blockTime = transactionsToValidate.map(_.timestamp).max)
+    val validTransactions = state.validate(transactionsToValidate, blockTime = transactionsToValidate.map(_.timestamp).max)._2
 
     validTransactions.count(tx => (tx.id sameElements txToForge.signature) ||
       (tx.id sameElements forgedTransaction.signature)) shouldBe 1
@@ -209,7 +209,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recipient, senderBalance / 2, 1).right.get)
     doubleSpending.foreach(t => state.isValid(t, t.timestamp) shouldBe true)
     state.isValid(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max) shouldBe false
-    state.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max).size shouldBe 1
+    state.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max)._2.size shouldBe 1
     state.processBlock(TestBlock(doubleSpending)) should be('failure)
   }
 

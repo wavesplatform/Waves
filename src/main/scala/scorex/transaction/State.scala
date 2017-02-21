@@ -15,7 +15,7 @@ trait State {
 
   // validation
 
-  def validate(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Seq[Transaction]
+  def validate(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): (Seq[ValidationError], Seq[Transaction])
 
   // state reads
 
@@ -72,9 +72,9 @@ trait State {
 
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
 
-  def incrementingTimestampValidator : IncrementingTimestampValidator
+  def incrementingTimestampValidator: IncrementingTimestampValidator
 
-  def leaseExtendedState : LeaseExtendedState
+  def leaseExtendedState: LeaseExtendedState
 
 }
 
@@ -85,9 +85,16 @@ object State {
 
     // validation
 
-    def isValid(tx: Transaction, blockTime: Long): Boolean = isValid(Seq(tx), blockTime = blockTime)
+    def validate[T<: Transaction](tx: T, blockTime: Long): Either[ValidationError, T] = s.validate(Seq(tx), None, blockTime) match {
+      case (_, Seq(t)) => Right(t.asInstanceOf[T])
+      case (Seq(err), _) => Left(err)
+    }
 
-    def isValid(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Boolean = s.validate(txs, height, blockTime).size == txs.size
+    def isValid(tx: Transaction, blockTime: Long): Boolean = validate(tx, blockTime).isRight
+
+    // calls from test only
+
+    def isValid(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Boolean = s.validate(txs, height, blockTime)._2.size == txs.size
   }
 
 }
