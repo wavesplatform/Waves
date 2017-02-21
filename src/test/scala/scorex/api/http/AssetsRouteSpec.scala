@@ -44,7 +44,6 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     ValidationError.TooBigArray,
     ValidationError.InvalidSignature,
     ValidationError.InvalidName,
-    ValidationError.StateCheckFailed,
     ValidationError.OverflowError,
     ValidationError.CustomValidationError("custom.error"),
     ValidationError.StateValidationError("state.validation.error")

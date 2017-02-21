@@ -10,7 +10,6 @@ object ValidationError {
   case object TooBigArray extends ValidationError
   case object InvalidSignature extends ValidationError
   case object InvalidName extends ValidationError
-  case object StateCheckFailed extends ValidationError
   case object OverflowError extends ValidationError
   case object ToSelf extends ValidationError
 

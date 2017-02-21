@@ -8,6 +8,7 @@ import scorex.api.http.leasing.LeaseRequest
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.mocks.TestBlock
+import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.state.database.state.extension.IncrementingTimestampValidator
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
@@ -128,7 +129,8 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
     val oldSenderEffectiveBalance = state.effectiveBalance(acc)
     val oldSenderBalance = state.effectiveBalance(acc)
-    state.processBlock(TestBlock(Seq(transactionModule.lease(LeaseRequest(acc.address, 5, 1, rec.address), application.wallet).right.get)))
+    val leaseTransaction = LeaseTransaction.create(acc, 5L, 1L, 1L, rec).right.get
+    state.processBlock(TestBlock(Seq(leaseTransaction)))
     state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - 6
     state.effectiveBalanceWithConfirmations(acc, 1) shouldBe oldSenderEffectiveBalance - 6
     state.balance(rec) shouldBe 0L
