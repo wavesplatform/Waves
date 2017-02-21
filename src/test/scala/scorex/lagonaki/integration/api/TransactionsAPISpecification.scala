@@ -7,7 +7,8 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.{GenesisTransaction, TransactionsBlockField}
-import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.HttpMethods
+import akka.http.scaladsl.model.headers.{`Access-Control-Allow-Methods`, _}
 
 class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons {
 
@@ -41,12 +42,31 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
     assert(response.getStatusCode == 404)
   }
 
+  test("/transactions/address/{address}/limit/{limit} API route should contains CORS header") {
+    addresses.foreach { a =>
+      val tr = GET.request(s"/transactions/address/$a/limit/2")
+      (tr \\ "amount").toList.size should be <= 2
+      checkTransactionList(tr)
+    }
+  }
+
+  test("/transactions/address/{address}/limit/{limit} API route should contains CORS header") {
+    val response = GET.requestRaw(s"/transactions/address/${addresses.head}/limit/2")
+    val allowOrigin = `Access-Control-Allow-Origin`.*
+    assert(response.getHeader(allowOrigin.name()).contains(allowOrigin.value()))
+  }
+
   test("OPTION request should returns CORS headers") {
     val response = OPTIONS.requestRaw("/transactions/address/1/limit/1")
     assert(response.getStatusCode == 200)
-    assert(response.getHeader(`Access-Control-Allow-Origin`.*.name()).contains(`Access-Control-Allow-Origin`.*.value()))
-    assert(response.getHeader(`Access-Control-Allow-Credentials`(true).name()).contains(`Access-Control-Allow-Credentials`(true).value()))
-    assert(response.getHeader(`Access-Control-Allow-Headers`("Authorization", "Content-Type", "X-Requested-With").name()).contains(`Access-Control-Allow-Headers`("Authorization", "Content-Type", "X-Requested-With").value()))
+    val allowOrigin = `Access-Control-Allow-Origin`.*
+    assert(response.getHeader(allowOrigin.name()).contains(allowOrigin.value()))
+    val allowCredentials = `Access-Control-Allow-Credentials`(true)
+    assert(response.getHeader(allowCredentials.name()).contains(allowCredentials.value()))
+    val allowMethods = `Access-Control-Allow-Methods`(HttpMethods.OPTIONS, HttpMethods.POST, HttpMethods.PUT, HttpMethods.GET, HttpMethods.DELETE)
+    assert(response.getHeader(allowMethods.name()).contains(allowMethods.value()))
+    val allowHeaders = `Access-Control-Allow-Headers`("Authorization", "Content-Type", "X-Requested-With")
+    assert(response.getHeader(allowHeaders.name()).contains(allowHeaders.value()))
   }
 
   test("/transactions/info/{signature} API route") {
