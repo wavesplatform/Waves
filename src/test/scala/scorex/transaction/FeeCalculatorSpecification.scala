@@ -3,7 +3,7 @@ package scorex.transaction
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.FeesSettings
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{Assertion, Matchers, PropSpec}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
 
@@ -40,13 +40,24 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
 
   private val WhitelistedAsset = Base58.decode("JAudr64y6YxTgLn9T5giKKqWGkbMfzhdRAxmNNfn6FJN").get
 
+  implicit class ConditionalAssert(v: Either[_, _]) {
+
+    def shouldBeRightIf(cond: Boolean): Assertion = {
+      if (cond) {
+        v shouldBe an[Right[_, _]]
+      } else {
+        v shouldBe an[Left[_, _]]
+      }
+    }
+  }
+
   property("Transfer transaction ") {
     val feeCalc = new FeeCalculator(mySettings)
     forAll(transferGenerator) { tx: TransferTransaction =>
       if (tx.feeAssetId.isEmpty) {
-        feeCalc.enoughFee(tx) shouldBe (tx.fee >= 100000)
+        feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 100000)
       } else {
-        feeCalc.enoughFee(tx) shouldBe false
+        feeCalc.enoughFee(tx) shouldBe an[Left[_,_]]
       }
     }
   }
@@ -54,28 +65,28 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
   property("Payment transaction ") {
     val feeCalc = new FeeCalculator(mySettings)
     forAll(paymentGenerator) { tx: PaymentTransaction =>
-      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 1000000)
+      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 1000000)
     }
   }
 
   property("Issue transaction ") {
     val feeCalc = new FeeCalculator(mySettings)
     forAll(issueGenerator) { tx: IssueTransaction =>
-      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 100000000)
+      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 100000000)
     }
   }
 
   property("Reissue transaction ") {
     val feeCalc = new FeeCalculator(mySettings)
     forAll(reissueGenerator) { tx: ReissueTransaction =>
-      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 200000)
+      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 200000)
     }
   }
 
   property("Burn transaction ") {
     val feeCalc = new FeeCalculator(mySettings)
     forAll(burnGenerator) { tx: BurnTransaction =>
-      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 300000)
+      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 300000)
     }
   }
 }

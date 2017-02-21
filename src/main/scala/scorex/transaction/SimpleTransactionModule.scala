@@ -60,7 +60,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 
   override def putUnconfirmedIfNew(tx: Transaction): Boolean = synchronized {
-    if (feeCalculator.enoughFee(tx)) {
+    if (feeCalculator.enoughFee(tx).isRight) {
       utxStorage.putIfNew(tx, isValid(_, tx.timestamp))
     } else false
   }
