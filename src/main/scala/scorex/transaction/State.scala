@@ -15,17 +15,11 @@ trait State {
 
   // validation
 
-  def isValid(tx: Transaction, blockTime: Long): Boolean = isValid(Seq(tx), blockTime = blockTime)
-
-  def isValid(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Boolean = validate(txs, height, blockTime).size == txs.size
-
   def validate(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Seq[Transaction]
 
   // state reads
 
   def included(signature: Array[Byte]): Option[Int]
-
-  def balance(account: Account, height: Option[Int] = None): Long
 
   def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
 
@@ -37,13 +31,11 @@ trait State {
 
   def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)]
 
-  // exposing 'extensions'
+  // exposing extensions for orders validation
 
   def orderMatchStoredState: OrderMatchStoredState
 
   def assetsExtension: AssetsExtendedState
-
-  def incrementingTimestampValidator : IncrementingTimestampValidator
 
   // debug from api
 
@@ -61,7 +53,7 @@ trait State {
 
   def rollbackTo(height: Int): State
 
-  // calls from tests only
+  // outside calls from tests only
 
   def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction]
 
@@ -73,8 +65,24 @@ trait State {
   def totalAssetQuantity(assetId: AssetId): Long
 
   def totalBalance: Long
+
+  def balance(account: Account, height: Option[Int] = None): Long
+
+  def incrementingTimestampValidator : IncrementingTimestampValidator
+
+
 }
 
 object State {
   private val DefaultLimit = 50
+
+  implicit class StateExt(s: State) {
+
+    // validation
+
+    def isValid(tx: Transaction, blockTime: Long): Boolean = isValid(Seq(tx), blockTime = blockTime)
+
+    def isValid(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Boolean = s.validate(txs, height, blockTime).size == txs.size
+  }
+
 }
