@@ -14,7 +14,7 @@ import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.{CustomValidationError, InvalidAddress, StateCheckFailed}
+import scorex.transaction.ValidationError.{CustomValidationError, InvalidAddress}
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
