@@ -1,13 +1,14 @@
 package scorex.waves.http
 
 import javax.ws.rs.Path
+
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import scorex.account.Account
 import scorex.api.http._
+import scorex.api.http.assets.PaymentRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.state.wallet.Payment
 import scorex.transaction.{PaymentTransaction, TransactionOperations}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
@@ -35,14 +36,14 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.Payment",
+      dataType = "scorex.api.http.assets.PaymentRequest",
       defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def payment: Route = withAuth {
     (path("payment") & post) {
-      json[Payment] { payment =>
+      json[PaymentRequest] { payment =>
         transactionModule.createPayment(payment, wallet).map { tx =>
           SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.address,
             Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
@@ -64,13 +65,13 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.Payment",
+      dataType = "scorex.api.http.assets.PaymentRequest",
       defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def signPayment: Route = (post & path("payment" / "signature")) {
-    json[Payment] { payment =>
+    json[PaymentRequest] { payment =>
       wallet
         .privateKeyAccount(payment.sender).toRight[ApiError](InvalidSender)
         .flatMap { sender =>
@@ -132,7 +133,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.waves.transaction.ExternalPayment",
+      dataType = "scorex.waves.transaction.SignedPayment",
       defaultValue = "{\n\t\"timestamp\": 0,\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"senderPublicKey\":\"senderPubKey\",\n\t\"recipient\":\"recipientId\",\n\t\"signature\":\"sig\"\n}"
     )
   ))

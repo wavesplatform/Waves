@@ -1,9 +1,9 @@
-package scorex.transaction.state.wallet
+package scorex.api.http.assets
 
 import play.api.libs.json.{Format, Json}
 
-case class Payment(amount: Long, fee: Long, sender: String, recipient: String)
+case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: String)
 
-object Payment {
-  implicit val paymentFormat: Format[Payment] = Json.format
+object PaymentRequest {
+  implicit val paymentFormat: Format[PaymentRequest] = Json.format
 }
