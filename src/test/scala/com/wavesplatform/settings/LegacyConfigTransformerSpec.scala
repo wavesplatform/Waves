@@ -7,6 +7,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
   private val legacyConfig =
     """{
       |  "p2p": {
+      |    "myAddress": "0.0.0.0",
       |    "nodeName": "",
       |    "bindAddress": "0.0.0.0",
       |    "port": 6868,
@@ -50,6 +51,32 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
       |""".stripMargin
 
   "properly parses custom values from legacy config file" in {
-    val legacyConfigFromJson = LegacyConfigTransformer.transform(ConfigFactory.parseString(legacyConfig))
+    val legacyConfigFromJson = LegacyConfigTransformer
+      .transform(ConfigFactory.parseString(legacyConfig))
+      .withFallback(ConfigFactory.parseString(
+        """waves {
+          |  blockchain.file = ""
+          |  network {
+          |    file = ""
+          |    unrequested-packets-threshold = 100
+          |  }
+          |  matcher {
+          |    enable = false
+          |    account = ""
+          |    bind-address = ""
+          |    port = 0
+          |    min-order-fee = 0
+          |    order-match-tx-fee = 0
+          |    journal-directory = ""
+          |    snapshots-directory = ""
+          |    snapshots-interval = 10m
+          |    max-open-orders = 1000
+          |  }
+          |  synchronization.score-ttl = 90s
+          |  utx {}
+          |}
+          |""".stripMargin))
+
+    WavesSettings.fromConfig(legacyConfigFromJson)
   }
 }
