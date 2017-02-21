@@ -229,15 +229,11 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   val minimumTxFee = 100000 // TODO: remove later
 
-  override def signPayment(payment: Payment, wallet: Wallet): Either[ValidationError, PaymentTransaction]
-
-  = {
+  override def signPayment(payment: Payment, wallet: Wallet): Either[ValidationError, PaymentTransaction]  = {
     PaymentTransaction.create(wallet.privateKeyAccount(payment.sender).get, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
   }
 
-  override def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction]
-
-  = {
+  override def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction]  = {
 
     val paymentVal = PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
 
@@ -250,9 +246,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     }
   }
 
-  override def broadcastPayment(payment: SignedPayment): Either[ValidationError, PaymentTransaction]
-
-  = {
+  override def broadcastPayment(payment: SignedPayment): Either[ValidationError, PaymentTransaction]  = {
     val paymentTx = for {
       _signature <- Base58.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)

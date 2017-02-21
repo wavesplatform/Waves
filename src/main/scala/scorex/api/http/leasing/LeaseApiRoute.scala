@@ -14,7 +14,7 @@ import scorex.wallet.Wallet
 
 @Path("/leasing")
 @Api(value = "/leasing/")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: StoredState, transactionModule: TransactionOperations)
+case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: State, transactionModule: TransactionOperations)
   extends ApiRoute {
 
   override val route = pathPrefix("leasing") {

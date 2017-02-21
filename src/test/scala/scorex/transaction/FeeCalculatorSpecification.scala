@@ -100,14 +100,14 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
   property("Lease transaction") {
     val feeCalc = new FeeCalculator(mySettings)
     forAll(leaseGenerator) { tx: LeaseTransaction =>
-      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 400000)
+      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 400000)
     }
   }
 
   property("Lease cancel transaction") {
     val feeCalc = new FeeCalculator(mySettings)
     forAll(leaseCancelGenerator) { tx: LeaseCancelTransaction =>
-      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 500000)
+      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 500000)
     }
   }
 }

@@ -4,7 +4,7 @@ import play.api.libs.json.JsObject
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.state.database.blockchain.AssetsExtendedState
+import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState}
 import scorex.transaction.state.database.state.{AccState, Reasons}
 import scorex.transaction.state.database.state.extension.{IncrementingTimestampValidator, OrderMatchStoredState}
 import scorex.utils.NTP
@@ -20,6 +20,8 @@ trait State {
   // state reads
 
   def included(signature: Array[Byte]): Option[Int]
+
+  def balance(account: Account, height: Option[Int] = None): Long
 
   def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
 
@@ -66,12 +68,13 @@ trait State {
 
   def totalBalance: Long
 
-  def balance(account: Account, height: Option[Int] = None): Long
   def effectiveBalance(account: Account, height: Option[Int] = None): Long
 
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
 
   def incrementingTimestampValidator : IncrementingTimestampValidator
+
+  def leaseExtendedState : LeaseExtendedState
 
 }
 
