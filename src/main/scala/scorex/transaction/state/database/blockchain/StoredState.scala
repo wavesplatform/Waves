@@ -7,7 +7,7 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.{CustomValidationError, StateValidationError}
+import scorex.transaction.ValidationError.{CustomValidationError, NegativeAmount, OverflowError, StateValidationError}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.state.database.state._
@@ -18,7 +18,7 @@ import scorex.utils.{NTP, ScorexLogging}
 import scala.annotation.tailrec
 import scala.collection.SortedMap
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Left, Right, Success, Try}
 import scala.util.control.NonFatal
 
 
@@ -164,55 +164,47 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }
   }
 
-  private def filterByBalanceApplicationErrors(allowUnissuedAssets: Boolean, trans: Seq[Transaction]): Seq[Transaction] = {
-    val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Transaction])) {
+  private def safeSum(first: Long, second: Long): Try[Long] = Try {
+    Math.addExact(first, second)
+  }
+
+  private def filterByBalanceApplicationErrors(allowUnissuedAssets: Boolean, trans: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
+    val (_, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Either[ValidationError, Transaction]])) {
       case ((currentState, seq), tx) =>
         try {
           val changes = if (allowUnissuedAssets) tx.balanceChanges() else tx.balanceChanges().sortBy(_.delta)
-          val newState = changes.foldLeft(currentState) { case (iChanges, bc) =>
+          val newState: Map[AssetAcc, (AccState, ReasonIds)] = changes.foldLeft(currentState) { case (iChanges, bc) =>
             //update balances sheet
-            def safeSum(first: Long, second: Long): Long = {
-              try {
-                Math.addExact(first, second)
-              } catch {
-                case e: ArithmeticException =>
-                  throw new Error(s"Transaction leads to overflow balance: $first + $second = ${first + second}")
-              }
-            }
-
             val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
-            val newBalance = safeSum(currentChange._1.balance, bc.delta)
-            if (newBalance >= 0 || tx.timestamp < settings.allowTemporaryNegativeUntil) {
-              iChanges.updated(bc.assetAcc, (AccState(newBalance), tx.id +: currentChange._2))
-            } else {
-              throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
-            }
+            safeSum(currentChange._1.balance, bc.delta).flatMap(newBalance => Try {
+              if (newBalance >= 0 || tx.timestamp < settings.allowTemporaryNegativeUntil) {
+                iChanges.updated(bc.assetAcc, (AccState(newBalance), tx.id +: currentChange._2))
+              } else {
+                throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
+              }
+            }).get
           }
-          (newState, seq :+ tx)
+          (newState, seq :+ Right(tx))
         } catch {
           case NonFatal(e) =>
-            (currentState, seq)
+            (currentState, seq :+ Left(CustomValidationError(e.getMessage)))
         }
     }
     validTxs
   }
 
-  /**
-    * Returns sequence of valid transactions
-    */
+  implicit class SeqEitherHelper[L, R](eis: Seq[Either[L, R]]) {
+    def segregate(): (Seq[L], Seq[R]) = (eis.filter(_.isLeft).map(_.left.get),
+      eis.filter(_.isRight).map(_.right.get))
+  }
+
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
     val height = heightOpt.getOrElse(storage.stateHeight)
-
-    val validOneByOne = validAgainstStateOneByOne(height, trans).filter(_.isRight).map(_.right.get)
-
-    val validAgainstConsecutivePayments = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).filter(_.isRight).map(_.right.get)
-
-    val filteredFromFuture = filterTooOldTransactions(validAgainstConsecutivePayments, blockTime).filter(_.isRight).map(_.right.get)
-
-    val allowUnissuedAssets = filteredFromFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
-
-    val result = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredFromFuture)
-
+    val (err0, validOneByOne) = validAgainstStateOneByOne(height, trans).segregate()
+    val (err1, validAgainstConsecutivePayments) = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).segregate()
+    val (err2, filterExpired) = filterTooOldTransactions(validAgainstConsecutivePayments, blockTime).segregate()
+    val allowUnissuedAssets = filterExpired.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
+    val (err3, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filterExpired).segregate()
     result
   }
 

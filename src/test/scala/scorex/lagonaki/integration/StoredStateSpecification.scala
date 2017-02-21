@@ -12,7 +12,7 @@ import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
 import scorex.utils._
 
-import scala.util.Random
+import scala.util.{Left, Random, Right}
 
 class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
@@ -137,8 +137,10 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
     txs.size should be(20)
 
-    val shuffledTxs = Random.shuffle(txs).map(_.right.get)
-
+    val shuffledTxs = Random.shuffle(txs).map {
+      case Right(ts) => ts
+      case Left(err) => throw new Exception(err.toString)
+    }
     shuffledTxs.size should be(20)
 
     waitForNextBlock(application)
