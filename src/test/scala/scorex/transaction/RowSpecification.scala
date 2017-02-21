@@ -32,7 +32,7 @@ class RowSpecification extends PropSpec
       val txs = List(FeesStateChange(fee), payment)
       TypedTransaction.parseBytes(payment.bytes).get shouldBe payment
 
-      val row = Row(AccState(balance), txs.map(_.id), lastRowHeight)
+      val row = Row(AccState(balance, 0L), txs.map(_.id), lastRowHeight)
       val restored = Row.deserialize(row.bytes)
 
       restored shouldBe row
@@ -48,7 +48,7 @@ class RowSpecification extends PropSpec
       val txs = List(FeesStateChange(fee), payment)
       TypedTransaction.parseBytes(payment.bytes).get shouldBe payment
 
-      val row = Row(AccState(balance), txs.map(_.id), lastRowHeight)
+      val row = Row(AccState(balance, 0L), txs.map(_.id), lastRowHeight)
       val buffer = new WriteBuffer(0)
       RowDataType.write(buffer, row)
 
@@ -70,7 +70,7 @@ class RowSpecification extends PropSpec
       val table: MVMap[Int, Row] = db1.openMap("rows", new LogMVMapBuilder[Int, Row].valueType(RowDataType))
 
       val txs = List(FeesStateChange(fee), payment)
-      val row = Row(AccState(balance), txs.map(_.id), lastRowHeight)
+      val row = Row(AccState(balance, 0L), txs.map(_.id), lastRowHeight)
 
       table.put(lastRowHeight, row)
       closeDb(db1)

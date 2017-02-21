@@ -14,6 +14,7 @@ trait ApiError {
   lazy val json = Json.obj("error" -> id, "message" -> message)
 }
 
+
 object ApiError {
   def fromValidationError(e: ValidationError): ApiError = e match {
     case ValidationError.InvalidAddress => InvalidAddress
@@ -25,6 +26,7 @@ object ApiError {
     case ValidationError.TooBigArray => TooBigArrayAllocation
     case ValidationError.StateCheckFailed => StateCheckFailed
     case ValidationError.OverflowError => OverflowError
+    case ValidationError.ToSelf => ToSelfError
     case ValidationError.CustomValidationError(m) => CustomValidationError(m)
     case ValidationError.StateValidationError(_) => StateCheckFailed
   }
@@ -140,6 +142,12 @@ case object StateCheckFailed extends ApiError {
 case object OverflowError extends ApiError {
   override val id: Int = 113
   override val message: String = "overflow error"
+  override val code: StatusCode = StatusCodes.BadRequest
+}
+
+case object ToSelfError extends ApiError {
+  override val id: Int = 114
+  override val message: String = "Transaction to yourself"
   override val code: StatusCode = StatusCodes.BadRequest
 }
 

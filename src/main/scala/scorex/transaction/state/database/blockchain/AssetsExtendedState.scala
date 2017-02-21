@@ -9,10 +9,13 @@ import scorex.transaction.state.database.state.extension.Validator
 import scorex.transaction.state.database.state.storage.{AssetsExtendedStateStorageI, StateStorageI}
 import scorex.utils.ScorexLogging
 
+import scala.util.{Failure, Success}
+
+//TODO move to state.extension package
 class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorageI) extends ScorexLogging
   with Validator {
 
-  override def validate(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
+  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: ReissueTransaction =>
       isIssuerAddress(tx.assetId, tx).flatMap(t =>
         if (isReissuable(tx.assetId)) Right(t) else Left(StateValidationError("Asset is not reissuable")))
@@ -21,7 +24,7 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     case _ => Right(tx)
   }
 
-  override def process(tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
+  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
     case tx: AssetIssuance =>
       addAsset(tx.assetId, height, tx.id, tx.quantity, tx.reissuable)
     case tx: BurnTransaction =>

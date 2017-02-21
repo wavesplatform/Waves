@@ -3,12 +3,13 @@ package scorex.lagonaki.integration
 import com.wavesplatform.settings.Constants
 import org.scalatest._
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.api.http.assets.{IssueRequest, TransferRequest}
+import scorex.api.http.leasing.LeaseRequest
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.state.database.state.extension.IncrementingTimestampValidator
-import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
 import scorex.utils._
 
@@ -87,19 +88,117 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     state.balanceWithConfirmations(rec, 5) shouldBe 0L
   }
 
+  test("effective balance confirmations") {
+    val rec = new PrivateKeyAccount(randomBytes())
+    val senderBalance = state.balance(acc)
+    state.effectiveBalance(rec) shouldBe 0L
+    senderBalance should be > 100L
+
+    val txs = Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)
+    val block = TestBlock(txs)
+    state.processBlock(block)
+    state.effectiveBalance(rec) shouldBe 5L
+    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 0L
+
+    state.processBlock(TestBlock(Seq()))
+    state.effectiveBalance(rec) shouldBe 5L
+    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 5L
+    state.effectiveBalanceWithConfirmations(rec, 2) shouldBe 0L
+
+    val spendingBlock = TestBlock(Seq(transactionModule.createPayment(rec, acc, 2, 1).right.get))
+    state.processBlock(spendingBlock)
+    state.effectiveBalance(rec) shouldBe 2L
+    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 2L
+
+    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.effectiveBalance(rec) shouldBe 7L
+    state.effectiveBalanceWithConfirmations(rec, 3) shouldBe 2L
+
+    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.effectiveBalance(rec) shouldBe 12L
+    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 7L
+    state.effectiveBalanceWithConfirmations(rec, 2) shouldBe 2L
+    state.effectiveBalanceWithConfirmations(rec, 4) shouldBe 2L
+    state.effectiveBalanceWithConfirmations(rec, 5) shouldBe 0L
+  }
+
+  test("lease tx and balances") {
+    val rec = new PrivateKeyAccount(randomBytes())
+    val senderBalance = state.balance(acc)
+    state.effectiveBalance(rec) shouldBe 0L
+    senderBalance should be > 100L
+
+    val oldSenderEffectiveBalance = state.effectiveBalance(acc)
+    val oldSenderBalance = state.effectiveBalance(acc)
+    state.processBlock(TestBlock(Seq(transactionModule.lease(LeaseRequest(acc.address, 5, 1, rec.address), application.wallet).right.get)))
+    state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - 6
+    state.effectiveBalanceWithConfirmations(acc, 1) shouldBe oldSenderEffectiveBalance - 6
+    state.balance(rec) shouldBe 0L
+    state.effectiveBalance(rec) shouldBe 5L
+    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 0L
+    application.consensusModule.generatingBalance(acc) shouldBe oldSenderEffectiveBalance - 6
+    application.consensusModule.generatingBalance(rec) shouldBe 0
+
+    for {
+      i <- 0 until 1000
+    } {
+      state.processBlock(TestBlock(Seq.empty))
+    }
+    state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - 6
+    state.effectiveBalanceWithConfirmations(acc, 1000) shouldBe oldSenderEffectiveBalance - 6
+    state.effectiveBalanceWithConfirmations(rec, 1000) shouldBe 5
+    application.consensusModule.generatingBalance(acc) shouldBe oldSenderEffectiveBalance - 6
+    application.consensusModule.generatingBalance(rec) shouldBe 5
+  }
+
+  test("effective balance and generating balance") {
+    val rec = new PrivateKeyAccount(randomBytes())
+    val senderBalance = state.effectiveBalance(acc)
+    state.effectiveBalance(rec) shouldBe 0L
+    senderBalance should be > 100L
+
+    val txs = Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)
+    val block = TestBlock(txs)
+    state.processBlock(block)
+    state.effectiveBalance(rec) shouldBe 5L
+    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 0L
+
+    state.processBlock(TestBlock(Seq()))
+    state.effectiveBalance(rec) shouldBe 5L
+    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 5L
+    state.effectiveBalanceWithConfirmations(rec, 2) shouldBe 0L
+
+    val spendingBlock = TestBlock(Seq(transactionModule.createPayment(rec, acc, 2, 1).right.get))
+    state.processBlock(spendingBlock)
+    state.effectiveBalance(rec) shouldBe 2L
+    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 2L
+
+    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.effectiveBalance(rec) shouldBe 7L
+    state.effectiveBalanceWithConfirmations(rec, 3) shouldBe 2L
+
+
+    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.effectiveBalance(rec) shouldBe 12L
+    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 7L
+    state.effectiveBalanceWithConfirmations(rec, 2) shouldBe 2L
+    state.effectiveBalanceWithConfirmations(rec, 4) shouldBe 2L
+    state.effectiveBalanceWithConfirmations(rec, 5) shouldBe 0L
+  }
+
   test("private methods") {
     val testAcc = applicationEmptyAccounts.head
     val applyChanges = PrivateMethod[Unit]('applyChanges)
     state.balance(testAcc) shouldBe 0
     val tx = transactionModule.createPayment(acc, testAcc, 1, 1).right.get
-    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(2L), Seq(FeesStateChange(1L), tx))), NTP.correctedTime())
+    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(2L, 0L), Seq(FeesStateChange(1L), tx))), NTP.correctedTime())
     state.balance(testAcc) shouldBe 2
     state.included(tx.id).value shouldBe state.stateHeight
-    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(0L), Seq(tx))), NTP.correctedTime())
+    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(0L, 0L), Seq(tx))), NTP.correctedTime())
   }
 
   test("validate single transaction") {
-    val senderBalance = state.balance(acc)
+    val senderBalance = math.min(state.balance(acc), state.effectiveBalance(acc))
     senderBalance should be > 0L
 
     transactionModule.createPayment(acc, recipient, senderBalance, 1) shouldBe 'left

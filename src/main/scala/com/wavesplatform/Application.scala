@@ -11,7 +11,8 @@ import com.wavesplatform.settings.BlockchainSettingsExtension._
 import com.wavesplatform.settings._
 import scorex.account.AddressScheme
 import scorex.api.http._
-import scorex.api.http.assets.AssetsBroadcastApiRoute
+import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
+import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
 import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
@@ -58,7 +59,9 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
     WavesApiRoute(settings.restAPISettings, wallet, transactionModule),
     AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.state, transactionModule),
     NodeApiRoute(this),
-    AssetsBroadcastApiRoute(settings.restAPISettings, transactionModule)
+    AssetsBroadcastApiRoute(settings.restAPISettings, transactionModule),
+    LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.state, transactionModule),
+    LeaseBroadcastApiRoute(settings.restAPISettings, transactionModule)
   )
 
   override lazy val apiTypes = Seq(
@@ -74,7 +77,9 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
     typeOf[WavesApiRoute],
     typeOf[AssetsApiRoute],
     typeOf[NodeApiRoute],
-    typeOf[AssetsBroadcastApiRoute]
+    typeOf[AssetsBroadcastApiRoute],
+    typeOf[LeaseApiRoute],
+    typeOf[LeaseBroadcastApiRoute]
   )
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs

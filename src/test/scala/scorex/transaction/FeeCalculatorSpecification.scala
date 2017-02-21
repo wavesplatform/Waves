@@ -6,6 +6,7 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 
 class FeeCalculatorSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
@@ -30,6 +31,12 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
       |    }
       |    burn {
       |      WAVES = 300000
+      |    }
+      |    lease {
+      |      WAVES = 400000
+      |    }
+      |    lease-cancel {
+      |      WAVES = 500000
       |    }
       |  }
       |}""".stripMargin
@@ -76,6 +83,20 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
     val feeCalc = new FeeCalculator(mySettings)
     forAll(burnGenerator) { tx: BurnTransaction =>
       feeCalc.enoughFee(tx) shouldBe (tx.fee >= 300000)
+    }
+  }
+
+  property("Lease transaction") {
+    val feeCalc = new FeeCalculator(mySettings)
+    forAll(leaseGenerator) { tx: LeaseTransaction =>
+      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 400000)
+    }
+  }
+
+  property("Lease cancel transaction") {
+    val feeCalc = new FeeCalculator(mySettings)
+    forAll(leaseCancelGenerator) { tx: LeaseCancelTransaction =>
+      feeCalc.enoughFee(tx) shouldBe (tx.fee >= 500000)
     }
   }
 }

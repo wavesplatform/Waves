@@ -65,7 +65,7 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Even
 
     // Check that every node has enough money to generate blocks
     val requiredBalanceForGenerationInWaves =
-      WavesConsensusModule.MinimalEffictiveBalanceForGenerator / Constants.UnitsInWave
+      WavesConsensusModule.MinimalEffectiveBalanceForGenerator / Constants.UnitsInWave
 
     eventually(timeout(1.second), interval(100.millis)) {
       applications.exists(getMaxWalletGeneratingBalanceWaves(_) > requiredBalanceForGenerationInWaves) shouldBe true

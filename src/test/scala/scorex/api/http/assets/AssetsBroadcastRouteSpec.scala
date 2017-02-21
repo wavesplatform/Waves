@@ -2,6 +2,7 @@ package scorex.api.http.assets
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
+import akka.http.scaladsl.testkit._
 import com.wavesplatform.settings.RestAPISettings
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
@@ -9,7 +10,6 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
-import scorex.api.http.assets.BroadcastRequests._
 import scorex.transaction.{Transaction, TransactionModule}
 
 

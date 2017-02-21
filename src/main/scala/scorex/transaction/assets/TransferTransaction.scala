@@ -27,6 +27,9 @@ sealed trait TransferTransaction extends SignedTransaction {
 
 object TransferTransaction extends Deser[TransferTransaction] {
 
+  val MaxAttachmentSize = 140
+  val MaxAttachmentStringSize = base58Length(MaxAttachmentSize)
+
   private case class TransferTransactionImpl(assetId: Option[AssetId],
                                              sender: PublicKeyAccount,
                                              recipient: Account,
@@ -82,9 +85,6 @@ object TransferTransaction extends Deser[TransferTransaction] {
     override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
   }
-
-  val MaxAttachmentSize = 140
-  val MaxAttachmentStringSize = base58Length(MaxAttachmentSize)
 
   override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
     require(bytes.head == TransactionType.TransferTransaction.id)

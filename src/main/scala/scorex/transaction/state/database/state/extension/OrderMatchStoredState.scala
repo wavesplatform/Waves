@@ -1,6 +1,9 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.crypto.encode.Base58
+import scorex.transaction.Transaction
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.ValidationError.StateValidationError
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.state.storage.{OrderMatchStorageI, StateStorageI}
@@ -8,12 +11,12 @@ import scorex.transaction.{Transaction, ValidationError}
 
 class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends Validator {
 
-  override def validate(tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
+  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case om: ExchangeTransaction => OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om))
     case _ => Right(tx)
   }
 
-  override def process(tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
+  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
     case om: ExchangeTransaction => putOrderMatch(om, blockTs)
     case _ =>
   }
@@ -30,7 +33,9 @@ class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) exte
         val orderIdStr = Base58.encode(order.id)
         val omIdStr = Base58.encode(om.id)
         val prev = storage.getOrderMatchTxByDay(orderDay, orderIdStr).getOrElse(Array.empty[String])
-        if (!prev.contains(omIdStr)) storage.putOrderMatchTxByDay(orderDay, orderIdStr, prev :+ omIdStr)
+        if (!prev.contains(omIdStr)) {
+          storage.putOrderMatchTxByDay(orderDay, orderIdStr, prev :+ omIdStr)
+        }
       }
     }
 

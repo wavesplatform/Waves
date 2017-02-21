@@ -1,23 +1,22 @@
 package scorex.api.http.assets
 
 import javax.ws.rs.Path
+
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
+import scorex.BroadcastRoute
 import scorex.api.http._
-import scorex.transaction.{Transaction, TransactionModule, ValidationError}
+import scorex.transaction.TransactionModule
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
 case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule: TransactionModule)
-  extends ApiRoute {
+  extends ApiRoute with BroadcastRoute {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer
   }
-
-  import BroadcastRequests._
-  import BroadcastResponses._
 
   @Path("/issue")
   @ApiOperation(value = "Broadcast signed Asset issue",
@@ -33,10 +32,10 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
       paramType = "body",
       dataType = "scorex.api.http.assets.BroadcastRequests$AssetIssueRequest")))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with signed Asset issue transaction contained Asset ID", response = classOf[AssetIssueResponse]),
+    new ApiResponse(code = 200, message = "Json with signed Asset issue transaction contained Asset ID"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
   def issue: Route = (path("issue") & post) {
-    json[AssetIssueRequest] { issueReq =>
+    json[SignedIssueRequest] { issueReq =>
       doBroadcast(issueReq.toTx)
     }
   }
@@ -55,10 +54,10 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
       paramType = "body",
       dataType = "scorex.api.http.assets.BroadcastRequests$AssetReissueRequest")))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with signed Asset reissue transaction", response = classOf[AssetReissueResponse]),
+    new ApiResponse(code = 200, message = "Json with signed Asset reissue transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
   def reissue: Route = (path("reissue") & post) {
-    json[AssetReissueRequest] { reissueReq =>
+    json[SignedReissueRequest] { reissueReq =>
       doBroadcast(reissueReq.toTx)
     }
   }
@@ -77,10 +76,10 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
       paramType = "body",
       dataType = "scorex.api.http.assets.BroadcastRequests$AssetBurnRequest")))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with signed Asset burn transaction", response = classOf[AssetBurnResponse]),
+    new ApiResponse(code = 200, message = "Json with signed Asset burn transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
   def burnRoute: Route = (path("burn") & post) {
-    json[AssetBurnRequest] { burnReq =>
+    json[SignedBurnRequest] { burnReq =>
       doBroadcast(burnReq.toTx)
     }
   }
@@ -103,7 +102,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
     )
   ))
   def batchTransfer: Route = (path("batch-transfer") & post) {
-    json[Seq[AssetTransferRequest]] { reqs =>
+    json[Seq[SignedTransferRequest]] { reqs =>
       val tr = reqs.map(r => doBroadcast(r.toTx))
       tr.map(_.fold(_.json, _.json))
     }
@@ -123,17 +122,11 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
       paramType = "body",
       dataType = "scorex.api.http.assets.BroadcastRequests$AssetTransferRequest")))
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with signed Asset transfer transaction", response = classOf[AssetTransferResponse]),
+    new ApiResponse(code = 200, message = "Json with signed Asset transfer transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
   def transfer: Route = (path("transfer") & post) {
-    json[AssetTransferRequest] { transferReq =>
+    json[SignedTransferRequest] { transferReq =>
       doBroadcast(transferReq.toTx)
     }
   }
-
-  private def doBroadcast[A <: Transaction](v: Either[ValidationError, A]) =
-    v.left.map(ApiError.fromValidationError).flatMap(broadcast)
-
-  private def broadcast[T <: Transaction](tx: T): Either[ApiError, T] =
-    if (transactionModule.onNewOffchainTransaction(tx)) Right(tx) else Left(StateCheckFailed)
 }

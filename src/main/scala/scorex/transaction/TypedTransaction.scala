@@ -1,10 +1,12 @@
 package scorex.transaction
 
-import scala.util.{Failure, Try}
 import com.wavesplatform.utils.base58Length
 import scorex.serialization.Deser
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+
+import scala.util.{Failure, Try}
 
 trait TypedTransaction extends Transaction {
 
@@ -16,7 +18,6 @@ trait TypedTransaction extends Transaction {
 object TypedTransaction extends Deser[TypedTransaction] {
 
   //TYPES
-  @SerialVersionUID(-6895735531914374629L)
   object TransactionType extends Enumeration {
     val GenesisTransaction = Value(1)
     val PaymentTransaction = Value(2)
@@ -25,6 +26,8 @@ object TypedTransaction extends Deser[TypedTransaction] {
     val ReissueTransaction = Value(5)
     val BurnTransaction = Value(6)
     val ExchangeTransaction = Value(7)
+    val LeaseTransaction = Value(8)
+    val LeaseCancelTransaction = Value(9)
   }
 
   val TimestampLength = 8
@@ -57,6 +60,12 @@ object TypedTransaction extends Deser[TypedTransaction] {
 
       case txType: Byte if txType == TransactionType.ExchangeTransaction.id =>
         ExchangeTransaction.parseTail(data.tail)
+
+      case txType: Byte if txType == TransactionType.LeaseTransaction.id =>
+        LeaseTransaction.parseTail(data.tail)
+
+      case txType: Byte if txType == TransactionType.LeaseCancelTransaction.id =>
+        LeaseCancelTransaction.parseTail(data.tail)
 
       case txType => Failure(new Exception(s"Invalid transaction type: $txType"))
     }

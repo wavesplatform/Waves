@@ -1,6 +1,8 @@
 package scorex.consensus.nxt.api.http
 
 import javax.ws.rs.Path
+
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json

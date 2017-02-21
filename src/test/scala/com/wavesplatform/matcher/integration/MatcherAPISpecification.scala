@@ -7,11 +7,11 @@ import org.scalatest.time.SpanSugar._
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.account.{Account, PrivateKeyAccount}
+import scorex.api.http.assets.{IssueRequest, TransferRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.state.wallet.{IssueRequest, TransferRequest}
 import scorex.utils.NTP
 
 /**

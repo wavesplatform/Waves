@@ -22,8 +22,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Lag
 
   override lazy val route =
     pathPrefix("addresses") {
-      validate ~ seed ~ confirmationBalance ~ balance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
-        signText ~ seq ~ publicKey
+      validate ~ seed ~ balanceWithConfirmations ~ balance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations
     } ~ root ~ create
 
   @Path("/{address}")
@@ -124,10 +124,35 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Lag
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
   ))
-  def confirmationBalance: Route = {
+  def balanceWithConfirmations: Route = {
     (path("balance" / Segment / IntNumber) & get) { case (address, confirmations) =>
-      //todo: confirmations parameter doesn't work atm
       complete(balanceJson(address, confirmations))
+    }
+  }
+
+
+  @Path("/effectiveBalance/{address}")
+  @ApiOperation(value = "Balance", notes = "Account's balance", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+  ))
+  def effectiveBalance: Route = {
+    path("effectiveBalance" / Segment) { address =>
+      complete (effectiveBalanceJson(address, 0))
+    }
+  }
+
+  @Path("/effectiveBalance/{address}/{confirmations}")
+  @ApiOperation(value = "Confirmed balance", notes = "Balance of {address} after {confirmations}", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
+  ))
+  def effectiveBalanceWithConfirmations: Route = {
+    path("effectiveBalance" / Segment / IntNumber) { case (address, confirmations) =>
+      complete (
+        effectiveBalanceJson(address, confirmations)
+      )
     }
   }
 
@@ -208,6 +233,18 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Lag
         "address" -> account.address,
         "confirmations" -> confirmations,
         "balance" -> state.balanceWithConfirmations(account, confirmations))
+    }
+  }
+
+  private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
+    val account = new Account(address)
+    if (!Account.isValid(account)) {
+      InvalidAddress
+    } else {
+      Json.obj(
+        "address" -> account.address,
+        "confirmations" -> confirmations,
+        "balance" -> state.effectiveBalanceWithConfirmations(account, confirmations))
     }
   }
 

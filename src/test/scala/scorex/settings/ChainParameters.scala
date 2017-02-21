@@ -33,6 +33,7 @@ object TestChainParameters {
     override def allowUnissuedAssetsUntil: Long = Long.MaxValue
     override def allowBurnTransactionAfterTimestamp: Long = Long.MaxValue
     override def requirePaymentUniqueId: Long = Long.MaxValue
+    override def allowLeaseTransactionAfterTimestamp: Long = Long.MaxValue
 
     override def initialBalance: Long = 100000000000000L
 
@@ -51,6 +52,7 @@ object TestChainParameters {
     override def allowUnissuedAssetsUntil: Long = 0
     override def allowBurnTransactionAfterTimestamp: Long = 0
     override def requirePaymentUniqueId: Long = 0
+    override def allowLeaseTransactionAfterTimestamp: Long = 0
 
     override def initialBalance: Long = ???
 
