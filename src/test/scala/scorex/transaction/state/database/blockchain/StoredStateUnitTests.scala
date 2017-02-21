@@ -48,7 +48,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     override def addressScheme: AddressScheme = ???
 
-    override def allowExchangeTransactionAfter: Long = 0L
+    override def allowExchangeTransactionAfterTimestamp: Long = 0L
   }
 
   val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"

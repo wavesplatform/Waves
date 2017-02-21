@@ -9,7 +9,8 @@ import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 
 class ActivatedValidator(
                           allowBurnTransactionAfterTimestamp: Long,
-                          allowLeaseTransactionAfterTimestamp: Long
+                          allowLeaseTransactionAfterTimestamp: Long,
+                          allowExchangeTransactionAfterTimestamp: Long
                         ) extends Validator {
 
 
@@ -20,6 +21,8 @@ class ActivatedValidator(
       Left(StateValidationError(s"LeaseTransaction(time: ${tx.timestamp}) must not appear before time=$allowLeaseTransactionAfterTimestamp"))
     case tx: LeaseCancelTransaction if tx.timestamp <= allowLeaseTransactionAfterTimestamp =>
       Left(StateValidationError(s"LeaseCancelTransaction(time: ${tx.timestamp}) must not appear before time=$allowLeaseTransactionAfterTimestamp"))
+    case tx: ExchangeTransaction if tx.timestamp <= allowExchangeTransactionAfterTimestamp =>
+      Left(StateValidationError(s"ExchangeTransaction(time: ${tx.timestamp}) must not appear before time=$allowExchangeTransactionAfterTimestamp"))
     case _: BurnTransaction => Right(tx)
     case _: PaymentTransaction => Right(tx)
     case _: GenesisTransaction => Right(tx)

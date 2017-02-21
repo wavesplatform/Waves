@@ -186,7 +186,7 @@ object BlockchainSettingsExtension {
 
         override def allowLeaseTransactionAfterTimestamp: Long = blockchainSettings.functionalitySettings.allowLeaseTransactionAfterTimestamp
 
-        override def allowExchangeTransactionAfter: Long = blockchainSettings.functionalitySettings.allowExchangeTransactionAfter
+        override def allowExchangeTransactionAfterTimestamp: Long = blockchainSettings.functionalitySettings.allowExchangeTransactionAfter
       }
     }
 

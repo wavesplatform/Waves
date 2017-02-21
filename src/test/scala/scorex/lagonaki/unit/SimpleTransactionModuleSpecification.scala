@@ -66,7 +66,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
 
     override def addressScheme: AddressScheme = ???
 
-    override def allowExchangeTransactionAfter: Long = 0L
+    override def allowExchangeTransactionAfterTimestamp: Long = 0L
   }
 
   implicit val app = stub[MyApp]
