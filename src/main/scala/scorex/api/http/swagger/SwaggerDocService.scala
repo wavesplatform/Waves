@@ -12,7 +12,6 @@ class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMat
   extends SwaggerHttpService with HasActorSystem {
 
   override val host: String = settings.bindAddress + ":" + settings.port
-  override val basePath: String = "api-docs"
   override val info: Info = Info("The Web Interface to the Waves Full Node API",
     Constants.VersionString,
     "Waves Full Node",

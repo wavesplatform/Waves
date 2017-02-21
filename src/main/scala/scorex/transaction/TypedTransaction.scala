@@ -1,5 +1,7 @@
 package scorex.transaction
 
+import scala.util.{Failure, Try}
+import com.wavesplatform.utils.base58Length
 import scorex.serialization.Deser
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -34,7 +36,9 @@ object TypedTransaction extends Deser[TypedTransaction] {
   val AmountLength = 8
   val TypeLength = 1
   val SignatureLength = 64
+  val SignatureStringLength = base58Length(SignatureLength)
   val KeyLength = 32
+  val KeyStringLength = base58Length(KeyLength)
 
   def parseBytes(data: Array[Byte]): Try[TypedTransaction] =
     data.head match {

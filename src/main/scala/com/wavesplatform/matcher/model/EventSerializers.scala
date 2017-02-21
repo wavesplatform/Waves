@@ -11,7 +11,6 @@ import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
 import play.api.libs.json._
-import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 
@@ -57,15 +56,6 @@ object MatcherSerializer {
     val OrderCancelled = "event.OrderCancelled"
   }
 
-  implicit val byteArrayWrites: Format[Option[Array[Byte]]] = Format(
-    Reads {
-      case JsString("") => JsSuccess(Option.empty[Array[Byte]])
-      case JsString(v) => Base58.decode(v).map(b => JsSuccess(Option(b))).getOrElse(JsError())
-      case _ => JsError()
-    },
-    Writes(_.fold(JsString(""))(b => JsString(Base58.encode(b))))
-  )
-
   private def zzz(lo: LimitOrder) = (lo.price, lo.amount, lo.order)
   private def fmt[T <: LimitOrder](f1: (Long, Long, Order) => T): Format[T] =
     ((__ \ "price").format[Long] and
@@ -97,10 +87,7 @@ object MatcherSerializer {
     }
   }
 
-  implicit val orderBookFormat = (
-    (__ \ "bids").format[TreeMap[Price, Level[BuyLimitOrder]]] and
-    (__ \ "asks").format[TreeMap[Price, Level[SellLimitOrder]]])(OrderBook.apply, unlift(OrderBook.unapply))
-
+  implicit val orderBookFormat: Format[OrderBook] = Json.format
   val orderAddedFormat = Format(
     (__ \ "o").read[LimitOrder].map(OrderAdded),
     Writes[OrderAdded](oa => Json.obj("o" -> oa.order))

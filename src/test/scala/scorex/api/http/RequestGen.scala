@@ -16,7 +16,7 @@ trait RequestGen extends TransactionGen {
   ).label("invalid decimals")
 
   val longAttachment: G[String] =
-    genBoundedBytes(TransferTransaction.MaxAttachmentSize + 1, TransferTransaction.MaxAttachmentSize + 50)
+    genBoundedBytes(TransferTransaction.MaxAttachmentSize + 10, TransferTransaction.MaxAttachmentSize + 50)
       .map(Base58.encode)
   val invalidBase58: G[String] = listOfN(50, oneOf(alphaNumChar, oneOf('O', '0', 'l')))
     .map(_.mkString)
