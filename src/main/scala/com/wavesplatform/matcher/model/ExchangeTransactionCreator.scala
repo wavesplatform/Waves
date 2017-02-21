@@ -2,21 +2,17 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.database.state.extension.OrderMatchStoredState
-import scorex.transaction.{SignedTransaction, TransactionModule, ValidationError}
+import scorex.transaction.{SignedTransaction, State, TransactionModule, ValidationError}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
 trait ExchangeTransactionCreator {
   val transactionModule: TransactionModule
-  val storedState: StoredState
+  val storedState: State
   val wallet: Wallet
   val settings: MatcherSettings
   //TODO ???
-  val omss = storedState.validators.filter(_.isInstanceOf[OrderMatchStoredState]).head
-    .asInstanceOf[OrderMatchStoredState]
-
+  val omss = storedState.orderMatchStoredState
   private var txTime: Long = 0
 
   private def getTimestamp: Long = {

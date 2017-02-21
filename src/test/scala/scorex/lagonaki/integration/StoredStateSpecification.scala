@@ -20,8 +20,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   private val history = application.transactionModule.blockStorage.history
   private val acc = applicationNonEmptyAccounts.head
   private val recipient = applicationEmptyAccounts.head
-  private val incrementingTimestampValidator: IncrementingTimestampValidator = state.validators.filter(_.isInstanceOf[IncrementingTimestampValidator]).head.asInstanceOf[IncrementingTimestampValidator]
-
+  private val incrementingTimestampValidator: IncrementingTimestampValidator = state.incrementingTimestampValidator
   require(acc.address != recipient.address)
 
   override def beforeAll(): Unit = {

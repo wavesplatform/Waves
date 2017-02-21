@@ -1,6 +1,7 @@
 package scorex.api.http
 
 import java.io.File
+
 import akka.http.scaladsl.model.headers.RawHeader
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
@@ -12,7 +13,7 @@ import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{TransactionOperations, ValidationError}
+import scorex.transaction.{State, TransactionOperations, ValidationError}
 import scorex.wallet.Wallet
 
 class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMockFactory with PropertyChecks {
@@ -60,7 +61,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     val currentPath = routePath(path)
     currentPath in {
       forAll(errorGen) { e =>
-        val route = AssetsApiRoute(settings, wallet, mock[StoredState], mkMock(e)).route
+        val route = AssetsApiRoute(settings, wallet, mock[State], mkMock(e)).route
 
         forAll(gen) { tr =>
           val p = Post(currentPath, tr)

@@ -1,6 +1,7 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
+
 import scala.util.{Failure, Success}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
@@ -13,12 +14,12 @@ import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
-import scorex.transaction.{AssetAcc, TransactionOperations}
+import scorex.transaction.{AssetAcc, State, TransactionOperations}
 import scorex.wallet.Wallet
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StoredState, transactionModule: TransactionOperations) extends ApiRoute {
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: State, transactionModule: TransactionOperations) extends ApiRoute {
   val MaxAddressesPerRequest = 1000
 
   private def processRequest[A: Reads](pathMatcher: String, f: A => ToResponseMarshallable) =

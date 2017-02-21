@@ -22,11 +22,6 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 
-/**
-  * Validation and processing of data with respect to the local storage
-  *
-  * Use fromDB method of StoredState object to create new instance
-  */
 class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
                   val assetsExtension: AssetsExtendedState,
                   val incrementingTimestampValidator: IncrementingTimestampValidator,
@@ -106,7 +101,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   override def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
     balance(account, Some(Math.max(1, heightOpt.getOrElse(storage.stateHeight) - confirmations)))
 
-  override def accountTransactions(account: Account, limit: Int = DefaultLimit): Seq[Transaction] = {
+  override def accountTransactions(account: Account, limit: Int): Seq[Transaction] = {
     val accountAssets = storage.getAccountAssets(account.address)
     val keys = account.address :: accountAssets.map(account.address + _).toList
 
@@ -203,8 +198,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     filterValidTransactionsByState(filteredFromFuture)
   }
 
-  private[blockchain] def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean):
-  Map[AssetAcc, (AccState, Reasons)] = {
+  def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
     val newBalances: Map[AssetAcc, (AccState, Reasons)] = trans.foldLeft(fees) { case (changes, tx) =>
       tx.balanceChanges().foldLeft(changes) { case (iChanges, bc) =>
         //update balances sheet
@@ -222,9 +216,9 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     newBalances
   }
 
-  private[blockchain] def totalAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
+  def totalAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
 
-  private[blockchain] def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)], blockTs: Long = NTP.correctedTime()): Unit = synchronized {
+  def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)], blockTs: Long = NTP.correctedTime()): Unit = synchronized {
     storage.setStateHeight(storage.stateHeight + 1)
     val h = storage.stateHeight
     changes.foreach { ch =>
@@ -287,7 +281,6 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   }
 
 
-  private val DefaultLimit = 50
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
     transactions.filter(t1 => !exclude.exists(t2 => t2.id sameElements t1.id))
@@ -300,7 +293,7 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
   }
 
   def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
-    validators.toStream.map(_.validate(transaction,height)).find(_.isLeft) match {
+    validators.toStream.map(_.validate(transaction, height)).find(_.isLeft) match {
       case Some(Left(e)) => Left(e)
       case _ => Right(transaction)
     }
@@ -356,10 +349,12 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     (BigInt(FastCryptographicHash(toString.getBytes)) % Int.MaxValue).toInt
   }
 
+  override def orderMatchStoredState: OrderMatchStoredState = validators.filter(_.isInstanceOf[OrderMatchStoredState])
+    .head.asInstanceOf[OrderMatchStoredState]
 }
 
 object StoredState {
-  def fromDB(mvStore: MVStore, settings: ChainParameters): StoredState = {
+  def fromDB(mvStore: MVStore, settings: ChainParameters): State = {
     val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage {
       override val db: MVStore = mvStore
       if (db.getStoreVersion > 0) db.rollback()
