@@ -1,10 +1,8 @@
-package com.wavesplatform.matcher.settings
-
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.NetworkSettings
-import org.scalatest.{FlatSpec, Matchers}
+package com.wavesplatform.settings
 
 import scala.concurrent.duration._
+import com.typesafe.config.ConfigFactory
+import org.scalatest.{FlatSpec, Matchers}
 
 class NetworkSettingsSpecification extends FlatSpec with Matchers {
 

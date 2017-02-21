@@ -1,8 +1,7 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigException.{BadValue, NotResolved}
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.{FeeSettings, FeesSettings}
 import org.scalatest.{FlatSpec, Matchers}
 
 class FeesSettingsSpecification extends FlatSpec with Matchers {
