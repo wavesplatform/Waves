@@ -9,7 +9,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigValue, ConfigValueFacto
 import scorex.transaction.TypedTransaction.TransactionType
 
 object LegacyConfigTransformer {
-  private val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_UNDERSCORE)
+  private val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)
   private def transformFees(feeMap: Config): ConfigValue = {
     val m = feeMap.root().keySet().map { txId =>
       val key = converter.convert(TransactionType(txId.toInt).toString).split("_")(0)

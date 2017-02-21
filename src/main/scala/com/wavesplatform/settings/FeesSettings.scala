@@ -15,7 +15,7 @@ case class FeesSettings(fees: Map[Int, List[FeeSettings]])
 object FeesSettings {
   val configPath: String = "waves.fees"
 
-  private val converter = CaseFormat.LOWER_UNDERSCORE.converterTo(CaseFormat.UPPER_CAMEL)
+  private val converter = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
   private def toTxType(key: String): TransactionType.Value =
     TransactionType.withName(s"${converter.convert(key)}Transaction")
 
