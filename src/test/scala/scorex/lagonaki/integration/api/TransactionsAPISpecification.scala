@@ -43,14 +43,6 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
   }
 
   test("/transactions/address/{address}/limit/{limit} API route should contains CORS header") {
-    addresses.foreach { a =>
-      val tr = GET.request(s"/transactions/address/$a/limit/2")
-      (tr \\ "amount").toList.size should be <= 2
-      checkTransactionList(tr)
-    }
-  }
-
-  test("/transactions/address/{address}/limit/{limit} API route should contains CORS header") {
     val response = GET.requestRaw(s"/transactions/address/${addresses.head}/limit/2")
     val allowOrigin = `Access-Control-Allow-Origin`.*
     assert(response.getHeader(allowOrigin.name()).contains(allowOrigin.value()))
