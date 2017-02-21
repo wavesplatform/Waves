@@ -470,7 +470,9 @@ object StoredState {
       new OrderMatchStoredState(storage),
       new IncludedValidator(storage, settings.requirePaymentUniqueId),
       new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
-        settings.allowLeaseTransactionAfterTimestamp)
+        settings.allowLeaseTransactionAfterTimestamp,
+        settings.allowExchangeTransactionAfterTimestamp
+      )
     )
     new StoredState(storage, leaseExtendedState, assetExtendedState, incrementingTimestampValidator, validators, settings)
   }
