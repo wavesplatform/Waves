@@ -5,19 +5,21 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError
+import scorex.transaction.TypedTransaction._
+import scorex.transaction.{AssetIdStringLength, ValidationError}
 import scorex.transaction.ValidationError.InvalidAddress
 import scorex.transaction.assets._
 
 object BroadcastRequests {
-  private def parseBase58(v: String, error: String): Either[ValidationError, Array[Byte]] =
-    Base58.decode(v).toEither.left.map(_ => ValidationError.CustomValidationError(error))
+  private def parseBase58(v: String, error: String, maxLength: Int): Either[ValidationError, Array[Byte]] =
+    if (v.length > maxLength) Left(ValidationError.CustomValidationError(error))
+    else Base58.decode(v).toOption.toRight(ValidationError.CustomValidationError(error))
 
-  private def parseBase58(v: Option[String], error: String): Either[ValidationError, Array[Byte]] =
-    v.fold[Either[ValidationError, Array[Byte]]](Right(Array.emptyByteArray))(_v => parseBase58(_v, error))
+  private def parseBase58(v: Option[String], error: String, maxLength: Int): Either[ValidationError, Array[Byte]] =
+    v.fold[Either[ValidationError, Array[Byte]]](Right(Array.emptyByteArray))(_v => parseBase58(_v, error, maxLength))
 
-  private def parseBase58ToOption(v: Option[String], error: String): Either[ValidationError, Option[Array[Byte]]] =
-    v.fold[Either[ValidationError, Option[Array[Byte]]]](Right(None)) { s => parseBase58(s, error).map(b => Option(b)) }
+  private def parseBase58ToOption(v: Option[String], error: String, maxLength: Int): Either[ValidationError, Option[Array[Byte]]] =
+    v.fold[Either[ValidationError, Option[Array[Byte]]]](Right(None)) { s => parseBase58(s, error, maxLength).map(b => Option(b)) }
 
   @ApiModel(value = "Signed Asset issue transaction")
   case class AssetIssueRequest(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
@@ -41,7 +43,7 @@ object BroadcastRequests {
 
     def toTx: Either[ValidationError, IssueTransaction] = for {
       _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _signature <- parseBase58(signature, "invalid signature")
+      _signature <- parseBase58(signature, "invalid signature", SignatureStringLength)
       _t <- IssueTransaction.create(_sender, name.getBytes(Charsets.UTF_8), description.getBytes(Charsets.UTF_8),
         quantity, decimals, reissuable, fee, timestamp, _signature)
     } yield _t
@@ -64,8 +66,8 @@ object BroadcastRequests {
 
     def toTx: Either[ValidationError, ReissueTransaction] = for {
       _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _signature <- parseBase58(signature, "invalid.signature")
-      _assetId <- parseBase58(assetId, "invalid.assetId")
+      _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
+      _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
       _t <- ReissueTransaction.create(_sender, _assetId, quantity, reissuable, fee, timestamp, _signature)
     } yield _t
   }
@@ -85,8 +87,8 @@ object BroadcastRequests {
 
     def toTx: Either[ValidationError, BurnTransaction] = for {
       _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _assetId <- parseBase58(assetId, "invalid.signature")
-      _signature <- parseBase58(signature, "invalid.signature")
+      _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
+      _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _t <- BurnTransaction.create(_sender, _assetId, quantity, fee, timestamp, _signature)
     } yield _t
   }
@@ -112,10 +114,10 @@ object BroadcastRequests {
                                   signature: String) {
     def toTx: Either[ValidationError, TransferTransaction] = for {
       _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
-      _assetId <- parseBase58ToOption(assetId, "invalid.assetId")
-      _feeAssetId <- parseBase58ToOption(feeAssetId, "invalid.feeAssetId")
-      _signature <- parseBase58(signature, "invalid.signature")
-      _attachment <- parseBase58(attachment, "invalid.attachment")
+      _assetId <- parseBase58ToOption(assetId, "invalid.assetId", AssetIdStringLength)
+      _feeAssetId <- parseBase58ToOption(feeAssetId, "invalid.feeAssetId", AssetIdStringLength)
+      _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
+      _attachment <- parseBase58(attachment, "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
       _account <- if (Account.isValidAddress(recipient)) Right(new Account(recipient)) else Left(InvalidAddress)
       _t <- TransferTransaction.create(_assetId, _sender, _account, amount, timestamp, _feeAssetId, fee, _attachment,
         _signature)
