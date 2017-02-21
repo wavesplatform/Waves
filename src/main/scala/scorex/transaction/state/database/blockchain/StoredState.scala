@@ -136,66 +136,76 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
     }.values.flatten.toList.sortWith(_.timestamp > _.timestamp).take(limit)
   }
 
+  private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Transaction] = txs.filter(t => validateAgainstState(t, height).isRight)
+
+  private def filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(txs: Seq[Transaction]): Seq[Transaction] = {
+    val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
+    if (allowInvalidPaymentTransactionsByTimestamp) {
+      txs
+    } else {
+      val invalidPaymentTransactionsByTimestamp = incrementingTimestampValidator.invalidatePaymentTransactionsByTimestamp(txs)
+      excludeTransactions(txs, invalidPaymentTransactionsByTimestamp)
+    }
+  }
+
+  private def filterFromTooFarFuture(trans: Seq[Transaction], blockTime: Long): Seq[Transaction] = {
+    val allowTransactionsFromFutureByTimestamp = trans.nonEmpty && trans.map(_.timestamp).max < settings.allowTransactionsFromFutureUntil
+    if (allowTransactionsFromFutureByTimestamp) {
+      trans
+    } else {
+      filterTransactionsFromFuture(trans, blockTime)
+    }
+  }
+
+  private def filterByBalanceApplicationErrors(allowUnissuedAssets: Boolean, trans: Seq[Transaction]): Seq[Transaction] = {
+    val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Transaction])) {
+      case ((currentState, seq), tx) =>
+        try {
+          val changes = if (allowUnissuedAssets) tx.balanceChanges() else tx.balanceChanges().sortBy(_.delta)
+          val newState = changes.foldLeft(currentState) { case (iChanges, bc) =>
+            //update balances sheet
+            def safeSum(first: Long, second: Long): Long = {
+              try {
+                Math.addExact(first, second)
+              } catch {
+                case e: ArithmeticException =>
+                  throw new Error(s"Transaction leads to overflow balance: $first + $second = ${first + second}")
+              }
+            }
+
+            val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
+            val newBalance = safeSum(currentChange._1.balance, bc.delta)
+            if (newBalance >= 0 || tx.timestamp < settings.allowTemporaryNegativeUntil) {
+              iChanges.updated(bc.assetAcc, (AccState(newBalance), tx.id +: currentChange._2))
+            } else {
+              throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
+            }
+          }
+          (newState, seq :+ tx)
+        } catch {
+          case NonFatal(e) =>
+            (currentState, seq)
+        }
+    }
+    validTxs
+  }
   /**
     * Returns sequence of valid transactions
     */
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
     val height = heightOpt.getOrElse(storage.stateHeight)
 
-    val txs = trans.filter(t => validateAgainstState(t, height).isRight)
+    val validOneByOne = validAgainstStateOneByOne(height, trans)
 
-    val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
-    val validTransactions = if (allowInvalidPaymentTransactionsByTimestamp) {
-      txs
-    } else {
-      val invalidPaymentTransactionsByTimestamp = incrementingTimestampValidator.invalidatePaymentTransactionsByTimestamp(txs)
-      excludeTransactions(txs, invalidPaymentTransactionsByTimestamp)
-    }
+    val validAgainstConsecutivePayments = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne)
 
-    val allowTransactionsFromFutureByTimestamp = validTransactions.nonEmpty && validTransactions.map(_.timestamp).max < settings.allowTransactionsFromFutureUntil
-    val filteredFromFuture = if (allowTransactionsFromFutureByTimestamp) {
-      validTransactions
-    } else {
-      filterTransactionsFromFuture(validTransactions, blockTime)
-    }
+    val filteredFromFuture = filterFromTooFarFuture(validAgainstConsecutivePayments, blockTime)
 
-    val allowUnissuedAssets = filteredFromFuture.nonEmpty && txs.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
+    val allowUnissuedAssets = filteredFromFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
 
+    val result = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredFromFuture)
 
-    def filterValidTransactionsByState(trans: Seq[Transaction]): Seq[Transaction] = {
-      val (state, validTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Transaction])) {
-        case ((currentState, seq), tx) =>
-          try {
-            val changes = if (allowUnissuedAssets) tx.balanceChanges() else tx.balanceChanges().sortBy(_.delta)
-            val newState = changes.foldLeft(currentState) { case (iChanges, bc) =>
-              //update balances sheet
-              def safeSum(first: Long, second: Long): Long = {
-                try {
-                  Math.addExact(first, second)
-                } catch {
-                  case e: ArithmeticException =>
-                    throw new Error(s"Transaction leads to overflow balance: $first + $second = ${first + second}")
-                }
-              }
-
-              val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc)), List.empty))
-              val newBalance = safeSum(currentChange._1.balance, bc.delta)
-              if (newBalance >= 0 || tx.timestamp < settings.allowTemporaryNegativeUntil) {
-                iChanges.updated(bc.assetAcc, (AccState(newBalance), tx.id +: currentChange._2))
-              } else {
-                throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
-              }
-            }
-            (newState, seq :+ tx)
-          } catch {
-            case NonFatal(e) =>
-              (currentState, seq)
-          }
-      }
-      validTxs
-    }
-
-    filterValidTransactionsByState(filteredFromFuture)
+    result
   }
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
@@ -279,7 +289,6 @@ class StoredState(protected val storage: StateStorageI with OrderMatchStorageI,
         0L
     }
   }
-
 
 
   private def excludeTransactions(transactions: Seq[Transaction], exclude: Iterable[Transaction]) =
