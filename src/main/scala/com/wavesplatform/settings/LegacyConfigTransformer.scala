@@ -27,17 +27,18 @@ object LegacyConfigTransformer {
     "p2p.peersDataResidenceTimeDays" -> { (cfg, p) => cv(Duration.ofDays(cfg.getInt(p))) },
     "p2p.blacklistResidenceTimeMilliseconds" -> millis,
     "p2p.peersDataBroadcastDelay" -> millis,
-    "p2p.connectionTimeout" -> seconds,
     "p2p.upnpGatewayTimeout"  -> seconds,
     "p2p.upnpDiscoverTimeout" -> seconds,
     "p2p.connectionTimeout" -> seconds,
-    "p2p.outboundBufferSizeMb" -> { (cfg, p) => cv(s"${cfg.getInt(p)}") },
+    "p2p.outboundBufferSizeMb" -> { (cfg, p) => cv(s"${cfg.getInt(p)}M") },
     "allowedGenerationTimeFromLastBlockInterval" -> days,
     "logLevel" -> { (cfg, p) => cv(cfg.getString(p).toUpperCase) },
     "feeMap" -> { (cfg, p) => transformFees(cfg.getConfig(p)) },
     "testnet" -> { (cfg, p) => cv(if (cfg.getBoolean(p)) "TESTNET" else "MAINNET") },
     "scoreBroadcastDelay" -> millis,
-    "utxRebroadcastInterval" -> seconds
+    "utxRebroadcastInterval" -> seconds,
+    "historySynchronizerTimeout" -> seconds,
+    "blockGenerationDelay" -> millis
   )
 
   private val fieldMap = Map(
@@ -95,7 +96,6 @@ object LegacyConfigTransformer {
     "pinToInitialPeer"           -> "synchronization.pin-to-initial-peer",
     "retriesBeforeBlacklisted"   -> "synchronization.retries-before-blacklisting",
     "operationRetries"           -> "synchronization.operation-retires",
-    "scoreBroadcastDelay"        -> "synchronization.score-broadcast-interval",
 
     "utxSize"                -> "utx.size",
     "utxRebroadcastInterval" -> "utx.broadcast-interval",
@@ -119,6 +119,8 @@ object LegacyConfigTransformer {
       |scoreBroadcastDelay = 30000
       |utxSize = 10000
       |utxRebroadcastInterval = 30
+      |historySynchronizerTimeout = 30
+      |blockGenerationDelay = 1000
       |p2p {
       |  localOnly = false
       |  peersDataResidenceTimeDays = 1
