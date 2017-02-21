@@ -8,7 +8,7 @@ import scorex.transaction.TypedTransaction.TransactionType
 
 object LegacyConfigTransformer {
   private val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_UNDERSCORE)
-  private def transformCommissions(feeMap: Config): ConfigValue = {
+  private def transformFees(feeMap: Config): ConfigValue = {
     val m = feeMap.root().keySet().map { txId =>
       val key = converter.convert(TransactionType(txId.toInt).toString).split("_")(0)
       key -> feeMap.getValue(txId)
@@ -55,11 +55,17 @@ object LegacyConfigTransformer {
     "checkpoints.publicKey" -> "checkpoints.public-key")
 
   def transform(legacyConfig: Config): Config = {
-    val blockchainType = ConfigValueFactory.fromAnyRef(if (!legacyConfig.getBoolean("testNet")) "MAINNET" else "TESTNET")
+    val lc = legacyConfig.withFallback(ConfigFactory.parseString("feeMap = {}, testnet = false".stripMargin))
+
+    val blockchainType = ConfigValueFactory.fromAnyRef(if (lc.getBoolean("testnet")) "TESTNET" else "MAINNET")
 
     fieldMap.foldLeft(ConfigFactory.empty()) {
-      case (cfg, (sourceKey, destKey)) => cfg.withValue(destKey, legacyConfig.getValue(sourceKey))
-    }.withValue("fees", transformCommissions(legacyConfig.getConfig("feeMap")))
+      case (cfg, (sourceKey, destKey)) =>
+        if (lc.hasPath(sourceKey))
+          cfg.withValue(destKey, lc.getValue(sourceKey))
+        else cfg
+    }
       .withValue("blockchain.type", blockchainType)
+      .withValue("fees", transformFees(lc.getConfig("feeMap")))
   }
 }
