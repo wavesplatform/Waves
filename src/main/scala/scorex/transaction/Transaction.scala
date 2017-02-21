@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.google.common.primitives.Ints
+import scorex.account.Account
 import scorex.serialization.JsonSerializable
 
 
@@ -24,3 +25,4 @@ trait Transaction extends StateChangeReason with JsonSerializable {
 }
 
 case class BalanceChange(assetAcc: AssetAcc, delta: Long)
+case class EffectiveBalanceChange(account: Account, amount: Long)

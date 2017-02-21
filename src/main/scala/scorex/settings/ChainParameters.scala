@@ -12,7 +12,9 @@ trait ChainParameters {
   def allowTransactionsFromFutureUntil: Long
   def allowUnissuedAssetsUntil: Long
   def allowBurnTransactionAfterTimestamp: Long
+  def allowLeaseTransactionAfterTimestamp: Long
   def requirePaymentUniqueId: Long
+
   def initialBalance: Long
   def genesisTimestamp: Long
   def genesisTxs: Seq[Transaction]

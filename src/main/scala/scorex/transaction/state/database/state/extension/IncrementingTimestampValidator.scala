@@ -1,14 +1,16 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.account.Account
+import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.StateValidationError
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.storage.StateStorageI
 import scorex.transaction.{PaymentTransaction, Transaction}
 
 class IncrementingTimestampValidator(allowInvalidPaymentTransactionsByTimestamp: Long, storage: StateStorageI) extends Validator {
 
-  override def validate(transaction: Transaction, height: Int): Either[StateValidationError, Transaction] = transaction match {
+  override def validate(storedState: StoredState, transaction: Transaction, height: Int): Either[StateValidationError, Transaction] = transaction match {
     case tx: PaymentTransaction =>
       val isCorrect = tx.timestamp < allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
       if (isCorrect) Right(tx)
@@ -73,5 +75,5 @@ class IncrementingTimestampValidator(allowInvalidPaymentTransactionsByTimestamp:
   }
 
 
-  override def process(tx: Transaction, blockTs: Long, height: Int): Unit = {}
+  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = {}
 }

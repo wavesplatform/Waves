@@ -69,7 +69,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     val effectiveBalance = generatingBalance(generator, Some(parentHeight))
 
     if (block.timestampField.value >= forksConfig.minimalGeneratingBalanceAfterTimestamp) {
-      require(effectiveBalance >= MinimalEffictiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffictiveBalanceForGenerator)")
+      require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
     }
 
     //check hit < target
@@ -93,8 +93,8 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     val height = history.heightOf(lastBlock).get
     val balance = generatingBalance(account, Some(height))
 
-    if (balance < MinimalEffictiveBalanceForGenerator) {
-      throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffictiveBalanceForGenerator)")
+    if (balance < MinimalEffectiveBalanceForGenerator) {
+      throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
     }
 
     val lastBlockKernelData = lastBlock.consensusDataField.value
@@ -224,7 +224,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
 object WavesConsensusModule {
   val BaseTargetLength = 8
   val GeneratorSignatureLength = 32
-  val MinimalEffictiveBalanceForGenerator = 1000000000000L
+  val MinimalEffectiveBalanceForGenerator = 1000000000000L
   val AvgBlockTimeDepth: Int = 3
   val MaxTimeDrift = 15.seconds
 }

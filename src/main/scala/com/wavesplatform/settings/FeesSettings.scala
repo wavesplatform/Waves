@@ -36,6 +36,8 @@ object FeesSettings {
       case "reissue" => 5
       case "burn" => 6
       case "exchange" => 7
+      case "lease" => 8
+      case "lease-cancel" => 9
       case _ => throw new NotResolved(s"Unsupported transaction '$transactionTypeName' in fee configuration section 'waves.fees'")
     }
 

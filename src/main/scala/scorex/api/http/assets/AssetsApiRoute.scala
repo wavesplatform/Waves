@@ -1,33 +1,27 @@
-package scorex.api.http
+package scorex.api.http.assets
 
 import javax.ws.rs.Path
-
-import scala.util.{Failure, Success}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
+import scorex.api.http.{ApiError, ApiRoute, InvalidAddress}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.wallet._
-import scorex.transaction.{AssetAcc, State, TransactionOperations}
+import scorex.transaction.{AssetAcc,State, AssetIdStringLength, TransactionOperations}
 import scorex.wallet.Wallet
+
+import scala.util.{Failure, Success}
 
 @Path("/assets")
 @Api(value = "assets")
 case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: State, transactionModule: TransactionOperations) extends ApiRoute {
   val MaxAddressesPerRequest = 1000
-
-  private def processRequest[A: Reads](pathMatcher: String, f: A => ToResponseMarshallable) =
-    (path(pathMatcher) & post & withAuth) {
-      json[A](f)
-    }
-
-
 
   override lazy val route =
     pathPrefix("assets") {
@@ -53,7 +47,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
   def balanceDistribution: Route =
     (get & path(Segment / "distribution")) { assetId =>
       complete {
-        Base58.decode(assetId) match {
+        Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) => Json.toJson(state.assetDistribution(byteArray))
           case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.CustomValidationError("Must be base58-encoded assetId"))
         }

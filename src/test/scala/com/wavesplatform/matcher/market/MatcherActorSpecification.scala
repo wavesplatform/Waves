@@ -65,7 +65,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
     "restore OrderBook after restart" in {
       val pair = AssetPair(None, Some("123".getBytes))
-      val order = buy(pair, 100000000, 2000)
+      val order = buy(pair, 1, 2000)
 
       actor ! order
       expectMsg(OrderAccepted(order))
@@ -80,7 +80,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       val a2 = Some("234".getBytes)
 
       val pair = AssetPair(a1, a2)
-      val order = buy(pair, 100000000, 2000)
+      val order = buy(pair, 1, 2000)
 
       actor ! order
       expectMsg(OrderAccepted(order))

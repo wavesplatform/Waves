@@ -10,9 +10,9 @@ import scorex.crypto.hash.SecureCryptographicHash
 import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.transaction.state.database.blockchain.{AssetsExtendedState, StoredState}
+import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState, StoredState}
 import scorex.transaction.state.database.state.extension._
-import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
+import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreLeaseExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
 import scorex.utils.{ByteArrayExtension, NTP}
 
 trait MatcherTestData {
@@ -80,9 +80,9 @@ trait MatcherTestData {
       matcherFee: Long <- maxWavesAnountGen
     } yield (Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee), sender)
 
-  def buy(pair: AssetPair, price: Long, amount: Long): Order = valueFromGen(buyGenerator(pair, price, amount))._1
+  def buy(pair: AssetPair, price: Long, amount: Long): Order = valueFromGen(buyGenerator(pair, price*Order.PriceConstant, amount))._1
 
-  def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price, amount))._1
+  def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price*Order.PriceConstant, amount))._1
 
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -115,7 +115,8 @@ trait MatcherTestData {
   } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
   def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): State = {
-    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage {
+    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage
+      with MVStoreLeaseExtendedStateStorage {
       override val db: MVStore = mvStore
       if (db.getStoreVersion > 0) db.rollback()
     }
@@ -125,15 +126,17 @@ trait MatcherTestData {
     }
 
     val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
+    val leaseExtendedState = new LeaseExtendedState(storage)
     val validators = Seq(
       extendedState,
       incrementingTimestampValidator,
       new GenesisValidator,
       new OrderMatchStoredState(storage),
       new IncludedValidator(storage, settings.requirePaymentUniqueId),
-      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp)
+      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
+        settings.allowLeaseTransactionAfterTimestamp)
     )
-    new StoredState(storage, extendedState, incrementingTimestampValidator, validators, settings) {
+    new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
       override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
     }
   }

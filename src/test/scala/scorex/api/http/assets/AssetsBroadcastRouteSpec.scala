@@ -2,6 +2,7 @@ package scorex.api.http.assets
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
+import akka.http.scaladsl.testkit._
 import com.wavesplatform.settings.RestAPISettings
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
@@ -9,7 +10,6 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
-import scorex.api.http.assets.BroadcastRequests._
 import scorex.transaction.{Transaction, TransactionModule}
 
 
@@ -88,7 +88,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       forAll(invalidBase58) { pk => posting(tr.copy(recipient = pk)) should produce (InvalidAddress) }
       forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce (CustomValidationError("invalid.assetId")) }
       forAll(invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce (CustomValidationError("invalid.feeAssetId")) }
-      forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce (TooBigArrayAllocation) }
+      forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce (CustomValidationError("invalid.attachment")) }
       forAll(posNum[Long]) { quantity => posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce (OverflowError) }
       forAll(nonPositiveLong) { fee => posting(tr.copy(fee = fee)) should produce (InsufficientFee) }
     }

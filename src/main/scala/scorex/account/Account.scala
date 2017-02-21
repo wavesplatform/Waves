@@ -1,11 +1,9 @@
 package scorex.account
 
-import com.typesafe.config.ConfigFactory
+import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
 import scorex.utils.ScorexLogging
-
-import scala.util.Try
 
 @SerialVersionUID(-5326597598126993189L)
 class Account(val address: String) extends Serializable {
@@ -26,10 +24,10 @@ class Account(val address: String) extends Serializable {
 object Account extends ScorexLogging {
 
   val AddressVersion: Byte = 1
-  //val AddressNetwork: Byte = Try(ConfigFactory.load().getConfig("app").getString("product").head.toByte).getOrElse(0)
   val ChecksumLength = 4
   val HashLength = 20
   val AddressLength = 1 + 1 + ChecksumLength + HashLength
+  val AddressStringLength = base58Length(AddressLength)
 
   private def scheme = AddressScheme.current
 
@@ -48,7 +46,7 @@ object Account extends ScorexLogging {
 
   def isValid(account: Account): Boolean = isValidAddress(account.address)
 
-  def isValidAddress(address: String): Boolean =
+  def isValidAddress(address: String): Boolean = (address.length <= AddressStringLength) &&
     Base58.decode(address).map { addressBytes =>
       val version = addressBytes.head
       val network = addressBytes.tail.head

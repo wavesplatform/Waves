@@ -25,4 +25,9 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
       case _ => complete(ApiKeyNotValid)
     }
   }
+
+  def processRequest[A: Reads](pathMatcher: String, f: A => ToResponseMarshallable) =
+    (path(pathMatcher) & post & withAuth) {
+      json[A](f)
+    }
 }

@@ -7,6 +7,7 @@ import org.scalatest.matchers.{BeMatcher, MatchResult}
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.utils.{ByteArrayExtension, NTP}
 
 trait TransactionGen {
@@ -24,12 +25,11 @@ trait TransactionGen {
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
+  val positiveIntGen: Gen[Int] = Gen.choose(1, Int.MaxValue / 3)
   val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)
 
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
   val timestampGen: Gen[Long] = Gen.choose(1, 1000).map(NTP.correctedTime() - _)
-
-  val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
 
   val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
   val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen)))
@@ -45,6 +45,46 @@ trait TransactionGen {
     sender: PrivateKeyAccount <- accountGen
     recipient: PrivateKeyAccount <- accountGen
   } yield PaymentTransaction.create(sender, recipient, amount, fee, timestamp).right.get
+
+  val leaseAndCancelGenerator: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
+    sender: PrivateKeyAccount <- accountGen
+    amount <- positiveLongGen
+    fee <- smallFeeGen
+    timestamp <- positiveLongGen
+    recipient: PrivateKeyAccount <- accountGen
+    lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
+    fee2 <- smallFeeGen
+    unlease = LeaseCancelTransaction.create(sender, lease.id, fee2, timestamp + 1).right.get
+  } yield (lease, unlease)
+
+  val twoLeasesGenerator: Gen[(LeaseTransaction, LeaseTransaction)] = for {
+    sender: PrivateKeyAccount <- accountGen
+    amount <- positiveLongGen
+    amount2 <- positiveLongGen
+    fee <- smallFeeGen
+    timestamp <- positiveLongGen
+    recipient: PrivateKeyAccount <- accountGen
+    recipient2: PrivateKeyAccount <- accountGen
+    lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
+    fee2 <- smallFeeGen
+    lease2 = LeaseTransaction.create(sender, amount2, fee2, timestamp + 1, recipient2).right.get
+  } yield (lease, lease2)
+
+  val leaseAndCancelWithOtherSenderGenerator: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
+    sender: PrivateKeyAccount <- accountGen
+    otherSender: PrivateKeyAccount <- accountGen
+    amount <- positiveLongGen
+    fee <- smallFeeGen
+    timestamp <- positiveLongGen
+    recipient: PrivateKeyAccount <- accountGen
+    lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
+    fee2 <- smallFeeGen
+    timestamp2 <- positiveLongGen
+    unlease = LeaseCancelTransaction.create(otherSender, lease.id, fee2, timestamp2).right.get
+  } yield (lease, unlease)
+
+  val leaseGenerator: Gen[LeaseTransaction] = leaseAndCancelGenerator.map(_._1)
+  val leaseCancelGenerator: Gen[LeaseCancelTransaction] = leaseAndCancelGenerator.map(_._2)
 
   val selfPaymentGenerator: Gen[PaymentTransaction] = for {
     account: PrivateKeyAccount <- accountGen
@@ -95,15 +135,19 @@ trait TransactionGen {
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
   } yield TransferTransaction.create(assetId, account, account, amount, timestamp, None, feeAmount, attachment).right.get
 
+  val priceGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
+  val amountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
+  val feeAmountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
+
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
     pair: AssetPair <- assetPairGen
-    price: Long <- maxWavesAnountGen
-    amount: Long <- maxWavesAnountGen
+    price: Long <- priceGen
+    amount: Long <- amountGen
     timestamp: Long <- timestampGen
     expiration: Long <- maxTimeGen
-    matcherFee: Long <- maxWavesAnountGen
+    matcherFee: Long <- feeAmountGen
   } yield (Order(sender, matcher, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee), sender)
 
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
@@ -127,7 +171,6 @@ trait TransactionGen {
     (issue, issue2, reissue, burn)
   }
 
-
   val issueGenerator: Gen[IssueTransaction] = issueReissueGenerator.map(_._1)
   val reissueGenerator: Gen[ReissueTransaction] = issueReissueGenerator.map(_._3)
   val burnGenerator: Gen[BurnTransaction] = issueReissueGenerator.map(_._4)
@@ -150,13 +193,13 @@ trait TransactionGen {
     assetPair <- assetPairGen
     spendAssetID: Array[Byte] <- bytes32gen
     receiveAssetID: Array[Byte] <- bytes32gen
-    price: Long <- maxWavesAnountGen
-    amount1: Long <- maxWavesAnountGen
-    amount2: Long <- maxWavesAnountGen
+    price: Long <- priceGen
+    amount1: Long <- amountGen
+    amount2: Long <- amountGen
     matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2, Math.min(amount1, amount2))
     timestamp: Long <- timestampGen
     expiration: Long <- maxTimeGen
-    matcherFee: Long <- maxWavesAnountGen
+    matcherFee: Long <- feeAmountGen
   } yield {
     val o1 = Order.buy(sender1, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
     val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
@@ -178,11 +221,6 @@ trait TransactionGen {
     accountGen
   }
 
-  def validOrderMatch = orderMatchGenerator.sample.get
-
-  /**
-    * Implicit to support <code>Containing</code> nature of <code>Validation</code>.
-    */
   implicit val containingNatureOfValidation: Containing[Validation] =
     new Containing[Validation] {
       def contains(v: Validation, ele: Any): Boolean =
@@ -207,6 +245,5 @@ trait TransactionGen {
   }
 
   val valid = new ValidationMatcher
-  val invalid = not(valid)
 
 }

@@ -2,12 +2,11 @@ package scorex.transaction.api.http.assets
 
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.api.http.assets.BroadcastRequests.{AssetBurnRequest, AssetIssueRequest, AssetReissueRequest, AssetTransferRequest}
-import scorex.api.http.assets.BroadcastResponses.{AssetIssueResponse, AssetReissueResponse, AssetTransferResponse}
+import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 
 
-class BroadcastRequestsSpec extends FunSuite with Matchers {
+class SignedRequestsTest extends FunSuite with Matchers {
 
   test("AssetIssueRequest json parsing works") {
     val json =
@@ -24,7 +23,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
           "fee": 100000
         }
       """
-    val req = Json.parse(json).validate[AssetIssueRequest].get
+    val req = Json.parse(json).validate[SignedIssueRequest].get
     req.name shouldBe "string"
     req.quantity shouldBe 100000L
     req.fee shouldBe 100000L
@@ -55,7 +54,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |"signature":"4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[AssetReissueRequest].get
+    val req = Json.parse(json).validate[SignedReissueRequest].get
     req.assetId shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     req.signature shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
     req.fee shouldBe 100000L
@@ -87,7 +86,7 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |   "attachment":"A"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[AssetTransferRequest].get
+    val req = Json.parse(json).validate[SignedTransferRequest].get
     req.recipient shouldBe "3Myss6gmMckKYtka3cKCM563TBJofnxvfD7"
     req.timestamp shouldBe 1479462208828L
     req.assetId shouldBe Some("GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u")
@@ -118,32 +117,11 @@ class BroadcastRequestsSpec extends FunSuite with Matchers {
         |"signature":"H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
         |}
       """.stripMargin
-    val req = Json.parse(json).validate[AssetBurnRequest].get
+    val req = Json.parse(json).validate[SignedBurnRequest].get
     req.senderPublicKey shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     req.signature shouldBe "H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
     req.fee shouldBe 100000000L
     req.quantity shouldBe 10000
   }
 
-  test("AssetIssueResponse json format test") {
-    val resp = AssetIssueResponse("id", "assetId", "sndPubKey", "assetName", "desc", 555L, 2.toByte, true, 100L, 132L, "sig")
-    val str = Json.toJson(resp).toString
-    assert(str == "{\"id\":\"id\",\"assetId\":\"assetId\",\"senderPublicKey\":\"sndPubKey\",\"name\":\"assetName\",\"description\":\"desc\",\"quantity\":555,\"decimals\":2,\"reissuable\":true,\"fee\":100,\"timestamp\":132,\"signature\":\"sig\"}")
-  }
-
-  test("AssetReissueResponse json format test") {
-    val resp = AssetReissueResponse("id", "assetId", "sndPubKey", 345L, true, 100L, 1L, "sig")
-    val str = Json.toJson(resp).toString
-    assert(str == "{\"id\":\"id\",\"assetId\":\"assetId\",\"senderPublicKey\":\"sndPubKey\",\"quantity\":345,\"reissuable\":true,\"fee\":100,\"timestamp\":1,\"signature\":\"sig\"}")
-  }
-
-  test("AssetTranferResponse json format test") {
-    val resp = AssetTransferResponse("id", Some("assetId"), "sndPubKey", "recip", 10L, 1L, 1L, None, "sig")
-    val str = Json.toJson(resp).toString
-    assert(str == "{\"id\":\"id\",\"assetId\":\"assetId\",\"senderPublicKey\":\"sndPubKey\",\"recipient\":\"recip\",\"amount\":10,\"fee\":1,\"timestamp\":1,\"signature\":\"sig\"}")
-
-    val respA = AssetTransferResponse("id", Some("assetId"), "sndPubKey", "recip", 10L, 1L, 1L, Some("atch"), "sig")
-    val strA = Json.toJson(respA).toString
-    assert(strA == "{\"id\":\"id\",\"assetId\":\"assetId\",\"senderPublicKey\":\"sndPubKey\",\"recipient\":\"recip\",\"amount\":10,\"fee\":1,\"timestamp\":1,\"attachment\":\"atch\",\"signature\":\"sig\"}")
-  }
 }

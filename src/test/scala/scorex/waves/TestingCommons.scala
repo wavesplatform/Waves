@@ -73,6 +73,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        allow-transactions-from-future-until: 0
       |        allow-unissued-assets-until: 1479416400000
       |        allow-burn-transaction-after: 1481110521000
+      |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |      }
       |      genesis {
@@ -177,6 +178,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        allow-transactions-from-future-until: 0
       |        allow-unissued-assets-until: 1479416400000
       |        allow-burn-transaction-after: 1481110521000
+      |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |      }
       |      genesis {
@@ -256,6 +258,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        allow-transactions-from-future-until: 0
       |        allow-unissued-assets-until: 1479416400000
       |        allow-burn-transaction-after: 1481110521000
+      |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |      }
       |      genesis {

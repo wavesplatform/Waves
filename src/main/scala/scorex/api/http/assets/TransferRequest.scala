@@ -1,4 +1,4 @@
-package scorex.transaction.state.wallet
+package scorex.api.http.assets
 
 import play.api.libs.json.{Format, Json}
 
