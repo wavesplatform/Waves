@@ -7,7 +7,7 @@ import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
-import scorex.transaction.{Transaction, TransactionModule, ValidationError}
+import scorex.transaction.TransactionModule
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
@@ -35,7 +35,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
     new ApiResponse(code = 200, message = "Json with signed Asset issue transaction contained Asset ID"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
   def issue: Route = (path("issue") & post) {
-    json[SignedAssetIssueRequest] { issueReq =>
+    json[SignedIssueRequest] { issueReq =>
       doBroadcast(issueReq.toTx)
     }
   }
@@ -57,7 +57,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
     new ApiResponse(code = 200, message = "Json with signed Asset reissue transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
   def reissue: Route = (path("reissue") & post) {
-    json[SignedAssetReissueRequest] { reissueReq =>
+    json[SignedReissueRequest] { reissueReq =>
       doBroadcast(reissueReq.toTx)
     }
   }
@@ -79,7 +79,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
     new ApiResponse(code = 200, message = "Json with signed Asset burn transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
   def burnRoute: Route = (path("burn") & post) {
-    json[SignedAssetBurnRequest] { burnReq =>
+    json[SignedBurnRequest] { burnReq =>
       doBroadcast(burnReq.toTx)
     }
   }
@@ -102,7 +102,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
     )
   ))
   def batchTransfer: Route = (path("batch-transfer") & post) {
-    json[Seq[SignedAssetTransferRequest]] { reqs =>
+    json[Seq[SignedTransferRequest]] { reqs =>
       val tr = reqs.map(r => doBroadcast(r.toTx))
       tr.map(_.fold(_.json, _.json))
     }
@@ -125,7 +125,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
     new ApiResponse(code = 200, message = "Json with signed Asset transfer transaction"),
     new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
   def transfer: Route = (path("transfer") & post) {
-    json[SignedAssetTransferRequest] { transferReq =>
+    json[SignedTransferRequest] { transferReq =>
       doBroadcast(transferReq.toTx)
     }
   }

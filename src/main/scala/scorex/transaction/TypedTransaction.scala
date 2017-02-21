@@ -1,6 +1,5 @@
 package scorex.transaction
 
-import scala.util.{Failure, Try}
 import com.wavesplatform.utils.base58Length
 import scorex.serialization.Deser
 import scorex.transaction.assets._
@@ -19,7 +18,6 @@ trait TypedTransaction extends Transaction {
 object TypedTransaction extends Deser[TypedTransaction] {
 
   //TYPES
-  @SerialVersionUID(-6895735531914374629L)
   object TransactionType extends Enumeration {
     val GenesisTransaction = Value(1)
     val PaymentTransaction = Value(2)

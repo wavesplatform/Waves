@@ -21,7 +21,7 @@ class LeaseRequestsTests extends FunSuite with Matchers {
 
     val req = Json.parse(json).validate[LeaseRequest].get
 
-    req shouldBe LeaseRequest(new Account("3MwKzMxUKaDaS4CXM8KNowCJJUnTSHDFGMb"), 100000, 1000, new Account("3Myss6gmMckKYtka3cKCM563TBJofnxvfD7"))
+    req shouldBe LeaseRequest("3MwKzMxUKaDaS4CXM8KNowCJJUnTSHDFGMb", 100000, 1000, "3Myss6gmMckKYtka3cKCM563TBJofnxvfD7")
   }
 
   test("LeaseCancelRequest") {
@@ -36,7 +36,7 @@ class LeaseRequestsTests extends FunSuite with Matchers {
 
     val req = Json.parse(json).validate[LeaseCancelRequest].get
 
-    req shouldBe LeaseCancelRequest(new Account("3Myss6gmMckKYtka3cKCM563TBJofnxvfD7"), "ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV", 10000000)
+    req shouldBe LeaseCancelRequest("3Myss6gmMckKYtka3cKCM563TBJofnxvfD7", "ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV", 10000000)
   }
 
   test("SignedLeaseRequest") {
@@ -54,8 +54,8 @@ class LeaseRequestsTests extends FunSuite with Matchers {
 
     val req = Json.parse(json).validate[SignedLeaseRequest].get
 
-    req shouldBe SignedLeaseRequest(new PublicKeyAccount(Base58.decode("CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw").get),100000L, 1000000L,
-      new Account("3MwKzMxUKaDaS4CXM8KNowCJJUnTSHDFGMb"), 0L, "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC")
+    req shouldBe SignedLeaseRequest("CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw",100000L, 1000000L,
+      "3MwKzMxUKaDaS4CXM8KNowCJJUnTSHDFGMb", 0L, "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC")
   }
 
   test("SignedLeaseCancelRequest") {
@@ -72,7 +72,7 @@ class LeaseRequestsTests extends FunSuite with Matchers {
 
     val req = Json.parse(json).validate[SignedLeaseCancelRequest].get
 
-    req shouldBe SignedLeaseCancelRequest(new PublicKeyAccount(Base58.decode("CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw").get),
+    req shouldBe SignedLeaseCancelRequest("CRxqEuxhdZBEHX42MU4FfyJxuHmbDBTaHMhM3Uki7pLw",
       "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5", 0L, "4VPg4piLZGQz3vBqCPbjTfAR4cDErMi57rDvyith5XrQJDLryU2w2JsL3p4ejEqTPpctZ5YekpQwZPTtYiGo5yPC", 1000000L)
   }
 }

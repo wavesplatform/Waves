@@ -1,8 +1,5 @@
 package scorex.transaction
 
-import scala.concurrent.duration._
-import scala.util.control.NonFatal
-import scala.util.{Left, Right, Try}
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.settings.WavesSettings
@@ -25,6 +22,10 @@ import scorex.transaction.state.wallet.{Payment, ReissueRequest}
 import scorex.utils._
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPayment
+
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
+import scala.util.{Left, Right}
 
 @SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
@@ -138,9 +139,9 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   }
 
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction] = {
-    val sender = wallet.privateKeyAccount(request.sender.address).get
+    val sender = wallet.privateKeyAccount(request.sender).get
 
-    val leaseTransactionVal = LeaseTransaction.create(sender, request.amount, request.fee, getTimestamp, request.recipient)
+    val leaseTransactionVal = LeaseTransaction.create(sender, request.amount, request.fee, getTimestamp, new Account(request.recipient))
     leaseTransactionVal match {
       case Right(tx) =>
         if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
@@ -152,7 +153,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   }
 
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction] = {
-    val sender = wallet.privateKeyAccount(request.sender.address).get
+    val sender = wallet.privateKeyAccount(request.sender).get
 
     val leaseCancelTransactionVal = LeaseCancelTransaction.create(sender, Base58.decode(request.txId).get, request.fee, getTimestamp)
     leaseCancelTransactionVal match {

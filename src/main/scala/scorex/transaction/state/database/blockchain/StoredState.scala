@@ -46,11 +46,11 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
       if (triedAssetId.isSuccess) {
         val assetId = triedAssetId.get
-        val maybeIssueTransaction = getIssueTransaction(assetId)
-        if (maybeIssueTransaction.isDefined) {
-          result.updated(assetId, (balance, assetsExtension.isReissuable(assetId), totalAssetQuantity(assetId), maybeIssueTransaction.get))
-        } else {
-          result
+        getIssueTransaction(assetId) match {
+          case Some(issueTransaction) =>
+            result.updated(assetId, (balance, assetsExtension.isReissuable(assetId), totalAssetQuantity(assetId), issueTransaction))
+          case None =>
+            result
         }
       } else {
         result

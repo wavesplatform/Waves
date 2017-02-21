@@ -2,22 +2,15 @@ package scorex.api.http.leasing
 
 import javax.ws.rs.Path
 
-import akka.actor.ActorRefFactory
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import io.swagger.annotations._
+import scorex.api.http._
 import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
 import scorex.api.http.leasing.LeaseRequest.leaseCancelRequestFormat
-import io.swagger.annotations._
-import play.api.libs.json.{JsError, JsSuccess, Json}
-import scorex.api.http._
-import scorex.api.http.assets.TransferRequest
-import scorex.app.Application
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction._
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
-
-import scala.util.{Failure, Success, Try}
 
 @Path("/leasing")
 @Api(value = "/leasing/")
