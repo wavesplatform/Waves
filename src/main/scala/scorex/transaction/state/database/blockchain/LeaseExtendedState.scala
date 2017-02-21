@@ -1,7 +1,7 @@
 package scorex.transaction.state.database.blockchain
 
 import scorex.account.Account
-import scorex.transaction.ValidationError.StateValidationError
+import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state.{AccState, Reasons}
 import scorex.transaction.state.database.state.extension.Validator
@@ -11,19 +11,19 @@ import scorex.utils.ScorexLogging
 
 class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with Validator {
 
-  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
+  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[TransactionValidationError, Transaction] = tx match {
     case tx: LeaseCancelTransaction =>
       val leaseOpt = storage.getLeaseTx(tx.leaseId)
       leaseOpt match {
         case Some(leaseTx) if leaseTx.sender.publicKey.sameElements(leaseTx.sender.publicKey) => Right(tx)
-        case Some(leaseTx) => Left(StateValidationError(s"LeaseTransaction was leased by other sender: $tx"))
-        case None => Left(StateValidationError(s"LeaseTransaction not found for $tx"))
+        case Some(leaseTx) => Left(TransactionValidationError(tx, s"LeaseTransaction was leased by other sender"))
+        case None => Left(TransactionValidationError(tx, s"Related LeaseTransaction not found"))
       }
     case tx: LeaseTransaction =>
       if (storedState.balance(tx.sender) - tx.fee - storage.getLeasedSum(tx.sender.address) >= tx.amount) {
         Right(tx)
       } else {
-        Left(StateValidationError(s"Not enough effective balance to lease for tx $tx"))
+        Left(TransactionValidationError(tx, s"Not enough effective balance to lease"))
       }
     case _ => Right(tx)
   }

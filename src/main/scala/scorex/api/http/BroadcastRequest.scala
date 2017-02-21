@@ -5,8 +5,8 @@ import scorex.transaction.ValidationError
 
 trait BroadcastRequest {
   protected def parseBase58(v: String, error: String, maxLength: Int): Either[ValidationError, Array[Byte]] =
-    if (v.length > maxLength) Left(ValidationError.CustomValidationError(error))
-    else Base58.decode(v).toOption.toRight(ValidationError.CustomValidationError(error))
+    if (v.length > maxLength) Left(ValidationError.TransactionParameterValidationError(error))
+    else Base58.decode(v).toOption.toRight(ValidationError.TransactionParameterValidationError(error))
 
   protected def parseBase58(v: Option[String], error: String, maxLength: Int): Either[ValidationError, Array[Byte]] =
     v.fold[Either[ValidationError, Array[Byte]]](Right(Array.emptyByteArray))(_v => parseBase58(_v, error, maxLength))

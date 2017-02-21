@@ -15,10 +15,11 @@ import scorex.api.http.assets.AssetsApiRoute
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{State, TransactionOperations, ValidationError}
+import scorex.transaction.{State, Transaction, TransactionOperations, ValidationError}
 import scorex.wallet.Wallet
 
 class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMockFactory with PropertyChecks {
+
   import AssetsRouteSpec._
 
   private val wallet = {
@@ -30,9 +31,9 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
   private def mkMock(expectedError: ValidationError) = {
     val m = mock[TransactionOperations]
     (m.transferAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
-    (m.issueAsset    _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
-    (m.reissueAsset  _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
-    (m.burnAsset     _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
+    (m.issueAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
+    (m.reissueAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
+    (m.burnAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
     m
   }
 
@@ -40,13 +41,12 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     ValidationError.InvalidAddress,
     ValidationError.NegativeAmount,
     ValidationError.InsufficientFee,
-    ValidationError.NoBalance,
     ValidationError.TooBigArray,
     ValidationError.InvalidSignature,
     ValidationError.InvalidName,
     ValidationError.OverflowError,
-    ValidationError.CustomValidationError("custom.error"),
-    ValidationError.StateValidationError("state.validation.error")
+    ValidationError.TransactionParameterValidationError("custom.error"),
+    ValidationError.TransactionValidationError(null, "state.validation.error")
   )
 
   routePath("balance/{address}/{assetId}") in pending
@@ -56,7 +56,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
   for ((path, gen) <- Seq(
     "transfer" -> transferReq.map(v => Json.toJson(v)),
     "issue" -> issueReq.map(v => Json.toJson(v)),
-    "reissue"-> reissueReq.map(v => Json.toJson(v)),
+    "reissue" -> reissueReq.map(v => Json.toJson(v)),
     "burn" -> burnReq.map(v => Json.toJson(v))
   )) {
     val currentPath = routePath(path)

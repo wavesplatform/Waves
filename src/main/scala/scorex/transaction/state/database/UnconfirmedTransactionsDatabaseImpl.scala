@@ -1,7 +1,7 @@
 package scorex.transaction.state.database
 
 import com.wavesplatform.settings.UTXSettings
-import scorex.transaction.ValidationError.CustomValidationError
+import scorex.transaction.ValidationError.{TransactionParameterValidationError, TransactionValidationError}
 import scorex.transaction.{Transaction, UnconfirmedTransactionsStorage, ValidationError}
 import scorex.utils.ScorexLogging
 
@@ -23,7 +23,7 @@ class UnconfirmedTransactionsDatabaseImpl(settings: UTXSettings) extends Unconfi
     if (transactions.size < settings.size) {
       val txKey = key(tx)
       if (transactions.contains(txKey)) {
-        Left(CustomValidationError(s"Transaction $tx already in the pool"))
+        Left(TransactionValidationError(tx, "already in the pool"))
       } else txValidator(tx) match {
         case Right(t) =>
           transactions.update(txKey, tx)
@@ -33,7 +33,7 @@ class UnconfirmedTransactionsDatabaseImpl(settings: UTXSettings) extends Unconfi
           Left(err)
       }
     } else {
-      Left(CustomValidationError("Transaction pool size limit is reached"))
+      Left(TransactionValidationError(tx, "Transaction pool size limit is reached"))
     }
 
   override def remove(tx: Transaction): Unit = transactions -= key(tx)

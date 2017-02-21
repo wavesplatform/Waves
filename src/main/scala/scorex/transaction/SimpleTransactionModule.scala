@@ -14,7 +14,7 @@ import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.{CustomValidationError, InvalidAddress}
+import scorex.transaction.ValidationError.{InvalidAddress, TransactionParameterValidationError, TransactionValidationError}
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
@@ -187,12 +187,12 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     if (notExpired) {
       blockStorage.state.validate(tx, tx.timestamp)
     } else {
-      Left(CustomValidationError("Transaction expired in UTX Pool"))
+      Left(TransactionValidationError(tx, "Transaction expired in UTX Pool"))
     }
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
-      Left(CustomValidationError("DB can't find last block because of unexpected modification"))
+      Left(TransactionValidationError(tx, "DB can't find last block because of unexpected modification"))
     case NonFatal(t) =>
       log.error(s"Unexpected error during validation", t)
       throw t
@@ -232,8 +232,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     for {
       _signature <- Base58.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
-      _account <- if (Account.isValidAddress(payment.recipient)) Right(new Account(payment.recipient)) else Left(InvalidAddress)
-      _t <- PaymentTransaction.create(_sender, _account, payment.amount, payment.fee, payment.timestamp, _signature)
+      _t <- PaymentTransaction.create(_sender, new Account(payment.recipient), payment.amount, payment.fee, payment.timestamp, _signature)
       t <- onNewOffchainTransaction(_t)
     } yield t
 

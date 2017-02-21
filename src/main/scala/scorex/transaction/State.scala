@@ -90,9 +90,9 @@ object State {
       case (Seq(err), _) => Left(err)
     }
 
-    def isValid(tx: Transaction, blockTime: Long): Boolean = validate(tx, blockTime).isRight
-
     // calls from test only
+
+    def isValid(tx: Transaction, blockTime: Long): Boolean = validate(tx, blockTime).isRight
 
     def isValid(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Boolean = s.validate(txs, height, blockTime)._2.size == txs.size
   }

@@ -9,7 +9,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.BytesSerializable
 import scorex.transaction.TypedTransaction.TransactionType
-import scorex.transaction.ValidationError.CustomValidationError
+import scorex.transaction.ValidationError.TransactionParameterValidationError
 import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
@@ -84,31 +84,31 @@ object ExchangeTransaction {
     } else if (amount <= 0) {
       Left(ValidationError.NegativeAmount)
     } else if (price <= 0) {
-      Left(CustomValidationError("price should be > 0"))
+      Left(TransactionParameterValidationError("price should be > 0"))
     } else if (price > Order.MaxAmount) {
-      Left(CustomValidationError("price too large"))
+      Left(TransactionParameterValidationError("price too large"))
     } else if (amount > Order.MaxAmount) {
-      Left(CustomValidationError("price too large"))
+      Left(TransactionParameterValidationError("price too large"))
     } else if (sellMatcherFee > Order.MaxAmount) {
-      Left(CustomValidationError("sellMatcherFee too large"))
+      Left(TransactionParameterValidationError("sellMatcherFee too large"))
     } else if (buyMatcherFee > Order.MaxAmount) {
-      Left(CustomValidationError("buyMatcherFee too large"))
+      Left(TransactionParameterValidationError("buyMatcherFee too large"))
     } else if (fee > Order.MaxAmount) {
-      Left(CustomValidationError("fee too large"))
+      Left(TransactionParameterValidationError("fee too large"))
     } else if (buyOrder.orderType != OrderType.BUY) {
-      Left(CustomValidationError("buyOrder should has OrderType.BUY"))
+      Left(TransactionParameterValidationError("buyOrder should has OrderType.BUY"))
     } else if (sellOrder.orderType != OrderType.SELL) {
-      Left(CustomValidationError("sellOrder should has OrderType.SELL"))
+      Left(TransactionParameterValidationError("sellOrder should has OrderType.SELL"))
     } else if (buyOrder.matcherPublicKey != sellOrder.matcherPublicKey) {
-      Left(CustomValidationError("buyOrder.matcher should be the same as sellOrder.matcher"))
+      Left(TransactionParameterValidationError("buyOrder.matcher should be the same as sellOrder.matcher"))
     } else if (buyOrder.assetPair != sellOrder.assetPair) {
-      Left(CustomValidationError("Both orders should have same AssetPair"))
+      Left(TransactionParameterValidationError("Both orders should have same AssetPair"))
     } else if (!buyOrder.isValid(timestamp)) {
-      Left(CustomValidationError("buyOrder"))
+      Left(TransactionParameterValidationError("buyOrder"))
     } else if (!sellOrder.isValid(timestamp)) {
-      Left(CustomValidationError("sellOrder"))
+      Left(TransactionParameterValidationError("sellOrder"))
     } else if (!priceIsValid) {
-      Left(CustomValidationError("priceIsValid"))
+      Left(TransactionParameterValidationError("priceIsValid"))
     } else {
       Right(ExchangeTransactionImpl(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature.orNull))
     }

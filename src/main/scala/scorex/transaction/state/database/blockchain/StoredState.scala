@@ -7,7 +7,7 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.{CustomValidationError, NegativeAmount, OverflowError, StateValidationError}
+import scorex.transaction.ValidationError.{TransactionParameterValidationError, NegativeAmount, OverflowError, TransactionValidationError}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -164,7 +164,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       val invalidPaymentTransactionsByTimestamp = incrementingTimestampValidator.invalidatePaymentTransactionsByTimestamp(txs)
       txs.map(t1 => if (!invalidPaymentTransactionsByTimestamp.exists(t2 => t2.id sameElements t1.id))
         Right(t1)
-      else Left(StateValidationError(s"$t1 is invalid due to one of previous transactions in the sequence is PaymentTransaction with a greater timestamp")))
+      else Left(TransactionValidationError(t1, s"is invalid due to one of previous transactions in the sequence is PaymentTransaction with a greater timestamp")))
     }
   }
 
@@ -177,7 +177,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         tx =>
           if ((tx.timestamp - blockTime).millis <= SimpleTransactionModule.MaxTimeForUnconfirmed)
             Right(tx)
-          else Left(CustomValidationError(s"$tx is too old. BlockTime: $blockTime"))
+          else Left(TransactionValidationError(tx, s"is too old. BlockTime: $blockTime"))
       }
     }
   }
@@ -186,8 +186,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     Math.addExact(first, second)
   }
 
-  def filterByBalanceApplicationErrors(allowUnissuedAssets: Boolean, trans: Seq[Transaction]): Seq[Either[ValidationError, Transaction]]  = {
-    val (_, validatedTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)],Seq.empty[Either[ValidationError, Transaction]])) {
+  def filterByBalanceApplicationErrors(allowUnissuedAssets: Boolean, trans: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
+    val (_, validatedTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Either[ValidationError, Transaction]])) {
       case ((currentState, seq), tx) =>
         try {
           val changes = if (allowUnissuedAssets) {
@@ -222,7 +222,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         } catch {
           case NonFatal(e) =>
             log.debug(e.getMessage)
-            (currentState, seq :+ Left(CustomValidationError(e.getMessage)))
+            (currentState, seq :+ Left(TransactionValidationError(tx, e.getMessage)))
         }
     }
     validatedTxs
