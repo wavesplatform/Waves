@@ -4,13 +4,11 @@ import com.wavesplatform.settings.Constants
 import org.scalatest._
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http.assets.{IssueRequest, TransferRequest}
-import scorex.api.http.leasing.LeaseRequest
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.state.AccState
-import scorex.transaction.state.database.state.extension.IncrementingTimestampValidator
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
 import scorex.utils._
 
