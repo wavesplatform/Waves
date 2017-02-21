@@ -165,16 +165,9 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   /** Check whether tx is valid on current state and not expired yet
     */
-  override def isValid(tx: Transaction, blockTime: Long): Boolean = isValid(Seq(tx), blockTime)
-
-  /** Check whether txs is valid on current state and not expired yet
-    */
-  def isValid(txs: Seq[Transaction], blockTime: Long): Boolean = try {
-    val notExpiredForAll = txs.forall(tx => {
-      val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-      (lastBlockTs - tx.timestamp).millis <= MaxTimeForUnconfirmed
-    })
-    notExpiredForAll && blockStorage.state.isValid(txs, None, blockTime)
+  override def isValid(tx: Transaction, blockTime: Long): Boolean = try {
+    val notExpired = (blockStorage.history.lastBlock.timestamp - tx.timestamp).millis <= MaxTimeForUnconfirmed
+    notExpired && blockStorage.state.isValid(tx, blockTime)
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
@@ -187,7 +180,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def isValid(block: Block): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     lazy val txsAreNew = block.transactionDataField.asInstanceOf[TransactionsBlockField].value.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
-    lazy val blockIsValid = blockStorage.state.isValid(block.transactionDataField.asInstanceOf[TransactionsBlockField].value, blockStorage.history.heightOf(block), block.timestampField.value)
+    lazy val blockIsValid = blockStorage.state.isValid(block.transactionData, blockStorage.history.heightOf(block), block.timestamp)
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (!blockIsValid) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs")
     txsAreNew && blockIsValid
