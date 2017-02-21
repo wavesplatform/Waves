@@ -54,6 +54,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(7)
     settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(8)
     settings.functionalitySettings.requirePaymentUniqueId should be(9)
+    settings.functionalitySettings.allowLeaseTransactionAfterTimestamp should be(10)
+    settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(11)
     settings.genesisSettings.timestamp should be (1460678400000L)
     settings.genesisSettings.signature should be ("BASE58BLOCKSIGNATURE")
     settings.genesisSettings.initialBalance should be (100000000000000L)
