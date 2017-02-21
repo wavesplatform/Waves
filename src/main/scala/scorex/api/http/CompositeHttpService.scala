@@ -42,5 +42,5 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
       getFromResourceDirectory("swagger-ui")
     } ~ options {
       withCors(complete(StatusCodes.OK))
-    }
+    } ~ complete(StatusCodes.NotFound)
 }
