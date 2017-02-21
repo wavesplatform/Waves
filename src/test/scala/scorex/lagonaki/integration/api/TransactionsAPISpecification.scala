@@ -7,6 +7,7 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.{GenesisTransaction, TransactionsBlockField}
+import akka.http.scaladsl.model.headers._
 
 class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons {
 
@@ -38,6 +39,14 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
   test("/transactions/address/{address}/limit/{limit} with invalid limit value") {
     val response = GET.requestRaw("/transactions/address/1/limit/f")
     assert(response.getStatusCode == 404)
+  }
+
+  test("OPTION request should returns CORS headers") {
+    val response = OPTIONS.requestRaw("/transactions/address/1/limit/1")
+    assert(response.getStatusCode == 200)
+    assert(response.getHeader(`Access-Control-Allow-Origin`.*.name()).contains(`Access-Control-Allow-Origin`.*.value()))
+    assert(response.getHeader(`Access-Control-Allow-Credentials`(true).name()).contains(`Access-Control-Allow-Credentials`(true).value()))
+    assert(response.getHeader(`Access-Control-Allow-Headers`("Authorization", "Content-Type", "X-Requested-With").name()).contains(`Access-Control-Allow-Headers`("Authorization", "Content-Type", "X-Requested-With").value()))
   }
 
   test("/transactions/info/{signature} API route") {
