@@ -5,9 +5,8 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
-import scorex.api.http.assets.TransferRequest
+import scorex.api.http.assets.{PaymentRequest, TransferRequest}
 import scorex.transaction.SimpleTransactionModule
-import scorex.transaction.state.wallet.Payment
 import scorex.wallet.Wallet
 
 @Path("/payment")
@@ -29,7 +28,7 @@ case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactio
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.transaction.state.wallet.Payment",
+      dataType = "scorex.api.http.assets.PaymentRequest",
       defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))
@@ -37,7 +36,7 @@ case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactio
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
   def payment: Route = (path("payment") & post & withAuth) {
-    json[Payment] { p =>
+    json[PaymentRequest] { p =>
       val transferRequest = TransferRequest(None, None, p.amount, p.fee, p.sender, None, p.recipient)
       transactionModule
         .transferAsset(transferRequest, wallet)
