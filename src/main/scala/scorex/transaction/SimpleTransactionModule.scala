@@ -75,8 +75,8 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   def clearIncorrectTransactions(): Unit = {
     val currentTime = NTP.correctedTime()
     val txs = utxStorage.all()
-    val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeForUnconfirmed }
-    val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeDrift }
+    val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
+    val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
     val valid = blockStorage.state.validate(notFromFuture, blockTime = currentTime)._2
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
@@ -161,11 +161,12 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   /** Check whether tx is valid on current state and not expired yet
     */
   override def validate[T <: Transaction](tx: T): Either[ValidationError, T] = try {
-    val notExpired = (blockStorage.history.lastBlock.timestamp - tx.timestamp).millis <= MaxTimeForUnconfirmed
+    val lastBlockTimestamp = blockStorage.history.lastBlock.timestamp
+    val notExpired = (lastBlockTimestamp - tx.timestamp).millis <= MaxTimePreviousBlockOverTransactionDiff
     if (notExpired) {
       blockStorage.state.validate(tx, tx.timestamp)
     } else {
-      Left(TransactionValidationError(tx, "Transaction expired in UTX Pool"))
+      Left(TransactionValidationError(tx, s"Transaction is too old: Last block timestamp is $lastBlockTimestamp"))
     }
   } catch {
     case e: UnsupportedOperationException =>
@@ -178,7 +179,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   override def isValid(block: Block): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-    lazy val txsAreNew = block.transactionDataField.asInstanceOf[TransactionsBlockField].value.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
+    lazy val txsAreNew = block.transactionData.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTimeCurrentBlockOverTransactionDiff }
     lazy val (errors, validTrans) = blockStorage.state.validate(block.transactionData, blockStorage.history.heightOf(block), block.timestamp)
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (errors.nonEmpty) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs: $errors")
@@ -213,8 +214,10 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 }
 
 object SimpleTransactionModule {
-  val MaxTimeDrift: FiniteDuration = 15.seconds
-  val MaxTimeForUnconfirmed: FiniteDuration = 90.minutes
-  val MaxTxAndBlockDiff: FiniteDuration = 2.hour
+  val MaxTimeUtxFuture: FiniteDuration = 15.seconds
+  val MaxTimeUtxPast: FiniteDuration = 90.minutes
+  val MaxTimeTransactionOverBlockDiff: FiniteDuration = 90.minutes
+  val MaxTimePreviousBlockOverTransactionDiff: FiniteDuration = 90.minutes
+  val MaxTimeCurrentBlockOverTransactionDiff: FiniteDuration = 2.hour
   val MaxTransactionsPerBlock: Int = 100
 }

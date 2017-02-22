@@ -7,7 +7,7 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.{TransactionParameterValidationError, NegativeAmount, OverflowError, TransactionValidationError}
+import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -19,8 +19,8 @@ import scorex.utils.{NTP, ScorexLogging}
 import scala.annotation.tailrec
 import scala.collection.SortedMap
 import scala.concurrent.duration._
-import scala.util.{Failure, Left, Right, Success, Try}
 import scala.util.control.NonFatal
+import scala.util.{Left, Right, Try}
 
 
 class StoredState(protected[blockchain] val storage: StateStorageI with OrderMatchStorageI,
@@ -168,16 +168,16 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     }
   }
 
-  private def filterTooOldTransactions(trans: Seq[Transaction], blockTime: Long): Seq[Either[ValidationError, Transaction]] = {
+  private def filterTransactionsFromFuture(trans: Seq[Transaction], blockTime: Long): Seq[Either[ValidationError, Transaction]] = {
     val allowTransactionsFromFutureByTimestamp = trans.nonEmpty && trans.map(_.timestamp).max < settings.allowTransactionsFromFutureUntil
     if (allowTransactionsFromFutureByTimestamp) {
       trans.map(Right(_))
     } else {
       trans.map {
         tx =>
-          if ((tx.timestamp - blockTime).millis <= SimpleTransactionModule.MaxTimeForUnconfirmed)
+          if ((tx.timestamp - blockTime).millis <= SimpleTransactionModule.MaxTimeTransactionOverBlockDiff)
             Right(tx)
-          else Left(TransactionValidationError(tx, s"is too old. BlockTime: $blockTime"))
+          else Left(TransactionValidationError(tx, s"Transaction is from far future. BlockTime: $blockTime"))
       }
     }
   }
@@ -238,9 +238,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     val height = heightOpt.getOrElse(storage.stateHeight)
     val (err0, validOneByOne) = validAgainstStateOneByOne(height, trans).segregate()
     val (err1, validAgainstConsecutivePayments) = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).segregate()
-    val (err2, filterExpired) = filterTooOldTransactions(validAgainstConsecutivePayments, blockTime).segregate()
-    val allowUnissuedAssets = filterExpired.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
-    val (err3, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filterExpired).segregate()
+    val (err2, filteredFarFuture) = filterTransactionsFromFuture(validAgainstConsecutivePayments, blockTime).segregate()
+    val allowUnissuedAssets = filteredFarFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
+    val (err3, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredFarFuture).segregate()
     (err0 ++ err1 ++ err2 ++ err3, result)
   }
 
