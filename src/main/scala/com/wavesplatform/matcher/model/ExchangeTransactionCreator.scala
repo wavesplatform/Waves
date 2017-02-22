@@ -1,6 +1,8 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
+import scorex.api.http.{ApiError, InvalidSender}
+import scorex.transaction.ValidationError.MissingSenderPrivateKey
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.{SignedTransaction, State, TransactionModule, ValidationError}
 import scorex.utils.NTP
@@ -21,13 +23,13 @@ trait ExchangeTransactionCreator {
   }
 
   def createTransaction(submitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
-    val matcher = wallet.privateKeyAccount(submitted.order.matcherPublicKey.address).get
-
-    val price = counter.price
-    val amount = math.min(submitted.amount, counter.amount)
-    val (buy, sell) = Order.splitByType(submitted.order, counter.order)
-    val (buyFee, sellFee) = calculateMatcherFee(buy, sell, amount: Long)
-    ExchangeTransaction.create(matcher, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+    wallet.privateKeyAccount(submitted.order.matcherPublicKey.address).toRight[ValidationError](MissingSenderPrivateKey).flatMap(matcherPrivateKey => {
+      val price = counter.price
+      val amount = math.min(submitted.amount, counter.amount)
+      val (buy, sell) = Order.splitByType(submitted.order, counter.order)
+      val (buyFee, sellFee) = calculateMatcherFee(buy, sell, amount: Long)
+      ExchangeTransaction.create(matcherPrivateKey, buy, sell, price, amount, buyFee, sellFee, settings.orderMatchTxFee, getTimestamp)
+    })
   }
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {

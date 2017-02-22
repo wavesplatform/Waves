@@ -1,7 +1,6 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.WalletSettings
 import org.scalatest.{FlatSpec, Matchers}
 
 class WalletSettingsSpecification extends FlatSpec with Matchers {

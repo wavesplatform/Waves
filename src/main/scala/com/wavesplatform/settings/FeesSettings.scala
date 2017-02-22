@@ -1,12 +1,12 @@
 package com.wavesplatform.settings
 
 import java.util.Map.Entry
-
-import com.typesafe.config.ConfigException.{BadValue, NotResolved}
-import com.typesafe.config.{Config, ConfigException, ConfigValue}
-
 import scala.collection.JavaConverters._
 import scala.util.Try
+import com.google.common.base.CaseFormat
+import com.typesafe.config.ConfigException.BadValue
+import com.typesafe.config.{Config, ConfigValue}
+import scorex.transaction.TypedTransaction.TransactionType
 
 case class FeeSettings(asset: String, fee: Long)
 
@@ -15,8 +15,12 @@ case class FeesSettings(fees: Map[Int, List[FeeSettings]])
 object FeesSettings {
   val configPath: String = "waves.fees"
 
+  private val converter = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
+  private def toTxType(key: String): TransactionType.Value =
+    TransactionType.withName(s"${converter.convert(key)}Transaction")
+
   def fromConfig(config: Config): FeesSettings = {
-    val feesEntries = config.entrySet().asScala.filter(_.getKey startsWith(configPath))
+    val feesEntries = config.entrySet().asScala.filter(_.getKey startsWith configPath)
     val fees = feesEntries.foldLeft(Map[Int, List[FeeSettings]]()) { (map, e) =>
       val p = toFeeSettings(e)
       map.updated(p._1, map.getOrElse(p._1, List()) :+ p._2)
@@ -29,17 +33,7 @@ object FeesSettings {
     val s = e.getKey.replace(s"$configPath.", "").trim
     val parts = s.split("\\.", 2)
     val (transactionTypeName, asset) = (parts(0), parts(1))
-    val transactionType = transactionTypeName match {
-      case "payment" => 2
-      case "issue" => 3
-      case "transfer" => 4
-      case "reissue" => 5
-      case "burn" => 6
-      case "exchange" => 7
-      case "lease" => 8
-      case "lease-cancel" => 9
-      case _ => throw new NotResolved(s"Unsupported transaction '$transactionTypeName' in fee configuration section 'waves.fees'")
-    }
+    val transactionType = toTxType(transactionTypeName).id
 
     val feeString = e.getValue.render
     val triedFee = Try(feeString.toLong)

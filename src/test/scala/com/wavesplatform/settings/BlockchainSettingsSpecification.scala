@@ -1,7 +1,6 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.{BlockchainSettings, GenesisTransactionSettings}
 import org.scalatest.{FlatSpec, Matchers}
 
 class BlockchainSettingsSpecification extends FlatSpec with Matchers {

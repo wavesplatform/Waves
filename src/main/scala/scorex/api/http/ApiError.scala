@@ -25,6 +25,7 @@ object ApiError {
     case ValidationError.TooBigArray => TooBigArrayAllocation
     case ValidationError.OverflowError => OverflowError
     case ValidationError.ToSelf => ToSelfError
+    case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
     case ValidationError.TransactionParameterValidationError(m) => CustomValidationError(m)
     case ValidationError.TransactionValidationError(tx, err) => StateCheckFailed(tx, err)
   }
@@ -147,6 +148,12 @@ case object OverflowError extends ApiError {
 case object ToSelfError extends ApiError {
   override val id: Int = 114
   override val message: String = "Transaction to yourself"
+  override val code: StatusCode = StatusCodes.BadRequest
+}
+
+case object MissingSenderPrivateKey extends ApiError {
+  override val id: Int = 115
+  override val message: String = "no private key for sender address in wallet"
   override val code: StatusCode = StatusCodes.BadRequest
 }
 

@@ -1,10 +1,8 @@
-package com.wavesplatform.matcher.settings
-
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.SynchronizationSettings
-import org.scalatest.{FlatSpec, Matchers}
+package com.wavesplatform.settings
 
 import scala.concurrent.duration._
+import com.typesafe.config.ConfigFactory
+import org.scalatest.{FlatSpec, Matchers}
 
 class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
   "SynchronizationSettings" should "read values" in {

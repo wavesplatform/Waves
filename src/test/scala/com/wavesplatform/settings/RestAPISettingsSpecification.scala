@@ -1,7 +1,6 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.RestAPISettings
 import org.scalatest.{FlatSpec, Matchers}
 
 class RestAPISettingsSpecification extends FlatSpec with Matchers {
