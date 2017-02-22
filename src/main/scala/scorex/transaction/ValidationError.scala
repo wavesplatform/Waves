@@ -13,6 +13,7 @@ object ValidationError {
   case object StateCheckFailed extends ValidationError
   case object OverflowError extends ValidationError
   case object ToSelf extends ValidationError
+  case object MissingSenderPrivateKey extends ValidationError
 
   case class CustomValidationError(err: String) extends ValidationError
 

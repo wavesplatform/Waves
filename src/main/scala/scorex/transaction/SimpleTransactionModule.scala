@@ -14,7 +14,7 @@ import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.{InvalidAddress, StateCheckFailed}
+import scorex.transaction.ValidationError.{InvalidAddress, MissingSenderPrivateKey, StateCheckFailed}
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
@@ -117,67 +117,68 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   }
 
   override def transferAsset(request: TransferRequest, wallet: Wallet): Either[ValidationError, TransferTransaction] = {
-    val sender = wallet.privateKeyAccount(request.sender).get
-    TransferTransaction
-      .create(request.assetId.map(s => Base58.decode(s).get),
-        sender: PrivateKeyAccount,
-        new Account(request.recipient),
-        request.amount,
-        getTimestamp,
-        request.feeAssetId.map(s => Base58.decode(s).get),
-        request.fee,
-        request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
-      .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
+    findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey =>
+      TransferTransaction
+        .create(request.assetId.map(s => Base58.decode(s).get),
+          senderPrivateKey,
+          new Account(request.recipient),
+          request.amount,
+          getTimestamp,
+          request.feeAssetId.map(s => Base58.decode(s).get),
+          request.fee,
+          request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
+        .filterOrElse(onNewOffchainTransaction, StateCheckFailed))
   }
 
   override def issueAsset(request: IssueRequest, wallet: Wallet): Either[ValidationError, IssueTransaction] = {
-    val sender = wallet.privateKeyAccount(request.sender).get
-    IssueTransaction
-      .create(sender, request.name.getBytes(Charsets.UTF_8), request.description.getBytes(Charsets.UTF_8), request.quantity, request.decimals, request.reissuable, request.fee, getTimestamp)
-      .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
+    findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey =>
+      IssueTransaction
+        .create(senderPrivateKey, request.name.getBytes(Charsets.UTF_8), request.description.getBytes(Charsets.UTF_8), request.quantity, request.decimals, request.reissuable, request.fee, getTimestamp)
+        .filterOrElse(onNewOffchainTransaction, StateCheckFailed))
   }
 
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction] = {
-    val sender = wallet.privateKeyAccount(request.sender).get
-
-    val leaseTransactionVal = LeaseTransaction.create(sender, request.amount, request.fee, getTimestamp, new Account(request.recipient))
-    leaseTransactionVal match {
-      case Right(tx) =>
-        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-        else throw new StateCheckFailed("Invalid transfer transaction generated: " + tx.json)
-      case Left(err) =>
-        throw new IllegalArgumentException(err.toString)
-    }
-    leaseTransactionVal
+    findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey => {
+      val leaseTransactionVal = LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, getTimestamp, new Account(request.recipient))
+      leaseTransactionVal match {
+        case Right(tx) =>
+          if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+          else throw new StateCheckFailed("Invalid transfer transaction generated: " + tx.json)
+        case Left(err) =>
+          throw new IllegalArgumentException(err.toString)
+      }
+      leaseTransactionVal
+    })
   }
 
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction] = {
-    val sender = wallet.privateKeyAccount(request.sender).get
-
-    val leaseCancelTransactionVal = LeaseCancelTransaction.create(sender, Base58.decode(request.txId).get, request.fee, getTimestamp)
-    leaseCancelTransactionVal match {
-      case Right(tx) =>
-        if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
-        else throw new StateCheckFailed("Invalid transfer transaction generated: " + tx.json)
-      case Left(err) =>
-        throw new IllegalArgumentException(err.toString)
-    }
-    leaseCancelTransactionVal
+    findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey => {
+      val leaseCancelTransactionVal = LeaseCancelTransaction.create(senderPrivateKey, Base58.decode(request.txId).get, request.fee, getTimestamp)
+      leaseCancelTransactionVal match {
+        case Right(tx) =>
+          if (isValid(tx, tx.timestamp)) onNewOffchainTransaction(tx)
+          else throw new StateCheckFailed("Invalid transfer transaction generated: " + tx.json)
+        case Left(err) =>
+          throw new IllegalArgumentException(err.toString)
+      }
+      leaseCancelTransactionVal
+    })
   }
 
   override def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction] = {
-    val sender = wallet.privateKeyAccount(request.sender).get
-    ReissueTransaction
-      .create(sender, Base58.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, getTimestamp)
-      .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
+    findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey => {
+      ReissueTransaction
+        .create(senderPrivateKey, Base58.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, getTimestamp)
+        .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
+    })
   }
 
   override def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction] = {
-    val sender = wallet.privateKeyAccount(request.sender).get
-
-    BurnTransaction
-      .create(sender, Base58.decode(request.assetId).get, request.quantity, request.fee, getTimestamp)
-      .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
+    findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey => {
+      BurnTransaction
+        .create(senderPrivateKey, Base58.decode(request.assetId).get, request.quantity, request.fee, getTimestamp)
+        .filterOrElse(onNewOffchainTransaction, StateCheckFailed)
+    })
   }
 
   private var txTime: Long = 0
@@ -268,6 +269,9 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
     paymentTx.filterOrElse(onNewOffchainTransaction, ValidationError.StateValidationError("State validation failed"))
   }
+
+  private def findPrivateKey(address: String)(implicit wallet: Wallet): Either[ValidationError, PrivateKeyAccount] =
+    wallet.privateKeyAccount(address).toRight[ValidationError](MissingSenderPrivateKey)
 }
 
 object SimpleTransactionModule {
