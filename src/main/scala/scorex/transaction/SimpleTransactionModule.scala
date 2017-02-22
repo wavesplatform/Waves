@@ -20,7 +20,7 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.utils._
 import scorex.wallet.Wallet
-import scorex.waves.transaction.SignedPayment
+import scorex.waves.transaction.SignedPaymentRequest
 
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
@@ -53,8 +53,6 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   val networkController = application.networkController
   private val feeCalculator = new FeeCalculator(settings.feesSettings)
-
-  val InitialBalance = hardForkParams.initialBalance
 
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
 
@@ -213,21 +211,14 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       throw t
   }
 
-  val minimumTxFee = 100000 // TODO: remove later
-
-  override def signPayment(payment: PaymentRequest, wallet: Wallet): Either[ValidationError, PaymentTransaction] = {
-    PaymentTransaction.create(wallet.privateKeyAccount(payment.sender).get, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
-  }
-
-  override def createSignedPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
-
+  override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
     for {
       p1 <- PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
       p2 <- blockStorage.state.validate(p1, p1.timestamp)
     } yield p2
   }
 
-  override def broadcastPayment(payment: SignedPayment): Either[ValidationError, PaymentTransaction] =
+  override def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction] =
     for {
       _signature <- Base58.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
