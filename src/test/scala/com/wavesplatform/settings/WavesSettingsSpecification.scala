@@ -1,7 +1,6 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.settings
 
-import com.typesafe.config.{ConfigFactory, ConfigResolveOptions}
-import com.wavesplatform.settings.{LogLevel, WavesSettings}
+import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 
 class WavesSettingsSpecification extends FlatSpec with Matchers {
