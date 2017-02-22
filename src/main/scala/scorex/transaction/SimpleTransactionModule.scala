@@ -1,21 +1,18 @@
 package scorex.transaction
 
 import com.google.common.base.Charsets
-import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.settings.WavesSettings
-import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.app.Application
-import scorex.block.{Block, BlockField}
+import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.{InvalidAddress, TransactionParameterValidationError, TransactionValidationError}
-import scorex.transaction.ValidationError.{InvalidAddress, MissingSenderPrivateKey, StateCheckFailed}
+import scorex.transaction.ValidationError.{MissingSenderPrivateKey, TransactionValidationError}
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
@@ -27,24 +24,6 @@ import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Left, Right}
 
-@SerialVersionUID(3044437555808662124L)
-case class TransactionsBlockField(override val value: Seq[Transaction])
-  extends BlockField[Seq[Transaction]] {
-
-  import SimpleTransactionModule.MaxTransactionsPerBlock
-
-  override val name = "transactions"
-
-  override lazy val json: JsObject = Json.obj(name -> JsArray(value.map(_.json)))
-
-  override lazy val bytes: Array[Byte] = {
-    val txCount = value.size.ensuring(_ <= MaxTransactionsPerBlock).toByte
-    value.foldLeft(Array(txCount)) { case (bs, tx) =>
-      val txBytes = tx.bytes
-      bs ++ Bytes.ensureCapacity(Ints.toByteArray(txBytes.length), 4, 0) ++ txBytes
-    }
-  }
-}
 
 class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val settings: WavesSettings,
                                                                application: Application)
