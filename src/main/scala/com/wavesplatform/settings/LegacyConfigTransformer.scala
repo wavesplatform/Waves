@@ -1,11 +1,12 @@
 package com.wavesplatform.settings
 
+import java.io.File
 import java.time.Duration
 import scala.collection.convert.ImplicitConversionsToJava._
 import scala.collection.convert.ImplicitConversionsToScala._
 import com.google.common.base.CaseFormat
 import com.typesafe.config.ConfigValueFactory.{fromAnyRef => cv}
-import com.typesafe.config.{Config, ConfigFactory, ConfigValue, ConfigValueFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions, ConfigValue, ConfigValueFactory}
 import scorex.transaction.TypedTransaction.TransactionType
 
 object LegacyConfigTransformer {
@@ -136,17 +137,26 @@ object LegacyConfigTransformer {
       |""".stripMargin)
 
   def transform(legacyConfig: Config): Config = {
-    val lc = transformers.foldLeft(legacyConfig.withFallback(legacyDefaults)) {
+    val transformedLegacyConfig = transformers.filter {
+      case (path, _) => legacyConfig.hasPath(path)
+    }.foldLeft(legacyConfig) {
       case (cfg, (path, f)) => cfg.withValue(path, f(cfg, path))
     }
 
-    val allValues = fieldMap.foldLeft(ConfigFactory.empty()) {
+    val mappedValues = fieldMap.foldLeft(ConfigFactory.empty()) {
       case (cfg, (sourceKey, destKey)) =>
-        if (lc.hasPath(sourceKey))
-          cfg.withValue(destKey, lc.getValue(sourceKey))
+        if (transformedLegacyConfig.hasPath(sourceKey))
+          cfg.withValue(destKey, transformedLegacyConfig.getValue(sourceKey))
         else cfg
     }
 
-    ConfigFactory.empty().withValue("waves", allValues.root())
+    ConfigFactory.empty().withValue("waves", mappedValues.root())
   }
+
+  def main(args: Array[String]): Unit =
+    for (p <- args.headOption) {
+      val cfg = ConfigFactory.parseFile(new File(p))
+      val options = ConfigRenderOptions.defaults().setJson(false).setOriginComments(false)
+      println(transform(cfg).root().render(options))
+    }
 }
