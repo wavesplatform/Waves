@@ -29,14 +29,13 @@ trait RequestGen extends TransactionGen {
       .map(Base58.encode)
 
   val addressGen: G[String] = listOfN(32, Arbitrary.arbByte.arbitrary).map(b => Base58.encode(b.toArray))
-  val fee: G[Long] = choose(0, Long.MaxValue)
   val signatureGen: G[String] = listOfN(TypedTransaction.SignatureLength, Arbitrary.arbByte.arbitrary)
     .map(b => Base58.encode(b.toArray))
   private val assetIdStringGen = assetIdGen.map(_.map(Base58.encode))
 
   private val commonFields = for {
     _account <- addressGen
-    _fee <- fee
+    _fee <- smallFeeGen
   } yield (_account, _fee)
 
   val issueReq: G[IssueRequest] = for {
