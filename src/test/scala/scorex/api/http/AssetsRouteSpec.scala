@@ -4,18 +4,16 @@ import java.io.File
 
 import akka.http.scaladsl.model.headers.RawHeader
 import com.typesafe.config.ConfigFactory
-import akka.http.scaladsl.testkit._
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import scorex.api.http.assets.AssetsApiRoute
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
-import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{State, Transaction, TransactionOperations, ValidationError}
+import scorex.transaction._
 import scorex.wallet.Wallet
 
 class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMockFactory with PropertyChecks {
@@ -28,13 +26,22 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     new Wallet(Some(file.getCanonicalPath), "123", None)
   }
 
-  private def mkMock(expectedError: ValidationError) = {
+  private def txsOperationsMock(expectedError: ValidationError) = {
     val m = mock[TransactionOperations]
     (m.transferAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
     (m.issueAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
     (m.reissueAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
     (m.burnAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
     m
+  }
+
+  private val txMock = new Transaction {
+    override val assetFee: (Option[AssetId], Long) = (None, 0)
+    override val timestamp: Long = 0
+    override def balanceChanges(): Seq[BalanceChange] = ???
+    override val id: Array[Byte] = Array()
+    override def bytes: Array[Byte] = ???
+    override def json: JsObject = Json.obj("k" -> "v")
   }
 
   private val errorGen: Gen[ValidationError] = Gen.oneOf(
@@ -45,8 +52,10 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     ValidationError.InvalidSignature,
     ValidationError.InvalidName,
     ValidationError.OverflowError,
+    ValidationError.ToSelf,
+    ValidationError.MissingSenderPrivateKey,
     ValidationError.TransactionParameterValidationError("custom.error"),
-    ValidationError.TransactionValidationError(null, "state.validation.error")
+    ValidationError.TransactionValidationError(txMock, "state.validation.error")
   )
 
   routePath("balance/{address}/{assetId}") in pending
@@ -62,7 +71,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     val currentPath = routePath(path)
     currentPath in {
       forAll(errorGen) { e =>
-        val route = AssetsApiRoute(settings, wallet, mock[State], mkMock(e)).route
+        val route = AssetsApiRoute(settings, wallet, mock[State], txsOperationsMock(e)).route
 
         forAll(gen) { tr =>
           val p = Post(currentPath, tr)
