@@ -1,1 +1,1 @@
-*.scala linguist-language=Scala
+src/main/resources/swagger-ui/* linguist-vendored
