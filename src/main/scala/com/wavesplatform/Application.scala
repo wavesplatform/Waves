@@ -103,6 +103,8 @@ object Application extends ScorexLogging {
       if file.exists
     } yield file
 
+    if (maybeConfigFile.isEmpty) log.warn("NO CONFIGURATION FILE WAS PROVIDED. STARTING WITH DEFAULT SETTINGS FOR TESTNET!")
+
     val maybeUserConfig = maybeConfigFile collect {
       case file if file.getName.endsWith(".json") =>
         log.warn("JSON configuration file is deprecated and will be removed in the future version. " +
