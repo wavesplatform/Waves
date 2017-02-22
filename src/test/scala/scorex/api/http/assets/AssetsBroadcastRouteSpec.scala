@@ -2,7 +2,6 @@ package scorex.api.http.assets
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
-import akka.http.scaladsl.testkit._
 import com.wavesplatform.settings.RestAPISettings
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
@@ -82,6 +81,13 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     "transfer transaction" in forAll(broadcastTransferReq) { tr =>
       def posting[A: Writes](v: A) = Post(routePath("transfer"), v) ~> route
+
+      posting(tr.copy(attachment = Some(""))) should produce(InvalidSignature)
+      posting(tr.copy(attachment = None)) should produce(InvalidSignature)
+      posting(tr.copy(assetId = Some(""))) should produce(InvalidSignature)
+      posting(tr.copy(assetId = None)) should produce(InvalidSignature)
+      posting(tr.copy(feeAssetId = Some(""))) should produce(InvalidSignature)
+      posting(tr.copy(feeAssetId = None)) should produce(InvalidSignature)
 
       forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce (NegativeAmount) }
       forAll(invalidBase58) { pk => posting(tr.copy(senderPublicKey = pk)) should produce (InvalidAddress) }
