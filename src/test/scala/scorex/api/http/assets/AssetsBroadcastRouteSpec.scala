@@ -88,14 +88,21 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     "transfer transaction" in forAll(broadcastTransferReq) { tr =>
       def posting[A: Writes](v: A) = Post(routePath("transfer"), v) ~> route
 
-      forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce(NegativeAmount) }
-      forAll(invalidBase58) { pk => posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
-      forAll(invalidBase58) { pk => posting(tr.copy(recipient = pk)) should produce(InvalidAddress) }
-      forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("invalid.assetId")) }
-      forAll(invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("invalid.feeAssetId")) }
-      forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment")) }
-      forAll(posNum[Long]) { quantity => posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError) }
-      forAll(nonPositiveLong) { fee => posting(tr.copy(fee = fee)) should produce(InsufficientFee) }
+      posting(tr.copy(attachment = Some(""))) should produce(InvalidSignature)
+      posting(tr.copy(attachment = None)) should produce(InvalidSignature)
+      posting(tr.copy(assetId = Some(""))) should produce(InvalidSignature)
+      posting(tr.copy(assetId = None)) should produce(InvalidSignature)
+      posting(tr.copy(feeAssetId = Some(""))) should produce(InvalidSignature)
+      posting(tr.copy(feeAssetId = None)) should produce(InvalidSignature)
+
+      forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce (NegativeAmount) }
+      forAll(invalidBase58) { pk => posting(tr.copy(senderPublicKey = pk)) should produce (InvalidAddress) }
+      forAll(invalidBase58) { pk => posting(tr.copy(recipient = pk)) should produce (InvalidAddress) }
+      forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce (CustomValidationError("invalid.assetId")) }
+      forAll(invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce (CustomValidationError("invalid.feeAssetId")) }
+      forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce (CustomValidationError("invalid.attachment")) }
+      forAll(posNum[Long]) { quantity => posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce (OverflowError) }
+      forAll(nonPositiveLong) { fee => posting(tr.copy(fee = fee)) should produce (InsufficientFee) }
     }
   }
 }
