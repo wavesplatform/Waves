@@ -154,7 +154,7 @@ case object ToSelfError extends ApiError {
 
 case object MissingSenderPrivateKey extends ApiError {
   override val id: Int = 115
-  override val message: String = "There aren't private key for sender address"
+  override val message: String = "no private key for sender address in wallet"
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
