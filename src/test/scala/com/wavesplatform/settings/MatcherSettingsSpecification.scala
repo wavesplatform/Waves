@@ -1,10 +1,9 @@
-package com.wavesplatform.matcher.settings
+package com.wavesplatform.settings
 
+import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.MatcherSettings
 import org.scalatest.{FlatSpec, Matchers}
-
-import scala.concurrent.duration._
 
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
   "MatcherSettings" should "read values" in {

@@ -1,10 +1,8 @@
-package com.wavesplatform.matcher.settings
-
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.MinerSettings
-import org.scalatest.{FlatSpec, Matchers}
+package com.wavesplatform.settings
 
 import scala.concurrent.duration._
+import com.typesafe.config.ConfigFactory
+import org.scalatest.{FlatSpec, Matchers}
 
 class MinerSettingsSpecification extends FlatSpec with Matchers {
   "MinerSettins" should "read values" in {

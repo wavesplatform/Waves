@@ -68,7 +68,7 @@ val commonSettings: Seq[Setting[_]] = Seq(
   packageJarTask
 )
 
-import NativePackagerHelper._
+import com.typesafe.sbt.SbtNativePackager.autoImport.NativePackagerHelper._
 
 val debianSettings = Seq(
   maintainer in Linux := "wavesplatform.com",
@@ -87,17 +87,18 @@ val debianSettings = Seq(
     DebianConstants.Postinst ->
       s"""
          |mkdir -p /home/${packageName.value} &&
-         |mkdir -p /home/${packageName.value}/wallet &&
-         |mkdir -p /home/${packageName.value}/data &&
          |(mv -n /usr/share/${packageName.value}/settings.conf /etc/${packageName.value}.conf 2>/dev/null || (rm -f /usr/share/${packageName.value}/settings.conf && cp -n /usr/share/${packageName.value}/settings.conf.default /etc/${packageName.value}.conf)) &&
-         |ln -s /etc/${packageName.value}.conf /usr/share/${packageName.value}/settings.conf &&
+         |ln -sv /etc/${packageName.value}.conf /usr/share/${packageName.value}/settings.conf &&
          |chmod -R 750 /home/${packageName.value} &&
          |chmod -R 750 /usr/share/${packageName.value} &&
          |chmod -R 750 /etc/${packageName.value} &&
          |chmod 750 /etc/${packageName.value}.conf &&
          |chown -R ${packageName.value}:${packageName.value} /etc/${packageName.value}.conf &&
          |chown -R ${packageName.value}:${packageName.value} /usr/share/${packageName.value} &&
-         |chown -R ${packageName.value}:${packageName.value} /home/${packageName.value}""".stripMargin),
+         |chown -R ${packageName.value}:${packageName.value} /home/${packageName.value} &&
+         |test -f /etc/${packageName.value}.json &&
+         |java -cp "/usr/share/${packageName.value}/lib/*" com.wavesplatform.settings.LegacyConfigTransformer /etc/${packageName.value}.json > /etc/${packageName.value}.conf &&
+         |rm -f /etc/${packageName.value}.json}""".stripMargin),
   debianPackageDependencies in Debian += "java8-runtime-headless",
   mappings in Universal ++= {
     if (network == "mainnet") {
