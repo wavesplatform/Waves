@@ -16,7 +16,7 @@ import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, 
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
 import scorex.transaction.TransactionModule
-import scorex.transaction.TypedTransaction.SignatureLength
+import scorex.transaction.TransactionParser.SignatureLength
 
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}

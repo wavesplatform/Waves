@@ -6,7 +6,7 @@ import scorex.consensus.ConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.network.message.BasicMessagesRepo
 import scorex.transaction.TransactionModule
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 
 class CheckpointSpecification extends FreeSpec
   with Matchers

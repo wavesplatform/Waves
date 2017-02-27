@@ -6,7 +6,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError
 import scorex.transaction._
 
@@ -16,7 +16,7 @@ sealed trait ReissueTransaction extends AssetIssuance {
   def fee: Long
 }
 
-object ReissueTransaction extends Deser[ReissueTransaction] {
+object ReissueTransaction {
 
   private case class ReissueTransactionImpl(sender: PublicKeyAccount,
                                     assetId: Array[Byte],
@@ -51,7 +51,7 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
 
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
     require(bytes.head == TransactionType.ReissueTransaction.id)
     parseTail(bytes.tail).get
   }

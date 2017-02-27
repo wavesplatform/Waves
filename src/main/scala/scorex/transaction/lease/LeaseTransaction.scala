@@ -1,12 +1,11 @@
 package scorex.transaction.lease
 
-import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -19,7 +18,7 @@ sealed trait LeaseTransaction extends SignedTransaction {
   def recipient: Account
 }
 
-object LeaseTransaction extends Deser[LeaseTransaction] {
+object LeaseTransaction {
 
   private case class LeaseTransactionImpl(sender: PublicKeyAccount,
                                           amount: Long,
@@ -51,7 +50,7 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
 
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     require(bytes.head == TransactionType.LeaseTransaction.id)
     parseTail(bytes.tail).get
   }

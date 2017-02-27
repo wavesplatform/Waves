@@ -7,7 +7,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError
 import scorex.transaction._
 
@@ -20,7 +20,7 @@ sealed trait IssueTransaction extends AssetIssuance {
   def fee: Long
 }
 
-object IssueTransaction extends Deser[IssueTransaction] {
+object IssueTransaction {
 
   private case class IssueTransactionImpl(sender: PublicKeyAccount,
                                   name: Array[Byte],
@@ -70,7 +70,7 @@ object IssueTransaction extends Deser[IssueTransaction] {
   val MinFee               = 100000000
   val MaxDecimals          = 8
 
-  override def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {
     require(bytes.head == TransactionType.IssueTransaction.id)
     parseTail(bytes.tail).get
   }
@@ -80,8 +80,8 @@ object IssueTransaction extends Deser[IssueTransaction] {
     val txId      = bytes(SignatureLength)
     require(txId == TransactionType.IssueTransaction.id.toByte, s"Signed tx id is not match")
     val sender                        = new PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-    val (assetName, descriptionStart) = parseArraySize(bytes, SignatureLength + KeyLength + 1)
-    val (description, quantityStart)  = parseArraySize(bytes, descriptionStart)
+    val (assetName, descriptionStart) = Deser.parseArraySize(bytes, SignatureLength + KeyLength + 1)
+    val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
     val quantity                      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
     val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head
     val reissuable                    = bytes.slice(quantityStart + 9, quantityStart + 10).head == (1: Byte)

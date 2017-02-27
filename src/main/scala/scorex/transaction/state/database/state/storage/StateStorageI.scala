@@ -14,7 +14,7 @@ trait StateStorageI {
   def getTransactionBytes(id: Array[Byte]): Option[Array[Byte]]
 
   def getTransaction(id: Array[Byte]): Option[Transaction] = getTransactionBytes(id)
-    .flatMap(b => TypedTransaction.parseBytes(b).toOption)
+    .flatMap(b => TransactionParser.parseBytes(b).toOption)
 
   def getLastStates(a: Address): Option[Int]
 

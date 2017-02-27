@@ -7,7 +7,7 @@ import scorex.api.http.BroadcastRequest
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.InvalidAddress
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.TypedTransaction.SignatureStringLength
+import scorex.transaction.TransactionParser.SignatureStringLength
 
 case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                               senderPublicKey: String,

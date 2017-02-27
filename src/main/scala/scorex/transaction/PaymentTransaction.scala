@@ -8,11 +8,11 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
 
-sealed trait PaymentTransaction extends TypedTransaction {
+sealed trait PaymentTransaction extends Transaction {
   def sender: PublicKeyAccount
 
   def recipient: Account
@@ -24,7 +24,7 @@ sealed trait PaymentTransaction extends TypedTransaction {
   def signature: Array[Byte]
 }
 
-object PaymentTransaction extends Deser[PaymentTransaction] {
+object PaymentTransaction {
 
   private case class PaymentTransactionImpl(sender: PublicKeyAccount,
                                             recipient: Account,

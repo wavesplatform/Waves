@@ -5,7 +5,7 @@ import play.api.libs.json.Json
 import scorex.account.PublicKeyAccount
 import scorex.api.http._
 import scorex.crypto.encode.Base58
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.waves.http.UnsignedPayment
 import scorex.waves.transaction.SignedPaymentRequest
 

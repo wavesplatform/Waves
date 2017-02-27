@@ -29,12 +29,9 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
   override def receive: Receive = {
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
-      tx match {
-        case ltx: TypedTransaction => transactionModule.putUnconfirmedIfNew(ltx) match{
-          case Right(_) => broadcastExceptOf(ltx, remote)
-          case Left(err) => log.error(s"transaction has been rejected by UTX pool. Reason: $err")
-        }
-        case m => log.error(s"Got unexpected transaction: $m")
+      transactionModule.putUnconfirmedIfNew(tx) match {
+        case Right(_) => broadcastExceptOf(tx, remote)
+        case Left(err) => log.error(s"transaction $tx has been rejected by UTX pool. Reason: $err")
       }
 
     case BroadcastRandom =>

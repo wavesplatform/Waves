@@ -7,7 +7,7 @@ import scorex.block.Block.BlockId
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
@@ -86,17 +86,17 @@ object Block extends ScorexLogging {
 
   val TransactionSizeLength = 4
 
-  def transParseBytes(bytes: Array[Byte]): Try[Seq[TypedTransaction]] = Try {
+  def transParseBytes(bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
     bytes.isEmpty match {
       case true => Seq.empty
       case false =>
         val txData = bytes.tail
         val txCount = bytes.head // so 255 txs max
-        (1 to txCount).foldLeft((0: Int, Seq[TypedTransaction]())) { case ((pos, txs), _) =>
+        (1 to txCount).foldLeft((0: Int, Seq[Transaction]())) { case ((pos, txs), _) =>
           val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
           val transactionLength = Ints.fromByteArray(transactionLengthBytes)
           val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
-          val transaction = TypedTransaction.parseBytes(transactionBytes).get
+          val transaction = TransactionParser.parseBytes(transactionBytes).get
 
           (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
         }._2

@@ -6,17 +6,17 @@ import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
 
-sealed trait GenesisTransaction extends TypedTransaction {
+sealed trait GenesisTransaction extends Transaction {
   def recipient: Account
   def amount: Long
   def signature: Array[Byte]
 }
 
-object GenesisTransaction extends Deser[GenesisTransaction] {
+object GenesisTransaction extends {
 
   private case class GenesisTransactionImpl(recipient: Account, amount: Long, timestamp: Long, signature: Array[Byte]) extends GenesisTransaction {
 
@@ -37,7 +37,7 @@ object GenesisTransaction extends Deser[GenesisTransaction] {
                "amount"    -> amount)
 
     lazy val bytes: Array[Byte] = {
-      val typeBytes      = Array(TransactionType.GenesisTransaction.id.toByte)
+      val typeBytes      = Array(transactionType.id.toByte)
       val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
       val amountBytes    = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
       val rcpBytes       = recipient.bytes

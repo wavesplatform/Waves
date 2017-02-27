@@ -7,7 +7,7 @@ import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.network.BlockchainSynchronizer.InnerId
 import scorex.transaction.TransactionsBlockField
-import scorex.transaction.TypedTransaction.SignatureLength
+import scorex.transaction.TransactionParser.SignatureLength
 
 import scala.language.{implicitConversions, postfixOps}
 

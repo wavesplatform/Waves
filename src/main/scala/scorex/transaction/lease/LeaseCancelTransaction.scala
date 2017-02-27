@@ -8,7 +8,7 @@ import scorex.crypto.EllipticCurveImpl.SignatureLength
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction.{KeyLength, _}
+import scorex.transaction.TransactionParser.{KeyLength, _}
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -19,7 +19,7 @@ sealed trait LeaseCancelTransaction extends SignedTransaction {
   def leaseId: Array[Byte]
 }
 
-object LeaseCancelTransaction extends Deser[LeaseCancelTransaction] {
+object LeaseCancelTransaction {
 
   private case class LeaseCancelTransactionImpl(sender: PublicKeyAccount,
                                                 leaseId: Array[Byte],
@@ -49,7 +49,7 @@ object LeaseCancelTransaction extends Deser[LeaseCancelTransaction] {
 
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[LeaseCancelTransaction] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[LeaseCancelTransaction] = Try {
     require(bytes.head == TransactionType.LeaseCancelTransaction.id)
     parseTail(bytes.tail).get
   }

@@ -39,7 +39,7 @@ case class Handshake(applicationName: String,
   }
 }
 
-object Handshake extends ScorexLogging with Deser[Handshake] {
+object Handshake extends ScorexLogging {
   def parseBytes(bytes: Array[Byte]): Try[Handshake] = Try {
     var position = 0
     val appNameSize = bytes.head

@@ -6,7 +6,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError
 import scorex.transaction._
 
@@ -18,7 +18,7 @@ sealed trait BurnTransaction extends SignedTransaction {
   def fee: Long
 }
 
-object BurnTransaction extends Deser[BurnTransaction] {
+object BurnTransaction {
 
   private case class BurnTransactionImpl(sender: PublicKeyAccount,
                                          assetId: Array[Byte],
@@ -50,7 +50,7 @@ object BurnTransaction extends Deser[BurnTransaction] {
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
   }
-  override def parseBytes(bytes: Array[Byte]): Try[BurnTransaction] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[BurnTransaction] = Try {
     require(bytes.head == TransactionType.BurnTransaction.id)
     parseTail(bytes.tail).get
   }
