@@ -50,7 +50,7 @@ object LeaseCancelTransaction {
   }
 
   def parseTail(bytes: Array[Byte]): Try[LeaseCancelTransaction] = Try {
-    val sender = new PublicKeyAccount(bytes.slice(0, KeyLength))
+    val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
     val fee = Longs.fromByteArray(bytes.slice(KeyLength, KeyLength + 8))
     val timestamp = Longs.fromByteArray(bytes.slice(KeyLength + 8, KeyLength + 16))
     val leaseId = bytes.slice(KeyLength + 16, KeyLength + 16 + DigestSize)

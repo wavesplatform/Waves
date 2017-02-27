@@ -132,7 +132,7 @@ object Block extends ScorexLogging {
 
     val signature = bytes.slice(position, position + SignatureLength)
 
-    new Block(timestamp, version, reference, SignerData(new PublicKeyAccount(genPK), signature), consData, txBlockField)
+    new Block(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txBlockField)
   }.recoverWith { case t: Throwable =>
     log.error("Error when parsing block", t)
     t.printStackTrace()

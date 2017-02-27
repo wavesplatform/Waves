@@ -177,7 +177,7 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Even
     }
 
     ignore("Double spending") {
-      val recepient = new PublicKeyAccount(Array.empty)
+      val recepient = PublicKeyAccount(Array.empty)
       val (trans, valid) = untilTimeout(5.seconds) {
         cleanTransactionPool()
         stopGeneration(applications)

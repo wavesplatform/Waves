@@ -117,7 +117,7 @@ abstract class ActorTestingCommons extends TestKitBase
     Block(timestamp = ts,
       version = 0,
       reference = 1,
-      signerData = SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array(id.toByte)),
+      signerData = SignerData(PublicKeyAccount(Array.fill(32)(0)), Array(id.toByte)),
       consensusData = NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
       transactionData = Seq.empty)
 

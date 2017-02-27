@@ -16,7 +16,7 @@ class InMemorySeqSpecification extends FreeSpec  with Matchers {
   def toBlockId(i: Int): BlockId = Array(i.toByte)
 
   private def newBlock(referenceId: Int) =
-     Block(0, 1, toBlockId(referenceId), SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array()),
+     Block(0, 1, toBlockId(referenceId), SignerData(PublicKeyAccount(Array.fill(32)(0)), Array()),
       NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)), Seq.empty)
 
   "life cycle" in {

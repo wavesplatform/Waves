@@ -5,7 +5,9 @@ import scorex.transaction.ValidationError.InvalidAddress
 import scorex.transaction.{TransactionParser, ValidationError}
 import scala.language.implicitConversions
 
-class PublicKeyAccount(val publicKey: Array[Byte]) {
+
+trait PublicKeyAccount {
+  def publicKey: Array[Byte]
 
   override def equals(b: Any): Boolean = b match {
     case a: PublicKeyAccount => publicKey.sameElements(a.publicKey)
@@ -14,13 +16,18 @@ class PublicKeyAccount(val publicKey: Array[Byte]) {
 
   override def hashCode(): Int = publicKey.hashCode()
 
+  override lazy val toString: String = PublicKeyAccount.toAddress(this).address
 }
 
 object PublicKeyAccount {
+
+  case class PublicKeyAccountImpl(publicKey: Array[Byte]) extends PublicKeyAccount
+
+  def apply(publicKey: Array[Byte]): PublicKeyAccount = PublicKeyAccountImpl(publicKey)
 
   implicit def toAddress(publicKeyAccount: PublicKeyAccount): Account = Account(Account.addressFromPublicKey(publicKeyAccount.publicKey))
 
   def fromBase58String(s: String): Either[ValidationError, PublicKeyAccount] =
     if (s.length > TransactionParser.KeyStringLength) Left(InvalidAddress)
-    else Base58.decode(s).toOption.map(new PublicKeyAccount(_)).toRight(InvalidAddress)
+    else Base58.decode(s).toOption.map(PublicKeyAccount(_)).toRight(InvalidAddress)
 }

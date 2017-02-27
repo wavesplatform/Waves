@@ -79,7 +79,7 @@ object IssueTransaction {
     val signature = bytes.slice(0, SignatureLength)
     val txId      = bytes(SignatureLength)
     require(txId == TransactionType.IssueTransaction.id.toByte, s"Signed tx id is not match")
-    val sender                        = new PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
+    val sender                        = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
     val (assetName, descriptionStart) = Deser.parseArraySize(bytes, SignatureLength + KeyLength + 1)
     val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
     val quantity                      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))

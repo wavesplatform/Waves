@@ -120,7 +120,7 @@ object PaymentTransaction {
 
       //READ SENDER
       val senderBytes = util.Arrays.copyOfRange(data, position, position + SenderLength)
-      val sender = new PublicKeyAccount(senderBytes)
+      val sender = PublicKeyAccount(senderBytes)
       position += SenderLength
 
       //READ RECIPIENT

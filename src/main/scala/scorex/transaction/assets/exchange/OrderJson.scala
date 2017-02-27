@@ -35,7 +35,7 @@ object OrderJson {
   implicit val publicKeyAccountReads = new Reads[PublicKeyAccount] {
     def reads(json: JsValue) = json match {
       case JsString(s) => Base58.decode(s) match {
-        case Success(bytes) if bytes.length == 32 => JsSuccess(new PublicKeyAccount(bytes))
+        case Success(bytes) if bytes.length == 32 => JsSuccess(PublicKeyAccount(bytes))
         case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.publicKeyAccount"))))
       }
       case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))

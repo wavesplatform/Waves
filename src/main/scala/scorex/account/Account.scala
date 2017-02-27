@@ -8,15 +8,6 @@ import scorex.utils.ScorexLogging
 case class Account(address: String) extends Serializable {
 
   lazy val bytes = Base58.decode(address).get
-
-  override def toString: String = address
-
-  override def equals(b: Any): Boolean = b match {
-    case a: Account => a.address == address
-    case _ => false
-  }
-
-  override def hashCode(): Int = address.hashCode()
 }
 
 
@@ -31,13 +22,13 @@ object Account extends ScorexLogging {
   private def scheme = AddressScheme.current
 
   /**
-   * Create account from public key.
-   */
+    * Create account from public key.
+    */
   def fromPublicKey(publicKey: Array[Byte]): Account = {
     new Account(addressFromPublicKey(publicKey))
   }
 
-  def addressFromPublicKey(publicKey: Array[Byte]) : String = {
+  def addressFromPublicKey(publicKey: Array[Byte]): String = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
     Base58.encode(withoutChecksum ++ calcCheckSum(withoutChecksum))

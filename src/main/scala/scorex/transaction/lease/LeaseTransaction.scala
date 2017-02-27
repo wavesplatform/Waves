@@ -52,7 +52,7 @@ object LeaseTransaction {
 
   def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     import EllipticCurveImpl._
-    val sender = new PublicKeyAccount(bytes.slice(0, KeyLength))
+    val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
     val recipient = new Account(Base58.encode(bytes.slice(KeyLength, KeyLength + Account.AddressLength)))
     val quantityStart = KeyLength + Account.AddressLength
 

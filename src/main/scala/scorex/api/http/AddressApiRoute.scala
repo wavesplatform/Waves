@@ -289,7 +289,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: String) = {
     (msg, Base58.decode(signature), Base58.decode(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-        val account = new PublicKeyAccount(pubKeyBytes)
+        val account = PublicKeyAccount(pubKeyBytes)
         val isValid = account.address == address && EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)

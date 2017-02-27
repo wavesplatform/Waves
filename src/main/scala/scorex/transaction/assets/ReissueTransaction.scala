@@ -57,7 +57,7 @@ object ReissueTransaction {
     val signature = bytes.slice(0, SignatureLength)
     val txId      = bytes(SignatureLength)
     require(txId == TransactionType.ReissueTransaction.id.toByte, s"Signed tx id is not match")
-    val sender        = new PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
+    val sender        = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
     val assetId       = bytes.slice(SignatureLength + KeyLength + 1, SignatureLength + KeyLength + AssetIdLength + 1)
     val quantityStart = SignatureLength + KeyLength + AssetIdLength + 1
 

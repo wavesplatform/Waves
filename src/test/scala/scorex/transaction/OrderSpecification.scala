@@ -81,8 +81,8 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
     forAll { (x: (Order, PrivateKeyAccount), bytes: Array[Byte]) =>
       val (order, pk) = x
       order.isValid(NTP.correctedTime()) shouldBe valid
-      order.copy(senderPublicKey = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(matcherPublicKey = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
+      order.copy(senderPublicKey = PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
+      order.copy(matcherPublicKey = PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(spendAssetId = order.spendAssetId.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte)))).
         isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(receiveAssetId = order.receiveAssetId.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte)))).

@@ -11,7 +11,7 @@ import scala.util.{Failure, Try}
 
 class GenesisTransactionSpecification extends PropSpec with PropertyChecks with Matchers {
 
-  private val defaultRecipient = new PublicKeyAccount(Array.fill(32)(0: Byte))
+  private val defaultRecipient = PublicKeyAccount(Array.fill(32)(0: Byte))
 
 
   def parseBytes(data: Array[Byte]): Try[GenesisTransaction] = {

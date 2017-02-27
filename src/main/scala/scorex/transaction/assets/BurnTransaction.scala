@@ -57,7 +57,7 @@ object BurnTransaction {
 
   def parseTail(bytes: Array[Byte]): Try[BurnTransaction] = Try {
     import EllipticCurveImpl._
-    val sender        = new PublicKeyAccount(bytes.slice(0, KeyLength))
+    val sender        = PublicKeyAccount(bytes.slice(0, KeyLength))
     val assetId       = bytes.slice(KeyLength, KeyLength + AssetIdLength)
     val quantityStart = KeyLength + AssetIdLength
 

@@ -32,7 +32,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
       TestActorRef(new UnconfirmedPoolSynchronizer(transactionModule, UTXSettings(1000, broadcastInterval), testActor))
     }
 
-    val defaultRecipient = new PublicKeyAccount(Array.fill(32)(0: Byte))
+    val defaultRecipient = PublicKeyAccount(Array.fill(32)(0: Byte))
     val tx = GenesisTransaction.create(defaultRecipient, 149857264546L, 4598723454L).right.get
 
     "broadcast new transaction to network" in {

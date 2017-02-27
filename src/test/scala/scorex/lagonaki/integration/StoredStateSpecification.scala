@@ -38,7 +38,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     }
     val txToForge = transactions.head
     val forgedSignature = forgeSignature(txToForge.signature)
-    val forgedTransaction = PaymentTransaction.create(new PublicKeyAccount(txToForge.sender.publicKey), txToForge.recipient,
+    val forgedTransaction = PaymentTransaction.create(PublicKeyAccount(txToForge.sender.publicKey), txToForge.recipient,
       txToForge.amount, txToForge.fee, txToForge.timestamp, forgedSignature).right.get
 
     val transactionsToValidate = transactions :+ forgedTransaction

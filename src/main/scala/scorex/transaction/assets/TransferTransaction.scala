@@ -92,7 +92,7 @@ object TransferTransaction {
     val signature = bytes.slice(0, SignatureLength)
     val txId = bytes(SignatureLength)
     require(txId == TransactionType.TransferTransaction.id.toByte, s"Signed tx id is not match")
-    val sender = new PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
+    val sender = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
     val (assetIdOpt, s0) = Deser.parseOption(bytes, SignatureLength + KeyLength + 1, AssetIdLength)
     val (feeAssetIdOpt, s1) = Deser.parseOption(bytes, s0, AssetIdLength)
     val timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))

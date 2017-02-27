@@ -118,18 +118,18 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
 
     val assetId = wavesTransferForAssets.id
     val assetIdString = Base58.encode(wavesTransferForAssets.id)
-    state.processBlock(TestBlock(Seq(wavesTransferForAssets), new PublicKeyAccount(feeGetter.publicKey))) should be(
+    state.processBlock(TestBlock(Seq(wavesTransferForAssets), PublicKeyAccount(feeGetter.publicKey))) should be(
       'success)
 
     val txs = Seq.fill(10) {
       createTransferAssetTx(TransferRequest(Some(assetIdString), Some(assetIdString),
         1000, 1000, sender.address, Some(blahBlahBase58), sender.address), wallet)
     }
-    state.processBlock(TestBlock(txs, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
+    state.processBlock(TestBlock(txs, PublicKeyAccount(feeGetter.publicKey))) should be('success)
 
     val senderAssetBalance = state.assetBalance(AssetAcc(new Account(sender.address), Some(assetId)))
     senderAssetBalance shouldBe 10000
-    val feeGetterAssetBalace = state.assetBalance(AssetAcc(new PublicKeyAccount(accounts.last.publicKey), Some(
+    val feeGetterAssetBalace = state.assetBalance(AssetAcc(PublicKeyAccount(accounts.last.publicKey), Some(
       assetId)))
     feeGetterAssetBalace shouldBe 10000
   }
@@ -144,7 +144,7 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
 
     val assetId = wavesTransferForAssets.id
     val assetIdString = Base58.encode(wavesTransferForAssets.id)
-    state.processBlock(TestBlock(Seq(wavesTransferForAssets), new PublicKeyAccount(feeGetter.publicKey))) should be(
+    state.processBlock(TestBlock(Seq(wavesTransferForAssets), PublicKeyAccount(feeGetter.publicKey))) should be(
       'success)
 
     val txs = Seq.fill(10) {
@@ -155,11 +155,11 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
       createTransferAssetTx(TransferRequest(Some(assetIdString), None,
         1000, 1000, sender.address, Some(blahBlahBase58), sender.address), wallet)
     }
-    state.processBlock(TestBlock(txs ++ txs2, new PublicKeyAccount(feeGetter.publicKey))) should be('success)
+    state.processBlock(TestBlock(txs ++ txs2, PublicKeyAccount(feeGetter.publicKey))) should be('success)
 
     val senderAssetBalance = state.assetBalance(AssetAcc(new Account(sender.address), Some(assetId)))
     senderAssetBalance shouldBe 10000
-    val feeGetterAssetBalace = state.assetBalance(AssetAcc(new PublicKeyAccount(accounts.last.publicKey), Some(
+    val feeGetterAssetBalace = state.assetBalance(AssetAcc(PublicKeyAccount(accounts.last.publicKey), Some(
       assetId)))
     feeGetterAssetBalace shouldBe 10000
   }

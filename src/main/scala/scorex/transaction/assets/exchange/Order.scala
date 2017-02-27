@@ -169,9 +169,9 @@ object Order {
   def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
     import EllipticCurveImpl._
     var from = 0
-    val sender = new PublicKeyAccount(bytes.slice(from, from + KeyLength));
+    val sender = PublicKeyAccount(bytes.slice(from, from + KeyLength));
     from += KeyLength
-    val matcher = new PublicKeyAccount(bytes.slice(from, from + KeyLength));
+    val matcher = PublicKeyAccount(bytes.slice(from, from + KeyLength));
     from += KeyLength
     val (spendAssetId, s0) = Deser.parseOption(bytes, from, AssetIdLength);
     from = s0
