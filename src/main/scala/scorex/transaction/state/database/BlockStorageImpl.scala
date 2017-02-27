@@ -34,6 +34,6 @@ class BlockStorageImpl(settings: BlockchainSettings)(implicit consensusModule: C
 
   override val history: History = new StoredBlockchain(db)(consensusModule, transactionModule)
 
-  override val state: StoredState = StoredState.fromDB(db, settings.asChainParameters)
+  override val state: State = StoredState.fromDB(db, settings.asChainParameters)
 
 }

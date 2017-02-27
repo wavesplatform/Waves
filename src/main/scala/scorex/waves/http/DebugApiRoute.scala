@@ -45,7 +45,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
     new ApiResponse(code = 200, message = "Json state")
   ))
   def state: Route = (path("state") & get) {
-    complete(blockStorage.state.asInstanceOf[StoredState].toJson(None))
+    complete(blockStorage.state.toJson(None))
   }
 
   @Path("/state/{height}")
@@ -54,7 +54,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
     new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateAt: Route = (path("state" / IntNumber) & get) { height =>
-    complete(blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)))
+    complete(blockStorage.state.toJson(Some(height)))
   }
 
   @Path("/stateWaves/{height}")
@@ -63,7 +63,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
     new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    complete(blockStorage.state.asInstanceOf[StoredState].toWavesJson(height))
+    complete(blockStorage.state.toWavesJson(height))
   }
 
   @Path("/info")
@@ -72,7 +72,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
     new ApiResponse(code = 200, message = "Json state")
   ))
   def info: Route = (path("info") & get) {
-    val state = blockStorage.state.asInstanceOf[StoredState]
+    val state = blockStorage.state
     complete(Json.obj(
       "stateHeight" -> state.stateHeight,
       "stateHash" -> state.hash

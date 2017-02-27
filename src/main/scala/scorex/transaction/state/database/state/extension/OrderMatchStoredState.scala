@@ -4,14 +4,14 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.Transaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.ValidationError.StateValidationError
+import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.state.storage.{OrderMatchStorageI, StateStorageI}
 import scorex.transaction.{Transaction, ValidationError}
 
 class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends Validator {
 
-  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
+  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[TransactionValidationError, Transaction] = tx match {
     case om: ExchangeTransaction => OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om))
     case _ => Right(tx)
   }
@@ -83,7 +83,7 @@ class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) exte
 
 
 object OrderMatchStoredState {
-  def isOrderMatchValid(exTrans: ExchangeTransaction, previousMatches: Set[ExchangeTransaction]): Either[StateValidationError, ExchangeTransaction] = {
+  def isOrderMatchValid(exTrans: ExchangeTransaction, previousMatches: Set[ExchangeTransaction]): Either[TransactionValidationError, ExchangeTransaction] = {
 
     lazy val buyTransactions = previousMatches.filter { om =>
       om.buyOrder.id sameElements exTrans.buyOrder.id
@@ -110,10 +110,10 @@ object OrderMatchStoredState {
     }
 
     if (!amountIsValid) {
-      Left(StateValidationError("Insufficient amount to buy or sell"))
+      Left(TransactionValidationError(exTrans, "Insufficient amount to buy or sell"))
     } else if (!isFeeValid(exTrans.buyMatcherFee, buyFeeTotal, buyTotal, exTrans.buyOrder.matcherFee, exTrans.buyOrder.amount) ||
       !isFeeValid(exTrans.sellMatcherFee, sellFeeTotal, sellTotal, exTrans.sellOrder.matcherFee, exTrans.sellOrder.amount)) {
-      Left(StateValidationError("Insufficient fee"))
+      Left(TransactionValidationError(exTrans, "Insufficient fee"))
     } else Right(exTrans)
   }
 }

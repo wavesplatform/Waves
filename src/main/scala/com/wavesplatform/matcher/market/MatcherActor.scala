@@ -11,7 +11,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{AssetId, TransactionModule}
+import scorex.transaction.{AssetId, State, TransactionModule}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -19,7 +19,7 @@ import scala.collection.mutable
 import scala.language.reflectiveCalls
 import scala.util.Try
 
-class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSettings,
+class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings,
                    transactionModule: TransactionModule
                   ) extends PersistentActor with ScorexLogging {
 
@@ -96,7 +96,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSe
 object MatcherActor {
   def name = "matcher"
 
-  def props(storedState: StoredState, wallet: Wallet, settings: MatcherSettings,
+  def props(storedState: State, wallet: Wallet, settings: MatcherSettings,
             transactionModule: TransactionModule): Props =
     Props(new MatcherActor(storedState, wallet, settings, transactionModule))
 

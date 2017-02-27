@@ -12,14 +12,14 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{AssetAcc, AssetIdStringLength, TransactionOperations}
+import scorex.transaction.{AssetAcc,State, AssetIdStringLength, TransactionOperations}
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StoredState, transactionModule: TransactionOperations) extends ApiRoute {
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: State, transactionModule: TransactionOperations) extends ApiRoute {
   val MaxAddressesPerRequest = 1000
 
   override lazy val route =
@@ -48,7 +48,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stor
       complete {
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
           case Success(byteArray) => Json.toJson(state.assetDistribution(byteArray))
-          case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.CustomValidationError("Must be base58-encoded assetId"))
+          case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.TransactionParameterValidationError("Must be base58-encoded assetId"))
         }
       }
     }

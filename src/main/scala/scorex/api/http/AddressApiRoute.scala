@@ -2,6 +2,7 @@ package scorex.api.http
 
 import java.nio.charset.StandardCharsets
 import javax.ws.rs.Path
+
 import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
@@ -12,12 +13,12 @@ import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.LagonakiState
+import scorex.transaction.State
 import scorex.wallet.Wallet
 
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: LagonakiState) extends ApiRoute {
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: State) extends ApiRoute {
   val MaxAddressesPerRequest = 1000
 
   override lazy val route =

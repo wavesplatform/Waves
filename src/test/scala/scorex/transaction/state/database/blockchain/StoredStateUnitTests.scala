@@ -74,7 +74,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     val trans = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
 
     val bts = trans.map(_.timestamp).max
-    val (time, result) = profile(state.validate(trans, blockTime = bts))
+    val (time, result) = profile(state.validate(trans, blockTime = bts)._2)
     time should be < 1000L
     result.size should be <= trans.size
   }

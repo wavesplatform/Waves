@@ -114,7 +114,7 @@ trait MatcherTestData {
     matcherFee: Long <- maxWavesAnountGen
   } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
-  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): StoredState = {
+  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): State = {
     val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage
       with MVStoreLeaseExtendedStateStorage {
       override val db: MVStore = mvStore

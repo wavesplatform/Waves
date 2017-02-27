@@ -1,6 +1,7 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
+
 import scala.util.Success
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
@@ -9,13 +10,13 @@ import io.swagger.annotations._
 import play.api.libs.json.{JsArray, JsNumber, Json}
 import scorex.account.Account
 import scorex.crypto.encode.Base58
-import scorex.transaction.{History, LagonakiState, SimpleTransactionModule}
+import scorex.transaction.{History, SimpleTransactionModule, State}
 
 @Path("/transactions")
 @Api(value = "/transactions", description = "Information about transactions")
 case class TransactionsApiRoute(
     settings: RestAPISettings,
-    state: LagonakiState,
+    state: State,
     history: History,
     transactionModule: SimpleTransactionModule) extends ApiRoute with CommonApiFunctions {
   val MaxTransactionsPerRequest = 1000

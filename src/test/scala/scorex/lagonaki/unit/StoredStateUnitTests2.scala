@@ -17,7 +17,7 @@ import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{AssetAcc, GenesisTransaction}
 import scorex.wallet.Wallet
 
-class StoredStateSpecification extends FunSuite with Matchers with TableDrivenPropertyChecks {
+class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPropertyChecks {
 
   val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"
   new File(folder).mkdirs()

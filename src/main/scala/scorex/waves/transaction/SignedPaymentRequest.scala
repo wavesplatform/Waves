@@ -2,7 +2,7 @@ package scorex.waves.transaction
 
 import play.api.libs.json._
 
-case class SignedPayment(
+case class SignedPaymentRequest(
     timestamp: Long,
     amount: Long,
     fee: Long,
@@ -11,6 +11,6 @@ case class SignedPayment(
     sender: String,
     signature: String)
 
-object SignedPayment {
-  implicit val paymentFormat: Format[SignedPayment] = Json.format
+object SignedPaymentRequest {
+  implicit val paymentFormat: Format[SignedPaymentRequest] = Json.format
 }

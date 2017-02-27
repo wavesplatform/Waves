@@ -2,7 +2,7 @@ package scorex.transaction
 
 
 trait UnconfirmedTransactionsStorage {
-  def putIfNew(tx: Transaction, txValidator: Transaction => Boolean = _ => true): Boolean
+  def putIfNew[T <: Transaction](tx: T, txValidator: T => Either[ValidationError, T]): Either[ValidationError, T]
 
   def all(): Seq[Transaction]
 

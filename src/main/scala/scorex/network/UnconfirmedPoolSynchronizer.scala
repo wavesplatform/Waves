@@ -30,7 +30,10 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
       tx match {
-        case ltx: TypedTransaction => if (transactionModule.putUnconfirmedIfNew(ltx)) broadcastExceptOf(ltx, remote)
+        case ltx: TypedTransaction => transactionModule.putUnconfirmedIfNew(ltx) match{
+          case Right(_) => broadcastExceptOf(ltx, remote)
+          case Left(err) => log.error(s"transaction has been rejected by UTX pool. Reason: $err")
+        }
         case m => log.error(s"Got unexpected transaction: $m")
       }
 
