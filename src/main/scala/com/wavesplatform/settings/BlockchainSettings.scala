@@ -192,7 +192,7 @@ object BlockchainSettingsExtension {
 
     private def buildTransactions(transactionSettings: List[GenesisTransactionSettings]): Seq[GenesisTransaction] = {
       transactionSettings.map { ts =>
-        GenesisTransaction.create(Account(ts.recipient), ts.amount, blockchainSettings.genesisSettings.timestamp)
+        GenesisTransaction.create(Account.fromBase58String(ts.recipient), ts.amount, blockchainSettings.genesisSettings.timestamp)
           .right.get
       }
     }

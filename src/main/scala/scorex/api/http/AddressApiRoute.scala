@@ -226,7 +226,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    val account = Account(address)
+    val account = Account.fromBase58String(address)
     if (!Account.isValid(account)) {
       InvalidAddress
     } else {
@@ -238,7 +238,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    val account = Account(address)
+    val account = Account.fromBase58String(address)
     if (!Account.isValid(account)) {
       InvalidAddress
     } else {

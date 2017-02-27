@@ -37,7 +37,7 @@ object Account extends ScorexLogging {
     AccountImpl(address)
   }
 
-  def apply(s: String): Account = AccountImpl(s)
+  def fromBase58String(s: String): Account = AccountImpl(s)
 
   def isValid(account: Account): Boolean = isValidAddress(account.address)
 
