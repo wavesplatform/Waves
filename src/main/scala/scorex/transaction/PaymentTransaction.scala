@@ -68,9 +68,7 @@ object PaymentTransaction {
   private val BaseLength = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
   def create(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
-    if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (amount <= 0) {
+    if (amount <= 0) {
       Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
@@ -88,9 +86,7 @@ object PaymentTransaction {
              fee: Long,
              timestamp: Long,
              signature: Array[Byte]): Either[ValidationError, PaymentTransaction] = {
-    if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (amount <= 0) {
+    if (amount <= 0) {
       Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
@@ -125,7 +121,7 @@ object PaymentTransaction {
 
       //READ RECIPIENT
       val recipientBytes = util.Arrays.copyOfRange(data, position, position + RecipientLength)
-      val recipient = Account.fromBase58String(Base58.encode(recipientBytes)).right.get
+      val recipient = Account.fromBytes(recipientBytes).right.get
       position += RecipientLength
 
       //READ AMOUNT

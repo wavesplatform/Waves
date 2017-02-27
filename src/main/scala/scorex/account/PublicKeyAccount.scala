@@ -21,7 +21,7 @@ trait PublicKeyAccount {
 
 object PublicKeyAccount {
 
-  case class PublicKeyAccountImpl(publicKey: Array[Byte]) extends PublicKeyAccount
+  private case class PublicKeyAccountImpl(publicKey: Array[Byte]) extends PublicKeyAccount
 
   def apply(publicKey: Array[Byte]): PublicKeyAccount = PublicKeyAccountImpl(publicKey)
 

@@ -10,7 +10,7 @@ sealed trait PrivateKeyAccount extends PublicKeyAccount {
 
 object PrivateKeyAccount {
 
-  case class PrivateKeyAccountImpl(seed: Array[Byte], privateKey: Array[Byte], publicKey: Array[Byte]) extends PrivateKeyAccount
+  private case class PrivateKeyAccountImpl(seed: Array[Byte], privateKey: Array[Byte], publicKey: Array[Byte]) extends PrivateKeyAccount
 
   def apply(seed: Array[Byte]): PrivateKeyAccount = {
     val pair = EllipticCurveImpl.createKeyPair(seed)

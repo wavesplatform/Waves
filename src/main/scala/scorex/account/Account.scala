@@ -4,15 +4,16 @@ import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
 import scorex.transaction.ValidationError
+import scorex.transaction.ValidationError.InvalidAddress
 import scorex.utils.ScorexLogging
+
+import scala.util.Success
 
 
 sealed trait Account {
-  def address: String
-
-  def bytes: Array[Byte]
+  lazy val address: String = Base58.encode(bytes)
+  val bytes: Array[Byte]
 }
-
 
 object Account extends ScorexLogging {
 
@@ -24,52 +25,51 @@ object Account extends ScorexLogging {
 
   private def scheme = AddressScheme.current
 
-  case class AccountImpl(address: String) extends Account {
-    lazy val bytes = Base58.decode(address).get
-  }
+  private case class AccountImpl(override val bytes: Array[Byte]) extends Account
 
-  /**
-    * Create account from public key.
-    */
   def fromPublicKey(publicKey: Array[Byte]): Account = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
-    val address = Base58.encode(withoutChecksum ++ calcCheckSum(withoutChecksum))
-    AccountImpl(address)
+    val bytes = withoutChecksum ++ calcCheckSum(withoutChecksum)
+    val address = Base58.encode(bytes)
+    AccountImpl(bytes)
   }
 
-  def fromBase58String(s: String): Either[ValidationError, Account] = {
-    if (isValidAddress(s)) Right(AccountImpl(s))
-    else Left(ValidationError.InvalidAddress)
+  def fromBytes(addressBytes: Array[Byte]): Either[ValidationError, Account] = {
+    if (isByteArrayValid(addressBytes)) Right(AccountImpl(addressBytes))
+    else Left(InvalidAddress)
   }
 
-  def isValid(account: Account): Boolean = isValidAddress(account.address)
-
-  def isValidAddress(address: String): Boolean = (address.length <= AddressStringLength) &&
-    Base58.decode(address).map { addressBytes =>
-      val version = addressBytes.head
-      val network = addressBytes.tail.head
-      if (version != AddressVersion) {
-        log.warn(s"Unknown address version: $version")
-        false
-      } else if (network != scheme.chainId) {
-        log.warn(s"~ For address: $address")
-        log.warn(s"~ Expected network: ${scheme.chainId}(${scheme.chainId.toChar}")
-        log.warn(s"~ Actual network: $network(${network.toChar}")
-        false
-      } else {
-        if (addressBytes.length != Account.AddressLength)
-          false
-        else {
-          val checkSum = addressBytes.takeRight(ChecksumLength)
-
-          val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
-
-          checkSum.sameElements(checkSumGenerated)
-
-        }
+  def fromBase58String(address: String): Either[ValidationError, Account] =
+    if (address.length <= AddressStringLength) {
+      Left(InvalidAddress)
+    } else {
+      Base58.decode(address) match {
+        case Success(byteArray) if isByteArrayValid(byteArray) => Right(AccountImpl(byteArray))
+        case _ => Left(InvalidAddress)
       }
-    }.getOrElse(false)
+    }
+
+  private def isByteArrayValid(addressBytes: Array[Byte]): Boolean = {
+    val version = addressBytes.head
+    val network = addressBytes.tail.head
+    if (version != AddressVersion) {
+      log.warn(s"Unknown address version: $version")
+      false
+    } else if (network != scheme.chainId) {
+      log.warn(s"~ Expected network: ${scheme.chainId}(${scheme.chainId.toChar}")
+      log.warn(s"~ Actual network: $network(${network.toChar}")
+      false
+    } else {
+      if (addressBytes.length != Account.AddressLength)
+        false
+      else {
+        val checkSum = addressBytes.takeRight(ChecksumLength)
+        val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
+        checkSum.sameElements(checkSumGenerated)
+      }
+    }
+  }
 
   private def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = hash(withoutChecksum).take(ChecksumLength)
 

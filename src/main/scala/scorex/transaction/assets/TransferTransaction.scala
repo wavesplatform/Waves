@@ -98,7 +98,7 @@ object TransferTransaction {
     val timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
     val amount = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
     val feeAmount = Longs.fromByteArray(bytes.slice(s1 + 16, s1 + 24))
-    val recipient = Account.fromBase58String(Base58.encode(bytes.slice(s1 + 24, s1 + 24 + Account.AddressLength))).right.get
+    val recipient = Account.fromBytes(bytes.slice(s1 + 24, s1 + 24 + Account.AddressLength)).right.get
     val (attachment, _) = Deser.parseArraySize(bytes, s1 + 24 + Account.AddressLength)
 
     TransferTransaction
@@ -115,16 +115,12 @@ object TransferTransaction {
                                feeAmount: Long,
                                attachment: Array[Byte],
                                signature: Option[Array[Byte]] = None) = {
-    if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
+    if (attachment.length > TransferTransaction.MaxAttachmentSize) {
       Left(ValidationError.TooBigArray)
     } else if (amount <= 0) {
       Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (Try(Math.addExact(amount, feeAmount)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

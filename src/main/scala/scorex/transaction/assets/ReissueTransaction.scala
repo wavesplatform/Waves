@@ -78,8 +78,6 @@ object ReissueTransaction {
                                signature: Option[Array[Byte]] = None) =
     if (quantity <= 0) {
       Left(ValidationError.NegativeAmount)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

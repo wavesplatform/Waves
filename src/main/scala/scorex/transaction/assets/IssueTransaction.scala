@@ -108,8 +108,6 @@ object IssueTransaction {
       Left(ValidationError.InvalidName)
     } else if (decimals < 0 || decimals > MaxDecimals) {
       Left(ValidationError.TooBigArray)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

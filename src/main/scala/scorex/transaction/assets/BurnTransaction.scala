@@ -78,8 +78,6 @@ object BurnTransaction {
                                signature: Option[Array[Byte]] = None): Either[ValidationError, BurnTransactionImpl] =
     if (quantity < 0) {
       Left(ValidationError.NegativeAmount)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

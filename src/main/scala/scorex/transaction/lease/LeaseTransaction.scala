@@ -53,7 +53,7 @@ object LeaseTransaction {
   def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     import EllipticCurveImpl._
     val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
-    val recipient = Account.fromBase58String(Base58.encode(bytes.slice(KeyLength, KeyLength + Account.AddressLength))).right.get
+    val recipient = Account.fromBytes(bytes.slice(KeyLength, KeyLength + Account.AddressLength)).right.get
     val quantityStart = KeyLength + Account.AddressLength
 
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
@@ -77,10 +77,6 @@ object LeaseTransaction {
       Left(ValidationError.ToSelf)
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

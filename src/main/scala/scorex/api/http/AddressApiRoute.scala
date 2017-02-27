@@ -34,7 +34,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def deleteAddress: Route = path(Segment) { address =>
     (delete & withAuth) {
-      if (!Account.isValidAddress(address)) {
+      if (Account.fromBase58String(address).isLeft) {
         complete(InvalidAddress)
       } else {
         val deleted = wallet.privateKeyAccount(address).exists(account =>
@@ -164,7 +164,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def seed: Route = {
     (path("seed" / Segment) & get & withAuth) { address =>
-      if (!Account.isValidAddress(address)) {
+      if (Account.fromBase58String(address).isLeft) {
         complete(InvalidAddress)
       } else {
         wallet.privateKeyAccount(address) match {
@@ -185,7 +185,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def validate: Route = (path("validate" / Segment) & get) { address =>
-    complete(Json.obj("address" -> address, "valid" -> Account.isValidAddress(address)))
+    complete(Json.obj("address" -> address, "valid" -> Account.fromBase58String(address).isRight))
   }
 
   @Path("/")
@@ -244,7 +244,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   private def signPath(address: String, encode: Boolean) = {
     (post & entity(as[String])) { message =>
       withAuth {
-        if (!Account.isValidAddress(address)) {
+        if (Account.fromBase58String(address).isLeft) {
           complete(InvalidAddress)
         } else {
           wallet.privateKeyAccount(address) match {
@@ -268,7 +268,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 
   private def verifyPath(address: String, decode: Boolean) = withAuth {
     json[SignedMessage] { m =>
-      if (!Account.isValidAddress(address)) {
+      if (Account.fromBase58String(address).isLeft) {
         InvalidAddress
       } else {
         //DECODE SIGNATURE

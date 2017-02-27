@@ -77,7 +77,7 @@ object GenesisTransaction extends {
       position += TimestampLength
 
       val recipientBytes = java.util.Arrays.copyOfRange(data, position, position + RECIPIENT_LENGTH)
-      val recipient      = Account.fromBase58String(Base58.encode(recipientBytes)).right.get
+      val recipient      = Account.fromBytes(recipientBytes).right.get
       position += RECIPIENT_LENGTH
 
       val amountBytes = java.util.Arrays.copyOfRange(data, position, position + AmountLength)
@@ -89,8 +89,6 @@ object GenesisTransaction extends {
   def create(recipient: Account, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
     if (amount < 0) {
       Left(ValidationError.NegativeAmount)
-    } else if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress)
     } else {
       val signature = GenesisTransaction.generateSignature(recipient, amount, timestamp)
       Right(GenesisTransactionImpl(recipient, amount, timestamp, signature))

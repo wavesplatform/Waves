@@ -67,8 +67,6 @@ object LeaseCancelTransaction {
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseCancelTransactionImpl] = {
     if (leaseId.length != DigestSize) {
       Left(ValidationError.NegativeAmount)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
