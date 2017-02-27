@@ -2,13 +2,15 @@ package scorex.transaction
 
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.TransferTransaction
 
 class TransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Transfer serialization roundtrip") {
     forAll(transferGenerator) { transfer: TransferTransaction =>
-      val recovered = TransferTransaction.parseBytes(transfer.bytes).get
+      require(transfer.bytes.head == TransactionType.TransferTransaction.id)
+      val recovered = TransferTransaction.parseTail(transfer.bytes.tail).get
 
       recovered.sender.address shouldEqual transfer.sender.address
       recovered.assetId.map(_ sameElements transfer.assetId.get).getOrElse(transfer.assetId.isEmpty) shouldBe true

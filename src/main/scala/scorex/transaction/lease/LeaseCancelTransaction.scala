@@ -49,11 +49,6 @@ object LeaseCancelTransaction {
 
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[LeaseCancelTransaction] = Try {
-    require(bytes.head == TransactionType.LeaseCancelTransaction.id)
-    parseTail(bytes.tail).get
-  }
-
   def parseTail(bytes: Array[Byte]): Try[LeaseCancelTransaction] = Try {
     val sender = new PublicKeyAccount(bytes.slice(0, KeyLength))
     val fee = Longs.fromByteArray(bytes.slice(KeyLength, KeyLength + 8))

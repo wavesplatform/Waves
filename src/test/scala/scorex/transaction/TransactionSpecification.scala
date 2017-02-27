@@ -3,9 +3,21 @@ package scorex.transaction
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
+import scorex.transaction.TransactionParser.TransactionType
+
+import scala.util.{Failure, Try}
 
 
 class TransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+
+  def parseBytes(data: Array[Byte]): Try[PaymentTransaction] = {
+    data.head match {
+      case transactionType: Byte if transactionType == TransactionType.PaymentTransaction.id =>
+        PaymentTransaction.parseTail(data.tail)
+      case transactionType =>
+        Failure(new Exception(s"Incorrect transaction type '$transactionType' in PaymentTransaction data"))
+    }
+  }
 
   property("transaction fields should be constructed in a right way") {
     forAll(bytes32gen, bytes32gen, positiveLongGen, positiveLongGen, positiveLongGen) {
@@ -31,7 +43,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         val sender = new PrivateKeyAccount(senderSeed)
         val recipient = new PrivateKeyAccount(recipientSeed)
         val tx = PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
-        val txAfter = PaymentTransaction.parseBytes(tx.bytes).get
+        val txAfter = parseBytes(tx.bytes).get
 
         txAfter.getClass.shouldBe(tx.getClass)
 

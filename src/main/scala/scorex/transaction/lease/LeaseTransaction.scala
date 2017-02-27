@@ -50,11 +50,6 @@ object LeaseTransaction {
 
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
-    require(bytes.head == TransactionType.LeaseTransaction.id)
-    parseTail(bytes.tail).get
-  }
-
   def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     import EllipticCurveImpl._
     val sender = new PublicKeyAccount(bytes.slice(0, KeyLength))

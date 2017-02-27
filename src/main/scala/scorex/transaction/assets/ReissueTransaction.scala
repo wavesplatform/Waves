@@ -51,10 +51,6 @@ object ReissueTransaction {
 
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
-    require(bytes.head == TransactionType.ReissueTransaction.id)
-    parseTail(bytes.tail).get
-  }
 
   def parseTail(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
     import EllipticCurveImpl._

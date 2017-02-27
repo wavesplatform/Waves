@@ -65,14 +65,6 @@ object GenesisTransaction extends {
     Bytes.concat(h, h)
   }
 
-  def parseBytes(data: Array[Byte]): Try[GenesisTransaction] = {
-    data.head match {
-      case transactionType: Byte if transactionType == TransactionType.GenesisTransaction.id =>
-        parseTail(data.tail)
-      case transactionType =>
-        Failure(new Exception(s"Incorrect transaction type '$transactionType' in GenesisTransaction data"))
-    }
-  }
 
   def parseTail(data: Array[Byte]): Try[GenesisTransaction] =
     Try {

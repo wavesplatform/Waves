@@ -87,8 +87,7 @@ object TransferTransaction {
   }
 
   def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
-    require(bytes.head == TransactionType.TransferTransaction.id)
-    parseTail(bytes.tail).get
+
   }
 
   def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = Try {
