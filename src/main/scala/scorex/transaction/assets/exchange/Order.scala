@@ -28,7 +28,6 @@ object OrderType {
 /**
   * Order to matcher service for asset exchange
   */
-@SerialVersionUID(2455530529543215878L)
 case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
                  @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
                  @ApiModelProperty(dataType = "java.lang.String") spendAssetId: Option[AssetId],

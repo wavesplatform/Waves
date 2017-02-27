@@ -2,7 +2,6 @@ package scorex.network.peer
 
 import java.net.InetSocketAddress
 
-@SerialVersionUID(-8490103514095092420L)
 case class PeerInfo(timestamp: Long, nonce: Long, nodeName: String = "")
 
 trait PeerDatabase {

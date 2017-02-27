@@ -26,7 +26,6 @@ sealed trait PaymentTransaction extends TypedTransaction {
 
 object PaymentTransaction extends Deser[PaymentTransaction] {
 
-  @SerialVersionUID(-4989881425715590828L)
   private case class PaymentTransactionImpl(sender: PublicKeyAccount,
                                             recipient: Account,
                                             amount: Long,

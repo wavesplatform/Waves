@@ -4,7 +4,6 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.InvalidAddress
 import scorex.transaction.{TypedTransaction, ValidationError}
 
-@SerialVersionUID(-5511437096393374460L)
 class PublicKeyAccount(val publicKey: Array[Byte]) extends Account(Account.addressFromPublicKey(publicKey))
 
 object PublicKeyAccount {
