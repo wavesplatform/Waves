@@ -25,13 +25,12 @@ object Account extends ScorexLogging {
 
   private def scheme = AddressScheme.current
 
-  private case class AccountImpl(override val bytes: Array[Byte]) extends Account
+  private case class AccountImpl(bytes: Array[Byte]) extends Account
 
   def fromPublicKey(publicKey: Array[Byte]): Account = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
     val bytes = withoutChecksum ++ calcCheckSum(withoutChecksum)
-    val address = Base58.encode(bytes)
     AccountImpl(bytes)
   }
 
