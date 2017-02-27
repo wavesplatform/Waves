@@ -5,9 +5,11 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
 import scorex.utils.ScorexLogging
 
-case class Account(address: String) extends Serializable {
 
-  lazy val bytes = Base58.decode(address).get
+sealed trait Account {
+  def address: String
+
+  def bytes: Array[Byte]
 }
 
 
@@ -21,18 +23,21 @@ object Account extends ScorexLogging {
 
   private def scheme = AddressScheme.current
 
+  case class AccountImpl(address: String) extends Account {
+    lazy val bytes = Base58.decode(address).get
+  }
+
   /**
     * Create account from public key.
     */
   def fromPublicKey(publicKey: Array[Byte]): Account = {
-    new Account(addressFromPublicKey(publicKey))
-  }
-
-  def addressFromPublicKey(publicKey: Array[Byte]): String = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
-    Base58.encode(withoutChecksum ++ calcCheckSum(withoutChecksum))
+    val address = Base58.encode(withoutChecksum ++ calcCheckSum(withoutChecksum))
+    AccountImpl(address)
   }
+
+  def apply(s: String): Account = AccountImpl(s)
 
   def isValid(account: Account): Boolean = isValidAddress(account.address)
 

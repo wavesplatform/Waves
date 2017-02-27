@@ -25,7 +25,7 @@ object PublicKeyAccount {
 
   def apply(publicKey: Array[Byte]): PublicKeyAccount = PublicKeyAccountImpl(publicKey)
 
-  implicit def toAddress(publicKeyAccount: PublicKeyAccount): Account = Account(Account.addressFromPublicKey(publicKeyAccount.publicKey))
+  implicit def toAddress(publicKeyAccount: PublicKeyAccount): Account = Account.fromPublicKey(publicKeyAccount.publicKey)
 
   def fromBase58String(s: String): Either[ValidationError, PublicKeyAccount] =
     if (s.length > TransactionParser.KeyStringLength) Left(InvalidAddress)

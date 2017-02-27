@@ -93,7 +93,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     }
 
   override def createPayment(payment: PaymentRequest, wallet: Wallet): Either[ValidationError, PaymentTransaction] = {
-    createPayment(wallet.privateKeyAccount(payment.sender).get, new Account(payment.recipient), payment.amount, payment.fee)
+    createPayment(wallet.privateKeyAccount(payment.sender).get, Account(payment.recipient), payment.amount, payment.fee)
   }
 
   override def transferAsset(request: TransferRequest, wallet: Wallet): Either[ValidationError, TransferTransaction] = {
@@ -101,7 +101,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       TransferTransaction
         .create(request.assetId.map(s => Base58.decode(s).get),
           senderPrivateKey,
-          new Account(request.recipient),
+          Account(request.recipient),
           request.amount,
           getTimestamp,
           request.feeAssetId.map(s => Base58.decode(s).get),
@@ -120,7 +120,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction] = {
     findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey =>
 
-      LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, getTimestamp, new Account(request.recipient))
+      LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, getTimestamp, Account(request.recipient))
       .flatMap(onNewOffchainTransaction))
   }
 
@@ -204,7 +204,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     for {
       _signature <- Base58.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
-      _t <- PaymentTransaction.create(_sender, new Account(payment.recipient), payment.amount, payment.fee, payment.timestamp, _signature)
+      _t <- PaymentTransaction.create(_sender, Account(payment.recipient), payment.amount, payment.fee, payment.timestamp, _signature)
       t <- onNewOffchainTransaction(_t)
     } yield t
 

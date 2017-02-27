@@ -35,7 +35,7 @@ case class TransactionsApiRoute(
   ))
   def addressLimit: Route = (path("address" / Segment / "limit" / IntNumber) & get) { case (address, limit) =>
     if (limit <= MaxTransactionsPerRequest) {
-      val account = new Account(address)
+      val account = Account(address)
       val txJsons = state.accountTransactions(account, limit).map(_.json)
       complete(Json.arr(txJsons))
     } else complete(TooBigArrayAllocation)

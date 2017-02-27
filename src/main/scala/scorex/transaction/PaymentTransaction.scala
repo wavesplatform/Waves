@@ -125,7 +125,7 @@ object PaymentTransaction {
 
       //READ RECIPIENT
       val recipientBytes = util.Arrays.copyOfRange(data, position, position + RecipientLength)
-      val recipient = new Account(Base58.encode(recipientBytes))
+      val recipient = Account(Base58.encode(recipientBytes))
       position += RecipientLength
 
       //READ AMOUNT

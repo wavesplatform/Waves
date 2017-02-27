@@ -77,7 +77,7 @@ object GenesisTransaction extends {
       position += TimestampLength
 
       val recipientBytes = java.util.Arrays.copyOfRange(data, position, position + RECIPIENT_LENGTH)
-      val recipient      = new Account(Base58.encode(recipientBytes))
+      val recipient      = Account(Base58.encode(recipientBytes))
       position += RECIPIENT_LENGTH
 
       val amountBytes = java.util.Arrays.copyOfRange(data, position, position + AmountLength)

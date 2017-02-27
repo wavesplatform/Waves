@@ -76,7 +76,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
         .privateKeyAccount(payment.sender).toRight[ApiError](InvalidSender)
         .flatMap { sender =>
           PaymentTransaction
-            .create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
+            .create(sender, Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
             .left.map(ApiError.fromValidationError)
         }
         .map { t =>
@@ -109,7 +109,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
       for {
         _seed <- Base58.decode(payment.senderWalletSeed).toOption.toRight(InvalidSeed)
         senderAccount = Wallet.generateNewAccount(_seed, payment.senderAddressNonce)
-        recipientAccount = new Account(payment.recipient)
+        recipientAccount = Account(payment.recipient)
         _tx <- transactionModule
           .createPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
           .left.map(ApiError.fromValidationError)

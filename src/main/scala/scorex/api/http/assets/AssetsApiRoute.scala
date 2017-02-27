@@ -142,7 +142,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
 
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
-    val account = new Account(address)
+    val account = Account(address)
     Base58.decode(assetIdStr) match {
       case Success(assetId) if Account.isValid(account) =>
         val json = Json.obj(
@@ -156,7 +156,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
   }
 
   private def balanceJson(address: String): Either[ApiError, JsObject] = {
-    val account = new Account(address)
+    val account = Account(address)
     if (Account.isValid(account)) {
       val balances: Seq[JsObject] = state.getAccountBalance(account).map { p =>
         JsObject(Seq(

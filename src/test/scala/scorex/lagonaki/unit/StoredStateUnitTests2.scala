@@ -49,7 +49,7 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
     val sender = wallet.privateKeyAccount(request.sender).get
     TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
-      new Account(request.recipient),
+      Account(request.recipient),
       request.amount,
       i.incrementAndGet(),
       request.feeAssetId.map(s => Base58.decode(s).get),
@@ -127,7 +127,7 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
     }
     state.processBlock(TestBlock(txs, PublicKeyAccount(feeGetter.publicKey))) should be('success)
 
-    val senderAssetBalance = state.assetBalance(AssetAcc(new Account(sender.address), Some(assetId)))
+    val senderAssetBalance = state.assetBalance(AssetAcc(Account(sender.address), Some(assetId)))
     senderAssetBalance shouldBe 10000
     val feeGetterAssetBalace = state.assetBalance(AssetAcc(PublicKeyAccount(accounts.last.publicKey), Some(
       assetId)))
@@ -157,7 +157,7 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
     }
     state.processBlock(TestBlock(txs ++ txs2, PublicKeyAccount(feeGetter.publicKey))) should be('success)
 
-    val senderAssetBalance = state.assetBalance(AssetAcc(new Account(sender.address), Some(assetId)))
+    val senderAssetBalance = state.assetBalance(AssetAcc(Account(sender.address), Some(assetId)))
     senderAssetBalance shouldBe 10000
     val feeGetterAssetBalace = state.assetBalance(AssetAcc(PublicKeyAccount(accounts.last.publicKey), Some(
       assetId)))
