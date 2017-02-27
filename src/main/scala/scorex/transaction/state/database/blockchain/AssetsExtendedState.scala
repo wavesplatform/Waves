@@ -102,15 +102,15 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     val asset = Base58.encode(assetId)
     val heights = storage.getHeights(asset)
 
-    val reverseSortedHeight = heights.toSeq.reverse
-    if (reverseSortedHeight.nonEmpty) {
-      val lastHeight = reverseSortedHeight.head
-      val transactions = storage.getTransactions(s"$asset@$lastHeight")
-      if (transactions.nonEmpty) {
-        val transaction = transactions.toSeq.reverse.head
-        storage.isReissuable(s"$asset@$transaction")
-      } else false
-    } else false
+    heights.lastOption match {
+      case Some(lastHeight) =>
+        val transactions = storage.getTransactions(s"$asset@$lastHeight")
+        if (transactions.nonEmpty) {
+          val transaction = transactions.last
+          storage.isReissuable(s"$asset@$transaction")
+        } else false
+      case None => false
+    }
   }
 
   def getAssetName(assetId: AssetId): String = {

@@ -2,7 +2,7 @@ package scorex.transaction.state.database.state.storage
 
 trait AssetsExtendedStateStorageI {
 
-  def getTransactions(key: String): Set[String]
+  def getTransactions(key: String): Seq[String]
 
   def addTransaction(key: String, transaction: String): Unit
 
