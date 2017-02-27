@@ -33,7 +33,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   ))
   def address: Route = (path("address" / Segment / IntNumber / IntNumber) & get) { case (address, start, end) =>
     if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
-      complete(JsArray(history.generatedBy(Account.fromBase58String(address), start, end).map(_.json)))
+      complete(JsArray(history.generatedBy(Account.fromBase58String(address).right.get, start, end).map(_.json)))
     } else complete(TooBigArrayAllocation)
   }
 

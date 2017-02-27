@@ -3,6 +3,7 @@ package scorex.account
 import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
+import scorex.transaction.ValidationError
 import scorex.utils.ScorexLogging
 
 
@@ -37,7 +38,10 @@ object Account extends ScorexLogging {
     AccountImpl(address)
   }
 
-  def fromBase58String(s: String): Account = AccountImpl(s)
+  def fromBase58String(s: String): Either[ValidationError, Account] = {
+    if (isValidAddress(s)) Right(AccountImpl(s))
+    else Left(ValidationError.InvalidAddress)
+  }
 
   def isValid(account: Account): Boolean = isValidAddress(account.address)
 

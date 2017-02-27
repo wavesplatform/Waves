@@ -139,7 +139,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def effectiveBalance: Route = {
     path("effectiveBalance" / Segment) { address =>
-      complete (effectiveBalanceJson(address, 0))
+      complete(effectiveBalanceJson(address, 0))
     }
   }
 
@@ -151,7 +151,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def effectiveBalanceWithConfirmations: Route = {
     path("effectiveBalance" / Segment / IntNumber) { case (address, confirmations) =>
-      complete (
+      complete(
         effectiveBalanceJson(address, confirmations)
       )
     }
@@ -226,27 +226,19 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    val account = Account.fromBase58String(address)
-    if (!Account.isValid(account)) {
-      InvalidAddress
-    } else {
-      Json.obj(
-        "address" -> account.address,
-        "confirmations" -> confirmations,
-        "balance" -> state.balanceWithConfirmations(account, confirmations))
-    }
+    Account.fromBase58String(address).right.map(acc => ToResponseMarshallable(Json.obj(
+      "address" -> acc.address,
+      "confirmations" -> confirmations,
+      "balance" -> state.balanceWithConfirmations(acc, confirmations))))
+      .getOrElse(InvalidAddress)
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    val account = Account.fromBase58String(address)
-    if (!Account.isValid(account)) {
-      InvalidAddress
-    } else {
-      Json.obj(
-        "address" -> account.address,
-        "confirmations" -> confirmations,
-        "balance" -> state.effectiveBalanceWithConfirmations(account, confirmations))
-    }
+    Account.fromBase58String(address).right.map(acc => ToResponseMarshallable(Json.obj(
+      "address" -> acc.address,
+      "confirmations" -> confirmations,
+      "balance" -> state.effectiveBalanceWithConfirmations(acc, confirmations))))
+      .getOrElse(InvalidAddress)
   }
 
   private def signPath(address: String, encode: Boolean) = {

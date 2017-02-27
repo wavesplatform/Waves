@@ -15,7 +15,7 @@ object TestChainParameters {
       val timestamp = 0L
 
       val txs = ipoMembers.map { addr =>
-        val recipient = Account.fromBase58String(addr)
+        val recipient = Account.fromBase58String(addr).right.get
         GenesisTransaction.create(recipient, initialBalance / ipoMembers.length, timestamp)
       }.map(_.right.get)
 

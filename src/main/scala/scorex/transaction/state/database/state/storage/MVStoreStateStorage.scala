@@ -98,7 +98,7 @@ trait MVStoreStateStorage extends StateStorageI {
     accountAssetsMap.entrySet().asScala
       .filter(e => e.getValue.contains(encodedAssetId))
       .map(e => {
-        val assetAcc: AssetAcc = AssetAcc(Account.fromBase58String(e.getKey),Some(assetId))
+        val assetAcc: AssetAcc = AssetAcc(Account.fromBase58String(e.getKey).right.get, Some(assetId))
         val key = assetAcc.key
         val balance = getAccountChanges(key, getLastStates(key).get).get.state.balance
         (e.getKey, balance)
