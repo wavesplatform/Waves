@@ -75,6 +75,7 @@ trait RunnableApplication extends Application with ScorexLogging {
   def run() {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
+    log.debug(s"Start with settings: ${settings.toString}")
 
     checkGenesis()
 
