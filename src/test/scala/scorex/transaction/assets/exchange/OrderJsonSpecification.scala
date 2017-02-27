@@ -11,7 +11,7 @@ import scorex.transaction.assets.exchange.OrderJson._
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Read Order from json") {
-    val pk = new PrivateKeyAccount("123".getBytes)
+    val pk = PrivateKeyAccount("123".getBytes)
     val pubKeyStr = Base58.encode(pk.publicKey)
 
     val json = Json.parse(
@@ -117,7 +117,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
   }
 
   property("Read Order with empty assetId") {
-    val pk = new PrivateKeyAccount("123".getBytes)
+    val pk = PrivateKeyAccount("123".getBytes)
     val pubKeyStr = Base58.encode(pk.publicKey)
 
     val json = Json.parse(

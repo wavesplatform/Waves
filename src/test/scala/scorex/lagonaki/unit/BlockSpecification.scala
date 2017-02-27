@@ -17,14 +17,14 @@ class BlockSpecification extends FunSuite with Matchers with scorex.waves.Testin
     implicit val transactionModule = new SimpleTransactionModule(TestChainParameters.Disabled)(application.settings, application)
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
-    val gen = new PrivateKeyAccount(reference)
+    val gen = PrivateKeyAccount(reference)
 
     val bt = Random.nextLong()
     val gs = Array.fill(WavesConsensusModule.GeneratorSignatureLength)(Random.nextInt(100).toByte)
 
 
     val ts = System.currentTimeMillis() - 5000
-    val sender = new PrivateKeyAccount(reference.dropRight(2))
+    val sender = PrivateKeyAccount(reference.dropRight(2))
     val tx: Transaction = PaymentTransaction.create(sender, gen, 5, 1000, ts).right.get
     val tr: TransferTransaction = TransferTransaction.create(None, sender, gen, 5, ts + 1, None, 2, Array()).right.get
     val assetId = Some(Array.fill(AssetIdLength)(Random.nextInt(100).toByte))

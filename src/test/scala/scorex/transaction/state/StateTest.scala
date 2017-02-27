@@ -23,7 +23,7 @@ class StateTest extends PropSpec with Checkers {
 object StateTestSpec extends Commands {
   val TestFolder = "target/test/"
   new File(TestFolder).mkdirs()
-  val accounts = (1 to 10) map (i => new PrivateKeyAccount(randomBytes()))
+  val accounts = (1 to 10) map (i => PrivateKeyAccount(randomBytes()))
   val accN = accounts.size
   val TotalBalance = 10000000
   val MaxTransactions = 100

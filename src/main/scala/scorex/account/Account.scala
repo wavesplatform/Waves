@@ -5,7 +5,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
 import scorex.utils.ScorexLogging
 
-class Account(val address: String) extends Serializable {
+case class Account(address: String) extends Serializable {
 
   lazy val bytes = Base58.decode(address).get
 

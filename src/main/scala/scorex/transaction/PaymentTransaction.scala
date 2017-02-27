@@ -7,8 +7,8 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
+import scorex.account.PublicKeyAccount._
 
 import scala.util.{Failure, Success, Try}
 
@@ -33,7 +33,6 @@ object PaymentTransaction {
                                             timestamp: Long,
                                             signature: Array[Byte])
     extends PaymentTransaction {
-
     override val transactionType = TransactionType.PaymentTransaction
     override val assetFee: (Option[AssetId], Long) = (None, fee)
     override val id: Array[Byte] = signature

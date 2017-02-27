@@ -86,10 +86,6 @@ object TransferTransaction {
 
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
-
-  }
-
   def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = Try {
     import EllipticCurveImpl._
 

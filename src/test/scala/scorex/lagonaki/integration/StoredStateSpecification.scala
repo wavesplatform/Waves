@@ -51,7 +51,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
 
   test("balance confirmations") {
-    val rec = new PrivateKeyAccount(randomBytes())
+    val rec = PrivateKeyAccount(randomBytes())
     val senderBalance = state.balance(acc)
     state.balance(rec) shouldBe 0L
     senderBalance should be > 100L
@@ -86,7 +86,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("effective balance confirmations") {
-    val rec = new PrivateKeyAccount(randomBytes())
+    val rec = PrivateKeyAccount(randomBytes())
     val senderBalance = state.balance(acc)
     state.effectiveBalance(rec) shouldBe 0L
     senderBalance should be > 100L
@@ -120,7 +120,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("lease tx and balances") {
-    val rec = new PrivateKeyAccount(randomBytes())
+    val rec = PrivateKeyAccount(randomBytes())
     val senderBalance = state.balance(acc)
     state.effectiveBalance(rec) shouldBe 0L
     senderBalance should be > 100L
@@ -150,7 +150,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("effective balance and generating balance") {
-    val rec = new PrivateKeyAccount(randomBytes())
+    val rec = PrivateKeyAccount(randomBytes())
     val senderBalance = state.effectiveBalance(acc)
     state.effectiveBalance(rec) shouldBe 0L
     senderBalance should be > 100L
@@ -217,8 +217,8 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val senderBalance = state.balance(acc)
 
     val recipients = Seq(
-      new PrivateKeyAccount(Array(34.toByte, 1.toByte)),
-      new PrivateKeyAccount(Array(1.toByte, 23.toByte))
+      PrivateKeyAccount(Array(34.toByte, 1.toByte)),
+      PrivateKeyAccount(Array(1.toByte, 23.toByte))
     )
 
     require(senderBalance > 10 * recipients.size * Constants.UnitsInWave)

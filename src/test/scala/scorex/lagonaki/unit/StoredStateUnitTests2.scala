@@ -66,8 +66,8 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
     val startWavesBalance = state.balance(acc)
 
     val recipients = Seq(
-      new PrivateKeyAccount(Array(34.toByte, 1.toByte)),
-      new PrivateKeyAccount(Array(1.toByte, 23.toByte))
+      PrivateKeyAccount(Array(34.toByte, 1.toByte)),
+      PrivateKeyAccount(Array(1.toByte, 23.toByte))
     )
 
     val issueAssetTx = createIssueAssetTx(IssueRequest(acc.address, "AAAAB", "BBBBB", 1000000, 2, reissuable = false,
@@ -92,8 +92,8 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
     val startWavesBalance = state.balance(acc)
 
     val recipients = Seq(
-      new PrivateKeyAccount(Array(37.toByte, 1.toByte)),
-      new PrivateKeyAccount(Array(8.toByte, 23.toByte))
+      PrivateKeyAccount(Array(37.toByte, 1.toByte)),
+      PrivateKeyAccount(Array(8.toByte, 23.toByte))
     )
 
     val txs = recipients.flatMap(r => Seq.fill(10) {

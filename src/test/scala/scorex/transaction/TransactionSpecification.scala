@@ -23,8 +23,8 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
     forAll(bytes32gen, bytes32gen, positiveLongGen, positiveLongGen, positiveLongGen) {
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
 
-        val sender = new PrivateKeyAccount(senderSeed)
-        val recipient = new PrivateKeyAccount(recipientSeed)
+        val sender = PrivateKeyAccount(senderSeed)
+        val recipient = PrivateKeyAccount(recipientSeed)
 
         val tx = PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
 
@@ -40,8 +40,8 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
     forAll(bytes32gen, bytes32gen, positiveLongGen, positiveLongGen, positiveLongGen) {
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
 
-        val sender = new PrivateKeyAccount(senderSeed)
-        val recipient = new PrivateKeyAccount(recipientSeed)
+        val sender = PrivateKeyAccount(senderSeed)
+        val recipient = PrivateKeyAccount(recipientSeed)
         val tx = PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
         val txAfter = parseBytes(tx.bytes).get
 
@@ -60,8 +60,8 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
     forAll(bytes32gen, bytes32gen, positiveLongGen, positiveLongGen, positiveLongGen) {
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
 
-        val sender = new PrivateKeyAccount(senderSeed)
-        val recipient = new PrivateKeyAccount(recipientSeed)
+        val sender = PrivateKeyAccount(senderSeed)
+        val recipient = PrivateKeyAccount(recipientSeed)
         val tx = PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
         val txAfter = TransactionParser.parseBytes(tx.bytes).get.asInstanceOf[PaymentTransaction]
 

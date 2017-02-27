@@ -45,7 +45,7 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
   val seed: Array[Byte] = seedPersistence.get("seed")
 
   private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
-    val accounts = accountsPersistence.asScala.keys.map(k => accountsPersistence.get(k)).map(seed => new PrivateKeyAccount(seed))
+    val accounts = accountsPersistence.asScala.keys.map(k => accountsPersistence.get(k)).map(seed => PrivateKeyAccount(seed))
     TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
   }
 
@@ -107,7 +107,7 @@ object Wallet {
 
   def generateNewAccount(seed: Array[Byte], nonce: Int): PrivateKeyAccount = {
     val accountSeed = generateAccountSeed(seed, nonce)
-    new PrivateKeyAccount(accountSeed)
+    PrivateKeyAccount(accountSeed)
   }
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =

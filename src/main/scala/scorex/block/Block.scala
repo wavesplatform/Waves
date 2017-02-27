@@ -166,7 +166,7 @@ object Block extends ScorexLogging {
               signatureStringOpt: Option[String] = None): Block = {
     val version: Byte = 1
 
-    val genesisSigner = new PrivateKeyAccount(Array.empty)
+    val genesisSigner = PrivateKeyAccount(Array.empty)
 
     val transactionGenesisDataField = TransactionsBlockField(transactionGenesisData)
     val concensusGenesisDataField = NxtConsensusBlockField(concensusGenesisData)

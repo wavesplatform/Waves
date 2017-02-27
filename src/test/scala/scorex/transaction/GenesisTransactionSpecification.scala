@@ -50,7 +50,7 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
   property("GenesisTransaction serialize/deserialize roundtrip") {
     forAll(Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray), Gen.posNum[Long], Gen.posNum[Long]) {
       (recipientSeed: Array[Byte], time: Long, amount: Long) =>
-        val recipient = new PrivateKeyAccount(recipientSeed)
+        val recipient = PrivateKeyAccount(recipientSeed)
         val source = GenesisTransaction.create(recipient, amount, time).right.get
         val bytes = source.bytes
         val dest = parseBytes(bytes).get

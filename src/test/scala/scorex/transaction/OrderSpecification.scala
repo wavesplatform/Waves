@@ -14,7 +14,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
       val recovered = Order.parseBytes(order.bytes).get
       recovered.bytes shouldEqual order.bytes
       recovered.id shouldBe order.id
-      recovered.senderPublicKey shouldBe order.senderPublicKey
+      recovered.senderPublicKey.publicKey shouldBe order.senderPublicKey.publicKey
       recovered.matcherPublicKey shouldBe order.matcherPublicKey
       ByteArrayExtension.sameOption(recovered.spendAssetId, order.spendAssetId) shouldBe true
       ByteArrayExtension.sameOption(recovered.receiveAssetId, order.receiveAssetId) shouldBe true
