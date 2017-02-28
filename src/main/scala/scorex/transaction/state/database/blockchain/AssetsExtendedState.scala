@@ -9,8 +9,6 @@ import scorex.transaction.state.database.state.extension.Validator
 import scorex.transaction.state.database.state.storage.{AssetsExtendedStateStorageI, StateStorageI}
 import scorex.utils.ScorexLogging
 
-import scala.util.{Failure, Success}
-
 class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorageI) extends ScorexLogging
   with Validator {
 
@@ -47,10 +45,16 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     val assetAtHeight = s"$asset@$height"
     val assetAtTransaction = s"$asset@$transaction"
 
+    if (!isIssueExists(assetId) ||
+      (reissuable && isReissuable(assetId)) ||
+      !reissuable) {
+      storage.setReissuable(assetAtTransaction, reissuable)
+    } else {
+      throw new RuntimeException("Asset is not reissuable")
+    }
     storage.addHeight(asset, height)
     storage.addTransaction(assetAtHeight, transaction)
     storage.setQuantity(assetAtTransaction, quantity)
-    storage.setReissuable(assetAtTransaction, reissuable)
   }
 
   private[blockchain] def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit = {
@@ -111,6 +115,10 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
         } else false
       case None => false
     }
+  }
+
+  def isIssueExists(assetId: AssetId): Boolean = {
+    storage.getHeights(Base58.encode(assetId)).nonEmpty
   }
 
   def getAssetName(assetId: AssetId): String = {

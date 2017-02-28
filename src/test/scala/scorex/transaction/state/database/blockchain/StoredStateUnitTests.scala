@@ -467,6 +467,25 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
+
+  property("Incorrect issue and reissue asset") {
+    forAll(issueWithInvalidReissuesGenerator) { case (issueTx, reissueTx, invalidReissueTx) =>
+      withRollbackTest {
+        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Right[_, _]]
+
+        state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
+
+        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Left[_, _]]
+
+        state.validate(invalidReissueTx, Int.MaxValue) shouldBe an[Right[_, _]]
+
+        state.applyChanges(state.calcNewBalances(Seq(reissueTx), Map(), allowTemporaryNegative = true))
+
+        state.validate(invalidReissueTx, Int.MaxValue) shouldBe an[Left[_, _]]
+      }
+    }
+  }
+
   property("Issue asset") {
     forAll(issueGenerator) { issueTx: IssueTransaction =>
       withRollbackTest {

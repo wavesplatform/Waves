@@ -71,7 +71,7 @@ object LeaseCancelTransaction extends Deser[LeaseCancelTransaction] {
                                timestamp: Long,
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseCancelTransactionImpl] = {
     if (leaseId.length != DigestSize) {
-      Left(ValidationError.NegativeAmount)
+      Left(ValidationError.TransactionParameterValidationError("Lease transaction id is invalid"))
     } else if (!Account.isValid(sender)) {
       Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
