@@ -49,7 +49,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
 
         tx.signature shouldEqual txAfter.signature
         tx.sender shouldEqual txAfter.asInstanceOf[PaymentTransaction].sender
-        tx.recipient shouldEqual txAfter.recipient
+        tx.recipient.address shouldEqual txAfter.recipient.address
         tx.timestamp shouldEqual txAfter.timestamp
         tx.amount shouldEqual txAfter.amount
         tx.fee shouldEqual txAfter.fee
@@ -69,7 +69,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
 
         tx.signature shouldEqual txAfter.signature
         tx.sender shouldEqual txAfter.asInstanceOf[PaymentTransaction].sender
-        tx.recipient shouldEqual txAfter.recipient
+        tx.recipient.address shouldEqual txAfter.recipient.address
         tx.timestamp shouldEqual txAfter.timestamp
         tx.amount shouldEqual txAfter.amount
         tx.fee shouldEqual txAfter.fee

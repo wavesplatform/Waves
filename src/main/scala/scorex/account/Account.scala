@@ -40,7 +40,7 @@ object Account extends ScorexLogging {
   }
 
   def fromBase58String(address: String): Either[ValidationError, Account] =
-    if (address.length <= AddressStringLength) {
+    if (address.length > AddressStringLength) {
       Left(InvalidAddress)
     } else {
       Base58.decode(address) match {
