@@ -103,4 +103,48 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
       FeesSettings.fromConfig(config)
     }
   }
+
+  it should "override values from default config" in {
+    val defaultConfig = ConfigFactory.defaultApplication()
+    val config = ConfigFactory.parseString(
+      """
+        |waves.fees {
+        |  payment {
+        |    WAVES = 100000
+        |  }
+        |  issue {
+        |    WAVES = 100000000
+        |  }
+        |  transfer {
+        |    WAVES = 100000,
+        |    "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL" = 1
+        |  }
+        |  reissue {
+        |    WAVES = 100000
+        |  }
+        |  burn {
+        |    WAVES = 100000
+        |  }
+        |  exchange {
+        |    WAVES = 100000
+        |  }
+        |  lease {
+        |    WAVES = 100000
+        |  }
+        |  lease-cancel {
+        |    WAVES = 100000
+        |  }
+        |}
+      """.stripMargin).withFallback(defaultConfig).resolve()
+    val settings = FeesSettings.fromConfig(config)
+    settings.fees.size should be(8)
+    settings.fees(2).toSet should equal(Set(FeeSettings("WAVES", 100000)))
+    settings.fees(3).toSet should equal(Set(FeeSettings("WAVES", 100000000)))
+    settings.fees(4).toSet should equal(Set(FeeSettings("WAVES", 100000), FeeSettings("6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL", 1)))
+    settings.fees(5).toSet should equal(Set(FeeSettings("WAVES", 100000)))
+    settings.fees(6).toSet should equal(Set(FeeSettings("WAVES", 100000)))
+    settings.fees(7).toSet should equal(Set(FeeSettings("WAVES", 100000)))
+    settings.fees(8).toSet should equal(Set(FeeSettings("WAVES", 100000)))
+    settings.fees(9).toSet should equal(Set(FeeSettings("WAVES", 100000)))
+  }
 }

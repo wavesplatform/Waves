@@ -37,8 +37,11 @@ class LeaseExtendedState(private[blockchain] val storage: StateStorageI with Lea
       Seq(
         EffectiveBalanceChange(tx.sender, leaseTx.amount - tx.fee),
         EffectiveBalanceChange(leaseTx.recipient, -leaseTx.amount))
-    case _ => tx.balanceChanges().map(bc => {
-      EffectiveBalanceChange(bc.assetAcc.account, bc.delta)
+    case _ => tx.balanceChanges().flatMap(bc => {
+      bc.assetAcc.assetId match {
+        case Some(_) => None
+        case None => Some(EffectiveBalanceChange(bc.assetAcc.account, bc.delta))
+      }
     })
   }
 

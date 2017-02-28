@@ -110,7 +110,8 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     state.effectiveBalance(rec) shouldBe 2L
     state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 2L
 
-    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
+    state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get,
+      transactionModule.issueAsset(IssueRequest(acc.address, "test", "test", 1000, 2, false, 100000000), application.wallet).right.get)))
     state.effectiveBalance(rec) shouldBe 7L
     state.effectiveBalanceWithConfirmations(rec, 3) shouldBe 2L
 
@@ -130,13 +131,16 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
     val oldSenderEffectiveBalance = state.effectiveBalance(acc)
     val oldSenderBalance = state.effectiveBalance(acc)
-    state.processBlock(TestBlock(Seq(transactionModule.lease(LeaseRequest(acc.address, 5, 1, rec.address), application.wallet).right.get)))
-    state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - 6
-    state.effectiveBalanceWithConfirmations(acc, 1) shouldBe oldSenderEffectiveBalance - 6
+    state.processBlock(TestBlock(Seq(
+      transactionModule.lease(LeaseRequest(acc.address, 5, 1, rec.address), application.wallet).right.get,
+      transactionModule.issueAsset(IssueRequest(acc.address, "test", "test", 1000, 2, false, 100000000), application.wallet).right.get
+      )))
+    state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
+    state.effectiveBalanceWithConfirmations(acc, 1) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
     state.balance(rec) shouldBe 0L
     state.effectiveBalance(rec) shouldBe 5L
     state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 0L
-    application.consensusModule.generatingBalance(acc) shouldBe oldSenderEffectiveBalance - 6
+    application.consensusModule.generatingBalance(acc) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
     application.consensusModule.generatingBalance(rec) shouldBe 0
 
     for {
@@ -144,10 +148,10 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     } {
       state.processBlock(TestBlock(Seq.empty))
     }
-    state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - 6
-    state.effectiveBalanceWithConfirmations(acc, 1000) shouldBe oldSenderEffectiveBalance - 6
+    state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
+    state.effectiveBalanceWithConfirmations(acc, 1000) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
     state.effectiveBalanceWithConfirmations(rec, 1000) shouldBe 5
-    application.consensusModule.generatingBalance(acc) shouldBe oldSenderEffectiveBalance - 6
+    application.consensusModule.generatingBalance(acc) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
     application.consensusModule.generatingBalance(rec) shouldBe 5
   }
 
