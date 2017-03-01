@@ -139,7 +139,7 @@ trait MatcherTestData {
         settings.allowExchangeTransactionAfterTimestamp)
     )
     new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
-      override def assetBalance2(account: AssetAcc): Long = Long.MaxValue
+      override def assetBalance(account: AssetAcc): Long = Long.MaxValue
       override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
     }
   }

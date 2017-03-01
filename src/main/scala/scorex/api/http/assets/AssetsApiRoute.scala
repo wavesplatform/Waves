@@ -149,7 +149,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
         } yield Json.obj(
           "address" -> acc.address,
           "assetId" -> assetIdStr,
-          "balance" -> state.assetBalance2(AssetAcc(acc, Some(assetId))))
+          "balance" -> state.assetBalance(AssetAcc(acc, Some(assetId))))
           ).left.map(ApiError.fromValidationError)
       case _ => Left(InvalidAddress)
     }

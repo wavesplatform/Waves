@@ -28,7 +28,7 @@ trait State {
 
   def accountTransactions(account: Account, limit: Int = State.DefaultLimit): Seq[_ <: Transaction]
 
-  def assetBalance2(account: AssetAcc): Long
+  def assetBalance(account: AssetAcc): Long
 
   def assetDistribution(assetId: Array[Byte]): Map[String, Long]
 

@@ -96,8 +96,8 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   }
 
   private def getBalances(acc: Account, pair: AssetPair) = {
-    (state.assetBalance2(AssetAcc(acc, None)), state.assetBalance2(AssetAcc(acc, pair.first)),
-      state.assetBalance2(AssetAcc(acc, pair.second)))
+    (state.assetBalance(AssetAcc(acc, None)), state.assetBalance(AssetAcc(acc, pair.first)),
+      state.assetBalance(AssetAcc(acc, pair.second)))
   }
 
   private def initPairWithBalances(): (AssetPair, PrivateKeyAccount, PrivateKeyAccount) = {
