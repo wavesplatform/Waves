@@ -13,8 +13,6 @@ trait ExchangeTransactionCreator {
   val storedState: State
   val wallet: Wallet
   val settings: MatcherSettings
-  //TODO ???
-  val omss = storedState.orderMatchStoredState
   private var txTime: Long = 0
 
   private def getTimestamp: Long = {
@@ -34,7 +32,7 @@ trait ExchangeTransactionCreator {
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
     def calcFee(o: Order, amount: Long): Long = {
-      omss.findPrevOrderMatchTxs(o)
+      storedState.findPrevOrderMatchTxs(o)
       val p = BigInt(amount) * o.matcherFee / o.amount
       p.toLong
     }

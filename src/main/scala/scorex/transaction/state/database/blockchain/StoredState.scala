@@ -10,6 +10,7 @@ import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
 import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.extension._
@@ -393,8 +394,13 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int]): Long =
     effectiveBalance(account, Some(heightWithConfirmations(heightOpt, confirmations)))
 
-  override def orderMatchStoredState: OrderMatchStoredState = validators.filter(_.isInstanceOf[OrderMatchStoredState])
-    .head.asInstanceOf[OrderMatchStoredState]
+  override def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = validators.filter(_.isInstanceOf[OrderMatchStoredState])
+    .head.asInstanceOf[OrderMatchStoredState].findPrevOrderMatchTxs(order)
+
+  def getAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
+
+  def getAssetName(assetId: AssetId): String = assetsExtension.getAssetName(assetId)
+
 
 }
 

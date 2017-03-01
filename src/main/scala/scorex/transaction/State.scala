@@ -4,6 +4,7 @@ import play.api.libs.json.JsObject
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState}
 import scorex.transaction.state.database.state.{AccState, Reasons}
 import scorex.transaction.state.database.state.extension.{IncrementingTimestampValidator, OrderMatchStoredState}
@@ -33,11 +34,14 @@ trait State {
 
   def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)]
 
-  // exposing extensions for orders validation
+  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
 
-  def orderMatchStoredState: OrderMatchStoredState
+  def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
 
-  def assetsExtension: AssetsExtendedState
+  def getAssetQuantity(assetId: AssetId): Long
+
+  def getAssetName(assetId: AssetId): String
+
 
   // debug from api
 
@@ -70,8 +74,6 @@ trait State {
 
   def effectiveBalance(account: Account, height: Option[Int] = None): Long
 
-  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
-
   def incrementingTimestampValidator: IncrementingTimestampValidator
 
   def leaseExtendedState: LeaseExtendedState
@@ -85,7 +87,7 @@ object State {
 
     // validation
 
-    def validate[T<: Transaction](tx: T, blockTime: Long): Either[ValidationError, T] = s.validate(Seq(tx), None, blockTime) match {
+    def validate[T <: Transaction](tx: T, blockTime: Long): Either[ValidationError, T] = s.validate(Seq(tx), None, blockTime) match {
       case (_, Seq(t)) => Right(t.asInstanceOf[T])
       case (Seq(err), _) => Left(err)
     }

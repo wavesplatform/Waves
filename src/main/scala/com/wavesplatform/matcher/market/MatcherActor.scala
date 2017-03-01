@@ -28,7 +28,7 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
   val openMarkets: mutable.Buffer[MarketData] = mutable.Buffer.empty[MarketData]
 
   def createOrderBook(pair: AssetPair): ActorRef = {
-    def getAssetName(asset: Option[AssetId]) = asset.map(storedState.assetsExtension.getAssetName).getOrElse(AssetPair.WavesName)
+    def getAssetName(asset: Option[AssetId]) = asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
 
     openMarkets += MarketData(pair, getAssetName(pair.first), getAssetName(pair.second), NTP.correctedTime())
 
@@ -38,9 +38,9 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
     Try(msg.assetPair).isSuccess :| "Invalid AssetPair" &&
-      msg.assetPair.first.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
+      msg.assetPair.first.map(storedState.getAssetQuantity).forall(_ > 0) :|
         s"Unknown Asset ID: ${msg.assetPair.firstStr}" &&
-      msg.assetPair.second.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
+      msg.assetPair.second.map(storedState.getAssetQuantity).forall(_ > 0) :|
         s"Unknown Asset ID: ${msg.assetPair.secondStr}"
   }
 

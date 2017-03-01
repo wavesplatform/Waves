@@ -125,6 +125,7 @@ trait MatcherTestData {
       override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
     }
 
+
     val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
     val leaseExtendedState = new LeaseExtendedState(storage)
     val validators = Seq(
@@ -139,6 +140,7 @@ trait MatcherTestData {
     )
     new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
       override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
+      override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
     }
   }
 }
