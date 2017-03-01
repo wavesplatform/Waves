@@ -45,9 +45,9 @@ trait State {
 
   // debug from api
 
-  def toWavesJson(heightOpt: Int): JsObject
+  def toWavesJson(height: Int): JsObject
 
-  def toJson(heightOpt: Option[Int] = None): JsObject
+  def toJson(heightOpt: Option[Int]): JsObject
 
   def hash: Int
 

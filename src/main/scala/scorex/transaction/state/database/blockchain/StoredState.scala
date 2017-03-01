@@ -39,7 +39,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     val address = account.address
     storage.getAccountAssets(address).foldLeft(Map.empty[AssetId, (Long, Boolean, Long, IssueTransaction)]) { (result, asset) =>
       val triedAssetId = Base58.decode(asset)
-      val balance = balanceByKey(address + asset, _.balance)
+      val balance = balanceByKey(address + asset, _.balance, storage.stateHeight)
 
       if (triedAssetId.isSuccess) {
         val assetId = triedAssetId.get
@@ -110,7 +110,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     assetBalanceAtHeight(AssetAcc(account, None), None)
 
   private def assetBalanceAtHeight(account: AssetAcc, atHeight: Option[Int] = None): Long = {
-    balanceByKey(account.key, _.balance, atHeight)
+    balanceByKey(account.key, _.balance, atHeight.getOrElse(storage.stateHeight))
   }
 
   override def assetBalance(account: AssetAcc): Long = assetBalanceAtHeight(account, Some(storage.stateHeight))
@@ -307,18 +307,17 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     }
   }
 
-  private def balanceByKey(key: String, calculatedBalance: AccState => Long, atHeight: Option[Int] = None): Long = {
+  private def balanceByKey(key: String, calculatedBalance: AccState => Long, atHeight: Int): Long = {
     storage.getLastStates(key) match {
       case Some(h) if h > 0 =>
-        val requiredHeight = atHeight.getOrElse(storage.stateHeight)
-        require(requiredHeight >= 0, s"Height should not be negative, $requiredHeight given")
+        require(atHeight >= 0, s"Height should not be negative, $atHeight given")
 
         @tailrec
         def loop(hh: Int, min: Long = Long.MaxValue): Long = {
           val rowOpt = storage.getAccountChanges(key, hh)
           require(rowOpt.isDefined, s"accountChanges($key).get($hh) is null. lastStates.get(address)=$h")
           val row = rowOpt.get
-          if (hh <= requiredHeight) {
+          if (hh <= atHeight) {
             Math.min(calculatedBalance(row.state), min)
           } else if (row.lastRowHeight == 0) {
             0L
@@ -346,17 +345,17 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
 
   //for debugging purposes only
-  def totalBalance: Long = storage.lastStatesKeys.map(address => balanceByKey(address, _.balance)).sum
+  def totalBalance: Long = storage.lastStatesKeys.map(address => balanceByKey(address, _.balance, storage.stateHeight)).sum
 
   //for debugging purposes only
-  def toJson(heightOpt: Option[Int] = None): JsObject = {
-    val ls = storage.lastStatesKeys.map(add => add -> balanceByKey(add, _.balance, heightOpt))
+  def toJson(heightOpt: Option[Int]): JsObject = {
+    val ls = storage.lastStatesKeys.map(add => add -> balanceByKey(add, _.balance, heightOpt.getOrElse(storage.stateHeight)))
       .filter(b => b._2 != 0).sortBy(_._1)
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
 
   //for debugging purposes only
-  def toWavesJson(heightOpt: Int): JsObject = {
+  def  toWavesJson(heightOpt: Int): JsObject = {
     val ls = storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add, heightOpt))
       .filter(b => b._2 != 0).sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
     JsObject(ls)
@@ -389,16 +388,16 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   //for debugging purposes only
   def hash: Int = {
-    (BigInt(FastCryptographicHash(toJson().toString().getBytes)) % Int.MaxValue).toInt
+    (BigInt(FastCryptographicHash(toJson(None).toString().getBytes)) % Int.MaxValue).toInt
   }
 
-  override def effectiveBalance(account: Account): Long = balanceByKey(account.address, _.effectiveBalance, None)
+  override def effectiveBalance(account: Account): Long = balanceByKey(account.address, _.effectiveBalance, storage.stateHeight)
 
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int): Long =
-    balanceByKey(account.address, _.effectiveBalance, Some(heightWithConfirmations(None, confirmations)))
+    balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(None, confirmations))
 
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
-    balanceByKey(account.address, _.effectiveBalance, Some(heightWithConfirmations(Some(height), confirmations)))
+    balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
 
   override def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = validators.filter(_.isInstanceOf[OrderMatchStoredState])
     .head.asInstanceOf[OrderMatchStoredState].findPrevOrderMatchTxs(order)
