@@ -72,7 +72,7 @@ trait State {
 
   def totalBalance: Long
 
-  def effectiveBalance(account: Account, height: Option[Int] = None): Long
+  def effectiveBalance(account: Account): Long
 
   def incrementingTimestampValidator: IncrementingTimestampValidator
 
