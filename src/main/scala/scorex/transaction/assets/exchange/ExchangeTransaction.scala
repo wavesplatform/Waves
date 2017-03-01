@@ -8,7 +8,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.BytesSerializable
-import scorex.transaction.TypedTransaction.TransactionType
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.TransactionParameterValidationError
 import scorex.transaction.{ValidationError, _}
 
@@ -155,8 +155,8 @@ object ExchangeTransaction {
     from += 8
     val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8));
     from += 8
-    val signature = bytes.slice(from, from + TypedTransaction.SignatureLength);
-    from += TypedTransaction.SignatureLength
+    val signature = bytes.slice(from, from + TransactionParser.SignatureLength);
+    from += TransactionParser.SignatureLength
 
     create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))

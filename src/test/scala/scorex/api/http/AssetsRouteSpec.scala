@@ -13,6 +13,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.api.http.assets.AssetsApiRoute
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction._
 import scorex.wallet.Wallet
 
@@ -42,6 +43,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     override val id: Array[Byte] = Array()
     override def bytes: Array[Byte] = ???
     override def json: JsObject = Json.obj("k" -> "v")
+    override val transactionType = TransactionType.TransferTransaction
   }
 
   private val errorGen: Gen[ValidationError] = Gen.oneOf(

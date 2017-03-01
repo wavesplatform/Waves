@@ -4,7 +4,7 @@ import org.scalacheck.{Arbitrary, Gen => G}
 import org.scalacheck.Gen.{alphaNumChar, choose, listOfN, oneOf}
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
-import scorex.transaction.{TransactionGen, TypedTransaction}
+import scorex.transaction.{TransactionGen, TransactionParser}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 
 trait RequestGen extends TransactionGen {
@@ -29,7 +29,7 @@ trait RequestGen extends TransactionGen {
       .map(Base58.encode)
 
   val addressGen: G[String] = listOfN(32, Arbitrary.arbByte.arbitrary).map(b => Base58.encode(b.toArray))
-  val signatureGen: G[String] = listOfN(TypedTransaction.SignatureLength, Arbitrary.arbByte.arbitrary)
+  val signatureGen: G[String] = listOfN(TransactionParser.SignatureLength, Arbitrary.arbByte.arbitrary)
     .map(b => Base58.encode(b.toArray))
   private val assetIdStringGen = assetIdGen.map(_.map(Base58.encode))
 

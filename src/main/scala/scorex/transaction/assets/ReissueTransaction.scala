@@ -6,7 +6,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError
 import scorex.transaction._
 
@@ -16,7 +16,7 @@ sealed trait ReissueTransaction extends AssetIssuance {
   def fee: Long
 }
 
-object ReissueTransaction extends Deser[ReissueTransaction] {
+object ReissueTransaction {
 
   private case class ReissueTransactionImpl(sender: PublicKeyAccount,
                                     assetId: Array[Byte],
@@ -51,17 +51,13 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
 
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
-    require(bytes.head == TransactionType.ReissueTransaction.id)
-    parseTail(bytes.tail).get
-  }
 
   def parseTail(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
     import EllipticCurveImpl._
     val signature = bytes.slice(0, SignatureLength)
     val txId      = bytes(SignatureLength)
     require(txId == TransactionType.ReissueTransaction.id.toByte, s"Signed tx id is not match")
-    val sender        = new PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
+    val sender        = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
     val assetId       = bytes.slice(SignatureLength + KeyLength + 1, SignatureLength + KeyLength + AssetIdLength + 1)
     val quantityStart = SignatureLength + KeyLength + AssetIdLength + 1
 
@@ -82,8 +78,6 @@ object ReissueTransaction extends Deser[ReissueTransaction] {
                                signature: Option[Array[Byte]] = None) =
     if (quantity <= 0) {
       Left(ValidationError.NegativeAmount)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

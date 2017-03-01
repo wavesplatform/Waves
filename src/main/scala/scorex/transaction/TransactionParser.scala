@@ -8,16 +8,8 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 import scala.util.{Failure, Try}
 
-trait TypedTransaction extends Transaction {
+object TransactionParser {
 
-  import TypedTransaction._
-
-  val transactionType: TransactionType.Value
-}
-
-object TypedTransaction extends Deser[TypedTransaction] {
-
-  //TYPES
   object TransactionType extends Enumeration {
     val GenesisTransaction = Value(1)
     val PaymentTransaction = Value(2)
@@ -34,11 +26,11 @@ object TypedTransaction extends Deser[TypedTransaction] {
   val AmountLength = 8
   val TypeLength = 1
   val SignatureLength = 64
-  val SignatureStringLength = base58Length(SignatureLength)
+  val SignatureStringLength: Int = base58Length(SignatureLength)
   val KeyLength = 32
-  val KeyStringLength = base58Length(KeyLength)
+  val KeyStringLength: Int = base58Length(KeyLength)
 
-  def parseBytes(data: Array[Byte]): Try[TypedTransaction] =
+  def parseBytes(data: Array[Byte]): Try[Transaction] =
     data.head match {
       case txType: Byte if txType == TransactionType.GenesisTransaction.id =>
         GenesisTransaction.parseTail(data.tail)

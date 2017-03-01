@@ -12,7 +12,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{AssetAcc,State, AssetIdStringLength, TransactionOperations}
+import scorex.transaction.{AssetAcc, State, AssetIdStringLength, TransactionOperations}
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success}
@@ -142,38 +142,37 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
 
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
-    val account = new Account(address)
     Base58.decode(assetIdStr) match {
-      case Success(assetId) if Account.isValid(account) =>
-        val json = Json.obj(
-          "address" -> account.address,
+      case Success(assetId) =>
+        (for {
+          acc <- Account.fromBase58String(address)
+        } yield Json.obj(
+          "address" -> acc.address,
           "assetId" -> assetIdStr,
-          "balance" -> state.assetBalance(AssetAcc(account, Some(assetId)))
-        )
-        Right(json)
+          "balance" -> state.assetBalance(AssetAcc(acc, Some(assetId))))
+          ).left.map(ApiError.fromValidationError)
       case _ => Left(InvalidAddress)
     }
   }
 
-  private def balanceJson(address: String): Either[ApiError, JsObject] = {
-    val account = new Account(address)
-    if (Account.isValid(account)) {
-      val balances: Seq[JsObject] = state.getAccountBalance(account).map { p =>
-        JsObject(Seq(
-          "assetId" -> JsString(Base58.encode(p._1)),
-          "balance" -> JsNumber(p._2._1),
-          "reissuable" -> JsBoolean(p._2._2),
-          "quantity" -> JsNumber(p._2._3),
-          "issueTransaction" -> p._2._4.json
-        ))
-      }.toSeq
-      val json = Json.obj(
-        "address" -> account.address,
-        "balances" -> JsArray(balances)
-      )
-      Right(json)
-    } else Left(InvalidAddress)
-  }
+  private def balanceJson(address: String): Either[ApiError, JsObject] = (for {
+    acc <- Account.fromBase58String(address)
+  } yield {
+    val balances: Seq[JsObject] = state.getAccountBalance(acc).map { p =>
+      JsObject(Seq(
+        "assetId" -> JsString(Base58.encode(p._1)),
+        "balance" -> JsNumber(p._2._1),
+        "reissuable" -> JsBoolean(p._2._2),
+        "quantity" -> JsNumber(p._2._3),
+        "issueTransaction" -> p._2._4.json
+      ))
+    }.toSeq
+    Json.obj(
+      "address" -> acc.address,
+      "balances" -> JsArray(balances)
+    )
+  }).left.map(ApiError.fromValidationError)
+
 
   @Path("/order")
   @ApiOperation(value = "Sign Order",

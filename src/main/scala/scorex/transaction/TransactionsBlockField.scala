@@ -4,7 +4,6 @@ import com.google.common.primitives.{Bytes, Ints}
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.block.BlockField
 
-@SerialVersionUID(3044437555808662124L)
 case class TransactionsBlockField(override val value: Seq[Transaction])
   extends BlockField[Seq[Transaction]] {
 

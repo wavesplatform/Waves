@@ -34,7 +34,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def deleteAddress: Route = path(Segment) { address =>
     (delete & withAuth) {
-      if (!Account.isValidAddress(address)) {
+      if (Account.fromBase58String(address).isLeft) {
         complete(InvalidAddress)
       } else {
         val deleted = wallet.privateKeyAccount(address).exists(account =>
@@ -139,7 +139,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def effectiveBalance: Route = {
     path("effectiveBalance" / Segment) { address =>
-      complete (effectiveBalanceJson(address, 0))
+      complete(effectiveBalanceJson(address, 0))
     }
   }
 
@@ -151,7 +151,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def effectiveBalanceWithConfirmations: Route = {
     path("effectiveBalance" / Segment / IntNumber) { case (address, confirmations) =>
-      complete (
+      complete(
         effectiveBalanceJson(address, confirmations)
       )
     }
@@ -164,7 +164,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def seed: Route = {
     (path("seed" / Segment) & get & withAuth) { address =>
-      if (!Account.isValidAddress(address)) {
+      if (Account.fromBase58String(address).isLeft) {
         complete(InvalidAddress)
       } else {
         wallet.privateKeyAccount(address) match {
@@ -185,7 +185,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def validate: Route = (path("validate" / Segment) & get) { address =>
-    complete(Json.obj("address" -> address, "valid" -> Account.isValidAddress(address)))
+    complete(Json.obj("address" -> address, "valid" -> Account.fromBase58String(address).isRight))
   }
 
   @Path("/")
@@ -226,33 +226,25 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    val account = new Account(address)
-    if (!Account.isValid(account)) {
-      InvalidAddress
-    } else {
-      Json.obj(
-        "address" -> account.address,
-        "confirmations" -> confirmations,
-        "balance" -> state.balanceWithConfirmations(account, confirmations))
-    }
+    Account.fromBase58String(address).right.map(acc => ToResponseMarshallable(Json.obj(
+      "address" -> acc.address,
+      "confirmations" -> confirmations,
+      "balance" -> state.balanceWithConfirmations(acc, confirmations))))
+      .getOrElse(InvalidAddress)
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    val account = new Account(address)
-    if (!Account.isValid(account)) {
-      InvalidAddress
-    } else {
-      Json.obj(
-        "address" -> account.address,
-        "confirmations" -> confirmations,
-        "balance" -> state.effectiveBalanceWithConfirmations(account, confirmations))
-    }
+    Account.fromBase58String(address).right.map(acc => ToResponseMarshallable(Json.obj(
+      "address" -> acc.address,
+      "confirmations" -> confirmations,
+      "balance" -> state.effectiveBalanceWithConfirmations(acc, confirmations))))
+      .getOrElse(InvalidAddress)
   }
 
   private def signPath(address: String, encode: Boolean) = {
     (post & entity(as[String])) { message =>
       withAuth {
-        if (!Account.isValidAddress(address)) {
+        if (Account.fromBase58String(address).isLeft) {
           complete(InvalidAddress)
         } else {
           wallet.privateKeyAccount(address) match {
@@ -276,7 +268,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 
   private def verifyPath(address: String, decode: Boolean) = withAuth {
     json[SignedMessage] { m =>
-      if (!Account.isValidAddress(address)) {
+      if (Account.fromBase58String(address).isLeft) {
         InvalidAddress
       } else {
         //DECODE SIGNATURE
@@ -289,7 +281,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: String) = {
     (msg, Base58.decode(signature), Base58.decode(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-        val account = new PublicKeyAccount(pubKeyBytes)
+        val account = PublicKeyAccount(pubKeyBytes)
         val isValid = account.address == address && EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)

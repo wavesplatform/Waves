@@ -17,7 +17,7 @@ import scorex.waves.transaction.SignedPaymentRequest
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transactionModule: TransactionOperations) extends ApiRoute {
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionModule: TransactionOperations) extends ApiRoute {
 
   override lazy val route = pathPrefix("waves") {
     externalPayment ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
@@ -72,13 +72,12 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def signPayment: Route = (post & path("payment" / "signature")) {
     json[PaymentRequest] { payment =>
-      wallet
-        .privateKeyAccount(payment.sender).toRight[ApiError](InvalidSender)
-        .flatMap { sender =>
-          PaymentTransaction
-            .create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
-            .left.map(ApiError.fromValidationError)
-        }
+      (for {
+        sender <- wallet.findWallet(payment.sender)
+        recipient <- Account.fromBase58String(payment.recipient)
+        pt <- PaymentTransaction.create(sender, recipient, payment.amount, payment.fee, NTP.correctedTime())
+      } yield pt)
+        .left.map(ApiError.fromValidationError)
         .map { t =>
           SignedPaymentRequest(t.timestamp, t.amount, t.fee, t.recipient.address, Base58.encode(t.sender.publicKey), t.sender.address, Base58.encode(t.signature))
         }
@@ -104,19 +103,21 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
-  def createdSignedPayment: Route = post { path("create-signed-payment")  {
-    json[UnsignedPayment] { payment =>
-      for {
-        _seed <- Base58.decode(payment.senderWalletSeed).toOption.toRight(InvalidSeed)
-        senderAccount = Wallet.generateNewAccount(_seed, payment.senderAddressNonce)
-        recipientAccount = new Account(payment.recipient)
-        _tx <- transactionModule
-          .createPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
-          .left.map(ApiError.fromValidationError)
-      } yield SignedPaymentRequest(_tx.timestamp, _tx.amount, _tx.fee, _tx.recipient.address, Base58.encode(_tx.sender.publicKey),
-        _tx.sender.address, Base58.encode(_tx.signature))
+  def createdSignedPayment: Route = post {
+    path("create-signed-payment") {
+      json[UnsignedPayment] { payment =>
+        for {
+          _seed <- Base58.decode(payment.senderWalletSeed).toOption.toRight(InvalidSeed)
+          senderAccount = Wallet.generateNewAccount(_seed, payment.senderAddressNonce)
+          recipientAccount <- Account.fromBase58String(payment.recipient).left.map(ApiError.fromValidationError)
+          _tx <- transactionModule
+            .createPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
+            .left.map(ApiError.fromValidationError)
+        } yield SignedPaymentRequest(_tx.timestamp, _tx.amount, _tx.fee, _tx.recipient.address, Base58.encode(_tx.sender.publicKey),
+          _tx.sender.address, Base58.encode(_tx.signature))
+      }
     }
-  }}
+  }
 
   private def broadcastPaymentRoute(suffix: String): Route = (path(suffix) & post) {
     json[SignedPaymentRequest] { payment =>

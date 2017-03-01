@@ -16,7 +16,7 @@ import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, 
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
 import scorex.transaction.TransactionModule
-import scorex.transaction.TypedTransaction.SignatureLength
+import scorex.transaction.TransactionParser.SignatureLength
 
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
@@ -117,7 +117,7 @@ abstract class ActorTestingCommons extends TestKitBase
     Block(timestamp = ts,
       version = 0,
       reference = 1,
-      signerData = SignerData(new PublicKeyAccount(Array.fill(32)(0)), Array(id.toByte)),
+      signerData = SignerData(PublicKeyAccount(Array.fill(32)(0)), Array(id.toByte)),
       consensusData = NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
       transactionData = Seq.empty)
 

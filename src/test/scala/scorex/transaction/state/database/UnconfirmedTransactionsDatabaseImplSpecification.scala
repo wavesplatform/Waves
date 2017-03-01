@@ -53,6 +53,6 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
     }
   }
 
-  private def newTx(id: Long) = GenesisTransaction.create(new PublicKeyAccount(Array.fill(32)(0: Byte)), id, 4598723454L).right.get
+  private def newTx(id: Long) = GenesisTransaction.create(PublicKeyAccount(Array.fill(32)(0: Byte)), id, 4598723454L).right.get
 
 }
