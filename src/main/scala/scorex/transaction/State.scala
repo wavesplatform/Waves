@@ -24,11 +24,11 @@ trait State {
 
   def balance(account: Account, height: Option[Int] = None): Long
 
-  def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
+  def balanceWithConfirmations(account: Account, confirmations: Int): Long
 
   def accountTransactions(account: Account, limit: Int = State.DefaultLimit): Seq[_ <: Transaction]
 
-  def assetBalance(account: AssetAcc, atHeight: Option[Int] = None): Long
+  def assetBalance2(account: AssetAcc): Long
 
   def assetDistribution(assetId: Array[Byte]): Map[String, Long]
 

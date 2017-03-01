@@ -81,9 +81,9 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
 
     state.processBlock(TestBlock(Random.shuffle(txs))) should be('success)
 
-    recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be(100))
+    recipients.foreach(r => state.assetBalance2(AssetAcc(r, Some(issueAssetTx.assetId))) should be(100))
 
-    state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
+    state.assetBalance2(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
     state.balance(acc) should be(startWavesBalance - 100000000 - 20)
   }
 
@@ -103,7 +103,7 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
 
     state.processBlock(TestBlock(Random.shuffle(txs))) should be('success)
 
-    recipients.foreach(r => state.assetBalance(AssetAcc(r, None)) should be(100))
+    recipients.foreach(r => state.assetBalance2(AssetAcc(r, None)) should be(100))
 
     state.balance(acc) should be(startWavesBalance - 200 - 20)
   }
@@ -127,9 +127,9 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
     }
     state.processBlock(TestBlock(txs, PublicKeyAccount(feeGetter.publicKey))) should be('success)
 
-    val senderAssetBalance = state.assetBalance(AssetAcc(Account.fromBase58String(sender.address).right.get, Some(assetId)))
+    val senderAssetBalance = state.assetBalance2(AssetAcc(Account.fromBase58String(sender.address).right.get, Some(assetId)))
     senderAssetBalance shouldBe 10000
-    val feeGetterAssetBalace = state.assetBalance(AssetAcc(PublicKeyAccount(accounts.last.publicKey), Some(
+    val feeGetterAssetBalace = state.assetBalance2(AssetAcc(PublicKeyAccount(accounts.last.publicKey), Some(
       assetId)))
     feeGetterAssetBalace shouldBe 10000
   }
@@ -157,9 +157,9 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
     }
     state.processBlock(TestBlock(txs ++ txs2, PublicKeyAccount(feeGetter.publicKey))) should be('success)
 
-    val senderAssetBalance = state.assetBalance(AssetAcc(Account.fromBase58String(sender.address).right.get, Some(assetId)))
+    val senderAssetBalance = state.assetBalance2(AssetAcc(Account.fromBase58String(sender.address).right.get, Some(assetId)))
     senderAssetBalance shouldBe 10000
-    val feeGetterAssetBalace = state.assetBalance(AssetAcc(PublicKeyAccount(accounts.last.publicKey), Some(
+    val feeGetterAssetBalace = state.assetBalance2(AssetAcc(PublicKeyAccount(accounts.last.publicKey), Some(
       assetId)))
     feeGetterAssetBalace shouldBe 10000
   }

@@ -244,9 +244,9 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
     waitForNextBlock(application)
 
-    state.assetBalance(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
+    state.assetBalance2(AssetAcc(acc, Some(issueAssetTx.assetId))) should be(999800)
 
-    recipients.foreach(r => state.assetBalance(AssetAcc(r, Some(issueAssetTx.assetId))) should be(100))
+    recipients.foreach(r => state.assetBalance2(AssetAcc(r, Some(issueAssetTx.assetId))) should be(100))
   }
 
   test("included") {
@@ -295,9 +295,9 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("valid order match transaction with fully executed orders") {
-    val wavesBal = state.assetBalance(AssetAcc(acc, None))
-    val bal2 = state.assetBalance(AssetAcc(Account.fromBase58String("3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K").right.get, None))
-    val bal3 = state.assetBalance(AssetAcc(Account.fromBase58String("3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY").right.get, None))
+    val wavesBal = state.assetBalance2(AssetAcc(acc, None))
+    val bal2 = state.assetBalance2(AssetAcc(Account.fromBase58String("3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K").right.get, None))
+    val bal3 = state.assetBalance2(AssetAcc(Account.fromBase58String("3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY").right.get, None))
     wavesBal should be > 0L
   }
 

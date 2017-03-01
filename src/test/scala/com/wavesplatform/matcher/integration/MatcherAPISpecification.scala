@@ -37,10 +37,10 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   def initBalances() = {
     assetTransfer(AccountM, AccountA, 5000 * Constants.UnitsInWave)
     Asset1 = Some(issueAsset(AccountM, 1000 * Constants.UnitsInWave))
-    MBalance = storedState.assetBalance(AssetAcc(AccountM, None))
-    MBalance1 = storedState.assetBalance(AssetAcc(AccountM, Asset1.flatMap(Base58.decode(_).toOption)))
-    ABalance = storedState.assetBalance(AssetAcc(AccountA, None))
-    ABalance1 = storedState.assetBalance(AssetAcc(AccountA, Asset1.flatMap(Base58.decode(_).toOption)))
+    MBalance = storedState.assetBalance2(AssetAcc(AccountM, None))
+    MBalance1 = storedState.assetBalance2(AssetAcc(AccountM, Asset1.flatMap(Base58.decode(_).toOption)))
+    ABalance = storedState.assetBalance2(AssetAcc(AccountA, None))
+    ABalance1 = storedState.assetBalance2(AssetAcc(AccountA, Asset1.flatMap(Base58.decode(_).toOption)))
   }
 
   def issueAsset(from: Account, amount: Long): String = {
@@ -85,7 +85,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     val assetId = asset.flatMap(Base58.decode(_).toOption)
     eventually(timeout(5.seconds), interval(500.millis)) {
       Thread.sleep(100)
-      storedState.assetBalance(
+      storedState.assetBalance2(
         AssetAcc(acc, assetId)) should be(balance)
     }
   }
