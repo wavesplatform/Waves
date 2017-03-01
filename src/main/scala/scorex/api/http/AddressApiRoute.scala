@@ -237,7 +237,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Account.fromBase58String(address).right.map(acc => ToResponseMarshallable(Json.obj(
       "address" -> acc.address,
       "confirmations" -> confirmations,
-      "balance" -> state.effectiveBalanceWithConfirmations(acc, confirmations))))
+      "balance" -> state.effectiveBalanceWithConfirmations(acc, confirmations, state.stateHeight))))
       .getOrElse(InvalidAddress)
   }
 

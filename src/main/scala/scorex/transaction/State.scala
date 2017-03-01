@@ -22,7 +22,7 @@ trait State {
 
   def included(signature: Array[Byte]): Option[Int]
 
-  def balance(account: Account, height: Option[Int] = None): Long
+  def balance(account: Account): Long
 
   def balanceWithConfirmations(account: Account, confirmations: Int): Long
 
@@ -34,7 +34,7 @@ trait State {
 
   def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)]
 
-  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
+  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long
 
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
 
@@ -77,6 +77,8 @@ trait State {
   def incrementingTimestampValidator: IncrementingTimestampValidator
 
   def leaseExtendedState: LeaseExtendedState
+
+  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int): Long
 
 }
 
