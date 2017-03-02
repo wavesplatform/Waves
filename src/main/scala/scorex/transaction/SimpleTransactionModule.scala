@@ -98,7 +98,8 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val txs = utxStorage.all()
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeForUnconfirmed }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeDrift }
-    val valid = blockStorage.state.validate(notFromFuture, blockTime = currentTime)
+    val inOrder = notFromFuture.sorted(TransactionsOrdering)
+    val valid = blockStorage.state.validate(inOrder, blockTime = currentTime)
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
   }
