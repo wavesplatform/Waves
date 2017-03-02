@@ -82,6 +82,22 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.isReissuable(assetId) shouldBe true
   }
 
+  property("Reissuable should doesn't work in case of few updates reissuable flags per block") {
+    val mvStore = new MVStore.Builder().open()
+    val storage = new MVStoreStateStorage with MVStoreAssetsExtendedStateStorage {
+      override val db: MVStore = mvStore
+    }
+    val state = new AssetsExtendedState(storage)
+    val assetId = getId(0)
+
+    state.addAsset(assetId, 1, getId(1), 10, reissuable = true)
+    state.addAsset(assetId, 1, getId(2), 20, reissuable = false)
+
+    assertThrows[RuntimeException] {
+      state.addAsset(assetId, 1, getId(4), 40, reissuable = true)
+    }
+  }
+
   property("Rollback should work after simple sequence of updates") {
     val mvStore = new MVStore.Builder().open()
     val storage = new MVStoreStateStorage with MVStoreAssetsExtendedStateStorage {

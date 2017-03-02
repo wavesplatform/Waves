@@ -171,6 +171,22 @@ trait TransactionGen {
     (issue, issue2, reissue, burn)
   }
 
+  val issueWithInvalidReissuesGenerator: Gen[(IssueTransaction, ReissueTransaction, ReissueTransaction)] = for {
+    sender: PrivateKeyAccount <- accountGen
+    assetName <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+    description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
+    quantity <- positiveLongGen
+    decimals <- Gen.choose(0: Byte, 8: Byte)
+    fee <- Gen.choose(1L, 2000000L)
+    iFee <- Gen.choose(IssueTransaction.MinFee, 2 * IssueTransaction.MinFee)
+    timestamp <- positiveLongGen
+  } yield {
+    val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).right.get
+    val reissue1 = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable = false, fee, timestamp).right.get
+    val reissue2 = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable = true, fee, timestamp + 1).right.get
+    (issue, reissue1, reissue2)
+  }
+
   val issueGenerator: Gen[IssueTransaction] = issueReissueGenerator.map(_._1)
   val reissueGenerator: Gen[ReissueTransaction] = issueReissueGenerator.map(_._3)
   val burnGenerator: Gen[BurnTransaction] = issueReissueGenerator.map(_._4)
