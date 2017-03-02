@@ -2,7 +2,7 @@ package scorex.transaction.state.database.blockchain
 
 import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsNumber, JsObject}
-import scorex.account.Account
+import scorex.account.{Account, Alias}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
@@ -196,7 +196,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     val (_, validatedTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Either[ValidationError, Transaction]])) {
       case ((currentState, seq), tx) =>
         try {
-          val changes0 = BalanceChangeCalculator.balanceChanges(tx).right.get
+          val changes0 = BalanceChangeCalculator.balanceChanges(this)(tx).right.get
           val changes = if (allowUnissuedAssets) {
             changes0
           } else {
@@ -215,7 +215,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
             }
           }
 
-          val ebc = BalanceChangeCalculator.effectiveBalanceChanges(storage)(tx).right.get
+          val ebc = BalanceChangeCalculator.effectiveBalanceChanges(this)(storage)(tx).right.get
           val newStateAfterEffectiveBalanceChanges = ebc.foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
             //update effective balances sheet
             val currentChange = iChanges.getOrElse(AssetAcc(bc.account, None), (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
@@ -236,6 +236,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     validatedTxs
   }
 
+  def resolveAlias(a: Alias) : Option[Account] = ???
 
   implicit class SeqEitherHelper[L, R](eis: Seq[Either[L, R]]) {
     def segregate(): (Seq[L], Seq[R]) = (eis.filter(_.isLeft).map(_.left.get),
@@ -254,7 +255,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
     val newBalances: Map[AssetAcc, (AccState, Reasons)] = trans.foldLeft(fees) { case (changes, tx) =>
-      val bcs = BalanceChangeCalculator.balanceChanges(tx).right.get
+      val bcs = BalanceChangeCalculator.balanceChanges(this)(tx).right.get
       val newStateAfterBalanceUpdates = bcs.foldLeft(changes) { case (iChanges, bc) =>
         //update balances sheet
         val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc), effectiveBalance(bc.assetAcc.account)), List.empty))
@@ -271,7 +272,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         }
       }
 
-      val ebcs = BalanceChangeCalculator.effectiveBalanceChanges(storage)(tx).right.get
+      val ebcs = BalanceChangeCalculator.effectiveBalanceChanges(this)(storage)(tx).right.get
       val newStateAfterEffectiveBalanceChanges = ebcs.foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
         //update effective balances sheet
         val wavesAcc = AssetAcc(bc.account, None)

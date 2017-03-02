@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import play.api.libs.json.JsObject
-import scorex.account.Account
+import scorex.account.{Account, Alias}
 import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -42,6 +42,7 @@ trait State {
 
   def getAssetName(assetId: AssetId): String
 
+  def resolveAlias(a: Alias) : Option[Account]
 
   // debug from api
 
