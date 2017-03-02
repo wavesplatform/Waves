@@ -72,12 +72,13 @@ object LeaseTransaction {
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseTransactionImpl] = {
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount)
-    } else if (sender.stringRepr == recipient.stringRepr) {
-      ??? // Left(ValidationError.ToSelf) // should be stateful
+
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
+      Left(ValidationError.OverflowError)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
+    } else if (recipient.isInstanceOf[Account] && sender.stringRepr == recipient.stringRepr) {
+      Left(ValidationError.ToSelf)
     } else {
       Right(LeaseTransactionImpl(sender, amount, fee, timestamp, recipient, signature.orNull))
     }
