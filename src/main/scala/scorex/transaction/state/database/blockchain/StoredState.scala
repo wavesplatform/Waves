@@ -24,7 +24,7 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right, Try}
 
 
-class StoredState(protected[blockchain] val storage: StateStorageI with OrderMatchStorageI,
+class StoredState(protected[blockchain] val storage: StateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI,
                   val leaseExtendedState: LeaseExtendedState,
                   val assetsExtension: AssetsExtendedState,
                   val incrementingTimestampValidator: IncrementingTimestampValidator,
@@ -197,9 +197,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       case ((currentState, seq), tx) =>
         try {
           val changes = if (allowUnissuedAssets) {
-            BalanceChangeCalculator(tx)
+            BalanceChangeCalculator.balanceChanges(tx)
           } else {
-            BalanceChangeCalculator(tx).sortBy(_.delta)
+            BalanceChangeCalculator.balanceChanges(tx).sortBy(_.delta)
           }
 
           val newStateAfterBalanceUpdates = changes.foldLeft(currentState) { case (iChanges, bc) =>
@@ -214,7 +214,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
             }
           }
 
-          val newStateAfterEffectiveBalanceChanges = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
+          val newStateAfterEffectiveBalanceChanges = BalanceChangeCalculator.effectiveBalanceChanges(storage)(tx).foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
             //update effective balances sheet
             val currentChange = iChanges.getOrElse(AssetAcc(bc.account, None), (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
             val newEffectiveBalance = safeSum(currentChange._1.effectiveBalance, bc.amount).get
@@ -252,7 +252,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
     val newBalances: Map[AssetAcc, (AccState, Reasons)] = trans.foldLeft(fees) { case (changes, tx) =>
-      val newStateAfterBalanceUpdates = BalanceChangeCalculator(tx).foldLeft(changes) { case (iChanges, bc) =>
+      val newStateAfterBalanceUpdates = BalanceChangeCalculator.balanceChanges(tx).foldLeft(changes) { case (iChanges, bc) =>
         //update balances sheet
         val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc), effectiveBalance(bc.assetAcc.account)), List.empty))
         val newBalance = if (currentChange._1.balance == Long.MinValue) {
@@ -268,7 +268,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         }
       }
 
-      val newStateAfterEffectiveBalanceChanges = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
+      val newStateAfterEffectiveBalanceChanges = BalanceChangeCalculator.effectiveBalanceChanges(storage)(tx).foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
         //update effective balances sheet
         val wavesAcc = AssetAcc(bc.account, None)
         val currentChange = iChanges.getOrElse(wavesAcc, (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))

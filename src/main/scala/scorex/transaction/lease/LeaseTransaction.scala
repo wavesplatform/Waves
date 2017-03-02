@@ -2,7 +2,7 @@ package scorex.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser._
@@ -15,7 +15,7 @@ sealed trait LeaseTransaction extends SignedTransaction {
 
   def fee: Long
 
-  def recipient: Account
+  def recipient: AccountOrAlias
 }
 
 object LeaseTransaction {
@@ -24,7 +24,7 @@ object LeaseTransaction {
                                           amount: Long,
                                           fee: Long,
                                           timestamp: Long,
-                                          recipient: Account,
+                                          recipient: AccountOrAlias,
                                           signature: Array[Byte])
     extends LeaseTransaction {
 
@@ -52,7 +52,7 @@ object LeaseTransaction {
   def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     import EllipticCurveImpl._
     val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
-    val recipient = Account.fromBytes(bytes.slice(KeyLength, KeyLength + Account.AddressLength)).right.get
+    val recipient = AccountOrAlias.fromBytes(bytes.slice(KeyLength, KeyLength + Account.AddressLength)).right.get
     val quantityStart = KeyLength + Account.AddressLength
 
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
@@ -68,12 +68,12 @@ object LeaseTransaction {
                                amount: Long,
                                fee: Long,
                                timestamp: Long,
-                               recipient: Account,
+                               recipient: AccountOrAlias,
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseTransactionImpl] = {
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount)
-    } else if (sender.address == recipient.address) {
-      Left(ValidationError.ToSelf)
+    } else if (sender.stringRepr == recipient.stringRepr) {
+      ??? // Left(ValidationError.ToSelf) // should be stateful
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else if (fee <= 0) {
@@ -87,7 +87,7 @@ object LeaseTransaction {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             recipient: Account,
+             recipient: AccountOrAlias,
              signature: Array[Byte]): Either[ValidationError, LeaseTransaction] = {
     createUnverified(sender, amount, fee, timestamp, recipient, Some(signature))
       .right.flatMap(SignedTransaction.verify)
@@ -97,7 +97,7 @@ object LeaseTransaction {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             recipient: Account): Either[ValidationError, LeaseTransaction] = {
+             recipient: AccountOrAlias): Either[ValidationError, LeaseTransaction] = {
     createUnverified(sender, amount, fee, timestamp, recipient).right.map { unsigned =>
       unsigned.copy(signature = EllipticCurveImpl.sign(sender, unsigned.toSign))
     }

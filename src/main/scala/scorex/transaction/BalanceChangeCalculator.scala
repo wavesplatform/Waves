@@ -4,11 +4,12 @@ import scorex.account.{Account, AccountOrAlias, Alias, PublicKeyAccount}
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.state.database.state.storage.LeaseExtendedStateStorageI
 
 
 object BalanceChangeCalculator {
 
-  def apply(tx: Transaction): Seq[BalanceChange] = {
+  def balanceChanges(tx: Transaction): Seq[BalanceChange] = {
     tx match {
       case t: GenesisTransaction =>
         Seq(BalanceChange(AssetAcc(t.recipient, None), t.amount))
@@ -55,6 +56,21 @@ object BalanceChangeCalculator {
 
       case _ => ???
     }
+  }
+
+
+  def effectiveBalanceChanges(storage: LeaseExtendedStateStorageI)(tx: Transaction): Seq[EffectiveBalanceChange] = tx match {
+    case tx: LeaseTransaction =>
+      Seq(EffectiveBalanceChange(tx.sender, -tx.amount - tx.fee),
+        EffectiveBalanceChange(resolve(tx.recipient), tx.amount))
+    case tx: LeaseCancelTransaction =>
+      val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
+      Seq(
+        EffectiveBalanceChange(tx.sender, leaseTx.amount - tx.fee),
+        EffectiveBalanceChange(resolve(leaseTx.recipient), -leaseTx.amount))
+    case _ => BalanceChangeCalculator.balanceChanges(tx).map(bc => {
+      EffectiveBalanceChange(bc.assetAcc.account, bc.delta)
+    })
   }
 
   def resolve(aoa: AccountOrAlias): Account = aoa match {

@@ -202,8 +202,8 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     val senderBalance = state.balance(sender)
     val senderEffectiveBalance = state.effectiveBalance(sender)
-    val recipientBalance = state.balance(recipient)
-    val recipientEffectiveBalance = state.effectiveBalance(recipient)
+    val recipientBalance = state.balance(recipient.asInstanceOf[Account])
+    val recipientEffectiveBalance = state.effectiveBalance(recipient.asInstanceOf[Account])
     (senderBalance, senderEffectiveBalance, recipientBalance, recipientEffectiveBalance)
   }
 
@@ -214,7 +214,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease transaction") {
-    forAll(leaseGenerator) { tx: LeaseTransaction =>
+    forAll(leaseGenerator suchThat (t => t.recipient.isInstanceOf[Account])) { tx: LeaseTransaction =>
       withRollbackTest {
 
         //set some balance
@@ -311,7 +311,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease cancel transaction") {
-    forAll(leaseAndCancelGenerator) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
+    forAll(leaseAndCancelGenerator suchThat (t => t._1.recipient.isInstanceOf[Account])) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
       withRollbackTest {
         val balance = lease.amount + lease.fee + cancel.fee
 
@@ -352,7 +352,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease cancel transaction with other sender") {
-    forAll(leaseAndCancelWithOtherSenderGenerator) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
+    forAll(leaseAndCancelWithOtherSenderGenerator suchThat(_._1.recipient.isInstanceOf[Account])) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
       withRollbackTest {
 
         //set some balance

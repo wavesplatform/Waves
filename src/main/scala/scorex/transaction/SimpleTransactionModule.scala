@@ -2,7 +2,7 @@ package scorex.transaction
 
 import com.google.common.base.Charsets
 import com.wavesplatform.settings.WavesSettings
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.app.Application
@@ -101,7 +101,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def transferAsset(request: TransferRequest, wallet: Wallet): Either[ValidationError, TransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
-      recipientAcc <- Account.fromBase58String(request.recipient)
+      recipientAcc <- AccountOrAlias.fromBase58String(request.recipient)
       tx <- TransferTransaction
         .create(request.assetId.map(s => Base58.decode(s).get),
           senderPrivateKey,
@@ -126,7 +126,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
-    recipientAcc <- Account.fromBase58String(request.recipient)
+    recipientAcc <- AccountOrAlias.fromBase58String(request.recipient)
     tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, getTimestamp, recipientAcc)
     r <- onNewOffchainTransaction(tx)
   } yield r

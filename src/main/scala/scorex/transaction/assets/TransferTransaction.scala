@@ -89,7 +89,7 @@ object TransferTransaction {
     val timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
     val amount = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
     val feeAmount = Longs.fromByteArray(bytes.slice(s1 + 16, s1 + 24))
-    val recipient = Account.fromBytes(bytes.slice(s1 + 24, s1 + 24 + Account.AddressLength)).right.get
+    val recipient = AccountOrAlias.fromBytes(bytes.slice(s1 + 24, s1 + 24 + Account.AddressLength)).right.get
     val (attachment, _) = Deser.parseArraySize(bytes, s1 + 24 + Account.AddressLength)
 
     TransferTransaction

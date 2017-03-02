@@ -28,20 +28,6 @@ class LeaseExtendedState(private[blockchain] val storage: StateStorageI with Lea
     case _ => Right(tx)
   }
 
-  def effectiveBalanceChanges(tx: Transaction): Seq[EffectiveBalanceChange] = tx match {
-    case tx: LeaseTransaction =>
-      Seq(EffectiveBalanceChange(tx.sender, -tx.amount - tx.fee),
-        EffectiveBalanceChange(tx.recipient, tx.amount))
-    case tx: LeaseCancelTransaction =>
-      val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
-      Seq(
-        EffectiveBalanceChange(tx.sender, leaseTx.amount - tx.fee),
-        EffectiveBalanceChange(leaseTx.recipient, -leaseTx.amount))
-    case _ => BalanceChangeCalculator(tx).map(bc => {
-      EffectiveBalanceChange(bc.assetAcc.account, bc.delta)
-    })
-  }
-
   private def updateLeasedSum(account: Account, update: Long => Long): Unit = {
     val address = account.address
     val newLeasedBalance = update(storage.getLeasedSum(address))
