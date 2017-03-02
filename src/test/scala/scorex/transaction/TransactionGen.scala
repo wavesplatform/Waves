@@ -4,7 +4,8 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Matchers._
 import org.scalatest.enablers.Containing
 import org.scalatest.matchers.{BeMatcher, MatchResult}
-import scorex.account.{AccountOrAlias, PrivateKeyAccount}
+import scorex.account.{Account, AccountOrAlias, Alias, PrivateKeyAccount}
+import scorex.account.PublicKeyAccount._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -24,6 +25,10 @@ trait TransactionGen {
   }
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
+  val aliasGen: Gen[Alias] = Arbitrary.arbString.arbitrary.map(Alias(_))
+
+  val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(pk => Account.fromPublicKey(pk.publicKey)))
+
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
   val positiveIntGen: Gen[Int] = Gen.choose(1, Int.MaxValue / 3)
   val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)
@@ -101,7 +106,7 @@ trait TransactionGen {
     timestamp: Long <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-    recipient: PrivateKeyAccount <- accountGen
+    recipient: AccountOrAlias <- accountOrAliasGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
 
@@ -112,7 +117,7 @@ trait TransactionGen {
     timestamp: Long <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-    recipient: PrivateKeyAccount <- accountGen
+    recipient: AccountOrAlias <- accountOrAliasGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, None, feeAmount, attachment).right.get
 
 

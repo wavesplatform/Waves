@@ -99,7 +99,7 @@ object TransferTransaction {
 
   private def createUnverified(assetId: Option[AssetId],
                                sender: PublicKeyAccount,
-                               recipient: Account,
+                               recipient: AccountOrAlias,
                                amount: Long,
                                timestamp: Long,
                                feeAssetId: Option[AssetId],
@@ -121,7 +121,7 @@ object TransferTransaction {
 
   def create(assetId: Option[AssetId],
              sender: PublicKeyAccount,
-             recipient: Account,
+             recipient: AccountOrAlias,
              amount: Long,
              timestamp: Long,
              feeAssetId: Option[AssetId],
@@ -134,7 +134,7 @@ object TransferTransaction {
 
   def create(assetId: Option[AssetId],
              sender: PrivateKeyAccount,
-             recipient: Account,
+             recipient: AccountOrAlias,
              amount: Long,
              timestamp: Long,
              feeAssetId: Option[AssetId],
