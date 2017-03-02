@@ -18,7 +18,7 @@ class TransferTransactionSpecification extends PropSpec with PropertyChecks with
       recovered.timestamp shouldEqual transfer.timestamp
       recovered.amount shouldEqual transfer.amount
       recovered.fee shouldEqual transfer.fee
-      recovered.recipient.address shouldEqual transfer.recipient.address
+      recovered.recipient.stringRepr shouldEqual transfer.recipient.stringRepr
 
       recovered.bytes shouldEqual transfer.bytes
     }

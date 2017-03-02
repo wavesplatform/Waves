@@ -39,13 +39,12 @@ object LeaseTransaction {
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "amount" -> amount,
-      "recipient" -> recipient.address,
+      "recipient" -> recipient.stringRepr,
       "fee" -> fee,
       "timestamp" -> timestamp
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(sender, None), -fee))
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
   }

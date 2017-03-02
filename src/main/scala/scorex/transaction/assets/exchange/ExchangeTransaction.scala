@@ -56,23 +56,6 @@ object ExchangeTransaction {
       "buyMatcherFee" -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
     )
-
-    override def balanceChanges(): Seq[BalanceChange] = {
-
-      val matcherChange = Seq(BalanceChange(AssetAcc(buyOrder.matcherPublicKey, None), buyMatcherFee + sellMatcherFee - fee))
-      val buyFeeChange = Seq(BalanceChange(AssetAcc(buyOrder.senderPublicKey, None), -buyMatcherFee))
-      val sellFeeChange = Seq(BalanceChange(AssetAcc(sellOrder.senderPublicKey, None), -sellMatcherFee))
-
-      val exchange = Seq(
-        (buyOrder.senderPublicKey, (buyOrder.spendAssetId, -buyOrder.getSpendAmount(price, amount).get)),
-        (buyOrder.senderPublicKey, (buyOrder.receiveAssetId, buyOrder.getReceiveAmount(price, amount).get)),
-        (sellOrder.senderPublicKey, (sellOrder.receiveAssetId, sellOrder.getReceiveAmount(price, amount).get)),
-        (sellOrder.senderPublicKey, (sellOrder.spendAssetId, -sellOrder.getSpendAmount(price, amount).get))
-      )
-
-      buyFeeChange ++ sellFeeChange ++ matcherChange ++
-        exchange.map(c => BalanceChange(AssetAcc(c._1, c._2._1), c._2._2))
-    }
   }
 
   private def createUnverified(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,

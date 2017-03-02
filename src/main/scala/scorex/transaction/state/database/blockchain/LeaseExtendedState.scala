@@ -6,7 +6,7 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state.{AccState, Reasons}
 import scorex.transaction.state.database.state.extension.Validator
 import scorex.transaction.state.database.state.storage.{LeaseExtendedStateStorageI, StateStorageI}
-import scorex.transaction.{AssetAcc, EffectiveBalanceChange, Transaction}
+import scorex.transaction.{AssetAcc, BalanceChangeCalculator, EffectiveBalanceChange, Transaction}
 import scorex.utils.ScorexLogging
 
 class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with Validator {
@@ -37,7 +37,7 @@ class LeaseExtendedState(private[blockchain] val storage: StateStorageI with Lea
       Seq(
         EffectiveBalanceChange(tx.sender, leaseTx.amount - tx.fee),
         EffectiveBalanceChange(leaseTx.recipient, -leaseTx.amount))
-    case _ => tx.balanceChanges().map(bc => {
+    case _ => BalanceChangeCalculator(tx).map(bc => {
       EffectiveBalanceChange(bc.assetAcc.account, bc.delta)
     })
   }

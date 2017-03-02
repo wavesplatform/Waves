@@ -39,7 +39,6 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
   private val txMock = new Transaction {
     override val assetFee: (Option[AssetId], Long) = (None, 0)
     override val timestamp: Long = 0
-    override def balanceChanges(): Seq[BalanceChange] = ???
     override val id: Array[Byte] = Array()
     override def bytes: Array[Byte] = ???
     override def json: JsObject = Json.obj("k" -> "v")

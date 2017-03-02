@@ -164,11 +164,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Transfer asset") {
-    forAll(transferGenerator) { tx: TransferTransaction =>
+    forAll(transferGenerator suchThat (t => t.recipient.isInstanceOf[Account])) { tx: TransferTransaction =>
       withRollbackTest {
         val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
         val senderFeeAcc = AssetAcc(tx.sender, tx.feeAssetId)
-        val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
+        val recipientAmountAcc = AssetAcc(tx.recipient.asInstanceOf[Account], tx.assetId)
 
         val senderAmountBalance = state.assetBalance(senderAmountAcc)
         val senderFeeBalance = state.assetBalance(senderFeeAcc)
@@ -378,10 +378,10 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   property("Transfer asset without balance should fails") {
     withRollbackTest {
-      forAll(transferGenerator) { tx: TransferTransaction =>
+      forAll(transferGenerator suchThat (t => t.recipient.isInstanceOf[Account])) { tx: TransferTransaction =>
         val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
         val senderFeeAcc = AssetAcc(tx.sender, tx.feeAssetId)
-        val recipientAmountAcc = AssetAcc(tx.recipient, tx.assetId)
+        val recipientAmountAcc = AssetAcc(tx.recipient.asInstanceOf[Account], tx.assetId)
 
         val senderAmountBalance = state.assetBalance(senderAmountAcc)
         val senderFeeBalance = state.assetBalance(senderFeeAcc)
@@ -505,13 +505,13 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("accountTransactions returns TransferTransactions if fee in base token") {
-    forAll(transferGeneratorWithNoneFeeAssetId) { t: TransferTransaction =>
+    forAll(transferGeneratorWithNoneFeeAssetId suchThat (t => t.recipient.isInstanceOf[Account])) { t: TransferTransaction =>
       val senderAmountAcc = AssetAcc(t.sender, t.assetId)
       val senderFeeAcc = AssetAcc(t.sender, t.feeAssetId)
-      val recipientAmountAcc = AssetAcc(t.recipient, t.assetId)
+      val recipientAmountAcc = AssetAcc(t.recipient.asInstanceOf[Account], t.assetId)
       state.applyChanges(state.calcNewBalances(Seq(t), Map(), allowTemporaryNegative = true))
       state.accountTransactions(t.sender).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
-      state.accountTransactions(t.recipient).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
+      state.accountTransactions(t.recipient.asInstanceOf[Account]).count(_.isInstanceOf[TransferTransaction]) shouldBe 1
     }
   }
 

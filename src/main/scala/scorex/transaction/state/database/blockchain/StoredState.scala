@@ -197,9 +197,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       case ((currentState, seq), tx) =>
         try {
           val changes = if (allowUnissuedAssets) {
-            tx.balanceChanges()
+            BalanceChangeCalculator(tx)
           } else {
-            tx.balanceChanges().sortBy(_.delta)
+            BalanceChangeCalculator(tx).sortBy(_.delta)
           }
 
           val newStateAfterBalanceUpdates = changes.foldLeft(currentState) { case (iChanges, bc) =>
@@ -252,7 +252,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
     val newBalances: Map[AssetAcc, (AccState, Reasons)] = trans.foldLeft(fees) { case (changes, tx) =>
-      val newStateAfterBalanceUpdates = tx.balanceChanges().foldLeft(changes) { case (iChanges, bc) =>
+      val newStateAfterBalanceUpdates = BalanceChangeCalculator(tx).foldLeft(changes) { case (iChanges, bc) =>
         //update balances sheet
         val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc), effectiveBalance(bc.assetAcc.account)), List.empty))
         val newBalance = if (currentChange._1.balance == Long.MinValue) {

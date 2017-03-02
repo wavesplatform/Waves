@@ -55,9 +55,6 @@ object PaymentTransaction {
 
       Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes, signature)
     }
-
-    override def balanceChanges(): Seq[BalanceChange] =
-      Seq(BalanceChange(AssetAcc(sender, None), -amount - fee), BalanceChange(AssetAcc(recipient, None), amount))
   }
 
   val MinimumFee = 1

@@ -2,12 +2,10 @@ package scorex.transaction.state.database.state.extension
 
 import scorex.crypto.encode.Base58
 import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.storage.{OrderMatchStorageI, StateStorageI}
-import scorex.transaction.{Transaction, ValidationError}
 
 class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends Validator {
 
