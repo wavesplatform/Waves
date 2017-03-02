@@ -23,7 +23,7 @@ case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender p
   def toTx: Either[ValidationError, LeaseTransaction] = for {
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
     _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-    _recipient <- AccountOrAlias.fromBase58String(recipient)
+    _recipient <- AccountOrAlias.fromString(recipient)
     _t <- LeaseTransaction.create(_sender, amount, fee, timestamp, _recipient, _signature)
   } yield _t
 }

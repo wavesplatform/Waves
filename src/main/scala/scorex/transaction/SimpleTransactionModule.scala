@@ -101,7 +101,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def transferAsset(request: TransferRequest, wallet: Wallet): Either[ValidationError, TransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
-      recipientAcc <- AccountOrAlias.fromBase58String(request.recipient)
+      recipientAcc <- AccountOrAlias.fromString(request.recipient)
       tx <- TransferTransaction
         .create(request.assetId.map(s => Base58.decode(s).get),
           senderPrivateKey,
@@ -126,7 +126,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
-    recipientAcc <- AccountOrAlias.fromBase58String(request.recipient)
+    recipientAcc <- AccountOrAlias.fromString(request.recipient)
     tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, getTimestamp, recipientAcc)
     r <- onNewOffchainTransaction(tx)
   } yield r
