@@ -220,11 +220,14 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-    lazy val txsAreNew = block.transactionDataField.asInstanceOf[TransactionsBlockField].value.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
-    lazy val blockIsValid = blockStorage.state.isValid(block.transactionDataField.asInstanceOf[TransactionsBlockField].value, blockStorage.history.heightOf(block), block.timestampField.value)
+    val txs = block.transactionDataField.asInstanceOf[TransactionsBlockField].value
+    lazy val txsAreNew = txs.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
+    lazy val blockIsValid = blockStorage.state.isValid(txs, blockStorage.history.heightOf(block), block.timestampField.value)
+    lazy val txsIdAreUniqueInBlock = txs.map(tx => Base58.encode(tx.id)).toSet.size == txs.size
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (!blockIsValid) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs")
-    txsAreNew && blockIsValid
+    if (!txsIdAreUniqueInBlock) log.debug(s"Invalid txs in block ${block.encodedId}: there are not unique txs")
+    txsAreNew && blockIsValid && txsIdAreUniqueInBlock
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
