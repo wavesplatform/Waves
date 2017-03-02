@@ -33,5 +33,5 @@ class AddressAliasValidator(storage: StateStorageI with AliasExtendedStorageI) e
     }
   }
 
-  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = ??? // No alias tx just yet
+  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = () // No alias tx just yet
 }
