@@ -1,10 +1,9 @@
 package scorex.transaction.state.database.state.extension
 
-import scorex.settings.ChainParameters
+import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.ValidationError.{TransactionParameterValidationError, TransactionValidationError}
 import scorex.transaction.state.database.state.storage.StateStorageI
-import scorex.transaction.{PaymentTransaction, Transaction, ValidationError}
+import scorex.transaction.{PaymentTransaction, Transaction}
 
 class IncludedValidator(storage: StateStorageI, requirePaymentUniqueId: Long) extends Validator {
 

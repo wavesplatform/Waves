@@ -24,7 +24,7 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right, Try}
 
 
-class StoredState(protected[blockchain] val storage: StateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI,
+class StoredState(protected[blockchain] val storage: StateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   val leaseExtendedState: LeaseExtendedState,
                   val assetsExtension: AssetsExtendedState,
                   val incrementingTimestampValidator: IncrementingTimestampValidator,
@@ -236,7 +236,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     validatedTxs
   }
 
-  def resolveAlias(a: Alias) : Option[Account] = ???
+  def resolveAlias(a: Alias): Option[Account] = storage
+    .resolveAlias(a.name)
+    .map(addr => Account.fromBase58String(addr).right.get)
 
   implicit class SeqEitherHelper[L, R](eis: Seq[Either[L, R]]) {
     def segregate(): (Seq[L], Seq[R]) = (eis.filter(_.isLeft).map(_.left.get),
@@ -360,7 +362,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   }
 
   //for debugging purposes only
-  def  toWavesJson(heightOpt: Int): JsObject = {
+  def toWavesJson(heightOpt: Int): JsObject = {
     val ls = storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add, heightOpt))
       .filter(b => b._2 != 0).sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
     JsObject(ls)
@@ -417,7 +419,11 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 object StoredState {
 
   def fromDB(mvStore: MVStore, settings: ChainParameters): State = {
-    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage with MVStoreLeaseExtendedStateStorage {
+    val storage = new MVStoreStateStorage
+      with MVStoreOrderMatchStorage
+      with MVStoreAssetsExtendedStateStorage
+      with MVStoreLeaseExtendedStateStorage
+      with MVStoreAliasExtendedStorage {
       override val db: MVStore = mvStore
       if (db.getStoreVersion > 0) {
         db.rollback()
@@ -431,6 +437,7 @@ object StoredState {
       incrementingTimestampValidator,
       leaseExtendedState,
       new GenesisValidator,
+      new AddressAliasValidator(storage),
       new OrderMatchStoredState(storage),
       new IncludedValidator(storage, settings.requirePaymentUniqueId),
       new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
@@ -441,7 +448,4 @@ object StoredState {
     new StoredState(storage, leaseExtendedState, assetExtendedState, incrementingTimestampValidator, validators, settings)
   }
 
-  def validate(state : State)(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): (Seq[ValidationError], Seq[Transaction]) = {
-    ???
-  }
 }
