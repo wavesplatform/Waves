@@ -15,7 +15,7 @@ trait MVStoreAssetsExtendedStateStorage extends AssetsExtendedStateStorageI{
     Option(transactionsTable.get(key)).getOrElse(Seq.empty[String])
 
   def addTransaction(key: String, transaction: String): Unit =
-    transactionsTable.put(key, getTransactions(key) :+ transaction)
+    transactionsTable.put(key, (getTransactions(key) :+ transaction).distinct)
 
 
   // ============= heights

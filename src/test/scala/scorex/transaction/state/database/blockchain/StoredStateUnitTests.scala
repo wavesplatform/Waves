@@ -477,11 +477,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Left[_, _]]
 
-        state.isValid(invalidReissueTx, Int.MaxValue) shouldBe true
+        state.validateAgainstState(invalidReissueTx, Int.MaxValue) shouldBe an[Right[_, _]]
 
         state.applyChanges(state.calcNewBalances(Seq(reissueTx), Map(), allowTemporaryNegative = true))
 
-        state.isValid(invalidReissueTx, Int.MaxValue) shouldBe false
+        state.validateAgainstState(invalidReissueTx, Int.MaxValue) shouldBe an[Left[_, _]]
       }
     }
   }
