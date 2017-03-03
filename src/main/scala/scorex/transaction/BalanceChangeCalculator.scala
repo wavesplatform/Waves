@@ -57,6 +57,9 @@ object BalanceChangeCalculator {
       case t: LeaseCancelTransaction =>
         Right(Seq(BalanceChange(AssetAcc(t.sender, None), -t.fee)))
 
+      case t: AliasTransaction =>
+        Right(Seq(BalanceChange(AssetAcc(t.sender, None), -t.fee)))
+
       case _ => ???
     }
   }

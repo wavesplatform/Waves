@@ -42,7 +42,9 @@ trait State {
 
   def getAssetName(assetId: AssetId): String
 
-  def resolveAlias(a: Alias) : Option[Account]
+  def resolveAlias(a: Alias): Option[Account]
+
+  def persistAlias(ac: Account, al: Alias): Unit
 
   // debug from api
 

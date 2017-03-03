@@ -1,7 +1,7 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.account.{Account, Alias}
-import scorex.transaction.Transaction
+import scorex.transaction.{AliasTransaction, Transaction}
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.LeaseTransaction
@@ -26,12 +26,15 @@ class AddressAliasValidator(storage: StateStorageI with AliasExtendedStorageI) e
 
     maybeAlias match {
       case None => Right(tx)
-      case Some(al) => storage.resolveAlias(al.name) match  {
+      case Some(al) => storage.resolveAlias(al.name) match {
         case Some(add) => Right(tx)
         case None => Left(TransactionValidationError(tx, "Alias doesn't exist"))
       }
     }
   }
 
-  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = () // No alias tx just yet
+  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
+    case at: AliasTransaction => storedState.persistAlias(at.sender, at.alias)
+    case _ => ()
+  }
 }

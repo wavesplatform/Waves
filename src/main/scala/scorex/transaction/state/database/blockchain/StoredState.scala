@@ -240,6 +240,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     .resolveAlias(a.name)
     .map(addr => Account.fromBase58String(addr).right.get)
 
+
+  def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)
+
   implicit class SeqEitherHelper[L, R](eis: Seq[Either[L, R]]) {
     def segregate(): (Seq[L], Seq[R]) = (eis.filter(_.isLeft).map(_.left.get),
       eis.filter(_.isRight).map(_.right.get))
