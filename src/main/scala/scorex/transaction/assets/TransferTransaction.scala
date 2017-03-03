@@ -89,12 +89,13 @@ object TransferTransaction {
     val timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
     val amount = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
     val feeAmount = Longs.fromByteArray(bytes.slice(s1 + 16, s1 + 24))
-    val recipient = AccountOrAlias.fromBytes(bytes.slice(s1 + 24, s1 + 24 + Account.AddressLength)).right.get
-    val (attachment, _) = Deser.parseArraySize(bytes, s1 + 24 + Account.AddressLength)
 
-    TransferTransaction
-      .create(assetIdOpt, sender, recipient, amount, timestamp, feeAssetIdOpt, feeAmount, attachment, signature)
-      .fold(left => Failure(new Exception(left.toString)), right => Success(right))
+    (for {
+      recRes <- AccountOrAlias.fromBytes(bytes, s1 + 24)
+      (recipient, recipientEnd) = recRes
+      (attachment, _) = Deser.parseArraySize(bytes, recipientEnd)
+      tt <- TransferTransaction.create(assetIdOpt, sender, recipient, amount, timestamp, feeAssetIdOpt, feeAmount, attachment, signature)
+    } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
   private def createUnverified(assetId: Option[AssetId],

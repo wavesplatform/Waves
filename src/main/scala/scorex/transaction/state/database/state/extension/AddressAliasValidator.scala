@@ -1,12 +1,12 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.account.{Account, Alias}
+import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.storage.{AliasExtendedStorageI, StateStorageI}
-import scorex.transaction.{PaymentTransaction, Transaction}
 
 class AddressAliasValidator(storage: StateStorageI with AliasExtendedStorageI) extends Validator {
 

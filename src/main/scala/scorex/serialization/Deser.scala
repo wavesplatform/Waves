@@ -2,8 +2,6 @@ package scorex.serialization
 
 import com.google.common.primitives.Shorts
 
-import scala.util.Try
-
 object Deser {
 
   def parseArraySize(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
