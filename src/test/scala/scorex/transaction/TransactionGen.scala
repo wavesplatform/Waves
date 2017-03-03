@@ -121,6 +121,11 @@ trait TransactionGen {
     recipient: AccountOrAlias <- accountOrAliasGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, None, feeAmount, attachment).right.get
 
+  val createAliasGenerator: Gen[CreateAliasTransaction] = for {
+    timestamp: Long <- positiveLongGen
+    sender: PrivateKeyAccount <- accountGen
+    alias: Alias <- aliasGen
+  } yield CreateAliasTransaction.create(sender, alias, IssueTransaction.MinFee, timestamp).right.get
 
   val selfTransferGenerator: Gen[TransferTransaction] = for {
     amount: Long <- Gen.choose(0, Long.MaxValue)
