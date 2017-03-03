@@ -28,7 +28,7 @@ object AccountOrAlias {
   def fromString(s: String): Either[ValidationError, AccountOrAlias] = {
     Account.fromBase58String(s) match {
       case Right(a) => Right(a)
-      case Left(_) => Right(Alias(s))
+      case Left(_) => Alias(s)
     }
   }
 }

@@ -25,7 +25,7 @@ trait TransactionGen {
   }
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
-  val aliasGen: Gen[Alias] = Arbitrary.arbString.arbitrary.map(Alias(_))
+  val aliasGen: Gen[Alias] = genBoundedString(Alias.MinLength, Alias.MaxLength).map(ar => new String(ar)).map(Alias(_).right.get)
 
   val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(pk => Account.fromPublicKey(pk.publicKey)))
 
@@ -56,7 +56,7 @@ trait TransactionGen {
     amount <- positiveLongGen
     fee <- smallFeeGen
     timestamp <- positiveLongGen
-    recipient : AccountOrAlias <- accountOrAliasGen
+    recipient: AccountOrAlias <- accountOrAliasGen
     lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
     fee2 <- smallFeeGen
     unlease = LeaseCancelTransaction.create(sender, lease.id, fee2, timestamp + 1).right.get
