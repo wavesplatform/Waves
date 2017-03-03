@@ -1,7 +1,7 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.account.{Account, Alias}
-import scorex.transaction.{AliasTransaction, Transaction}
+import scorex.transaction.{AliasTransaction, CreateAliasTransaction, Transaction}
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.LeaseTransaction
@@ -34,7 +34,7 @@ class AddressAliasValidator(storage: StateStorageI with AliasExtendedStorageI) e
   }
 
   override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
-    case at: AliasTransaction => storedState.persistAlias(at.sender, at.alias)
+    case at: CreateAliasTransaction => storedState.persistAlias(at.sender, at.alias)
     case _ => ()
   }
 }
