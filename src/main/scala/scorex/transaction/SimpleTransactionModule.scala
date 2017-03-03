@@ -2,7 +2,8 @@ package scorex.transaction
 
 import com.google.common.base.Charsets
 import com.wavesplatform.settings.WavesSettings
-import scorex.account.{Account, AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account._
+import scorex.api.http.alias.AliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.app.Application
@@ -137,6 +138,13 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
         .flatMap(onNewOffchainTransaction))
   }
 
+  override def alias(request: AliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction] = for {
+    senderPrivateKey <- wallet.findWallet(request.sender)
+    alias <- Alias(request.alias)
+    tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, getTimestamp)
+    r <- onNewOffchainTransaction(tx)
+  } yield r
+
   override def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction] = {
     findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey =>
       ReissueTransaction
@@ -218,7 +226,6 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   private def findPrivateKey(address: String)(implicit wallet: Wallet): Either[ValidationError, PrivateKeyAccount] =
     wallet.privateKeyAccount(address).toRight[ValidationError](MissingSenderPrivateKey)
-
 }
 
 object SimpleTransactionModule {
