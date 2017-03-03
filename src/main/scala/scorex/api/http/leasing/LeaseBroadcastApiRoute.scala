@@ -10,7 +10,7 @@ import scorex.api.http._
 import scorex.transaction._
 
 @Path("/leasing/broadcast")
-@Api(value = "leasing")
+@Api(value = "/leasing")
 case class LeaseBroadcastApiRoute(settings: RestAPISettings, transactionModule: TransactionModule)
   extends ApiRoute with BroadcastRoute {
   override val route = pathPrefix("leasing" / "broadcast") {

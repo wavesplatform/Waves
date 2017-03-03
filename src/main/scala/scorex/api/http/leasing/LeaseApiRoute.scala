@@ -13,7 +13,7 @@ import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
 @Path("/leasing")
-@Api(value = "/leasing/")
+@Api(value = "/leasing")
 case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: State, transactionModule: TransactionOperations)
   extends ApiRoute {
 
