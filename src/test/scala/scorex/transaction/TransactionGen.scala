@@ -25,7 +25,8 @@ trait TransactionGen {
   }
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
-  val aliasGen: Gen[Alias] = genBoundedString(Alias.MinLength, Alias.MaxLength).map(ar => new String(ar)).map(Alias(_).right.get)
+  val aliasGen: Gen[Alias] = genBoundedString(Alias.MinLength, Alias.MaxLength).map(ar => new String(ar)).map(Alias(_).right.get
+  )
 
   val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(pk => Account.fromPublicKey(pk.publicKey)))
 

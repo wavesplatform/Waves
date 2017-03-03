@@ -438,6 +438,7 @@ object StoredState {
       leaseExtendedState,
       new GenesisValidator,
       new AddressAliasValidator(storage),
+      new LeaseToSelfAliasValidator(storage),
       new OrderMatchStoredState(storage),
       new IncludedValidator(storage, settings.requirePaymentUniqueId),
       new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
