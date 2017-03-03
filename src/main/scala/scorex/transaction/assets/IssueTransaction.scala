@@ -64,7 +64,6 @@ object IssueTransaction {
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength   = 16
   val MinAssetNameLength   = 4
-  val MinFee               = 100000000
   val MaxDecimals          = 8
 
   def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {

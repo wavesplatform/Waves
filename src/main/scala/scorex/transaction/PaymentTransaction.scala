@@ -57,7 +57,6 @@ object PaymentTransaction {
     }
   }
 
-  val MinimumFee = 1
   val RecipientLength = Account.AddressLength
 
   private val SenderLength = 32

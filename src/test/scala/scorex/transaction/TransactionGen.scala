@@ -156,6 +156,8 @@ trait TransactionGen {
     matcherFee: Long <- feeAmountGen
   } yield (Order(sender, matcher, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee), sender)
 
+  val MinIssueFee = 100000000
+
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
     assetName <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
@@ -166,7 +168,7 @@ trait TransactionGen {
     reissuable <- Arbitrary.arbitrary[Boolean]
     reissuable2 <- Arbitrary.arbitrary[Boolean]
     fee <- Gen.choose(1L, 2000000L)
-    iFee <- Gen.choose(IssueTransaction.MinFee, 2 * IssueTransaction.MinFee)
+    iFee <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
     timestamp <- positiveLongGen
   } yield {
     val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable, iFee, timestamp).right.get
