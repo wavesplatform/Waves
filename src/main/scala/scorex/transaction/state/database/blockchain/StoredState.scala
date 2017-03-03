@@ -71,8 +71,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
               leaseExtendedState.cancelLease(t)
             case Some(t: LeaseCancelTransaction) =>
               leaseExtendedState.cancelLeaseCancel(t)
-//            case Some(t: CreateAliasTransaction) =>
-//              storage.removeAlias(t.alias.name)
+            case Some(t: CreateAliasTransaction) =>
+              storage.removeAlias(t.alias.name)
             case _ =>
           }
           storage.removeTransaction(id)

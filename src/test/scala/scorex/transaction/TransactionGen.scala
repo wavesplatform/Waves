@@ -4,7 +4,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Matchers._
 import org.scalatest.enablers.Containing
 import org.scalatest.matchers.{BeMatcher, MatchResult}
-import scorex.account.{Account, AccountOrAlias, Alias, PrivateKeyAccount}
+import scorex.account._
 import scorex.account.PublicKeyAccount._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
@@ -28,7 +28,7 @@ trait TransactionGen {
   val aliasGen: Gen[Alias] = genBoundedString(Alias.MinLength, Alias.MaxLength).map(ar => new String(ar)).map(Alias(_).right.get
   )
 
-  val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(pk => Account.fromPublicKey(pk.publicKey)))
+  val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAddress(_)))
 
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
   val positiveIntGen: Gen[Int] = Gen.choose(1, Int.MaxValue / 3)
