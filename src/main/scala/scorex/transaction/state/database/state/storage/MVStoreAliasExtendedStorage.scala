@@ -11,8 +11,9 @@ trait MVStoreAliasExtendedStorage extends AliasExtendedStorageI {
   private lazy val aliasAddressMap: MVMap[String, String] = db.openMap(AliasAddressTableName,
     new LogMVMapBuilder[String, String])
 
-  def resolveAlias(alias: String): Option[Address] = Option(aliasAddressMap.get(alias))
+  def addressByAlias(alias: String): Option[Address] = Option(aliasAddressMap.get(alias))
 
   def persistAlias(address: Address, alias: String): Unit = aliasAddressMap.put(alias, address)
 
+  def removeAlias(alias: String): Unit = aliasAddressMap.remove(alias)
 }

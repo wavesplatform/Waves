@@ -71,6 +71,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
               leaseExtendedState.cancelLease(t)
             case Some(t: LeaseCancelTransaction) =>
               leaseExtendedState.cancelLeaseCancel(t)
+//            case Some(t: CreateAliasTransaction) =>
+//              storage.removeAlias(t.alias.name)
             case _ =>
           }
           storage.removeTransaction(id)
@@ -237,7 +239,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   }
 
   def resolveAlias(a: Alias): Option[Account] = storage
-    .resolveAlias(a.name)
+    .addressByAlias(a.name)
     .map(addr => Account.fromBase58String(addr).right.get)
 
 
