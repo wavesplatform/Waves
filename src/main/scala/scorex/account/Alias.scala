@@ -1,14 +1,12 @@
 package scorex.account
 
-import java.nio.charset.Charset
-
 import scorex.serialization.BytesSerializable
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.TransactionParameterValidationError
 
 sealed trait Alias extends AccountOrAlias {
   lazy val stringRepr: String = name
-  lazy val bytes: Array[Byte] = Alias.AddressVersion +: BytesSerializable.arrayWithSize(name.getBytes(Charset.forName("UTF-8")))
+  lazy val bytes: Array[Byte] = Alias.AddressVersion +: BytesSerializable.arrayWithSize(name.getBytes("UTF-8"))
 
   val name: String
 }
@@ -28,7 +26,7 @@ object Alias {
 
   def fromBytes(bytes: Array[Byte]): Either[ValidationError, Alias] = {
     bytes.headOption match {
-      case Some(AddressVersion) => Right(AliasImpl(new String(bytes.drop(3), Charset.forName("UTF-8"))))
+      case Some(AddressVersion) => Right(AliasImpl(new String(bytes.drop(3), "UTF-8")))
       case _ => Left(TransactionParameterValidationError("Bad alias bytes"))
     }
   }
