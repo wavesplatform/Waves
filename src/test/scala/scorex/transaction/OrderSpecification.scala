@@ -16,8 +16,8 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
       recovered.id shouldBe order.id
       recovered.senderPublicKey shouldBe order.senderPublicKey
       recovered.matcherPublicKey shouldBe order.matcherPublicKey
-      ByteArrayExtension.sameOption(recovered.spendAssetId, order.spendAssetId) shouldBe true
-      ByteArrayExtension.sameOption(recovered.receiveAssetId, order.receiveAssetId) shouldBe true
+      recovered.assetPair shouldBe order.assetPair
+      recovered.orderType shouldBe order.orderType
       recovered.price shouldBe order.price
       recovered.amount shouldBe order.amount
       recovered.timestamp shouldBe order.timestamp
@@ -83,10 +83,12 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
       order.isValid(NTP.correctedTime()) shouldBe valid
       order.copy(senderPublicKey = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(matcherPublicKey = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(spendAssetId = order.spendAssetId.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte)))).
+      val assetPair = order.assetPair
+      order.copy(assetPair = assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte))))).
         isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(receiveAssetId = order.receiveAssetId.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte)))).
+      order.copy(assetPair = assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte))))).
         isValid(NTP.correctedTime()) should contain("signature should be valid")
+      order.copy(orderType = OrderType.reverse(order.orderType)).isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(price = order.price + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(amount = order.amount + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(expiration = order.expiration + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
@@ -112,7 +114,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
     forAll(assetIdGen, assetIdGen) { (assetA: Option[AssetId], assetB: Option[AssetId]) =>
       whenever(!ByteArrayExtension.sameOption(assetA, assetB)) {
         val pair = AssetPair(assetA, assetB)
-        ByteArrayExtension.compare(pair.first, pair.second) should be < 0
+        pair.isValid shouldBe valid
       }
     }
   }

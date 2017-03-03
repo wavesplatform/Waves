@@ -11,8 +11,8 @@ case class OrderBookResult(timestamp: Long, pair: AssetPair, bids: Seq[LevelAgg]
 object OrderBookResult {
   implicit val assetPairWrites = new Writes[AssetPair] {
     def writes(pair: AssetPair) = Json.obj(
-      "asset1" -> pair.firstStr,
-      "asset2" -> pair.secondStr
+      "asset1" -> pair.priceAssetStr,
+      "asset2" -> pair.amountAssetStr
     )
   }
 

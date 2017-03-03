@@ -4,6 +4,7 @@ import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.MatcherSettings
 import org.scalatest.{FlatSpec, Matchers}
+import scorex.transaction.assets.exchange.AssetPair
 
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
   "MatcherSettings" should "read values" in {
@@ -22,6 +23,16 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    snapshots-directory: ${waves.directory}"/snapshots"
         |    snapshots-interval: 1d
         |    max-open-orders: 1000
+        |    base-assets: [
+        |      "WAVES",
+        |      "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS",
+        |      "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"
+        |    ]
+        |    base-pairs: [
+        |      {amountAsset = "WAVES", priceAsset = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"},
+        |      {amountAsset = "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", priceAsset = "WAVES"},
+        |      {amountAsset = "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", priceAsset = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"},
+        |    ]
         |  }
         |}
       """.stripMargin).resolve()
@@ -37,5 +48,11 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.snapshotsDataDir should be("/waves/snapshots")
     settings.snapshotsInterval should be(1.day)
     settings.maxOpenOrders should be(1000)
+    settings.baseAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
+    settings.basePairs should be(Seq(
+      AssetPair.createAssetPair("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get,
+      AssetPair.createAssetPair("DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", "WAVES").get,
+      AssetPair.createAssetPair("DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get
+    ))
   }
 }

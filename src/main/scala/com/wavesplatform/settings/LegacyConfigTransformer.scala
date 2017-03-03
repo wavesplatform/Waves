@@ -88,6 +88,8 @@ object LegacyConfigTransformer {
     "matcher.host"        -> "matcher.bind-address",
     "matcher.port"        -> "matcher.port",
     "matcher.minOrderFee" -> "matcher.order-match-tx-fee",
+    "matcher.baseAssets"  -> "matcher.base-assets",
+    "matcher.basePairs"   -> "matcher.base-Pairs",
 
     "scoreBroadcastDelay"        -> "synchronization.score-broadcast-interval",
     "historySynchronizerTimeout" -> "synchronization.synchronization-timeout",

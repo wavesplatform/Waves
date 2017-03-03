@@ -92,6 +92,8 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    snapshots-directory = ""
           |    snapshots-interval = 10m
           |    max-open-orders = 1000
+          |    base-assets = []
+          |    base-pairs = []
           |  }
           |  synchronization.score-ttl = 90s
           |}
