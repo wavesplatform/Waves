@@ -1,12 +1,10 @@
 package scorex.transaction.state.database.state.storage
 
-import scorex.account.Alias
-import scorex.transaction.state.database.state.Address
-
 
 trait AliasExtendedStorageI {
-  def addressByAlias(alias: String): Option[Address]
+  def addressByAlias(address: String): Option[String]
+  def aliasByAddress(alias: String): Option[String]
 
-  def persistAlias(address: Address, alias: String): Unit
+  def persistAlias(address: String, alias: String): Unit
   def removeAlias(alias: String): Unit
 }

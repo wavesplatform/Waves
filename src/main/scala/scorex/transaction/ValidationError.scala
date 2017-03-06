@@ -12,6 +12,7 @@ object ValidationError {
   case object OverflowError extends ValidationError
   case object ToSelf extends ValidationError
   case object MissingSenderPrivateKey extends ValidationError
+  case object UnsupportedTransactionType extends ValidationError
 
   case class TransactionParameterValidationError(err: String) extends ValidationError
 

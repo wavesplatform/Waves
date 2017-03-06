@@ -1,8 +1,7 @@
 package scorex.transaction
 
 import scorex.account.{Account, AccountOrAlias, Alias, PublicKeyAccount}
-import scorex.api.http.CustomValidationError
-import scorex.transaction.ValidationError.TransactionParameterValidationError
+import scorex.transaction.ValidationError.{TransactionParameterValidationError, UnsupportedTransactionType}
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -60,7 +59,7 @@ object BalanceChangeCalculator {
       case t: CreateAliasTransaction =>
         Right(Seq(BalanceChange(AssetAcc(t.sender, None), -t.fee)))
 
-      case _ => ???
+      case _ => Left(UnsupportedTransactionType)
     }
   }
 

@@ -63,7 +63,7 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
     AssetsBroadcastApiRoute(settings.restAPISettings, transactionModule),
     LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.state, transactionModule),
     LeaseBroadcastApiRoute(settings.restAPISettings, transactionModule),
-    AliasApiRoute(settings.restAPISettings, wallet, transactionModule),
+    AliasApiRoute(settings.restAPISettings, wallet, transactionModule, blockStorage.state),
     AliasBroadcastApiRoute(settings.restAPISettings, transactionModule)
   )
 

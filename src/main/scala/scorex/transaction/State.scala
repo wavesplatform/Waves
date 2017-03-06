@@ -44,6 +44,8 @@ trait State {
 
   def resolveAlias(a: Alias): Option[Account]
 
+  def getAlias(a: Account): Option[Alias]
+
   def persistAlias(ac: Account, al: Alias): Unit
 
   // debug from api

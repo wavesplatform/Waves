@@ -242,6 +242,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     .addressByAlias(a.name)
     .map(addr => Account.fromBase58String(addr).right.get)
 
+  def getAlias(a: Account): Option[Alias] = storage
+    .aliasByAddress(a.address)
+    .map(addr => Alias(addr).right.get)
 
   def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)
 

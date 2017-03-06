@@ -26,6 +26,7 @@ object ApiError {
     case ValidationError.OverflowError => OverflowError
     case ValidationError.ToSelf => ToSelfError
     case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
+    case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
     case ValidationError.TransactionParameterValidationError(m) => CustomValidationError(m)
     case ValidationError.TransactionValidationError(tx, err) => StateCheckFailed(tx, err)
   }
