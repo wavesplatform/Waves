@@ -49,7 +49,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
       case Right(alias) =>
         state.resolveAlias(alias) match {
           case Some(addr) => Right(AliasInfo(addr.address, aliasString))
-          case None => Right(AliasInfo("", alias.stringRepr))
+          case None => Left(AliasNotExists)
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
     }
@@ -66,7 +66,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
       case Right(address) =>
         state.getAlias(address) match {
           case Some(al) => Right(AliasInfo(address.stringRepr, al.stringRepr))
-          case None => Right(AliasInfo(address.stringRepr, ""))
+          case None => Left(AliasNotExists)
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
     }

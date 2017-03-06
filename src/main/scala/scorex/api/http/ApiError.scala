@@ -164,10 +164,14 @@ case class CustomValidationError(errorMessage: String) extends ApiError {
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
-//BLOCKS
 case object BlockNotExists extends ApiError {
   override val id: Int = 301
   override val code = StatusCodes.NotFound
   override val message: String = "block does not exist"
 }
 
+case object AliasNotExists extends ApiError {
+  override val id: Int = 301
+  override val code = StatusCodes.NotFound
+  override val message: String = "alias doesn't exist"
+}
