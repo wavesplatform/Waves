@@ -24,5 +24,5 @@ class LeaseToSelfAliasValidator(storage: StateStorageI with AliasExtendedStorage
     }
   }
 
-  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = () // No alias tx just yet
+  override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = ()
 }
