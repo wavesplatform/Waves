@@ -5,7 +5,7 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
+import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, PaymentTransaction, Transaction}
 
 class ActivatedValidator(
                           allowBurnTransactionAfterTimestamp: Long,
@@ -32,6 +32,7 @@ class ActivatedValidator(
     case _: ExchangeTransaction => Right(tx)
     case _: LeaseTransaction => Right(tx)
     case _: LeaseCancelTransaction => Right(tx)
+    case _: CreateAliasTransaction => Right(tx)
     case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
   }
 

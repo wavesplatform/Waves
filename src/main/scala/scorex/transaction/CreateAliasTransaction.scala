@@ -4,6 +4,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account._
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TransactionParser._
 
@@ -25,6 +26,8 @@ object CreateAliasTransaction {
     extends CreateAliasTransaction {
 
     override val transactionType: TransactionType.Value = TransactionType.CreateAliasTransaction
+
+    override lazy val id: Array[Byte] = FastCryptographicHash(transactionType.id.toByte +: alias.bytes)
 
     lazy val toSign: Array[Byte] = Bytes.concat(
       Array(transactionType.id.toByte),

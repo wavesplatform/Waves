@@ -33,8 +33,6 @@ object ExchangeTransaction {
 
     override val transactionType: TransactionType.Value = TransactionType.ExchangeTransaction
 
-    override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
-
     override val assetFee: (Option[AssetId], Long) = (None, fee)
 
     @ApiModelProperty(hidden = true)

@@ -38,18 +38,29 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def alias: Route = processRequest("create", (t: AliasRequest) => transactionOperations.alias(t, wallet))
 
+
+  @Path("/byAlias/{alias}")
+  @ApiOperation(value = "Account", notes = "Address by Alias", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
+  ))
   def addressOfAlias: Route = (get & path("byAlias" / Segment)) { aliasString =>
     val result = Alias(aliasString) match {
       case Right(alias) =>
         state.resolveAlias(alias) match {
           case Some(addr) => Right(AliasInfo(addr.address, aliasString))
-          case None => Left(CustomValidationError("alias is not assigned to any address"))
+          case None => Right(AliasInfo("", alias.stringRepr))
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
     }
     complete(result)
   }
 
+  @Path("/byAddress/{address}")
+  @ApiOperation(value = "Alias", notes = "Alias by Address", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7", required = true, dataType = "string", paramType = "path")
+  ))
   def aliasOfAddress: Route = (get & path("byAddress" / Segment)) { addressString =>
     val result = Account.fromBase58String(addressString) match {
       case Right(address) =>
