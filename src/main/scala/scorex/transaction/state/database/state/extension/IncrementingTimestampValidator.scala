@@ -54,7 +54,7 @@ class IncrementingTimestampValidator(allowInvalidPaymentTransactionsByTimestamp:
   }
 
   def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
-    def loop(h: Int, address: Address): Option[PaymentTransaction] = {
+    def loop(h: Int, address: AddressString): Option[PaymentTransaction] = {
       storage.getAccountChanges(address, h) match {
         case Some(row) =>
           val accountTransactions = row.reason.flatMap(id => storage.getTransaction(id))

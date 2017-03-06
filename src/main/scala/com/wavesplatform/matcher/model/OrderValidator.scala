@@ -16,7 +16,7 @@ trait OrderValidator {
   val settings: MatcherSettings
   val wallet: Wallet
 
-  lazy val matcherPubKey: PublicKeyAccount = wallet.privateKeyAccount(settings.account).get
+  lazy val matcherPubKey: PublicKeyAccount = wallet.findWallet(settings.account).right.get
 
   def isBalanceWithOpenOrdersEnough(order: Order): Boolean = {
     val (acc, feeAcc) = (AssetAcc(order.senderPublicKey, order.spendAssetId), AssetAcc(order.senderPublicKey, None))

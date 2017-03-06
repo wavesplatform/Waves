@@ -57,7 +57,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   def rollbackTo(rollbackTo: Int): State = synchronized {
     @tailrec
-    def deleteNewer(key: Address): Unit = {
+    def deleteNewer(key: AddressString): Unit = {
       val currentHeight = storage.getLastStates(key).getOrElse(0)
       if (currentHeight > rollbackTo) {
         val changes = storage.removeAccountChanges(key, currentHeight)

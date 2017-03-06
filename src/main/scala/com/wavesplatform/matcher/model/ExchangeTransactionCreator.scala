@@ -21,7 +21,7 @@ trait ExchangeTransactionCreator {
   }
 
   def createTransaction(submitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
-    wallet.privateKeyAccount(submitted.order.matcherPublicKey.address).toRight[ValidationError](MissingSenderPrivateKey).flatMap(matcherPrivateKey => {
+    wallet.privateKeyAccount(submitted.order.matcherPublicKey).flatMap(matcherPrivateKey => {
       val price = counter.price
       val amount = math.min(submitted.amount, counter.amount)
       val (buy, sell) = Order.splitByType(submitted.order, counter.order)
