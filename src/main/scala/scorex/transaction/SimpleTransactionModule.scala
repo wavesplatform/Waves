@@ -3,7 +3,7 @@ package scorex.transaction
 import com.google.common.base.Charsets
 import com.wavesplatform.settings.WavesSettings
 import scorex.account._
-import scorex.api.http.alias.AliasRequest
+import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.app.Application
@@ -13,7 +13,7 @@ import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.{MissingSenderPrivateKey, TransactionValidationError}
+import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
@@ -141,7 +141,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     } yield t
 
 
-  override def alias(request: AliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction] = for {
+  override def alias(request: CreateAliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
     alias <- Alias(request.alias)
     tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, getTimestamp)
