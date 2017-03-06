@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import scorex.account.{Account, AccountOrAlias, Alias, PublicKeyAccount}
-import scorex.transaction.ValidationError.{TransactionParameterValidationError, UnsupportedTransactionType}
+import scorex.transaction.ValidationError.{AliasNotExists, UnsupportedTransactionType}
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -21,7 +21,7 @@ object BalanceChangeCalculator {
       case t: IssueTransaction =>
         Right(Seq(BalanceChange(AssetAcc(t.sender, Some(t.assetId)), t.quantity), BalanceChange(AssetAcc(t.sender, t.assetFee._1), -t.assetFee._2)))
 
-      case t: TransferTransaction => resolveA(state: State)(t.recipient).map(recipient => {
+      case t: TransferTransaction => resolveA(state: State)(t, t.recipient).map(recipient => {
         lazy val sameAssetForFee: Boolean = t.feeAssetId.map(fa => t.assetId.exists(_ sameElements fa)).getOrElse(t.assetId.isEmpty)
         val recipientCh = BalanceChange(AssetAcc(recipient, t.assetId), t.amount)
         val senderCh =
@@ -65,13 +65,13 @@ object BalanceChangeCalculator {
 
   def effectiveBalanceChanges(state: State)(storage: LeaseExtendedStateStorageI)(tx: Transaction)
   : Either[ValidationError, Seq[EffectiveBalanceChange]] = tx match {
-    case tx: LeaseTransaction => resolveA(state)(tx.recipient).map(recipient => {
+    case tx: LeaseTransaction => resolveA(state)(tx,tx.recipient).map(recipient => {
       Seq(EffectiveBalanceChange(tx.sender, -tx.amount - tx.fee),
         EffectiveBalanceChange(recipient, tx.amount))
     })
     case tx: LeaseCancelTransaction =>
       val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
-      resolveA(state)(leaseTx.recipient).map(recipient => {
+      resolveA(state)(tx,leaseTx.recipient).map(recipient => {
         Seq(
           EffectiveBalanceChange(tx.sender, leaseTx.amount - tx.fee),
           EffectiveBalanceChange(recipient, -leaseTx.amount))
@@ -81,11 +81,11 @@ object BalanceChangeCalculator {
     )
   }
 
-  def resolveA(state: State)(aoa: AccountOrAlias): Either[ValidationError, Account] = aoa match {
+  def resolveA(state: State)(tx: Transaction, aoa: AccountOrAlias): Either[ValidationError, Account] = aoa match {
     case a: Account => Right(a)
     case al: Alias => state.resolveAlias(al) match {
       case Some(ac) => Right(ac)
-      case None => Left(TransactionParameterValidationError(s"No account exists for $aoa"))
+      case None => Left(AliasNotExists(al))
     }
   }
 }

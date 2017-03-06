@@ -1,6 +1,9 @@
 package scorex.transaction
 
+import scorex.account.AccountOrAlias
+
 sealed trait ValidationError
+sealed trait StateValidationError extends ValidationError
 
 object ValidationError {
   case object InvalidAddress extends ValidationError
@@ -16,6 +19,7 @@ object ValidationError {
 
   case class TransactionParameterValidationError(err: String) extends ValidationError
 
-  case class TransactionValidationError(ts: Transaction, err: String) extends ValidationError
+  case class AliasNotExists(aoa : AccountOrAlias) extends StateValidationError
+  case class TransactionValidationError(tx: Transaction, err: String) extends StateValidationError
 
 }

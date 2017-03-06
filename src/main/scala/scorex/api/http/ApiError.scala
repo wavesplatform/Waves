@@ -1,7 +1,8 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import play.api.libs.json.{JsError, JsPath, Json, JsonValidationError}
+import play.api.libs.json._
+import scorex.account.{Account, AccountOrAlias, Alias}
 import scorex.transaction.{Transaction, ValidationError}
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -26,6 +27,7 @@ object ApiError {
     case ValidationError.OverflowError => OverflowError
     case ValidationError.ToSelf => ToSelfError
     case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
+    case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
     case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
     case ValidationError.TransactionParameterValidationError(m) => CustomValidationError(m)
     case ValidationError.TransactionValidationError(tx, err) => StateCheckFailed(tx, err)
@@ -39,12 +41,12 @@ case object Unknown extends ApiError {
 }
 
 case class WrongJson(
-                      cause: Option[Throwable] = None,
-                      errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
+                        cause: Option[Throwable] = None,
+                        errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
   override val id = 1
   override val code = StatusCodes.BadRequest
   override lazy val message = "failed to parse json message"
-  override lazy val json = Json.obj(
+  override lazy val json: JsObject = Json.obj(
     "error" -> id,
     "message" -> message,
     "cause" -> cause.map(_.toString),
@@ -170,8 +172,12 @@ case object BlockNotExists extends ApiError {
   override val message: String = "block does not exist"
 }
 
-case object AliasNotExists extends ApiError {
+case class AliasNotExists(aoa: AccountOrAlias) extends ApiError {
   override val id: Int = 301
   override val code = StatusCodes.NotFound
-  override val message: String = "alias doesn't exist"
+  private lazy val msgReason = aoa match {
+    case a: Account => s"for address '${a.stringRepr}'"
+    case a: Alias => s"'${a.stringRepr}'"
+  }
+  override val message: String = s"alias $msgReason doesn't exist"
 }

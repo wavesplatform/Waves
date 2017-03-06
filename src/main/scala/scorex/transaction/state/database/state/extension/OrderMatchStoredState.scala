@@ -1,7 +1,7 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.crypto.encode.Base58
-import scorex.transaction.Transaction
+import scorex.transaction.{StateValidationError, Transaction}
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.blockchain.StoredState
@@ -9,7 +9,7 @@ import scorex.transaction.state.database.state.storage.{OrderMatchStorageI, Stat
 
 class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends Validator {
 
-  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[TransactionValidationError, Transaction] = tx match {
+  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case om: ExchangeTransaction => OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om))
     case _ => Right(tx)
   }
@@ -81,7 +81,7 @@ class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) exte
 
 
 object OrderMatchStoredState {
-  def isOrderMatchValid(exTrans: ExchangeTransaction, previousMatches: Set[ExchangeTransaction]): Either[TransactionValidationError, ExchangeTransaction] = {
+  def isOrderMatchValid(exTrans: ExchangeTransaction, previousMatches: Set[ExchangeTransaction]): Either[StateValidationError, ExchangeTransaction] = {
 
     lazy val buyTransactions = previousMatches.filter { om =>
       om.buyOrder.id sameElements exTrans.buyOrder.id

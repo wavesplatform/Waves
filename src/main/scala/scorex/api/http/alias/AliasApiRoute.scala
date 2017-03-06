@@ -49,7 +49,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
       case Right(alias) =>
         state.resolveAlias(alias) match {
           case Some(addr) => Right(AliasInfo(addr.address, aliasString))
-          case None => Left(AliasNotExists)
+          case None => Left(AliasNotExists(alias))
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
     }
@@ -62,11 +62,11 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
     new ApiImplicitParam(name = "address", value = "3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7", required = true, dataType = "string", paramType = "path")
   ))
   def aliasOfAddress: Route = (get & path("byAddress" / Segment)) { addressString =>
-    val result = Account.fromBase58String(addressString) match {
+    val result: Either[ApiError, AliasInfo] = Account.fromBase58String(addressString) match {
       case Right(address) =>
         state.getAlias(address) match {
           case Some(al) => Right(AliasInfo(address.stringRepr, al.stringRepr))
-          case None => Left(AliasNotExists)
+          case None => Left(AliasNotExists(address))
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
     }

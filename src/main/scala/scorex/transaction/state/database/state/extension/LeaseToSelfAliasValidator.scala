@@ -1,7 +1,7 @@
 package scorex.transaction.state.database.state.extension
 
 import scorex.account.Alias
-import scorex.transaction.Transaction
+import scorex.transaction.{StateValidationError, Transaction}
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.blockchain.StoredState
@@ -9,7 +9,7 @@ import scorex.transaction.state.database.state.storage.{AliasExtendedStorageI, S
 
 class LeaseToSelfAliasValidator(storage: StateStorageI with AliasExtendedStorageI) extends Validator {
 
-  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[TransactionValidationError, Transaction] = {
+  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = {
 
     tx match {
       case ltx: LeaseTransaction =>
