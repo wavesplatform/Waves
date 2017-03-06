@@ -17,8 +17,6 @@ sealed trait CreateAliasTransaction extends SignedTransaction {
 
 object CreateAliasTransaction {
 
-  val MaxAliasSize = 140
-
   private case class CreateAliasTransactionImpl(sender: PublicKeyAccount,
                                                 alias: Alias,
                                                 fee: Long,
@@ -64,9 +62,7 @@ object CreateAliasTransaction {
                                fee: Long,
                                timestamp: Long,
                                signature: Option[Array[Byte]] = None): Either[ValidationError, CreateAliasTransactionImpl] = {
-    if (alias.bytes.length > MaxAliasSize) {
-      Left(ValidationError.TooBigArray)
-    } else if (fee <= 0) {
+    if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
       Right(CreateAliasTransactionImpl(sender, alias, fee, timestamp, signature.orNull))
