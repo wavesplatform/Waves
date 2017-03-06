@@ -437,6 +437,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   property("Alias by Address with rollback") {
     forAll(createAliasGenerator) { at: CreateAliasTransaction =>
       withRollbackTest {
+        val initialBalance = state.balance(at.sender)
         state.applyChanges(state.calcNewBalances(Seq(at), Map(), allowTemporaryNegative = true))
         val maybeRealAccount: Option[Account] = state.resolveAlias(at.alias)
         maybeRealAccount.get.address shouldBe at.sender.address
@@ -444,6 +445,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.rollbackTo(state.stateHeight - 1)
         val noRealAccount : Option[Account] = state.resolveAlias(at.alias)
         noRealAccount shouldBe None
+        state.balance(at.sender) shouldBe initialBalance
       }
     }
   }

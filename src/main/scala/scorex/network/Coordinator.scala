@@ -248,7 +248,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   def isBlockValid(b: Block) : Boolean = {
     if (application.transactionModule.blockStorage.history.contains(b)) true //applied blocks are valid
     else {
-      def history = application.transactionModule.blockStorage.history.contains(b.referenceField.value)
+      def history = application.transactionModule.blockStorage.history.contains(b.reference)
 
       def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
         b.signerDataField.value.generator.publicKey)

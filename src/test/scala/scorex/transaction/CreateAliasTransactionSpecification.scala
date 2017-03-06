@@ -21,6 +21,13 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
     }
   }
 
+
+  property("The same aliases from different senders have the same id") {
+    forAll(createAliasGenerator, createAliasGenerator) { case (tx1: CreateAliasTransaction, tx2: CreateAliasTransaction) =>
+      tx1.id sameElements tx2.id
+    }
+  }
+
   private def assertTxs(first: CreateAliasTransaction, second: CreateAliasTransaction): Unit = {
     first.sender.address shouldEqual second.sender.address
     first.timestamp shouldEqual second.timestamp
