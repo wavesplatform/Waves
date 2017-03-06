@@ -40,9 +40,9 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe.play" % "play-functional_2.11" % "2.4.8",
   "com.typesafe.play" % "play-iteratees_2.11" % "2.4.8",
   "com.typesafe.play" % "play-json_2.11" % "2.4.8",
-  "com.wavesplatform" % "scorex-basics_2.11" % "1.4.6",
-  "com.wavesplatform" % "scorex-consensus_2.11" % "1.4.6",
-  "com.wavesplatform" % "scorex-transaction_2.11" % "1.4.6",
+  "com.wavesplatform" % "scorex-basics_2.11" % "1.4.7",
+  "com.wavesplatform" % "scorex-consensus_2.11" % "1.4.7",
+  "com.wavesplatform" % "scorex-transaction_2.11" % "1.4.7",
   "commons-net" % "commons-net" % "3.5",
   "io.netty" % "netty" % "3.10.0.Final",
   "io.spray" % "spray-json_2.11" % "1.3.2",
@@ -57,7 +57,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "javax.ws.rs" % "jsr311-api" % "1.1.1",
   "jline" % "jline" % "2.12.1",
   "joda-time" % "joda-time" % "2.8.1",
-  "net.databinder.dispatch" % "dispatch-core_2.11" % "0.11.3",
+  "net.databinder.dispatch" % "dispatch-core_2.11" % "0.12.0",
   "org.apache.commons" % "commons-lang3" % "3.2.1",
   "org.bitlet" % "weupnp" % "0.1.4",
   "org.codehaus.woodstox" % "stax2-api" % "3.1.4",
@@ -68,7 +68,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.reflections" % "reflections" % "0.9.10",
   "org.scala-lang.modules" % "scala-java8-compat_2.11" % "0.7.0",
   "org.scala-lang.modules" % "scala-parser-combinators_2.11" % "1.0.4",
-  "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.2",
+  "org.scala-lang.modules" % "scala-xml_2.11" % "1.0.6",
   "org.scala-sbt" % "test-interface" % "1.0",
   "org.scala-stm" % "scala-stm_2.11" % "0.7",
   "org.scalacheck" % "scalacheck_2.11" % "1.12.6",
@@ -79,4 +79,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.2.4",
   "org.yaml" % "snakeyaml" % "1.12"
 )
-// LIBRARY_DEPENDENCIES_HASH 1395b5244e73b2194a817ee2a8acc966f15c3e5f
+// LIBRARY_DEPENDENCIES_HASH 9802d9d815b51ffa9b249cf9db7bf8b6e6f9a3c6
