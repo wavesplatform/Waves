@@ -51,8 +51,8 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSe
 
     val isCorrectOrder = if (tradedPairs.contains(aPair)) true
       else if (tradedPairs.contains(reversePair)) false
-      else if (settings.baseAssets.contains(aPair.priceAssetStr) &&
-        !settings.baseAssets.contains(aPair.amountAssetStr)) true
+      else if (settings.priceAssets.contains(aPair.priceAssetStr) &&
+        !settings.priceAssets.contains(aPair.amountAssetStr)) true
       else ByteArrayExtension.compare(aPair.priceAsset, aPair.amountAsset) < 0
 
     isCorrectOrder :|  s"Invalid AssetPair ordering, should be reversed: $reversePair"
@@ -97,7 +97,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSe
   }
 
   def initPredefinedPairs(): Unit = {
-    settings.basePairs.diff(tradedPairs).foreach(pair =>
+    settings.predefinedPairs.diff(tradedPairs).foreach(pair =>
       createOrderBook(pair)
     )
   }

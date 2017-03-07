@@ -17,8 +17,8 @@ case class MatcherSettings(enable: Boolean,
                            snapshotsDataDir: String,
                            snapshotsInterval: FiniteDuration,
                            maxOpenOrders: Int,
-                           baseAssets: Seq[String],
-                           basePairs: Seq[AssetPair]
+                           priceAssets: Seq[String],
+                           predefinedPairs: Seq[AssetPair]
                           )
 
 
@@ -36,8 +36,8 @@ object MatcherSettings {
     val snapshotsDirectory = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval = config.as[FiniteDuration](s"$configPath.snapshots-interval")
     val maxOpenOrders = config.as[Int](s"$configPath.max-open-orders")
-    val baseAssets = config.as[List[String]](s"$configPath.base-assets")
-    val basePairs: Seq[AssetPair] = config.getConfigList(s"$configPath.base-pairs").asScala.map { p: Config =>
+    val baseAssets = config.as[List[String]](s"$configPath.price-assets")
+    val basePairs: Seq[AssetPair] = config.getConfigList(s"$configPath.predefined-pairs").asScala.map { p: Config =>
       AssetPair.createAssetPair(p.as[String]("amountAsset"), p.as[String]("priceAsset")).get
     }
 

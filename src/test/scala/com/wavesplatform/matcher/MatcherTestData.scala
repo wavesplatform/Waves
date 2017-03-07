@@ -50,8 +50,8 @@ trait MatcherTestData {
       |    snapshots-directory: ${waves.directory}"/snapshots"
       |    snapshots-interval: 1d
       |    max-open-orders: 1000
-      |    base-assets: []
-      |    base-pairs: []
+      |    price-assets: ["BASE1", "BASE2"]
+      |    predefined-pairs: [{amountAsset = "BASE2", priceAsset = "BASE1"}]
       |  }
       |}
     """.stripMargin).withFallback(ConfigFactory.load()).resolve()
