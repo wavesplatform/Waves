@@ -38,7 +38,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     val history = transactionModule.blockStorage.history
 
     if (block.timestampField.value > forksConfig.requireSortedTransactionsAfter) {
-      require(block.transactionDataField.asInstanceOf[TransactionsBlockField].value.sorted(TransactionsOrdering) == block.transactionDataField.asInstanceOf[TransactionsBlockField].value, "Transactions must be sorted correctly")
+      require(block.transactionDataField.asInstanceOf[TransactionsBlockField].value.sorted(TransactionsOrdering.InBlock) == block.transactionDataField.asInstanceOf[TransactionsBlockField].value, "Transactions must be sorted correctly")
     }
 
     val parentOpt = history.parent(block)
@@ -123,7 +123,7 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
       val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
       val unconfirmed = tm.packUnconfirmed(Some(height))
-      log.debug(s"Build block with ${unconfirmed.asInstanceOf[Seq[Transaction]].size} transactions")
+      log.debug(s"Build block with ${unconfirmed.size} transactions")
       log.debug(s"Block time interval is $eta seconds ")
 
       Some(Block.buildAndSign(version,

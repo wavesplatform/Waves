@@ -71,14 +71,17 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def packUnconfirmed(heightOpt: Option[Int]): Seq[Transaction] = synchronized {
     clearIncorrectTransactions()
 
-    val txs = utxStorage.all().sorted(TransactionsOrdering).take(MaxTransactionsPerBlock)
+    val txs = utxStorage.all()
+      .sorted(TransactionsOrdering.InUTXPool)
+      .take(MaxTransactionsPerBlock)
+
     val valid = blockStorage.state.validate(txs, heightOpt, NTP.correctedTime())
 
     if (valid.size != txs.size) {
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
     }
 
-    valid
+    valid.sorted(TransactionsOrdering.InBlock)
   }
 
   override def clearFromUnconfirmed(data: Seq[Transaction]): Unit = synchronized {
@@ -98,7 +101,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val txs = utxStorage.all()
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeForUnconfirmed }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeDrift }
-    val inOrder = notFromFuture.sorted(TransactionsOrdering)
+    val inOrder = notFromFuture.sorted(TransactionsOrdering.InUTXPool)
     val valid = blockStorage.state.validate(inOrder, blockTime = currentTime)
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)

@@ -16,6 +16,8 @@ import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 import scorex.wallet.Wallet
 
+import scala.util.Random
+
 //TODO: gagarin55 - Can't move it to appropriate module due to dependancy on some ConsesusModule impl
 class SimpleTransactionModuleSpecification extends FunSuite with MockFactory with Matchers {
 
@@ -133,9 +135,21 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
   }
 
   test("unique txs by id in one block") {
-      val tx = TransferTransaction.create(None, privateKeyAccount, privateKeyAccount, 1L, genesisTimestamp + 1000, None, 100000L, Array.empty).right.get
-      transactionModule.isValid(tx, tx.timestamp) shouldBe true
-      val replaySeq = Seq(tx, tx)
-      transactionModule.isValid(TestBlock(replaySeq)) shouldBe false
+    val tx = TransferTransaction.create(None, privateKeyAccount, privateKeyAccount, 1L, genesisTimestamp + 1000, None, 100000L, Array.empty).right.get
+    transactionModule.isValid(tx, tx.timestamp) shouldBe true
+    val replaySeq = Seq(tx, tx)
+    transactionModule.isValid(TestBlock(replaySeq)) shouldBe false
+  }
+
+  test("packUnconfirmed() packs txs in correct order") {
+    val correctSeq = Seq(
+      PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp + 2).right.get,
+      PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp + 1).right.get,
+      PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp).right.get
+    )
+
+    Random.shuffle(correctSeq).foreach(t => transactionModule.utxStorage.putIfNew(t))
+    assert(transactionModule.utxStorage.all().size == 3)
+    assert(transactionModule.packUnconfirmed() == correctSeq)
   }
 }
