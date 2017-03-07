@@ -467,6 +467,25 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
+
+  property("Incorrect issue and reissue asset") {
+    forAll(issueWithInvalidReissuesGenerator) { case (issueTx, reissueTx, invalidReissueTx) =>
+      withRollbackTest {
+        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Right[_, _]]
+
+        state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
+
+        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Left[_, _]]
+
+        state.validateAgainstState(invalidReissueTx, Int.MaxValue) shouldBe an[Right[_, _]]
+
+        state.applyChanges(state.calcNewBalances(Seq(reissueTx), Map(), allowTemporaryNegative = true))
+
+        state.validateAgainstState(invalidReissueTx, Int.MaxValue) shouldBe an[Left[_, _]]
+      }
+    }
+  }
+
   property("Issue asset") {
     forAll(issueGenerator) { issueTx: IssueTransaction =>
       withRollbackTest {
@@ -571,11 +590,10 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
           if (assetId.isEmpty) amount else 0L
         }
 
-        def amountInWaves(amount: Long, order: Order): Long = {
-          if (order.assetPair.first.isEmpty) {
-            val sign = if (order.orderType == OrderType.BUY) -1 else 1
-            amount * sign
-          } else 0L
+        def amountInWaves(price: Long, amount: Long, order: Order): Long = {
+          if (order.getSpendAssetId.isEmpty) -order.getSpendAmount(price, amount).get
+          else if (order.getReceiveAssetId.isEmpty) order.getReceiveAmount(price, amount).get
+          else 0L
         }
 
         val (om, matcher) = x
@@ -584,10 +602,10 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val buyer = om.buyOrder.senderPublicKey
         val seller = om.sellOrder.senderPublicKey
 
-        val buyerAcc1 = AssetAcc(buyer, pair.first)
-        val buyerAcc2 = AssetAcc(buyer, pair.second)
-        val sellerAcc1 = AssetAcc(seller, pair.first)
-        val sellerAcc2 = AssetAcc(seller, pair.second)
+        val buyerAcc1 = AssetAcc(buyer, pair.priceAsset)
+        val buyerAcc2 = AssetAcc(buyer, pair.amountAsset)
+        val sellerAcc1 = AssetAcc(seller, pair.priceAsset)
+        val sellerAcc2 = AssetAcc(seller, pair.amountAsset)
         val buyerFeeAcc = AssetAcc(buyer, None)
         val sellerFeeAcc = AssetAcc(seller, None)
         val matcherFeeAcc = AssetAcc(om.buyOrder.matcherPublicKey, None)
@@ -606,8 +624,8 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         newSellerBal1 should be(sellerBal1 + (BigInt(om.amount) * om.price / Order.PriceConstant).toLong - feeInAsset(om.sellMatcherFee, sellerAcc1.assetId))
         newSellerBal2 should be(sellerBal2 - om.amount -
           feeInAsset(om.sellMatcherFee, sellerAcc2.assetId))
-        newBuyerFeeBal should be(buyerFeeBal - om.buyMatcherFee + amountInWaves((BigInt(om.amount) * om.price / Order.PriceConstant).toLong, om.buyOrder))
-        newSellerFeeBal should be(sellerFeeBal - om.sellMatcherFee + amountInWaves((BigInt(om.amount) * om.price / Order.PriceConstant).toLong, om.sellOrder))
+        newBuyerFeeBal should be(buyerFeeBal - om.buyMatcherFee + amountInWaves(om.price, om.amount, om.buyOrder))
+        newSellerFeeBal should be(sellerFeeBal - om.sellMatcherFee + amountInWaves(om.price, om.amount, om.sellOrder))
         newMatcherFeeBal should be(matcherFeeBal + om.buyMatcherFee + om.sellMatcherFee - om.fee)
       }
     }

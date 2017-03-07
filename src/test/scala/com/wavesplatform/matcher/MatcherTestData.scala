@@ -9,7 +9,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.settings.ChainParameters
 import scorex.transaction._
-import scorex.transaction.assets.exchange.{AssetPair, Order}
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState, StoredState}
 import scorex.transaction.state.database.state.extension._
 import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreLeaseExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
@@ -50,6 +50,8 @@ trait MatcherTestData {
       |    snapshots-directory: ${waves.directory}"/snapshots"
       |    snapshots-interval: 1d
       |    max-open-orders: 1000
+      |    price-assets: ["BASE1", "BASE2"]
+      |    predefined-pairs: [{amountAsset = "BASE2", priceAsset = "BASE1"}]
       |  }
       |}
     """.stripMargin).withFallback(ConfigFactory.load()).resolve()
@@ -84,15 +86,18 @@ trait MatcherTestData {
 
   def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price*Order.PriceConstant, amount))._1
 
+  val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
+
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     pair <- assetPairGen
+    orderType <- orderTypeGenerator
     price: Long <- maxWavesAnountGen
     amount: Long <- maxWavesAnountGen
     timestamp: Long <- createdTimeGen
     expiration: Long <- maxTimeGen
     matcherFee: Long <- maxWavesAnountGen
-  } yield (Order(sender, MatcherAccount, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee), sender)
+  } yield (Order(sender, MatcherAccount, pair, orderType, price, amount, timestamp, expiration, matcherFee), sender)
 
   val buyLimitOrderGenerator: Gen[BuyLimitOrder] = for {
     sender: PrivateKeyAccount <- accountGen

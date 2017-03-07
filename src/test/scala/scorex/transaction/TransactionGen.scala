@@ -1,7 +1,6 @@
 package scorex.transaction
 
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.Matchers._
 import org.scalatest.enablers.Containing
 import org.scalatest.matchers.{BeMatcher, MatchResult}
 import scorex.account.PrivateKeyAccount
@@ -139,16 +138,19 @@ trait TransactionGen {
   val amountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
   val feeAmountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
 
+  val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
+
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
     pair: AssetPair <- assetPairGen
+    orderType: OrderType <- orderTypeGenerator
     price: Long <- priceGen
     amount: Long <- amountGen
     timestamp: Long <- timestampGen
     expiration: Long <- maxTimeGen
     matcherFee: Long <- feeAmountGen
-  } yield (Order(sender, matcher, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee), sender)
+  } yield (Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee), sender)
 
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -171,6 +173,22 @@ trait TransactionGen {
     (issue, issue2, reissue, burn)
   }
 
+  val issueWithInvalidReissuesGenerator: Gen[(IssueTransaction, ReissueTransaction, ReissueTransaction)] = for {
+    sender: PrivateKeyAccount <- accountGen
+    assetName <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+    description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
+    quantity <- positiveLongGen
+    decimals <- Gen.choose(0: Byte, 8: Byte)
+    fee <- Gen.choose(1L, 2000000L)
+    iFee <- Gen.choose(IssueTransaction.MinFee, 2 * IssueTransaction.MinFee)
+    timestamp <- positiveLongGen
+  } yield {
+    val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).right.get
+    val reissue1 = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable = false, fee, timestamp).right.get
+    val reissue2 = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable = true, fee, timestamp + 1).right.get
+    (issue, reissue1, reissue2)
+  }
+
   val issueGenerator: Gen[IssueTransaction] = issueReissueGenerator.map(_._1)
   val reissueGenerator: Gen[ReissueTransaction] = issueReissueGenerator.map(_._3)
   val burnGenerator: Gen[BurnTransaction] = issueReissueGenerator.map(_._4)
@@ -179,12 +197,13 @@ trait TransactionGen {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
     pair <- assetPairGen
+    orderType <- orderTypeGenerator
     price: Long <- Arbitrary.arbitrary[Long]
     amount: Long <- Arbitrary.arbitrary[Long]
     timestamp: Long <- Arbitrary.arbitrary[Long]
     expiration: Long <- Arbitrary.arbitrary[Long]
     matcherFee: Long <- Arbitrary.arbitrary[Long]
-  } yield Order(sender, matcher, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee)
+  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
 
   val orderMatchGenerator: Gen[(ExchangeTransaction, PrivateKeyAccount)] = for {
     sender1: PrivateKeyAccount <- accountGen

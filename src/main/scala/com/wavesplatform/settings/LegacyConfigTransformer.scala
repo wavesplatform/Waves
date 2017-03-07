@@ -84,11 +84,6 @@ object LegacyConfigTransformer {
     "allowedGenerationTimeFromLastBlockInterval" -> "miner.interval-after-last-block-then-generation-is-allowed",
     "tflikeScheduling"     -> "miner.tf-like-scheduling",
 
-    "matcher.account"     -> "matcher.account",
-    "matcher.host"        -> "matcher.bind-address",
-    "matcher.port"        -> "matcher.port",
-    "matcher.minOrderFee" -> "matcher.order-match-tx-fee",
-
     "scoreBroadcastDelay"        -> "synchronization.score-broadcast-interval",
     "historySynchronizerTimeout" -> "synchronization.synchronization-timeout",
     "maxRollback"                -> "synchronization.max-rollback",

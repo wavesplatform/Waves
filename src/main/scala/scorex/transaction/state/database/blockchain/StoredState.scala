@@ -9,6 +9,7 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.extension._
@@ -158,6 +159,13 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     }.values.flatten.toList.sortWith(_.timestamp > _.timestamp).take(limit)
   }
 
+  def validateWithBlockTxs(t: Transaction, txs: Seq[Transaction], height: Int): Either[ValidationError, Transaction] = {
+    validators.toStream.map(_.validateWithBlockTxs(this, t, txs, height)).find(_.isLeft) match {
+      case Some(Left(e)) => Left(e)
+      case _ => Right(t)
+    }
+  }
+
   /**
     * Returns sequence of valid transactions
     */
@@ -235,8 +243,11 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       validTxs
     }
 
-    filterValidTransactionsByState(filteredFromFuture)
+    val validWithBlockTxs = filteredFromFuture.filter(t => validateWithBlockTxs(t, trans, height).isRight)
+
+    filterValidTransactionsByState(validWithBlockTxs)
   }
+
 
   private[blockchain] def calcNewBalances(trans: Seq[Transaction],
                                           fees: Map[AssetAcc, (AccState, Reasons)],

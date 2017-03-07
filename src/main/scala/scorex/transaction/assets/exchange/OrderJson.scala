@@ -42,18 +42,32 @@ object OrderJson {
     }
   }
 
-  def readOrder(sender: PublicKeyAccount, matcher: PublicKeyAccount, spendAssetID: Option[Option[Array[Byte]]],
-                receiveAssetID: Option[Option[Array[Byte]]], price: Long, amount: Long, timestamp: Long,
-                expiration: Long, matcherFee: Long, signature: Option[Array[Byte]]): Order = {
-    Order(sender, matcher, spendAssetID.flatten, receiveAssetID.flatten, price, amount, timestamp, expiration,
+  def readOrder(sender: PublicKeyAccount, matcher: PublicKeyAccount, assetPair: AssetPair, orderType: OrderType,
+                price: Long, amount: Long, timestamp: Long, expiration: Long,
+                matcherFee: Long, signature: Option[Array[Byte]]): Order = {
+    Order(sender, matcher, assetPair, orderType, price, amount, timestamp, expiration,
       matcherFee, signature.getOrElse(Array()))
   }
+
+  def readAssetPair(amountAsset: Option[Option[Array[Byte]]], priceAsset: Option[Option[Array[Byte]]]): AssetPair = {
+    AssetPair(amountAsset.flatten, priceAsset.flatten)
+  }
+
+  implicit val assetPairReads: Reads[AssetPair] = {
+    val r = (JsPath \ "amountAsset").readNullable[Option[Array[Byte]]] and
+      (JsPath \ "priceAsset").readNullable[Option[Array[Byte]]]
+    r(readAssetPair _)
+  }
+
+  implicit val orderTypeReads: Reads[OrderType] =
+    JsPath.read[String].map(OrderType.apply)
+
 
   implicit val orderReads: Reads[Order] = {
     val r = (JsPath \ "senderPublicKey").read[PublicKeyAccount] and
       (JsPath \ "matcherPublicKey").read[PublicKeyAccount] and
-      (JsPath \ "spendAssetId").readNullable[Option[Array[Byte]]] and
-      (JsPath \ "receiveAssetId").readNullable[Option[Array[Byte]]] and
+      (JsPath \ "assetPair").read[AssetPair] and
+      (JsPath \ "orderType").read[OrderType] and
       (JsPath \ "price").read[Long] and
       (JsPath \ "amount").read[Long] and
       (JsPath \ "timestamp").read[Long] and
