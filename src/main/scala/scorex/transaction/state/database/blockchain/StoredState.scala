@@ -159,12 +159,17 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     }.values.flatten.toList.sortWith(_.timestamp > _.timestamp).take(limit)
   }
 
-  def validateWithBlockTxs(t: Transaction, txs: Seq[Transaction], height: Int): Either[ValidationError, Transaction] = {
-    validators.toStream.map(_.validateWithBlockTxs(this, t, txs, height)).find(_.isLeft) match {
-      case Some(Left(e)) => Left(e)
-      case _ => Right(t)
-    }
+  def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Transaction] = {
+    val validator = new OrderMatchStoredState(storage)
+
+    txs.foldLeft(Seq.empty[Transaction]){
+      case (seq,tx) => validator.validateWithBlockTxs(this, tx, seq, height) match {
+        case Left(err) => seq
+        case Right(t) => t +: seq
+      }
+    }.reverse
   }
+
 
   /**
     * Returns sequence of valid transactions
@@ -243,7 +248,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       validTxs
     }
 
-    val validWithBlockTxs = filteredFromFuture.filter(t => validateWithBlockTxs(t, trans, height).isRight)
+    val validWithBlockTxs = validateExchangeTxs(filteredFromFuture, height)
 
     filterValidTransactionsByState(validWithBlockTxs)
   }
