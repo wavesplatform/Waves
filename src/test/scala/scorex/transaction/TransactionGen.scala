@@ -1,7 +1,6 @@
 package scorex.transaction
 
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.Matchers._
 import org.scalatest.enablers.Containing
 import org.scalatest.matchers.{BeMatcher, MatchResult}
 import scorex.account.PrivateKeyAccount
@@ -139,16 +138,19 @@ trait TransactionGen {
   val amountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
   val feeAmountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
 
+  val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
+
   val orderGenerator: Gen[(Order, PrivateKeyAccount)] = for {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
     pair: AssetPair <- assetPairGen
+    orderType: OrderType <- orderTypeGenerator
     price: Long <- priceGen
     amount: Long <- amountGen
     timestamp: Long <- timestampGen
     expiration: Long <- maxTimeGen
     matcherFee: Long <- feeAmountGen
-  } yield (Order(sender, matcher, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee), sender)
+  } yield (Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee), sender)
 
   val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -195,12 +197,13 @@ trait TransactionGen {
     sender: PrivateKeyAccount <- accountGen
     matcher: PrivateKeyAccount <- accountGen
     pair <- assetPairGen
+    orderType <- orderTypeGenerator
     price: Long <- Arbitrary.arbitrary[Long]
     amount: Long <- Arbitrary.arbitrary[Long]
     timestamp: Long <- Arbitrary.arbitrary[Long]
     expiration: Long <- Arbitrary.arbitrary[Long]
     matcherFee: Long <- Arbitrary.arbitrary[Long]
-  } yield Order(sender, matcher, pair.first, pair.second, price, amount, timestamp, expiration, matcherFee)
+  } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
 
   val orderMatchGenerator: Gen[(ExchangeTransaction, PrivateKeyAccount)] = for {
     sender1: PrivateKeyAccount <- accountGen

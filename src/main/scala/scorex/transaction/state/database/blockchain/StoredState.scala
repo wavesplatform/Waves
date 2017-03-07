@@ -10,6 +10,7 @@ import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
 import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.extension._
@@ -156,6 +157,19 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = txs.map(t => validateAgainstState(t, height))
 
+  def validateWithBlockTxs(t: Transaction, txs: Seq[Transaction], height: Int): Either[ValidationError, Transaction] = {
+    validators.toStream.map(_.validateWithBlockTxs(this, t, txs, height)).find(_.isLeft) match {
+      case Some(Left(e)) => Left(e)
+      case _ => Right(t)
+    }
+  }
+
+  /**
+    * Returns sequence of valid transactions
+    */
+  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
+    val height = heightOpt.getOrElse(storage.stateHeight)
+
   private def filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
     if (allowInvalidPaymentTransactionsByTimestamp) {
@@ -228,6 +242,10 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     validatedTxs
   }
 
+    val validWithBlockTxs = filteredFromFuture.filter(t => validateWithBlockTxs(t, trans, height).isRight)
+
+    filterValidTransactionsByState(validWithBlockTxs)
+  }
 
   implicit class SeqEitherHelper[L, R](eis: Seq[Either[L, R]]) {
     def segregate(): (Seq[L], Seq[R]) = (eis.filter(_.isLeft).map(_.left.get),

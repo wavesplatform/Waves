@@ -2,12 +2,10 @@ package scorex.transaction.state.database.state.extension
 
 import scorex.crypto.encode.Base58
 import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.storage.{OrderMatchStorageI, StateStorageI}
-import scorex.transaction.{Transaction, ValidationError}
 
 class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends Validator {
 
@@ -78,6 +76,17 @@ class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) exte
       parseTxSeq(storage.getOrderMatchTxByDay(calcStartDay(order.expiration), Base58.encode(order.id))
         .getOrElse(emptyTxIdSeq))
     } else Set.empty[ExchangeTransaction]
+  }
+
+  override def validateWithBlockTxs(storedState: StoredState, tx: Transaction,
+                                    blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = tx match {
+    case om: ExchangeTransaction =>
+      val thisExchanges: Set[ExchangeTransaction] = blockTxs.collect {
+        case a: ExchangeTransaction if a != tx && (a.buyOrder == om.buyOrder || a.sellOrder == om.sellOrder) => a
+      }.toSet
+
+      OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om) ++ thisExchanges)
+    case _ => Right(tx)
   }
 }
 

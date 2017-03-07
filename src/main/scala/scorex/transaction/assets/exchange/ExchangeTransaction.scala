@@ -5,7 +5,6 @@ import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.BytesSerializable
 import scorex.transaction.TransactionParser.TransactionType
@@ -64,10 +63,10 @@ object ExchangeTransaction {
       val sellFeeChange = Seq(BalanceChange(AssetAcc(sellOrder.senderPublicKey, None), -sellMatcherFee))
 
       val exchange = Seq(
-        (buyOrder.senderPublicKey, (buyOrder.spendAssetId, -buyOrder.getSpendAmount(price, amount).get)),
-        (buyOrder.senderPublicKey, (buyOrder.receiveAssetId, buyOrder.getReceiveAmount(price, amount).get)),
-        (sellOrder.senderPublicKey, (sellOrder.receiveAssetId, sellOrder.getReceiveAmount(price, amount).get)),
-        (sellOrder.senderPublicKey, (sellOrder.spendAssetId, -sellOrder.getSpendAmount(price, amount).get))
+        (buyOrder.senderPublicKey, (buyOrder.assetPair.priceAsset, -buyOrder.getSpendAmount(price, amount).get)),
+        (buyOrder.senderPublicKey, (buyOrder.assetPair.amountAsset, buyOrder.getReceiveAmount(price, amount).get)),
+        (sellOrder.senderPublicKey, (sellOrder.assetPair.priceAsset, sellOrder.getReceiveAmount(price, amount).get)),
+        (sellOrder.senderPublicKey, (sellOrder.assetPair.amountAsset, -sellOrder.getSpendAmount(price, amount).get))
       )
 
       buyFeeChange ++ sellFeeChange ++ matcherChange ++
@@ -133,7 +132,6 @@ object ExchangeTransaction {
   }
 
   def parseTail(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {
-    import EllipticCurveImpl._
     var from = 0
     val o1Size = Ints.fromByteArray(bytes.slice(from, from + 4));
     from += 4

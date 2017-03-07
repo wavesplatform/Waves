@@ -58,7 +58,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(buyOrder = buy.copy(matcherPublicKey = sender2)) shouldBe an[Left[_, _]]
         create(sellOrder = buy.copy(matcherPublicKey = sender2)) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.copy(spendAssetId = None), sellOrder = sell.copy(receiveAssetId = Some(Array(1: Byte)))) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.copy(assetPair = buy.assetPair.copy(amountAsset = None)),
+          sellOrder = sell.copy(assetPair = sell.assetPair.copy(priceAsset = Some(Array(1:Byte))))) shouldBe an[Left[_, _]]
         create(buyOrder = buy.copy(expiration = 1L)) shouldBe an[Left[_, _]]
         create(price = buy.price + 1) shouldBe an[Left[_, _]]
         create(price = sell.price - 1) shouldBe an[Left[_, _]]

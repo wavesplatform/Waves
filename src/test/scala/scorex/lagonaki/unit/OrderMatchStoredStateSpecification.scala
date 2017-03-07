@@ -96,8 +96,8 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   }
 
   private def getBalances(acc: Account, pair: AssetPair) = {
-    (state.assetBalance(AssetAcc(acc, None)), state.assetBalance(AssetAcc(acc, pair.first)),
-      state.assetBalance(AssetAcc(acc, pair.second)))
+    (state.assetBalance(AssetAcc(acc, None)), state.assetBalance(AssetAcc(acc, pair.priceAsset)),
+      state.assetBalance(AssetAcc(acc, pair.amountAsset)))
   }
 
   private def initPairWithBalances(): (AssetPair, PrivateKeyAccount, PrivateKeyAccount) = {
@@ -105,8 +105,8 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val eur = addInitialAssets(acc2, "eur", 1000L)
 
     val pair = AssetPair(usd, eur)
-    val buyAcc = if (ByteArrayExtension.sameOption(usd, pair.first)) acc1 else acc2
-    val sellAcc = if (ByteArrayExtension.sameOption(usd, pair.first)) acc2 else acc1
+    val buyAcc = if (ByteArrayExtension.sameOption(usd, pair.priceAsset)) acc1 else acc2
+    val sellAcc = if (ByteArrayExtension.sameOption(usd, pair.priceAsset)) acc2 else acc1
     (pair, buyAcc, sellAcc)
   }
 
