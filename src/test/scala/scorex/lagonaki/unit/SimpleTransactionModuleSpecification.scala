@@ -142,6 +142,8 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
   }
 
   test("packUnconfirmed() packs txs in correct order") {
+    transactionModule.utxStorage.all().foreach(transactionModule.utxStorage.remove)
+
     val correctSeq = Seq(
       PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp + 2).right.get,
       PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp + 1).right.get,
