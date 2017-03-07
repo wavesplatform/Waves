@@ -19,4 +19,7 @@ class IncludedValidator(storage: StateStorageI, requirePaymentUniqueId: Long) ex
   override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = {
     storage.putTransaction(tx, height)
   }
+
+  override def validateWithBlockTxs(storedState: StoredState,
+                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = Right(tx)
 }

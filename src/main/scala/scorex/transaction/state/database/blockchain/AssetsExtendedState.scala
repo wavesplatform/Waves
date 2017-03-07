@@ -32,6 +32,9 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     case _ =>
   }
 
+  override def validateWithBlockTxs(storedState: StoredState,
+                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = Right(tx)
+
   private def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[StateValidationError, SignedTransaction] = {
     storage.getTransaction(assetId) match {
       case None => Left(StateValidationError("Referenced assetId not found"))

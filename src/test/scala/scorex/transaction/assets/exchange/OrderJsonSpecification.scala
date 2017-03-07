@@ -19,8 +19,11 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         {
           "senderPublicKey": "${pubKeyStr}",
           "matcherPublicKey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
-          "spendAssetId": "29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b",
-          "receiveAssetId": "GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44",
+          "assetPair": {
+            "amountAsset": "29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b",
+            "priceAsset": "GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44"
+          },
+          "orderType": "buy",
           "amount": 0,
           "matcherFee": 0,
           "price": 0,
@@ -36,8 +39,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         val o = s.get
         o.senderPublicKey shouldBe new PublicKeyAccount(pk.publicKey)
         o.matcherPublicKey shouldBe new PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
-        o.spendAssetId.get shouldBe Base58.decode("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
-        o.receiveAssetId.get shouldBe Base58.decode("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
+        o.assetPair.amountAsset.get shouldBe Base58.decode("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
+        o.assetPair.priceAsset.get shouldBe Base58.decode("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
         o.price shouldBe 0
         o.amount shouldBe 0
         o.matcherFee shouldBe 0
@@ -111,6 +114,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
           fail("Error: " + JsError.toJson(e).toString())
         case s: JsSuccess[Order] =>
           val o = s.get
+          o.json.toString() should be (json.toString())
           o.signatureValid should be(true)
       }
     }
@@ -125,8 +129,11 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         {
           "senderPublicKey": "${pubKeyStr}",
           "matcherPublicKey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
-          "spendAssetId": "",
-          "receiveAssetId": "",
+           "assetPair": {
+             "amountAsset": "",
+             "priceAsset": ""
+           },
+          "orderType": "sell",
           "amount": 0,
           "matcherFee": 0,
           "price": 0,
@@ -140,8 +147,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         fail("Error: " + JsError.toJson(e).toString())
       case s: JsSuccess[Order] =>
         val o = s.get
-        o.spendAssetId shouldBe empty
-        o.receiveAssetId shouldBe empty
+        o.assetPair.amountAsset shouldBe empty
+        o.assetPair.priceAsset shouldBe empty
 
     }
   }

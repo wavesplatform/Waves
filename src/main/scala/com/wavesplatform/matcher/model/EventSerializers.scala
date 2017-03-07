@@ -103,7 +103,7 @@ object MatcherSerializer {
   )
 
   private def mkOrderBookCreated(a1: String, a2: String) = OrderBookCreated(AssetPair.createAssetPair(a1, a2).get)
-  private def orderBookToPair(obc: OrderBookCreated) = (obc.pair.firstStr, obc.pair.secondStr)
+  private def orderBookToPair(obc: OrderBookCreated) = (obc.pair.amountAssetStr, obc.pair.priceAssetStr)
 
   implicit val orderBookCreatedFormat: Format[OrderBookCreated] = (
     (__ \ "a1").format[String] and

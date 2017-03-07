@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import akka.persistence.PersistentActor
+import akka.persistence.{PersistentActor, RecoveryCompleted}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{GetOrderBookResponse, OrderBookRequest}
@@ -12,12 +12,11 @@ import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{AssetId, TransactionModule}
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.collection.mutable
 import scala.language.reflectiveCalls
-import scala.util.Try
 
 class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSettings,
                    transactionModule: TransactionModule
@@ -26,22 +25,37 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSe
   import MatcherActor._
 
   val openMarkets: mutable.Buffer[MarketData] = mutable.Buffer.empty[MarketData]
+  val tradedPairs: mutable.Buffer[AssetPair] = mutable.Buffer.empty[AssetPair]
 
   def createOrderBook(pair: AssetPair): ActorRef = {
     def getAssetName(asset: Option[AssetId]) = asset.map(storedState.assetsExtension.getAssetName).getOrElse(AssetPair.WavesName)
 
-    openMarkets += MarketData(pair, getAssetName(pair.first), getAssetName(pair.second), NTP.correctedTime())
+    openMarkets += MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime())
+    tradedPairs += pair
 
     context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule),
       OrderBookActor.name(pair))
   }
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
-    Try(msg.assetPair).isSuccess :| "Invalid AssetPair" &&
-      msg.assetPair.first.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
-        s"Unknown Asset ID: ${msg.assetPair.firstStr}" &&
-      msg.assetPair.second.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
-        s"Unknown Asset ID: ${msg.assetPair.secondStr}"
+    msg.assetPair.isValid :| "Invalid AssetPair" &&
+      msg.assetPair.priceAsset.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
+        s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
+      msg.assetPair.amountAsset.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
+        s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}" &&
+      checkPairOrdering(msg.assetPair)
+  }
+
+  def checkPairOrdering(aPair: AssetPair): Validation = {
+    val reversePair = AssetPair(aPair.priceAsset, aPair.amountAsset)
+
+    val isCorrectOrder = if (tradedPairs.contains(aPair)) true
+      else if (tradedPairs.contains(reversePair)) false
+      else if (settings.priceAssets.contains(aPair.priceAssetStr) &&
+        !settings.priceAssets.contains(aPair.amountAssetStr)) true
+      else ByteArrayExtension.compare(aPair.priceAsset, aPair.amountAsset) < 0
+
+    isCorrectOrder :|  s"Invalid AssetPair ordering, should be reversed: $reversePair"
   }
 
   def createAndForward(order: Order): Unit = {
@@ -82,10 +96,19 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSe
       }
   }
 
+  def initPredefinedPairs(): Unit = {
+    settings.predefinedPairs.diff(tradedPairs).foreach(pair =>
+      createOrderBook(pair)
+    )
+  }
+
   override def receiveRecover: Receive = {
     case OrderBookCreated(pair) =>
       context.child(OrderBookActor.name(pair))
         .getOrElse(createOrderBook(pair))
+    case RecoveryCompleted =>
+      log.info("MatcherActor - Recovery completed!")
+      initPredefinedPairs()
   }
 
   override def receiveCommand: Receive = forwardToOrderBook
@@ -106,10 +129,10 @@ object MatcherActor {
 
   case class GetMarketsResponse(publicKey: Array[Byte], markets: Seq[MarketData]) extends MatcherResponse {
     def getMarketsJs: JsValue = JsArray(markets.map(m => Json.obj(
-      "asset1Id" -> m.pair.firstStr,
-      "asset1Name" -> m.firstAssetName,
-      "asset2Id" -> m.pair.secondStr,
-      "asset2Name" -> m.secondAssetName,
+      "amountAsset" -> m.pair.amountAssetStr,
+      "amountAssetName" -> m.amountAssetName,
+      "priceAsset" -> m.pair.priceAssetStr,
+      "priceAssetName" -> m.priceAssetName,
       "created" -> m.created
     ))
     )
@@ -122,6 +145,6 @@ object MatcherActor {
     def code: StatusCode = StatusCodes.OK
   }
 
-  case class MarketData(pair: AssetPair, firstAssetName: String, secondAssetName: String, created: Long)
+  case class MarketData(pair: AssetPair, amountAssetName: String, priceAssetName: String, created: Long)
 
 }
