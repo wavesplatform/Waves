@@ -10,7 +10,6 @@ import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{AssetId, State, TransactionModule}
 import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging}
 import scorex.wallet.Wallet
@@ -39,9 +38,9 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
     msg.assetPair.isValid :| "Invalid AssetPair" &&
-      msg.assetPair.priceAsset.map(storedState.getAssetQuantity).forall(_ > 0) :|
+      msg.assetPair.priceAsset.map(storedState.totalAssetQuantity).forall(_ > 0) :|
         s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
-      msg.assetPair.amountAsset.map(storedState.getAssetQuantity).forall(_ > 0) :|
+      msg.assetPair.amountAsset.map(storedState.totalAssetQuantity).forall(_ > 0) :|
         s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}" &&
       checkPairOrdering(msg.assetPair)
   }

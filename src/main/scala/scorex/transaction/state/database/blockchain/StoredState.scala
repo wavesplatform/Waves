@@ -10,7 +10,6 @@ import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.extension._
@@ -164,11 +163,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     }
   }
 
-  /**
-    * Returns sequence of valid transactions
-    */
-  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
-    val height = heightOpt.getOrElse(storage.stateHeight)
+  private def validateAgainstReplay(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] =
+    txs.map(validateWithBlockTxs(_, txs, height))
+
 
   private def filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
@@ -242,11 +239,6 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     validatedTxs
   }
 
-    val validWithBlockTxs = filteredFromFuture.filter(t => validateWithBlockTxs(t, trans, height).isRight)
-
-    filterValidTransactionsByState(validWithBlockTxs)
-  }
-
   implicit class SeqEitherHelper[L, R](eis: Seq[Either[L, R]]) {
     def segregate(): (Seq[L], Seq[R]) = (eis.filter(_.isLeft).map(_.left.get),
       eis.filter(_.isRight).map(_.right.get))
@@ -257,9 +249,13 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     val (err0, validOneByOne) = validAgainstStateOneByOne(height, trans).segregate()
     val (err1, validAgainstConsecutivePayments) = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).segregate()
     val (err2, filteredFarFuture) = filterTransactionsFromFuture(validAgainstConsecutivePayments, blockTime).segregate()
+
+
     val allowUnissuedAssets = filteredFarFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
-    val (err3, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredFarFuture).segregate()
-    (err0 ++ err1 ++ err2 ++ err3, result)
+
+    val (err3, filteredReplays) = validateAgainstReplay(height, filteredFarFuture).segregate()
+    val (err4, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredReplays).segregate()
+    (err0 ++ err1 ++ err2 ++ err3 ++ err4, result)
   }
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {

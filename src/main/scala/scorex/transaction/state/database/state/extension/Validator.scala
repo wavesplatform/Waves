@@ -9,6 +9,6 @@ trait Validator {
 
   def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit
 
-  def validateWithBlockTxs(storedState: StoredState, tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction]
+  def validateWithBlockTxs(storedState: StoredState, tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[TransactionValidationError, Transaction]
 
 }

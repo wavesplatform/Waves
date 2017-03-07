@@ -32,7 +32,7 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
   }
 
   override def validateWithBlockTxs(storedState: StoredState,
-                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = Right(tx)
+                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[TransactionValidationError, Transaction] = Right(tx)
 
   private def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[TransactionValidationError, SignedTransaction] = {
     storage.getTransaction(assetId) match {

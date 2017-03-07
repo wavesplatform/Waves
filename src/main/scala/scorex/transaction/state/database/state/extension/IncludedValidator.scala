@@ -21,5 +21,5 @@ class IncludedValidator(storage: StateStorageI, requirePaymentUniqueId: Long) ex
   }
 
   override def validateWithBlockTxs(storedState: StoredState,
-                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = Right(tx)
+                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[TransactionValidationError, Transaction] = Right(tx)
 }

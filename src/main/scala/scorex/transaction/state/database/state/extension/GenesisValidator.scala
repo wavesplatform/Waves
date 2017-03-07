@@ -15,5 +15,5 @@ class GenesisValidator extends Validator {
   override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = {}
 
   override def validateWithBlockTxs(storedState: StoredState,
-                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = Right(tx)
+                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[TransactionValidationError, Transaction] = Right(tx)
 }
