@@ -30,7 +30,7 @@ import scorex.crypto.encode.Base58
 
 class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
-  val pk: PrivateKeyAccount = new PrivateKeyAccount(Array.fill(32)(Random.nextInt(100).toByte))
+  val pk: PrivateKeyAccount = PrivateKeyAccount(Array.fill(32)(Random.nextInt(100).toByte))
 
   private val localConfig = ConfigFactory.parseString(
     s"""
@@ -76,7 +76,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   lazy val app = stub[TestAppMock]
 
   override lazy protected val actorRef: ActorRef = system.actorOf(Props(classOf[Coordinator], app))
-  val gen = new PrivateKeyAccount(Array(0.toByte))
+  val gen = PrivateKeyAccount(Array(0.toByte))
   var score: Int = 10000
 
   def createBlock(reference: Array[Byte]): Block = {

@@ -77,6 +77,8 @@ val debianSettings = Seq(
       "waves"
     } else if (network == "testnet") {
       "waves-testnet"
+    } else if (network == "devnet") {
+      "waves-devnet"
     } else {
       throw new IllegalStateException("invalid network")
     }
@@ -96,16 +98,18 @@ val debianSettings = Seq(
          |chown -R ${packageName.value}:${packageName.value} /etc/${packageName.value}.conf &&
          |chown -R ${packageName.value}:${packageName.value} /usr/share/${packageName.value} &&
          |chown -R ${packageName.value}:${packageName.value} /home/${packageName.value} &&
-         |test -f /etc/${packageName.value}.json &&
+         |(! test -f /etc/${packageName.value}.json ||
          |java -cp "/usr/share/${packageName.value}/lib/*" com.wavesplatform.settings.LegacyConfigTransformer /etc/${packageName.value}.json > /etc/${packageName.value}.conf &&
-         |rm -f /etc/${packageName.value}.json}""".stripMargin),
+         |rm -f /etc/${packageName.value}.json})""".stripMargin),
   debianPackageDependencies in Debian += "java8-runtime-headless",
   mappings in Universal ++= {
     if (network == "mainnet") {
       Seq((baseDirectory in root).value / "waves-mainnet.conf" -> "settings.conf.default")
     } else if (network == "testnet") {
       Seq((baseDirectory in root).value / "waves-testnet.conf" -> "settings.conf.default")
-    } else {
+    } else if (network == "devnet") {
+      Seq((baseDirectory in root).value / "waves-devnet.conf" -> "settings.conf.default")
+    }else {
       throw new IllegalStateException("invalid network")
     }
   },

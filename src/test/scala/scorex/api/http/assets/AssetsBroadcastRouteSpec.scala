@@ -9,16 +9,20 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
-import scorex.transaction.{Transaction, TransactionModule}
+import scorex.transaction.{Transaction, TransactionModule, ValidationError}
 
 
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
   private val settings = RestAPISettings.fromConfig(ConfigFactory.load())
 
-  "returns StateCheckFiled when state validation fails" - {
+  "returns StateCheckFiled" - {
+
     val stmMock = {
       val m = mock[TransactionModule]
-      (m.onNewOffchainTransaction _).expects(*).onCall { _: Transaction => false } anyNumberOfTimes()
+      (m.onNewOffchainTransaction(_: Transaction))
+        .expects(*)
+        .onCall((t: Transaction) => Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo")))
+        .anyNumberOfTimes()
       m
     }
 
@@ -41,9 +45,11 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     def posting(url: String, v: JsValue) = Post(routePath(url), v) ~> route
 
-    forAll(vt) { (url, gen, transform) =>
-      forAll(gen) { t =>
-        posting(url, transform(t.json)) should produce(StateCheckFailed)
+    "when state validation fails" in {
+      forAll(vt) { (url, gen, transform) =>
+        forAll(gen) { (t: Transaction) =>
+          posting(url, transform(t.json)) should produce(StateCheckFailed(t, "foo"))
+        }
       }
     }
   }
@@ -54,29 +60,29 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     "issue transaction" in forAll(broadcastIssueReq) { ir =>
       def posting[A: Writes](v: A) = Post(routePath("issue"), v) ~> route
 
-      forAll(nonPositiveLong) { q => posting(ir.copy(fee = q)) should produce (InsufficientFee) }
-      forAll(nonPositiveLong) { q => posting(ir.copy(quantity = q)) should produce (NegativeAmount) }
-      forAll(invalidDecimals) { d => posting(ir.copy(decimals = d)) should produce (TooBigArrayAllocation) }
-      forAll(longDescription) { d => posting(ir.copy(description = d)) should produce (TooBigArrayAllocation) }
-      forAll(invalidName) { name => posting(ir.copy(name = name)) should produce (InvalidName) }
-      forAll(invalidBase58) { name => posting(ir.copy(name = name)) should produce (InvalidName) }
-      forAll(nonPositiveLong) { fee => posting(ir.copy(fee = fee)) should produce (InsufficientFee) }
+      forAll(nonPositiveLong) { q => posting(ir.copy(fee = q)) should produce(InsufficientFee) }
+      forAll(nonPositiveLong) { q => posting(ir.copy(quantity = q)) should produce(NegativeAmount) }
+      forAll(invalidDecimals) { d => posting(ir.copy(decimals = d)) should produce(TooBigArrayAllocation) }
+      forAll(longDescription) { d => posting(ir.copy(description = d)) should produce(TooBigArrayAllocation) }
+      forAll(invalidName) { name => posting(ir.copy(name = name)) should produce(InvalidName) }
+      forAll(invalidBase58) { name => posting(ir.copy(name = name)) should produce(InvalidName) }
+      forAll(nonPositiveLong) { fee => posting(ir.copy(fee = fee)) should produce(InsufficientFee) }
     }
 
     "reissue transaction" in forAll(broadcastReissueReq) { rr =>
       def posting[A: Writes](v: A) = Post(routePath("reissue"), v) ~> route
 
       // todo: invalid sender
-      forAll(nonPositiveLong) { q => posting(rr.copy(quantity = q)) should produce (NegativeAmount) }
-      forAll(nonPositiveLong) { fee => posting(rr.copy(fee = fee)) should produce (InsufficientFee) }
+      forAll(nonPositiveLong) { q => posting(rr.copy(quantity = q)) should produce(NegativeAmount) }
+      forAll(nonPositiveLong) { fee => posting(rr.copy(fee = fee)) should produce(InsufficientFee) }
     }
 
     "burn transaction" in forAll(broadcastBurnReq) { br =>
       def posting[A: Writes](v: A) = Post(routePath("burn"), v) ~> route
 
-      forAll(invalidBase58) { pk => posting(br.copy(senderPublicKey = pk)) should produce (InvalidAddress) }
-      forAll(nonPositiveLong) { q => posting(br.copy(quantity = q)) should produce (NegativeAmount) }
-      forAll(nonPositiveLong) { fee => posting(br.copy(fee = fee)) should produce (InsufficientFee) }
+      forAll(invalidBase58) { pk => posting(br.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
+      forAll(nonPositiveLong) { q => posting(br.copy(quantity = q)) should produce(NegativeAmount) }
+      forAll(nonPositiveLong) { fee => posting(br.copy(fee = fee)) should produce(InsufficientFee) }
     }
 
     "transfer transaction" in forAll(broadcastTransferReq) { tr =>

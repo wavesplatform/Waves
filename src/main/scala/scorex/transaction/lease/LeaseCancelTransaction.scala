@@ -2,13 +2,12 @@ package scorex.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.EllipticCurveImpl.SignatureLength
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
-import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction.{KeyLength, _}
+import scorex.transaction.TransactionParser.{KeyLength, _}
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -19,7 +18,7 @@ sealed trait LeaseCancelTransaction extends SignedTransaction {
   def leaseId: Array[Byte]
 }
 
-object LeaseCancelTransaction extends Deser[LeaseCancelTransaction] {
+object LeaseCancelTransaction {
 
   private case class LeaseCancelTransactionImpl(sender: PublicKeyAccount,
                                                 leaseId: Array[Byte],
@@ -49,13 +48,8 @@ object LeaseCancelTransaction extends Deser[LeaseCancelTransaction] {
 
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[LeaseCancelTransaction] = Try {
-    require(bytes.head == TransactionType.LeaseCancelTransaction.id)
-    parseTail(bytes.tail).get
-  }
-
   def parseTail(bytes: Array[Byte]): Try[LeaseCancelTransaction] = Try {
-    val sender = new PublicKeyAccount(bytes.slice(0, KeyLength))
+    val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
     val fee = Longs.fromByteArray(bytes.slice(KeyLength, KeyLength + 8))
     val timestamp = Longs.fromByteArray(bytes.slice(KeyLength + 8, KeyLength + 16))
     val leaseId = bytes.slice(KeyLength + 16, KeyLength + 16 + DigestSize)
@@ -71,9 +65,7 @@ object LeaseCancelTransaction extends Deser[LeaseCancelTransaction] {
                                timestamp: Long,
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseCancelTransactionImpl] = {
     if (leaseId.length != DigestSize) {
-      Left(ValidationError.CustomValidationError("Lease transaction id is invalid"))
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
+      Left(ValidationError.TransactionParameterValidationError("Lease transaction id is invalid"))
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

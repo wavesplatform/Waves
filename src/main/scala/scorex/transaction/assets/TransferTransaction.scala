@@ -8,7 +8,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
 
 sealed trait TransferTransaction extends SignedTransaction {
@@ -25,7 +25,7 @@ sealed trait TransferTransaction extends SignedTransaction {
   def attachment: Array[Byte]
 }
 
-object TransferTransaction extends Deser[TransferTransaction] {
+object TransferTransaction {
 
   val MaxAttachmentSize = 140
   val MaxAttachmentStringSize = base58Length(MaxAttachmentSize)
@@ -86,25 +86,20 @@ object TransferTransaction extends Deser[TransferTransaction] {
 
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
-    require(bytes.head == TransactionType.TransferTransaction.id)
-    parseTail(bytes.tail).get
-  }
-
   def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = Try {
     import EllipticCurveImpl._
 
     val signature = bytes.slice(0, SignatureLength)
     val txId = bytes(SignatureLength)
     require(txId == TransactionType.TransferTransaction.id.toByte, s"Signed tx id is not match")
-    val sender = new PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-    val (assetIdOpt, s0) = parseOption(bytes, SignatureLength + KeyLength + 1, AssetIdLength)
-    val (feeAssetIdOpt, s1) = parseOption(bytes, s0, AssetIdLength)
+    val sender = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
+    val (assetIdOpt, s0) = Deser.parseOption(bytes, SignatureLength + KeyLength + 1, AssetIdLength)
+    val (feeAssetIdOpt, s1) = Deser.parseOption(bytes, s0, AssetIdLength)
     val timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
     val amount = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
     val feeAmount = Longs.fromByteArray(bytes.slice(s1 + 16, s1 + 24))
-    val recipient = new Account(Base58.encode(bytes.slice(s1 + 24, s1 + 24 + Account.AddressLength)))
-    val (attachment, _) = parseArraySize(bytes, s1 + 24 + Account.AddressLength)
+    val recipient = Account.fromBytes(bytes.slice(s1 + 24, s1 + 24 + Account.AddressLength)).right.get
+    val (attachment, _) = Deser.parseArraySize(bytes, s1 + 24 + Account.AddressLength)
 
     TransferTransaction
       .create(assetIdOpt, sender, recipient, amount, timestamp, feeAssetIdOpt, feeAmount, attachment, signature)
@@ -120,16 +115,12 @@ object TransferTransaction extends Deser[TransferTransaction] {
                                feeAmount: Long,
                                attachment: Array[Byte],
                                signature: Option[Array[Byte]] = None) = {
-    if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
+    if (attachment.length > TransferTransaction.MaxAttachmentSize) {
       Left(ValidationError.TooBigArray)
     } else if (amount <= 0) {
       Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (Try(Math.addExact(amount, feeAmount)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

@@ -1,12 +1,11 @@
 package scorex.transaction.lease
 
-import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
@@ -19,7 +18,7 @@ sealed trait LeaseTransaction extends SignedTransaction {
   def recipient: Account
 }
 
-object LeaseTransaction extends Deser[LeaseTransaction] {
+object LeaseTransaction {
 
   private case class LeaseTransactionImpl(sender: PublicKeyAccount,
                                           amount: Long,
@@ -51,15 +50,10 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
 
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
-    require(bytes.head == TransactionType.LeaseTransaction.id)
-    parseTail(bytes.tail).get
-  }
-
   def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     import EllipticCurveImpl._
-    val sender = new PublicKeyAccount(bytes.slice(0, KeyLength))
-    val recipient = new Account(Base58.encode(bytes.slice(KeyLength, KeyLength + Account.AddressLength)))
+    val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
+    val recipient = Account.fromBytes(bytes.slice(KeyLength, KeyLength + Account.AddressLength)).right.get
     val quantityStart = KeyLength + Account.AddressLength
 
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
@@ -83,10 +77,6 @@ object LeaseTransaction extends Deser[LeaseTransaction] {
       Left(ValidationError.ToSelf)
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

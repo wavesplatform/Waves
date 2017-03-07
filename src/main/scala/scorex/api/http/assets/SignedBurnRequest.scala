@@ -4,7 +4,7 @@ import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.TypedTransaction.SignatureStringLength
+import scorex.transaction.TransactionParser.SignatureStringLength
 import scorex.transaction.{AssetIdStringLength, ValidationError}
 import scorex.transaction.assets.BurnTransaction
 

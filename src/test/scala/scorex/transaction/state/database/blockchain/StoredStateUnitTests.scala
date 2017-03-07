@@ -58,7 +58,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
   val state = StoredState.fromDB(db, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
-  val testAcc = new PrivateKeyAccount(scorex.utils.randomBytes(64))
+  val testAcc = PrivateKeyAccount(scorex.utils.randomBytes(64))
   val testAssetAcc = AssetAcc(testAcc, None)
   val testAdd = testAcc.address
 
@@ -74,7 +74,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     val trans = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
 
     val bts = trans.map(_.timestamp).max
-    val (time, result) = profile(state.validate(trans, blockTime = bts))
+    val (time, result) = profile(state.validate(trans, blockTime = bts)._2)
     time should be < 1000L
     result.size should be <= trans.size
   }
@@ -125,7 +125,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Validate transfer with too big amount") {
-    val recipient = new PrivateKeyAccount("recipient account".getBytes)
+    val recipient = PrivateKeyAccount("recipient account".getBytes)
 
     forAll(positiveLongGen, positiveLongGen) { (balance: Long, fee: Long) =>
       whenever(balance > fee) {
@@ -648,12 +648,12 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   def genTransfer(amount: Long, fee: Long): TransferTransaction = {
-    val recipient = new PrivateKeyAccount(scorex.utils.randomBytes())
+    val recipient = PrivateKeyAccount(scorex.utils.randomBytes())
     TransferTransaction.create(None, testAcc, recipient: Account, amount, getTimestamp, None, fee, Array()).right.get
   }
 
   def genPayment(amount: Long, fee: Long): PaymentTransaction = {
-    val recipient = new PrivateKeyAccount(scorex.utils.randomBytes())
+    val recipient = PrivateKeyAccount(scorex.utils.randomBytes())
     val time = getTimestamp
     PaymentTransaction.create(testAcc, recipient, amount, fee, time).right.get
   }

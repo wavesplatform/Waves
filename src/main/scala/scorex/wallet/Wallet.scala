@@ -7,6 +7,9 @@ import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
+import scorex.transaction.ValidationError
+import scorex.transaction.ValidationError.MissingSenderPrivateKey
+import scorex.transaction.state.database.state.Address
 import scorex.utils.{LogMVMapBuilder, ScorexLogging, randomBytes}
 
 import scala.collection.JavaConverters._
@@ -45,7 +48,7 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
   val seed: Array[Byte] = seedPersistence.get("seed")
 
   private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
-    val accounts = accountsPersistence.asScala.keys.map(k => accountsPersistence.get(k)).map(seed => new PrivateKeyAccount(seed))
+    val accounts = accountsPersistence.asScala.keys.map(k => accountsPersistence.get(k)).map(seed => PrivateKeyAccount(seed))
     TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
   }
 
@@ -88,6 +91,7 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
 
   def privateKeyAccount(address: String): Option[PrivateKeyAccount] = accountsCache.get(address)
 
+
   def close(): Unit = if (!database.isClosed) {
     database.commit()
     database.close()
@@ -105,9 +109,15 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
 
 object Wallet {
 
+  implicit class WalletExtension(w: Wallet) {
+    def findWallet(a: Address): Either[ValidationError, PrivateKeyAccount]
+    = w.privateKeyAccount(a).toRight[ValidationError](MissingSenderPrivateKey)
+  }
+
+
   def generateNewAccount(seed: Array[Byte], nonce: Int): PrivateKeyAccount = {
     val accountSeed = generateAccountSeed(seed, nonce)
-    new PrivateKeyAccount(accountSeed)
+    PrivateKeyAccount(accountSeed)
   }
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =

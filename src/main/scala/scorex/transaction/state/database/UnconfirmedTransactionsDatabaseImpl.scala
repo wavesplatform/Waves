@@ -1,7 +1,8 @@
 package scorex.transaction.state.database
 
 import com.wavesplatform.settings.UTXSettings
-import scorex.transaction.{Transaction, UnconfirmedTransactionsStorage}
+import scorex.transaction.ValidationError.{TransactionParameterValidationError, TransactionValidationError}
+import scorex.transaction.{Transaction, UnconfirmedTransactionsStorage, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.collection.concurrent.TrieMap
@@ -18,21 +19,21 @@ class UnconfirmedTransactionsDatabaseImpl(settings: UTXSettings) extends Unconfi
 
   private def key(tx: Transaction): TxKey = key(tx.id)
 
-  override def putIfNew(tx: Transaction, txValidator: Transaction => Boolean): Boolean =
+  override def putIfNew[T <: Transaction](tx: T, txValidator: T => Either[ValidationError, T]): Either[ValidationError, T] =
     if (transactions.size < settings.size) {
       val txKey = key(tx)
       if (transactions.contains(txKey)) {
-        false
-      } else if (txValidator(tx)) {
-        transactions.update(txKey, tx)
-        true
-      } else {
-        log.error(s"Transaction $tx is not valid")
-        false
+        Left(TransactionValidationError(tx, "already in the pool"))
+      } else txValidator(tx) match {
+        case Right(t) =>
+          transactions.update(txKey, tx)
+          Right(t)
+        case Left(err) =>
+          log.error(s"Transaction $tx is not valid")
+          Left(err)
       }
     } else {
-      log.warn("Transaction pool size limit is reached")
-      false
+      Left(TransactionValidationError(tx, "Transaction pool size limit is reached"))
     }
 
   override def remove(tx: Transaction): Unit = transactions -= key(tx)

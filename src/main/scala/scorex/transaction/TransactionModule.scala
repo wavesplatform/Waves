@@ -10,15 +10,15 @@ trait TransactionModule {
 
   def isValid(block: Block): Boolean
 
-  def isValid(tx: Transaction, blockTime: Long): Boolean
+  def validate[T <: Transaction](tx: T): Either[ValidationError, T]
 
   def unconfirmedTxs: Seq[Transaction]
 
-  def putUnconfirmedIfNew(tx: Transaction): Boolean
+  def putUnconfirmedIfNew[T <: Transaction](tx: T): Either[ValidationError, T]
 
   def packUnconfirmed(heightOpt: Option[Int] = None): Seq[Transaction]
 
   def clearFromUnconfirmed(data: Seq[Transaction]): Unit
 
-  def onNewOffchainTransaction(transaction: Transaction): Boolean
+  def onNewOffchainTransaction[T <: Transaction](transaction: T): Either[ValidationError, T]
 }

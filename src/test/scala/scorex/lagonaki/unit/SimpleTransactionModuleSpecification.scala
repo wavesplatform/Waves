@@ -90,11 +90,13 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
 
   test("isValid() checks that tx not too old") {
     val validTx = PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp).right.get
-    assert(transactionModule.isValid(validTx, validTx.timestamp))
+    assert(transactionModule.validate(validTx).isRight)
 
     val oldTx = PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp - (1 day).toMillis).right.get
-    assert(!transactionModule.isValid(oldTx, oldTx.timestamp))
+    assert(transactionModule.validate(oldTx).isLeft)
   }
+
+  val validDelegate = (tx: Transaction) => Right(tx)
 
   test("clearIncorrectTransactions() removes valid but expired txs") {
     transactionModule.utxStorage.all().foreach(transactionModule.utxStorage.remove)
@@ -102,8 +104,8 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     // prepare
     val validTx = PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp).right.get
     val oldValidTx = PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp - (1 day).toMillis).right.get
-    transactionModule.utxStorage.putIfNew(validTx)
-    transactionModule.utxStorage.putIfNew(oldValidTx)
+    transactionModule.utxStorage.putIfNew(validTx, validDelegate)
+    transactionModule.utxStorage.putIfNew(oldValidTx, validDelegate)
     assert(transactionModule.utxStorage.all().size == 2)
 
     // do
@@ -119,8 +121,8 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     // prepare
     val validTx = PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp).right.get
     val invalidTx = PaymentTransaction.create(noBalanceAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp).right.get
-    transactionModule.utxStorage.putIfNew(validTx)
-    transactionModule.utxStorage.putIfNew(invalidTx)
+    transactionModule.utxStorage.putIfNew(validTx, validDelegate)
+    transactionModule.utxStorage.putIfNew(invalidTx, validDelegate)
     assert(transactionModule.utxStorage.all().size == 2)
 
     // do

@@ -19,8 +19,8 @@ trait MatcherTestData {
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray)
   val WalletSeed = "Matcher".getBytes
   val MatcherSeed = SecureCryptographicHash(Bytes.concat(Ints.toByteArray(0), WalletSeed))
-  val MatcherAccount = new PrivateKeyAccount(MatcherSeed)
-  val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
+  val MatcherAccount = PrivateKeyAccount(MatcherSeed)
+  val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue)
 
   val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
@@ -114,7 +114,7 @@ trait MatcherTestData {
     matcherFee: Long <- maxWavesAnountGen
   } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
-  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): StoredState = {
+  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): State = {
     val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage
       with MVStoreLeaseExtendedStateStorage {
       override val db: MVStore = mvStore

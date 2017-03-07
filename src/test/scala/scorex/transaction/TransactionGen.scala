@@ -23,7 +23,7 @@ trait TransactionGen {
     Gen.choose(minSize, maxSize) flatMap { sz => Gen.listOfN(sz, Gen.choose(0, 0x7f).map(_.toByte)).map(_.toArray) }
   }
 
-  val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
+  val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
   val positiveIntGen: Gen[Int] = Gen.choose(1, Int.MaxValue / 3)
   val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)

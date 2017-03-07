@@ -10,11 +10,9 @@ import play.api.libs.functional.syntax._
 import scala.collection.immutable.Stream
 import scala.util.{Failure, Success}
 
-@SerialVersionUID(-4750343171084108636L)
 case class BlockCheckpoint(height: Int,
                            @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
 
-@SerialVersionUID(-3551519894804767122L)
 case class Checkpoint(items: Seq[BlockCheckpoint],
                       @ApiModelProperty(dataType = "java.lang.String")signature: Array[Byte]) {
   def toSign: Array[Byte] = {
@@ -41,7 +39,7 @@ object Checkpoint {
   implicit val byteArrayReads = new Reads[Array[Byte]] {
     def reads(json: JsValue) = json match {
       case JsString(s) => Base58.decode(s) match {
-        case Success(bytes) if bytes.length == scorex.transaction.TypedTransaction.SignatureLength => JsSuccess(bytes)
+        case Success(bytes) if bytes.length == scorex.transaction.TransactionParser.SignatureLength => JsSuccess(bytes)
         case Success(bytes) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.signatureLength"))))
         case Failure(_) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
       }

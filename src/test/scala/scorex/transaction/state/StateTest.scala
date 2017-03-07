@@ -23,7 +23,7 @@ class StateTest extends PropSpec with Checkers {
 object StateTestSpec extends Commands {
   val TestFolder = "target/test/"
   new File(TestFolder).mkdirs()
-  val accounts = (1 to 10) map (i => new PrivateKeyAccount(randomBytes()))
+  val accounts = (1 to 10) map (i => PrivateKeyAccount(randomBytes()))
   val accN = accounts.size
   val TotalBalance = 10000000
   val MaxTransactions = 100
@@ -153,7 +153,7 @@ object StateTestSpec extends Commands {
     type Result = Seq[Transaction]
 
     def run(sut: Sut): Result = sut.synchronized {
-      sut.storedState.validate(txs.map(_._1), blockTime = txs.map(_._1.timestamp).max)
+      sut.storedState.validate(txs.map(_._1), blockTime = txs.map(_._1.timestamp).max)._2
     }
 
     def nextState(state: State): State = state

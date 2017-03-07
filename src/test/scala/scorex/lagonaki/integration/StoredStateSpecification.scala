@@ -4,16 +4,15 @@ import com.wavesplatform.settings.Constants
 import org.scalatest._
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http.assets.{IssueRequest, TransferRequest}
-import scorex.api.http.leasing.LeaseRequest
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.mocks.TestBlock
+import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.state.AccState
-import scorex.transaction.state.database.state.extension.IncrementingTimestampValidator
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
 import scorex.utils._
 
-import scala.util.Random
+import scala.util.{Left, Random, Right}
 
 class StoredStateSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
@@ -21,8 +20,6 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   private val history = application.transactionModule.blockStorage.history
   private val acc = applicationNonEmptyAccounts.head
   private val recipient = applicationEmptyAccounts.head
-  private val incrementingTimestampValidator: IncrementingTimestampValidator = state.validators.filter(_.isInstanceOf[IncrementingTimestampValidator]).head.asInstanceOf[IncrementingTimestampValidator]
-
   require(acc.address != recipient.address)
 
   override def beforeAll(): Unit = {
@@ -41,11 +38,11 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     }
     val txToForge = transactions.head
     val forgedSignature = forgeSignature(txToForge.signature)
-    val forgedTransaction = PaymentTransaction.create(new PublicKeyAccount(txToForge.sender.publicKey), txToForge.recipient,
+    val forgedTransaction = PaymentTransaction.create(PublicKeyAccount(txToForge.sender.publicKey), txToForge.recipient,
       txToForge.amount, txToForge.fee, txToForge.timestamp, forgedSignature).right.get
 
     val transactionsToValidate = transactions :+ forgedTransaction
-    val validTransactions = state.validate(transactionsToValidate, blockTime = transactionsToValidate.map(_.timestamp).max)
+    val validTransactions = state.validate(transactionsToValidate, blockTime = transactionsToValidate.map(_.timestamp).max)._2
 
     validTransactions.count(tx => (tx.id sameElements txToForge.signature) ||
       (tx.id sameElements forgedTransaction.signature)) shouldBe 1
@@ -54,7 +51,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
 
   test("balance confirmations") {
-    val rec = new PrivateKeyAccount(randomBytes())
+    val rec = PrivateKeyAccount(randomBytes())
     val senderBalance = state.balance(acc)
     state.balance(rec) shouldBe 0L
     senderBalance should be > 100L
@@ -89,7 +86,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("effective balance confirmations") {
-    val rec = new PrivateKeyAccount(randomBytes())
+    val rec = PrivateKeyAccount(randomBytes())
     val senderBalance = state.balance(acc)
     state.effectiveBalance(rec) shouldBe 0L
     senderBalance should be > 100L
@@ -124,7 +121,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("lease tx and balances") {
-    val rec = new PrivateKeyAccount(randomBytes())
+    val rec = PrivateKeyAccount(randomBytes())
     val senderBalance = state.balance(acc)
     state.effectiveBalance(rec) shouldBe 0L
     senderBalance should be > 100L
@@ -132,8 +129,8 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val oldSenderEffectiveBalance = state.effectiveBalance(acc)
     val oldSenderBalance = state.effectiveBalance(acc)
     state.processBlock(TestBlock(Seq(
-      transactionModule.lease(LeaseRequest(acc.address, 5, 1, rec.address), application.wallet).right.get,
-      transactionModule.issueAsset(IssueRequest(acc.address, "test", "test", 1000, 2, false, 100000000), application.wallet).right.get
+    LeaseTransaction.create(acc, 5L, 1L, 1L, rec).right.get,
+    transactionModule.issueAsset(IssueRequest(acc.address, "test", "test", 1000, 2, false, 100000000), application.wallet).right.get
       )))
     state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
     state.effectiveBalanceWithConfirmations(acc, 1) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
@@ -156,7 +153,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   }
 
   test("effective balance and generating balance") {
-    val rec = new PrivateKeyAccount(randomBytes())
+    val rec = PrivateKeyAccount(randomBytes())
     val senderBalance = state.effectiveBalance(acc)
     state.effectiveBalance(rec) shouldBe 0L
     senderBalance should be > 100L
@@ -215,7 +212,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recipient, senderBalance / 2, 1).right.get)
     doubleSpending.foreach(t => state.isValid(t, t.timestamp) shouldBe true)
     state.isValid(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max) shouldBe false
-    state.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max).size shouldBe 1
+    state.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max)._2.size shouldBe 1
     state.processBlock(TestBlock(doubleSpending)) should be('failure)
   }
 
@@ -223,8 +220,8 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val senderBalance = state.balance(acc)
 
     val recipients = Seq(
-      new PrivateKeyAccount(Array(34.toByte, 1.toByte)),
-      new PrivateKeyAccount(Array(1.toByte, 23.toByte))
+      PrivateKeyAccount(Array(34.toByte, 1.toByte)),
+      PrivateKeyAccount(Array(1.toByte, 23.toByte))
     )
 
     require(senderBalance > 10 * recipients.size * Constants.UnitsInWave)
@@ -242,8 +239,10 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
     txs.size should be(20)
 
-    val shuffledTxs = Random.shuffle(txs).map(_.right.get)
-
+    val shuffledTxs = Random.shuffle(txs).map {
+      case Right(ts) => ts
+      case Left(err) => throw new Exception(err.toString)
+    }
     shuffledTxs.size should be(20)
 
     waitForNextBlock(application)
@@ -300,8 +299,8 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
 
   test("valid order match transaction with fully executed orders") {
     val wavesBal = state.assetBalance(AssetAcc(acc, None))
-    val bal2 = state.assetBalance(AssetAcc(new Account("3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K"), None))
-    val bal3 = state.assetBalance(AssetAcc(new Account("3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY"), None))
+    val bal2 = state.assetBalance(AssetAcc(Account.fromBase58String("3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K").right.get, None))
+    val bal3 = state.assetBalance(AssetAcc(Account.fromBase58String("3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY").right.get, None))
     wavesBal should be > 0L
   }
 

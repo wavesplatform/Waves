@@ -7,7 +7,7 @@ import scala.collection.convert.ImplicitConversionsToScala._
 import com.google.common.base.CaseFormat
 import com.typesafe.config.ConfigValueFactory.{fromAnyRef => cv}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions, ConfigValue, ConfigValueFactory}
-import scorex.transaction.TypedTransaction.TransactionType
+import scorex.transaction.TransactionParser.TransactionType
 
 object LegacyConfigTransformer {
   private val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)

@@ -9,8 +9,8 @@ case class ApplicationVersion(firstDigit: Int, secondDigit: Int, thirdDigit: Int
   lazy val bytes: Array[Byte] = Ints.toByteArray(firstDigit) ++ Ints.toByteArray(secondDigit) ++ Ints.toByteArray(thirdDigit)
 }
 
-object ApplicationVersion extends Deser[ApplicationVersion] {
-  val SerializedVersionLength = 4 * 3
+object ApplicationVersion {
+  val SerializedVersionLength: Int = 4 * 3
 
   def parseBytes(bytes: Array[Byte]): Try[ApplicationVersion] = Try {
     require(bytes.length == SerializedVersionLength, "Wrong bytes for application version")

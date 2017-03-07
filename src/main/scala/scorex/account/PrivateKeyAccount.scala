@@ -2,11 +2,18 @@ package scorex.account
 
 import scorex.crypto.EllipticCurveImpl
 
-@SerialVersionUID(8568952246932352318L)
-case class PrivateKeyAccount(seed: Array[Byte], privateKey: Array[Byte], override val publicKey: Array[Byte])
-  extends PublicKeyAccount(publicKey) {
+sealed trait PrivateKeyAccount extends PublicKeyAccount {
+  def seed: Array[Byte]
 
-  def this(seed: Array[Byte], keyPair: (Array[Byte], Array[Byte])) = this(seed, keyPair._1, keyPair._2)
+  def privateKey: Array[Byte]
+}
 
-  def this(seed: Array[Byte]) = this(seed, EllipticCurveImpl.createKeyPair(seed))
+object PrivateKeyAccount {
+
+  private case class PrivateKeyAccountImpl(seed: Array[Byte], privateKey: Array[Byte], publicKey: Array[Byte]) extends PrivateKeyAccount
+
+  def apply(seed: Array[Byte]): PrivateKeyAccount = {
+    val pair = EllipticCurveImpl.createKeyPair(seed)
+    PrivateKeyAccountImpl(seed, pair._1, pair._2)
+  }
 }

@@ -1,8 +1,8 @@
 package scorex.consensus.nxt
 
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
-import scorex.consensus.{ConsensusModule, PoSConsensusModule, TransactionsOrdering}
+import scorex.consensus.{ConsensusModule, TransactionsOrdering}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.settings.ChainParameters
@@ -12,8 +12,7 @@ import scorex.utils.{NTP, ScorexLogging}
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration) extends PoSConsensusModule
-  with ScorexLogging {
+class WavesConsensusModule(val forksConfig: ChainParameters, AvgDelay: Duration) extends ConsensusModule with ScorexLogging {
 
   import WavesConsensusModule._
 
@@ -219,6 +218,12 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     BigInt(prevBlockData.baseTarget) * eta * balance
   }
 
+  def generatingBalance(account: Account, atHeight: Option[Int] = None)
+                       (implicit transactionModule: TransactionModule): Long = {
+    val balanceSheet = transactionModule.blockStorage.state
+    val generatingBalanceDepth = if (atHeight.exists(h => h >= forksConfig.generatingBalanceDepthFrom50To1000AfterHeight)) 1000 else 50
+    balanceSheet.effectiveBalanceWithConfirmations(account, generatingBalanceDepth, atHeight)
+  }
 }
 
 object WavesConsensusModule {
