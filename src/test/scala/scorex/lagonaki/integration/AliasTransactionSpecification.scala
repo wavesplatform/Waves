@@ -8,6 +8,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.CreateAliasTransaction
 import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.lease.LeaseTransaction
 import scorex.utils._
 
 import scala.util._
@@ -39,7 +40,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
 
     val creatorBalance0 = state.balance(aliasCreator)
     val fee = 100000L
-    val tx = CreateAliasTransaction.create(aliasCreator, Alias("NEW ALIAS").right.get, fee, 1L).right.get
+    val tx = CreateAliasTransaction.create(aliasCreator, Alias("TRANSFER-ALIAS").right.get, fee, 1L).right.get
     val block = TestBlock(Seq(tx))
     state.validateAgainstState(tx, state.stateHeight) shouldBe a[Right[_, _]]
     state.processBlock(block) shouldBe a[Success[_]]
@@ -52,11 +53,35 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
 
     val fee2 = 100001L
     val amount = 1000L
-    val tx2 = TransferTransaction.create(None, sender, Alias("NEW ALIAS").right.get, amount, 1L, None, fee2, Array()).right.get
+    val tx2 = TransferTransaction.create(None, sender, Alias("TRANSFER-ALIAS").right.get, amount, 1L, None, fee2, Array()).right.get
     state.validateAgainstState(tx2, state.stateHeight) shouldBe a[Right[_, _]]
     state.processBlock(TestBlock(Seq(tx2))) shouldBe a[Success[_]]
     state.balance(aliasCreator) shouldBe (creatorBalance + amount)
     state.balance(sender) shouldBe (senderBalance - fee2 - amount)
+  }
+
+  test("able to issue alias and lease money to alias") {
+
+    val creatorBalance0 = state.balance(aliasCreator)
+    val fee = 100000L
+    val tx = CreateAliasTransaction.create(aliasCreator, Alias("LEASE-ALIAS").right.get, fee, 1L).right.get
+    val block = TestBlock(Seq(tx))
+    state.validateAgainstState(tx, state.stateHeight) shouldBe a[Right[_, _]]
+    state.processBlock(block) shouldBe a[Success[_]]
+    state.balance(aliasCreator) shouldBe creatorBalance0 - fee
+
+    val sender: PrivateKeyAccount = PrivateKeyAccount(randomBytes())
+    ensureSenderHasBalance(sender)
+    val senderEffectiveBalance = state.effectiveBalance(sender)
+    val creatorEffectiveBalance = state.effectiveBalance(aliasCreator)
+
+    val fee2 = 100001L
+    val amount = 1000L
+    val tx2 = LeaseTransaction.create(sender, amount, fee2, 1L, Alias("LEASE-ALIAS").right.get).right.get
+    state.validateAgainstState(tx2, state.stateHeight) shouldBe a[Right[_, _]]
+    state.processBlock(TestBlock(Seq(tx2))) shouldBe a[Success[_]]
+    state.effectiveBalance(aliasCreator) shouldBe (creatorEffectiveBalance + amount)
+    state.effectiveBalance(sender) shouldBe (senderEffectiveBalance - fee2 - amount)
   }
 
   test("unable to send to non-issued alias") {
@@ -68,6 +93,17 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     state.processBlock(block) shouldBe a[Failure[_]]
     state.balance(aliasCreator) shouldBe senderBalance
   }
+
+  test("unable to lease to non-issued alias") {
+    val senderBalance = state.balance(aliasCreator)
+
+    val tx = LeaseTransaction.create(aliasCreator, 10000L, 100000L, 1L, Alias("NON-EXISTING ALIAS").right.get).right.get
+    state.validateAgainstState(tx, state.stateHeight) shouldBe a[Left[AliasNotExists, _]]
+    val block = TestBlock(Seq(tx))
+    state.processBlock(block) shouldBe a[Failure[_]]
+    state.balance(aliasCreator) shouldBe senderBalance
+  }
+
 
   test("unable to create the same alias in the next block") {
     val senderBalance = state.balance(aliasCreator)
@@ -86,7 +122,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
   }
 
   test("able to recreate alias after rollback") {
-    val theAlias = Alias("THE ALIAS")
+    val theAlias = Alias("ALIAS")
     val tx = CreateAliasTransaction.create(aliasCreator, theAlias.right.get, 100000L, 1L).right.get
     val block = TestBlock(Seq(tx))
     state.processBlock(block)
