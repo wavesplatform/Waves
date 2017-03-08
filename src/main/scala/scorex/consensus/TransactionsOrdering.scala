@@ -2,22 +2,31 @@ package scorex.consensus
 
 import scorex.crypto.encode.Base58
 import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.ExchangeTransaction
 
-object TransactionsOrdering extends Ordering[Transaction] {
-  private def orderBy(t: Transaction): (Int, Long, Long, String) = {
-    //TODO sort by real value of fee?
-    val byFee = t.assetFee._1.foldLeft(-t.assetFee._2)((_, asset) => 0L)
-    val byTimestamp = -t.timestamp
-    val byAddress = Base58.encode(t.id)
-    val typeOrdering = t match {
-      case exchange: ExchangeTransaction => -1
-      case _ => 0
+object TransactionsOrdering {
+  trait WavesOrdering extends Ordering[Transaction] {
+    def txTimestampOrder(ts: Long): Long
+    private def orderBy(t: Transaction): (Long, Long, String) = {
+      val byFee = t.assetFee._1 match {
+        case Some(assetId) => 0
+        case None => -t.assetFee._2
+      }
+      val byTimestamp = txTimestampOrder(t.timestamp)
+      val byTxId = Base58.encode(t.id)
+
+      (byFee, byTimestamp, byTxId)
     }
-
-    (typeOrdering, byFee, byTimestamp, byAddress)
+    override def compare(first: Transaction, second: Transaction): Int = {
+      implicitly[Ordering[(Long, Long, String)]].compare(orderBy(first), orderBy(second))
+    }
   }
-  override def compare(first: Transaction, second: Transaction): Int = {
-    implicitly[Ordering[(Int, Long, Long, String)]].compare(orderBy(first), orderBy(second))
+
+  object InBlock extends WavesOrdering {
+    // sorting from network start
+    override def txTimestampOrder(ts: Long): Long = -ts
+  }
+
+  object InUTXPool extends WavesOrdering {
+    override def txTimestampOrder(ts: Long): Long = ts
   }
 }

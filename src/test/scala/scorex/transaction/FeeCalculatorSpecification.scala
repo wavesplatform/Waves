@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.FeesSettings
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Assertion, Matchers, PropSpec}
+import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -24,7 +25,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
       |    }
       |    transfer {
       |      WAVES = 100000
-      |      "JAudr64y6YxTgLn9T5giKKqWGkbMfzhdRAxmNNfn6FJN" = 1002
+      |      "JAudr64y6YxTgLn9T5giKKqWGkbMfzhdRAxmNNfn6FJN" = 2
       |    }
       |    reissue {
       |      WAVES = 200000
@@ -70,6 +71,19 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
         feeCalc.enoughFee(tx) shouldBe an[Left[_,_]]
       }
     }
+  }
+
+  property("Transfer transaction with fee in asset") {
+    val feeCalculator = new FeeCalculator(mySettings)
+    val sender = PrivateKeyAccount(Array.emptyByteArray)
+    val recipient = Account.fromBase58String("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get
+    val tx1: TransferTransaction = TransferTransaction.create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000,
+      Some(WhitelistedAsset), 2, Array.emptyByteArray).right.get
+    val tx2: TransferTransaction = TransferTransaction.create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000,
+      Some(WhitelistedAsset), 1, Array.emptyByteArray).right.get
+
+    feeCalculator.enoughFee(tx1) shouldBe a[Right[_,_]]
+    feeCalculator.enoughFee(tx2) shouldBe a[Left[_,_]]
   }
 
   property("Payment transaction ") {

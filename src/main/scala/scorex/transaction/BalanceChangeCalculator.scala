@@ -41,14 +41,15 @@ object BalanceChangeCalculator {
         val buyFeeChange = Seq(BalanceChange(AssetAcc(t.buyOrder.senderPublicKey, None), -t.buyMatcherFee))
         val sellFeeChange = Seq(BalanceChange(AssetAcc(t.sellOrder.senderPublicKey, None), -t.sellMatcherFee))
 
-        val exchange: Seq[(PublicKeyAccount, (Option[AssetId], Long))] = Seq(
-          (t.buyOrder.senderPublicKey, (t.buyOrder.spendAssetId, -t.buyOrder.getSpendAmount(t.price, t.amount).get)),
-          (t.buyOrder.senderPublicKey, (t.buyOrder.receiveAssetId, t.buyOrder.getReceiveAmount(t.price, t.amount).get)),
-          (t.sellOrder.senderPublicKey, (t.sellOrder.receiveAssetId, t.sellOrder.getReceiveAmount(t.price, t.amount).get)),
-          (t.sellOrder.senderPublicKey, (t.sellOrder.spendAssetId, -t.sellOrder.getSpendAmount(t.price, t.amount).get))
+        val exchange = Seq(
+          (t.buyOrder.senderPublicKey, (t.buyOrder.assetPair.priceAsset, -t.buyOrder.getSpendAmount(t.price, t.amount).get)),
+          (t.buyOrder.senderPublicKey, (t.buyOrder.assetPair.amountAsset, t.buyOrder.getReceiveAmount(t.price, t.amount).get)),
+          (t.sellOrder.senderPublicKey, (t.sellOrder.assetPair.priceAsset, t.sellOrder.getReceiveAmount(t.price, t.amount).get)),
+          (t.sellOrder.senderPublicKey, (t.sellOrder.assetPair.amountAsset, -t.sellOrder.getSpendAmount(t.price, t.amount).get))
         )
 
-        Right(buyFeeChange ++ sellFeeChange ++ matcherChange ++ exchange.map(c => BalanceChange(AssetAcc(c._1, c._2._1), c._2._2)))
+        Right(buyFeeChange ++ sellFeeChange ++ matcherChange ++
+          exchange.map(c => BalanceChange(AssetAcc(c._1, c._2._1), c._2._2)))
 
       case t: LeaseTransaction =>
         Right(Seq(BalanceChange(AssetAcc(t.sender, None), -t.fee)))
@@ -65,20 +66,24 @@ object BalanceChangeCalculator {
 
   def effectiveBalanceChanges(state: State)(storage: LeaseExtendedStateStorageI)(tx: Transaction)
   : Either[ValidationError, Seq[EffectiveBalanceChange]] = tx match {
-    case tx: LeaseTransaction => resolveAddressOrAlias(state)(tx,tx.recipient).map(recipient => {
+    case tx: LeaseTransaction => resolveAddressOrAlias(state)(tx, tx.recipient).map(recipient => {
       Seq(EffectiveBalanceChange(tx.sender, -tx.amount - tx.fee),
         EffectiveBalanceChange(recipient, tx.amount))
     })
     case tx: LeaseCancelTransaction =>
       val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
-      resolveAddressOrAlias(state)(tx,leaseTx.recipient).map(recipient => {
+      resolveAddressOrAlias(state)(tx, leaseTx.recipient).map(recipient => {
         Seq(
           EffectiveBalanceChange(tx.sender, leaseTx.amount - tx.fee),
           EffectiveBalanceChange(recipient, -leaseTx.amount))
       })
-    case _ => BalanceChangeCalculator.balanceChanges(state)(tx).map(_.map(bc =>
-      EffectiveBalanceChange(bc.assetAcc.account, bc.delta))
-    )
+
+    case _ => BalanceChangeCalculator.balanceChanges(state)(tx).map(_.flatMap(bc => {
+      bc.assetAcc.assetId match {
+        case Some(_) => None
+        case None => Some(EffectiveBalanceChange(bc.assetAcc.account, bc.delta))
+      }
+    }))
   }
 
   def resolveAddressOrAlias(state: State)(tx: Transaction, aoa: AccountOrAlias): Either[ValidationError, Account] = aoa match {

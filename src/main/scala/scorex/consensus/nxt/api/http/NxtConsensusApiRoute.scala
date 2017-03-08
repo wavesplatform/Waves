@@ -11,6 +11,7 @@ import scorex.api.http.{ApiError, ApiRoute, CommonApiFunctions, InvalidAddress}
 import scorex.app.RunnableApplication
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.encode.Base58
+import scorex.transaction.state.database.blockchain.StoredState
 
 
 @Path("/consensus")
@@ -38,7 +39,7 @@ class NxtConsensusApiRoute(application: RunnableApplication) extends ApiRoute wi
     } else {
       complete(Json.obj(
         "address" -> account.right.get.address,
-        "balance" -> consensusModule.generatingBalance(account.right.get, application.transactionModule.blockStorage.state.stateHeight)(application.transactionModule)))
+        "balance" -> consensusModule.generatingBalance(account.right.get, blockStorage.state.stateHeight)(application.transactionModule)))
     }
   }
 

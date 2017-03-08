@@ -1,17 +1,17 @@
 package scorex.transaction.assets.exchange
 
+import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction._
+import scorex.transaction.assets.exchange.Order.assetIdBytes
 import scorex.utils.ByteArrayExtension
+import scorex.transaction.assets.exchange.Validation.booleanOperators
+
 import scala.util.{Success, Try}
 
-case class AssetPair(private val pair: (Option[AssetId], Option[AssetId])) {
-  require(!ByteArrayExtension.sameOption(pair._1, pair._2))
-  val first: Option[AssetId] = if (ByteArrayExtension.compare(pair._1, pair._2) < 0) pair._1 else pair._2
-  val second: Option[AssetId] = if (ByteArrayExtension.compare(pair._1, pair._2) < 0) pair._2 else pair._1
-
-  lazy val firstStr: String = first.map(Base58.encode).getOrElse(AssetPair.WavesName)
-  lazy val secondStr: String = second.map(Base58.encode).getOrElse(AssetPair.WavesName)
+case class AssetPair(amountAsset: Option[AssetId], priceAsset: Option[AssetId]) {
+  lazy val priceAssetStr: String = priceAsset.map(Base58.encode).getOrElse(AssetPair.WavesName)
+  lazy val amountAssetStr: String = amountAsset.map(Base58.encode).getOrElse(AssetPair.WavesName)
 
   override def hashCode(): Int = toString.hashCode()
 
@@ -23,7 +23,18 @@ case class AssetPair(private val pair: (Option[AssetId], Option[AssetId])) {
     }
   }
 
-  override def toString: String = firstStr + "-" + secondStr
+  override def toString: String = amountAssetStr + "-" + priceAssetStr
+
+  def isValid: Validation = {
+    !ByteArrayExtension.sameOption(amountAsset, priceAsset) :| "Invalid AssetPair"
+  }
+
+  def bytes: Array[Byte] = assetIdBytes(amountAsset) ++ assetIdBytes(priceAsset)
+
+  def json: JsObject = Json.obj(
+    "amountAsset" -> amountAsset.map(Base58.encode),
+    "priceAsset" -> priceAsset.map(Base58.encode)
+  )
 }
 
 object AssetPair {

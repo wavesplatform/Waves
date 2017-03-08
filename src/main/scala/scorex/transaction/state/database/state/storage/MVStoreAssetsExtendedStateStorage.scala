@@ -8,14 +8,14 @@ trait MVStoreAssetsExtendedStateStorage extends AssetsExtendedStateStorageI{
 
   // ============= transactions
   private lazy val TransactionsTableName = "AssetsTransactions"
-  private lazy val transactionsTable: MVMap[String, Set[String]] = db.openMap(TransactionsTableName,
-    new LogMVMapBuilder[String, Set[String]])
+  private lazy val transactionsTable: MVMap[String, Seq[String]] = db.openMap(TransactionsTableName,
+    new LogMVMapBuilder[String, Seq[String]])
 
-  def getTransactions(key: String): Set[String] =
-    Option(transactionsTable.get(key)).getOrElse(Set.empty[String])
+  def getTransactions(key: String): Seq[String] =
+    Option(transactionsTable.get(key)).getOrElse(Seq.empty[String])
 
   def addTransaction(key: String, transaction: String): Unit =
-    transactionsTable.put(key, getTransactions(key) + transaction)
+    transactionsTable.put(key, (getTransactions(key) :+ transaction).distinct)
 
 
   // ============= heights

@@ -10,7 +10,7 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.api.http.assets.{IssueRequest, TransferRequest}
 import scorex.crypto.encode.Base58
 import scorex.transaction.AssetAcc
-import scorex.transaction.assets.exchange.{AssetPair, Order}
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.utils.NTP
 
@@ -23,6 +23,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   private val AccountM = wallet.privateKeyAccounts()(2)
   private val AccountA = wallet.privateKeyAccounts().head
   private var Asset1 = Option("")
+  private var TradingPair = AssetPair(None, None)
   private var MBalance = 0L
   private var MBalance1 = 0L
   private var ABalance = 0L
@@ -37,6 +38,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   def initBalances() = {
     assetTransfer(AccountM, AccountA, 5000 * Constants.UnitsInWave)
     Asset1 = Some(issueAsset(AccountM, 1000 * Constants.UnitsInWave))
+    TradingPair = AssetPair(Base58.decode(Asset1.get).toOption, None)
     MBalance = storedState.assetBalance(AssetAcc(AccountM, None))
     MBalance1 = storedState.assetBalance(AssetAcc(AccountM, Asset1.flatMap(Base58.decode(_).toOption)))
     ABalance = storedState.assetBalance(AssetAcc(AccountA, None))
@@ -90,7 +92,18 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     }
   }
 
-  def placeOrder(acc: PrivateKeyAccount, spendAsset: Option[String], receiveAsset: Option[String],
+  def placeBuy(acc: PrivateKeyAccount,
+               price: Double, amount: Long, expectedStatus: String = "OrderAccepted"): Option[String] = {
+    placeOrder(acc, TradingPair, OrderType.BUY, price, amount, expectedStatus)
+  }
+
+  def placeSell(acc: PrivateKeyAccount,
+               price: Double, amount: Long, expectedStatus: String = "OrderAccepted"): Option[String] = {
+    placeOrder(acc, TradingPair, OrderType.SELL, price, amount, expectedStatus)
+  }
+
+
+  def placeOrder(acc: PrivateKeyAccount, assetPair: AssetPair, orderType: OrderType,
                  price: Double, amount: Long, expectedStatus: String = "OrderAccepted"): Option[String] = {
     val created = NTP.correctedTime()
     val timeToLive = created + Order.MaxLiveTime - 1000
@@ -99,8 +112,8 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
       s"""{
          |  "matcherFee": 100000,
          |  "price": ${(price * Order.PriceConstant).toLong},
-         |  "spendAssetId": "${spendAsset.getOrElse("")}",
-         |  "receiveAssetId": "${receiveAsset.getOrElse("")}",
+         |  "assetPair": ${Json.stringify(assetPair.json)},
+         |  "orderType": "$orderType",
          |  "amount": $amount,
          |  "timestamp": $created,
          |  "expiration": $timeToLive,
@@ -118,11 +131,11 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   }
 
   def getOrderBook(asset: Option[String]): JsValue = {
-    matcherGetRequest(s"/orderbook/WAVES/${asset.get}")
+    matcherGetRequest(s"/orderbook/${asset.get}/WAVES")
   }
 
   def getOrderStatus(asset: Option[String], id: String): JsValue = {
-    matcherGetRequest(s"/orderbook/WAVES/${asset.get}/$id")
+    matcherGetRequest(s"/orderbook/${asset.get}/WAVES/$id")
   }
 
   def waitForOrderStatus(asset: Option[String], id: String, status: String) = {
@@ -131,7 +144,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     }
   }
 
-  def cancelOrder(acc: PrivateKeyAccount, spendAsset: Option[String], receiveAsset: Option[String],
+  def cancelOrder(acc: PrivateKeyAccount,
                   orderId: String, expectedStatus: String = "OrderCanceled"): Unit = {
     val ts = NTP.correctedTime()
     val pubKeyStr = Base58.encode(acc.publicKey)
@@ -145,12 +158,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     val signed = CancelOrderRequest.sign(orderCancel, acc)
     val signedJson = signed.json
 
-    val (a1, a2) = if (spendAsset.isDefined) (spendAsset.get, receiveAsset.getOrElse("")) else
-      (receiveAsset.get, spendAsset.getOrElse(""))
-
-    val pair = AssetPair.createAssetPair(spendAsset.getOrElse(AssetPair.WavesName),
-      receiveAsset.getOrElse(AssetPair.WavesName)).get
-    val resp = matcherPostRequest(s"/orderbook/${pair.firstStr}/${pair.secondStr}/cancel", body = signedJson.toString)
+    val resp = matcherPostRequest(s"/orderbook/${TradingPair.amountAssetStr}/${TradingPair.priceAssetStr}/cancel", body = signedJson.toString)
 
     (resp \ "status").as[String] shouldBe expectedStatus
   }
@@ -169,14 +177,14 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   }
 
   test("place sell order") {
-    orderIdToCancel = placeOrder(AccountM, Asset1, None, 2, 500 * Constants.UnitsInWave)
+    orderIdToCancel = placeSell(AccountM, 2, 500 * Constants.UnitsInWave)
     val ob = getOrderBook(Asset1)
     ((ob \ "asks") (0) \ "price").as[Long] shouldBe 2 * Order.PriceConstant
     ((ob \ "asks") (0) \ "amount").as[Long] shouldBe 500 * Constants.UnitsInWave
   }
 
   test("match with buy order") {
-    val id = placeOrder(AccountA, None, Asset1, 2, 200 * Constants.UnitsInWave)
+    val id = placeBuy(AccountA, 2, 200 * Constants.UnitsInWave)
     val ob = getOrderBook(Asset1)
     ((ob \ "asks") (0) \ "amount").as[Long] shouldBe 300 * Constants.UnitsInWave
 
@@ -197,8 +205,8 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   test("submit more orders than available assets including open") {
     waitForBalance(800 * Constants.UnitsInWave, AccountM, Asset1) // And 300 by price = 2 is open
     // Should be available Asset1 = 800 - 300 = 500 Asset1
-    placeOrder(AccountM, Asset1, None, 1.5, 501 * Constants.UnitsInWave, "OrderRejected")
-    placeOrder(AccountM, Asset1, None, 1.5, 500 * Constants.UnitsInWave, "OrderAccepted")
+    placeSell(AccountM, 1.5, 501 * Constants.UnitsInWave, "OrderRejected")
+    placeSell(AccountM, 1.5, 500 * Constants.UnitsInWave, "OrderAccepted")
 
     val ob = getOrderBook(Asset1)
     ((ob \ "asks") (0) \ "price").as[Long] shouldBe (1.5 * Order.PriceConstant).toLong
@@ -208,7 +216,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   }
 
   test("buy order match several price levels") {
-    val id = placeOrder(AccountA, None, Asset1, 2.5, 700 * Constants.UnitsInWave, "OrderAccepted")
+    val id = placeBuy(AccountA, 2.5, 700 * Constants.UnitsInWave, "OrderAccepted")
     waitForOrderStatus(Asset1, id.get, "Filled")
 
     val wavesAmount = (1.5 * 500 + 2 * 200).toLong * Constants.UnitsInWave
@@ -230,13 +238,13 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   }
 
   test("cancel order and resubmit a new one") {
-    cancelOrder(AccountM, Asset1, None, orderIdToCancel.get)
-    placeOrder(AccountM, Asset1, None, 5, 100 * Constants.UnitsInWave, "OrderAccepted")
+    cancelOrder(AccountM, orderIdToCancel.get)
+    placeSell(AccountM, 5, 100 * Constants.UnitsInWave, "OrderAccepted")
   }
 
   test("buy order should execute all open orders and put remaining in OrderBook") {
     waitForBalance(ABalance, AccountA, None)
-    placeOrder(AccountA, None, Asset1, 5.5, 250 * Constants.UnitsInWave, "OrderAccepted")
+    placeBuy(AccountA, 5.5, 250 * Constants.UnitsInWave, "OrderAccepted")
     MBalance1 = 0
     waitForBalance(MBalance1, AccountM, Asset1)
     ABalance1 = 1000 * Constants.UnitsInWave

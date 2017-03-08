@@ -2,12 +2,11 @@ package scorex.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.EllipticCurveImpl.SignatureLength
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
-import scorex.serialization.Deser
 import scorex.transaction.TransactionParser.{KeyLength, _}
 import scorex.transaction._
 
@@ -64,7 +63,7 @@ object LeaseCancelTransaction {
                                timestamp: Long,
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseCancelTransactionImpl] = {
     if (leaseId.length != DigestSize) {
-      Left(ValidationError.NegativeAmount)
+      Left(ValidationError.TransactionParameterValidationError("Lease transaction id is invalid"))
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

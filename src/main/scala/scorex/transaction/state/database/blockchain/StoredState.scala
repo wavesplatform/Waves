@@ -164,6 +164,17 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = txs.map(t => validateAgainstState(t, height))
 
+  def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Either[ValidationError,Transaction]] = {
+    val validator = new OrderMatchStoredState(storage)
+
+    txs.foldLeft(Seq.empty[Either[ValidationError,Transaction]]){
+      case (seq,tx) => validator.validateWithBlockTxs(this, tx, seq.filter(_.isRight).map(_.right.get), height) match {
+        case Left(err) => Left(err) +: seq
+        case Right(t) => Right(t) +: seq
+      }
+    }.reverse
+  }
+
   private def filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
     if (allowInvalidPaymentTransactionsByTimestamp) {
@@ -259,8 +270,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     val (err1, validAgainstConsecutivePayments) = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).segregate()
     val (err2, filteredFarFuture) = filterTransactionsFromFuture(validAgainstConsecutivePayments, blockTime).segregate()
     val allowUnissuedAssets = filteredFarFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
-    val (err3, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredFarFuture).segregate()
-    (err0 ++ err1 ++ err2 ++ err3, result)
+    val (err3, filteredOvermatch) = validateExchangeTxs(filteredFarFuture, height).segregate()
+    val (err4, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredOvermatch).segregate()
+    (err0 ++ err1 ++ err2 ++ err3 ++ err4, result)
   }
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {

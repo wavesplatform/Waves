@@ -31,6 +31,9 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     case _ =>
   }
 
+  override def validateWithBlockTxs(storedState: StoredState,
+                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = Right(tx)
+
   private def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[StateValidationError, SignedTransaction] = {
     storage.getTransaction(assetId) match {
       case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
@@ -47,6 +50,13 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     val assetAtHeight = s"$asset@$height"
     val assetAtTransaction = s"$asset@$transaction"
 
+    if (!isIssueExists(assetId) ||
+      (reissuable && isReissuable(assetId)) ||
+      !reissuable) {
+      storage.setReissuable(assetAtTransaction, reissuable)
+    } else {
+      throw new RuntimeException("Asset is not reissuable")
+    }
     storage.addHeight(asset, height)
     storage.addTransaction(assetAtHeight, transaction)
     storage.setQuantity(assetAtTransaction, quantity)
@@ -102,15 +112,19 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     val asset = Base58.encode(assetId)
     val heights = storage.getHeights(asset)
 
-    val reverseSortedHeight = heights.toSeq.reverse
-    if (reverseSortedHeight.nonEmpty) {
-      val lastHeight = reverseSortedHeight.head
-      val transactions = storage.getTransactions(s"$asset@$lastHeight")
-      if (transactions.nonEmpty) {
-        val transaction = transactions.toSeq.reverse.head
-        storage.isReissuable(s"$asset@$transaction")
-      } else false
-    } else false
+    heights.lastOption match {
+      case Some(lastHeight) =>
+        val transactions = storage.getTransactions(s"$asset@$lastHeight")
+        if (transactions.nonEmpty) {
+          val transaction = transactions.last
+          storage.isReissuable(s"$asset@$transaction")
+        } else false
+      case None => false
+    }
+  }
+
+  def isIssueExists(assetId: AssetId): Boolean = {
+    storage.getHeights(Base58.encode(assetId)).nonEmpty
   }
 
   def getAssetName(assetId: AssetId): String = {

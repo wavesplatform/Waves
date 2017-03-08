@@ -32,7 +32,7 @@ trait OrderHistory {
 
   private def addAssetsToSpend(lo: LimitOrder) = {
     val order = lo.order
-    val assetAcc = AssetAcc(order.senderPublicKey, order.spendAssetId)
+    val assetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
     val feeAssetAcc = AssetAcc(order.senderPublicKey, None)
     assetsToSpend(assetAcc.key) = assetsToSpend.getOrElse(assetAcc.key, 0L) + lo.getSpendAmount
     assetsToSpend(feeAssetAcc.key) = assetsToSpend.getOrElse(feeAssetAcc.key, 0L) + lo.feeAmount
@@ -60,7 +60,7 @@ trait OrderHistory {
       }
 
     val order = limitOrder.order
-    val assetAcc = AssetAcc(order.senderPublicKey, order.spendAssetId)
+    val assetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
     val feeAssetAcc = AssetAcc(order.senderPublicKey, None)
 
     reduce(assetAcc.key, limitOrder.getSpendAmount)

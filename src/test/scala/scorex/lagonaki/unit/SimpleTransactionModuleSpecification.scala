@@ -5,18 +5,21 @@ import scala.language.postfixOps
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.WavesSettings
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.FunSuite
+import org.scalatest.{FunSuite, Matchers}
 import scorex.account.AddressScheme
 import scorex.app.{Application, RunnableApplication}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
-import scorex.lagonaki.mocks.ConsensusMock
+import scorex.lagonaki.mocks.{ConsensusMock, TestBlock}
 import scorex.settings.{ChainParameters, TestChainParameters}
+import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 import scorex.wallet.Wallet
 
+import scala.util.Random
+
 //TODO: gagarin55 - Can't move it to appropriate module due to dependancy on some ConsesusModule impl
-class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
+class SimpleTransactionModuleSpecification extends FunSuite with MockFactory with Matchers {
 
   private val config = ConfigFactory.parseString(
     """
@@ -133,5 +136,26 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory {
     // assert
     assert(transactionModule.utxStorage.all().size == 1)
     assert(!transactionModule.utxStorage.all().contains(invalidTx))
+  }
+
+  test("unique txs by id in one block") {
+    val tx = TransferTransaction.create(None, privateKeyAccount, privateKeyAccount, 1L, genesisTimestamp + 1000, None, 100000L, Array.empty).right.get
+    transactionModule.isValid(TestBlock(Seq(tx))) shouldBe true
+    val replaySeq = Seq(tx, tx)
+    transactionModule.isValid(TestBlock(replaySeq)) shouldBe false
+  }
+
+  test("packUnconfirmed() packs txs in correct order") {
+    transactionModule.utxStorage.all().foreach(transactionModule.utxStorage.remove)
+
+    val correctSeq = Seq(
+      PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp + 2).right.get,
+      PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp + 1).right.get,
+      PaymentTransaction.create(privateKeyAccount, privateKeyAccount, 1L, 100000L, genesisTimestamp).right.get
+    )
+
+    Random.shuffle(correctSeq).foreach(t => transactionModule.utxStorage.putIfNew(t, (t : Transaction) => Right(t)))
+    assert(transactionModule.utxStorage.all().size == 3)
+    assert(transactionModule.packUnconfirmed() == correctSeq)
   }
 }

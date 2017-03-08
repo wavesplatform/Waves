@@ -37,4 +37,8 @@ class AddressAliasValidator(storage: StateStorageI with AliasExtendedStorageI) e
     case at: CreateAliasTransaction => storedState.persistAlias(at.sender, at.alias)
     case _ => ()
   }
+
+  override def validateWithBlockTxs(storedState: StoredState,
+                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = Right(tx)
+
 }

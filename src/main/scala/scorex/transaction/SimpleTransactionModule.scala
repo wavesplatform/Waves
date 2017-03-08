@@ -51,14 +51,17 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def packUnconfirmed(heightOpt: Option[Int]): Seq[Transaction] = synchronized {
     clearIncorrectTransactions()
 
-    val txs = utxStorage.all().sorted(TransactionsOrdering).take(MaxTransactionsPerBlock)
+    val txs = utxStorage.all()
+      .sorted(TransactionsOrdering.InUTXPool)
+      .take(MaxTransactionsPerBlock)
+
     val valid = blockStorage.state.validate(txs, heightOpt, NTP.correctedTime())._2
 
     if (valid.size != txs.size) {
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
     }
 
-    valid
+    valid.sorted(TransactionsOrdering.InBlock)
   }
 
   override def clearFromUnconfirmed(data: Seq[Transaction]): Unit = synchronized {
@@ -78,7 +81,8 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val txs = utxStorage.all()
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
-    val valid = blockStorage.state.validate(notFromFuture, blockTime = currentTime)._2
+    val inOrder = notFromFuture.sorted(TransactionsOrdering.InUTXPool)
+    val valid = blockStorage.state.validate(inOrder, blockTime = currentTime)._2
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
   }
@@ -196,12 +200,15 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   }
 
   override def isValid(block: Block): Boolean = try {
-    val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
-    lazy val txsAreNew = block.transactionData.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTimeCurrentBlockOverTransactionDiff }
+    val lastBlockTs = blockStorage.history.lastBlock.timestamp
+    val txs = block.transactionData
+    lazy val txsAreNew = txs.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTimeCurrentBlockOverTransactionDiff }
     lazy val (errors, validTrans) = blockStorage.state.validate(block.transactionData, blockStorage.history.heightOf(block), block.timestamp)
+    lazy val txsIdAreUniqueInBlock = txs.map(tx => Base58.encode(tx.id)).toSet.size == txs.size
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (errors.nonEmpty) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs: $errors")
-    txsAreNew && errors.isEmpty
+    if (!txsIdAreUniqueInBlock) log.debug(s"Invalid txs in block ${block.encodedId}: there are not unique txs")
+    txsAreNew && errors.isEmpty && txsIdAreUniqueInBlock
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")

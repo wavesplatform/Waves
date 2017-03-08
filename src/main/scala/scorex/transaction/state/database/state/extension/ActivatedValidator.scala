@@ -40,4 +40,7 @@ class ActivatedValidator(
   }
 
   override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = {}
+
+  override def validateWithBlockTxs(storedState: StoredState,
+                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = Right(tx)
 }
