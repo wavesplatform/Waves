@@ -2,27 +2,33 @@ package scorex.transaction.state.database.blockchain
 
 import com.google.common.primitives.Longs
 import org.h2.mvstore.MVStore
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Assertions, Matchers, PropSpec}
-import scorex.transaction.TransactionGen
-import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
+import scorex.settings.ChainParameters
+import scorex.transaction.{State, TransactionGen}
+import scorex.transaction.state.database.state.storage._
 
 class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
-  with Matchers with TransactionGen with Assertions {
+  with Matchers with TransactionGen with Assertions with MockFactory {
 
-  def newAssetExtendedState() = {
+  def newAssetExtendedState(): StoredState = {
     val mvStore = new MVStore.Builder().open()
-    val storage = new MVStoreStateStorage with MVStoreAssetsExtendedStateStorage {
+    val storage = new MVStoreStateStorage
+      with MVStoreOrderMatchStorage
+      with MVStoreAssetsExtendedStateStorage
+      with MVStoreLeaseExtendedStateStorage
+      with MVStoreAliasExtendedStorage {
       override val db: MVStore = mvStore
     }
-    new AssetsExtendedState(storage)
+    new StoredState(storage, mock[ChainParameters])
   }
 
   property("Assets quantity and issueability should work on one update") {
     val state = newAssetExtendedState()
     forAll(bytes32gen, bytes32gen, positiveLongGen) { (assetId, transactionId, quantity) =>
       state.addAsset(assetId, 1, transactionId, quantity, reissuable = true)
-      state.getAssetQuantity(assetId) shouldBe quantity
+      state.totalAssetQuantity(assetId) shouldBe quantity
       state.isReissuable(assetId) shouldBe true
     }
   }
@@ -36,7 +42,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
         i = i + 1
         q = q + quantity
         state.addAsset(assetId, i, transactionId, quantity, reissuable = true)
-        state.getAssetQuantity(assetId) shouldBe q
+        state.totalAssetQuantity(assetId) shouldBe q
       }
     }
   }
@@ -58,18 +64,18 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.addAsset(assetId, 1, getId(1), 10, reissuable = true)
     state.addAsset(assetId, 1, getId(2), 20, reissuable = true)
 
-    state.getAssetQuantity(assetId) shouldBe 30
+    state.totalAssetQuantity(assetId) shouldBe 30
     state.isReissuable(assetId) shouldBe true
 
     state.addAsset(assetId, 3, getId(3), 30, reissuable = true)
     state.addAsset(assetId, 3, getId(4), 40, reissuable = false)
 
-    state.getAssetQuantity(assetId) shouldBe 100
+    state.totalAssetQuantity(assetId) shouldBe 100
     state.isReissuable(assetId) shouldBe false
 
-    state.rollbackTo(assetId, 2)
+    state.assetRollbackTo(assetId, 2)
 
-    state.getAssetQuantity(assetId) shouldBe 30
+    state.totalAssetQuantity(assetId) shouldBe 30
     state.isReissuable(assetId) shouldBe true
   }
 
@@ -93,17 +99,17 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.addAsset(assetId, 2, getId(2), 10, reissuable = true)
     state.addAsset(assetId, 3, getId(3), 10, reissuable = true)
 
-    state.getAssetQuantity(assetId) shouldBe 30
+    state.totalAssetQuantity(assetId) shouldBe 30
     state.isReissuable(assetId) shouldBe true
 
     state.addAsset(assetId, 4, getId(4), 10, reissuable = false)
 
-    state.getAssetQuantity(assetId) shouldBe 40
+    state.totalAssetQuantity(assetId) shouldBe 40
     state.isReissuable(assetId) shouldBe false
 
-    state.rollbackTo(assetId, 2)
+    state.assetRollbackTo(assetId, 2)
 
-    state.getAssetQuantity(assetId) shouldBe 20
+    state.totalAssetQuantity(assetId) shouldBe 20
     state.isReissuable(assetId) shouldBe true
   }
 
@@ -115,17 +121,17 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.addAsset(assetId, 20, getId(2), 10, reissuable = true)
     state.addAsset(assetId, 30, getId(3), 10, reissuable = true)
 
-    state.getAssetQuantity(assetId) shouldBe 30
+    state.totalAssetQuantity(assetId) shouldBe 30
     state.isReissuable(assetId) shouldBe true
 
     state.addAsset(assetId, 40, getId(4), 10, reissuable = false)
 
-    state.getAssetQuantity(assetId) shouldBe 40
+    state.totalAssetQuantity(assetId) shouldBe 40
     state.isReissuable(assetId) shouldBe false
 
-    state.rollbackTo(assetId, 25)
+    state.assetRollbackTo(assetId, 25)
 
-    state.getAssetQuantity(assetId) shouldBe 20
+    state.totalAssetQuantity(assetId) shouldBe 20
     state.isReissuable(assetId) shouldBe true
   }
 
@@ -137,19 +143,19 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.addAsset(assetId, 10, getId(1), 10, reissuable = true)
     state.addAsset(assetId, 10, getId(1), 10, reissuable = true)
 
-    state.getAssetQuantity(assetId) shouldBe 10
+    state.totalAssetQuantity(assetId) shouldBe 10
     state.isReissuable(assetId) shouldBe true
 
     state.addAsset(assetId, 20, getId(2), 20, reissuable = false)
     state.addAsset(assetId, 20, getId(2), 20, reissuable = false)
     state.addAsset(assetId, 20, getId(2), 20, reissuable = false)
 
-    state.getAssetQuantity(assetId) shouldBe 30
+    state.totalAssetQuantity(assetId) shouldBe 30
     state.isReissuable(assetId) shouldBe false
 
-    state.rollbackTo(assetId, 18)
+    state.assetRollbackTo(assetId, 18)
 
-    state.getAssetQuantity(assetId) shouldBe 10
+    state.totalAssetQuantity(assetId) shouldBe 10
     state.isReissuable(assetId) shouldBe true
   }
 
@@ -165,18 +171,18 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
 
     state.addAsset(assetId, 30, getId(5), 30, reissuable = true)
 
-    state.getAssetQuantity(assetId) shouldBe 90
+    state.totalAssetQuantity(assetId) shouldBe 90
     state.isReissuable(assetId) shouldBe true
 
     state.burnAsset(assetId, 40, getId(6), -50)
     state.addAsset(assetId, 40, getId(7), 10, reissuable = false)
 
-    state.getAssetQuantity(assetId) shouldBe 50
+    state.totalAssetQuantity(assetId) shouldBe 50
     state.isReissuable(assetId) shouldBe false
 
-    state.rollbackTo(assetId, 15)
+    state.assetRollbackTo(assetId, 15)
 
-    state.getAssetQuantity(assetId) shouldBe 20
+    state.totalAssetQuantity(assetId) shouldBe 20
     state.isReissuable(assetId) shouldBe true
   }
 

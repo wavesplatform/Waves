@@ -5,7 +5,6 @@ import scorex.account.{Account, Alias}
 import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState}
 import scorex.transaction.state.database.state.{AccState, AddressString, Reasons}
 import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
 import scorex.utils.NTP
@@ -37,8 +36,6 @@ trait State {
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long
 
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
-
-  def getAssetQuantity(assetId: AssetId): Long
 
   def getAssetName(assetId: AssetId): String
 

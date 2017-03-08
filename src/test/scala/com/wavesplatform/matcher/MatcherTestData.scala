@@ -10,7 +10,7 @@ import scorex.crypto.hash.SecureCryptographicHash
 import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState, StoredState}
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.extension._
 import scorex.transaction.state.database.state.storage._
 import scorex.utils.{ByteArrayExtension, NTP}
@@ -129,11 +129,8 @@ trait MatcherTestData {
     new StoredState(storage, settings) {
       override def assetBalance(account: AssetAcc): Long = Long.MaxValue
 
-      override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
+      override def totalAssetQuantity(assetId: AssetId): Long = Long.MaxValue
 
-      override val assetsExtension: AssetsExtendedState = new AssetsExtendedState(storage) {
-        override def  getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
-      }
     }
   }
 }

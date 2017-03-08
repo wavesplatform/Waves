@@ -1,5 +1,6 @@
 package scorex.transaction.state.database.blockchain
 
+import com.google.common.base.Charsets
 import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.{Account, Alias}
@@ -27,15 +28,119 @@ import scorex.transaction.state.database.blockchain.StoredState._
 class StoredState(protected[blockchain] val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   settings: ChainParameters) extends State with ScorexLogging {
 
+  def assetIssueReissueBurnValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = {
+    def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[StateValidationError, SignedTransaction] = {
+      storage.getTransaction(assetId) match {
+        case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
+        case Some(it: IssueTransaction) =>
+          if (it.sender.address == tx.sender.address) Right(tx)
+          else Left(TransactionValidationError(tx, "Asset was issued by other address"))
+        case _ => Left(TransactionValidationError(tx, "Referenced transaction is not IssueTransaction"))
+      }
+    }
 
-  val assetsExtension = new AssetsExtendedState(storage)
+    tx match {
+      case tx: ReissueTransaction =>
+        isIssuerAddress(tx.assetId, tx).flatMap(t =>
+          if (isReissuable(tx.assetId)) Right(t) else Left(TransactionValidationError(tx, "Asset is not reissuable")))
+      case tx: BurnTransaction =>
+        isIssuerAddress(tx.assetId, tx)
+      case _ => Right(tx)
+    }
+  }
+
+  def assetIssueReissueBurnTransactionProcessor(height: Int)(tx: Transaction): Unit = tx match {
+    case tx: AssetIssuance =>
+      addAsset(tx.assetId, height, tx.id, tx.quantity, tx.reissuable)
+    case tx: BurnTransaction =>
+      burnAsset(tx.assetId, height, tx.id, -tx.amount)
+    case _ =>
+  }
+
+  private[blockchain] def addAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long, reissuable: Boolean): Unit = {
+    val asset = Base58.encode(assetId)
+    val transaction = Base58.encode(transactionId)
+    val assetAtHeight = s"$asset@$height"
+    val assetAtTransaction = s"$asset@$transaction"
+
+    if (!isIssueExists(assetId) ||
+      (reissuable && isReissuable(assetId)) ||
+      !reissuable) {
+      storage.setReissuable(assetAtTransaction, reissuable)
+    } else {
+      throw new RuntimeException("Asset is not reissuable")
+    }
+    storage.addHeight(asset, height)
+    storage.addTransaction(assetAtHeight, transaction)
+    storage.setQuantity(assetAtTransaction, quantity)
+    storage.setReissuable(assetAtTransaction, reissuable)
+  }
+
+  private[blockchain] def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit = {
+    require(quantity <= 0, "Quantity of burned asset should be negative")
+
+    val asset = Base58.encode(assetId)
+    val transaction = Base58.encode(transactionId)
+    val assetAtHeight = s"$asset@$height"
+    val assetAtTransaction = s"$asset@$transaction"
+
+    storage.addHeight(asset, height)
+    storage.addTransaction(assetAtHeight, transaction)
+    storage.setQuantity(assetAtTransaction, quantity)
+  }
+
+  def assetRollbackTo(assetId: AssetId, height: Int): Unit = {
+    val asset = Base58.encode(assetId)
+
+    val heights = storage.getHeights(asset)
+    val heightsToRemove = heights.filter(h => h > height)
+    storage.setHeight(asset, heights -- heightsToRemove)
+
+    val transactionsToRemove: Seq[String] = heightsToRemove.foldLeft(Seq.empty[String]) { (result, h) =>
+      result ++ storage.getTransactions(s"$asset@$h")
+    }
+
+    val keysToRemove = transactionsToRemove.map(t => s"$asset@$t")
+
+    keysToRemove.foreach { key =>
+      storage.removeKey(key)
+    }
+  }
+
+
+  def isReissuable(assetId: AssetId): Boolean = {
+    val asset = Base58.encode(assetId)
+    val heights = storage.getHeights(asset)
+
+    heights.lastOption match {
+      case Some(lastHeight) =>
+        val transactions = storage.getTransactions(s"$asset@$lastHeight")
+        if (transactions.nonEmpty) {
+          val transaction = transactions.last
+          storage.isReissuable(s"$asset@$transaction")
+        } else false
+      case None => false
+    }
+  }
+
+  def isIssueExists(assetId: AssetId): Boolean = {
+    storage.getHeights(Base58.encode(assetId)).nonEmpty
+  }
+
+  def getAssetName(assetId: AssetId): String = {
+    storage.getTransaction(assetId).flatMap {
+      case tx: IssueTransaction => Some(tx.asInstanceOf[IssueTransaction])
+      case _ => None
+    }.map(tx => new String(tx.name, Charsets.UTF_8)).getOrElse("Unknown")
+  }
+
 
   def exchangeTransactionValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case om: ExchangeTransaction => ExchangeTransactionValidator.isValid(om, findPrevOrderMatchTxs(om))
     case _ => Right(tx)
   }
 
-  def exchangeTransactionProcessor(blockTs: Long)(tx: Transaction): Unit = tx match {
+  def exchangeTransactionProcessorF(blockTs: Long)(tx: Transaction): Unit = tx match {
     case om: ExchangeTransaction =>
       def isSaveNeeded(order: Order): Boolean = {
         order.expiration >= blockTs
@@ -144,7 +249,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     applyLease(leaseTx)
   }
 
-  def leaseProcessor(tx: Transaction): Unit = tx match {
+  def leaseProcessorF(tx: Transaction): Unit = tx match {
     case tx: LeaseCancelTransaction =>
       val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
       cancelLease(leaseTx)
@@ -301,6 +406,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
   }
 
+  val assetIssueReissueBurnValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => assetIssueReissueBurnValidatorF(t)
   val activatedValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => activatedValidatorF(settings)(t)
   val genesisValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => genesisValidatorF(h)(t)
   val includedValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => includedValidatorF(settings.requirePaymentUniqueId)(t)
@@ -311,7 +417,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   val exchangeTransactionValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => exchangeTransactionValidatorF(t)
 
   val validators: Seq[(StoredState, Transaction, Int) => Either[StateValidationError, Transaction]] = Seq(
-    assetsExtension).map(v => v.validate _) ++ Seq(incrementingTimestampValidatorAdapter,
+    assetIssueReissueBurnValidatorAdapter,
+    incrementingTimestampValidatorAdapter,
     leaseValidatorAdapter,
     genesisValidatorAdapter,
     addressAliasValidatorAdapter,
@@ -323,12 +430,16 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
 
   val includedProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => includedProcessorF(height)(t)
   val addressAliasProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => addressAliasProcessorF(t)
-  val leaseProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => leaseProcessor(t)
-  val exchangeTransactionProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => exchangeTransactionProcessor(blockTs)(t)
+  val leaseProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => leaseProcessorF(t)
+  val exchangeTransactionProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => exchangeTransactionProcessorF(blockTs)(t)
+  val assetIssueReissueBurnTransactionProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => assetIssueReissueBurnTransactionProcessor(height)(t)
 
   val processors: Seq[(StoredState, Transaction, Long, Int) => Unit] = Seq(
-    assetsExtension).map(p => p.process _) ++
-    Seq(leaseProcessorAdapter, addressAliasProcessorAdapter, exchangeTransactionProcessorAdapter, includedProcessorAdapter)
+    assetIssueReissueBurnTransactionProcessorAdapter,
+    leaseProcessorAdapter,
+    addressAliasProcessorAdapter,
+    exchangeTransactionProcessorAdapter,
+    includedProcessorAdapter)
 
   override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 
@@ -344,7 +455,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
         val assetId = triedAssetId.get
         getIssueTransaction(assetId) match {
           case Some(issueTransaction) =>
-            result.updated(assetId, (balance, assetsExtension.isReissuable(assetId), totalAssetQuantity(assetId), issueTransaction))
+            result.updated(assetId, (balance, isReissuable(assetId), totalAssetQuantity(assetId), issueTransaction))
           case None =>
             result
         }
@@ -363,9 +474,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
         changes.reason.foreach(id => {
           storage.getTransaction(id) match {
             case Some(t: AssetIssuance) =>
-              assetsExtension.rollbackTo(t.assetId, currentHeight)
+              assetRollbackTo(t.assetId, currentHeight)
             case Some(t: BurnTransaction) =>
-              assetsExtension.rollbackTo(t.assetId, currentHeight)
+              assetRollbackTo(t.assetId, currentHeight)
             case Some(t: LeaseTransaction) =>
               cancelLease(t)
             case Some(t: LeaseCancelTransaction) =>
@@ -608,7 +719,19 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     newBalances
   }
 
-  def totalAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
+  def totalAssetQuantity(assetId: AssetId): Long = {
+    val asset = Base58.encode(assetId)
+    val heights = storage.getHeights(asset)
+
+    val sortedHeights = heights.toSeq.sorted
+    val transactions: Seq[String] = sortedHeights.foldLeft(Seq.empty[String]) { (result, h) =>
+      result ++ storage.getTransactions(s"$asset@$h")
+    }
+
+    transactions.foldLeft(0L) { (result, transaction) =>
+      result + storage.getQuantity(s"$asset@$transaction")
+    }
+  }
 
   def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)],
                    blockTs: Long = NTP.correctedTime()): Unit = synchronized {
@@ -718,11 +841,6 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
 
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
     balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
-
-  def getAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
-
-  def getAssetName(assetId: AssetId): String = assetsExtension.getAssetName(assetId)
-
 
 }
 
