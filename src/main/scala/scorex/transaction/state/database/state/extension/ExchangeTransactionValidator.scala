@@ -4,10 +4,8 @@ import scorex.transaction.StateValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.exchange.ExchangeTransaction
 
-
-
-object OrderMatchStoredState {
-  def isOrderMatchValid(exTrans: ExchangeTransaction, previousMatches: Set[ExchangeTransaction]): Either[StateValidationError, ExchangeTransaction] = {
+object ExchangeTransactionValidator {
+  def isValid(exTrans: ExchangeTransaction, previousMatches: Set[ExchangeTransaction]): Either[StateValidationError, ExchangeTransaction] = {
 
     lazy val buyTransactions = previousMatches.filter { om =>
       om.buyOrder.id sameElements exTrans.buyOrder.id

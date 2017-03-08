@@ -31,7 +31,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   val assetsExtension = new AssetsExtendedState(storage)
 
   def exchangeTransactionValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
-    case om: ExchangeTransaction => OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om))
+    case om: ExchangeTransaction => ExchangeTransactionValidator.isValid(om, findPrevOrderMatchTxs(om))
     case _ => Right(tx)
   }
 
@@ -97,14 +97,13 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     } else Set.empty[ExchangeTransaction]
   }
 
-  def validateWithBlockTxs(storedState: StoredState, tx: Transaction,
-                           blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = tx match {
+  def validateWithBlockTxs(tx: Transaction, blockTxs: Seq[Transaction]): Either[StateValidationError, Transaction] = tx match {
     case om: ExchangeTransaction =>
       val thisExchanges: Set[ExchangeTransaction] = blockTxs.collect {
         case a: ExchangeTransaction if a != tx && (a.buyOrder == om.buyOrder || a.sellOrder == om.sellOrder) => a
       }.toSet
 
-      OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om) ++ thisExchanges)
+      ExchangeTransactionValidator.isValid(om, findPrevOrderMatchTxs(om) ++ thisExchanges)
     case _ => Right(tx)
   }
 
@@ -469,7 +468,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Either[ValidationError, Transaction]] = {
 
     txs.foldLeft(Seq.empty[Either[ValidationError, Transaction]]) {
-      case (seq, tx) => validateWithBlockTxs(this, tx, seq.filter(_.isRight).map(_.right.get), height) match {
+      case (seq, tx) => validateWithBlockTxs(tx, seq.filter(_.isRight).map(_.right.get)) match {
         case Left(err) => Left(err) +: seq
         case Right(t) => Right(t) +: seq
       }

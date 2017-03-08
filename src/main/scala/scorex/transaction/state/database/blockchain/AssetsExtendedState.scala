@@ -12,13 +12,26 @@ import scorex.utils.ScorexLogging
 class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorageI) extends ScorexLogging
   with Validator with Processor {
 
-  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
-    case tx: ReissueTransaction =>
-      isIssuerAddress(tx.assetId, tx).flatMap(t =>
-        if (isReissuable(tx.assetId)) Right(t) else Left(TransactionValidationError(tx, "Asset is not reissuable")))
-    case tx: BurnTransaction =>
-      isIssuerAddress(tx.assetId, tx)
-    case _ => Right(tx)
+  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = {
+
+    def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[StateValidationError, SignedTransaction] = {
+      storage.getTransaction(assetId) match {
+        case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
+        case Some(it: IssueTransaction) =>
+          if (it.sender.address == tx.sender.address) Right(tx)
+          else Left(TransactionValidationError(tx, "Asset was issued by other address"))
+        case _ => Left(TransactionValidationError(tx, "Referenced transaction is not IssueTransaction"))
+      }
+    }
+
+    tx match {
+      case tx: ReissueTransaction =>
+        isIssuerAddress(tx.assetId, tx).flatMap(t =>
+          if (isReissuable(tx.assetId)) Right(t) else Left(TransactionValidationError(tx, "Asset is not reissuable")))
+      case tx: BurnTransaction =>
+        isIssuerAddress(tx.assetId, tx)
+      case _ => Right(tx)
+    }
   }
 
   override def process(storedState: StoredState, tx: Transaction, blockTs: Long, height: Int): Unit = tx match {
@@ -27,16 +40,6 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     case tx: BurnTransaction =>
       burnAsset(tx.assetId, height, tx.id, -tx.amount)
     case _ =>
-  }
-
-  private def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[StateValidationError, SignedTransaction] = {
-    storage.getTransaction(assetId) match {
-      case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
-      case Some(it: IssueTransaction) =>
-        if (it.sender.address == tx.sender.address) Right(tx)
-        else Left(TransactionValidationError(tx, "Asset was issued by other address"))
-      case _ => Left(TransactionValidationError(tx, "Referenced transaction is not IssueTransaction"))
-    }
   }
 
   private[blockchain] def addAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long, reissuable: Boolean): Unit = {

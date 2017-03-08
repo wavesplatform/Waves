@@ -11,7 +11,7 @@ import scorex.settings.TestChainParameters
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.database.state.extension.OrderMatchStoredState
+import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
 import scorex.transaction.{AssetAcc, AssetId, GenesisTransaction, TransactionGen}
 import scorex.utils.{ByteArrayExtension, NTP}
 import scorex.wallet.Wallet
@@ -293,7 +293,7 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
           val om2Invalid = ExchangeTransaction.create(acc, buy2, sell, buyPrice, sellAmount - om1.amount,
             mf3, (mf2 - (BigInt(mf2) * buyAmount / sellAmount).toLong) + 1, 1, curTime).right.get
 
-          OrderMatchStoredState.isOrderMatchValid(om2Invalid, Set(om1)) shouldBe an[Left[_, _]]
+          ExchangeTransactionValidator.isValid(om2Invalid, Set(om1)) shouldBe an[Left[_, _]]
         }
     }
 

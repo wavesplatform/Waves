@@ -7,7 +7,7 @@ import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState}
 import scorex.transaction.state.database.state.{AccState, AddressString, Reasons}
-import scorex.transaction.state.database.state.extension.OrderMatchStoredState
+import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
 import scorex.utils.NTP
 
 import scala.util.Try
