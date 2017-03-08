@@ -31,6 +31,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
   val assetsExtension = new AssetsExtendedState(storage)
   val leaseExtendedState = new LeaseExtendedState(storage)
+  val orderMatchStoredState = new OrderMatchStoredState(storage)
 
   val validators = Seq(
     assetsExtension,
@@ -39,7 +40,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     new GenesisValidator,
     new AddressAliasValidator(storage),
     new LeaseToSelfAliasValidator(storage),
-    new OrderMatchStoredState(storage),
+    orderMatchStoredState,
     new IncludedValidator(storage, settings.requirePaymentUniqueId),
     new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
       settings.allowLeaseTransactionAfterTimestamp,
@@ -182,7 +183,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = txs.map(t => validateAgainstState(t, height))
 
   def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Either[ValidationError,Transaction]] = {
-    val validator = new OrderMatchStoredState(storage)
+    val validator = orderMatchStoredState
 
     txs.foldLeft(Seq.empty[Either[ValidationError,Transaction]]){
       case (seq,tx) => validator.validateWithBlockTxs(this, tx, seq.filter(_.isRight).map(_.right.get), height) match {
@@ -438,8 +439,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
     balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
 
-  override def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = validators.filter(_.isInstanceOf[OrderMatchStoredState])
-    .head.asInstanceOf[OrderMatchStoredState].findPrevOrderMatchTxs(order)
+  override def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = orderMatchStoredState.findPrevOrderMatchTxs(order)
 
   def getAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
 

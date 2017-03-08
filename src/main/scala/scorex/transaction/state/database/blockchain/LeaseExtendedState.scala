@@ -55,6 +55,4 @@ class LeaseExtendedState(private[blockchain] val storage: StateStorageI with Lea
     case _ =>
   }
 
-  override def validateWithBlockTxs(storedState: StoredState,
-                                    tx: Transaction, blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = Right(tx)
 }
