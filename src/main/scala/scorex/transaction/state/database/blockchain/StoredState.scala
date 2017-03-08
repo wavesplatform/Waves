@@ -36,41 +36,39 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   }
 
   def exchangeTransactionProcessor(blockTs: Long)(tx: Transaction): Unit = tx match {
-    case om: ExchangeTransaction => putOrderMatch(om, blockTs)
+    case om: ExchangeTransaction =>
+      def isSaveNeeded(order: Order): Boolean = {
+        order.expiration >= blockTs
+      }
+
+      def putOrder(order: Order) = {
+        if (isSaveNeeded(order)) {
+          val orderDay = calcStartDay(order.expiration)
+          storage.putSavedDays(orderDay)
+          val orderIdStr = Base58.encode(order.id)
+          val omIdStr = Base58.encode(om.id)
+          val prev = storage.getOrderMatchTxByDay(orderDay, orderIdStr).getOrElse(Array.empty[String])
+          if (!prev.contains(omIdStr)) {
+            storage.putOrderMatchTxByDay(orderDay, orderIdStr, prev :+ omIdStr)
+          }
+        }
+      }
+
+      def removeObsoleteDays(timestamp: Long): Unit = {
+        val ts = calcStartDay(timestamp)
+        val daysToRemove: List[Long] = storage.savedDaysKeys.filter(t => t < ts)
+        if (daysToRemove.nonEmpty) {
+          synchronized {
+            storage.removeOrderMatchDays(daysToRemove)
+          }
+        }
+      }
+
+      putOrder(om.buyOrder)
+      putOrder(om.sellOrder)
+      removeObsoleteDays(blockTs)
+
     case _ =>
-  }
-
-  private def putOrderMatch(om: ExchangeTransaction, blockTs: Long): Unit = {
-    def isSaveNeeded(order: Order): Boolean = {
-      order.expiration >= blockTs
-    }
-
-    def putOrder(order: Order) = {
-      if (isSaveNeeded(order)) {
-        val orderDay = calcStartDay(order.expiration)
-        storage.putSavedDays(orderDay)
-        val orderIdStr = Base58.encode(order.id)
-        val omIdStr = Base58.encode(om.id)
-        val prev = storage.getOrderMatchTxByDay(orderDay, orderIdStr).getOrElse(Array.empty[String])
-        if (!prev.contains(omIdStr)) {
-          storage.putOrderMatchTxByDay(orderDay, orderIdStr, prev :+ omIdStr)
-        }
-      }
-    }
-
-    def removeObsoleteDays(timestamp: Long): Unit = {
-      val ts = calcStartDay(timestamp)
-      val daysToRemove: List[Long] = storage.savedDaysKeys.filter(t => t < ts)
-      if (daysToRemove.nonEmpty) {
-        synchronized {
-          storage.removeOrderMatchDays(daysToRemove)
-        }
-      }
-    }
-
-    putOrder(om.buyOrder)
-    putOrder(om.sellOrder)
-    removeObsoleteDays(blockTs)
   }
 
   private def calcStartDay(t: Long): Long = {
