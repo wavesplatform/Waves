@@ -7,7 +7,7 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
 import scorex.transaction.{Transaction, _}
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -27,10 +27,85 @@ import scorex.transaction.state.database.blockchain.StoredState._
 class StoredState(protected[blockchain] val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   settings: ChainParameters) extends State with ScorexLogging {
 
+
   val assetsExtension = new AssetsExtendedState(storage)
-  val leaseExtendedState = new LeaseExtendedState(storage)
   val orderMatchStoredState = new OrderMatchStoredState(storage)
-  val addressAliasValidator = new AddressAliasValidator(storage)
+
+  def getLeasedSum(address: AddressString): Long = storage.getLeasedSum(address)
+
+  def leaseTransactionValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+    case tx: LeaseCancelTransaction =>
+      val leaseOpt = storage.getLeaseTx(tx.leaseId)
+      leaseOpt match {
+        case Some(leaseTx) if leaseTx.sender.publicKey.sameElements(leaseTx.sender.publicKey) => Right(tx)
+        case Some(leaseTx) => Left(TransactionValidationError(tx, s"LeaseTransaction was leased by other sender"))
+        case None => Left(TransactionValidationError(tx, s"Related LeaseTransaction not found"))
+      }
+    case tx: LeaseTransaction =>
+      if (balance(tx.sender) - tx.fee - storage.getLeasedSum(tx.sender.address) >= tx.amount) {
+        Right(tx)
+      } else {
+        Left(TransactionValidationError(tx, s"Not enough effective balance to lease"))
+      }
+    case _ => Right(tx)
+  }
+
+  private def updateLeasedSum(account: Account, update: Long => Long): Unit = {
+    val address = account.address
+    val newLeasedBalance = update(storage.getLeasedSum(address))
+    storage.updateLeasedSum(address, newLeasedBalance)
+  }
+
+  def applyLease(tx: LeaseTransaction): Unit = {
+    updateLeasedSum(tx.sender, _ + tx.amount)
+  }
+
+  def cancelLease(tx: LeaseTransaction): Unit = {
+    updateLeasedSum(tx.sender, _ - tx.amount)
+  }
+
+  def cancelLeaseCancel(tx: LeaseCancelTransaction): Unit = {
+    val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
+    applyLease(leaseTx)
+  }
+
+  def leaseProcessor(tx: Transaction): Unit = tx match {
+    case tx: LeaseCancelTransaction =>
+      val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
+      cancelLease(leaseTx)
+    case tx: LeaseTransaction =>
+      applyLease(tx)
+    case _ =>
+  }
+
+
+  def addressAliasValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = {
+
+    val maybeAlias = tx match {
+      case ltx: LeaseTransaction => ltx.recipient match {
+        case a: Account => None
+        case a: Alias => Some(a)
+      }
+      case ttx: TransferTransaction => ttx.recipient match {
+        case a: Account => None
+        case a: Alias => Some(a)
+      }
+      case _ => None
+    }
+
+    maybeAlias match {
+      case None => Right(tx)
+      case Some(al) => storage.addressByAlias(al.name) match {
+        case Some(add) => Right(tx)
+        case None => Left(AliasNotExists(al))
+      }
+    }
+  }
+
+  def addressAliasProcessorF(tx: Transaction): Unit = tx match {
+    case at: CreateAliasTransaction => persistAlias(at.sender, at.alias)
+    case _ => ()
+  }
 
   def leaseToSelfValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = {
 
@@ -156,25 +231,28 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   val includedValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => includedValidatorF(settings.requirePaymentUniqueId)(t)
   val incrementingTimestampValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => incrementingTimestampValidatorF(settings.allowInvalidPaymentTransactionsByTimestamp)(t)
   val leaseToSelfValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => leaseToSelfValidatorF(t)
+  val addressAliasValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => addressAliasValidatorF(t)
+  val leaseValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => leaseTransactionValidatorF(t)
 
   val validators: Seq[(StoredState, Transaction, Int) => Either[StateValidationError, Transaction]] = Seq(
-    assetsExtension).map(v => v.validate _) ++ Seq(incrementingTimestampValidatorAdapter) ++
-    Seq(leaseExtendedState).map(v => v.validate _) ++
-    Seq(genesisValidatorAdapter) ++ Seq(
-    addressAliasValidator).map(v => v.validate _) ++
-    Seq(leaseToSelfValidatorAdapter) ++ Seq(
+    assetsExtension).map(v => v.validate _) ++ Seq(incrementingTimestampValidatorAdapter,
+    leaseValidatorAdapter,
+    genesisValidatorAdapter,
+    addressAliasValidatorAdapter,
+    leaseToSelfValidatorAdapter) ++ Seq(
     orderMatchStoredState).map(v => v.validate _) ++
     Seq(includedValidatorAdapter,
       activatedValidatorAdapter)
 
 
   val includedProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => includedProcessorF(height)(t)
+  val addressAliasProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => addressAliasProcessorF(t)
+  val leaseProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => leaseProcessor(t)
 
   val processors: Seq[(StoredState, Transaction, Long, Int) => Unit] = Seq(
-    assetsExtension,
-    leaseExtendedState,
-    addressAliasValidator,
-    orderMatchStoredState).map(p => p.process _) ++
+    assetsExtension).map(p => p.process _) ++
+    Seq(leaseProcessorAdapter, addressAliasProcessorAdapter) ++
+    Seq(orderMatchStoredState).map(p => p.process _) ++
     Seq(includedProcessorAdapter)
 
   override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
@@ -214,9 +292,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
             case Some(t: BurnTransaction) =>
               assetsExtension.rollbackTo(t.assetId, currentHeight)
             case Some(t: LeaseTransaction) =>
-              leaseExtendedState.cancelLease(t)
+              cancelLease(t)
             case Some(t: LeaseCancelTransaction) =>
-              leaseExtendedState.cancelLeaseCancel(t)
+              cancelLeaseCancel(t)
             case Some(t: CreateAliasTransaction) =>
               storage.removeAlias(t.alias.name)
             case _ =>

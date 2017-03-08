@@ -230,7 +230,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         val (senderBalance, senderEffectiveBalance, recipientBalance, recipientEffectiveBalance) = senderAndRecipientStateBalances(tx)
 
-        state.leaseExtendedState.storage.getLeasedSum(tx.sender.address) shouldBe 0L
+        state.getLeasedSum(tx.sender.address) shouldBe 0L
         state.isValid(tx, Int.MaxValue) shouldBe true
 
         // apply lease tx
@@ -261,7 +261,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.balance(first.sender) shouldBe balance
         state.effectiveBalance(first.sender) shouldBe balance
 
-        state.leaseExtendedState.storage.getLeasedSum(first.sender.address) shouldBe 0L
+        state.getLeasedSum(first.sender.address) shouldBe 0L
 
         state.isValid(first, Int.MaxValue) shouldBe true
         state.isValid(second, Int.MaxValue) shouldBe true
@@ -328,7 +328,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         state.isValid(cancel, Int.MaxValue) shouldBe false
 
-        state.leaseExtendedState.storage.getLeasedSum(lease.sender.address) shouldBe 0L
+        state.getLeasedSum(lease.sender.address) shouldBe 0L
         state.isValid(lease, Int.MaxValue) shouldBe true
 
         // apply lease tx
