@@ -79,7 +79,7 @@ class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) exte
     } else Set.empty[ExchangeTransaction]
   }
 
-  override def validateWithBlockTxs(storedState: StoredState, tx: Transaction,
+  def validateWithBlockTxs(storedState: StoredState, tx: Transaction,
                                     blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = tx match {
     case om: ExchangeTransaction =>
       val thisExchanges: Set[ExchangeTransaction] = blockTxs.collect {

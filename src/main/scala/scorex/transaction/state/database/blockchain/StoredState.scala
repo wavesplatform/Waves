@@ -183,10 +183,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = txs.map(t => validateAgainstState(t, height))
 
   def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Either[ValidationError,Transaction]] = {
-    val validator = orderMatchStoredState
 
     txs.foldLeft(Seq.empty[Either[ValidationError,Transaction]]){
-      case (seq,tx) => validator.validateWithBlockTxs(this, tx, seq.filter(_.isRight).map(_.right.get), height) match {
+      case (seq,tx) => orderMatchStoredState.validateWithBlockTxs(this, tx, seq.filter(_.isRight).map(_.right.get), height) match {
         case Left(err) => Left(err) +: seq
         case Right(t) => Right(t) +: seq
       }
