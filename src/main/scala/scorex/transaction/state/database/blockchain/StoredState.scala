@@ -30,13 +30,17 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   val assetsExtension = new AssetsExtendedState(storage)
   val leaseExtendedState = new LeaseExtendedState(storage)
   val orderMatchStoredState = new OrderMatchStoredState(storage)
-  val genesisValidator = new GenesisValidator
   val addressAliasValidator = new AddressAliasValidator(storage)
   val leaseToSelfAliasValidator = new LeaseToSelfAliasValidator(storage)
 
+  def genesisValidatorF(height: Int)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+    case gtx: GenesisTransaction if height != 0 => Left(TransactionValidationError(tx, "GenesisTranaction cannot appear in non-initial block"))
+    case _ => Right(tx)
+  }
+
   def includedValidatorF(requirePaymentUniqueId: Long)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case tx: PaymentTransaction if tx.timestamp < requirePaymentUniqueId => Right(tx)
-    case tx: Transaction => if (storage.included(tx.id, None).isEmpty) Right(tx)
+    case tx: Transaction => if (included(tx.id).isEmpty) Right(tx)
     else Left(TransactionValidationError(tx, "(except for some cases of PaymentTransaction) cannot be duplicated"))
   }
 
@@ -133,17 +137,18 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
   }
 
-  val activatedValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => activatedValidatorF(settings)(t)
-  val includedValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => includedValidatorF(settings.requirePaymentUniqueId)(t)
+  val activatedValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => activatedValidatorF(settings)(t)
+  val genesisValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => genesisValidatorF(h)(t)
+  val includedValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => includedValidatorF(settings.requirePaymentUniqueId)(t)
   val incrementingTimestampValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => incrementingTimestampValidatorF(settings.allowInvalidPaymentTransactionsByTimestamp)(t)
 
   val validators: Seq[(StoredState, Transaction, Int) => Either[StateValidationError, Transaction]] = Seq(
     assetsExtension).map(v => v.validate _) ++ Seq(incrementingTimestampValidatorAdapter) ++
-    Seq(leaseExtendedState,
-      genesisValidator,
-      addressAliasValidator,
-      leaseToSelfAliasValidator,
-      orderMatchStoredState).map(v => v.validate _) ++
+    Seq(leaseExtendedState).map(v => v.validate _) ++
+    Seq(genesisValidatorAdapter) ++ Seq(
+    addressAliasValidator,
+    leaseToSelfAliasValidator,
+    orderMatchStoredState).map(v => v.validate _) ++
     Seq(includedValidatorAdapter,
       activatedValidatorAdapter)
 
