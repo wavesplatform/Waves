@@ -29,7 +29,85 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
 
 
   val assetsExtension = new AssetsExtendedState(storage)
-  val orderMatchStoredState = new OrderMatchStoredState(storage)
+
+  def exchangeTransactionValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+    case om: ExchangeTransaction => OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om))
+    case _ => Right(tx)
+  }
+
+  def exchangeTransactionProcessor(blockTs: Long)(tx: Transaction): Unit = tx match {
+    case om: ExchangeTransaction => putOrderMatch(om, blockTs)
+    case _ =>
+  }
+
+  private def putOrderMatch(om: ExchangeTransaction, blockTs: Long): Unit = {
+    def isSaveNeeded(order: Order): Boolean = {
+      order.expiration >= blockTs
+    }
+
+    def putOrder(order: Order) = {
+      if (isSaveNeeded(order)) {
+        val orderDay = calcStartDay(order.expiration)
+        storage.putSavedDays(orderDay)
+        val orderIdStr = Base58.encode(order.id)
+        val omIdStr = Base58.encode(om.id)
+        val prev = storage.getOrderMatchTxByDay(orderDay, orderIdStr).getOrElse(Array.empty[String])
+        if (!prev.contains(omIdStr)) {
+          storage.putOrderMatchTxByDay(orderDay, orderIdStr, prev :+ omIdStr)
+        }
+      }
+    }
+
+    def removeObsoleteDays(timestamp: Long): Unit = {
+      val ts = calcStartDay(timestamp)
+      val daysToRemove: List[Long] = storage.savedDaysKeys.filter(t => t < ts)
+      if (daysToRemove.nonEmpty) {
+        synchronized {
+          storage.removeOrderMatchDays(daysToRemove)
+        }
+      }
+    }
+
+    putOrder(om.buyOrder)
+    putOrder(om.sellOrder)
+    removeObsoleteDays(blockTs)
+  }
+
+  private def calcStartDay(t: Long): Long = {
+    val ts = t / 1000
+    ts - ts % (24 * 60 * 60)
+  }
+
+
+  private def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] = {
+    a.toSet.flatMap { s: String => Base58.decode(s).toOption }.flatMap { id =>
+      storage.getTransactionBytes(id).flatMap(b => ExchangeTransaction.parseBytes(b).toOption)
+    }
+  }
+
+  private def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction] = {
+    findPrevOrderMatchTxs(om.buyOrder) ++ findPrevOrderMatchTxs(om.sellOrder)
+  }
+
+  def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = {
+    val orderDay = calcStartDay(order.expiration)
+    if (storage.containsSavedDays(orderDay)) {
+      parseTxSeq(storage.getOrderMatchTxByDay(calcStartDay(order.expiration), Base58.encode(order.id))
+        .getOrElse(Array.empty[String]))
+    } else Set.empty[ExchangeTransaction]
+  }
+
+  def validateWithBlockTxs(storedState: StoredState, tx: Transaction,
+                           blockTxs: Seq[Transaction], height: Int): Either[StateValidationError, Transaction] = tx match {
+    case om: ExchangeTransaction =>
+      val thisExchanges: Set[ExchangeTransaction] = blockTxs.collect {
+        case a: ExchangeTransaction if a != tx && (a.buyOrder == om.buyOrder || a.sellOrder == om.sellOrder) => a
+      }.toSet
+
+      OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om) ++ thisExchanges)
+    case _ => Right(tx)
+  }
+
 
   def getLeasedSum(address: AddressString): Long = storage.getLeasedSum(address)
 
@@ -233,27 +311,27 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   val leaseToSelfValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => leaseToSelfValidatorF(t)
   val addressAliasValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => addressAliasValidatorF(t)
   val leaseValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => leaseTransactionValidatorF(t)
+  val exchangeTransactionValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => exchangeTransactionValidatorF(t)
 
   val validators: Seq[(StoredState, Transaction, Int) => Either[StateValidationError, Transaction]] = Seq(
     assetsExtension).map(v => v.validate _) ++ Seq(incrementingTimestampValidatorAdapter,
     leaseValidatorAdapter,
     genesisValidatorAdapter,
     addressAliasValidatorAdapter,
-    leaseToSelfValidatorAdapter) ++ Seq(
-    orderMatchStoredState).map(v => v.validate _) ++
-    Seq(includedValidatorAdapter,
-      activatedValidatorAdapter)
+    leaseToSelfValidatorAdapter,
+    includedValidatorAdapter,
+    exchangeTransactionValidatorAdapter,
+    activatedValidatorAdapter)
 
 
   val includedProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => includedProcessorF(height)(t)
   val addressAliasProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => addressAliasProcessorF(t)
   val leaseProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => leaseProcessor(t)
+  val exchangeTransactionProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => exchangeTransactionProcessor(blockTs)(t)
 
   val processors: Seq[(StoredState, Transaction, Long, Int) => Unit] = Seq(
     assetsExtension).map(p => p.process _) ++
-    Seq(leaseProcessorAdapter, addressAliasProcessorAdapter) ++
-    Seq(orderMatchStoredState).map(p => p.process _) ++
-    Seq(includedProcessorAdapter)
+    Seq(leaseProcessorAdapter, addressAliasProcessorAdapter, exchangeTransactionProcessorAdapter, includedProcessorAdapter)
 
   override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 
@@ -391,7 +469,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Either[ValidationError, Transaction]] = {
 
     txs.foldLeft(Seq.empty[Either[ValidationError, Transaction]]) {
-      case (seq, tx) => orderMatchStoredState.validateWithBlockTxs(this, tx, seq.filter(_.isRight).map(_.right.get), height) match {
+      case (seq, tx) => validateWithBlockTxs(this, tx, seq.filter(_.isRight).map(_.right.get), height) match {
         case Left(err) => Left(err) +: seq
         case Right(t) => Right(t) +: seq
       }
@@ -643,8 +721,6 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
 
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
     balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
-
-  override def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = orderMatchStoredState.findPrevOrderMatchTxs(order)
 
   def getAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
 

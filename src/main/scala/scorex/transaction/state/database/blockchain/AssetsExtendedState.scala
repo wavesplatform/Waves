@@ -9,8 +9,6 @@ import scorex.transaction.state.database.state.extension.{Processor, Validator}
 import scorex.transaction.state.database.state.storage.{AssetsExtendedStateStorageI, StateStorageI}
 import scorex.utils.ScorexLogging
 
-import scala.util.{Failure, Success}
-
 class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorageI) extends ScorexLogging
   with Validator with Processor {
 
