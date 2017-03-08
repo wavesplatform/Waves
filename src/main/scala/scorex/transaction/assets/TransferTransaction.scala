@@ -4,7 +4,7 @@ import scala.util.{Failure, Success, Try}
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.utils.base58Length
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
@@ -14,7 +14,7 @@ import scorex.transaction.{ValidationError, _}
 sealed trait TransferTransaction extends SignedTransaction {
   def assetId: Option[AssetId]
 
-  def recipient: Account
+  def recipient: AccountOrAlias
 
   def amount: Long
 
@@ -32,7 +32,7 @@ object TransferTransaction {
 
   private case class TransferTransactionImpl(assetId: Option[AssetId],
                                              sender: PublicKeyAccount,
-                                             recipient: Account,
+                                             recipient: AccountOrAlias,
                                              amount: Long,
                                              timestamp: Long,
                                              feeAssetId: Option[AssetId],
@@ -41,15 +41,6 @@ object TransferTransaction {
                                              signature: Array[Byte])
     extends TransferTransaction {
     override val transactionType: TransactionType.Value = TransactionType.TransferTransaction
-
-    override def balanceChanges(): Seq[BalanceChange] = {
-      val recipientCh = BalanceChange(AssetAcc(recipient, assetId), amount)
-      val senderCh =
-        if (sameAssetForFee) Seq(BalanceChange(AssetAcc(sender, assetId), -amount - fee))
-        else Seq(BalanceChange(AssetAcc(sender, assetId), -amount), BalanceChange(AssetAcc(sender, feeAssetId), -fee))
-
-      recipientCh +: senderCh
-    }
 
     lazy val sameAssetForFee: Boolean = feeAssetId.map(fa => assetId.exists(_ sameElements fa)).getOrElse(assetId.isEmpty)
 
@@ -75,7 +66,7 @@ object TransferTransaction {
 
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "recipient" -> recipient.address,
+      "recipient" -> recipient.stringRepr,
       "assetId" -> assetId.map(Base58.encode),
       "amount" -> amount,
       "feeAsset" -> feeAssetId.map(Base58.encode),
@@ -98,17 +89,18 @@ object TransferTransaction {
     val timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
     val amount = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
     val feeAmount = Longs.fromByteArray(bytes.slice(s1 + 16, s1 + 24))
-    val recipient = Account.fromBytes(bytes.slice(s1 + 24, s1 + 24 + Account.AddressLength)).right.get
-    val (attachment, _) = Deser.parseArraySize(bytes, s1 + 24 + Account.AddressLength)
 
-    TransferTransaction
-      .create(assetIdOpt, sender, recipient, amount, timestamp, feeAssetIdOpt, feeAmount, attachment, signature)
-      .fold(left => Failure(new Exception(left.toString)), right => Success(right))
+    (for {
+      recRes <- AccountOrAlias.fromBytes(bytes, s1 + 24)
+      (recipient, recipientEnd) = recRes
+      (attachment, _) = Deser.parseArraySize(bytes, recipientEnd)
+      tt <- TransferTransaction.create(assetIdOpt, sender, recipient, amount, timestamp, feeAssetIdOpt, feeAmount, attachment, signature)
+    } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
   private def createUnverified(assetId: Option[AssetId],
                                sender: PublicKeyAccount,
-                               recipient: Account,
+                               recipient: AccountOrAlias,
                                amount: Long,
                                timestamp: Long,
                                feeAssetId: Option[AssetId],
@@ -130,7 +122,7 @@ object TransferTransaction {
 
   def create(assetId: Option[AssetId],
              sender: PublicKeyAccount,
-             recipient: Account,
+             recipient: AccountOrAlias,
              amount: Long,
              timestamp: Long,
              feeAssetId: Option[AssetId],
@@ -143,7 +135,7 @@ object TransferTransaction {
 
   def create(assetId: Option[AssetId],
              sender: PrivateKeyAccount,
-             recipient: Account,
+             recipient: AccountOrAlias,
              amount: Long,
              timestamp: Long,
              feeAssetId: Option[AssetId],

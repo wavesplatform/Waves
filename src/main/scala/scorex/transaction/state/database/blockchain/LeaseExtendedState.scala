@@ -2,16 +2,15 @@ package scorex.transaction.state.database.blockchain
 
 import scorex.account.Account
 import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.state.database.state.{AccState, Reasons}
 import scorex.transaction.state.database.state.extension.Validator
 import scorex.transaction.state.database.state.storage.{LeaseExtendedStateStorageI, StateStorageI}
-import scorex.transaction.{AssetAcc, EffectiveBalanceChange, Transaction}
 import scorex.utils.ScorexLogging
 
 class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with Validator {
 
-  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[TransactionValidationError, Transaction] = tx match {
+  override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: LeaseCancelTransaction =>
       val leaseOpt = storage.getLeaseTx(tx.leaseId)
       leaseOpt match {
@@ -26,20 +25,6 @@ class LeaseExtendedState(private[blockchain] val storage: StateStorageI with Lea
         Left(TransactionValidationError(tx, s"Not enough effective balance to lease"))
       }
     case _ => Right(tx)
-  }
-
-  def effectiveBalanceChanges(tx: Transaction): Seq[EffectiveBalanceChange] = tx match {
-    case tx: LeaseTransaction =>
-      Seq(EffectiveBalanceChange(tx.sender, -tx.amount - tx.fee),
-        EffectiveBalanceChange(tx.recipient, tx.amount))
-    case tx: LeaseCancelTransaction =>
-      val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
-      Seq(
-        EffectiveBalanceChange(tx.sender, leaseTx.amount - tx.fee),
-        EffectiveBalanceChange(leaseTx.recipient, -leaseTx.amount))
-    case _ => tx.balanceChanges().map(bc => {
-      EffectiveBalanceChange(bc.assetAcc.account, bc.delta)
-    })
   }
 
   private def updateLeasedSum(account: Account, update: Long => Long): Unit = {

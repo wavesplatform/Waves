@@ -46,8 +46,6 @@ object GenesisTransaction extends {
       require(res.length == TypeLength + BASE_LENGTH)
       res
     }
-
-    override def balanceChanges(): Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(recipient, None), amount))
   }
 
   private val RECIPIENT_LENGTH = Account.AddressLength

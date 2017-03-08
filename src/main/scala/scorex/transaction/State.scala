@@ -1,9 +1,10 @@
 package scorex.transaction
 
 import play.api.libs.json.JsObject
-import scorex.account.Account
+import scorex.account.{Account, Alias}
 import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState}
 import scorex.transaction.state.database.state.{AccState, Reasons}
 import scorex.transaction.state.database.state.extension.{IncrementingTimestampValidator, OrderMatchStoredState}
@@ -21,29 +22,37 @@ trait State {
 
   def included(signature: Array[Byte]): Option[Int]
 
-  def balance(account: Account, height: Option[Int] = None): Long
+  def balance(account: Account): Long
 
-  def balanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
+  def balanceWithConfirmations(account: Account, confirmations: Int): Long
 
   def accountTransactions(account: Account, limit: Int = State.DefaultLimit): Seq[_ <: Transaction]
 
-  def assetBalance(account: AssetAcc, atHeight: Option[Int] = None): Long
+  def assetBalance(account: AssetAcc): Long
 
   def assetDistribution(assetId: Array[Byte]): Map[String, Long]
 
   def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)]
 
-  // exposing extensions for orders validation
+  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long
 
-  def orderMatchStoredState: OrderMatchStoredState
+  def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
 
-  def assetsExtension: AssetsExtendedState
+  def getAssetQuantity(assetId: AssetId): Long
+
+  def getAssetName(assetId: AssetId): String
+
+  def resolveAlias(a: Alias): Option[Account]
+
+  def getAlias(a: Account): Option[Alias]
+
+  def persistAlias(ac: Account, al: Alias): Unit
 
   // debug from api
 
-  def toWavesJson(heightOpt: Int): JsObject
+  def toWavesJson(height: Int): JsObject
 
-  def toJson(heightOpt: Option[Int] = None): JsObject
+  def toJson(heightOpt: Option[Int]): JsObject
 
   def hash: Int
 
@@ -68,13 +77,13 @@ trait State {
 
   def totalBalance: Long
 
-  def effectiveBalance(account: Account, height: Option[Int] = None): Long
-
-  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, heightOpt: Option[Int] = None): Long
+  def effectiveBalance(account: Account): Long
 
   def incrementingTimestampValidator: IncrementingTimestampValidator
 
   def leaseExtendedState: LeaseExtendedState
+
+  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int): Long
 
 }
 
@@ -85,7 +94,7 @@ object State {
 
     // validation
 
-    def validate[T<: Transaction](tx: T, blockTime: Long): Either[ValidationError, T] = s.validate(Seq(tx), None, blockTime) match {
+    def validate[T <: Transaction](tx: T, blockTime: Long): Either[ValidationError, T] = s.validate(Seq(tx), None, blockTime) match {
       case (_, Seq(t)) => Right(t.asInstanceOf[T])
       case (Seq(err), _) => Left(err)
     }

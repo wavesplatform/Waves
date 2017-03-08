@@ -32,7 +32,7 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
   state.processBlock(TestBlock(Seq(GenesisTransaction.create(accounts.head, 100000000000L, 0).right.get)))
 
   private def createIssueAssetTx(request: IssueRequest, wallet: Wallet): IssueTransaction = {
-    val sender = wallet.privateKeyAccount(request.sender).get
+    val sender = wallet.findWallet(request.sender).right.get
     IssueTransaction.create(sender,
       Base58.decode(request.name).get,
       Base58.decode(request.description).get,
@@ -46,7 +46,7 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
   private val i = new AtomicInteger
 
   private def createTransferAssetTx(request: TransferRequest, wallet: Wallet): TransferTransaction = {
-    val sender = wallet.privateKeyAccount(request.sender).get
+    val sender = wallet.findWallet(request.sender).right.get
     TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
       Account.fromBase58String(request.recipient).right.get,

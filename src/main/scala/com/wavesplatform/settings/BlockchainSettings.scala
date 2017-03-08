@@ -19,7 +19,8 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowBurnTransactionAfterTimestamp: Long,
                                  allowLeaseTransactionAfterTimestamp: Long,
                                  requirePaymentUniqueId: Long,
-                                 allowExchangeTransactionAfterTimestamp: Long)
+                                 allowExchangeTransactionAfterTimestamp: Long,
+                                 allowCreateAliasTransactionAfterTimestamp: Long)
 
 object FunctionalitySettings {
   val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
@@ -32,7 +33,8 @@ object FunctionalitySettings {
     allowBurnTransactionAfterTimestamp = 1482233593000L,
     allowLeaseTransactionAfterTimestamp = 1458144000000L,
     requirePaymentUniqueId = 1488361885000L,
-    allowExchangeTransactionAfterTimestamp = 1489708800000L)
+    allowExchangeTransactionAfterTimestamp = 1489708800000L,
+    allowCreateAliasTransactionAfterTimestamp = Long.MaxValue)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
@@ -45,7 +47,8 @@ object FunctionalitySettings {
     allowBurnTransactionAfterTimestamp = 1481110521000L,
     allowLeaseTransactionAfterTimestamp = Long.MinValue,
     requirePaymentUniqueId = 1485942685000L,
-    allowExchangeTransactionAfterTimestamp = 1483228800000L)
+    allowExchangeTransactionAfterTimestamp = 1483228800000L,
+    allowCreateAliasTransactionAfterTimestamp = Long.MinValue)
 
   val configPath = "waves.blockchain.custom.functionality"
 
@@ -61,11 +64,13 @@ object FunctionalitySettings {
     val allowLeaseTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-lease-transaction-after")
     val requirePaymentUniqueId = config.as[Long](s"$configPath.require-payment-unique-id-after")
     val allowExchangeTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-exchange-transaction-after")
+    val allowCreateAliasTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-createalias-transaction-after")
 
     FunctionalitySettings(allowTemporaryNegativeUntil, allowInvalidPaymentTransactionsByTimestamp,
       requireSortedTransactionsAfter, generatingBalanceDepthFrom50To1000AfterHeight,
       minimalGeneratingBalanceAfterTimestamp, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil,
-      allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId, allowExchangeTransactionAfterTimestamp)
+      allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId,
+      allowExchangeTransactionAfterTimestamp, allowCreateAliasTransactionAfterTimestamp)
   }
 }
 
@@ -187,6 +192,8 @@ object BlockchainSettingsExtension {
         override def allowLeaseTransactionAfterTimestamp: Long = blockchainSettings.functionalitySettings.allowLeaseTransactionAfterTimestamp
 
         override def allowExchangeTransactionAfterTimestamp: Long = blockchainSettings.functionalitySettings.allowExchangeTransactionAfterTimestamp
+
+        override def allowCreateAliasTransactionAfterTimestamp: Long = blockchainSettings.functionalitySettings.allowCreateAliasTransactionAfterTimestamp
       }
     }
 

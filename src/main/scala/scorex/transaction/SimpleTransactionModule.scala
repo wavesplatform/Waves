@@ -2,7 +2,8 @@ package scorex.transaction
 
 import com.google.common.base.Charsets
 import com.wavesplatform.settings.WavesSettings
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account._
+import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.app.Application
@@ -12,7 +13,7 @@ import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.{MissingSenderPrivateKey, TransactionValidationError}
+import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
@@ -92,16 +93,17 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       tx
     }
 
-  override def createPayment(payment: PaymentRequest, wallet: Wallet): Either[ValidationError, PaymentTransaction] = for {
-    acc <- Account.fromBase58String(payment.recipient)
-    pmt <- createPayment(wallet.privateKeyAccount(payment.sender).get, acc, payment.amount, payment.fee)
+  override def createPayment(request: PaymentRequest, wallet: Wallet): Either[ValidationError, PaymentTransaction] = for {
+    pk <- wallet.findWallet(request.sender)
+    rec <- Account.fromBase58String(request.recipient)
+    pmt <- createPayment(pk, rec, request.amount, request.fee)
   } yield pmt
 
 
   override def transferAsset(request: TransferRequest, wallet: Wallet): Either[ValidationError, TransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
-      recipientAcc <- Account.fromBase58String(request.recipient)
+      recipientAcc <- AccountOrAlias.fromString(request.recipient)
       tx <- TransferTransaction
         .create(request.assetId.map(s => Base58.decode(s).get),
           senderPrivateKey,
@@ -126,30 +128,39 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
 
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
-    recipientAcc <- Account.fromBase58String(request.recipient)
+    recipientAcc <- AccountOrAlias.fromString(request.recipient)
     tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, getTimestamp, recipientAcc)
     r <- onNewOffchainTransaction(tx)
   } yield r
 
-  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction] = {
-    findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey =>
-      LeaseCancelTransaction.create(senderPrivateKey, Base58.decode(request.txId).get, request.fee, getTimestamp)
-        .flatMap(onNewOffchainTransaction))
-  }
+  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction] =
+    for {
+      pk <- wallet.findWallet(request.sender)
+      lease <- LeaseCancelTransaction.create(pk, Base58.decode(request.txId).get, request.fee, getTimestamp)
+      t <- onNewOffchainTransaction(lease)
+    } yield t
 
-  override def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction] = {
-    findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey =>
-      ReissueTransaction
-        .create(senderPrivateKey, Base58.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, getTimestamp)
-        .flatMap(onNewOffchainTransaction))
-  }
 
-  override def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction] = {
-    findPrivateKey(request.sender)(wallet).flatMap(senderPrivateKey =>
-      BurnTransaction
-        .create(senderPrivateKey, Base58.decode(request.assetId).get, request.quantity, request.fee, getTimestamp)
-        .flatMap(onNewOffchainTransaction))
-  }
+  override def alias(request: CreateAliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction] = for {
+    senderPrivateKey <- wallet.findWallet(request.sender)
+    alias <- Alias(request.alias)
+    tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, getTimestamp)
+    r <- onNewOffchainTransaction(tx)
+  } yield r
+
+  override def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction] = for {
+    pk <- wallet.findWallet(request.sender)
+    tx <- ReissueTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, getTimestamp)
+    r <- onNewOffchainTransaction(tx)
+  } yield r
+
+
+  override def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction] = for {
+    pk <- wallet.findWallet(request.sender)
+    tx <- BurnTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.fee, getTimestamp)
+    r <- onNewOffchainTransaction(tx)
+  } yield r
+
 
   private var txTime: Long = 0
 
@@ -215,10 +226,6 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       _t <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)
       t <- onNewOffchainTransaction(_t)
     } yield t
-
-  private def findPrivateKey(address: String)(implicit wallet: Wallet): Either[ValidationError, PrivateKeyAccount] =
-    wallet.privateKeyAccount(address).toRight[ValidationError](MissingSenderPrivateKey)
-
 }
 
 object SimpleTransactionModule {

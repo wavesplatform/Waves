@@ -31,8 +31,8 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   private val storedState = application.storedState
   private var orderIdToCancel = Option.empty[String]
 
-  private val MatcherPubKey = application.wallet.privateKeyAccount(application.settings.matcherSettings.account).
-    map(a => Base58.encode(a.publicKey)).get
+  private val MatcherPubKey = application.wallet.findWallet(application.settings.matcherSettings.account).
+    map(a => Base58.encode(a.publicKey)).right.get
 
   def initBalances() = {
     assetTransfer(AccountM, AccountA, 5000 * Constants.UnitsInWave)

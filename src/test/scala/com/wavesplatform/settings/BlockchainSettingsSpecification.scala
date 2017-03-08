@@ -26,6 +26,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        require-payment-unique-id-after: 9
         |        allow-lease-transaction-after: 10
         |        allow-exchange-transaction-after: 11
+        |        allow-createalias-transaction-after: 12
         |      }
         |      genesis {
         |        timestamp: 1460678400000
@@ -55,6 +56,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.requirePaymentUniqueId should be(9)
     settings.functionalitySettings.allowLeaseTransactionAfterTimestamp should be(10)
     settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(11)
+    settings.functionalitySettings.allowCreateAliasTransactionAfterTimestamp should be(12)
     settings.genesisSettings.timestamp should be (1460678400000L)
     settings.genesisSettings.signature should be ("BASE58BLOCKSIGNATURE")
     settings.genesisSettings.initialBalance should be (100000000000000L)

@@ -6,11 +6,11 @@ import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.storage.StateStorageI
-import scorex.transaction.{PaymentTransaction, Transaction}
+import scorex.transaction.{PaymentTransaction, StateValidationError, Transaction}
 
 class IncrementingTimestampValidator(allowInvalidPaymentTransactionsByTimestamp: Long, storage: StateStorageI) extends Validator {
 
-  override def validate(storedState: StoredState, transaction: Transaction, height: Int): Either[TransactionValidationError, Transaction] = transaction match {
+  override def validate(storedState: StoredState, transaction: Transaction, height: Int): Either[StateValidationError, Transaction] = transaction match {
     case tx: PaymentTransaction =>
       val isCorrect = tx.timestamp < allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
       if (isCorrect) Right(tx)
@@ -54,7 +54,7 @@ class IncrementingTimestampValidator(allowInvalidPaymentTransactionsByTimestamp:
   }
 
   def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
-    def loop(h: Int, address: Address): Option[PaymentTransaction] = {
+    def loop(h: Int, address: AddressString): Option[PaymentTransaction] = {
       storage.getAccountChanges(address, h) match {
         case Some(row) =>
           val accountTransactions = row.reason.flatMap(id => storage.getTransaction(id))

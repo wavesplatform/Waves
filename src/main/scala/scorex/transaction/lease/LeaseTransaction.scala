@@ -2,7 +2,7 @@ package scorex.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser._
@@ -15,7 +15,7 @@ sealed trait LeaseTransaction extends SignedTransaction {
 
   def fee: Long
 
-  def recipient: Account
+  def recipient: AccountOrAlias
 }
 
 object LeaseTransaction {
@@ -24,7 +24,7 @@ object LeaseTransaction {
                                           amount: Long,
                                           fee: Long,
                                           timestamp: Long,
-                                          recipient: Account,
+                                          recipient: AccountOrAlias,
                                           signature: Array[Byte])
     extends LeaseTransaction {
 
@@ -39,13 +39,12 @@ object LeaseTransaction {
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "amount" -> amount,
-      "recipient" -> recipient.address,
+      "recipient" -> recipient.stringRepr,
       "fee" -> fee,
       "timestamp" -> timestamp
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(sender, None), -fee))
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
   }
@@ -53,32 +52,33 @@ object LeaseTransaction {
   def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     import EllipticCurveImpl._
     val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
-    val recipient = Account.fromBytes(bytes.slice(KeyLength, KeyLength + Account.AddressLength)).right.get
-    val quantityStart = KeyLength + Account.AddressLength
-
-    val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
-    val fee = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
-    val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
-    val signature = bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength)
-    LeaseTransaction
-      .create(sender, quantity, fee, timestamp, recipient, signature)
-      .fold(left => Failure(new Exception(left.toString)), right => Success(right))
+    (for {
+      recRes <- AccountOrAlias.fromBytes(bytes, KeyLength)
+      (recipient, recipientEnd) = recRes
+      quantityStart = recipientEnd
+      quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
+      fee = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
+      timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
+      signature = bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength)
+      lt <- LeaseTransaction.create(sender, quantity, fee, timestamp, recipient, signature)
+    } yield lt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
   private def createUnverified(sender: PublicKeyAccount,
                                amount: Long,
                                fee: Long,
                                timestamp: Long,
-                               recipient: Account,
+                               recipient: AccountOrAlias,
                                signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseTransactionImpl] = {
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount)
-    } else if (sender.address == recipient.address) {
-      Left(ValidationError.ToSelf)
+
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
+      Left(ValidationError.OverflowError)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
+    } else if (recipient.isInstanceOf[Account] && sender.stringRepr == recipient.stringRepr) {
+      Left(ValidationError.ToSelf)
     } else {
       Right(LeaseTransactionImpl(sender, amount, fee, timestamp, recipient, signature.orNull))
     }
@@ -88,7 +88,7 @@ object LeaseTransaction {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             recipient: Account,
+             recipient: AccountOrAlias,
              signature: Array[Byte]): Either[ValidationError, LeaseTransaction] = {
     createUnverified(sender, amount, fee, timestamp, recipient, Some(signature))
       .right.flatMap(SignedTransaction.verify)
@@ -98,7 +98,7 @@ object LeaseTransaction {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             recipient: Account): Either[ValidationError, LeaseTransaction] = {
+             recipient: AccountOrAlias): Either[ValidationError, LeaseTransaction] = {
     createUnverified(sender, amount, fee, timestamp, recipient).right.map { unsigned =>
       unsigned.copy(signature = EllipticCurveImpl.sign(sender, unsigned.toSign))
     }

@@ -13,8 +13,6 @@ trait ExchangeTransactionCreator {
   val storedState: State
   val wallet: Wallet
   val settings: MatcherSettings
-  //TODO ???
-  val omss = storedState.orderMatchStoredState
   private var txTime: Long = 0
 
   private def getTimestamp: Long = {
@@ -23,7 +21,7 @@ trait ExchangeTransactionCreator {
   }
 
   def createTransaction(submitted: LimitOrder, counter: LimitOrder): Either[ValidationError, ExchangeTransaction] = {
-    wallet.privateKeyAccount(submitted.order.matcherPublicKey.address).toRight[ValidationError](MissingSenderPrivateKey).flatMap(matcherPrivateKey => {
+    wallet.privateKeyAccount(submitted.order.matcherPublicKey).flatMap(matcherPrivateKey => {
       val price = counter.price
       val amount = math.min(submitted.amount, counter.amount)
       val (buy, sell) = Order.splitByType(submitted.order, counter.order)
@@ -34,7 +32,7 @@ trait ExchangeTransactionCreator {
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
     def calcFee(o: Order, amount: Long): Long = {
-      omss.findPrevOrderMatchTxs(o)
+      storedState.findPrevOrderMatchTxs(o)
       val p = BigInt(amount) * o.matcherFee / o.amount
       p.toLong
     }

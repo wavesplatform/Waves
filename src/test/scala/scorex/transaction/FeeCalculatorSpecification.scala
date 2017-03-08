@@ -38,6 +38,9 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
       |    lease-cancel {
       |      WAVES = 500000
       |    }
+      |    create-alias {
+      |      WAVES = 600000
+      |    }
       |  }
       |}""".stripMargin
 
@@ -108,6 +111,13 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
     val feeCalc = new FeeCalculator(mySettings)
     forAll(leaseCancelGenerator) { tx: LeaseCancelTransaction =>
       feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 500000)
+    }
+  }
+
+  property("Create alias transaction") {
+    val feeCalc = new FeeCalculator(mySettings)
+    forAll(createAliasGenerator) { tx: CreateAliasTransaction =>
+      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 600000)
     }
   }
 }
