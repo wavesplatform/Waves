@@ -4,11 +4,11 @@ import scorex.account.Account
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.state.database.state.extension.Validator
+import scorex.transaction.state.database.state.extension.{Processor, Validator}
 import scorex.transaction.state.database.state.storage.{LeaseExtendedStateStorageI, StateStorageI}
 import scorex.utils.ScorexLogging
 
-class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with Validator {
+class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with Validator with Processor {
 
   override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: LeaseCancelTransaction =>

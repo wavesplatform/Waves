@@ -8,7 +8,7 @@ import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.storage.{OrderMatchStorageI, StateStorageI}
 
-class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends Validator {
+class OrderMatchStoredState(storage: StateStorageI with OrderMatchStorageI) extends Validator with Processor {
 
   override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case om: ExchangeTransaction => OrderMatchStoredState.isOrderMatchValid(om, findPrevOrderMatchTxs(om))

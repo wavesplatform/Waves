@@ -132,7 +132,7 @@ trait MatcherTestData {
       override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
 
       override val assetsExtension: AssetsExtendedState = new AssetsExtendedState(storage) {
-        override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
+        override def  getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
       }
     }
   }

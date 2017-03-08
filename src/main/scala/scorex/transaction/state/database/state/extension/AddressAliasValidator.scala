@@ -8,7 +8,7 @@ import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.storage.{AliasExtendedStorageI, StateStorageI}
 
-class AddressAliasValidator(storage: StateStorageI with AliasExtendedStorageI) extends Validator {
+class AddressAliasValidator(storage: StateStorageI with AliasExtendedStorageI) extends Validator with Processor {
 
   override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = {
 

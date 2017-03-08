@@ -32,22 +32,34 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   val assetsExtension = new AssetsExtendedState(storage)
   val leaseExtendedState = new LeaseExtendedState(storage)
   val orderMatchStoredState = new OrderMatchStoredState(storage)
+  val genesisValidator = new GenesisValidator
+  val addressAliasValidator = new AddressAliasValidator(storage)
+  val leaseToSelfAliasValidator = new LeaseToSelfAliasValidator(storage)
+  val includedValidator = new IncludedValidator(storage, settings.requirePaymentUniqueId)
+  val activatedValidator = new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
+    settings.allowLeaseTransactionAfterTimestamp,
+    settings.allowExchangeTransactionAfterTimestamp,
+    settings.allowCreateAliasTransactionAfterTimestamp
+  )
 
   val validators = Seq(
     assetsExtension,
     incrementingTimestampValidator,
     leaseExtendedState,
-    new GenesisValidator,
-    new AddressAliasValidator(storage),
-    new LeaseToSelfAliasValidator(storage),
+    genesisValidator,
+    addressAliasValidator,
+    leaseToSelfAliasValidator,
     orderMatchStoredState,
-    new IncludedValidator(storage, settings.requirePaymentUniqueId),
-    new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
-      settings.allowLeaseTransactionAfterTimestamp,
-      settings.allowExchangeTransactionAfterTimestamp,
-      settings.allowCreateAliasTransactionAfterTimestamp
-    )
-  )
+    includedValidator,
+    activatedValidator
+  ).map(v => v.validate _)
+
+  val processors = Seq(
+    assetsExtension,
+    leaseExtendedState,
+    addressAliasValidator,
+    orderMatchStoredState,
+    includedValidator).map(p => p.process _)
 
   override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 
@@ -182,10 +194,10 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
 
   private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = txs.map(t => validateAgainstState(t, height))
 
-  def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Either[ValidationError,Transaction]] = {
+  def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Either[ValidationError, Transaction]] = {
 
-    txs.foldLeft(Seq.empty[Either[ValidationError,Transaction]]){
-      case (seq,tx) => orderMatchStoredState.validateWithBlockTxs(this, tx, seq.filter(_.isRight).map(_.right.get), height) match {
+    txs.foldLeft(Seq.empty[Either[ValidationError, Transaction]]) {
+      case (seq, tx) => orderMatchStoredState.validateWithBlockTxs(this, tx, seq.filter(_.isRight).map(_.right.get), height) match {
         case Left(err) => Left(err) +: seq
         case Right(t) => Right(t) +: seq
       }
@@ -339,7 +351,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
       storage.putLastStates(ch._1.key, h)
       ch._2._2.foreach {
         case tx: Transaction =>
-          validators.foreach(_.process(this, tx, blockTs, h))
+          processors.foreach(_.apply(this, tx, blockTs, h))
         case _ =>
       }
       storage.updateAccountAssets(ch._1.account.address, ch._1.assetId)
@@ -372,7 +384,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   }
 
   def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
-    validators.toStream.map(_.validate(this, transaction, height)).find(_.isLeft) match {
+    validators.toStream.map(_.apply(this, transaction, height)).find(_.isLeft) match {
       case Some(Left(e)) => Left(e)
       case _ => Right(transaction)
     }

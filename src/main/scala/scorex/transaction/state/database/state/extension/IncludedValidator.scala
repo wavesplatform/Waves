@@ -5,7 +5,7 @@ import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.state.database.state.storage.StateStorageI
 import scorex.transaction.{PaymentTransaction, StateValidationError, Transaction}
 
-class IncludedValidator(storage: StateStorageI, requirePaymentUniqueId: Long) extends Validator {
+class IncludedValidator(storage: StateStorageI, requirePaymentUniqueId: Long) extends Validator with Processor {
 
   override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: PaymentTransaction if tx.timestamp < requirePaymentUniqueId => Right(tx)

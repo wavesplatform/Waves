@@ -5,14 +5,14 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
 import scorex.transaction.assets.{AssetIssuance, BurnTransaction, IssueTransaction, ReissueTransaction}
-import scorex.transaction.state.database.state.extension.Validator
+import scorex.transaction.state.database.state.extension.{Processor, Validator}
 import scorex.transaction.state.database.state.storage.{AssetsExtendedStateStorageI, StateStorageI}
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Success}
 
 class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorageI) extends ScorexLogging
-  with Validator {
+  with Validator with Processor {
 
   override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
     case tx: ReissueTransaction =>
