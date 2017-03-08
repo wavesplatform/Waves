@@ -31,7 +31,21 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   val leaseExtendedState = new LeaseExtendedState(storage)
   val orderMatchStoredState = new OrderMatchStoredState(storage)
   val addressAliasValidator = new AddressAliasValidator(storage)
-  val leaseToSelfAliasValidator = new LeaseToSelfAliasValidator(storage)
+
+  def leaseToSelfValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = {
+
+    tx match {
+      case ltx: LeaseTransaction =>
+        ltx.recipient match {
+          case a: Alias => resolveAlias(a) match {
+            case Some(acc) if ltx.sender.address == acc.address => Left(TransactionValidationError(tx, "Cannot lease to own alias"))
+            case _ => Right(tx)
+          }
+          case _ => Right(tx)
+        }
+      case _ => Right(tx)
+    }
+  }
 
   def genesisValidatorF(height: Int)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case gtx: GenesisTransaction if height != 0 => Left(TransactionValidationError(tx, "GenesisTranaction cannot appear in non-initial block"))
@@ -141,13 +155,14 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   val genesisValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => genesisValidatorF(h)(t)
   val includedValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => includedValidatorF(settings.requirePaymentUniqueId)(t)
   val incrementingTimestampValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => incrementingTimestampValidatorF(settings.allowInvalidPaymentTransactionsByTimestamp)(t)
+  val leaseToSelfValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => leaseToSelfValidatorF(t)
 
   val validators: Seq[(StoredState, Transaction, Int) => Either[StateValidationError, Transaction]] = Seq(
     assetsExtension).map(v => v.validate _) ++ Seq(incrementingTimestampValidatorAdapter) ++
     Seq(leaseExtendedState).map(v => v.validate _) ++
     Seq(genesisValidatorAdapter) ++ Seq(
-    addressAliasValidator,
-    leaseToSelfAliasValidator,
+    addressAliasValidator).map(v => v.validate _) ++
+    Seq(leaseToSelfValidatorAdapter) ++ Seq(
     orderMatchStoredState).map(v => v.validate _) ++
     Seq(includedValidatorAdapter,
       activatedValidatorAdapter)
