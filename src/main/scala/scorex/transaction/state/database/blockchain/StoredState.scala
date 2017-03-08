@@ -249,12 +249,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     val (err0, validOneByOne) = validAgainstStateOneByOne(height, trans).segregate()
     val (err1, validAgainstConsecutivePayments) = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).segregate()
     val (err2, filteredFarFuture) = filterTransactionsFromFuture(validAgainstConsecutivePayments, blockTime).segregate()
-
-
     val allowUnissuedAssets = filteredFarFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
-
-    val (err3, filteredReplays) = validateExchangeTxs(filteredFarFuture, height).segregate()
-    val (err4, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredReplays).segregate()
+    val (err3, filteredOvermatch) = validateExchangeTxs(filteredFarFuture, height).segregate()
+    val (err4, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredOvermatch).segregate()
     (err0 ++ err1 ++ err2 ++ err3 ++ err4, result)
   }
 
