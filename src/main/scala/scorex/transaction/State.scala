@@ -7,7 +7,7 @@ import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState}
 import scorex.transaction.state.database.state.{AccState, Reasons}
-import scorex.transaction.state.database.state.extension.{IncrementingTimestampValidator, OrderMatchStoredState}
+import scorex.transaction.state.database.state.extension.OrderMatchStoredState
 import scorex.utils.NTP
 
 import scala.util.Try
@@ -79,7 +79,7 @@ trait State {
 
   def effectiveBalance(account: Account): Long
 
-  def incrementingTimestampValidator: IncrementingTimestampValidator
+  def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction]
 
   def leaseExtendedState: LeaseExtendedState
 

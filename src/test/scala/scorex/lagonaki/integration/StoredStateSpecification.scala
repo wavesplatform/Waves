@@ -271,7 +271,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val block = TestBlock(Seq(tx1, tx2))
     state.processBlock(block)
 
-    val result = state.incrementingTimestampValidator.lastAccountPaymentTransaction(acc)
+    val result = state.lastAccountPaymentTransaction(acc)
     result.isDefined shouldBe true
     result.get shouldBe tx2
   }
@@ -288,11 +288,11 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val block2 = TestBlock(Seq(tx3, tx4))
     state.processBlock(block2)
 
-    val result1 = state.incrementingTimestampValidator.lastAccountPaymentTransaction(acc)
+    val result1 = state.lastAccountPaymentTransaction(acc)
     result1.isDefined shouldBe true
     result1.get shouldBe tx2
 
-    val result2 = state.incrementingTimestampValidator.lastAccountPaymentTransaction(recipient)
+    val result2 = state.lastAccountPaymentTransaction(recipient)
     result2.isDefined shouldBe true
     result2.get shouldBe tx4
   }

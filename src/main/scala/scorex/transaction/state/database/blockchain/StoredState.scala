@@ -27,7 +27,6 @@ import scorex.transaction.state.database.blockchain.StoredState._
 class StoredState(protected[blockchain] val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   settings: ChainParameters) extends State with ScorexLogging {
 
-  val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
   val assetsExtension = new AssetsExtendedState(storage)
   val leaseExtendedState = new LeaseExtendedState(storage)
   val orderMatchStoredState = new OrderMatchStoredState(storage)
@@ -45,6 +44,70 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     storage.putTransaction(tx, height)
   }
 
+  def incrementingTimestampValidatorF(allowInvalidPaymentTransactionsByTimestamp: Long)(transaction: Transaction): Either[StateValidationError, Transaction] = {
+
+    def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
+      lastAccountPaymentTransaction(tx.sender) match {
+        case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
+        case None => true
+      }
+    }
+
+    transaction match {
+      case tx: PaymentTransaction =>
+        val isCorrect = tx.timestamp < allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
+        if (isCorrect) Right(tx)
+        else Left(TransactionValidationError(tx, s" is earlier than previous transaction after time=$allowInvalidPaymentTransactionsByTimestamp"))
+      case _ => Right(transaction)
+    }
+  }
+
+  def invalidatePaymentTransactionsByTimestamp(transactions: Seq[Transaction]): Seq[Transaction] = {
+    val paymentTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
+      .map(_.asInstanceOf[PaymentTransaction])
+
+    val initialSelection: Map[String, (List[Transaction], Long)] = Map(paymentTransactions.map { payment =>
+      val address = payment.sender.address
+      val stateTimestamp = lastAccountPaymentTransaction(payment.sender) match {
+        case Some(lastTransaction) => lastTransaction.timestamp
+        case _ => 0
+      }
+      address -> (List[Transaction](), stateTimestamp)
+    }: _*)
+
+    val orderedTransaction = paymentTransactions.sortBy(_.timestamp)
+    val selection: Map[String, (List[Transaction], Long)] = orderedTransaction.foldLeft(initialSelection) { (s, t) =>
+      val address = t.sender.address
+      val tuple = s(address)
+      if (t.timestamp > tuple._2) {
+        s.updated(address, (tuple._1, t.timestamp))
+      } else {
+        s.updated(address, (tuple._1 :+ t, tuple._2))
+      }
+    }
+
+    selection.foldLeft(List[Transaction]()) { (l, s) => l ++ s._2._1 }
+  }
+
+  def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
+    def loop(h: Int, address: AddressString): Option[PaymentTransaction] = {
+      storage.getAccountChanges(address, h) match {
+        case Some(row) =>
+          val accountTransactions = row.reason.flatMap(id => storage.getTransaction(id))
+            .filter(_.isInstanceOf[PaymentTransaction])
+            .map(_.asInstanceOf[PaymentTransaction])
+            .filter(_.sender.address == address)
+          if (accountTransactions.nonEmpty) Some(accountTransactions.maxBy(_.timestamp))
+          else loop(row.lastRowHeight, address)
+        case _ => None
+      }
+    }
+
+    storage.getLastStates(account.address) match {
+      case Some(height) => loop(height, account.address)
+      case None => None
+    }
+  }
 
   def activatedValidatorF(s: ChainParameters)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case tx: BurnTransaction if tx.timestamp <= s.allowBurnTransactionAfterTimestamp =>
@@ -72,15 +135,15 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
 
   val activatedValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => activatedValidatorF(settings)(t)
   val includedValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => includedValidatorF(settings.requirePaymentUniqueId)(t)
+  val incrementingTimestampValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => incrementingTimestampValidatorF(settings.allowInvalidPaymentTransactionsByTimestamp)(t)
 
   val validators: Seq[(StoredState, Transaction, Int) => Either[StateValidationError, Transaction]] = Seq(
-    assetsExtension,
-    incrementingTimestampValidator,
-    leaseExtendedState,
-    genesisValidator,
-    addressAliasValidator,
-    leaseToSelfAliasValidator,
-    orderMatchStoredState).map(v => v.validate _) ++
+    assetsExtension).map(v => v.validate _) ++ Seq(incrementingTimestampValidatorAdapter) ++
+    Seq(leaseExtendedState,
+      genesisValidator,
+      addressAliasValidator,
+      leaseToSelfAliasValidator,
+      orderMatchStoredState).map(v => v.validate _) ++
     Seq(includedValidatorAdapter,
       activatedValidatorAdapter)
 
@@ -242,7 +305,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     if (allowInvalidPaymentTransactionsByTimestamp) {
       txs.map(Right(_))
     } else {
-      val invalidPaymentTransactionsByTimestamp = incrementingTimestampValidator.invalidatePaymentTransactionsByTimestamp(txs)
+      val invalidPaymentTransactionsByTimestamp = invalidatePaymentTransactionsByTimestamp(txs)
       txs.map(t1 => if (!invalidPaymentTransactionsByTimestamp.exists(t2 => t2.id sameElements t1.id))
         Right(t1)
       else Left(TransactionValidationError(t1, s"is invalid due to one of previous transactions in the sequence is PaymentTransaction with a greater timestamp")))
