@@ -138,7 +138,8 @@ trait MatcherTestData {
       new IncludedValidator(storage, settings.requirePaymentUniqueId),
       new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
         settings.allowLeaseTransactionAfterTimestamp,
-        settings.allowExchangeTransactionAfterTimestamp)
+        settings.allowExchangeTransactionAfterTimestamp,
+        settings.allowCreateAliasTransactionAfterTimestamp)
     )
     new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
       override def assetBalance(account: AssetAcc): Long = Long.MaxValue

@@ -10,7 +10,8 @@ import scorex.transaction._
 class ActivatedValidator(
                           allowBurnTransactionAfterTimestamp: Long,
                           allowLeaseTransactionAfterTimestamp: Long,
-                          allowExchangeTransactionAfterTimestamp: Long
+                          allowExchangeTransactionAfterTimestamp: Long,
+                          allowCreateAliasTransactionAfterTimestamp: Long
                         ) extends Validator {
 
 
@@ -23,6 +24,8 @@ class ActivatedValidator(
       Left(TransactionValidationError(tx, s"must not appear before time=$allowLeaseTransactionAfterTimestamp"))
     case tx: ExchangeTransaction if tx.timestamp <= allowExchangeTransactionAfterTimestamp =>
       Left(TransactionValidationError(tx, s"must not appear before time=$allowExchangeTransactionAfterTimestamp"))
+    case tx: CreateAliasTransaction if tx.timestamp <= allowCreateAliasTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=$allowCreateAliasTransactionAfterTimestamp"))
     case _: BurnTransaction => Right(tx)
     case _: PaymentTransaction => Right(tx)
     case _: GenesisTransaction => Right(tx)

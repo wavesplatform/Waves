@@ -39,12 +39,12 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
   def alias: Route = processRequest("create", (t: CreateAliasRequest) => transactionOperations.alias(t, wallet))
 
 
-  @Path("/byAlias/{alias}")
+  @Path("/by-alias/{alias}")
   @ApiOperation(value = "Account", notes = "Address by Alias", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
   ))
-  def addressOfAlias: Route = (get & path("byAlias" / Segment)) { aliasString =>
+  def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasString =>
     val result = Alias(aliasString) match {
       case Right(alias) =>
         state.resolveAlias(alias) match {
@@ -56,12 +56,12 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
     complete(result)
   }
 
-  @Path("/byAddress/{address}")
+  @Path("/by-address/{address}")
   @ApiOperation(value = "Alias", notes = "Alias by Address", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7", required = true, dataType = "string", paramType = "path")
   ))
-  def aliasOfAddress: Route = (get & path("byAddress" / Segment)) { addressString =>
+  def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
     val result: Either[ApiError, AliasInfo] = Account.fromBase58String(addressString) match {
       case Right(address) =>
         state.getAlias(address) match {
