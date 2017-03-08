@@ -156,16 +156,16 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = txs.map(t => validateAgainstState(t, height))
 
-  def validateWithBlockTxs(t: Transaction, txs: Seq[Transaction], height: Int): Either[ValidationError, Transaction] = {
-    validators.toStream.map(_.validateWithBlockTxs(this, t, txs, height)).find(_.isLeft) match {
-      case Some(Left(e)) => Left(e)
-      case _ => Right(t)
-    }
+  def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Either[ValidationError,Transaction]] = {
+    val validator = new OrderMatchStoredState(storage)
+
+    txs.foldLeft(Seq.empty[Either[ValidationError,Transaction]]){
+      case (seq,tx) => validator.validateWithBlockTxs(this, tx, seq.filter(_.isRight).map(_.right.get), height) match {
+        case Left(err) => Left(err) +: seq
+        case Right(t) => Right(t) +: seq
+      }
+    }.reverse
   }
-
-  private def validateAgainstReplay(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] =
-    txs.map(validateWithBlockTxs(_, txs, height))
-
 
   private def filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
@@ -253,7 +253,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
     val allowUnissuedAssets = filteredFarFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
 
-    val (err3, filteredReplays) = validateAgainstReplay(height, filteredFarFuture).segregate()
+    val (err3, filteredReplays) = validateExchangeTxs(filteredFarFuture, height).segregate()
     val (err4, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredReplays).segregate()
     (err0 ++ err1 ++ err2 ++ err3 ++ err4, result)
   }
