@@ -82,9 +82,9 @@ trait MatcherTestData {
       matcherFee: Long <- maxWavesAnountGen
     } yield (Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee), sender)
 
-  def buy(pair: AssetPair, price: Long, amount: Long): Order = valueFromGen(buyGenerator(pair, price*Order.PriceConstant, amount))._1
+  def buy(pair: AssetPair, price: Long, amount: Long): Order = valueFromGen(buyGenerator(pair, price * Order.PriceConstant, amount))._1
 
-  def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price*Order.PriceConstant, amount))._1
+  def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price * Order.PriceConstant, amount))._1
 
   val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 
@@ -126,29 +126,14 @@ trait MatcherTestData {
       if (db.getStoreVersion > 0) db.rollback()
     }
 
-    val extendedState = new AssetsExtendedState(storage) {
-      override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
-    }
-
-
-    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
-    val leaseExtendedState = new LeaseExtendedState(storage)
-    val validators = Seq(
-      extendedState,
-      incrementingTimestampValidator,
-      new GenesisValidator,
-      new AddressAliasValidator(storage),
-      new LeaseToSelfAliasValidator(storage),
-      new OrderMatchStoredState(storage),
-      new IncludedValidator(storage, settings.requirePaymentUniqueId),
-      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
-        settings.allowLeaseTransactionAfterTimestamp,
-        settings.allowExchangeTransactionAfterTimestamp,
-        settings.allowCreateAliasTransactionAfterTimestamp)
-    )
-    new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
+    new StoredState(storage, settings) {
       override def assetBalance(account: AssetAcc): Long = Long.MaxValue
+
       override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
+
+      override val assetsExtension: AssetsExtendedState = new AssetsExtendedState(storage) {
+        override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
+      }
     }
   }
 }

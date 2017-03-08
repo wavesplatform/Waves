@@ -23,13 +23,30 @@ import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Left, Right, Try}
 
+import scorex.transaction.state.database.blockchain.StoredState._
 
-class StoredState(protected[blockchain] val storage: StateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
-                  val leaseExtendedState: LeaseExtendedState,
-                  val assetsExtension: AssetsExtendedState,
-                  val incrementingTimestampValidator: IncrementingTimestampValidator,
-                  val validators: Seq[Validator],
+class StoredState(protected[blockchain] val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   settings: ChainParameters) extends State with ScorexLogging {
+
+  val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
+  val assetsExtension = new AssetsExtendedState(storage)
+  val leaseExtendedState = new LeaseExtendedState(storage)
+
+  val validators = Seq(
+    assetsExtension,
+    incrementingTimestampValidator,
+    leaseExtendedState,
+    new GenesisValidator,
+    new AddressAliasValidator(storage),
+    new LeaseToSelfAliasValidator(storage),
+    new OrderMatchStoredState(storage),
+    new IncludedValidator(storage, settings.requirePaymentUniqueId),
+    new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
+      settings.allowLeaseTransactionAfterTimestamp,
+      settings.allowExchangeTransactionAfterTimestamp,
+      settings.allowCreateAliasTransactionAfterTimestamp
+    )
+  )
 
   override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 
@@ -259,11 +276,6 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)
 
-  implicit class SeqEitherHelper[L, R](eis: Seq[Either[L, R]]) {
-    def segregate(): (Seq[L], Seq[R]) = (eis.filter(_.isLeft).map(_.left.get),
-      eis.filter(_.isRight).map(_.right.get))
-  }
-
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): (Seq[ValidationError], Seq[Transaction]) = {
     val height = heightOpt.getOrElse(storage.stateHeight)
     val (err0, validOneByOne) = validAgainstStateOneByOne(height, trans).segregate()
@@ -438,6 +450,12 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
 object StoredState {
 
+
+  implicit class SeqEitherHelper[L, R](eis: Seq[Either[L, R]]) {
+    def segregate(): (Seq[L], Seq[R]) = (eis.filter(_.isLeft).map(_.left.get),
+      eis.filter(_.isRight).map(_.right.get))
+  }
+
   def fromDB(mvStore: MVStore, settings: ChainParameters): State = {
     val storage = new MVStoreStateStorage
       with MVStoreOrderMatchStorage
@@ -449,25 +467,8 @@ object StoredState {
         db.rollback()
       }
     }
-    val assetExtendedState = new AssetsExtendedState(storage)
-    val leaseExtendedState = new LeaseExtendedState(storage)
-    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
-    val validators = Seq(
-      assetExtendedState,
-      incrementingTimestampValidator,
-      leaseExtendedState,
-      new GenesisValidator,
-      new AddressAliasValidator(storage),
-      new LeaseToSelfAliasValidator(storage),
-      new OrderMatchStoredState(storage),
-      new IncludedValidator(storage, settings.requirePaymentUniqueId),
-      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
-        settings.allowLeaseTransactionAfterTimestamp,
-        settings.allowExchangeTransactionAfterTimestamp,
-        settings.allowCreateAliasTransactionAfterTimestamp
-      )
-    )
-    new StoredState(storage, leaseExtendedState, assetExtendedState, incrementingTimestampValidator, validators, settings)
+
+    new StoredState(storage, settings)
   }
 
 }
