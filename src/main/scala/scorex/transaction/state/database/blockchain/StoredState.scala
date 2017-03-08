@@ -8,7 +8,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.TransactionValidationError
-import scorex.transaction._
+import scorex.transaction.{Transaction, _}
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -22,7 +22,6 @@ import scala.collection.SortedMap
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Left, Right, Try}
-
 import scorex.transaction.state.database.blockchain.StoredState._
 
 class StoredState(protected[blockchain] val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
@@ -35,31 +34,65 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   val genesisValidator = new GenesisValidator
   val addressAliasValidator = new AddressAliasValidator(storage)
   val leaseToSelfAliasValidator = new LeaseToSelfAliasValidator(storage)
-  val includedValidator = new IncludedValidator(storage, settings.requirePaymentUniqueId)
-  val activatedValidator = new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
-    settings.allowLeaseTransactionAfterTimestamp,
-    settings.allowExchangeTransactionAfterTimestamp,
-    settings.allowCreateAliasTransactionAfterTimestamp
-  )
 
-  val validators = Seq(
+  def includedValidatorF(requirePaymentUniqueId: Long)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+    case tx: PaymentTransaction if tx.timestamp < requirePaymentUniqueId => Right(tx)
+    case tx: Transaction => if (storage.included(tx.id, None).isEmpty) Right(tx)
+    else Left(TransactionValidationError(tx, "(except for some cases of PaymentTransaction) cannot be duplicated"))
+  }
+
+  def includedProcessorF(height: Int)(tx: Transaction): Unit = {
+    storage.putTransaction(tx, height)
+  }
+
+
+  def activatedValidatorF(s: ChainParameters)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+    case tx: BurnTransaction if tx.timestamp <= s.allowBurnTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowBurnTransactionAfterTimestamp}"))
+    case tx: LeaseTransaction if tx.timestamp <= s.allowLeaseTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowLeaseTransactionAfterTimestamp}"))
+    case tx: LeaseCancelTransaction if tx.timestamp <= s.allowLeaseTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowLeaseTransactionAfterTimestamp}"))
+    case tx: ExchangeTransaction if tx.timestamp <= s.allowExchangeTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowExchangeTransactionAfterTimestamp}"))
+    case tx: CreateAliasTransaction if tx.timestamp <= s.allowCreateAliasTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowCreateAliasTransactionAfterTimestamp}"))
+    case _: BurnTransaction => Right(tx)
+    case _: PaymentTransaction => Right(tx)
+    case _: GenesisTransaction => Right(tx)
+    case _: TransferTransaction => Right(tx)
+    case _: IssueTransaction => Right(tx)
+    case _: ReissueTransaction => Right(tx)
+    case _: ExchangeTransaction => Right(tx)
+    case _: LeaseTransaction => Right(tx)
+    case _: LeaseCancelTransaction => Right(tx)
+    case _: CreateAliasTransaction => Right(tx)
+    case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
+  }
+
+  val activatedValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => activatedValidatorF(settings)(t)
+  val includedValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => includedValidatorF(settings.requirePaymentUniqueId)(t)
+
+  val validators: Seq[(StoredState, Transaction, Int) => Either[StateValidationError, Transaction]] = Seq(
     assetsExtension,
     incrementingTimestampValidator,
     leaseExtendedState,
     genesisValidator,
     addressAliasValidator,
     leaseToSelfAliasValidator,
-    orderMatchStoredState,
-    includedValidator,
-    activatedValidator
-  ).map(v => v.validate _)
+    orderMatchStoredState).map(v => v.validate _) ++
+    Seq(includedValidatorAdapter,
+      activatedValidatorAdapter)
 
-  val processors = Seq(
+
+  val includedProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => includedProcessorF(height)(t)
+
+  val processors: Seq[(StoredState, Transaction, Long, Int) => Unit] = Seq(
     assetsExtension,
     leaseExtendedState,
     addressAliasValidator,
-    orderMatchStoredState,
-    includedValidator).map(p => p.process _)
+    orderMatchStoredState).map(p => p.process _) ++
+    Seq(includedProcessorAdapter)
 
   override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 
