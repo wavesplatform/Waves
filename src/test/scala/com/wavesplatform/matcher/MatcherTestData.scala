@@ -12,7 +12,7 @@ import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState, StoredState}
 import scorex.transaction.state.database.state.extension._
-import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreLeaseExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
+import scorex.transaction.state.database.state.storage._
 import scorex.utils.{ByteArrayExtension, NTP}
 
 trait MatcherTestData {
@@ -121,7 +121,7 @@ trait MatcherTestData {
 
   def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): State = {
     val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage
-      with MVStoreLeaseExtendedStateStorage {
+      with MVStoreLeaseExtendedStateStorage with MVStoreAliasExtendedStorage {
       override val db: MVStore = mvStore
       if (db.getStoreVersion > 0) db.rollback()
     }
@@ -130,20 +130,25 @@ trait MatcherTestData {
       override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
     }
 
+
     val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
     val leaseExtendedState = new LeaseExtendedState(storage)
     val validators = Seq(
       extendedState,
       incrementingTimestampValidator,
       new GenesisValidator,
+      new AddressAliasValidator(storage),
+      new LeaseToSelfAliasValidator(storage),
       new OrderMatchStoredState(storage),
       new IncludedValidator(storage, settings.requirePaymentUniqueId),
       new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
         settings.allowLeaseTransactionAfterTimestamp,
-        settings.allowExchangeTransactionAfterTimestamp)
+        settings.allowExchangeTransactionAfterTimestamp,
+        settings.allowCreateAliasTransactionAfterTimestamp)
     )
     new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
-      override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
+      override def assetBalance(account: AssetAcc): Long = Long.MaxValue
+      override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
     }
   }
 }

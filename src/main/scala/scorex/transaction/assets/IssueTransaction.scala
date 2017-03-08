@@ -57,9 +57,6 @@ object IssueTransaction {
         "reissuable"  -> reissuable
       )
 
-    override lazy val balanceChanges: Seq[BalanceChange] =
-      Seq(BalanceChange(AssetAcc(sender, Some(assetId)), quantity), BalanceChange(AssetAcc(sender, assetFee._1), -assetFee._2))
-
     override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
   }
@@ -67,7 +64,6 @@ object IssueTransaction {
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength   = 16
   val MinAssetNameLength   = 4
-  val MinFee               = 100000000
   val MaxDecimals          = 8
 
   def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {

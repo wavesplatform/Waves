@@ -20,4 +20,5 @@ trait ChainParameters {
   def genesisTxs: Seq[Transaction]
   def addressScheme: AddressScheme
   def allowExchangeTransactionAfterTimestamp: Long
+  def allowCreateAliasTransactionAfterTimestamp: Long
 }

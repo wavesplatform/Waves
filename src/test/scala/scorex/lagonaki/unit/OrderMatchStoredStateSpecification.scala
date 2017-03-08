@@ -49,7 +49,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   }
 
   private def issueAsset(request: IssueRequest, wallet: Wallet): IssueTransaction = {
-    val sender = wallet.privateKeyAccount(request.sender).get
+    val sender = wallet.findWallet(request.sender).right.get
     IssueTransaction.create(sender,
       request.name.getBytes,
       request.description.getBytes,
@@ -61,7 +61,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   }
 
   def transferAsset(request: TransferRequest, wallet: Wallet): TransferTransaction = {
-    val sender = wallet.privateKeyAccount(request.sender).get
+    val sender = wallet.findWallet(request.sender).right.get
     TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
       Account.fromBase58String(request.recipient).right.get,
@@ -152,13 +152,13 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     //buyAcc buy1
     val (om1buyW, om1buy1, om1buy2) = getBalances(buyAcc, pair)
     om1buyW should be(initBuyW - buy1Fee)
-    om1buy1 should be(initBuy1 - 5 *  price)
+    om1buy1 should be(initBuy1 - 5 * price)
     om1buy2 should be(initBuy2 + 5 * ASSET_UNITS)
 
     //sellAcc sell1
     val (om1sellW, om1sell1, om1sell2) = getBalances(sellAcc, pair)
     om1sellW should be(initSellW - sell1.matcherFee)
-    om1sell1 should be(initSell1 + 5 *  price)
+    om1sell1 should be(initSell1 + 5 * price)
     om1sell2 should be(initSell2 - 5 * ASSET_UNITS)
 
     val sell2 = Order
@@ -293,7 +293,7 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
           val om2Invalid = ExchangeTransaction.create(acc, buy2, sell, buyPrice, sellAmount - om1.amount,
             mf3, (mf2 - (BigInt(mf2) * buyAmount / sellAmount).toLong) + 1, 1, curTime).right.get
 
-          OrderMatchStoredState.isOrderMatchValid(om2Invalid, Set(om1)) shouldBe an[Left[_,_]]
+          OrderMatchStoredState.isOrderMatchValid(om2Invalid, Set(om1)) shouldBe an[Left[_, _]]
         }
     }
 

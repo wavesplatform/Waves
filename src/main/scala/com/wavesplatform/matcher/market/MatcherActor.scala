@@ -27,7 +27,7 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
   val tradedPairs: mutable.Buffer[AssetPair] = mutable.Buffer.empty[AssetPair]
 
   def createOrderBook(pair: AssetPair): ActorRef = {
-    def getAssetName(asset: Option[AssetId]) = asset.map(storedState.assetsExtension.getAssetName).getOrElse(AssetPair.WavesName)
+    def getAssetName(asset: Option[AssetId]) = asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
 
     openMarkets += MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime())
     tradedPairs += pair
@@ -77,7 +77,7 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
   }
 
   def getMatcherPublicKey: Array[Byte] = {
-    wallet.privateKeyAccount(settings.account).map(_.publicKey).getOrElse(Array())
+    wallet.findWallet(settings.account).map(_.publicKey).getOrElse(Array())
   }
 
   def forwardToOrderBook: Receive = {

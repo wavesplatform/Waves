@@ -84,7 +84,7 @@ trait RequestGen extends TransactionGen {
 
   val transferReq: G[TransferRequest] = for {
     (account, fee) <- commonFields
-    recipient <- accountGen.map(_.address)
+    recipient <- accountOrAliasGen.map(_.stringRepr)
     amount <- positiveLongGen
     assetId <- assetIdStringGen
     feeAssetId <- assetIdStringGen

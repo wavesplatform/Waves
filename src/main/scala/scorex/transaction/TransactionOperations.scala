@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import scorex.account.{Account, PrivateKeyAccount}
+import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
@@ -14,6 +15,7 @@ trait TransactionOperations {
   def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction]
   def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction]
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction]
+  def alias(request: CreateAliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction]
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction]
   def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction]
 

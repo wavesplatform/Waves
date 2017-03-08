@@ -134,7 +134,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionM
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.waves.transaction.SignedPayment",
+      dataType = "scorex.waves.transaction.SignedPaymentRequest",
       defaultValue = "{\n\t\"timestamp\": 0,\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"senderPublicKey\":\"senderPubKey\",\n\t\"recipient\":\"recipientId\",\n\t\"signature\":\"sig\"\n}"
     )
   ))
@@ -152,7 +152,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionM
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.waves.transaction.SignedPayment",
+      dataType = "scorex.waves.transaction.SignedPaymentRequest",
       defaultValue = "{\n\t\"timestamp\": 0,\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"senderPublicKey\":\"senderPubKey\",\n\t\"senderAddress\":\"senderAddress\",\n\t\"recipient\":\"recipientId\",\n\t\"signature\":\"sig\"\n}"
     )
   ))

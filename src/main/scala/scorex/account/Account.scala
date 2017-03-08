@@ -10,8 +10,10 @@ import scorex.utils.ScorexLogging
 import scala.util.Success
 
 
-sealed trait Account {
+sealed trait Account extends AccountOrAlias {
   lazy val address: String = Base58.encode(bytes)
+  lazy val stringRepr: String = address
+
   val bytes: Array[Byte]
 }
 

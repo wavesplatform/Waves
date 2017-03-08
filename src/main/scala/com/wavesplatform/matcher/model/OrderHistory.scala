@@ -11,10 +11,10 @@ import scala.collection.mutable
 import scala.concurrent.duration._
 
 trait OrderHistory {
-  val assetsToSpend = mutable.Map.empty[Address, Long]
+  val assetsToSpend = mutable.Map.empty[AddressString, Long]
   val ordersRemainingAmount: Cache[String, (Long, Long)] =
     TTLCache[String, (Long, Long)]((Order.MaxLiveTime + 3600*1000).millis)
-  val openOrdersCount = mutable.Map.empty[Address, Int]
+  val openOrdersCount = mutable.Map.empty[AddressString, Int]
 
 
   def initOrdersCache(m: Map[String, (Long, Long)]) = {
@@ -27,8 +27,8 @@ trait OrderHistory {
     ob.asks.foreach(_._2.foreach(addAssetsToSpend))
   }
 
-  private def incCount(address: Address) = openOrdersCount(address) = openOrdersCount.getOrElse(address, 0) + 1
-  private def decCount(address: Address) = openOrdersCount(address) = openOrdersCount.getOrElse(address, 0) - 1
+  private def incCount(address: AddressString) = openOrdersCount(address) = openOrdersCount.getOrElse(address, 0) + 1
+  private def decCount(address: AddressString) = openOrdersCount(address) = openOrdersCount.getOrElse(address, 0) - 1
 
   private def addAssetsToSpend(lo: LimitOrder) = {
     val order = lo.order
@@ -52,7 +52,7 @@ trait OrderHistory {
   }
 
   def reduceSpendAssets(limitOrder: LimitOrder) = {
-    def reduce(key: Address, value: Long) =
+    def reduce(key: AddressString, value: Long) =
       if (assetsToSpend.contains(key)) {
         val newVal = assetsToSpend(key) - value
         if (newVal > 0) assetsToSpend += (key -> newVal)

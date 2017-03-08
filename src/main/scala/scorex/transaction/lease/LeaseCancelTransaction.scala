@@ -42,8 +42,6 @@ object LeaseCancelTransaction {
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override lazy val balanceChanges: Seq[BalanceChange] = Seq(BalanceChange(AssetAcc(sender, None), -fee))
-
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
   }

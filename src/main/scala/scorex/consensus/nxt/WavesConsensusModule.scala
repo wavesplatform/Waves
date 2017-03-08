@@ -65,7 +65,7 @@ class WavesConsensusModule(val forksConfig: ChainParameters, AvgDelay: Duration)
     require(calcGs.sameElements(blockGs),
       s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
 
-    val effectiveBalance = generatingBalance(generator, Some(parentHeight))
+    val effectiveBalance = generatingBalance(generator, parentHeight)
 
     if (block.timestampField.value >= forksConfig.minimalGeneratingBalanceAfterTimestamp) {
       require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
@@ -90,7 +90,7 @@ class WavesConsensusModule(val forksConfig: ChainParameters, AvgDelay: Duration)
     val lastBlock = history.lastBlock
 
     val height = history.heightOf(lastBlock).get
-    val balance = generatingBalance(account, Some(height))
+    val balance = generatingBalance(account, height)
 
     if (balance < MinimalEffectiveBalanceForGenerator) {
       throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
@@ -146,7 +146,7 @@ class WavesConsensusModule(val forksConfig: ChainParameters, AvgDelay: Duration)
     val history = tm.blockStorage.history
 
     history.heightOf(block.uniqueId)
-      .map(height => (height, generatingBalance(account, Some(height)))).filter(_._2 > 0)
+      .map(height => (height, generatingBalance(account, height))).filter(_._2 > 0)
       .flatMap { case (height, balance) =>
         val cData = block.consensusDataField.value
         val hit = calcHit(cData, account)
@@ -218,10 +218,10 @@ class WavesConsensusModule(val forksConfig: ChainParameters, AvgDelay: Duration)
     BigInt(prevBlockData.baseTarget) * eta * balance
   }
 
-  def generatingBalance(account: Account, atHeight: Option[Int] = None)
+  def generatingBalance(account: Account, atHeight: Int)
                        (implicit transactionModule: TransactionModule): Long = {
     val balanceSheet = transactionModule.blockStorage.state
-    val generatingBalanceDepth = if (atHeight.exists(h => h >= forksConfig.generatingBalanceDepthFrom50To1000AfterHeight)) 1000 else 50
+    val generatingBalanceDepth = if (atHeight >= forksConfig.generatingBalanceDepthFrom50To1000AfterHeight) 1000 else 50
     balanceSheet.effectiveBalanceWithConfirmations(account, generatingBalanceDepth, atHeight)
   }
 }

@@ -190,9 +190,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     )
   ))
   def signOrder: Route = processRequest("order", (order: Order) => {
-    wallet.privateKeyAccount(order.senderPublicKey.address) match {
-      case Some(sender) => Order.sign(order, sender)
-      case None => InvalidAddress
-    }
+    wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
   })
 }

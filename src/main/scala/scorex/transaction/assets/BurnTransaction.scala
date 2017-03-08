@@ -44,8 +44,6 @@ object BurnTransaction {
       )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override lazy val balanceChanges: Seq[BalanceChange] =
-      Seq(BalanceChange(AssetAcc(sender, Some(assetId)), -amount), BalanceChange(AssetAcc(sender, assetFee._1), -assetFee._2))
 
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 

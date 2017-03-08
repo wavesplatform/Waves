@@ -44,8 +44,6 @@ object ReissueTransaction {
       )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override lazy val balanceChanges: Seq[BalanceChange] =
-      Seq(BalanceChange(AssetAcc(sender, Some(assetId)), quantity), BalanceChange(AssetAcc(sender, assetFee._1), -assetFee._2))
 
     override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 

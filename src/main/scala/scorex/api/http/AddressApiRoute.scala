@@ -37,7 +37,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
       if (Account.fromBase58String(address).isLeft) {
         complete(InvalidAddress)
       } else {
-        val deleted = wallet.privateKeyAccount(address).exists(account =>
+        val deleted = wallet.findWallet(address).exists(account =>
           wallet.deleteAccount(account))
         complete(Json.obj("deleted" -> deleted))
       }
@@ -164,18 +164,11 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def seed: Route = {
     (path("seed" / Segment) & get & withAuth) { address =>
-      if (Account.fromBase58String(address).isLeft) {
-        complete(InvalidAddress)
-      } else {
-        wallet.privateKeyAccount(address) match {
-          case None => complete(WalletAddressNotExists)
-          case Some(account) =>
-            wallet.exportAccountSeed(account.address) match {
-              case None => complete(WalletSeedExportFailed)
-              case Some(seed) => complete(Json.obj("address" -> address, "seed" -> Base58.encode(seed)))
-            }
-        }
-      }
+      complete(for {
+        pk <- wallet.findWallet(address)
+        seed <- wallet.exportAccountSeed(pk)
+      } yield Json.obj("address" -> address, "seed" -> Base58.encode(seed))
+      )
     }
   }
 
@@ -237,34 +230,24 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Account.fromBase58String(address).right.map(acc => ToResponseMarshallable(Json.obj(
       "address" -> acc.address,
       "confirmations" -> confirmations,
-      "balance" -> state.effectiveBalanceWithConfirmations(acc, confirmations))))
+      "balance" -> state.effectiveBalanceWithConfirmations(acc, confirmations, state.stateHeight))))
       .getOrElse(InvalidAddress)
   }
 
-  private def signPath(address: String, encode: Boolean) = {
-    (post & entity(as[String])) { message =>
-      withAuth {
-        if (Account.fromBase58String(address).isLeft) {
-          complete(InvalidAddress)
-        } else {
-          wallet.privateKeyAccount(address) match {
-            case None => complete(WalletAddressNotExists)
-            case Some(account) =>
-              val messageBytes = message.getBytes(StandardCharsets.UTF_8)
-              Try(EllipticCurveImpl.sign(account, messageBytes)) match {
-                case Success(signature) =>
-                  val msg = if (encode) Base58.encode(messageBytes) else message
-                  val json = Json.obj("message" -> msg,
-                    "publicKey" -> Base58.encode(account.publicKey),
-                    "signature" -> Base58.encode(signature))
-                  complete(json)
-                case Failure(t) => complete(StatusCodes.InternalServerError)
-              }
-          }
-        }
-      }
+  private def signPath(address: String, encode: Boolean) = (post & entity(as[String])) { message =>
+    withAuth {
+      val res = wallet.findWallet(address).map(pk => {
+        val messageBytes = message.getBytes(StandardCharsets.UTF_8)
+        val signature = EllipticCurveImpl.sign(pk, messageBytes)
+        val msg = if (encode) Base58.encode(messageBytes) else message
+        Json.obj("message" -> msg,
+          "publicKey" -> Base58.encode(pk.publicKey),
+          "signature" -> Base58.encode(signature))
+      })
+      complete(res)
     }
   }
+
 
   private def verifyPath(address: String, decode: Boolean) = withAuth {
     json[SignedMessage] { m =>

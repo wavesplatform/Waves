@@ -39,7 +39,7 @@ class NxtConsensusApiRoute(application: RunnableApplication) extends ApiRoute wi
     } else {
       complete(Json.obj(
         "address" -> account.right.get.address,
-        "balance" -> consensusModule.generatingBalance(account.right.get, Some(blockStorage.state.stateHeight))(application.transactionModule)))
+        "balance" -> consensusModule.generatingBalance(account.right.get, blockStorage.state.stateHeight)(application.transactionModule)))
     }
   }
 
