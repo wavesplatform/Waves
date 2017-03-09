@@ -19,9 +19,7 @@ import scorex.wallet.Wallet
 
 class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPropertyChecks {
 
-  val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"
-  new File(folder).mkdirs()
-  val stateFile = folder + "state.dat"
+  private val stateFile = scorex.createTestTemporaryFolder() + "state.dat"
   new File(stateFile).delete()
 
   val wallet = new Wallet(None, "123", Some(Array(0.toByte, 1.toByte)))
