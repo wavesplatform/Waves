@@ -1,15 +1,18 @@
 import java.io.File
-import java.util.UUID
+import java.nio.file.{Files, Path}
 
 package object scorex {
-  def createTestTemporaryFolder(): String = {
-    val temporaryFolder = System.getProperty("java.io.tmpdir")
-    val uuid = UUID.randomUUID().toString
-    val folder = s"$temporaryFolder/$uuid/"
+  def createTestTemporaryFolder(): Path = {
+    val path = Files.createTempDirectory("waves-test-")
+    path.toFile.deleteOnExit()
 
-    new File(folder).mkdirs()
-
-    folder
+    path
   }
 
+  def createTestTemporaryFile(name: String, ext: String): File = {
+    val file = Files.createTempFile(createTestTemporaryFolder(), name, ext).toFile
+    file.deleteOnExit()
+
+    file
+  }
 }

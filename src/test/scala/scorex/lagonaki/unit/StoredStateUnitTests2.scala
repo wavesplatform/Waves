@@ -1,9 +1,8 @@
 package scorex.lagonaki.unit
 
 import java.io.File
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
-import scala.util.Random
+
 import org.h2.mvstore.MVStore
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}
@@ -17,15 +16,16 @@ import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{AssetAcc, GenesisTransaction}
 import scorex.wallet.Wallet
 
+import scala.util.Random
+
 class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPropertyChecks {
 
-  private val stateFile = scorex.createTestTemporaryFolder() + "state.dat"
-  new File(stateFile).delete()
+  private val stateFile = scorex.createTestTemporaryFile("state", ".dat")
 
   val wallet = new Wallet(None, "123", Some(Array(0.toByte, 1.toByte)))
   val accounts = wallet.generateNewAccounts(3)
 
-  val db = new MVStore.Builder().fileName(stateFile).compress().open()
+  val db = new MVStore.Builder().fileName(stateFile.getAbsolutePath).compress().open()
   val state = StoredState.fromDB(db, TestChainParameters.Disabled)
   state.processBlock(TestBlock(Seq(GenesisTransaction.create(accounts.head, 100000000000L, 0).right.get)))
 

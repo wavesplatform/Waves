@@ -1,7 +1,6 @@
 package scorex.transaction.state.database.blockchain
 
 import java.io.File
-import java.util.UUID
 
 import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
@@ -56,10 +55,9 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
 
-  private val stateFile = scorex.createTestTemporaryFolder() + "state.dat"
-  new File(stateFile).delete()
+  private val stateFile = scorex.createTestTemporaryFile("state", ".dat")
 
-  private val db = new MVStore.Builder().fileName(stateFile).compress().open()
+  private val db = new MVStore.Builder().fileName(stateFile.getAbsolutePath).compress().open()
   private val state = StoredState.fromDB(db, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
   private val testAcc = PrivateKeyAccount(scorex.utils.randomBytes(64))
   private val testAssetAcc = AssetAcc(testAcc, None)
