@@ -67,7 +67,6 @@ trait State {
 
   // outside calls from tests only
 
-  def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction]
 
   def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)], blockTs: Long = NTP.correctedTime()): Unit
 

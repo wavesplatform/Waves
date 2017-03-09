@@ -8,49 +8,24 @@ import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
-import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
-import scorex.transaction.{Transaction, _}
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.state.database.blockchain.StoredState._
 import scorex.transaction.state.database.state._
-import scorex.transaction.state.database.state.extension._
 import scorex.transaction.state.database.state.storage._
+import scorex.transaction.{Transaction, _}
 import scorex.utils.{NTP, ScorexLogging}
 
 import scala.annotation.tailrec
 import scala.collection.SortedMap
-import scala.concurrent.duration._
-import scala.util.control.NonFatal
-import scala.util.{Left, Right, Try}
-import scorex.transaction.state.database.blockchain.StoredState._
-
 import scala.reflect.ClassTag
+import scala.util.Try
 
 
-class StoredState(private val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
+class StoredState(private val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI
+  with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   settings: ChainParameters) extends State with ScorexLogging {
-
-  def validateAssetIssueReissueBurnTransactions(tx: Transaction): Either[StateValidationError, Transaction] = {
-    def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[StateValidationError, SignedTransaction] = {
-      storage.getTransaction(assetId) match {
-        case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
-        case Some(it: IssueTransaction) =>
-          if (it.sender.address == tx.sender.address) Right(tx)
-          else Left(TransactionValidationError(tx, "Asset was issued by other address"))
-        case _ => Left(TransactionValidationError(tx, "Referenced transaction is not IssueTransaction"))
-      }
-    }
-
-    tx match {
-      case tx: ReissueTransaction =>
-        isIssuerAddress(tx.assetId, tx).flatMap(t =>
-          if (isReissuable(tx.assetId)) Right(t) else Left(TransactionValidationError(tx, "Asset is not reissuable")))
-      case tx: BurnTransaction =>
-        isIssuerAddress(tx.assetId, tx)
-      case _ => Right(tx)
-    }
-  }
 
   def applyAssetIssueReissueBurnTransaction(height: Int)(tx: Transaction): Unit = tx match {
     case tx: AssetIssuance =>
@@ -136,12 +111,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     }.map(tx => new String(tx.name, Charsets.UTF_8)).getOrElse("Unknown")
   }
 
-
-  def validateExchangeTransaction(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
-    case om: ExchangeTransaction => ExchangeTransactionValidator.isValid(om, findPrevOrderMatchTxs(om))
-    case _ => Right(tx)
-  }
-
   def applyExchangeTransaction(blockTs: Long)(tx: Transaction): Unit = tx match {
     case om: ExchangeTransaction =>
       def isSaveNeeded(order: Order): Boolean = {
@@ -178,23 +147,19 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     case _ =>
   }
 
-  private def calcStartDay(t: Long): Long = {
-    val ts = t / 1000
-    ts - ts % (24 * 60 * 60)
-  }
-
-
-  private def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] = {
-    a.toSet.flatMap { s: String => Base58.decode(s).toOption }.flatMap { id =>
-      storage.getTransactionBytes(id).flatMap(b => ExchangeTransaction.parseBytes(b).toOption)
-    }
-  }
 
   def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction] = {
     findPrevOrderMatchTxs(om.buyOrder) ++ findPrevOrderMatchTxs(om.sellOrder)
   }
 
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = {
+
+    def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] = {
+      a.toSet.flatMap { s: String => Base58.decode(s).toOption }.flatMap { id =>
+        storage.getTransactionBytes(id).flatMap(b => ExchangeTransaction.parseBytes(b).toOption)
+      }
+    }
+
     val orderDay = calcStartDay(order.expiration)
     if (storage.containsSavedDays(orderDay)) {
       parseTxSeq(storage.getOrderMatchTxByDay(calcStartDay(order.expiration), Base58.encode(order.id))
@@ -202,35 +167,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     } else Set.empty[ExchangeTransaction]
   }
 
-  def validateWithBlockTxs(tx: Transaction, blockTxs: Seq[Transaction]): Either[StateValidationError, Transaction] = tx match {
-    case om: ExchangeTransaction =>
-      val thisExchanges: Set[ExchangeTransaction] = blockTxs.collect {
-        case a: ExchangeTransaction if a != tx && (a.buyOrder == om.buyOrder || a.sellOrder == om.sellOrder) => a
-      }.toSet
-
-      ExchangeTransactionValidator.isValid(om, findPrevOrderMatchTxs(om) ++ thisExchanges)
-    case _ => Right(tx)
-  }
-
-
   def getLeasedSum(address: AddressString): Long = storage.getLeasedSum(address)
-
-  def validateLeaseTransactions(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
-    case tx: LeaseCancelTransaction =>
-      val leaseOpt = storage.getLeaseTx(tx.leaseId)
-      leaseOpt match {
-        case Some(leaseTx) if leaseTx.sender.publicKey.sameElements(leaseTx.sender.publicKey) => Right(tx)
-        case Some(leaseTx) => Left(TransactionValidationError(tx, s"LeaseTransaction was leased by other sender"))
-        case None => Left(TransactionValidationError(tx, s"Related LeaseTransaction not found"))
-      }
-    case tx: LeaseTransaction =>
-      if (balance(tx.sender) - tx.fee - storage.getLeasedSum(tx.sender.address) >= tx.amount) {
-        Right(tx)
-      } else {
-        Left(TransactionValidationError(tx, s"Not enough effective balance to lease"))
-      }
-    case _ => Right(tx)
-  }
 
   private def updateLeasedSum(account: Account, update: Long => Long): Unit = {
     val address = account.address
@@ -260,108 +197,13 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     case _ =>
   }
 
-
-  def addressAliasExists(tx: Transaction): Either[StateValidationError, Transaction] = {
-
-    val maybeAlias = tx match {
-      case ltx: LeaseTransaction => ltx.recipient match {
-        case a: Account => None
-        case a: Alias => Some(a)
-      }
-      case ttx: TransferTransaction => ttx.recipient match {
-        case a: Account => None
-        case a: Alias => Some(a)
-      }
-      case _ => None
-    }
-
-    maybeAlias match {
-      case None => Right(tx)
-      case Some(al) => storage.addressByAlias(al.name) match {
-        case Some(add) => Right(tx)
-        case None => Left(AliasNotExists(al))
-      }
-    }
-  }
-
   def registerAlias(tx: Transaction): Unit = tx match {
     case at: CreateAliasTransaction => persistAlias(at.sender, at.alias)
     case _ => ()
   }
 
-  def disallowLeaseToSelfAlias(tx: Transaction): Either[StateValidationError, Transaction] = {
-
-    tx match {
-      case ltx: LeaseTransaction =>
-        ltx.recipient match {
-          case a: Alias => resolveAlias(a) match {
-            case Some(acc) if ltx.sender.address == acc.address => Left(TransactionValidationError(tx, "Cannot lease to own alias"))
-            case _ => Right(tx)
-          }
-          case _ => Right(tx)
-        }
-      case _ => Right(tx)
-    }
-  }
-
-  def genesisTransactionHeightMustBeZero(height: Int)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
-    case gtx: GenesisTransaction if height != 0 => Left(TransactionValidationError(tx, "GenesisTranaction cannot appear in non-initial block"))
-    case _ => Right(tx)
-  }
-
-  def disallowDuplicateIds(requirePaymentUniqueId: Long)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
-    case tx: PaymentTransaction if tx.timestamp < requirePaymentUniqueId => Right(tx)
-    case tx: Transaction => if (included(tx.id).isEmpty) Right(tx)
-    else Left(TransactionValidationError(tx, "(except for some cases of PaymentTransaction) cannot be duplicated"))
-  }
-
   def registerTransactionById(height: Int)(tx: Transaction): Unit = {
     storage.putTransaction(tx, height)
-  }
-
-  def incrementingTimestamp(allowInvalidPaymentTransactionsByTimestamp: Long)(transaction: Transaction): Either[StateValidationError, Transaction] = {
-
-    def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
-      lastAccountPaymentTransaction(tx.sender) match {
-        case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
-        case None => true
-      }
-    }
-
-    transaction match {
-      case tx: PaymentTransaction =>
-        val isCorrect = tx.timestamp < allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
-        if (isCorrect) Right(tx)
-        else Left(TransactionValidationError(tx, s" is earlier than previous transaction after time=$allowInvalidPaymentTransactionsByTimestamp"))
-      case _ => Right(transaction)
-    }
-  }
-
-  def invalidatePaymentTransactionsByTimestamp(transactions: Seq[Transaction]): Seq[Transaction] = {
-    val paymentTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
-      .map(_.asInstanceOf[PaymentTransaction])
-
-    val initialSelection: Map[String, (List[Transaction], Long)] = Map(paymentTransactions.map { payment =>
-      val address = payment.sender.address
-      val stateTimestamp = lastAccountPaymentTransaction(payment.sender) match {
-        case Some(lastTransaction) => lastTransaction.timestamp
-        case _ => 0
-      }
-      address -> (List[Transaction](), stateTimestamp)
-    }: _*)
-
-    val orderedTransaction = paymentTransactions.sortBy(_.timestamp)
-    val selection: Map[String, (List[Transaction], Long)] = orderedTransaction.foldLeft(initialSelection) { (s, t) =>
-      val address = t.sender.address
-      val tuple = s(address)
-      if (t.timestamp > tuple._2) {
-        s.updated(address, (tuple._1, t.timestamp))
-      } else {
-        s.updated(address, (tuple._1 :+ t, tuple._2))
-      }
-    }
-
-    selection.foldLeft(List[Transaction]()) { (l, s) => l ++ s._2._1 }
   }
 
   def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
@@ -382,30 +224,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       case Some(height) => loop(height, account.address)
       case None => None
     }
-  }
-
-  def disallowBeforeActivationTime(s: ChainParameters)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
-    case tx: BurnTransaction if tx.timestamp <= s.allowBurnTransactionAfterTimestamp =>
-      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowBurnTransactionAfterTimestamp}"))
-    case tx: LeaseTransaction if tx.timestamp <= s.allowLeaseTransactionAfterTimestamp =>
-      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowLeaseTransactionAfterTimestamp}"))
-    case tx: LeaseCancelTransaction if tx.timestamp <= s.allowLeaseTransactionAfterTimestamp =>
-      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowLeaseTransactionAfterTimestamp}"))
-    case tx: ExchangeTransaction if tx.timestamp <= s.allowExchangeTransactionAfterTimestamp =>
-      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowExchangeTransactionAfterTimestamp}"))
-    case tx: CreateAliasTransaction if tx.timestamp <= s.allowCreateAliasTransactionAfterTimestamp =>
-      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowCreateAliasTransactionAfterTimestamp}"))
-    case _: BurnTransaction => Right(tx)
-    case _: PaymentTransaction => Right(tx)
-    case _: GenesisTransaction => Right(tx)
-    case _: TransferTransaction => Right(tx)
-    case _: IssueTransaction => Right(tx)
-    case _: ReissueTransaction => Right(tx)
-    case _: ExchangeTransaction => Right(tx)
-    case _: LeaseTransaction => Right(tx)
-    case _: LeaseCancelTransaction => Right(tx)
-    case _: CreateAliasTransaction => Right(tx)
-    case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
   }
 
   override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
@@ -539,92 +357,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     }.values.flatten.toList.sortWith(_.timestamp > _.timestamp).take(limit)
   }
 
-  private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = txs.map(t => validateAgainstState(t, height))
-
-  def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Either[ValidationError, Transaction]] = {
-
-    txs.foldLeft(Seq.empty[Either[ValidationError, Transaction]]) {
-      case (seq, tx) => validateWithBlockTxs(tx, seq.filter(_.isRight).map(_.right.get)) match {
-        case Left(err) => Left(err) +: seq
-        case Right(t) => Right(t) +: seq
-      }
-    }.reverse
-  }
-
-  private def filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
-    val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
-    if (allowInvalidPaymentTransactionsByTimestamp) {
-      txs.map(Right(_))
-    } else {
-      val invalidPaymentTransactionsByTimestamp = invalidatePaymentTransactionsByTimestamp(txs)
-      txs.map(t1 => if (!invalidPaymentTransactionsByTimestamp.exists(t2 => t2.id sameElements t1.id))
-        Right(t1)
-      else Left(TransactionValidationError(t1, s"is invalid due to one of previous transactions in the sequence is PaymentTransaction with a greater timestamp")))
-    }
-  }
-
-  private def filterTransactionsFromFuture(trans: Seq[Transaction], blockTime: Long): Seq[Either[ValidationError, Transaction]] = {
-    val allowTransactionsFromFutureByTimestamp = trans.nonEmpty && trans.map(_.timestamp).max < settings.allowTransactionsFromFutureUntil
-    if (allowTransactionsFromFutureByTimestamp) {
-      trans.map(Right(_))
-    } else {
-      trans.map {
-        tx =>
-          if ((tx.timestamp - blockTime).millis <= SimpleTransactionModule.MaxTimeTransactionOverBlockDiff)
-            Right(tx)
-          else Left(TransactionValidationError(tx, s"Transaction is from far future. BlockTime: $blockTime"))
-      }
-    }
-  }
-
-  private def safeSum(first: Long, second: Long): Try[Long] = Try {
-    Math.addExact(first, second)
-  }
-
-  def filterByBalanceApplicationErrors(allowUnissuedAssets: Boolean, trans: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
-    val (_, validatedTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Either[ValidationError, Transaction]])) {
-      case ((currentState, seq), tx) =>
-        try {
-          val changes0 = BalanceChangeCalculator.balanceChanges(this)(tx).right.get
-          val changes = if (allowUnissuedAssets) {
-            changes0
-          } else {
-            changes0.sortBy(_.delta)
-          }
-
-          val newStateAfterBalanceUpdates = changes.foldLeft(currentState) { case (iChanges, bc) =>
-            //update balances sheet
-
-            val currentChange = iChanges.getOrElse(bc.assetAcc, (AccState(assetBalance(bc.assetAcc), effectiveBalance(bc.assetAcc.account)), List.empty))
-            val newBalance = safeSum(currentChange._1.balance, bc.delta).get
-            if (tx.timestamp < settings.allowTemporaryNegativeUntil || newBalance >= 0) {
-              iChanges.updated(bc.assetAcc, (AccState(newBalance, currentChange._1.effectiveBalance), tx.id +: currentChange._2))
-            } else {
-              throw new Error(s"Transaction leads to negative state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
-            }
-          }
-
-          val ebc = BalanceChangeCalculator.effectiveBalanceChanges(this)(tx).right.get
-          val newStateAfterEffectiveBalanceChanges = ebc.foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
-            //update effective balances sheet
-            val currentChange = iChanges.getOrElse(AssetAcc(bc.account, None), (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
-            val newEffectiveBalance = safeSum(currentChange._1.effectiveBalance, bc.amount).get
-            if (tx.timestamp < settings.allowTemporaryNegativeUntil || newEffectiveBalance >= 0) {
-              iChanges.updated(AssetAcc(bc.account, None), (AccState(currentChange._1.balance, newEffectiveBalance), currentChange._2))
-            } else {
-              throw new Error(s"Transaction leads to negative effective balance: ${currentChange._1.effectiveBalance} + ${bc.amount} = ${currentChange._1.effectiveBalance + bc.amount}")
-            }
-          }
-          (newStateAfterEffectiveBalanceChanges, seq :+ Right(tx))
-        } catch {
-          case NonFatal(e) =>
-            log.debug(e.getMessage)
-            (currentState, seq :+ Left(TransactionValidationError(tx, e.getMessage)))
-        }
-    }
-    validatedTxs
-  }
-
   def resolveAlias(a: Alias): Option[Account] = storage
     .addressByAlias(a.name)
     .map(addr => Account.fromBase58String(addr).right.get)
@@ -740,28 +472,8 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     }
   }
 
-  def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
-    val validators: Seq[(Transaction) => Either[StateValidationError, Transaction]] = Seq(
-      validateAssetIssueReissueBurnTransactions,
-      validateLeaseTransactions,
-      validateExchangeTransaction,
-      genesisTransactionHeightMustBeZero(height),
-      disallowLeaseToSelfAlias,
-      disallowDuplicateIds(settings.requirePaymentUniqueId),
-      disallowBeforeActivationTime(settings),
-      incrementingTimestamp(settings.allowInvalidPaymentTransactionsByTimestamp),
-      addressAliasExists)
-
-    validators.toStream.map(_.apply(transaction)).find(_.isLeft) match {
-      case Some(Left(e)) => Left(e)
-      case _ => Right(transaction)
-    }
-  }
-
-
   private def getIssueTransaction(assetId: AssetId): Option[IssueTransaction] =
     storage.getTransactionBytes(assetId).flatMap(b => IssueTransaction.parseBytes(b).toOption)
-
 
   //for debugging purposes only
   def totalBalance: Long = storage.lastStatesKeys.map(address => balanceByKey(address, _.balance, storage.stateHeight)).sum
@@ -849,4 +561,8 @@ object StoredState {
     new StoredState(storage, settings)
   }
 
+  def calcStartDay(t: Long): Long = {
+    val ts = t / 1000
+    ts - ts % (24 * 60 * 60)
+  }
 }
