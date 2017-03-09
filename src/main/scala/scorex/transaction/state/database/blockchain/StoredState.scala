@@ -507,9 +507,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
   def effectiveBalance(account: Account): Long = balanceByKey(account.address, _.effectiveBalance, storage.stateHeight)
 
-  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int): Long =
-    balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(None, confirmations))
-
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
     balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
 

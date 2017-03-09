@@ -95,29 +95,20 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val block = TestBlock(txs)
     state.processBlock(block)
     state.effectiveBalance(rec) shouldBe 5L
-    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 0L
 
     state.processBlock(TestBlock(Seq()))
     state.effectiveBalance(rec) shouldBe 5L
-    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 5L
-    state.effectiveBalanceWithConfirmations(rec, 2) shouldBe 0L
 
     val spendingBlock = TestBlock(Seq(transactionModule.createPayment(rec, acc, 2, 1).right.get))
     state.processBlock(spendingBlock)
     state.effectiveBalance(rec) shouldBe 2L
-    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 2L
 
     state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get,
       transactionModule.issueAsset(IssueRequest(acc.address, "test", "test", 1000, 2, false, 100000000), application.wallet).right.get)))
     state.effectiveBalance(rec) shouldBe 7L
-    state.effectiveBalanceWithConfirmations(rec, 3) shouldBe 2L
 
     state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
     state.effectiveBalance(rec) shouldBe 12L
-    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 7L
-    state.effectiveBalanceWithConfirmations(rec, 2) shouldBe 2L
-    state.effectiveBalanceWithConfirmations(rec, 4) shouldBe 2L
-    state.effectiveBalanceWithConfirmations(rec, 5) shouldBe 0L
   }
 
   test("lease tx and balances") {
@@ -133,10 +124,8 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     transactionModule.issueAsset(IssueRequest(acc.address, "test", "test", 1000, 2, false, 100000000), application.wallet).right.get
       )))
     state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
-    state.effectiveBalanceWithConfirmations(acc, 1) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
     state.balance(rec) shouldBe 0L
     state.effectiveBalance(rec) shouldBe 5L
-    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 0L
     application.consensusModule.generatingBalance(acc, transactionModule.blockStorage.state.stateHeight) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
     application.consensusModule.generatingBalance(rec, transactionModule.blockStorage.state.stateHeight) shouldBe 0
 
@@ -146,8 +135,6 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
       state.processBlock(TestBlock(Seq.empty))
     }
     state.effectiveBalance(acc) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
-    state.effectiveBalanceWithConfirmations(acc, 1000) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
-    state.effectiveBalanceWithConfirmations(rec, 1000) shouldBe 5
     application.consensusModule.generatingBalance(acc, transactionModule.blockStorage.state.stateHeight) shouldBe oldSenderEffectiveBalance - (100000000 + 6)
     application.consensusModule.generatingBalance(rec, transactionModule.blockStorage.state.stateHeight) shouldBe 5
   }
@@ -162,29 +149,20 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val block = TestBlock(txs)
     state.processBlock(block)
     state.effectiveBalance(rec) shouldBe 5L
-    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 0L
 
     state.processBlock(TestBlock(Seq()))
     state.effectiveBalance(rec) shouldBe 5L
-    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 5L
-    state.effectiveBalanceWithConfirmations(rec, 2) shouldBe 0L
 
     val spendingBlock = TestBlock(Seq(transactionModule.createPayment(rec, acc, 2, 1).right.get))
     state.processBlock(spendingBlock)
     state.effectiveBalance(rec) shouldBe 2L
-    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 2L
 
     state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
     state.effectiveBalance(rec) shouldBe 7L
-    state.effectiveBalanceWithConfirmations(rec, 3) shouldBe 2L
 
 
     state.processBlock(TestBlock(Seq(transactionModule.createPayment(acc, rec, 5, 1).right.get)))
     state.effectiveBalance(rec) shouldBe 12L
-    state.effectiveBalanceWithConfirmations(rec, 1) shouldBe 7L
-    state.effectiveBalanceWithConfirmations(rec, 2) shouldBe 2L
-    state.effectiveBalanceWithConfirmations(rec, 4) shouldBe 2L
-    state.effectiveBalanceWithConfirmations(rec, 5) shouldBe 0L
   }
 
   test("private methods") {

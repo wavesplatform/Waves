@@ -54,6 +54,8 @@ trait State {
 
   def wavesDistributionAtHeight(height: Int): JsObject
 
+  def totalAssetQuantity(assetId: AssetId): Long
+
   // debug from api
 
   def toJson(heightOpt: Option[Int]): JsObject
@@ -72,10 +74,6 @@ trait State {
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)],
                       allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)]
-
-  def totalAssetQuantity(assetId: AssetId): Long
-
-  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int): Long
 
   def addAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long, reissuable: Boolean): Unit
 
