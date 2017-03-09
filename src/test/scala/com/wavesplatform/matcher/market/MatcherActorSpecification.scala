@@ -14,10 +14,9 @@ import com.wavesplatform.matcher.model.LevelAgg
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
-import play.api.libs.json.Json
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
-import scorex.settings.TestChainParameters
+import scorex.settings.TestBlockchainSettings
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.{NTP, ScorexLogging}
@@ -34,7 +33,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   with PathMockFactory {
 
   val db = new MVStore.Builder().compress().open()
-  val storedState = fromDBWithUnlimitedBalance(db, TestChainParameters.Disabled)
+  val storedState = fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 
@@ -67,30 +66,36 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
     "AssetPair with predefined pair" in {
       def predefinedPair = AssetPair(Base58.decode("BASE2").toOption, Base58.decode("BASE1").toOption)
+
       actor ! GetOrderBookRequest(predefinedPair, None)
       expectMsg(GetOrderBookResponse(predefinedPair, Seq(), Seq()))
 
       def reversePredefinedPair = AssetPair(Base58.decode("BASE1").toOption, Base58.decode("BASE2").toOption)
+
       actor ! GetOrderBookRequest(reversePredefinedPair, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid AssetPair ordering, should be reversed: BASE2-BASE1"))
     }
 
     "AssetPair with predefined price assets" in {
       def priceAsset = AssetPair(Base58.decode("Some").toOption, Base58.decode("BASE1").toOption)
+
       actor ! GetOrderBookRequest(priceAsset, None)
       expectMsg(GetOrderBookResponse(priceAsset, Seq(), Seq()))
 
       def wrongPriceAsset = AssetPair(Base58.decode("BASE2").toOption, Base58.decode("Some").toOption)
+
       actor ! GetOrderBookRequest(wrongPriceAsset, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid AssetPair ordering, should be reversed: Some-BASE2"))
     }
 
     "AssetPair with unknown assets" in {
       def unknownAssets = AssetPair(Base58.decode("Some2").toOption, Base58.decode("Some1").toOption)
+
       actor ! GetOrderBookRequest(unknownAssets, None)
       expectMsg(GetOrderBookResponse(unknownAssets, Seq(), Seq()))
 
       def wrongUnknownAssets = AssetPair(Base58.decode("Some1").toOption, Base58.decode("Some2").toOption)
+
       actor ! GetOrderBookRequest(wrongUnknownAssets, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid AssetPair ordering, should be reversed: Some2-Some1"))
     }
@@ -133,8 +138,8 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
       expectMsgPF() {
         case GetMarketsResponse(publicKey, Seq(
-            MarketData(predefined, "Unknown", "Unknown", _),
-            MarketData(_, "Unknown", "Unknown", _))) =>
+        MarketData(predefined, "Unknown", "Unknown", _),
+        MarketData(_, "Unknown", "Unknown", _))) =>
           publicKey shouldBe MatcherAccount.publicKey
       }
     }

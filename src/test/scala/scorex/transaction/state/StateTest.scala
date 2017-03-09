@@ -105,7 +105,7 @@ object StateTestSpec extends Commands {
 
   case class Sut(fileName: String) {
     val db = new MVStore.Builder().fileName(fileName).compress().open()
-    val storedState = StoredState.fromDB(db, TestChainParameters.Disabled)
+    val storedState = StoredState.fromDB(db, TestBlockchainSettings.Disabled.functionalitySettings)
     storedState.processBlock(TestBlock(genesisTxs))
     val validator = new ValidatorImpl(storedState, TestChainParameters.Disabled)
   }

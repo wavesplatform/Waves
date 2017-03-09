@@ -13,7 +13,7 @@ import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrde
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import scorex.settings.TestChainParameters
+import scorex.settings.TestBlockchainSettings
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.utils.ScorexLogging
@@ -37,7 +37,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
   val db = new MVStore.Builder().compress().open()
-  val storedState = fromDBWithUnlimitedBalance(db, TestChainParameters.Disabled)
+  val storedState = fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
 
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)

@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Charsets
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{GenesisSettings, WavesSettings}
 import scorex.account._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
@@ -12,7 +12,6 @@ import scorex.consensus.TransactionsOrdering
 import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
-import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -27,8 +26,8 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right}
 
 
-class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val settings: WavesSettings,
-                                                               application: Application)
+class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val settings: WavesSettings,
+                                                                application: Application)
   extends TransactionModule with TransactionOperations with ScorexLogging {
 
   import SimpleTransactionModule._
@@ -181,7 +180,8 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       .flatMap(onNewOffchainTransaction)
 
 
-  override def genesisData: Seq[Transaction] = hardForkParams.genesisTxs
+  override def genesisData: Seq[Transaction] =
+    genesisSettings.transactions.map(_.asInstanceOf[Transaction])
 
   /** Check whether tx is valid on current state and not expired yet
     */

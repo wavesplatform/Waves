@@ -10,8 +10,7 @@ import scorex.account.PublicKeyAccount
 import scorex.app.Application
 import scorex.block.Block._
 import scorex.block.{Block, SignerData}
-import scorex.consensus.ConsensusModule
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
@@ -150,7 +149,7 @@ abstract class ActorTestingCommons extends TestKitBase
 
   trait ApplicationMock extends Application {
     implicit val transactionModule = stub[TransactionModule]
-    implicit val consensusModule = stub[ConsensusModule]
+    implicit val consensusModule = stub[WavesConsensusModule]
     final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock
   }

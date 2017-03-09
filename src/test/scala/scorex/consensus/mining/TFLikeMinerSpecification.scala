@@ -7,7 +7,7 @@ import scorex.ActorTestingCommons
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.Block
-import scorex.consensus.ConsensusModule
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.Coordinator.AddBlock
 import scorex.transaction.{History, TransactionModule}
 import scorex.wallet.Wallet
@@ -33,7 +33,7 @@ class TFLikeMinerSpecification extends ActorTestingCommons {
   private val calculatedGenDelay = 2000 millis
 
   private val testHistory = mock[History]
-  private val testConsensusModule = mock[ConsensusModule]
+  private val testConsensusModule = mock[WavesConsensusModule]
 
   private val f = mockFunction[Block, String]
   f.expects(*).never
@@ -73,7 +73,7 @@ class TFLikeMinerSpecification extends ActorTestingCommons {
     override val wallet: Wallet = testWallet
     override val coordinator = testCoordinator.ref
     override val history: History = testHistory
-    override implicit val consensusModule: ConsensusModule = testConsensusModule
+    override implicit val consensusModule: WavesConsensusModule = testConsensusModule
   }
 
   private val genTimeShift = Miner.BlockGenerationTimeShift
@@ -184,7 +184,7 @@ class SimpleMinerSpecification extends ActorTestingCommons {
   val testCoordinator = TestProbe("Coordinator")
 
   private val testHistory = mock[History]
-  private val testConsensusModule = mock[ConsensusModule]
+  private val testConsensusModule = mock[WavesConsensusModule]
 
   private val f = mockFunction[Block, String]
   f.expects(*).never
@@ -224,7 +224,7 @@ class SimpleMinerSpecification extends ActorTestingCommons {
     override val wallet: Wallet = testWallet
     override val coordinator = testCoordinator.ref
     override val history: History = testHistory
-    override implicit val consensusModule: ConsensusModule = testConsensusModule
+    override implicit val consensusModule: WavesConsensusModule = testConsensusModule
   }
 
   private val genTimeShift = Miner.BlockGenerationTimeShift

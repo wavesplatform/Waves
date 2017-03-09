@@ -7,7 +7,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
-import com.wavesplatform.settings.BlockchainSettingsExtension._
 import com.wavesplatform.settings._
 import scorex.account.AddressScheme
 import scorex.api.http._
@@ -39,9 +38,9 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 } with scorex.app.RunnableApplication
   with MatcherApplication {
 
-  override implicit lazy val consensusModule = new WavesConsensusModule(settings.blockchainSettings.asChainParameters, Constants.AvgBlockDelay)
+  override implicit lazy val consensusModule = new WavesConsensusModule(settings.blockchainSettings, Constants.AvgBlockDelay)
 
-  override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.asChainParameters)(settings, this)
+  override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.genesisSettings)(settings, this)
 
   override lazy val blockStorage = transactionModule.blockStorage
 

@@ -3,13 +3,12 @@ package scorex.transaction.state.database
 import java.io.File
 
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.settings.BlockchainSettingsExtension._
 import org.h2.mvstore.MVStore
-import scorex.consensus.ConsensusModule
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.transaction._
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 
-class BlockStorageImpl(settings: BlockchainSettings)(implicit consensusModule: ConsensusModule, transactionModule: TransactionModule)
+class BlockStorageImpl(settings: BlockchainSettings)(implicit consensusModule: WavesConsensusModule, transactionModule: TransactionModule)
   extends BlockStorage {
 
   require(consensusModule != null)
@@ -34,6 +33,6 @@ class BlockStorageImpl(settings: BlockchainSettings)(implicit consensusModule: C
 
   override val history: History = new StoredBlockchain(db)(consensusModule, transactionModule)
 
-  override val state: State = StoredState.fromDB(db, settings.asChainParameters)
+  override val state: State = StoredState.fromDB(db, settings.functionalitySettings)
 
 }

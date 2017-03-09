@@ -9,8 +9,6 @@ import scala.concurrent.duration._
   */
 
 object Constants extends ScorexLogging {
-  val genesisTimestamp = 1460678400000L
-
   private val appConf = ConfigFactory.load().getConfig("app")
 
   val ApplicationName = "waves"

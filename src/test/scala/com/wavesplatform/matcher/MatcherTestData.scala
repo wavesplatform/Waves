@@ -131,6 +131,25 @@ trait MatcherTestData {
 
       override def totalAssetQuantity(assetId: AssetId): Long = Long.MaxValue
 
+    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
+    val leaseExtendedState = new LeaseExtendedState(storage)
+    val validators = Seq(
+      extendedState,
+      incrementingTimestampValidator,
+      new GenesisValidator,
+      new AddressAliasValidator(storage),
+      new LeaseToSelfAliasValidator(storage),
+      new OrderMatchStoredState(storage),
+      new IncludedValidator(storage, settings.requirePaymentUniqueId),
+      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
+        settings.allowLeaseTransactionAfterTimestamp,
+        settings.allowExchangeTransactionAfterTimestamp,
+        settings.allowCreateAliasTransactionAfterTimestamp)
+    )
+    new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
+      override def assetBalance(account: AssetAcc): Long = Long.MaxValue
+
+      override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
     }
   }
 }

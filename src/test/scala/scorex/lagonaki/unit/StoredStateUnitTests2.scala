@@ -10,7 +10,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.api.http.assets.{IssueRequest, TransferRequest}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestChainParameters
+import scorex.settings.TestBlockchainSettings
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{AssetAcc, GenesisTransaction}
@@ -25,8 +25,8 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
   val wallet = new Wallet(None, "123", Some(Array(0.toByte, 1.toByte)))
   val accounts = wallet.generateNewAccounts(3)
 
-  val db = new MVStore.Builder().fileName(stateFile.getAbsolutePath).compress().open()
-  val state = StoredState.fromDB(db, TestChainParameters.Disabled)
+  val db = new MVStore.Builder().fileName(stateFile).compress().open()
+  val state = StoredState.fromDB(db, TestBlockchainSettings.Disabled.functionalitySettings)
   state.processBlock(TestBlock(Seq(GenesisTransaction.create(accounts.head, 100000000000L, 0).right.get)))
 
   private def createIssueAssetTx(request: IssueRequest, wallet: Wallet): IssueTransaction = {

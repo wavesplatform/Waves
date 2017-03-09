@@ -2,8 +2,7 @@ package scorex.network
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
-import scorex.consensus.ConsensusModule
-import scorex.crypto.EllipticCurveImpl
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.message.BasicMessagesRepo
 import scorex.transaction.TransactionModule
 import scorex.transaction.TransactionParser._
@@ -30,7 +29,7 @@ class CheckpointSpecification extends FreeSpec
   }
 
   "serialization" in {
-    val spec = new BasicMessagesRepo()(stub[TransactionModule], stub[ConsensusModule]).CheckpointMessageSpec
+    val spec = new BasicMessagesRepo()(stub[TransactionModule], stub[WavesConsensusModule]).CheckpointMessageSpec
 
     def sig(b: Byte) = Array.fill[Byte](SignatureLength)(b)
 

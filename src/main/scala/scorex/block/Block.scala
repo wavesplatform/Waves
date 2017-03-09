@@ -160,7 +160,7 @@ object Block extends ScorexLogging {
     build(version, timestamp, reference, consensusData, transactionData, signer, signature)
   }
 
-  def genesis(concensusGenesisData: NxtLikeConsensusBlockData,
+  def genesis(consensusGenesisData: NxtLikeConsensusBlockData,
               transactionGenesisData: Seq[Transaction],
               timestamp: Long = 0L,
               signatureStringOpt: Option[String] = None): Block = {
@@ -169,11 +169,11 @@ object Block extends ScorexLogging {
     val genesisSigner = PrivateKeyAccount(Array.empty)
 
     val transactionGenesisDataField = TransactionsBlockField(transactionGenesisData)
-    val concensusGenesisDataField = NxtConsensusBlockField(concensusGenesisData)
+    val consensusGenesisDataField = NxtConsensusBlockField(consensusGenesisData)
     val txBytesSize = transactionGenesisDataField.bytes.length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionGenesisDataField.bytes
-    val cBytesSize = concensusGenesisDataField.bytes.length
-    val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ concensusGenesisDataField.bytes
+    val cBytesSize = consensusGenesisDataField.bytes.length
+    val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ consensusGenesisDataField.bytes
 
     val reference = Array.fill(BlockIdLength)(-1: Byte)
 
@@ -193,7 +193,7 @@ object Block extends ScorexLogging {
       version = 1,
       reference = reference,
       signerData = SignerData(genesisSigner, signature),
-      consensusData = concensusGenesisData,
+      consensusData = consensusGenesisData,
       transactionData = transactionGenesisData)
   }
 }
