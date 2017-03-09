@@ -58,7 +58,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       .sorted(TransactionsOrdering.InUTXPool)
       .take(MaxTransactionsPerBlock)
 
-    val valid = blockStorage.state.validate(txs, heightOpt, NTP.correctedTime())._2
+    val valid = validator.validate(txs, heightOpt, NTP.correctedTime())._2
 
     if (valid.size != txs.size) {
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
@@ -85,7 +85,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
     val inOrder = notFromFuture.sorted(TransactionsOrdering.InUTXPool)
-    val valid = blockStorage.state.validate(inOrder, blockTime = currentTime)._2
+    val valid = validator.validate(inOrder, blockTime = currentTime)._2
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
   }
@@ -206,7 +206,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val lastBlockTs = blockStorage.history.lastBlock.timestamp
     val txs = block.transactionData
     lazy val txsAreNew = txs.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTimeCurrentBlockOverTransactionDiff }
-    lazy val (errors, validTrans) = blockStorage.state.validate(block.transactionData, blockStorage.history.heightOf(block), block.timestamp)
+    lazy val (errors, validTrans) = validator.validate(block.transactionData, blockStorage.history.heightOf(block), block.timestamp)
     lazy val txsIdAreUniqueInBlock = txs.map(tx => Base58.encode(tx.id)).toSet.size == txs.size
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (errors.nonEmpty) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs: $errors")
