@@ -635,17 +635,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
   def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)
 
-  override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): (Seq[ValidationError], Seq[Transaction]) = {
-    val height = heightOpt.getOrElse(storage.stateHeight)
-    val (err0, validOneByOne) = validAgainstStateOneByOne(height, trans).segregate()
-    val (err1, validAgainstConsecutivePayments) = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).segregate()
-    val (err2, filteredFarFuture) = filterTransactionsFromFuture(validAgainstConsecutivePayments, blockTime).segregate()
-    val allowUnissuedAssets = filteredFarFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
-    val (err3, filteredOvermatch) = validateExchangeTxs(filteredFarFuture, height).segregate()
-    val (err4, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredOvermatch).segregate()
-    (err0 ++ err1 ++ err2 ++ err3 ++ err4, result)
-  }
-
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
     val newBalances: Map[AssetAcc, (AccState, Reasons)] = trans.foldLeft(fees) { case (changes, tx) =>
       val bcs = BalanceChangeCalculator.balanceChanges(this)(tx).right.get

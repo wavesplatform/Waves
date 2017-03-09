@@ -14,10 +14,6 @@ import scala.util.Try
 
 trait State {
 
-  // validation
-
-  def validate(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): (Seq[ValidationError], Seq[Transaction])
-
   // state reads
 
   def included(signature: Array[Byte]): Option[Int]
