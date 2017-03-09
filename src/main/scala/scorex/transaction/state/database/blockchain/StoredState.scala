@@ -829,9 +829,9 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
     balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
 
-  override def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T] = {
-    storage.getTransaction(signature) match {
-      case Some(tx) if ct.runtimeClass == tx.getClass => Some(tx.asInstanceOf[T])
+  override def findTransaction[T <: Transaction](id: Array[Byte])(implicit ct: ClassTag[T]): Option[T] = {
+    storage.getTransaction(id) match {
+      case Some(tx) if ct.runtimeClass.isAssignableFrom(tx.getClass) => Some(tx.asInstanceOf[T])
       case _ => None
     }
   }

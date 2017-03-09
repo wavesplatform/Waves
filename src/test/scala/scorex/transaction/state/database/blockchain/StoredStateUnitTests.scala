@@ -60,6 +60,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   val db = new MVStore.Builder().fileName(stateFile).compress().open()
   val state = StoredState.fromDB(db, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
+  val validator: Validator = new ValidatorImpl(state, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
   val testAcc = PrivateKeyAccount(scorex.utils.randomBytes(64))
   val testAssetAcc = AssetAcc(testAcc, None)
   val testAdd = testAcc.address
@@ -76,7 +77,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     val trans = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
 
     val bts = trans.map(_.timestamp).max
-    val (time, result) = profile(state.validate(trans, blockTime = bts)._2)
+    val (time, result) = profile(validator.validate(trans, blockTime = bts)._2)
     time should be < 1000L
     result.size should be <= trans.size
   }
@@ -118,10 +119,10 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     state.effectiveBalance(testAcc) shouldBe InitialBalance
 
     val transfers = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
-    val invalidTxs = transfers.filterNot(tx => state.isValid(tx, tx.timestamp))
+    val invalidTxs = transfers.filterNot(tx => validator.isValid(tx, tx.timestamp))
     invalidTxs shouldBe 'isEmpty
 
-    state.isValid(transfers, blockTime = transfers.map(_.timestamp).max) shouldBe false
+    validator.isValid(transfers, blockTime = transfers.map(_.timestamp).max) shouldBe false
 
     state.applyChanges(Map(testAssetAcc -> (AccState(0L, 0L), List())))
   }
@@ -141,13 +142,13 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         //valid transfer
         val tx = TransferTransaction.create(None, testAcc, recipient, balance - fee, System.currentTimeMillis(),
           None, fee, Array()).right.get
-        state.isValid(tx, tx.timestamp) shouldBe true
+        validator.isValid(tx, tx.timestamp) shouldBe true
 
         //transfer asset
         state.balance(testAcc) shouldBe balance
         val invalidtx = TransferTransaction.create(None, testAcc, recipient, balance, System.currentTimeMillis(),
           None, fee, Array()).right.get
-        state.isValid(invalidtx, invalidtx.timestamp) shouldBe false
+        validator.isValid(invalidtx, invalidtx.timestamp) shouldBe false
 
         state.applyChanges(Map(testAssetAcc -> (AccState(0L, 0L), List(tx))))
       }
@@ -160,7 +161,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val senderAccount = AssetAcc(tx.sender, None)
         val txFee = tx.fee
         state.applyChanges(Map(senderAccount -> (AccState(txFee, txFee), List(FeesStateChange(txFee)))))
-        state.isValid(Seq(tx), None, System.currentTimeMillis()) shouldBe false
+        validator.isValid(Seq(tx), None, System.currentTimeMillis()) shouldBe false
       }
     }
   }
@@ -231,12 +232,12 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val (senderBalance, senderEffectiveBalance, recipientBalance, recipientEffectiveBalance) = senderAndRecipientStateBalances(tx)
 
         state.getLeasedSum(tx.sender.address) shouldBe 0L
-        state.isValid(tx, Int.MaxValue) shouldBe true
+        validator.isValid(tx, Int.MaxValue) shouldBe true
 
         // apply lease tx
         state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = false))
 
-        state.isValid(tx, Int.MaxValue) shouldBe false
+        validator.isValid(tx, Int.MaxValue) shouldBe false
 
         val (newSenderBalance, newSenderEffectiveBalance, newRecipientBalance, newRecipientEffectiveBalance) = senderAndRecipientStateBalances(tx)
 
@@ -263,14 +264,14 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         state.getLeasedSum(first.sender.address) shouldBe 0L
 
-        state.isValid(first, Int.MaxValue) shouldBe true
-        state.isValid(second, Int.MaxValue) shouldBe true
+        validator.isValid(first, Int.MaxValue) shouldBe true
+        validator.isValid(second, Int.MaxValue) shouldBe true
 
         // apply lease tx
         state.applyChanges(state.calcNewBalances(Seq(first), Map(), allowTemporaryNegative = false))
 
-        state.isValid(first, Int.MaxValue) shouldBe false
-        state.isValid(second, Int.MaxValue) shouldBe false
+        validator.isValid(first, Int.MaxValue) shouldBe false
+        validator.isValid(second, Int.MaxValue) shouldBe false
       }
     }
   }
@@ -289,7 +290,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.effectiveBalance(tx.sender) shouldBe balance
         balance < tx.amount + tx.fee shouldBe true
 
-        state.isValid(tx, Int.MaxValue) shouldBe false
+        validator.isValid(tx, Int.MaxValue) shouldBe false
       }
     }
   }
@@ -307,7 +308,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.effectiveBalance(tx.sender) shouldBe balance
         balance < tx.amount + tx.fee shouldBe true
 
-        state.isValid(tx, Int.MaxValue) shouldBe false
+        validator.isValid(tx, Int.MaxValue) shouldBe false
       }
     }
   }
@@ -326,22 +327,22 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         val (senderBalance, senderEffectiveBalance, recipientBalance, recipientEffectiveBalance) = senderAndRecipientStateBalances(lease)
 
-        state.isValid(cancel, Int.MaxValue) shouldBe false
+        validator.isValid(cancel, Int.MaxValue) shouldBe false
 
         state.getLeasedSum(lease.sender.address) shouldBe 0L
-        state.isValid(lease, Int.MaxValue) shouldBe true
+        validator.isValid(lease, Int.MaxValue) shouldBe true
 
         // apply lease tx
         val balancesAfterLeasing = state.calcNewBalances(Seq(lease), Map(), allowTemporaryNegative = false)
         state.applyChanges(balancesAfterLeasing)
 
-        state.isValid(cancel, Int.MaxValue) shouldBe true
+        validator.isValid(cancel, Int.MaxValue) shouldBe true
 
         // apply cancel lease tx
         val balancesAfterCancel = state.calcNewBalances(Seq(cancel), Map(), allowTemporaryNegative = false)
         state.applyChanges(balancesAfterCancel)
 
-        state.isValid(cancel, Int.MaxValue) shouldBe false
+        validator.isValid(cancel, Int.MaxValue) shouldBe false
 
         val (newSenderBalance, newSenderEffectiveBalance, newRecipientBalance, newRecipientEffectiveBalance) = senderAndRecipientStateBalances(lease)
 
@@ -365,7 +366,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val balancesAfterLeasing = state.calcNewBalances(Seq(lease), Map(), allowTemporaryNegative = false)
         state.applyChanges(balancesAfterLeasing)
 
-        state.isValid(cancel, Int.MaxValue) shouldBe false
+        validator.isValid(cancel, Int.MaxValue) shouldBe false
       }
     }
   }
@@ -373,7 +374,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   property("Lease cancel transaction without lease") {
     forAll(leaseCancelGenerator) { cancel: LeaseCancelTransaction =>
       withRollbackTest {
-        state.isValid(cancel, Int.MaxValue) shouldBe false
+        validator.isValid(cancel, Int.MaxValue) shouldBe false
       }
     }
   }
@@ -580,7 +581,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance, balance), Seq(FeesStateChange(balance)))),
           NTP.correctedTime())
         state.balance(account) shouldBe balance
-        state.isValid(tx, System.currentTimeMillis) should be(false)
+        validator.isValid(tx, System.currentTimeMillis) should be(false)
       }
     }
   }
@@ -596,7 +597,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance, balance), Seq(FeesStateChange(balance)))),
           NTP.correctedTime())
         state.assetBalance(assetAccount) shouldBe balance
-        state.isValid(tx, System.currentTimeMillis) should be(false)
+        validator.isValid(tx, System.currentTimeMillis) should be(false)
       }
     }
   }

@@ -42,7 +42,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
       txToForge.amount, txToForge.fee, txToForge.timestamp, forgedSignature).right.get
 
     val transactionsToValidate = transactions :+ forgedTransaction
-    val validTransactions = state.validate(transactionsToValidate, blockTime = transactionsToValidate.map(_.timestamp).max)._2
+    val validTransactions = transactionModule.validator.validate(transactionsToValidate, blockTime = transactionsToValidate.map(_.timestamp).max)._2
 
     validTransactions.count(tx => (tx.id sameElements txToForge.signature) ||
       (tx.id sameElements forgedTransaction.signature)) shouldBe 1
@@ -210,8 +210,8 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   test("double spending") {
     val senderBalance = state.balance(acc)
     val doubleSpending = (1 to 2).map(i => transactionModule.createPayment(acc, recipient, senderBalance / 2, 1).right.get)
-    doubleSpending.foreach(t => state.isValid(t, t.timestamp) shouldBe true)
-    state.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max)._2.size shouldBe 1
+    doubleSpending.foreach(t => transactionModule.validator.isValid(t, t.timestamp) shouldBe true)
+    transactionModule.validator.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max)._2.size shouldBe 1
     state.processBlock(TestBlock(doubleSpending)) should be('failure)
   }
 
@@ -263,9 +263,9 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   test("last transaction of account one block behind") {
     val amount = state.balance(acc) / 1000
     val tx1 = transactionModule.createPayment(acc, recipient, amount, 1).right.get
-    state.isValid(tx1, tx1.timestamp) shouldBe true
+    transactionModule.validator.isValid(tx1, tx1.timestamp) shouldBe true
     val tx2 = transactionModule.createPayment(acc, recipient, amount, 2).right.get
-    state.isValid(tx2, tx2.timestamp) shouldBe true
+    transactionModule.validator.isValid(tx2, tx2.timestamp) shouldBe true
 
     val block = TestBlock(Seq(tx1, tx2))
     state.processBlock(block)

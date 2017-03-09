@@ -16,7 +16,7 @@ import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.state.database.blockchain.{Validator, ValidatorImpl, ValidatorImpl$}
+import scorex.transaction.state.database.blockchain.{Validator, ValidatorImpl}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.utils._
 import scorex.wallet.Wallet
@@ -189,7 +189,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val lastBlockTimestamp = blockStorage.history.lastBlock.timestamp
     val notExpired = (lastBlockTimestamp - tx.timestamp).millis <= MaxTimePreviousBlockOverTransactionDiff
     if (notExpired) {
-      blockStorage.state.validate(tx, tx.timestamp)
+      validator.validate(tx, tx.timestamp)
     } else {
       Left(TransactionValidationError(tx, s"Transaction is too old: Last block timestamp is $lastBlockTimestamp"))
     }
@@ -224,7 +224,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
     for {
       p1 <- PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
-      p2 <- blockStorage.state.validate(p1, p1.timestamp)
+      p2 <- validator.validate(p1, p1.timestamp)
     } yield p2
   }
 

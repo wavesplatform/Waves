@@ -50,7 +50,7 @@ trait State {
 
   def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
 
-  def isReissuable(id: Array[Byte]) : Boolean
+  def isReissuable(id: Array[Byte]): Boolean
 
 
   // debug from api
@@ -90,26 +90,8 @@ trait State {
 
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int): Long
 
-
 }
 
 object State {
   private val DefaultLimit = 50
-
-  implicit class StateExt(s: State) {
-
-    // validation
-
-    def validate[T <: Transaction](tx: T, blockTime: Long): Either[ValidationError, T] = s.validate(Seq(tx), None, blockTime) match {
-      case (_, Seq(t)) => Right(t.asInstanceOf[T])
-      case (Seq(err), _) => Left(err)
-    }
-
-    // calls from test only
-
-    def isValid(tx: Transaction, blockTime: Long): Boolean = validate(tx, blockTime).isRight
-
-    def isValid(txs: Seq[Transaction], height: Option[Int] = None, blockTime: Long): Boolean = s.validate(txs, height, blockTime)._2.size == txs.size
-  }
-
 }
