@@ -34,30 +34,31 @@ trait State {
 
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
 
-  def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction]
-
   def getAssetName(assetId: AssetId): String
 
   def resolveAlias(a: Alias): Option[Account]
 
   def getAlias(a: Account): Option[Alias]
 
-  def persistAlias(ac: Account, al: Alias): Unit
-
   def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
 
   def isReissuable(id: Array[Byte]): Boolean
 
+  def getLeasedSum(address: AddressString): Long
+
+  def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction]
+
+  def effectiveBalance(account: Account): Long
+
+  def stateHeight: Int
+
+  def wavesDistributionAtHeight(height: Int): JsObject
 
   // debug from api
-
-  def toWavesJson(height: Int): JsObject
 
   def toJson(heightOpt: Option[Int]): JsObject
 
   def hash: Int
-
-  def stateHeight: Int
 
   // state writes
 
@@ -67,7 +68,6 @@ trait State {
 
   // outside calls from tests only
 
-
   def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)], blockTs: Long = NTP.correctedTime()): Unit
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)],
@@ -75,18 +75,22 @@ trait State {
 
   def totalAssetQuantity(assetId: AssetId): Long
 
-  def totalBalance: Long
-
-  def effectiveBalance(account: Account): Long
-
-  def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction]
-
-  def getLeasedSum(address: AddressString): Long
-
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int): Long
 
+  def addAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long, reissuable: Boolean): Unit
+
+  def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit
+
+  def assetRollbackTo(assetId: AssetId, height: Int): Unit
 }
 
 object State {
   private val DefaultLimit = 50
+
+  implicit class StateExt(s: State) {
+    def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction] = {
+      s.findPrevOrderMatchTxs(om.buyOrder) ++ s.findPrevOrderMatchTxs(om.sellOrder)
+    }
+  }
+
 }

@@ -35,13 +35,13 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     case _ =>
   }
 
-  private[blockchain] def addAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long, reissuable: Boolean): Unit = {
+  def addAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long, reissuable: Boolean): Unit = {
     val asset = Base58.encode(assetId)
     val transaction = Base58.encode(transactionId)
     val assetAtHeight = s"$asset@$height"
     val assetAtTransaction = s"$asset@$transaction"
 
-    if (!isIssueExists(assetId) ||
+    if (findTransaction[IssueTransaction](assetId).isEmpty ||
       (reissuable && isReissuable(assetId)) ||
       !reissuable) {
       storage.setReissuable(assetAtTransaction, reissuable)
@@ -54,7 +54,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     storage.setReissuable(assetAtTransaction, reissuable)
   }
 
-  private[blockchain] def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit = {
+  def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit = {
     require(quantity <= 0, "Quantity of burned asset should be negative")
 
     val asset = Base58.encode(assetId)
@@ -100,10 +100,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     }
   }
 
-  def isIssueExists(assetId: AssetId): Boolean = {
-    storage.getHeights(Base58.encode(assetId)).nonEmpty
-  }
-
   def getAssetName(assetId: AssetId): String = {
     storage.getTransaction(assetId).flatMap {
       case tx: IssueTransaction => Some(tx.asInstanceOf[IssueTransaction])
@@ -145,11 +141,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       removeObsoleteDays(blockTs)
 
     case _ =>
-  }
-
-
-  def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction] = {
-    findPrevOrderMatchTxs(om.buyOrder) ++ findPrevOrderMatchTxs(om.sellOrder)
   }
 
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = {
@@ -238,7 +229,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
       if (triedAssetId.isSuccess) {
         val assetId = triedAssetId.get
-        getIssueTransaction(assetId) match {
+        findTransaction[IssueTransaction](assetId) match {
           case Some(issueTransaction) =>
             result.updated(assetId, (balance, isReissuable(assetId), totalAssetQuantity(assetId), issueTransaction))
           case None =>
@@ -295,7 +286,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
     applyChanges(newBalances, block.timestampField.value)
-    log.trace(s"New state height is ${storage.stateHeight}, hash: $hash, totalBalance: $totalBalance")
 
     this
   }
@@ -472,12 +462,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     }
   }
 
-  private def getIssueTransaction(assetId: AssetId): Option[IssueTransaction] =
-    storage.getTransactionBytes(assetId).flatMap(b => IssueTransaction.parseBytes(b).toOption)
-
-  //for debugging purposes only
-  def totalBalance: Long = storage.lastStatesKeys.map(address => balanceByKey(address, _.balance, storage.stateHeight)).sum
-
   //for debugging purposes only
   def toJson(heightOpt: Option[Int]): JsObject = {
     val ls = storage.lastStatesKeys.map(add => add -> balanceByKey(add, _.balance, heightOpt.getOrElse(storage.stateHeight)))
@@ -485,34 +469,33 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
 
-  //for debugging purposes only
-  def toWavesJson(heightOpt: Int): JsObject = {
+  def wavesDistributionAtHeight(heightOpt: Int): JsObject = {
+
+    def balanceAtHeight(key: String, atHeight: Int): Long = {
+      storage.getLastStates(key) match {
+        case Some(h) if h > 0 =>
+
+          @tailrec
+          def loop(hh: Int): Long = {
+            val row = storage.getAccountChanges(key, hh).get
+            if (hh <= atHeight) {
+              row.state.balance
+            } else if (row.lastRowHeight == 0) {
+              0L
+            } else {
+              loop(row.lastRowHeight)
+            }
+          }
+
+          loop(h)
+        case _ =>
+          0L
+      }
+    }
+
     val ls = storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add, heightOpt))
       .filter(b => b._2 != 0).sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
     JsObject(ls)
-  }
-
-  //for debugging purposes only
-  private def balanceAtHeight(key: String, atHeight: Int): Long = {
-    storage.getLastStates(key) match {
-      case Some(h) if h > 0 =>
-
-        @tailrec
-        def loop(hh: Int): Long = {
-          val row = storage.getAccountChanges(key, hh).get
-          if (hh <= atHeight) {
-            row.state.balance
-          } else if (row.lastRowHeight == 0) {
-            0L
-          } else {
-            loop(row.lastRowHeight)
-          }
-        }
-
-        loop(h)
-      case _ =>
-        0L
-    }
   }
 
   def assetDistribution(assetId: Array[Byte]): Map[String, Long] = storage.assetDistribution(assetId)

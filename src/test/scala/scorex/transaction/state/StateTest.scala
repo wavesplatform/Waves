@@ -130,13 +130,13 @@ object StateTestSpec extends Commands {
 
   case class PutTransactions(txs: Seq[Transaction]) extends Command {
 
-    type Result = (Int, Long)
+    type Result = (Int)
 
     def run(sut: Sut): Result = sut.synchronized {
       assert(sut.validator.isValid(txs, blockTime = txs.map(_.timestamp).max))
       val block = TestBlock(txs)
       sut.storedState.processBlock(block)
-      (sut.storedState.stateHeight, sut.storedState.totalBalance)
+      sut.storedState.stateHeight
     }
 
     def nextState(state: State): State = state.copy(
@@ -147,7 +147,7 @@ object StateTestSpec extends Commands {
     def preCondition(state: State): Boolean = true
 
     override def postCondition(state: State, result: Try[Result]): Prop =
-      result == Success((state.height + 1, TotalBalance))
+      result == Success(state.height + 1)
   }
 
   case class ValidateTransactions(txs: Seq[(Transaction, Boolean)]) extends Command {

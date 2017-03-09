@@ -12,7 +12,7 @@ import scorex.transaction.state.database.state.storage._
 class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
   with Matchers with TransactionGen with Assertions with MockFactory {
 
-  def newAssetExtendedState(): StoredState = {
+  def newAssetExtendedState(): State = {
     val mvStore = new MVStore.Builder().open()
     val storage = new MVStoreStateStorage
       with MVStoreOrderMatchStorage

@@ -25,7 +25,7 @@ class ValidatorImpl(s: State, settings: ChainParameters) extends Validator {
   private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]]
   = txs.map(t => validateAgainstState(t, height))
 
-  private def validateAssetIssueReissueBurnTransactions(tx: Transaction): Either[StateValidationError, Transaction] = {
+  private def validateAssetReissueBurnTransactions(tx: Transaction): Either[StateValidationError, Transaction] = {
     def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[StateValidationError, SignedTransaction] = {
       s.findTransaction[Transaction](assetId) match {
         case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
@@ -159,7 +159,7 @@ class ValidatorImpl(s: State, settings: ChainParameters) extends Validator {
 
   private def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
     val validators: Seq[(Transaction) => Either[StateValidationError, Transaction]] = Seq(
-      validateAssetIssueReissueBurnTransactions,
+      validateAssetReissueBurnTransactions,
       validateLeaseTransactions,
       validateExchangeTransaction,
       genesisTransactionHeightMustBeZero(height),
