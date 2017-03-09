@@ -22,8 +22,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
   import AssetsRouteSpec._
 
   private val wallet = {
-    val file = File.createTempFile("wallet", ".dat")
-    file.deleteOnExit()
+    val file = scorex.createTestTemporaryFile("wallet", ".dat")
     new Wallet(Some(file.getCanonicalPath), "123", None)
   }
 
