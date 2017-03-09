@@ -1,5 +1,7 @@
 package scorex.transaction.state.database.blockchain
 
+import javassist.bytecode.stackmap.TypeTag
+
 import com.google.common.base.Charsets
 import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsNumber, JsObject}
@@ -25,7 +27,9 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right, Try}
 import scorex.transaction.state.database.blockchain.StoredState._
 
-class StoredState(protected[blockchain] val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
+import scala.reflect.ClassTag
+
+class StoredState(private val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   settings: ChainParameters) extends State with ScorexLogging {
 
   def validateAssetIssueReissueBurnTransactions(tx: Transaction): Either[StateValidationError, Transaction] = {
@@ -188,7 +192,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     }
   }
 
-  private def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction] = {
+  def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction] = {
     findPrevOrderMatchTxs(om.buyOrder) ++ findPrevOrderMatchTxs(om.sellOrder)
   }
 
@@ -602,7 +606,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
             }
           }
 
-          val ebc = BalanceChangeCalculator.effectiveBalanceChanges(this)(storage)(tx).right.get
+          val ebc = BalanceChangeCalculator.effectiveBalanceChanges(this)(tx).right.get
           val newStateAfterEffectiveBalanceChanges = ebc.foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
             //update effective balances sheet
             val currentChange = iChanges.getOrElse(AssetAcc(bc.account, None), (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
@@ -663,7 +667,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
         }
       }
 
-      val ebcs = BalanceChangeCalculator.effectiveBalanceChanges(this)(storage)(tx).right.get
+      val ebcs = BalanceChangeCalculator.effectiveBalanceChanges(this)(tx).right.get
       val newStateAfterEffectiveBalanceChanges = ebcs.foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
         //update effective balances sheet
         val wavesAcc = AssetAcc(bc.account, None)
@@ -827,6 +831,15 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
     balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
 
+  override def findTransaction[T <: Transaction](signature: Array[Byte]): Option[T] = {
+    storage.getTransaction(signature) match {
+      case None => None
+      case Some(t) => t match {
+        case tt: T => Some(tt)
+        case _ => None
+      }
+    }
+  }
 }
 
 object StoredState {

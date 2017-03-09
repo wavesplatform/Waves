@@ -37,6 +37,8 @@ trait State {
 
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
 
+    def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction]
+
   def getAssetName(assetId: AssetId): String
 
   def resolveAlias(a: Alias): Option[Account]
@@ -44,6 +46,8 @@ trait State {
   def getAlias(a: Account): Option[Alias]
 
   def persistAlias(ac: Account, al: Alias): Unit
+
+  def findTransaction[T <: Transaction](signature: Array[Byte]) : Option[T]
 
   // debug from api
 
