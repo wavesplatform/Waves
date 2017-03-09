@@ -9,6 +9,7 @@ import scorex.transaction.state.database.state.{AccState, AddressString, Reasons
 import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
 import scorex.utils.NTP
 
+import scala.reflect.ClassTag
 import scala.util.Try
 
 trait State {
@@ -47,7 +48,7 @@ trait State {
 
   def persistAlias(ac: Account, al: Alias): Unit
 
-  def findTransaction[T <: Transaction](signature: Array[Byte]): Option[T]
+  def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
 
   def isReissuable(id: Array[Byte]) : Boolean
 

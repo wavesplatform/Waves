@@ -25,6 +25,8 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right, Try}
 import scorex.transaction.state.database.blockchain.StoredState._
 
+import scala.reflect.ClassTag
+
 
 class StoredState(private val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   settings: ChainParameters) extends State with ScorexLogging {
@@ -827,13 +829,10 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
     balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
 
-  override def findTransaction[T <: Transaction](signature: Array[Byte]): Option[T] = {
+  override def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T] = {
     storage.getTransaction(signature) match {
-      case None => None
-      case Some(t) => t match {
-        case tt: T => Some(tt)
-        case _ => None
-      }
+      case Some(tx) if ct.runtimeClass == tx.getClass => Some(tx.asInstanceOf[T])
+      case _ => None
     }
   }
 }
