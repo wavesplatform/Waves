@@ -1,7 +1,5 @@
 package scorex.transaction.state.database.blockchain
 
-import javassist.bytecode.stackmap.TypeTag
-
 import com.google.common.base.Charsets
 import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsNumber, JsObject}
@@ -27,7 +25,6 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right, Try}
 import scorex.transaction.state.database.blockchain.StoredState._
 
-import scala.reflect.ClassTag
 
 class StoredState(private val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   settings: ChainParameters) extends State with ScorexLogging {
@@ -110,7 +107,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       storage.removeKey(key)
     }
   }
-
 
   def isReissuable(assetId: AssetId): Boolean = {
     val asset = Base58.encode(assetId)

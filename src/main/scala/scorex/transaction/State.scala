@@ -37,7 +37,7 @@ trait State {
 
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
 
-    def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction]
+  def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction]
 
   def getAssetName(assetId: AssetId): String
 
@@ -47,7 +47,10 @@ trait State {
 
   def persistAlias(ac: Account, al: Alias): Unit
 
-  def findTransaction[T <: Transaction](signature: Array[Byte]) : Option[T]
+  def findTransaction[T <: Transaction](signature: Array[Byte]): Option[T]
+
+  def isReissuable(id: Array[Byte]) : Boolean
+
 
   // debug from api
 
@@ -85,6 +88,7 @@ trait State {
   def getLeasedSum(address: AddressString): Long
 
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int): Long
+
 
 }
 
