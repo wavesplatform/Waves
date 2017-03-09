@@ -28,7 +28,7 @@ import scorex.transaction.state.database.blockchain.StoredState._
 class StoredState(protected[blockchain] val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   settings: ChainParameters) extends State with ScorexLogging {
 
-  def assetIssueReissueBurnValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = {
+  def validateAssetIssueReissueBurnTransactions(tx: Transaction): Either[StateValidationError, Transaction] = {
     def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[StateValidationError, SignedTransaction] = {
       storage.getTransaction(assetId) match {
         case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
@@ -49,7 +49,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     }
   }
 
-  def assetIssueReissueBurnTransactionProcessor(height: Int)(tx: Transaction): Unit = tx match {
+  def applyAssetIssueReissueBurnTransaction(height: Int)(tx: Transaction): Unit = tx match {
     case tx: AssetIssuance =>
       addAsset(tx.assetId, height, tx.id, tx.quantity, tx.reissuable)
     case tx: BurnTransaction =>
@@ -135,12 +135,12 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   }
 
 
-  def exchangeTransactionValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+  def validateExchangeTransaction(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case om: ExchangeTransaction => ExchangeTransactionValidator.isValid(om, findPrevOrderMatchTxs(om))
     case _ => Right(tx)
   }
 
-  def exchangeTransactionProcessorF(blockTs: Long)(tx: Transaction): Unit = tx match {
+  def applyExchangeTransaction(blockTs: Long)(tx: Transaction): Unit = tx match {
     case om: ExchangeTransaction =>
       def isSaveNeeded(order: Order): Boolean = {
         order.expiration >= blockTs
@@ -213,7 +213,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
 
   def getLeasedSum(address: AddressString): Long = storage.getLeasedSum(address)
 
-  def leaseTransactionValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+  def validateLeaseTransactions(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case tx: LeaseCancelTransaction =>
       val leaseOpt = storage.getLeaseTx(tx.leaseId)
       leaseOpt match {
@@ -249,7 +249,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     applyLease(leaseTx)
   }
 
-  def leaseProcessorF(tx: Transaction): Unit = tx match {
+  def applyLeaseTransactions(tx: Transaction): Unit = tx match {
     case tx: LeaseCancelTransaction =>
       val leaseTx = storage.getExistedLeaseTx(tx.leaseId)
       cancelLease(leaseTx)
@@ -259,7 +259,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   }
 
 
-  def addressAliasValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = {
+  def addressAliasExists(tx: Transaction): Either[StateValidationError, Transaction] = {
 
     val maybeAlias = tx match {
       case ltx: LeaseTransaction => ltx.recipient match {
@@ -282,12 +282,12 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     }
   }
 
-  def addressAliasProcessorF(tx: Transaction): Unit = tx match {
+  def registerAlias(tx: Transaction): Unit = tx match {
     case at: CreateAliasTransaction => persistAlias(at.sender, at.alias)
     case _ => ()
   }
 
-  def leaseToSelfValidatorF(tx: Transaction): Either[StateValidationError, Transaction] = {
+  def disallowLeaseToSelfAlias(tx: Transaction): Either[StateValidationError, Transaction] = {
 
     tx match {
       case ltx: LeaseTransaction =>
@@ -302,22 +302,22 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     }
   }
 
-  def genesisValidatorF(height: Int)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+  def genesisTransactionHeightMustBeZero(height: Int)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case gtx: GenesisTransaction if height != 0 => Left(TransactionValidationError(tx, "GenesisTranaction cannot appear in non-initial block"))
     case _ => Right(tx)
   }
 
-  def includedValidatorF(requirePaymentUniqueId: Long)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+  def disallowDuplicateIds(requirePaymentUniqueId: Long)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case tx: PaymentTransaction if tx.timestamp < requirePaymentUniqueId => Right(tx)
     case tx: Transaction => if (included(tx.id).isEmpty) Right(tx)
     else Left(TransactionValidationError(tx, "(except for some cases of PaymentTransaction) cannot be duplicated"))
   }
 
-  def includedProcessorF(height: Int)(tx: Transaction): Unit = {
+  def registerTransactionById(height: Int)(tx: Transaction): Unit = {
     storage.putTransaction(tx, height)
   }
 
-  def incrementingTimestampValidatorF(allowInvalidPaymentTransactionsByTimestamp: Long)(transaction: Transaction): Either[StateValidationError, Transaction] = {
+  def incrementingTimestamp(allowInvalidPaymentTransactionsByTimestamp: Long)(transaction: Transaction): Either[StateValidationError, Transaction] = {
 
     def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
       lastAccountPaymentTransaction(tx.sender) match {
@@ -382,7 +382,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     }
   }
 
-  def activatedValidatorF(s: ChainParameters)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+  def disallowBeforeActivationTime(s: ChainParameters)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case tx: BurnTransaction if tx.timestamp <= s.allowBurnTransactionAfterTimestamp =>
       Left(TransactionValidationError(tx, s"must not appear before time=${s.allowBurnTransactionAfterTimestamp}"))
     case tx: LeaseTransaction if tx.timestamp <= s.allowLeaseTransactionAfterTimestamp =>
@@ -405,41 +405,6 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
     case _: CreateAliasTransaction => Right(tx)
     case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
   }
-
-  val assetIssueReissueBurnValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => assetIssueReissueBurnValidatorF(t)
-  val activatedValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => activatedValidatorF(settings)(t)
-  val genesisValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => genesisValidatorF(h)(t)
-  val includedValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => includedValidatorF(settings.requirePaymentUniqueId)(t)
-  val incrementingTimestampValidatorAdapter = (s: StoredState, t: Transaction, i: Int) => incrementingTimestampValidatorF(settings.allowInvalidPaymentTransactionsByTimestamp)(t)
-  val leaseToSelfValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => leaseToSelfValidatorF(t)
-  val addressAliasValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => addressAliasValidatorF(t)
-  val leaseValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => leaseTransactionValidatorF(t)
-  val exchangeTransactionValidatorAdapter = (s: StoredState, t: Transaction, h: Int) => exchangeTransactionValidatorF(t)
-
-  val validators: Seq[(StoredState, Transaction, Int) => Either[StateValidationError, Transaction]] = Seq(
-    assetIssueReissueBurnValidatorAdapter,
-    incrementingTimestampValidatorAdapter,
-    leaseValidatorAdapter,
-    genesisValidatorAdapter,
-    addressAliasValidatorAdapter,
-    leaseToSelfValidatorAdapter,
-    includedValidatorAdapter,
-    exchangeTransactionValidatorAdapter,
-    activatedValidatorAdapter)
-
-
-  val includedProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => includedProcessorF(height)(t)
-  val addressAliasProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => addressAliasProcessorF(t)
-  val leaseProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => leaseProcessorF(t)
-  val exchangeTransactionProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => exchangeTransactionProcessorF(blockTs)(t)
-  val assetIssueReissueBurnTransactionProcessorAdapter = (s: StoredState, t: Transaction, blockTs: Long, height: Int) => assetIssueReissueBurnTransactionProcessor(height)(t)
-
-  val processors: Seq[(StoredState, Transaction, Long, Int) => Unit] = Seq(
-    assetIssueReissueBurnTransactionProcessorAdapter,
-    leaseProcessorAdapter,
-    addressAliasProcessorAdapter,
-    exchangeTransactionProcessorAdapter,
-    includedProcessorAdapter)
 
   override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 
@@ -736,14 +701,23 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)],
                    blockTs: Long = NTP.correctedTime()): Unit = synchronized {
     storage.setStateHeight(storage.stateHeight + 1)
-    val h = storage.stateHeight
+    val height = storage.stateHeight
+
+    val processors: Seq[(Transaction) => Unit] = Seq(
+      applyAssetIssueReissueBurnTransaction(height),
+      applyLeaseTransactions,
+      registerAlias,
+      applyExchangeTransaction(blockTs),
+      registerTransactionById(height))
+
     changes.foreach { ch =>
       val change = Row(ch._2._1, ch._2._2.map(_.id), storage.getLastStates(ch._1.key).getOrElse(0))
-      storage.putAccountChanges(ch._1.key, h, change)
-      storage.putLastStates(ch._1.key, h)
+      storage.putAccountChanges(ch._1.key, height, change)
+      storage.putLastStates(ch._1.key, height)
       ch._2._2.foreach {
         case tx: Transaction =>
-          processors.foreach(_.apply(this, tx, blockTs, h))
+
+          processors.foreach(_.apply(tx))
         case _ =>
       }
       storage.updateAccountAssets(ch._1.account.address, ch._1.assetId)
@@ -776,7 +750,18 @@ class StoredState(protected[blockchain] val storage: StateStorageI with AssetsEx
   }
 
   def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
-    validators.toStream.map(_.apply(this, transaction, height)).find(_.isLeft) match {
+    val validators: Seq[(Transaction) => Either[StateValidationError, Transaction]] = Seq(
+      validateAssetIssueReissueBurnTransactions,
+      validateLeaseTransactions,
+      validateExchangeTransaction,
+      genesisTransactionHeightMustBeZero(height),
+      disallowLeaseToSelfAlias,
+      disallowDuplicateIds(settings.requirePaymentUniqueId),
+      disallowBeforeActivationTime(settings),
+      incrementingTimestamp(settings.allowInvalidPaymentTransactionsByTimestamp),
+      addressAliasExists)
+
+    validators.toStream.map(_.apply(transaction)).find(_.isLeft) match {
       case Some(Left(e)) => Left(e)
       case _ => Right(transaction)
     }
