@@ -13,11 +13,14 @@ import scorex.account.{Account, AddressScheme, PrivateKeyAccount}
 import scorex.settings.{ChainParameters, TestChainParameters}
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.waves.TestingCommons
+
+import scala.util.Random
+import scala.util.control.NonFatal
 
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging with TestingCommons {
@@ -54,25 +57,22 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     override def allowCreateAliasTransactionAfterTimestamp: Long = 0L
   }
 
-  val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"
-  new File(folder).mkdirs()
-  val stateFile = folder + "state.dat"
-  new File(stateFile).delete()
+  private val stateFile = scorex.createTestTemporaryFile("state", ".dat")
 
-  val db = new MVStore.Builder().fileName(stateFile).compress().open()
-  val state = StoredState.fromDB(db, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
-  val validator: Validator = new ValidatorImpl(state, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
-  val testAcc = PrivateKeyAccount(scorex.utils.randomBytes(64))
-  val testAssetAcc = AssetAcc(testAcc, None)
-  val testAdd = testAcc.address
+  private val db = new MVStore.Builder().fileName(stateFile.getAbsolutePath).compress().open()
+  private val state = StoredState.fromDB(db, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
+  private val validator: Validator = new ValidatorImpl(state, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
+  private val testAcc = PrivateKeyAccount(scorex.utils.randomBytes(64))
+  private val testAssetAcc = AssetAcc(testAcc, None)
+  private val testAdd = testAcc.address
 
 
-  def shouldBeValid(t: Transaction): Assertion = {
+  private def shouldBeValid(t: Transaction): Assertion = {
     validator.validate(t,Int.MaxValue) shouldBe a[Right[_,_]]
   }
 
 
-  def shouldBeInvalid(t: Transaction): Assertion = {
+  private def shouldBeInvalid(t: Transaction): Assertion = {
     validator.validate(t,Int.MaxValue) shouldBe a[Left[_,_]]
   }
 
@@ -217,8 +217,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   private def senderAndRecipientStateBalances(tx: LeaseTransaction): (Long, Long, Long, Long) = {
-    import tx.sender
-    import tx.recipient
+    import tx.{recipient, sender}
 
     val senderBalance = state.balance(sender)
     val senderEffectiveBalance = state.effectiveBalance(sender)
@@ -372,7 +371,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease cancel transaction with other sender") {
-    forAll(leaseAndCancelWithOtherSenderGenerator suchThat(_._1.recipient.isInstanceOf[Account])) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
+    forAll(leaseAndCancelWithOtherSenderGenerator suchThat (_._1.recipient.isInstanceOf[Account])) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
       withRollbackTest {
 
         //set some balance
@@ -463,7 +462,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         maybeRealAccount.get.address shouldBe at.sender.address
 
         state.rollbackTo(state.stateHeight - 1)
-        val noRealAccount : Option[Account] = state.resolveAlias(at.alias)
+        val noRealAccount: Option[Account] = state.resolveAlias(at.alias)
         noRealAccount shouldBe None
         state.balance(at.sender) shouldBe initialBalance
       }
