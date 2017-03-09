@@ -217,7 +217,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     }
   }
 
-  override def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
+  def included(id: Array[Byte]): Option[Int] = storage.included(id, None)
 
   def stateHeight: Int = storage.stateHeight
 
@@ -276,7 +276,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     this
   }
 
-  override def processBlock(block: Block): Try[State] = Try {
+  def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactionData
     val fees: Map[AssetAcc, (AccState, Reasons)] = Block.feesDistribution(block)
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2, effectiveBalance(m._1.account) + m._2), List(FeesStateChange(m._2))))
@@ -293,23 +293,23 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
   private def balance(account: Account, atHeight: Option[Int]): Long =
     assetBalanceAtHeight(AssetAcc(account, None), atHeight)
 
-  override def balance(account: Account): Long =
+  def balance(account: Account): Long =
     assetBalanceAtHeight(AssetAcc(account, None), None)
 
   private def assetBalanceAtHeight(account: AssetAcc, atHeight: Option[Int] = None): Long = {
     balanceByKey(account.key, _.balance, atHeight.getOrElse(storage.stateHeight))
   }
 
-  override def assetBalance(account: AssetAcc): Long = assetBalanceAtHeight(account, Some(storage.stateHeight))
+  def assetBalance(account: AssetAcc): Long = assetBalanceAtHeight(account, Some(storage.stateHeight))
 
   private def heightWithConfirmations(heightOpt: Option[Int], confirmations: Int): Int = {
     Math.max(1, heightOpt.getOrElse(storage.stateHeight) - confirmations)
   }
 
-  override def balanceWithConfirmations(account: Account, confirmations: Int): Long =
+  def balanceWithConfirmations(account: Account, confirmations: Int): Long =
     balance(account, Some(heightWithConfirmations(None, confirmations)))
 
-  override def accountTransactions(account: Account, limit: Int): Seq[Transaction] = {
+  def accountTransactions(account: Account, limit: Int): Seq[Transaction] = {
     val accountAssets = storage.getAccountAssets(account.address)
     val keys = account.address :: accountAssets.map(account.address + _).toList
 
@@ -355,7 +355,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     .aliasByAddress(a.address)
     .map(addr => Alias(addr).right.get)
 
-  def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)
+  private def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
     val newBalances: Map[AssetAcc, (AccState, Reasons)] = trans.foldLeft(fees) { case (changes, tx) =>
@@ -505,15 +505,15 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     (BigInt(FastCryptographicHash(toJson(None).toString().getBytes)) % Int.MaxValue).toInt
   }
 
-  override def effectiveBalance(account: Account): Long = balanceByKey(account.address, _.effectiveBalance, storage.stateHeight)
+  def effectiveBalance(account: Account): Long = balanceByKey(account.address, _.effectiveBalance, storage.stateHeight)
 
-  override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int): Long =
+  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int): Long =
     balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(None, confirmations))
 
-  override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
+  def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
     balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
 
-  override def findTransaction[T <: Transaction](id: Array[Byte])(implicit ct: ClassTag[T]): Option[T] = {
+  def findTransaction[T <: Transaction](id: Array[Byte])(implicit ct: ClassTag[T]): Option[T] = {
     storage.getTransaction(id) match {
       case Some(tx) if ct.runtimeClass.isAssignableFrom(tx.getClass) => Some(tx.asInstanceOf[T])
       case _ => None

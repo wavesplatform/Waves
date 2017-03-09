@@ -93,7 +93,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     result.size should be <= trans.size
   }
 
-  ignore("Burn assets") {
+  property("Burn assets") {
     forAll(issueReissueGenerator) { pair =>
       withRollbackTest {
         val issueTx: IssueTransaction = pair._1
@@ -101,11 +101,17 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val senderAddress = issueTx.sender.address
         val senderAmountAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
+        val genes0 = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes0), Map(), allowTemporaryNegative = true))
+
         state.assetBalance(senderAmountAcc) shouldBe 0
         shouldBeValid(issueTx)
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe issueTx.quantity
+
+        val genes1 = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), burnTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes1), Map(), allowTemporaryNegative = true))
 
         shouldBeValid(burnTx)
 
@@ -476,17 +482,23 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
-  ignore("Reissue asset") {
+  property("Reissue asset") {
     forAll(issueReissueGenerator) { pair =>
       withRollbackTest {
         val issueTx: IssueTransaction = pair._1
         val reissueTx: ReissueTransaction = pair._3
+
+        val genes0 = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes0), Map(), allowTemporaryNegative = true))
 
         shouldBeValid(issueTx)
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
         shouldBeInvalid(issueTx)
+
+        val genes1 = GenesisTransaction.create(issueTx.sender, reissueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes1), Map(), allowTemporaryNegative = true))
 
         val state1 = validator.validate(reissueTx, Int.MaxValue)
         issueTx.reissuable match {
@@ -498,14 +510,21 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
 
-  ignore("Incorrect issue and reissue asset") {
+  property("Incorrect issue and reissue asset") {
     forAll(issueWithInvalidReissuesGenerator) { case (issueTx, reissueTx, invalidReissueTx) =>
       withRollbackTest {
+
+        val genes0 = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes0), Map(), allowTemporaryNegative = true))
+
         shouldBeValid(issueTx)
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
         shouldBeInvalid(issueTx)
+
+        val genes1 = GenesisTransaction.create(invalidReissueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes1), Map(), allowTemporaryNegative = true))
 
         shouldBeValid(invalidReissueTx)
 
