@@ -41,7 +41,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     val assetAtHeight = s"$asset@$height"
     val assetAtTransaction = s"$asset@$transaction"
 
-    if (findTransaction[IssueTransaction](assetId).isEmpty ||
+    if (storage.getHeights(Base58.encode(assetId)).isEmpty ||
       (reissuable && isReissuable(assetId)) ||
       !reissuable) {
       storage.setReissuable(assetAtTransaction, reissuable)
