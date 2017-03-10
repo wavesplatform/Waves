@@ -64,8 +64,7 @@ object BalanceChangeCalculator {
     }
   }
 
-  def effectiveBalanceChanges(state: State)(tx: Transaction)
-  : Either[ValidationError, Seq[EffectiveBalanceChange]] = tx match {
+  def effectiveBalanceChanges(state: State)(tx: Transaction): Either[ValidationError, Seq[EffectiveBalanceChange]] = tx match {
     case tx: LeaseTransaction => resolveAddressOrAlias(state)(tx, tx.recipient).map(recipient => {
       Seq(EffectiveBalanceChange(tx.sender, -tx.amount - tx.fee),
         EffectiveBalanceChange(recipient, tx.amount))

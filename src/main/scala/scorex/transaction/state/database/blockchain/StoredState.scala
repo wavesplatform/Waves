@@ -80,9 +80,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
     val keysToRemove = transactionsToRemove.map(t => s"$asset@$t")
 
-    keysToRemove.foreach { key =>
-      storage.removeKey(key)
-    }
+    keysToRemove.foreach(storage.removeKey)
   }
 
   def isReissuable(assetId: AssetId): Boolean = {
@@ -98,13 +96,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
         } else false
       case None => false
     }
-  }
-
-  def getAssetName(assetId: AssetId): String = {
-    storage.getTransaction(assetId).flatMap {
-      case tx: IssueTransaction => Some(tx.asInstanceOf[IssueTransaction])
-      case _ => None
-    }.map(tx => new String(tx.name, Charsets.UTF_8)).getOrElse("Unknown")
   }
 
   def applyExchangeTransaction(blockTs: Long)(tx: Transaction): Unit = tx match {
@@ -145,11 +136,12 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = {
 
-    def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] = {
-      a.toSet.flatMap { s: String => Base58.decode(s).toOption }.flatMap { id =>
-        storage.getTransactionBytes(id).flatMap(b => ExchangeTransaction.parseBytes(b).toOption)
-      }
-    }
+    def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] =
+      for {
+        idStr <- a.toSet
+        idBytes <- Base58.decode(idStr).toOption
+        tx <- findTransaction[ExchangeTransaction](idBytes)
+      } yield tx
 
     val orderDay = calcStartDay(order.expiration)
     if (storage.containsSavedDays(orderDay)) {

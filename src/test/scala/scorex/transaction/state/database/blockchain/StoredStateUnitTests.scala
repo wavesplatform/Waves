@@ -68,12 +68,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
 
   private def shouldBeValid(t: Transaction): Assertion = {
-    validator.validate(t,Int.MaxValue) shouldBe a[Right[_,_]]
+    validator.validate(t,Int.MaxValue) shouldBe 'right
   }
 
-
   private def shouldBeInvalid(t: Transaction): Assertion = {
-    validator.validate(t,Int.MaxValue) shouldBe a[Left[_,_]]
+    validator.validate(t,Int.MaxValue) shouldBe 'left
   }
 
   val applyChanges = PrivateMethod[Unit]('applyChanges)

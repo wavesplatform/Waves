@@ -40,12 +40,11 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
   }
 
   def shouldBeValid(t: Transaction): Assertion = {
-    validator.validate(t,TIME) shouldBe a[Right[_,_]]
+    validator.validate(t,TIME) shouldBe 'right
   }
 
-
   def shouldBeInvalid(t: Transaction): Assertion = {
-    validator.validate(t,TIME) shouldBe a[Left[_,_]]
+    validator.validate(t,TIME) shouldBe 'left
   }
 
 

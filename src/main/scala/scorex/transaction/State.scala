@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.google.common.base.Charsets
 import play.api.libs.json.JsObject
 import scorex.account.{Account, Alias}
 import scorex.block.Block
@@ -33,8 +34,6 @@ trait State {
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long
 
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
-
-  def getAssetName(assetId: AssetId): String
 
   def resolveAlias(a: Alias): Option[Account]
 
@@ -88,6 +87,12 @@ object State {
   implicit class StateExt(s: State) {
     def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction] = {
       s.findPrevOrderMatchTxs(om.buyOrder) ++ s.findPrevOrderMatchTxs(om.sellOrder)
+    }
+
+    def getAssetName(assetId: AssetId): String = {
+      s.findTransaction[IssueTransaction](assetId)
+        .map(tx => new String(tx.name, Charsets.UTF_8))
+        .getOrElse("Unknown")
     }
   }
 
