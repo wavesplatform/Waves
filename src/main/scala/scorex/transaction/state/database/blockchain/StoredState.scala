@@ -459,16 +459,16 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
 
-  def wavesDistributionAtHeight(heightOpt: Int): JsObject = {
+  def wavesDistributionAtHeight(height: Int): JsObject = {
 
-    def balanceAtHeight(key: String, atHeight: Int): Long = {
+    def balanceAtHeight(key: String): Long = {
       storage.getLastStates(key) match {
         case Some(h) if h > 0 =>
 
           @tailrec
           def loop(hh: Int): Long = {
             val row = storage.getAccountChanges(key, hh).get
-            if (hh <= atHeight) {
+            if (hh <= height) {
               row.state.balance
             } else if (row.lastRowHeight == 0) {
               0L
@@ -483,7 +483,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       }
     }
 
-    val ls = storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add, heightOpt))
+    val ls = storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add))
       .filter(b => b._2 != 0).sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
     JsObject(ls)
   }
