@@ -5,7 +5,7 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.block.Block
-import scorex.consensus.ConsensusModule
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.signatures.SigningFunctions
 import scorex.crypto.signatures.SigningFunctions.Signature
@@ -18,7 +18,7 @@ import scala.util.Try
 
 
 class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule,
-                          consensusModule: ConsensusModule) {
+                          consensusModule: WavesConsensusModule) {
 
   object GetPeersSpec extends MessageSpec[Unit] {
     override val messageCode: Message.MessageCode = 1: Byte

@@ -1,12 +1,12 @@
 package scorex.transaction.state.database.blockchain
 
+import com.wavesplatform.settings.FunctionalitySettings
 import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.{Account, Alias}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.settings.ChainParameters
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -24,7 +24,7 @@ import scala.util.Try
 
 class StoredState(private val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI
   with LeaseExtendedStateStorageI with AliasExtendedStorageI,
-                  settings: ChainParameters) extends State with ScorexLogging {
+                  settings: FunctionalitySettings) extends State with ScorexLogging {
 
   def applyAssetIssueReissueBurnTransaction(height: Int)(tx: Transaction): Unit = tx match {
     case tx: AssetIssuance =>
@@ -137,7 +137,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
     def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] =
       for {
-        idStr : String <- a.toSet
+        idStr: String <- a.toSet
         idBytes <- Base58.decode(idStr).toOption
         tx <- findTransaction[ExchangeTransaction](idBytes)
       } yield tx
@@ -516,7 +516,7 @@ object StoredState {
       eis.filter(_.isRight).map(_.right.get))
   }
 
-  def fromDB(mvStore: MVStore, settings: ChainParameters): State = {
+  def fromDB(mvStore: MVStore, settings: FunctionalitySettings): State = {
     val storage = new MVStoreStateStorage
       with MVStoreOrderMatchStorage
       with MVStoreAssetsExtendedStateStorage

@@ -4,17 +4,18 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.settings.Constants
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Matchers
 import scorex.account.PublicKeyAccount
 import scorex.app.Application
 import scorex.block.Block._
 import scorex.block.{Block, SignerData}
-import scorex.consensus.ConsensusModule
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
 import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
+import scorex.settings.TestBlockchainSettings
 import scorex.transaction.TransactionModule
 import scorex.transaction.TransactionParser.SignatureLength
 
@@ -91,8 +92,10 @@ abstract class ActorTestingCommons extends TestKitBase
         try {
           fun
         } finally {
-          try verifyExpectations
-          finally shutdown()
+          try
+            verifyExpectations
+          finally
+            shutdown()
         }
       }
     }
@@ -150,7 +153,7 @@ abstract class ActorTestingCommons extends TestKitBase
 
   trait ApplicationMock extends Application {
     implicit val transactionModule = stub[TransactionModule]
-    implicit val consensusModule = stub[ConsensusModule]
+    implicit val consensusModule = new WavesConsensusModule(TestBlockchainSettings.Enabled, Constants.AvgBlockDelay)
     final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock
   }

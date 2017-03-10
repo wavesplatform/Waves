@@ -1,16 +1,11 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.File
-import java.util.UUID
-
-import scala.util.{Left, Random, Right}
-import scala.util.control.NonFatal
+import com.wavesplatform.settings.FunctionalitySettings
 import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import scorex.account.{Account, AddressScheme, PrivateKeyAccount}
-import scorex.settings.{ChainParameters, TestChainParameters}
+import scorex.account.{Account, PrivateKeyAccount}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -25,37 +20,8 @@ import scala.util.control.NonFatal
 class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers
   with PrivateMethodTester with OptionValues with TransactionGen with Assertions with ScorexLogging with TestingCommons {
 
-  val forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck = new ChainParameters with TestChainParameters.GenesisData {
-    override def allowTemporaryNegativeUntil: Long = 0L
-
-    override def requireSortedTransactionsAfter: Long = Long.MaxValue
-
-    override def allowInvalidPaymentTransactionsByTimestamp: Long = Long.MaxValue
-
-    override def generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MaxValue
-
-    override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
-
-    override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
-
-    override def allowLeaseTransactionAfterTimestamp: Long = Long.MinValue
-
-    override def allowUnissuedAssetsUntil: Long = 0L
-
-    override def allowBurnTransactionAfterTimestamp: Long = 0L
-
-    override def requirePaymentUniqueId: Long = 0L
-
-    override def initialBalance: Long = ???
-
-    override def genesisTimestamp: Long = ???
-
-    override def addressScheme: AddressScheme = ???
-
-    override def allowExchangeTransactionAfterTimestamp: Long = 0L
-
-    override def allowCreateAliasTransactionAfterTimestamp: Long = 0L
-  }
+  val forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck = FunctionalitySettings(0L, Long.MaxValue, Long.MaxValue,
+    Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MinValue, 0L, 0L, 0L, 0L, 0L)
 
   private val stateFile = scorex.createTestTemporaryFile("state", ".dat")
 

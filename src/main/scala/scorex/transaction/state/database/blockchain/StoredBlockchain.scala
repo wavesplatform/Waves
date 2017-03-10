@@ -6,7 +6,7 @@ import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.consensus.ConsensusModule
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.Checkpoint
 import scorex.transaction.BlockStorage._
 import scorex.transaction.History.BlockchainScore
@@ -20,7 +20,7 @@ import scala.util.{Failure, Success, Try}
   * If no datafolder provided, blockchain lives in RAM (useful for tests)
   */
 class StoredBlockchain(db: MVStore)
-                      (implicit consensusModule: ConsensusModule,
+                      (implicit consensusModule: WavesConsensusModule,
                        transactionModule: TransactionModule)
   extends BlockChain with ScorexLogging {
 

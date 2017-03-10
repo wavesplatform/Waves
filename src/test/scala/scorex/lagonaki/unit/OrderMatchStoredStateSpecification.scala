@@ -7,7 +7,7 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.api.http.assets.{IssueRequest, TransferRequest}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestChainParameters
+import scorex.settings.{TestBlockchainSettings, TestFunctionalitySettings}
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 import scorex.transaction.state.database.blockchain.{StoredState, Validator, ValidatorImpl}
@@ -26,11 +26,11 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   val ASSET_UNITS = Order.PriceConstant
 
   val db = new MVStore.Builder().open()
-  val state = StoredState.fromDB(db, TestChainParameters.Enabled)
+  val state = StoredState.fromDB(db, TestBlockchainSettings.Enabled.functionalitySettings)
   state.processBlock(TestBlock(Seq(GenesisTransaction.create(acc1, 1000 * ASSET_UNITS, 0).right.get,
     GenesisTransaction.create(acc2, 100 * ASSET_UNITS, 0).right.get)))
 
-  val validator: Validator = new ValidatorImpl(state, TestChainParameters.Enabled)
+  val validator: Validator = new ValidatorImpl(state, TestFunctionalitySettings.Enabled)
 
   override protected def afterAll(): Unit = {
     db.close()

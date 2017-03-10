@@ -32,6 +32,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        timestamp: 1460678400000
         |        signature: "BASE58BLOCKSIGNATURE"
         |        initial-balance: 100000000000000
+        |        initial-base-target =153722867
         |        transactions = [
         |          {recipient: "BASE58ADDRESS1", amount: 50000000000001},
         |          {recipient: "BASE58ADDRESS2", amount: 49999999999999}
@@ -57,7 +58,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowLeaseTransactionAfterTimestamp should be(10)
     settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(11)
     settings.functionalitySettings.allowCreateAliasTransactionAfterTimestamp should be(12)
-    settings.genesisSettings.timestamp should be (1460678400000L)
+    settings.genesisSettings.blockTimestamp should be (1460678400000L)
+    settings.genesisSettings.transactionsTimestamp should be (1460678400000L)
     settings.genesisSettings.signature should be ("BASE58BLOCKSIGNATURE")
     settings.genesisSettings.initialBalance should be (100000000000000L)
     settings.genesisSettings.transactions.size should be (2)
@@ -89,7 +91,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
     settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(1481110521000L)
     settings.functionalitySettings.requirePaymentUniqueId should be(1485942685000L)
-    settings.genesisSettings.timestamp should be (1478000000000L)
+    settings.genesisSettings.blockTimestamp should be (1460678400000L)
+    settings.genesisSettings.transactionsTimestamp should be (1478000000000L)
     settings.genesisSettings.signature should be ("5uqnLK3Z9eiot6FyYBfwUnbyid3abicQbAZjz38GQ1Q8XigQMxTK4C1zNkqS1SVw7FqSidbZKxWAKLVoEsp4nNqa")
     settings.genesisSettings.initialBalance should be (10000000000000000L)
     settings.genesisSettings.transactions.size should be (5)
@@ -124,7 +127,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
     settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(1482233593000L)
     settings.functionalitySettings.requirePaymentUniqueId should be(1488361885000L)
-    settings.genesisSettings.timestamp should be (1465742577614L)
+    settings.genesisSettings.blockTimestamp should be (1460678400000L)
+    settings.genesisSettings.transactionsTimestamp should be (1465742577614L)
     settings.genesisSettings.signature should be ("FSH8eAAzZNqnG8xgTZtz5xuLqXySsXgAjmFEC25hXMbEufiGjqWPnGCZFt6gLiVLJny16ipxRNAkkzjjhqTjBE2")
     settings.genesisSettings.initialBalance should be (10000000000000000L)
     settings.genesisSettings.transactions.size should be (6)
