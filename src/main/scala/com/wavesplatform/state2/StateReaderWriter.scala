@@ -8,11 +8,15 @@ class StateWriterImpl(p: JavaMapStorage) extends StateWriter {
 
   override def applyDiff(d: Diff): Unit = {
     d.transactions.foreach { case (id, (h, tx)) =>
-      p.txs.put(id, (h, tx.bytes))
+      p.transactions.put(id.arr, (h, tx.bytes))
     }
 
     d.portfolios.foreach { case (account, portfolio) =>
-      p.portfolios.put(account.bytes, (portfolio.balance, portfolio.effectiveBalance, portfolio.assets))
+      p.portfolios.put(account.bytes, (portfolio.balance, portfolio.effectiveBalance, portfolio.assets.map { case (k, v) => k.arr -> v }))
+    }
+
+    d.issuedAssets.foreach { case (id, assetInfo) =>
+      p.assets.put(id.arr, (assetInfo.isReissuableOverride, assetInfo.totalVolumeOverride))
     }
   }
 }
