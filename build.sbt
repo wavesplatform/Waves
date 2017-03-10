@@ -29,8 +29,7 @@ libraryDependencies ++=
   Seq(
     "com.iheart" %% "ficus" % "1.4.0",
     "org.scorexfoundation" %% "scrypto" % "1.2.0",
-    "commons-net" % "commons-net" % "3.+",
-    "com.github.pathikrit" %% "better-files" % "2.17.+"
+    "commons-net" % "commons-net" % "3.+"
   )
 
 inConfig(Test)(Seq(
@@ -39,6 +38,10 @@ inConfig(Test)(Seq(
   parallelExecution := false,
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
+
+Defaults.itSettings
+
+configs(IntegrationTest)
 
 concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 

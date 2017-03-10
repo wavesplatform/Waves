@@ -12,7 +12,7 @@ object Dependencies {
     "net.databinder.dispatch" %% "dispatch-core" % "+",
     "org.scalamock" %% "scalamock-scalatest-support" % "3.5.+",
     "com.typesafe.akka" %% "akka-http-testkit" % "10.0.3"
-  ) map (_ % "test")
+  ) map (_ % "it,test")
 
   lazy val serialization = Seq(
     "com.google.guava" % "guava" % "18.+",
