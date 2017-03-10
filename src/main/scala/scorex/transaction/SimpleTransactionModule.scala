@@ -211,6 +211,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (errors.nonEmpty) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs: $errors")
     if (!txsIdAreUniqueInBlock) log.debug(s"Invalid txs in block ${block.encodedId}: there are not unique txs")
+
     txsAreNew && errors.isEmpty && txsIdAreUniqueInBlock
   } catch {
     case e: UnsupportedOperationException =>

@@ -7,6 +7,7 @@ import scorex.api.http.assets.{IssueRequest, TransferRequest}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.mocks.TestBlock
+import scorex.transaction.assets.{IssueTransaction, ReissueTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
@@ -191,6 +192,37 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     doubleSpending.foreach(t => transactionModule.validator.isValid(t, t.timestamp) shouldBe true)
     transactionModule.validator.validate(doubleSpending, blockTime = doubleSpending.map(_.timestamp).max)._2.size shouldBe 1
     state.processBlock(TestBlock(doubleSpending)) should be('failure)
+  }
+
+  test("issue and reissue with different reissuable") {
+    val senderBalance = state.balance(acc)
+
+    require(senderBalance > 4 * Constants.UnitsInWave)
+
+    val ts = System.currentTimeMillis()
+    val issue = IssueTransaction.create(acc, Array.fill(10)(0.toByte), Array.fill(10)(0.toByte), 1000000L, 0, reissuable = true, 100000, ts).right.get
+    val validReissue = ReissueTransaction.create(acc, issue.assetId, 1000000L, reissuable = false, 100000, ts + 1).right.get
+    val invalidReissue = ReissueTransaction.create(acc, issue.assetId, 1000000L, reissuable = true, 100000, ts + 2).right.get
+
+    val allInOneBlock = Seq(issue, validReissue, invalidReissue)
+
+    transactionModule.validator.isValid(issue, issue.timestamp) shouldBe true
+
+    transactionModule.validator.isValid(allInOneBlock, blockTime = allInOneBlock.map(_.timestamp).max) shouldBe false
+    transactionModule.validator.validate(allInOneBlock, blockTime = allInOneBlock.map(_.timestamp).max)._2.size shouldBe 1
+
+    state.processBlock(TestBlock(Seq(issue))) should be('success)
+
+    val reissuesSeq = Seq(validReissue, invalidReissue)
+
+    transactionModule.validator.isValid(reissuesSeq, blockTime = reissuesSeq.map(_.timestamp).max) shouldBe false
+    transactionModule.validator.validate(reissuesSeq, blockTime = reissuesSeq.map(_.timestamp).max)._2.size shouldBe 1
+
+    val validReissueSeq = Seq(validReissue)
+
+    transactionModule.validator.isValid(validReissueSeq, blockTime = validReissueSeq.map(_.timestamp).max) shouldBe true
+    transactionModule.validator.validate(validReissueSeq, blockTime = validReissueSeq.map(_.timestamp).max)._2.size shouldBe 1
+    state.processBlock(TestBlock(validReissueSeq)) should be('success)
   }
 
   test("many transactions") {
