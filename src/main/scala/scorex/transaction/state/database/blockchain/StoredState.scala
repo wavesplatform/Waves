@@ -137,7 +137,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
     def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] =
       for {
-        idStr : String <- a.toSet
+        idStr: String <- a.toSet
         idBytes <- Base58.decode(idStr).toOption
         tx <- findTransaction[ExchangeTransaction](idBytes)
       } yield tx
@@ -272,10 +272,10 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2, effectiveBalance(m._1.account) + m._2), List(FeesStateChange(m._2))))
 
     val newBalances: Map[AssetAcc, (AccState, Reasons)] =
-      calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil)
+      calcNewBalances(trans, fees, block.timestamp < settings.allowTemporaryNegativeUntil)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
-    applyChanges(newBalances, block.timestampField.value)
+    applyChanges(newBalances, block.timestamp)
 
     this
   }
@@ -292,12 +292,16 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
   def assetBalance(account: AssetAcc): Long = assetBalanceAtHeight(account, Some(storage.stateHeight))
 
-  private def heightWithConfirmations(heightOpt: Option[Int], confirmations: Int): Int = {
-    Math.max(1, heightOpt.getOrElse(storage.stateHeight) - confirmations)
+  private def heightWithConfirmations(confirmations: Int): Int = {
+    Math.max(1, storage.stateHeight - confirmations)
+  }
+
+  private def heightWithConfirmations(height : Int, confirmations: Int): Int = {
+    Math.max(1, height - confirmations)
   }
 
   def balanceWithConfirmations(account: Account, confirmations: Int): Long =
-    balance(account, Some(heightWithConfirmations(None, confirmations)))
+    balance(account, Some(heightWithConfirmations(confirmations)))
 
   def accountTransactions(account: Account, limit: Int): Seq[Transaction] = {
     val accountAssets = storage.getAccountAssets(account.address)
@@ -490,15 +494,10 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
   def assetDistribution(assetId: Array[Byte]): Map[String, Long] = storage.assetDistribution(assetId)
 
-  //for debugging purposes only
-  def hash: Int = {
-    (BigInt(FastCryptographicHash(toJson(None).toString().getBytes)) % Int.MaxValue).toInt
-  }
-
   def effectiveBalance(account: Account): Long = balanceByKey(account.address, _.effectiveBalance, storage.stateHeight)
 
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
-    balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
+    balanceByKey(account.address, _.effectiveBalance, Math.max(1, height - confirmations))
 
   def findTransaction[T <: Transaction](id: Array[Byte])(implicit ct: ClassTag[T]): Option[T] = {
     storage.getTransaction(id) match {
