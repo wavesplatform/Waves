@@ -1,6 +1,5 @@
 package scorex.transaction.state.database.blockchain
 
-import com.google.common.base.Charsets
 import org.h2.mvstore.MVStore
 import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.{Account, Alias}
@@ -138,7 +137,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
     def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] =
       for {
-        idStr <- a.toSet
+        idStr : String <- a.toSet
         idBytes <- Base58.decode(idStr).toOption
         tx <- findTransaction[ExchangeTransaction](idBytes)
       } yield tx
@@ -193,9 +192,8 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     def loop(h: Int, address: AddressString): Option[PaymentTransaction] = {
       storage.getAccountChanges(address, h) match {
         case Some(row) =>
-          val accountTransactions = row.reason.flatMap(id => storage.getTransaction(id))
-            .filter(_.isInstanceOf[PaymentTransaction])
-            .map(_.asInstanceOf[PaymentTransaction])
+          val accountTransactions = row.reason
+            .flatMap(id => findTransaction[PaymentTransaction](id))
             .filter(_.sender.address == address)
           if (accountTransactions.nonEmpty) Some(accountTransactions.maxBy(_.timestamp))
           else loop(row.lastRowHeight, address)
