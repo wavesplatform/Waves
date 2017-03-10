@@ -8,7 +8,6 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.state.{AccState, AddressString, Reasons}
-import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
 import scorex.utils.NTP
 
 import scala.reflect.ClassTag
@@ -50,6 +49,7 @@ trait State {
 
   // height-related queries backed by Map((acc,height) -> (balance, eff_balance)).
   // Which gets filled only on change
+  // Cleaned up sometimes
 
   def balanceWithConfirmations(account: Account, confirmations: Int): Long
 
@@ -59,6 +59,7 @@ trait State {
 
   // other
 
+  // Cleaned up sometimes
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
 
   def resolveAlias(a: Alias): Option[Account]
