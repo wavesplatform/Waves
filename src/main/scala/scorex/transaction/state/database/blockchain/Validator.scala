@@ -88,23 +88,23 @@ class ValidatorImpl(s: State, settings: ChainParameters) extends Validator {
     }
   }
 
-  private def disallowDuplicateIds(requirePaymentUniqueId: Long)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
-    case tx: PaymentTransaction if tx.timestamp < requirePaymentUniqueId => Right(tx)
+  private def disallowDuplicateIds(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+    case tx: PaymentTransaction if tx.timestamp < settings.requirePaymentUniqueId => Right(tx)
     case tx: Transaction => if (s.included(tx.id).isEmpty) Right(tx)
     else Left(TransactionValidationError(tx, "(except for some cases of PaymentTransaction) cannot be duplicated"))
   }
 
-  private def disallowBeforeActivationTime(s: ChainParameters)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
-    case tx: BurnTransaction if tx.timestamp <= s.allowBurnTransactionAfterTimestamp =>
-      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowBurnTransactionAfterTimestamp}"))
-    case tx: LeaseTransaction if tx.timestamp <= s.allowLeaseTransactionAfterTimestamp =>
-      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowLeaseTransactionAfterTimestamp}"))
-    case tx: LeaseCancelTransaction if tx.timestamp <= s.allowLeaseTransactionAfterTimestamp =>
-      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowLeaseTransactionAfterTimestamp}"))
-    case tx: ExchangeTransaction if tx.timestamp <= s.allowExchangeTransactionAfterTimestamp =>
-      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowExchangeTransactionAfterTimestamp}"))
-    case tx: CreateAliasTransaction if tx.timestamp <= s.allowCreateAliasTransactionAfterTimestamp =>
-      Left(TransactionValidationError(tx, s"must not appear before time=${s.allowCreateAliasTransactionAfterTimestamp}"))
+  private def disallowBeforeActivationTime(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+    case tx: BurnTransaction if tx.timestamp <= settings.allowBurnTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowBurnTransactionAfterTimestamp}"))
+    case tx: LeaseTransaction if tx.timestamp <= settings.allowLeaseTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowLeaseTransactionAfterTimestamp}"))
+    case tx: LeaseCancelTransaction if tx.timestamp <= settings.allowLeaseTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowLeaseTransactionAfterTimestamp}"))
+    case tx: ExchangeTransaction if tx.timestamp <= settings.allowExchangeTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowExchangeTransactionAfterTimestamp}"))
+    case tx: CreateAliasTransaction if tx.timestamp <= settings.allowCreateAliasTransactionAfterTimestamp =>
+      Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowCreateAliasTransactionAfterTimestamp}"))
     case _: BurnTransaction => Right(tx)
     case _: PaymentTransaction => Right(tx)
     case _: GenesisTransaction => Right(tx)
@@ -118,7 +118,7 @@ class ValidatorImpl(s: State, settings: ChainParameters) extends Validator {
     case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
   }
 
-  private def incrementingTimestamp(allowInvalidPaymentTransactionsByTimestamp: Long)(transaction: Transaction): Either[StateValidationError, Transaction] = {
+  private def incrementingTimestamp(transaction: Transaction): Either[StateValidationError, Transaction] = {
 
     def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
       s.lastAccountPaymentTransaction(tx.sender) match {
@@ -129,9 +129,9 @@ class ValidatorImpl(s: State, settings: ChainParameters) extends Validator {
 
     transaction match {
       case tx: PaymentTransaction =>
-        val isCorrect = tx.timestamp < allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
+        val isCorrect = tx.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect(tx)
         if (isCorrect) Right(tx)
-        else Left(TransactionValidationError(tx, s" is earlier than previous transaction after time=$allowInvalidPaymentTransactionsByTimestamp"))
+        else Left(TransactionValidationError(tx, s" is earlier than previous transaction after time=${settings.allowInvalidPaymentTransactionsByTimestamp}"))
       case _ => Right(transaction)
     }
   }
@@ -165,9 +165,9 @@ class ValidatorImpl(s: State, settings: ChainParameters) extends Validator {
       validateExchangeTransaction,
       genesisTransactionHeightMustBeZero(height),
       disallowLeaseToSelfAlias,
-      disallowDuplicateIds(settings.requirePaymentUniqueId),
-      disallowBeforeActivationTime(settings),
-      incrementingTimestamp(settings.allowInvalidPaymentTransactionsByTimestamp),
+      disallowDuplicateIds,
+      disallowBeforeActivationTime,
+      incrementingTimestamp,
       addressAliasExists)
 
     validators.toStream.map(_.apply(transaction)).find(_.isLeft) match {

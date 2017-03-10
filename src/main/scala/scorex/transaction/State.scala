@@ -15,45 +15,42 @@ import scala.util.Try
 
 trait State {
 
-  // state reads
+  // tx lookup
 
   def included(signature: Array[Byte]): Option[Int]
+  def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
 
-  def balance(account: Account): Long
 
-  def balanceWithConfirmations(account: Account, confirmations: Int): Long
+  // tx history
 
   def accountTransactions(account: Account, limit: Int = State.DefaultLimit): Seq[_ <: Transaction]
+  def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction]  // = accountTransactions...
 
+  // account balance and effective balance
+
+  def balance(account: Account): Long
   def assetBalance(account: AssetAcc): Long
-
-  def assetDistribution(assetId: Array[Byte]): Map[String, Long]
-
   def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)]
+  def assetDistribution(assetId: Array[Byte]): Map[String, Long]
+  def effectiveBalance(account: Account): Long
+  def getLeasedSum(address: AddressString): Long // = balance - effectiveBalance
 
+  // asset info
+  def isReissuable(id: Array[Byte]): Boolean
+  def totalAssetQuantity(assetId: AssetId): Long
+
+  // height-related queries
+
+  def balanceWithConfirmations(account: Account, confirmations: Int): Long
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long
+  def wavesDistributionAtHeight(height: Int): JsObject
 
   def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
 
   def resolveAlias(a: Alias): Option[Account]
-
   def getAlias(a: Account): Option[Alias]
 
-  def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
-
-  def isReissuable(id: Array[Byte]): Boolean
-
-  def getLeasedSum(address: AddressString): Long
-
-  def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction]
-
-  def effectiveBalance(account: Account): Long
-
   def stateHeight: Int
-
-  def wavesDistributionAtHeight(height: Int): JsObject
-
-  def totalAssetQuantity(assetId: AssetId): Long
 
   // debug from api
 
