@@ -1,25 +1,24 @@
 package scorex.transaction.state.database.blockchain
 
+import com.wavesplatform.settings.FunctionalitySettings
 import scorex.account.{Account, Alias}
-import scorex.crypto.encode.Base58
-import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction._
 import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.state.database.state.{AccState, ReasonIds}
 import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
+import scorex.transaction.state.database.state.{AccState, ReasonIds}
 
-import scala.util.{Left, Right, Try}
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
+import scala.util.{Left, Right, Try}
 
 trait Validator {
   def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): (Seq[ValidationError], Seq[Transaction])
 }
 
-class ValidatorImpl(s: State, settings: ChainParameters) extends Validator {
+class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator {
 
   import Validator._
 
@@ -94,7 +93,7 @@ class ValidatorImpl(s: State, settings: ChainParameters) extends Validator {
     else Left(TransactionValidationError(tx, "(except for some cases of PaymentTransaction) cannot be duplicated"))
   }
 
-  private def disallowBeforeActivationTime(s: ChainParameters)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+  private def disallowBeforeActivationTime(s: FunctionalitySettings)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case tx: BurnTransaction if tx.timestamp <= s.allowBurnTransactionAfterTimestamp =>
       Left(TransactionValidationError(tx, s"must not appear before time=${s.allowBurnTransactionAfterTimestamp}"))
     case tx: LeaseTransaction if tx.timestamp <= s.allowLeaseTransactionAfterTimestamp =>

@@ -3,15 +3,14 @@ package com.wavesplatform.matcher
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
+import com.wavesplatform.settings.FunctionalitySettings
 import org.h2.mvstore.MVStore
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.hash.SecureCryptographicHash
-import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.database.state.extension._
 import scorex.transaction.state.database.state.storage._
 import scorex.utils.{ByteArrayExtension, NTP}
 
@@ -119,7 +118,7 @@ trait MatcherTestData {
     matcherFee: Long <- maxWavesAnountGen
   } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
-  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): State = {
+  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: FunctionalitySettings): State = {
     val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage
       with MVStoreLeaseExtendedStateStorage with MVStoreAliasExtendedStorage {
       override val db: MVStore = mvStore
@@ -131,25 +130,6 @@ trait MatcherTestData {
 
       override def totalAssetQuantity(assetId: AssetId): Long = Long.MaxValue
 
-    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
-    val leaseExtendedState = new LeaseExtendedState(storage)
-    val validators = Seq(
-      extendedState,
-      incrementingTimestampValidator,
-      new GenesisValidator,
-      new AddressAliasValidator(storage),
-      new LeaseToSelfAliasValidator(storage),
-      new OrderMatchStoredState(storage),
-      new IncludedValidator(storage, settings.requirePaymentUniqueId),
-      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
-        settings.allowLeaseTransactionAfterTimestamp,
-        settings.allowExchangeTransactionAfterTimestamp,
-        settings.allowCreateAliasTransactionAfterTimestamp)
-    )
-    new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
-      override def assetBalance(account: AssetAcc): Long = Long.MaxValue
-
-      override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
     }
   }
 }

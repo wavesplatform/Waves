@@ -31,7 +31,6 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
   extends TransactionModule with TransactionOperations with ScorexLogging {
 
   import SimpleTransactionModule._
-  import com.wavesplatform.settings.BlockchainSettingsExtension._
 
   private val networkController = application.networkController
   private val feeCalculator = new FeeCalculator(settings.feesSettings)
@@ -39,7 +38,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
 
   override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)(application.consensusModule, this)
-  val validator : Validator = new ValidatorImpl(blockStorage.state, settings.blockchainSettings.asChainParameters)
+  val validator: Validator = new ValidatorImpl(blockStorage.state, settings.blockchainSettings.functionalitySettings)
 
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 

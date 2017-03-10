@@ -7,8 +7,6 @@ import scorex.account.{Account, Alias}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.ValidationError.TransactionValidationError
-import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -24,11 +22,8 @@ import scala.reflect.ClassTag
 import scala.util.Try
 
 
-class StoredState(protected[blockchain] val storage: StateStorageI with OrderMatchStorageI with LeaseExtendedStateStorageI with AliasExtendedStorageI,
-                  val leaseExtendedState: LeaseExtendedState,
-                  val assetsExtension: AssetsExtendedState,
-                  val incrementingTimestampValidator: IncrementingTimestampValidator,
-                  val validators: Seq[Validator],
+class StoredState(private val storage: StateStorageI with AssetsExtendedStateStorageI with OrderMatchStorageI
+  with LeaseExtendedStateStorageI with AliasExtendedStorageI,
                   settings: FunctionalitySettings) extends State with ScorexLogging {
 
   def applyAssetIssueReissueBurnTransaction(height: Int)(tx: Transaction): Unit = tx match {
@@ -142,7 +137,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
     def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] =
       for {
-        idStr : String <- a.toSet
+        idStr: String <- a.toSet
         idBytes <- Base58.decode(idStr).toOption
         tx <- findTransaction[ExchangeTransaction](idBytes)
       } yield tx
@@ -514,6 +509,12 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 }
 
 object StoredState {
+
+
+  implicit class SeqEitherHelper[L, R](eis: Seq[Either[L, R]]) {
+    def segregate(): (Seq[L], Seq[R]) = (eis.filter(_.isLeft).map(_.left.get),
+      eis.filter(_.isRight).map(_.right.get))
+  }
 
   def fromDB(mvStore: MVStore, settings: FunctionalitySettings): State = {
     val storage = new MVStoreStateStorage

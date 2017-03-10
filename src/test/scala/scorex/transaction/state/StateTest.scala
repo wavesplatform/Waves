@@ -2,7 +2,6 @@ package scorex.transaction.state
 
 import java.io.File
 
-import scala.util.{Random, Success, Try}
 import org.h2.mvstore.MVStore
 import org.scalacheck.commands.Commands
 import org.scalacheck.{Gen, Prop}
@@ -10,10 +9,12 @@ import org.scalatest.PropSpec
 import org.scalatest.prop.Checkers
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestChainParameters
-import scorex.transaction.state.database.blockchain.{StoredState, Validator, ValidatorImpl}
+import scorex.settings.TestFunctionalitySettings
+import scorex.transaction.state.database.blockchain.{StoredState, ValidatorImpl}
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 import scorex.utils._
+
+import scala.util.{Random, Success, Try}
 
 class StateTest extends PropSpec with Checkers {
   property("state test") {
@@ -105,9 +106,9 @@ object StateTestSpec extends Commands {
 
   case class Sut(fileName: String) {
     val db = new MVStore.Builder().fileName(fileName).compress().open()
-    val storedState = StoredState.fromDB(db, TestBlockchainSettings.Disabled.functionalitySettings)
+    val storedState = StoredState.fromDB(db, TestFunctionalitySettings.Disabled)
     storedState.processBlock(TestBlock(genesisTxs))
-    val validator = new ValidatorImpl(storedState, TestChainParameters.Disabled)
+    val validator = new ValidatorImpl(storedState, TestFunctionalitySettings.Disabled)
   }
 
   case class CheckTransaction(signature: Transaction) extends Command {
