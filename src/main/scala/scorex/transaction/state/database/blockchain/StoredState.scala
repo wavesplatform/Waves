@@ -162,12 +162,44 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Transaction] = {
     val validator = new OrderMatchStoredState(storage)
 
-    txs.foldLeft(Seq.empty[Transaction]){
-      case (seq,tx) => validator.validateWithBlockTxs(this, tx, seq, height) match {
+    txs.foldLeft(Seq.empty[Transaction]) {
+      case (seq, tx) => validator.validateWithBlockTxs(this, tx, seq, height) match {
         case Left(err) => seq
         case Right(t) => t +: seq
       }
     }.reverse
+  }
+
+  def validateCorrectIssueAndReissueTxs(txs: Seq[Transaction]): Seq[Transaction] = {
+    type IssueId = String
+    type IsReissuable = Boolean
+
+    val a = txs.foldLeft((Map.empty[IssueId, IsReissuable], Seq.empty[Transaction])) {
+      case ((map, seq), tx) =>
+        tx match {
+          case issue: IssueTransaction =>
+            val assetId = Base58.encode(issue.assetId)
+            val isIssueExists = map.getOrElse(assetId, assetsExtension.isIssueExists(issue.assetId))
+            if (!isIssueExists) {
+              (map + (assetId -> issue.reissuable), seq :+ tx)
+            } else {
+              (map, seq)
+            }
+          case reissue: ReissueTransaction =>
+            val assetId = Base58.encode(reissue.assetId)
+            val isIssueExists = map.get(assetId).isDefined || assetsExtension.isIssueExists(reissue.assetId)
+            val isReissuable = map.getOrElse(assetId, assetsExtension.isReissuable(reissue.assetId))
+
+            if (isIssueExists && isReissuable) {
+              (map + (assetId -> reissue.reissuable), seq :+ tx)
+            } else {
+              (map, seq)
+            }
+          case tx =>
+            (map, seq :+ tx)
+        }
+    }
+    a._2
   }
 
 
@@ -208,6 +240,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
             } else {
               tx.balanceChanges().sortBy(_.delta)
             }
+
             def safeSum(first: Long, second: Long): Long = {
               try {
                 Math.addExact(first, second)
@@ -216,6 +249,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
                   throw new Error(s"Transaction leads to overflow balance: $first + $second = ${first + second}")
               }
             }
+
             val newStateAfterBalanceUpdates = changes.foldLeft(currentState) { case (iChanges, bc) =>
               //update balances sheet
 
@@ -248,7 +282,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       validTxs
     }
 
-    val validWithBlockTxs = validateExchangeTxs(filteredFromFuture, height)
+    val validatedCorrectIssueAndReissueTxs = validateCorrectIssueAndReissueTxs(filteredFromFuture)
+
+    val validWithBlockTxs = validateExchangeTxs(validatedCorrectIssueAndReissueTxs, height)
 
     filterValidTransactionsByState(validWithBlockTxs)
   }
@@ -275,7 +311,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         }
       }
 
-      val newStateAfterEffectiveBalanceChanges = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(newStateAfterBalanceUpdates) {     case (iChanges, bc) =>
+      val newStateAfterEffectiveBalanceChanges = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
         //update effective balances sheet
         val wavesAcc = AssetAcc(bc.account, None)
         val currentChange = iChanges.getOrElse(wavesAcc, (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
@@ -399,7 +435,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
     validators.toStream.map(_.validate(this, transaction,height)).find(_.isLeft) match {
-      case Some(Left(e)) => Left(e)
+      case Some(Left(e)) =>
+        Left(e)
       case _ => Right(transaction)
     }
   }
