@@ -2,6 +2,7 @@ package scorex.transaction.state.database.blockchain
 
 import com.wavesplatform.settings.FunctionalitySettings
 import scorex.account.{Account, Alias}
+import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
 import scorex.transaction._
 import scorex.transaction.assets.exchange.ExchangeTransaction
