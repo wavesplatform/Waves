@@ -223,7 +223,7 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
   test("issue and reissue with different reissuable") {
     val senderBalance = state.balance(acc)
 
-    require(senderBalance > 3 * Constants.UnitsInWave)
+    require(senderBalance > 4 * Constants.UnitsInWave)
 
     val ts = System.currentTimeMillis()
     val issue = IssueTransaction.create(acc, Array.fill(10)(0.toByte), Array.fill(10)(0.toByte), 1000000L, 0, reissuable = true, 100000, ts).right.get

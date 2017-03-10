@@ -174,7 +174,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     type IssueId = String
     type IsReissuable = Boolean
 
-    val a = txs.foldLeft((Map.empty[IssueId, IsReissuable], Seq.empty[Transaction])) {
+    txs.foldLeft((Map.empty[IssueId, IsReissuable], Seq.empty[Transaction])) {
       case ((map, seq), tx) =>
         tx match {
           case issue: IssueTransaction =>
@@ -198,8 +198,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
           case tx =>
             (map, seq :+ tx)
         }
-    }
-    a._2
+    }._2
   }
 
 
@@ -435,8 +434,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
   def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
     validators.toStream.map(_.validate(this, transaction,height)).find(_.isLeft) match {
-      case Some(Left(e)) =>
-        Left(e)
+      case Some(Left(e)) => Left(e)
       case _ => Right(transaction)
     }
   }
