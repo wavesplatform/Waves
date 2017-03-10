@@ -1,8 +1,5 @@
 package scorex.transaction.state.database.blockchain
 
-import java.io.File
-import java.util.UUID
-
 import com.wavesplatform.settings.FunctionalitySettings
 import org.h2.mvstore.MVStore
 import org.scalacheck.Gen

@@ -2,13 +2,14 @@ package scorex.consensus.mining
 
 import akka.actor.Props
 import akka.testkit.TestProbe
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{Constants, WavesSettings}
 import scorex.ActorTestingCommons
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.Coordinator.AddBlock
+import scorex.settings.TestBlockchainSettings
 import scorex.transaction.{History, TransactionModule}
 import scorex.wallet.Wallet
 
@@ -33,11 +34,14 @@ class TFLikeMinerSpecification extends ActorTestingCommons {
   private val calculatedGenDelay = 2000 millis
 
   private val testHistory = mock[History]
-  private val testConsensusModule = mock[WavesConsensusModule]
+  private val testConsensusModule = new WavesConsensusModule(TestBlockchainSettings.Enabled, Constants.AvgBlockDelay) {
+    override def blockOrdering(implicit transactionModule: TransactionModule): Ordering[(Block)] = {
+      Ordering.by(f)
+    }
+  }
 
   private val f = mockFunction[Block, String]
   f.expects(*).never
-  (testConsensusModule.blockOrdering(_: TransactionModule)).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
 
   private def mayBe(b: Boolean): Range = (if (b) 0 else 1) to 1
 
@@ -184,11 +188,11 @@ class SimpleMinerSpecification extends ActorTestingCommons {
   val testCoordinator = TestProbe("Coordinator")
 
   private val testHistory = mock[History]
-  private val testConsensusModule = mock[WavesConsensusModule]
+  private val testConsensusModule = new WavesConsensusModule(TestBlockchainSettings.Enabled, Constants.AvgBlockDelay)
 
-  private val f = mockFunction[Block, String]
-  f.expects(*).never
-  (testConsensusModule.blockOrdering(_: TransactionModule)).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
+//  private val f = mockFunction[Block, String]
+//  f.expects(*).never
+//  (testConsensusModule.blockOrdering(_: TransactionModule)).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
 
   private def mayBe(b: Boolean): Range = (if (b) 0 else 1) to 1
 

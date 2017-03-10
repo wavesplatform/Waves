@@ -31,9 +31,9 @@ class WavesConsensusModule(val settings: BlockchainSettings, AvgDelay: Duration)
   def blockOrdering(implicit transactionModule: TransactionModule): Ordering[(Block)] =
     Ordering.by {
       block =>
-        val parent = transactionModule.blockStorage.history.blockById(block.referenceField.value).get
-        val blockCreationTime = nextBlockGenerationTime(parent, block.signerDataField.value.generator)
-          .getOrElse(block.timestampField.value)
+        val parent = transactionModule.blockStorage.history.blockById(block.reference).get
+        val blockCreationTime = nextBlockGenerationTime(parent, block.signerData.generator)
+          .getOrElse(block.timestamp)
 
         (block.blockScore, -blockCreationTime)
     }

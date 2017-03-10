@@ -1,6 +1,5 @@
 package scorex.lagonaki.unit
 
-import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.h2.mvstore.MVStore
@@ -25,7 +24,7 @@ class StoredStateUnitTests2 extends FunSuite with Matchers with TableDrivenPrope
   val wallet = new Wallet(None, "123", Some(Array(0.toByte, 1.toByte)))
   val accounts = wallet.generateNewAccounts(3)
 
-  val db = new MVStore.Builder().fileName(stateFile).compress().open()
+  val db = new MVStore.Builder().fileName(stateFile.getAbsolutePath).compress().open()
   val state = StoredState.fromDB(db, TestBlockchainSettings.Disabled.functionalitySettings)
   state.processBlock(TestBlock(Seq(GenesisTransaction.create(accounts.head, 100000000000L, 0).right.get)))
 

@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Charsets
-import com.wavesplatform.settings.{GenesisSettings, WavesSettings}
+import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings, WavesSettings}
 import scorex.account._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
@@ -180,8 +180,14 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
       .flatMap(onNewOffchainTransaction)
 
 
-  override def genesisData: Seq[Transaction] =
-    genesisSettings.transactions.map(_.asInstanceOf[Transaction])
+  override def genesisData: Seq[Transaction] = buildTransactions(genesisSettings.transactions)
+
+  private def buildTransactions(transactionSettings: List[GenesisTransactionSettings]): Seq[GenesisTransaction] = {
+    transactionSettings.map { ts =>
+      val acc = Account.fromBase58String(ts.recipient).right.get
+      GenesisTransaction.create(acc, ts.amount, genesisSettings.transactionsTimestamp).right.get
+    }
+  }
 
   /** Check whether tx is valid on current state and not expired yet
     */

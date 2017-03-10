@@ -3,9 +3,9 @@ package scorex.settings
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
 
 object TestFunctionalitySettings {
-  val Enabled = FunctionalitySettings(Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue,
+  val Disabled = FunctionalitySettings(Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue,
     Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue)
-  val Disabled = FunctionalitySettings(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L)
+  val Enabled = FunctionalitySettings(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L)
 }
 
 object TestBlockchainSettings {

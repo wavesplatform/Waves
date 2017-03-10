@@ -32,6 +32,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        timestamp: 1460678400000
         |        signature: "BASE58BLOCKSIGNATURE"
         |        initial-balance: 100000000000000
+        |        initial-base-target =153722867
         |        transactions = [
         |          {recipient: "BASE58ADDRESS1", amount: 50000000000001},
         |          {recipient: "BASE58ADDRESS2", amount: 49999999999999}
