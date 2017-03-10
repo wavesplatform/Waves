@@ -9,7 +9,6 @@ import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.Coordinator.AddBlock
-import scorex.settings.TestBlockchainSettings
 import scorex.transaction.{History, TransactionModule}
 import scorex.wallet.Wallet
 
@@ -34,14 +33,16 @@ class TFLikeMinerSpecification extends ActorTestingCommons {
   private val calculatedGenDelay = 2000 millis
 
   private val testHistory = mock[History]
-  private val testConsensusModule = new WavesConsensusModule(TestBlockchainSettings.Enabled, Constants.AvgBlockDelay) {
-    override def blockOrdering(implicit transactionModule: TransactionModule): Ordering[(Block)] = {
-      Ordering.by(f)
-    }
-  }
 
+  private val wavesSettings: WavesSettings = WavesSettings.fromConfig(baseTestConfig)
+
+  class MockableConsensusModule extends WavesConsensusModule(wavesSettings.blockchainSettings, Constants.AvgBlockDelay)
+
+  private val testConsensusModule = mock[MockableConsensusModule]
   private val f = mockFunction[Block, String]
-  f.expects(*).never
+  f.expects(*).never()
+  (testConsensusModule.blockOrdering(_: TransactionModule)).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
+
 
   private def mayBe(b: Boolean): Range = (if (b) 0 else 1) to 1
 
@@ -70,8 +71,6 @@ class TFLikeMinerSpecification extends ActorTestingCommons {
     }
   }
 
-  val wavesSettings = WavesSettings.fromConfig(baseTestConfig)
-
   private trait App extends ApplicationMock {
     override val settings = wavesSettings
     override val wallet: Wallet = testWallet
@@ -95,6 +94,7 @@ class TFLikeMinerSpecification extends ActorTestingCommons {
         setExpectations(1, Some(calculatedGenDelay))
 
         "stop" in {
+
           setBlockGenExpectations(Seq(newBlock), maybe = true)
 
           actorRef ! GuessABlock(false)
@@ -187,12 +187,16 @@ class SimpleMinerSpecification extends ActorTestingCommons {
 
   val testCoordinator = TestProbe("Coordinator")
 
+  val wavesSettings: WavesSettings = WavesSettings.fromConfig(testConfigTFLikeOff)
   private val testHistory = mock[History]
-  private val testConsensusModule = new WavesConsensusModule(TestBlockchainSettings.Enabled, Constants.AvgBlockDelay)
 
-//  private val f = mockFunction[Block, String]
-//  f.expects(*).never
-//  (testConsensusModule.blockOrdering(_: TransactionModule)).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
+  class MockableConsensusModule extends WavesConsensusModule(wavesSettings.blockchainSettings, Constants.AvgBlockDelay)
+
+  private val testConsensusModule = mock[MockableConsensusModule]
+
+  private val f = mockFunction[Block, String]
+  f.expects(*).never()
+  (testConsensusModule.blockOrdering(_: TransactionModule)).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
 
   private def mayBe(b: Boolean): Range = (if (b) 0 else 1) to 1
 
@@ -220,8 +224,6 @@ class SimpleMinerSpecification extends ActorTestingCommons {
       setBlockGenTimeExpectations(lastBlock, d.map(currentTimeMillis + _.toMillis), maybe)
     }
   }
-
-  val wavesSettings = WavesSettings.fromConfig(testConfigTFLikeOff)
 
   private trait App extends ApplicationMock {
     override val settings = wavesSettings

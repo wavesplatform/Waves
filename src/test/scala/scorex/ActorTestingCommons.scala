@@ -92,8 +92,10 @@ abstract class ActorTestingCommons extends TestKitBase
         try {
           fun
         } finally {
-          try verifyExpectations
-          finally shutdown()
+          try
+            verifyExpectations
+          finally
+            shutdown()
         }
       }
     }
