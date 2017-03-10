@@ -63,7 +63,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
     new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    complete(blockStorage.state.toWavesJson(height))
+    complete(blockStorage.state.wavesDistributionAtHeight(height))
   }
 
   @Path("/info")

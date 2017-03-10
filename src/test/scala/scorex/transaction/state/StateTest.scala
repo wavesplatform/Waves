@@ -1,6 +1,7 @@
 package scorex.transaction.state
 
 import java.io.File
+
 import scala.util.{Random, Success, Try}
 import org.h2.mvstore.MVStore
 import org.scalacheck.commands.Commands
@@ -10,7 +11,7 @@ import org.scalatest.prop.Checkers
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestChainParameters
-import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.state.database.blockchain.{StoredState, Validator, ValidatorImpl}
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 import scorex.utils._
 
@@ -106,6 +107,7 @@ object StateTestSpec extends Commands {
     val db = new MVStore.Builder().fileName(fileName).compress().open()
     val storedState = StoredState.fromDB(db, TestChainParameters.Disabled)
     storedState.processBlock(TestBlock(genesisTxs))
+    val validator = new ValidatorImpl(storedState, TestChainParameters.Disabled)
   }
 
   case class CheckTransaction(signature: Transaction) extends Command {
@@ -128,13 +130,13 @@ object StateTestSpec extends Commands {
 
   case class PutTransactions(txs: Seq[Transaction]) extends Command {
 
-    type Result = (Int, Long)
+    type Result = (Int)
 
     def run(sut: Sut): Result = sut.synchronized {
-      assert(sut.storedState.isValid(txs, blockTime = txs.map(_.timestamp).max))
+      assert(sut.validator.isValid(txs, blockTime = txs.map(_.timestamp).max))
       val block = TestBlock(txs)
       sut.storedState.processBlock(block)
-      (sut.storedState.stateHeight, sut.storedState.totalBalance)
+      sut.storedState.stateHeight
     }
 
     def nextState(state: State): State = state.copy(
@@ -145,7 +147,7 @@ object StateTestSpec extends Commands {
     def preCondition(state: State): Boolean = true
 
     override def postCondition(state: State, result: Try[Result]): Prop =
-      result == Success((state.height + 1, TotalBalance))
+      result == Success(state.height + 1)
   }
 
   case class ValidateTransactions(txs: Seq[(Transaction, Boolean)]) extends Command {
@@ -153,7 +155,7 @@ object StateTestSpec extends Commands {
     type Result = Seq[Transaction]
 
     def run(sut: Sut): Result = sut.synchronized {
-      sut.storedState.validate(txs.map(_._1), blockTime = txs.map(_._1.timestamp).max)._2
+      sut.validator.validate(txs.map(_._1), blockTime = txs.map(_._1.timestamp).max)._2
     }
 
     def nextState(state: State): State = state

@@ -16,6 +16,7 @@ import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.state.database.blockchain.{Validator, ValidatorImpl}
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.utils._
 import scorex.wallet.Wallet
@@ -31,6 +32,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   extends TransactionModule with TransactionOperations with ScorexLogging {
 
   import SimpleTransactionModule._
+  import com.wavesplatform.settings.BlockchainSettingsExtension._
 
   private val networkController = application.networkController
   private val feeCalculator = new FeeCalculator(settings.feesSettings)
@@ -38,6 +40,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
 
   override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)(application.consensusModule, this)
+  val validator : Validator = new ValidatorImpl(blockStorage.state, settings.blockchainSettings.asChainParameters)
 
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 
@@ -55,7 +58,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       .sorted(TransactionsOrdering.InUTXPool)
       .take(MaxTransactionsPerBlock)
 
-    val valid = blockStorage.state.validate(txs, heightOpt, NTP.correctedTime())._2
+    val valid = validator.validate(txs, heightOpt, NTP.correctedTime())._2
 
     if (valid.size != txs.size) {
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
@@ -82,7 +85,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
     val inOrder = notFromFuture.sorted(TransactionsOrdering.InUTXPool)
-    val valid = blockStorage.state.validate(inOrder, blockTime = currentTime)._2
+    val valid = validator.validate(inOrder, blockTime = currentTime)._2
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
   }
@@ -186,7 +189,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val lastBlockTimestamp = blockStorage.history.lastBlock.timestamp
     val notExpired = (lastBlockTimestamp - tx.timestamp).millis <= MaxTimePreviousBlockOverTransactionDiff
     if (notExpired) {
-      blockStorage.state.validate(tx, tx.timestamp)
+      validator.validate(tx, tx.timestamp)
     } else {
       Left(TransactionValidationError(tx, s"Transaction is too old: Last block timestamp is $lastBlockTimestamp"))
     }
@@ -203,7 +206,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val lastBlockTs = blockStorage.history.lastBlock.timestamp
     val txs = block.transactionData
     lazy val txsAreNew = txs.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTimeCurrentBlockOverTransactionDiff }
-    lazy val (errors, validTrans) = blockStorage.state.validate(block.transactionData, blockStorage.history.heightOf(block), block.timestamp)
+    lazy val (errors, validTrans) = validator.validate(block.transactionData, blockStorage.history.heightOf(block), block.timestamp)
     lazy val txsIdAreUniqueInBlock = txs.map(tx => Base58.encode(tx.id)).toSet.size == txs.size
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (errors.nonEmpty) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs: $errors")
@@ -221,7 +224,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
     for {
       p1 <- PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
-      p2 <- blockStorage.state.validate(p1, p1.timestamp)
+      p2 <- validator.validate(p1, p1.timestamp)
     } yield p2
   }
 

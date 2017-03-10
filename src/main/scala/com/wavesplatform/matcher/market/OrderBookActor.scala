@@ -12,7 +12,7 @@ import com.wavesplatform.matcher.model.{OrderValidator, _}
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange._
-import scorex.transaction.state.database.state.extension.OrderMatchStoredState
+import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
 import scorex.transaction.{State, TransactionModule}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet

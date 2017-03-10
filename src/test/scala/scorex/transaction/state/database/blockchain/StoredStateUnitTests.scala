@@ -1,7 +1,10 @@
 package scorex.transaction.state.database.blockchain
 
 import java.io.File
+import java.util.UUID
 
+import scala.util.{Left, Random, Right}
+import scala.util.control.NonFatal
 import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
 import org.scalatest._
@@ -54,17 +57,26 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     override def allowCreateAliasTransactionAfterTimestamp: Long = 0L
   }
 
-
   private val stateFile = scorex.createTestTemporaryFile("state", ".dat")
 
   private val db = new MVStore.Builder().fileName(stateFile.getAbsolutePath).compress().open()
   private val state = StoredState.fromDB(db, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
+  private val validator: Validator = new ValidatorImpl(state, forkParametersWithEnableUnissuedAssetsAndLeasingTxCheck)
   private val testAcc = PrivateKeyAccount(scorex.utils.randomBytes(64))
   private val testAssetAcc = AssetAcc(testAcc, None)
   private val testAdd = testAcc.address
 
-  private val applyChanges = PrivateMethod[Unit]('applyChanges)
-  private val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
+
+  private def shouldBeValid(t: Transaction): Assertion = {
+    validator.validate(t,Int.MaxValue) shouldBe 'right
+  }
+
+  private def shouldBeInvalid(t: Transaction): Assertion = {
+    validator.validate(t,Int.MaxValue) shouldBe 'left
+  }
+
+  val applyChanges = PrivateMethod[Unit]('applyChanges)
+  val calcNewBalances = PrivateMethod[Unit]('calcNewBalances)
 
 
   property("validate plenty of transactions") {
@@ -75,7 +87,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     val trans = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
 
     val bts = trans.map(_.timestamp).max
-    val (time, result) = profile(state.validate(trans, blockTime = bts)._2)
+    val (time, result) = profile(validator.validate(trans, blockTime = bts)._2)
     time should be < 1000L
     result.size should be <= trans.size
   }
@@ -88,13 +100,19 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val senderAddress = issueTx.sender.address
         val senderAmountAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
 
+        val genes0 = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes0), Map(), allowTemporaryNegative = true))
+
         state.assetBalance(senderAmountAcc) shouldBe 0
-        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Right[_, _]]
+        shouldBeValid(issueTx)
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe issueTx.quantity
 
-        state.validateAgainstState(burnTx, Int.MaxValue) shouldBe an[Right[_, _]]
+        val genes1 = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), burnTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes1), Map(), allowTemporaryNegative = true))
+
+        shouldBeValid(burnTx)
 
         state.applyChanges(state.calcNewBalances(Seq(burnTx), Map(), allowTemporaryNegative = true))
         state.assetBalance(senderAmountAcc) shouldBe (issueTx.quantity - burnTx.amount)
@@ -117,10 +135,10 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     state.effectiveBalance(testAcc) shouldBe InitialBalance
 
     val transfers = (0 until TxN).map { i => genTransfer(InitialBalance - 1, 1) }
-    val invalidTxs = transfers.filterNot(tx => state.isValid(tx, tx.timestamp))
+    val invalidTxs = transfers.filterNot(tx => validator.isValid(tx, tx.timestamp))
     invalidTxs shouldBe 'isEmpty
 
-    state.isValid(transfers, blockTime = transfers.map(_.timestamp).max) shouldBe false
+    validator.isValid(transfers, blockTime = transfers.map(_.timestamp).max) shouldBe false
 
     state.applyChanges(Map(testAssetAcc -> (AccState(0L, 0L), List())))
   }
@@ -140,13 +158,13 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         //valid transfer
         val tx = TransferTransaction.create(None, testAcc, recipient, balance - fee, System.currentTimeMillis(),
           None, fee, Array()).right.get
-        state.isValid(tx, tx.timestamp) shouldBe true
+        validator.isValid(tx, tx.timestamp) shouldBe true
 
         //transfer asset
         state.balance(testAcc) shouldBe balance
         val invalidtx = TransferTransaction.create(None, testAcc, recipient, balance, System.currentTimeMillis(),
           None, fee, Array()).right.get
-        state.isValid(invalidtx, invalidtx.timestamp) shouldBe false
+        validator.isValid(invalidtx, invalidtx.timestamp) shouldBe false
 
         state.applyChanges(Map(testAssetAcc -> (AccState(0L, 0L), List(tx))))
       }
@@ -159,7 +177,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val senderAccount = AssetAcc(tx.sender, None)
         val txFee = tx.fee
         state.applyChanges(Map(senderAccount -> (AccState(txFee, txFee), List(FeesStateChange(txFee)))))
-        state.isValid(Seq(tx), None, System.currentTimeMillis()) shouldBe false
+        validator.isValid(Seq(tx), None, System.currentTimeMillis()) shouldBe false
       }
     }
   }
@@ -228,13 +246,13 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         val (senderBalance, senderEffectiveBalance, recipientBalance, recipientEffectiveBalance) = senderAndRecipientStateBalances(tx)
 
-        state.leaseExtendedState.storage.getLeasedSum(tx.sender.address) shouldBe 0L
-        state.isValid(tx, Int.MaxValue) shouldBe true
+        state.getLeasedSum(tx.sender.address) shouldBe 0L
+        validator.isValid(tx, Int.MaxValue) shouldBe true
 
         // apply lease tx
         state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = false))
 
-        state.isValid(tx, Int.MaxValue) shouldBe false
+        validator.isValid(tx, Int.MaxValue) shouldBe false
 
         val (newSenderBalance, newSenderEffectiveBalance, newRecipientBalance, newRecipientEffectiveBalance) = senderAndRecipientStateBalances(tx)
 
@@ -259,16 +277,16 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.balance(first.sender) shouldBe balance
         state.effectiveBalance(first.sender) shouldBe balance
 
-        state.leaseExtendedState.storage.getLeasedSum(first.sender.address) shouldBe 0L
+        state.getLeasedSum(first.sender.address) shouldBe 0L
 
-        state.isValid(first, Int.MaxValue) shouldBe true
-        state.isValid(second, Int.MaxValue) shouldBe true
+        validator.isValid(first, Int.MaxValue) shouldBe true
+        validator.isValid(second, Int.MaxValue) shouldBe true
 
         // apply lease tx
         state.applyChanges(state.calcNewBalances(Seq(first), Map(), allowTemporaryNegative = false))
 
-        state.isValid(first, Int.MaxValue) shouldBe false
-        state.isValid(second, Int.MaxValue) shouldBe false
+        validator.isValid(first, Int.MaxValue) shouldBe false
+        validator.isValid(second, Int.MaxValue) shouldBe false
       }
     }
   }
@@ -287,7 +305,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.effectiveBalance(tx.sender) shouldBe balance
         balance < tx.amount + tx.fee shouldBe true
 
-        state.isValid(tx, Int.MaxValue) shouldBe false
+        validator.isValid(tx, Int.MaxValue) shouldBe false
       }
     }
   }
@@ -305,7 +323,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state.effectiveBalance(tx.sender) shouldBe balance
         balance < tx.amount + tx.fee shouldBe true
 
-        state.isValid(tx, Int.MaxValue) shouldBe false
+        validator.isValid(tx, Int.MaxValue) shouldBe false
       }
     }
   }
@@ -324,22 +342,22 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         val (senderBalance, senderEffectiveBalance, recipientBalance, recipientEffectiveBalance) = senderAndRecipientStateBalances(lease)
 
-        state.isValid(cancel, Int.MaxValue) shouldBe false
+        validator.isValid(cancel, Int.MaxValue) shouldBe false
 
-        state.leaseExtendedState.storage.getLeasedSum(lease.sender.address) shouldBe 0L
-        state.isValid(lease, Int.MaxValue) shouldBe true
+        state.getLeasedSum(lease.sender.address) shouldBe 0L
+        validator.isValid(lease, Int.MaxValue) shouldBe true
 
         // apply lease tx
         val balancesAfterLeasing = state.calcNewBalances(Seq(lease), Map(), allowTemporaryNegative = false)
         state.applyChanges(balancesAfterLeasing)
 
-        state.isValid(cancel, Int.MaxValue) shouldBe true
+        validator.isValid(cancel, Int.MaxValue) shouldBe true
 
         // apply cancel lease tx
         val balancesAfterCancel = state.calcNewBalances(Seq(cancel), Map(), allowTemporaryNegative = false)
         state.applyChanges(balancesAfterCancel)
 
-        state.isValid(cancel, Int.MaxValue) shouldBe false
+        validator.isValid(cancel, Int.MaxValue) shouldBe false
 
         val (newSenderBalance, newSenderEffectiveBalance, newRecipientBalance, newRecipientEffectiveBalance) = senderAndRecipientStateBalances(lease)
 
@@ -363,7 +381,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val balancesAfterLeasing = state.calcNewBalances(Seq(lease), Map(), allowTemporaryNegative = false)
         state.applyChanges(balancesAfterLeasing)
 
-        state.isValid(cancel, Int.MaxValue) shouldBe false
+        validator.isValid(cancel, Int.MaxValue) shouldBe false
       }
     }
   }
@@ -371,7 +389,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   property("Lease cancel transaction without lease") {
     forAll(leaseCancelGenerator) { cancel: LeaseCancelTransaction =>
       withRollbackTest {
-        state.isValid(cancel, Int.MaxValue) shouldBe false
+        validator.isValid(cancel, Int.MaxValue) shouldBe false
       }
     }
   }
@@ -458,7 +476,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
       state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
-      state.validateAgainstState(issueTx2, Int.MaxValue) shouldBe an[Left[_, _]]
+      shouldBeInvalid(issueTx2)
     }
   }
 
@@ -468,13 +486,19 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         val issueTx: IssueTransaction = pair._1
         val reissueTx: ReissueTransaction = pair._3
 
-        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Right[_, _]]
+        val genes0 = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes0), Map(), allowTemporaryNegative = true))
+
+        shouldBeValid(issueTx)
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
-        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Left[_, _]]
+        shouldBeInvalid(issueTx)
 
-        val state1 = state.validateAgainstState(reissueTx, Int.MaxValue)
+        val genes1 = GenesisTransaction.create(issueTx.sender, reissueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes1), Map(), allowTemporaryNegative = true))
+
+        val state1 = validator.validate(reissueTx, Int.MaxValue)
         issueTx.reissuable match {
           case true => state1 shouldBe an[Right[_, _]]
           case false => state1 shouldBe an[Left[_, _]]
@@ -487,17 +511,24 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   property("Incorrect issue and reissue asset") {
     forAll(issueWithInvalidReissuesGenerator) { case (issueTx, reissueTx, invalidReissueTx) =>
       withRollbackTest {
-        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Right[_, _]]
+
+        val genes0 = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes0), Map(), allowTemporaryNegative = true))
+
+        shouldBeValid(issueTx)
 
         state.applyChanges(state.calcNewBalances(Seq(issueTx), Map(), allowTemporaryNegative = true))
 
-        state.validateAgainstState(issueTx, Int.MaxValue) shouldBe an[Left[_, _]]
+        shouldBeInvalid(issueTx)
 
-        state.validateAgainstState(invalidReissueTx, Int.MaxValue) shouldBe an[Right[_, _]]
+        val genes1 = GenesisTransaction.create(invalidReissueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes1), Map(), allowTemporaryNegative = true))
+
+        shouldBeValid(invalidReissueTx)
 
         state.applyChanges(state.calcNewBalances(Seq(reissueTx), Map(), allowTemporaryNegative = true))
 
-        state.validateAgainstState(invalidReissueTx, Int.MaxValue) shouldBe an[Left[_, _]]
+        shouldBeInvalid(invalidReissueTx)
       }
     }
   }
@@ -578,7 +609,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance, balance), Seq(FeesStateChange(balance)))),
           NTP.correctedTime())
         state.balance(account) shouldBe balance
-        state.isValid(tx, System.currentTimeMillis) should be(false)
+        validator.isValid(tx, System.currentTimeMillis) should be(false)
       }
     }
   }
@@ -594,7 +625,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         state invokePrivate applyChanges(Map(assetAccount -> (AccState(balance, balance), Seq(FeesStateChange(balance)))),
           NTP.correctedTime())
         state.assetBalance(assetAccount) shouldBe balance
-        state.isValid(tx, System.currentTimeMillis) should be(false)
+        validator.isValid(tx, System.currentTimeMillis) should be(false)
       }
     }
   }
