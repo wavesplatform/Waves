@@ -1,6 +1,7 @@
 package scorex.transaction.state.database.blockchain
 
 import scorex.account.{Account, Alias}
+import scorex.crypto.encode.Base58
 import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
@@ -292,15 +293,48 @@ class ValidatorImpl(s: State, settings: ChainParameters) extends Validator {
     validatedTxs
   }
 
+
+  def validateCorrectIssueAndReissueTxs(txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
+    type IssueId = String
+    type IsReissuable = Boolean
+
+    txs.foldLeft((Map.empty[IssueId, IsReissuable], Seq.empty[Either[ValidationError, Transaction]])) {
+      case ((map, seq), tx) =>
+        tx match {
+          case issue: IssueTransaction =>
+            val assetId = Base58.encode(issue.assetId)
+            val isIssueExists = map.getOrElse(assetId, s.findTransaction[IssueTransaction](issue.assetId).isDefined)
+            if (!isIssueExists) {
+              (map + (assetId -> issue.reissuable), seq :+ Right(tx))
+            } else {
+              (map, seq :+ Left(TransactionValidationError(tx, "Issue transaction of the same asset already exists in the seq")))
+            }
+          case reissue: ReissueTransaction =>
+            val assetId = Base58.encode(reissue.assetId)
+            val isIssueExists = map.get(assetId).isDefined || s.findTransaction[IssueTransaction](reissue.assetId).isDefined
+            val isReissuable = map.getOrElse(assetId, s.isReissuable(reissue.assetId))
+
+            if (isIssueExists && isReissuable) {
+              (map + (assetId -> reissue.reissuable), seq :+ Right(tx))
+            } else {
+              (map, seq :+ Left(TransactionValidationError(tx, "Asset is no reissuable in the seq")))
+            }
+          case _ =>
+            (map, seq :+ Right(tx))
+        }
+    }._2
+  }
+
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int], blockTime: Long): (Seq[ValidationError], Seq[Transaction]) = {
     val height = heightOpt.getOrElse(s.stateHeight)
     val (err0, validOneByOne) = validAgainstStateOneByOne(height, trans).segregate()
     val (err1, validAgainstConsecutivePayments) = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).segregate()
     val (err2, filteredFarFuture) = filterTransactionsFromFuture(validAgainstConsecutivePayments, blockTime).segregate()
     val allowUnissuedAssets = filteredFarFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
-    val (err3, filteredOvermatch) = validateExchangeTxs(filteredFarFuture, height).segregate()
-    val (err4, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredOvermatch).segregate()
-    (err0 ++ err1 ++ err2 ++ err3 ++ err4, result)
+    val (err3, filterIncorrectIssueReissue) = validateCorrectIssueAndReissueTxs(filteredFarFuture).segregate()
+    val (err4, filteredOvermatch) = validateExchangeTxs(filterIncorrectIssueReissue, height).segregate()
+    val (err5, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredOvermatch).segregate()
+    (err0 ++ err1 ++ err2 ++ err3 ++ err4 ++ err5, result)
   }
 }
 
