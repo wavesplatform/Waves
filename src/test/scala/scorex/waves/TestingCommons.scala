@@ -1,11 +1,6 @@
 package scorex.waves
 
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.util.Random
 import akka.actor.ActorSystem
-import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
 import akka.util.Timeout
 import com.ning.http.client.Response
@@ -18,6 +13,11 @@ import play.api.libs.json._
 import scorex.api.http.ApiKeyNotValid
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
 import scorex.utils._
+
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.Random
 
 trait TestingCommons extends Suite with BeforeAndAfterAll {
 
@@ -419,16 +419,18 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
     }
   }
 
-  object RequestType {
-    type RequestType = Req => Req
+  object Request {
+    type RequestMethodSetter = Req => Req
 
-    val POST: RequestType = _.POST
-    val GET: RequestType = _.GET
-    val OPTIONS: RequestType = _.OPTIONS
-    val DELETE: RequestType = _.DELETE
+    val POST: RequestMethodSetter = _.POST
+    val GET: RequestMethodSetter = _.GET
+    val OPTIONS: RequestMethodSetter = _.OPTIONS
+    val DELETE: RequestMethodSetter = _.DELETE
   }
 
-  sealed trait RequestType {
+  sealed trait Request {
+    def t: Request.RequestMethodSetter
+
     def incorrectApiKeyTest(path: String): Unit = {
       Seq(Map[String, String](), Map("api_key" -> "wrong key")) foreach { h =>
         val resp = requestJson(path, headers = h).toString()
@@ -440,19 +442,19 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
                 params: Map[String, String] = Map.empty,
                 body: String = "",
                 headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
-                peer: String = peerUrl(application)): JsValue
+                peer: String = peerUrl(application)): JsValue = _requestJson(us, params, body, headers, peer, t)
 
     def requestRaw(us: String,
                    params: Map[String, String] = Map.empty,
                    body: String = "",
                    headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
-                   peer: String = peerUrl(application)): Response
+                   peer: String = peerUrl(application)): Response = _requestRaw(us, params, body, headers, peer, t)
 
     def requestObject[T](us: String,
                          params: Map[String, String] = Map.empty,
                          body: String = "",
                          headers: Map[String, String] = Map.empty,
-                         peer: String = peerUrl(application))(implicit format: Format[T]): T
+                         peer: String = peerUrl(application))(implicit format: Format[T]): T = _requestObject(us, params, body, headers, peer, t)
 
     protected def _requestJson(us: String,
                 params: Map[String, String] = Map.empty,
@@ -470,13 +472,13 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
                    peer: String = peerUrl(application),
                    method: Req => Req): Response = {
       val request = method match {
-        case RequestType.GET =>
+        case Request.GET =>
           method(url(peer + us) <:< headers)
-        case RequestType.POST =>
+        case Request.POST =>
           method(url(peer + us) <:< headers << body << params)
-        case RequestType.DELETE =>
+        case Request.DELETE =>
           method(url(peer + us) <:< headers)
-        case RequestType.OPTIONS =>
+        case Request.OPTIONS =>
           method(url(peer + us) <:< headers)
       }
       Await.result(Http(request), timeout)
@@ -494,36 +496,20 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
     }
   }
 
-  case object GET extends RequestType {
-    override def requestJson(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): JsValue = _requestJson(us, params, body, headers, peer, RequestType.GET)
-
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = _requestRaw(us, params, body, headers, peer, RequestType.GET)
-
-    override def requestObject[T](us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String)(implicit format: Format[T]): T = _requestObject(us, params, body, headers, peer, RequestType.GET)
+  case object GET extends Request {
+    override val t: Request.RequestMethodSetter = Request.GET
   }
 
-  case object POST extends RequestType {
-    override def requestJson(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): JsValue = _requestJson(us, params, body, headers, peer, RequestType.POST)
-
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = _requestRaw(us, params, body, headers, peer, RequestType.POST)
-
-    override def requestObject[T](us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String)(implicit format: Format[T]): T = _requestObject(us, params, body, headers, peer, RequestType.POST)
+  case object POST extends Request {
+    override val t: Request.RequestMethodSetter = Request.POST
   }
 
-  case object OPTIONS extends RequestType {
-    override def requestJson(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): JsValue = _requestJson(us, params, body, headers, peer, RequestType.OPTIONS)
-
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = _requestRaw(us, params, body, headers, peer, RequestType.OPTIONS)
-
-    override def requestObject[T](us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String)(implicit format: Format[T]): T = _requestObject(us, params, body, headers, peer, RequestType.OPTIONS)
+  case object OPTIONS extends Request {
+    override val t: Request.RequestMethodSetter = Request.OPTIONS
   }
 
-  case object DELETE extends RequestType {
-    override def requestJson(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): JsValue = _requestJson(us, params, body, headers, peer, RequestType.DELETE)
-
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = _requestRaw(us, params, body, headers, peer, RequestType.DELETE)
-
-    override def requestObject[T](us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String)(implicit format: Format[T]): T = _requestObject(us, params, body, headers, peer, RequestType.DELETE)
+  case object DELETE extends Request {
+    override val t: Request.RequestMethodSetter = Request.DELETE
   }
 
 }
