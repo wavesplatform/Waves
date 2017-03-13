@@ -1,8 +1,9 @@
 logLevel := Level.Warn
 
-resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/"
-
-resolvers += "Artima Maven Repository" at "http://repo.artima.com/releases"
+resolvers ++= Seq(
+  "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
+  "Artima Maven Repository" at "http://repo.artima.com/releases"
+)
 
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.3")
 
@@ -16,6 +17,9 @@ addSbtPlugin("org.scoverage" % "sbt-scoverage" % "+")
 
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.3")
 
-libraryDependencies += "com.typesafe" % "config" % "1.3.0"
+addSbtPlugin("se.marcuslonnberg" % "sbt-docker" % "1.4.1")
 
-libraryDependencies += "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar")
+libraryDependencies ++= Seq(
+  "com.typesafe" % "config" % "1.3.0",
+  "com.spotify" % "docker-client" % "8.1.2",
+  "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar"))

@@ -46,3 +46,20 @@ configs(IntegrationTest)
 concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 
 test in assembly := {}
+
+dockerfile in docker := {
+  val artifact: File = assembly.value
+  val artifactTargetPath = s"/opt/waves/${artifact.name}"
+
+  new Dockerfile {
+    from("anapsix/alpine-java:8_server-jre")
+    run("apk", "add", "--no-cache", "--update", "iproute2")
+    add(artifact, artifactTargetPath)
+    entryPoint("java", "-jar", artifactTargetPath)
+    expose(16868, 16869)
+  }
+}
+
+testOptions in IntegrationTest += Tests.Argument(s"-DdockerImageId=${docker.value.id}")
+
+(test in IntegrationTest) <<= (test in IntegrationTest).dependsOn(docker)
