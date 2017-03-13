@@ -3,10 +3,9 @@ package com.wavesplatform.settings
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
-import scorex.account.{Account, AddressScheme}
-import scorex.transaction.GenesisTransaction
 
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 
 case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowInvalidPaymentTransactionsByTimestamp: Long,
@@ -76,7 +75,8 @@ object FunctionalitySettings {
 case class GenesisTransactionSettings(recipient: String, amount: Long)
 
 case class GenesisSettings(blockTimestamp: Long, transactionsTimestamp: Long, initialBalance: Long, signature: String,
-                           transactions: List[GenesisTransactionSettings], initialBaseTarget: Long)
+                           transactions: List[GenesisTransactionSettings], initialBaseTarget: Long,
+                           averageBlockDelay: FiniteDuration)
 
 object GenesisSettings {
   val MAINNET = GenesisSettings(1460678400000L, 1465742577614L, Constants.UnitsInWave * Constants.TotalWaves,
@@ -88,7 +88,7 @@ object GenesisSettings {
       GenesisTransactionSettings("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF", Constants.UnitsInWave),
       GenesisTransactionSettings("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3", Constants.UnitsInWave),
       GenesisTransactionSettings("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J", Constants.UnitsInWave)),
-    153722867L)
+    153722867L, 60.seconds)
 
   val TESTNET = GenesisSettings(1460678400000L, 1478000000000L, Constants.UnitsInWave * Constants.TotalWaves,
     "5uqnLK3Z9eiot6FyYBfwUnbyid3abicQbAZjz38GQ1Q8XigQMxTK4C1zNkqS1SVw7FqSidbZKxWAKLVoEsp4nNqa",
@@ -98,7 +98,7 @@ object GenesisSettings {
       GenesisTransactionSettings("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", (Constants.UnitsInWave * Constants.TotalWaves * 0.02).toLong),
       GenesisTransactionSettings("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd", (Constants.UnitsInWave * Constants.TotalWaves * 0.02).toLong),
       GenesisTransactionSettings("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx", (Constants.UnitsInWave * Constants.TotalWaves - Constants.UnitsInWave * Constants.TotalWaves * 0.1).toLong)),
-    153722867L)
+    153722867L, 60.seconds)
 
   val configPath: String = "waves.blockchain.custom.genesis"
 
@@ -110,8 +110,9 @@ object GenesisSettings {
       GenesisTransactionSettings(p.as[String]("recipient"), p.as[Long]("amount"))
     }.toList
     val initialBaseTarget = config.as[Long](s"$configPath.initial-base-target")
+    val averageBlockDelay = config.as[FiniteDuration](s"$configPath.average-block-delay")
 
-    GenesisSettings(timestamp, timestamp, initialBalance, signature, transactions, initialBaseTarget)
+    GenesisSettings(timestamp, timestamp, initialBalance, signature, transactions, initialBaseTarget, averageBlockDelay)
   }
 }
 

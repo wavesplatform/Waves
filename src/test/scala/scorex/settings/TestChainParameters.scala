@@ -1,6 +1,7 @@
 package scorex.settings
 
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
+import scala.concurrent.duration._
 
 object TestFunctionalitySettings {
   val Disabled = FunctionalitySettings(Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue,
@@ -18,7 +19,7 @@ object TestBlockchainSettings {
       GenesisTransactionSettings("3N3rfWUDPkFsf2GEZBCLw491A79G46djvQk", initialBalance / 3),
       GenesisTransactionSettings("3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", initialBalance / 3),
       GenesisTransactionSettings("3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY", initialBalance / 3)
-    ), initialBaseTarget)
+    ), initialBaseTarget, 5.seconds)
 
   val Enabled = BlockchainSettings("", 'T', TestFunctionalitySettings.Enabled, testGenesisSettings)
 

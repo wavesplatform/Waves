@@ -36,7 +36,7 @@ class TFLikeMinerSpecification extends ActorTestingCommons {
 
   private val wavesSettings: WavesSettings = WavesSettings.fromConfig(baseTestConfig)
 
-  class MockableConsensusModule extends WavesConsensusModule(wavesSettings.blockchainSettings, Constants.AvgBlockDelay)
+  class MockableConsensusModule extends WavesConsensusModule(wavesSettings.blockchainSettings)
 
   private val testConsensusModule = mock[MockableConsensusModule]
   private val f = mockFunction[Block, String]
@@ -190,7 +190,7 @@ class SimpleMinerSpecification extends ActorTestingCommons {
   val wavesSettings: WavesSettings = WavesSettings.fromConfig(testConfigTFLikeOff)
   private val testHistory = mock[History]
 
-  class MockableConsensusModule extends WavesConsensusModule(wavesSettings.blockchainSettings, Constants.AvgBlockDelay)
+  class MockableConsensusModule extends WavesConsensusModule(wavesSettings.blockchainSettings)
 
   private val testConsensusModule = mock[MockableConsensusModule]
 
