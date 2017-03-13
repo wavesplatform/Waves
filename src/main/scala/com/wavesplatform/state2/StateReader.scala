@@ -12,6 +12,7 @@ trait StateReader {
   def accountPortfolio(a: Account): Portfolio
 
   def assetInfo(id: ByteArray): Option[AssetInfo]
+
 }
 
 class StateReaderImpl(p: JavaMapStorage) extends StateReader {
@@ -30,11 +31,11 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 }
 
 class CompositeStateReader(s: StateReader, d: Diff) extends StateReader {
-  override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] = d.transactions.get(id).orElse(s.transactionInfo(id))
+  override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
+    d.transactions.get(id).orElse(s.transactionInfo(id))
 
-  override def accountPortfolio(a: Account): Portfolio = {
+  override def accountPortfolio(a: Account): Portfolio =
     s.accountPortfolio(a).combine(d.portfolios.get(a).orEmpty)
-  }
 
   override def assetInfo(id: ByteArray): Option[AssetInfo] = d.issuedAssets.get(id).orElse(s.assetInfo(id))
 }
