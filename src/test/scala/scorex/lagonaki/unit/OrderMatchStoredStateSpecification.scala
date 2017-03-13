@@ -66,7 +66,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val sender = wallet.findWallet(request.sender).right.get
     TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
-      Account.fromBase58String(request.recipient).right.get,
+      Account.fromString(request.recipient).right.get,
       request.amount,
       getTimestamp,
       request.feeAssetId.map(s => Base58.decode(s).get),

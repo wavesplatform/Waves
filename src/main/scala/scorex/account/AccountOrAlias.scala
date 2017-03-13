@@ -20,15 +20,14 @@ object AccountOrAlias {
         Account.fromBytes(addressBytes).map((_, addressEnd))
       case Alias.AddressVersion =>
         val (arr, aliasEnd) = Deser.parseArraySize(bytes, position + 2)
-        Alias.fromBytes(bytes.slice(position,aliasEnd)).map((_, aliasEnd))
+        Alias.fromBytes(bytes.slice(position, aliasEnd)).map((_, aliasEnd))
       case _ => Left(ValidationError.InvalidAddress)
     }
   }
 
   def fromString(s: String): Either[ValidationError, AccountOrAlias] = {
-    Account.fromBase58String(s) match {
-      case Right(a) => Right(a)
-      case Left(_) => Alias(s)
-    }
+    if (s.startsWith(Alias.Prefix))
+      Alias.fromString(s)
+    else Account.fromString(s)
   }
 }

@@ -12,7 +12,7 @@ class AccountSpecification extends PropSpec with PropertyChecks with GeneratorDr
       val publicKeyHash = hash(data).take(Account.HashLength)
       val withoutChecksum = AddressVersion2 +: AddressScheme.current.chainId +: publicKeyHash
       val addressVersion2 = Base58.encode(withoutChecksum ++ hash(withoutChecksum).take(Account.ChecksumLength))
-      Account.fromBase58String(addressVersion2).isRight shouldBe (AddressVersion2 == Account.AddressVersion)
+      Account.fromString(addressVersion2).isRight shouldBe (AddressVersion2 == Account.AddressVersion)
     }
   }
 }
