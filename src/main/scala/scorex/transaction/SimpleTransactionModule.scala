@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Charsets
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings, WavesSettings}
 import scorex.account._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
@@ -12,7 +12,6 @@ import scorex.consensus.TransactionsOrdering
 import scorex.crypto.encode.Base58
 import scorex.network.message.Message
 import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
-import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -27,12 +26,11 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right}
 
 
-class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val settings: WavesSettings,
-                                                               application: Application)
+class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val settings: WavesSettings,
+                                                                application: Application)
   extends TransactionModule with TransactionOperations with ScorexLogging {
 
   import SimpleTransactionModule._
-  import com.wavesplatform.settings.BlockchainSettingsExtension._
 
   private val networkController = application.networkController
   private val feeCalculator = new FeeCalculator(settings.feesSettings)
@@ -40,7 +38,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
 
   override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)(application.consensusModule, this)
-  val validator : Validator = new ValidatorImpl(blockStorage.state, settings.blockchainSettings.asChainParameters)
+  val validator: Validator = new ValidatorImpl(blockStorage.state, settings.blockchainSettings.functionalitySettings)
 
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 
@@ -181,7 +179,14 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       .flatMap(onNewOffchainTransaction)
 
 
-  override def genesisData: Seq[Transaction] = hardForkParams.genesisTxs
+  override def genesisData: Seq[Transaction] = buildTransactions(genesisSettings.transactions)
+
+  private def buildTransactions(transactionSettings: List[GenesisTransactionSettings]): Seq[GenesisTransaction] = {
+    transactionSettings.map { ts =>
+      val acc = Account.fromBase58String(ts.recipient).right.get
+      GenesisTransaction.create(acc, ts.amount, genesisSettings.transactionsTimestamp).right.get
+    }
+  }
 
   /** Check whether tx is valid on current state and not expired yet
     */

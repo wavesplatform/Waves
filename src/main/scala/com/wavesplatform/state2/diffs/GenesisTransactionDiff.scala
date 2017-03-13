@@ -1,8 +1,8 @@
 package com.wavesplatform.state2.diffs
 
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.{Diff, EqByteArray, StateReader}
 import scorex.account.{Account, Alias}
-import scorex.settings.ChainParameters
 import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
 import scorex.transaction._
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
@@ -22,7 +22,7 @@ object GenesisTransactionDiff {
 
 object BasicDiff {
 
-  def apply[T <: Transaction](state: StateReader, settings: ChainParameters, time: Long)(transaction: T): Either[ValidationError, T] = {
+  def apply[T <: Transaction](state: StateReader, settings: FunctionalitySettings, time: Long)(transaction: T): Either[ValidationError, T] = {
 
     def disallowDuplicateIds(t: T): Either[StateValidationError, T] = t match {
       case tx: PaymentTransaction if tx.timestamp < settings.requirePaymentUniqueId => Right(t)

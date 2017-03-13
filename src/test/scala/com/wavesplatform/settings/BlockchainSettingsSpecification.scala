@@ -3,6 +3,8 @@ package com.wavesplatform.settings
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.concurrent.duration._
+
 class BlockchainSettingsSpecification extends FlatSpec with Matchers {
   "BlockchainSettings" should "read custom values" in {
     val config = ConfigFactory.parseString(
@@ -32,6 +34,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        timestamp: 1460678400000
         |        signature: "BASE58BLOCKSIGNATURE"
         |        initial-balance: 100000000000000
+        |        initial-base-target = 153722867
+        |        average-block-delay = 60s
         |        transactions = [
         |          {recipient: "BASE58ADDRESS1", amount: 50000000000001},
         |          {recipient: "BASE58ADDRESS2", amount: 49999999999999}
@@ -57,12 +61,15 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowLeaseTransactionAfterTimestamp should be(10)
     settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(11)
     settings.functionalitySettings.allowCreateAliasTransactionAfterTimestamp should be(12)
-    settings.genesisSettings.timestamp should be (1460678400000L)
-    settings.genesisSettings.signature should be ("BASE58BLOCKSIGNATURE")
-    settings.genesisSettings.initialBalance should be (100000000000000L)
-    settings.genesisSettings.transactions.size should be (2)
-    settings.genesisSettings.transactions.head should be (GenesisTransactionSettings("BASE58ADDRESS1", 50000000000001L))
-    settings.genesisSettings.transactions.tail.head should be (GenesisTransactionSettings("BASE58ADDRESS2", 49999999999999L))
+    settings.genesisSettings.blockTimestamp should be(1460678400000L)
+    settings.genesisSettings.transactionsTimestamp should be(1460678400000L)
+    settings.genesisSettings.signature should be("BASE58BLOCKSIGNATURE")
+    settings.genesisSettings.initialBalance should be(100000000000000L)
+    settings.genesisSettings.initialBaseTarget should be(153722867)
+    settings.genesisSettings.averageBlockDelay should be(60.seconds)
+    settings.genesisSettings.transactions.size should be(2)
+    settings.genesisSettings.transactions.head should be(GenesisTransactionSettings("BASE58ADDRESS1", 50000000000001L))
+    settings.genesisSettings.transactions.tail.head should be(GenesisTransactionSettings("BASE58ADDRESS2", 49999999999999L))
   }
 
   it should "read testnet settings" in {
@@ -89,15 +96,16 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
     settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(1481110521000L)
     settings.functionalitySettings.requirePaymentUniqueId should be(1485942685000L)
-    settings.genesisSettings.timestamp should be (1478000000000L)
-    settings.genesisSettings.signature should be ("5uqnLK3Z9eiot6FyYBfwUnbyid3abicQbAZjz38GQ1Q8XigQMxTK4C1zNkqS1SVw7FqSidbZKxWAKLVoEsp4nNqa")
-    settings.genesisSettings.initialBalance should be (10000000000000000L)
-    settings.genesisSettings.transactions.size should be (5)
-    settings.genesisSettings.transactions.head should be (GenesisTransactionSettings("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8", 400000000000000L))
-    settings.genesisSettings.transactions.tail.head should be (GenesisTransactionSettings("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8", 200000000000000L))
-    settings.genesisSettings.transactions.tail.tail.head should be (GenesisTransactionSettings("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000000000L))
-    settings.genesisSettings.transactions.tail.tail.tail.head should be (GenesisTransactionSettings("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd", 200000000000000L))
-    settings.genesisSettings.transactions.tail.tail.tail.tail.head should be (GenesisTransactionSettings("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx", 9000000000000000L))
+    settings.genesisSettings.blockTimestamp should be(1460678400000L)
+    settings.genesisSettings.transactionsTimestamp should be(1478000000000L)
+    settings.genesisSettings.signature should be("5uqnLK3Z9eiot6FyYBfwUnbyid3abicQbAZjz38GQ1Q8XigQMxTK4C1zNkqS1SVw7FqSidbZKxWAKLVoEsp4nNqa")
+    settings.genesisSettings.initialBalance should be(10000000000000000L)
+    settings.genesisSettings.transactions.size should be(5)
+    settings.genesisSettings.transactions.head should be(GenesisTransactionSettings("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8", 400000000000000L))
+    settings.genesisSettings.transactions.tail.head should be(GenesisTransactionSettings("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8", 200000000000000L))
+    settings.genesisSettings.transactions.tail.tail.head should be(GenesisTransactionSettings("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000000000L))
+    settings.genesisSettings.transactions.tail.tail.tail.head should be(GenesisTransactionSettings("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd", 200000000000000L))
+    settings.genesisSettings.transactions.tail.tail.tail.tail.head should be(GenesisTransactionSettings("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx", 9000000000000000L))
   }
 
   it should "read mainnet settings" in {
@@ -124,15 +132,16 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
     settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(1482233593000L)
     settings.functionalitySettings.requirePaymentUniqueId should be(1488361885000L)
-    settings.genesisSettings.timestamp should be (1465742577614L)
-    settings.genesisSettings.signature should be ("FSH8eAAzZNqnG8xgTZtz5xuLqXySsXgAjmFEC25hXMbEufiGjqWPnGCZFt6gLiVLJny16ipxRNAkkzjjhqTjBE2")
-    settings.genesisSettings.initialBalance should be (10000000000000000L)
-    settings.genesisSettings.transactions.size should be (6)
-    settings.genesisSettings.transactions.head should be (GenesisTransactionSettings("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ", 9999999500000000L))
-    settings.genesisSettings.transactions.tail.head should be (GenesisTransactionSettings("3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM", 100000000L))
-    settings.genesisSettings.transactions.tail.tail.head should be (GenesisTransactionSettings("3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy", 100000000L))
-    settings.genesisSettings.transactions.tail.tail.tail.head should be (GenesisTransactionSettings("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF", 100000000L))
-    settings.genesisSettings.transactions.tail.tail.tail.tail.head should be (GenesisTransactionSettings("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3", 100000000L))
-    settings.genesisSettings.transactions.tail.tail.tail.tail.tail.head should be (GenesisTransactionSettings("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J", 100000000L))
+    settings.genesisSettings.blockTimestamp should be(1460678400000L)
+    settings.genesisSettings.transactionsTimestamp should be(1465742577614L)
+    settings.genesisSettings.signature should be("FSH8eAAzZNqnG8xgTZtz5xuLqXySsXgAjmFEC25hXMbEufiGjqWPnGCZFt6gLiVLJny16ipxRNAkkzjjhqTjBE2")
+    settings.genesisSettings.initialBalance should be(10000000000000000L)
+    settings.genesisSettings.transactions.size should be(6)
+    settings.genesisSettings.transactions.head should be(GenesisTransactionSettings("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ", 9999999500000000L))
+    settings.genesisSettings.transactions.tail.head should be(GenesisTransactionSettings("3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM", 100000000L))
+    settings.genesisSettings.transactions.tail.tail.head should be(GenesisTransactionSettings("3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy", 100000000L))
+    settings.genesisSettings.transactions.tail.tail.tail.head should be(GenesisTransactionSettings("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF", 100000000L))
+    settings.genesisSettings.transactions.tail.tail.tail.tail.head should be(GenesisTransactionSettings("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3", 100000000L))
+    settings.genesisSettings.transactions.tail.tail.tail.tail.tail.head should be(GenesisTransactionSettings("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J", 100000000L))
   }
 }

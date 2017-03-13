@@ -1,71 +1,27 @@
 package scorex.settings
 
-import scorex.account.{Account, AddressScheme}
-import scorex.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
+import scala.concurrent.duration._
 
-object TestChainParameters {
-  trait GenesisData { this: ChainParameters =>
-    override def genesisTxs: Seq[Transaction] = {
-      val ipoMembers = List(
-        "3N3rfWUDPkFsf2GEZBCLw491A79G46djvQk",
-        "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K",
-        "3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY"
-      )
+object TestFunctionalitySettings {
+  val Disabled = FunctionalitySettings(Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue,
+    Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue)
+  val Enabled = FunctionalitySettings(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L)
+}
 
-      val timestamp = 0L
+object TestBlockchainSettings {
+  private val initialBalance = 100000000000000L
 
-      val txs = ipoMembers.map { addr =>
-        val recipient = Account.fromBase58String(addr).right.get
-        GenesisTransaction.create(recipient, initialBalance / ipoMembers.length, timestamp)
-      }.map(_.right.get)
+  private val initialBaseTarget = 153722867L
 
-      txs
-    }
-  }
+  private val testGenesisSettings = GenesisSettings(0L, 0L, initialBalance, "",
+    List(
+      GenesisTransactionSettings("3N3rfWUDPkFsf2GEZBCLw491A79G46djvQk", initialBalance / 3),
+      GenesisTransactionSettings("3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", initialBalance / 3),
+      GenesisTransactionSettings("3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY", initialBalance / 3)
+    ), initialBaseTarget, 5.seconds)
 
-  val Disabled = new ChainParameters with GenesisData {
-    override def allowTemporaryNegativeUntil: Long = Long.MaxValue
-    override def requireSortedTransactionsAfter: Long = Long.MaxValue
-    override def allowInvalidPaymentTransactionsByTimestamp: Long = Long.MaxValue
-    override def generatingBalanceDepthFrom50To1000AfterHeight: Long = Long.MaxValue
-    override def minimalGeneratingBalanceAfterTimestamp: Long = Long.MaxValue
-    override def allowTransactionsFromFutureUntil: Long = Long.MaxValue
-    override def allowUnissuedAssetsUntil: Long = Long.MaxValue
-    override def allowBurnTransactionAfterTimestamp: Long = Long.MaxValue
-    override def requirePaymentUniqueId: Long = Long.MaxValue
-    override def allowLeaseTransactionAfterTimestamp: Long = Long.MaxValue
+  val Enabled = BlockchainSettings("", 'T', TestFunctionalitySettings.Enabled, testGenesisSettings)
 
-    override def initialBalance: Long = 100000000000000L
-
-    override def genesisTimestamp: Long = ???
-
-    override def addressScheme: AddressScheme = ???
-
-    override def allowExchangeTransactionAfterTimestamp: Long = Long.MaxValue
-
-    override def allowCreateAliasTransactionAfterTimestamp: Long = Long.MaxValue
-  }
-
-  val Enabled = new ChainParameters with GenesisData {
-    override def allowTemporaryNegativeUntil: Long = 0
-    override def requireSortedTransactionsAfter: Long = 0
-    override def allowInvalidPaymentTransactionsByTimestamp: Long = 0
-    override def generatingBalanceDepthFrom50To1000AfterHeight: Long = 0
-    override def minimalGeneratingBalanceAfterTimestamp: Long = 0
-    override def allowTransactionsFromFutureUntil: Long = 0
-    override def allowUnissuedAssetsUntil: Long = 0
-    override def allowBurnTransactionAfterTimestamp: Long = 0
-    override def requirePaymentUniqueId: Long = 0
-    override def allowLeaseTransactionAfterTimestamp: Long = 0
-
-    override def initialBalance: Long = ???
-
-    override def genesisTimestamp: Long = ???
-
-    override def addressScheme: AddressScheme = ???
-
-    override def allowExchangeTransactionAfterTimestamp: Long = 0L
-
-    override def allowCreateAliasTransactionAfterTimestamp: Long = 0L
-  }
+  val Disabled = BlockchainSettings("", 'T', TestFunctionalitySettings.Disabled, testGenesisSettings)
 }

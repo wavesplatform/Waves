@@ -13,7 +13,7 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
   implicit lazy val transactionModule = application.transactionModule
 
   if (application.transactionModule.blockStorage.history.isEmpty) {
-    application.transactionModule.blockStorage.appendBlock(Block.genesis(RunnableApplication.consensusGenesisBlockData,transactionModule.genesisData))
+    application.transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData))
   }
 
   if (application.wallet.privateKeyAccounts().size < 3) {

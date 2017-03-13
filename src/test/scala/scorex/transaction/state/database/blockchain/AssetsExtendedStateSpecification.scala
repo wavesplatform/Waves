@@ -5,9 +5,9 @@ import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Assertions, Matchers, PropSpec}
-import scorex.settings.ChainParameters
-import scorex.transaction.{State, TransactionGen}
+import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.state.database.state.storage._
+import scorex.transaction.{State, TransactionGen}
 
 class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
   with Matchers with TransactionGen with Assertions with MockFactory {
@@ -21,7 +21,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
       with MVStoreAliasExtendedStorage {
       override val db: MVStore = mvStore
     }
-    new StoredState(storage, mock[ChainParameters])
+    new StoredState(storage, TestFunctionalitySettings.Enabled)
   }
 
   property("Assets quantity and issueability should work on one update") {
