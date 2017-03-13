@@ -13,6 +13,10 @@ trait StateReader {
 
   def assetInfo(id: ByteArray): Option[AssetInfo]
 
+  def height: Int
+
+  def accountTransactionIds(a: Account): Seq[ByteArray]
+
 }
 
 class StateReaderImpl(p: JavaMapStorage) extends StateReader {
@@ -28,6 +32,10 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
   override def assetInfo(id: ByteArray): Option[AssetInfo] = Option(p.assets.get(id.arr)).map {
     case (is, amt) => AssetInfo(is, amt)
   }
+
+  override def height: Int = p.getHeight
+
+  override def accountTransactionIds(a: Account): Seq[ByteArray] = Option(p.accountTransactionIds.get(a.bytes)).toSeq.map(EqByteArray)
 }
 
 class CompositeStateReader(s: StateReader, d: Diff) extends StateReader {
@@ -38,5 +46,12 @@ class CompositeStateReader(s: StateReader, d: Diff) extends StateReader {
     s.accountPortfolio(a).combine(d.portfolios.get(a).orEmpty)
 
   override def assetInfo(id: ByteArray): Option[AssetInfo] = d.issuedAssets.get(id).orElse(s.assetInfo(id))
+
+  override def height: Int = s.height + d.height
+
+  override def accountTransactionIds(a: Account): Seq[ByteArray] = {
+    val newAccTxIds: Seq[ByteArray] = d.transactions.get(EqByteArray(a.bytes)).map(_._2.id).toSeq.map(EqByteArray)
+    s.accountTransactionIds(a) ++ newAccTxIds
+  }
 }
 
