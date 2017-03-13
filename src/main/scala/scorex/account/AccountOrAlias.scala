@@ -19,7 +19,7 @@ object AccountOrAlias {
         val addressBytes = bytes.slice(position, addressEnd)
         Account.fromBytes(addressBytes).map((_, addressEnd))
       case Alias.AddressVersion =>
-        val (arr, aliasEnd) = Deser.parseArraySize(bytes, position + 1)
+        val (arr, aliasEnd) = Deser.parseArraySize(bytes, position + 2)
         Alias.fromBytes(bytes.slice(position,aliasEnd)).map((_, aliasEnd))
       case _ => Left(ValidationError.InvalidAddress)
     }
