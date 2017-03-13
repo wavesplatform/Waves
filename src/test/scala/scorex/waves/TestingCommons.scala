@@ -82,7 +82,8 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        timestamp: 1478000000000
       |        signature: "59WJ5L8rPCXpBeAeDF1s6jUraiSpSU2dFsnL1u2oVf44sqFGSZWrf7zwti9XA5rVKR7UGRWzHeaiTUnKyqwmQcoH"
       |        initial-balance: 10000000000000000
-      |        initial-base-target =153722867
+      |        initial-base-target = 153722867
+      |        average-block-delay = 5s
       |        transactions = [
       |          {recipient: "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", amount: 400000000000000}
       |          {recipient: "3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8", amount: 200000000000000}
@@ -191,6 +192,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        signature: "59WJ5L8rPCXpBeAeDF1s6jUraiSpSU2dFsnL1u2oVf44sqFGSZWrf7zwti9XA5rVKR7UGRWzHeaiTUnKyqwmQcoH"
       |        initial-balance: 10000000000000000
       |        initial-base-target =153722867
+      |        average-block-delay = 5s
       |        transactions = [
       |          {recipient: "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", amount: 400000000000000}
       |          {recipient: "3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8", amount: 200000000000000}
@@ -274,6 +276,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        signature: "59WJ5L8rPCXpBeAeDF1s6jUraiSpSU2dFsnL1u2oVf44sqFGSZWrf7zwti9XA5rVKR7UGRWzHeaiTUnKyqwmQcoH"
       |        initial-balance: 10000000000000000
       |        initial-base-target =153722867
+      |        average-block-delay = 5s
       |        transactions = [
       |          {recipient: "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", amount: 400000000000000}
       |          {recipient: "3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8", amount: 200000000000000}

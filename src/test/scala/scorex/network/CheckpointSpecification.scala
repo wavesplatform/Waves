@@ -32,7 +32,7 @@ class CheckpointSpecification extends FreeSpec
 
   "serialization" in {
     val spec = new BasicMessagesRepo()(stub[TransactionModule],
-      new WavesConsensusModule(TestBlockchainSettings.Enabled, Constants.AvgBlockDelay)).CheckpointMessageSpec
+      new WavesConsensusModule(TestBlockchainSettings.Enabled)).CheckpointMessageSpec
 
     def sig(b: Byte) = Array.fill[Byte](SignatureLength)(b)
 

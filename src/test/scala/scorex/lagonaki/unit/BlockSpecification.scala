@@ -14,7 +14,7 @@ import scala.util.Random
 class BlockSpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
   test("Nxt block with txs bytes/parse roundtrip") {
-    implicit val consensusModule = new WavesConsensusModule(TestBlockchainSettings.Disabled, 5.seconds)
+    implicit val consensusModule = new WavesConsensusModule(TestBlockchainSettings.Disabled)
     implicit val transactionModule = new SimpleTransactionModule(TestBlockchainSettings.Disabled.genesisSettings)(application.settings, application)
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)

@@ -5,5 +5,5 @@ import scorex.settings.TestBlockchainSettings
 
 import scala.concurrent.duration._
 
-class ConsensusMock extends WavesConsensusModule(TestBlockchainSettings.Disabled, 5.seconds) {
+class ConsensusMock extends WavesConsensusModule(TestBlockchainSettings.Disabled) {
 }

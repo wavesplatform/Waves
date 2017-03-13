@@ -54,7 +54,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db: MVStore = new MVStore.Builder().open()
 
   trait TestAppMock extends Application {
-    lazy implicit val consensusModule: WavesConsensusModule = new WavesConsensusModule(TestBlockchainSettings.Disabled, 5.seconds) {
+    lazy implicit val consensusModule: WavesConsensusModule = new WavesConsensusModule(TestBlockchainSettings.Disabled) {
       override def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean = true
     }
     lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(TestBlockchainSettings.Disabled.genesisSettings)(wavesSettings, this)

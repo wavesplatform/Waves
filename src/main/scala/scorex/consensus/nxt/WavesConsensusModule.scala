@@ -13,7 +13,7 @@ import scorex.utils.{NTP, ScorexLogging}
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-class WavesConsensusModule(val settings: BlockchainSettings, AvgDelay: Duration) extends ScorexLogging {
+class WavesConsensusModule(val settings: BlockchainSettings) extends ScorexLogging {
 
   import WavesConsensusModule._
 
@@ -24,7 +24,7 @@ class WavesConsensusModule(val settings: BlockchainSettings, AvgDelay: Duration)
   private val BaseTargetGamma = normalize(64)
   private val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
 
-  private def avgDelayInSeconds: Long = AvgDelay.toSeconds
+  private def avgDelayInSeconds: Long = settings.genesisSettings.averageBlockDelay.toSeconds
 
   private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
