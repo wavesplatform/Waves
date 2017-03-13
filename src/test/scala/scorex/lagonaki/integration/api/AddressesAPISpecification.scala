@@ -20,11 +20,11 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
   }
 
   test("/addresses/seq/{from}/{to} API route") {
-    val responded = GET.request("/addresses/seq/1/4").as[List[String]]
+    val responded = GET.requestJson("/addresses/seq/1/4").as[List[String]]
     responded.size shouldBe 3
     responded.foreach(a => addresses should contain(a))
 
-    val r2 = GET.request("/addresses/seq/5/9").as[List[String]]
+    val r2 = GET.requestJson("/addresses/seq/5/9").as[List[String]]
     r2.size shouldBe 4
     r2.foreach(a => addresses should contain(a))
     responded.intersect(r2).isEmpty shouldBe true
@@ -33,7 +33,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
   test("/addresses/validate/{address} API route") {
     val toCheck: Seq[(String, Boolean)] = ("wrongA", false) +: addresses.map(a => (a, true))
     toCheck.foreach { a =>
-      val response = GET.request(s"/addresses/validate/${a._1}")
+      val response = GET.requestJson(s"/addresses/validate/${a._1}")
       (response \ "address").as[String] shouldBe a._1
       (response \ "valid").as[Boolean] shouldBe a._2
     }
@@ -43,13 +43,13 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
     val path = s"/addresses/seed/${account.address}"
     GET.incorrectApiKeyTest(path)
 
-    val response = GET.request(us = path, headers = Map("api_key" -> "test"))
+    val response = GET.requestJson(us = path, headers = Map("api_key" -> "test"))
     (response \ "address").as[String] shouldBe account.address
     (response \ "seed").as[String] shouldBe Base58.encode(account.seed)
   }
 
   test("/addresses/balance/{address} API route") {
-    val response = GET.request(s"/addresses/balance/$address")
+    val response = GET.requestJson(s"/addresses/balance/$address")
     (response \ "address").as[String] shouldBe address
     (response \ "confirmations").as[Int] shouldBe 0
     (response \ "balance").as[Long] should be >= 0L
@@ -57,7 +57,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
 
   test("POST /addresses/sign/{address} API route") {
     val message = "test"
-    val req = POST.request(s"/addresses/sign/$address", body = message)
+    val req = POST.requestJson(s"/addresses/sign/$address", body = message)
     (req \ "message").as[String] shouldBe Base58.encode(message.getBytes)
     val pubkey = (req \ "publicKey").asOpt[String].flatMap(Base58.decode(_).toOption)
     val signature = (req \ "signature").asOpt[String].flatMap(Base58.decode(_).toOption)
@@ -71,7 +71,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
 
   test("/addresses/balance/{address}/{confirmations} API route") {
     val confirmations = Math.min(3, application.blockStorage.state.stateHeight)
-    val response = GET.request(s"/addresses/balance/$address/$confirmations")
+    val response = GET.requestJson(s"/addresses/balance/$address/$confirmations")
     (response \ "address").as[String] shouldBe address
     (response \ "confirmations").as[Int] shouldBe confirmations
     (response \ "balance").as[Long] should be >= 0L
@@ -81,7 +81,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
     val address = accounts.last.address
     DELETE.incorrectApiKeyTest(s"/addresses/$address")
 
-    (DELETE.request(s"/addresses/$address") \ "deleted").as[Boolean] shouldBe true
+    (DELETE.requestJson(s"/addresses/$address") \ "deleted").as[Boolean] shouldBe true
     addresses.contains(address) shouldBe false
   }
 
@@ -108,7 +108,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
 
   test("POST /addresses/signText/{address} API route") {
     val message = "test"
-    val req = POST.request(s"/addresses/signText/$address", body = message)
+    val req = POST.requestJson(s"/addresses/signText/$address", body = message)
     (req \ "message").as[String] shouldBe message
     val pubkey = (req \ "publicKey").asOpt[String].flatMap(Base58.decode(_).toOption)
     val signature = (req \ "signature").asOpt[String].flatMap(Base58.decode(_).toOption)
@@ -121,7 +121,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
   }
 
   test("POST /addresses API route") {
-    (POST.request("/addresses") \ "address").asOpt[String].flatMap(Base58.decode(_).toOption).isDefined shouldBe true
+    (POST.requestJson("/addresses") \ "address").asOpt[String].flatMap(Base58.decode(_).toOption).isDefined shouldBe true
     val add = "/addresses"
 
     POST.incorrectApiKeyTest("/addresses")
@@ -134,7 +134,7 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
 
   test("/addresses/ API route") {
     val ads: Seq[String] = addresses
-    val response = GET.request("/addresses")
+    val response = GET.requestJson("/addresses")
     response.as[List[String]] shouldBe ads
   }
 

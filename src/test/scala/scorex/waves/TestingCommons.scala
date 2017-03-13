@@ -5,15 +5,16 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
 import akka.actor.ActorSystem
+import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
 import akka.util.Timeout
 import com.ning.http.client.Response
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.Application
 import com.wavesplatform.settings.WavesSettings
-import dispatch.{Http, url}
+import dispatch.{Http, Req, url}
 import org.scalatest.{BeforeAndAfterAll, Suite}
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+import play.api.libs.json._
 import scorex.api.http.ApiKeyNotValid
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
 import scorex.utils._
@@ -341,7 +342,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   }
 
   def getConnectedPeersCount(app: Application): Int = {
-    val response = GET.request("/peers/connected", peer = peerUrl(app))
+    val response = GET.requestJson("/peers/connected", peer = peerUrl(app))
     val peers = (response \ "peers").asOpt[JsArray]
 
     peers.get.value.size
@@ -418,113 +419,111 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
     }
   }
 
+  object RequestType {
+    type RequestType = Req => Req
+
+    val POST: RequestType = _.POST
+    val GET: RequestType = _.GET
+    val OPTIONS: RequestType = _.OPTIONS
+    val DELETE: RequestType = _.DELETE
+  }
+
   sealed trait RequestType {
     def incorrectApiKeyTest(path: String): Unit = {
       Seq(Map[String, String](), Map("api_key" -> "wrong key")) foreach { h =>
-        val resp = request(path, headers = h).toString()
+        val resp = requestJson(path, headers = h).toString()
         assert(resp == ApiKeyNotValid.json.toString(), s"$resp == ${ApiKeyNotValid.json.toString()} is false")
       }
     }
 
-    def request(us: String,
+    def requestJson(us: String,
                 params: Map[String, String] = Map.empty,
                 body: String = "",
-                headers: Map[String, String] = Map("api_key" -> "test"),
+                headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
                 peer: String = peerUrl(application)): JsValue
 
     def requestRaw(us: String,
                    params: Map[String, String] = Map.empty,
                    body: String = "",
-                   headers: Map[String, String] = Map("api_key" -> "test"),
+                   headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
                    peer: String = peerUrl(application)): Response
+
+    def requestObject[T](us: String,
+                         params: Map[String, String] = Map.empty,
+                         body: String = "",
+                         headers: Map[String, String] = Map.empty,
+                         peer: String = peerUrl(application))(implicit format: Format[T]): T
+
+    protected def _requestJson(us: String,
+                params: Map[String, String] = Map.empty,
+                body: String = "",
+                headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
+                peer: String = peerUrl(application),
+                method: Req => Req): JsValue = {
+      Json.parse(_requestRaw(us, params, body, headers, peer, method).getResponseBody)
+    }
+
+    protected def _requestRaw(us: String,
+                   params: Map[String, String] = Map.empty,
+                   body: String = "",
+                   headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
+                   peer: String = peerUrl(application),
+                   method: Req => Req): Response = {
+      val request = method match {
+        case RequestType.GET =>
+          method(url(peer + us) <:< headers)
+        case RequestType.POST =>
+          method(url(peer + us) <:< headers << body << params)
+        case RequestType.DELETE =>
+          method(url(peer + us) <:< headers)
+        case RequestType.OPTIONS =>
+          method(url(peer + us) <:< headers)
+      }
+      Await.result(Http(request), timeout)
+    }
+
+    private val timeout = 5.seconds
+
+    protected def _requestObject[T](us: String,
+                            params: Map[String, String] = Map.empty,
+                            body: String = "",
+                            headers: Map[String, String] = Map("api_key" -> "test"),
+                            peer: String = peerUrl(application),
+                            method: Req => Req)(implicit format: Format[T]): T = {
+      format.reads(_requestJson(us, params, body, headers, peer, method)).getOrElse(throw new RuntimeException)
+    }
   }
 
   case object GET extends RequestType {
-    def request(us: String,
-                params: Map[String, String] = Map.empty,
-                body: String = "",
-                headers: Map[String, String] = Map.empty,
-                peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).GET <:< headers)
-      val response: Response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
-    }
+    override def requestJson(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): JsValue = _requestJson(us, params, body, headers, peer, RequestType.GET)
 
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
-      val request = Http(url(peer + us).GET <:< headers)
-      Await.result(request, 5.seconds)
-    }
+    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = _requestRaw(us, params, body, headers, peer, RequestType.GET)
+
+    override def requestObject[T](us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String)(implicit format: Format[T]): T = _requestObject(us, params, body, headers, peer, RequestType.GET)
   }
 
   case object POST extends RequestType {
-    def requestJson(us: String,
-        params: Map[String, String] = Map.empty,
-        body: String = "",
-        headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
-        peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).POST << params <:< headers << body)
-      val response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
-    }
+    override def requestJson(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): JsValue = _requestJson(us, params, body, headers, peer, RequestType.POST)
 
-    def request(us: String,
-                params: Map[String, String] = Map.empty,
-                body: String = "",
-                headers: Map[String, String] = Map("api_key" -> "test"),
-                peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).POST << params <:< headers << body)
-      val response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
-    }
+    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = _requestRaw(us, params, body, headers, peer, RequestType.POST)
 
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
-      val request = Http(url(peer + us).POST << params <:< headers << body)
-      Await.result(request, 5.seconds)
-    }
+    override def requestObject[T](us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String)(implicit format: Format[T]): T = _requestObject(us, params, body, headers, peer, RequestType.POST)
   }
 
   case object OPTIONS extends RequestType {
-    def requestJson(us: String,
-                    params: Map[String, String] = Map.empty,
-                    body: String = "",
-                    headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
-                    peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).OPTIONS << params <:< headers << body)
-      val response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
-    }
+    override def requestJson(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): JsValue = _requestJson(us, params, body, headers, peer, RequestType.OPTIONS)
 
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
-      val request = Http(url(peer + us).OPTIONS << params <:< headers << body)
-      Await.result(request, 5.seconds)
-    }
+    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = _requestRaw(us, params, body, headers, peer, RequestType.OPTIONS)
 
-    def request(us: String,
-                params: Map[String, String] = Map.empty,
-                body: String = "",
-                headers: Map[String, String] = Map("api_key" -> "test"),
-                peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).OPTIONS << params <:< headers << body)
-      val response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
-    }
+    override def requestObject[T](us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String)(implicit format: Format[T]): T = _requestObject(us, params, body, headers, peer, RequestType.OPTIONS)
   }
 
   case object DELETE extends RequestType {
-    def request(us: String,
-                params: Map[String, String] = Map.empty,
-                body: String = "",
-                headers: Map[String, String] = Map("api_key" -> "test"),
-                peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).DELETE << params <:< headers << body)
-      val response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
-    }
+    override def requestJson(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): JsValue = _requestJson(us, params, body, headers, peer, RequestType.DELETE)
 
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
-      val request = Http(url(peer + us).DELETE << params <:< headers << body)
-      Await.result(request, 5.seconds)
-    }
+    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = _requestRaw(us, params, body, headers, peer, RequestType.DELETE)
+
+    override def requestObject[T](us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String)(implicit format: Format[T]): T = _requestObject(us, params, body, headers, peer, RequestType.DELETE)
   }
 
 }

@@ -29,25 +29,25 @@ class ValidChainGenerationSpecification extends FunSuite with Matchers with Even
 
   private def getMaxWalletGeneratingBalanceWaves(app: Application): Long = {
     val url = peerUrl(app)
-    val addressesResponse = GET.request("/addresses", peer = url)
+    val addressesResponse = GET.requestJson("/addresses", peer = url)
     val addresses = addressesResponse.as[List[String]]
 
     addresses.map(address => {
-      val balanceResponse = GET.request(s"/consensus/generatingbalance/$address", peer = url)
+      val balanceResponse = GET.requestJson(s"/consensus/generatingbalance/$address", peer = url)
       (balanceResponse \ "balance").asOpt[JsNumber].get.value.toLongExact / Constants.UnitsInWave
     }).max
   }
 
   private def getHeight(app: Application): Int = {
     val url = peerUrl(app)
-    val response = GET.request("/blocks/height", peer = url)
+    val response = GET.requestJson("/blocks/height", peer = url)
 
     (response \ "height").asOpt[JsNumber].get.value.toIntExact
   }
 
   private def getBlockIdAtHeight(app: Application, height: Int): String = {
     val url = peerUrl(app)
-    val response = GET.request(s"/blocks/at/$height", peer = url)
+    val response = GET.requestJson(s"/blocks/at/$height", peer = url)
 
     (response \ "signature").asOpt[JsString].get.value
   }
