@@ -44,15 +44,22 @@ class StateReaderAdapter(r: StateReader) extends State {
       id.arr -> (amt, assetInfo.isReissuableOverride, assetInfo.totalVolumeOverride, findTransaction[IssueTransaction](id.arr).get)
     }
 
-  override def assetDistribution(assetId: Array[Byte]): Map[String, Long] = ???
+  override def assetDistribution(assetId: Array[Byte]): Map[String, Long] =
+    r.assetDistribution(EqByteArray(assetId))
+      .map { case (acc, amt) => (acc.address, amt) }
 
-  override def effectiveBalance(account: Account): Long = ???
+  override def effectiveBalance(account: Account): Long = r.accountPortfolio(account).effectiveBalance
 
-  override def getLeasedSum(address: AddressString): Long = ???
+  override def getLeasedSum(address: AddressString): Long = {
+    val portfolio = r.accountPortfolio(Account.fromBase58String(address).right.get)
+    portfolio.effectiveBalance - portfolio.balance
+  }
 
-  override def isReissuable(id: Array[Byte]): Boolean = ???
+  override def isReissuable(id: Array[Byte]): Boolean =
+    r.assetInfo(EqByteArray(id)).get.isReissuableOverride
 
-  override def totalAssetQuantity(assetId: AssetId): Long = ???
+  override def totalAssetQuantity(assetId: AssetId): Long =
+    r.assetInfo(EqByteArray(assetId)).get.totalVolumeOverride
 
   override def balanceWithConfirmations(account: Account, confirmations: Int): Long = ???
 

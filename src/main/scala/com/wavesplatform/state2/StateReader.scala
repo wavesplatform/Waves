@@ -2,9 +2,10 @@ package com.wavesplatform.state2
 
 import cats._
 import cats.implicits._
-
 import scorex.account.Account
 import scorex.transaction.{Transaction, TransactionParser}
+
+import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
 trait StateReader {
   def transactionInfo(id: ByteArray): Option[(Int, Transaction)]
@@ -16,6 +17,19 @@ trait StateReader {
   def height: Int
 
   def accountTransactionIds(a: Account): Seq[ByteArray]
+
+  def nonEmptyAccounts: Seq[Account]
+
+}
+
+object StateReader {
+
+  implicit class StateReaderExt(r: StateReader) {
+    def assetDistribution(assetId: ByteArray): Map[Account, Long] =
+      r.nonEmptyAccounts
+        .flatMap(acc => r.accountPortfolio(acc).assets.get(assetId).map(acc -> _))
+        .toMap
+    }
 
 }
 
@@ -36,6 +50,13 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
   override def height: Int = p.getHeight
 
   override def accountTransactionIds(a: Account): Seq[ByteArray] = Option(p.accountTransactionIds.get(a.bytes)).toSeq.map(EqByteArray)
+
+  override def nonEmptyAccounts: Seq[Account] =
+    p.portfolios
+      .keySet()
+      .asScala
+      .map(b => Account.fromBytes(b).right.get)
+      .toSeq
 }
 
 class CompositeStateReader(s: StateReader, d: Diff) extends StateReader {
@@ -53,5 +74,8 @@ class CompositeStateReader(s: StateReader, d: Diff) extends StateReader {
     val newAccTxIds: Seq[ByteArray] = d.transactions.get(EqByteArray(a.bytes)).map(_._2.id).toSeq.map(EqByteArray)
     s.accountTransactionIds(a) ++ newAccTxIds
   }
+
+  override def nonEmptyAccounts: Seq[Account] =
+    s.nonEmptyAccounts ++ d.portfolios.keySet
 }
 
