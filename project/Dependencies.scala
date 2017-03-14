@@ -2,7 +2,12 @@ import sbt._
 
 object Dependencies {
 
-  lazy val testKit = Seq(
+  lazy val scalatest = Seq(
+    "org.scalatest" %% "scalatest" % "3.0.1",
+    "org.scalactic" %% "scalactic" % "3.0.0"
+  )
+
+  lazy val testKit = (scalatest ++ Seq(
     akkaModule("testkit"),
     "org.scalatest" %% "scalatest" % "3.0.1",
     "org.scalactic" %% "scalactic" % "3.0.0",
@@ -12,7 +17,12 @@ object Dependencies {
     "net.databinder.dispatch" %% "dispatch-core" % "+",
     "org.scalamock" %% "scalamock-scalatest-support" % "3.5.+",
     "com.typesafe.akka" %% "akka-http-testkit" % "10.0.3"
-  ) map (_ % "it,test")
+  )) map (_ % "test")
+
+  lazy val itKit = (scalatest ++ Seq(
+    // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
+    "com.spotify" % "docker-client" % "8.1.2" classifier "shaded"
+  )) map (_ % "it,test")
 
   lazy val serialization = Seq(
     "com.google.guava" % "guava" % "18.+",

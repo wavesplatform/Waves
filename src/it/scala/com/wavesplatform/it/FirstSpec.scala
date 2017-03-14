@@ -1,16 +1,16 @@
 package com.wavesplatform.it
 
-import org.scalatest.{BeforeAndAfterAllConfigMap, ConfigMap, FreeSpec}
+import com.spotify.docker.client.DockerClient
+import com.spotify.docker.client.messages.ContainerConfig
+import org.scalatest._
 
-class FirstSpec extends FreeSpec with BeforeAndAfterAllConfigMap {
-
+class FirstSpec(docker: DockerClient) extends FreeSpec with BeforeAndAfterAllConfigMap {
   "zzz" - {
     "works" in {
+      val cfg = ContainerConfig.builder().image(System.getProperty("docker.imageId")).build()
+      val containerId = docker.createContainer(cfg).id()
 
+      docker.startContainer(containerId)
     }
-  }
-
-  override protected def beforeAll(configMap: ConfigMap): Unit = {
-    println(configMap.get("dockerImageId"))
   }
 }

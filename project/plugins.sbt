@@ -21,5 +21,4 @@ addSbtPlugin("se.marcuslonnberg" % "sbt-docker" % "1.4.1")
 
 libraryDependencies ++= Seq(
   "com.typesafe" % "config" % "1.3.0",
-  "com.spotify" % "docker-client" % "8.1.2",
   "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar"))

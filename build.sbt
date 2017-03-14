@@ -23,6 +23,7 @@ libraryDependencies ++=
   Dependencies.akka ++
   Dependencies.serialization ++
   Dependencies.testKit ++
+  Dependencies.itKit ++
   Dependencies.logging ++
   Dependencies.matcher ++
   Dependencies.p2p ++
@@ -60,6 +61,10 @@ dockerfile in docker := {
   }
 }
 
-testOptions in IntegrationTest += Tests.Argument(s"-DdockerImageId=${docker.value.id}")
-
-(test in IntegrationTest) <<= (test in IntegrationTest).dependsOn(docker)
+inConfig(IntegrationTest)(Seq(
+  fork := true,
+  javaOptions ++= Seq(
+    s"-Ddocker.imageId=${docker.value.id}"
+  ),
+  test <<= test.dependsOn(docker)
+))
