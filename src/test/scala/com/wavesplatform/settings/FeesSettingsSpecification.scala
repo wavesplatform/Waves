@@ -105,7 +105,7 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
   }
 
   it should "override values from default config" in {
-    val defaultConfig = ConfigFactory.defaultApplication()
+    val defaultConfig = ConfigFactory.load()
     val config = ConfigFactory.parseString(
       """
         |waves.fees {
