@@ -75,7 +75,6 @@ class StateReaderAdapter(r: StateReader) extends State {
 
   override def stateHeight: Int = ???
 
-
   override def toJson(heightOpt: Option[Int]): JsObject = ???
 
   override def processBlock(block: Block): Try[State] = ???

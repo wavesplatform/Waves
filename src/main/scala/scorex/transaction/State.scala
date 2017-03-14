@@ -53,7 +53,7 @@ trait State {
 
   def balanceWithConfirmations(account: Account, confirmations: Int): Long
 
-  def wavesDistributionAtHeight(height: Int): JsObject
+  def wavesDistributionAtHeight(height: Int): Seq[(AddressString, Long)]
 
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long
 

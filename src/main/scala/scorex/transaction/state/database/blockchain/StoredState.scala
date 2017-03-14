@@ -18,6 +18,7 @@ import scorex.utils.{NTP, ScorexLogging}
 
 import scala.annotation.tailrec
 import scala.collection.SortedMap
+import scala.collection.immutable.Seq
 import scala.reflect.ClassTag
 import scala.util.Try
 
@@ -463,7 +464,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
 
-  def wavesDistributionAtHeight(height: Int): JsObject = {
+  def wavesDistributionAtHeight(height: Int): Seq[(AddressString,Long)] = {
 
     def balanceAtHeight(key: String): Long = {
       storage.getLastStates(key) match {
@@ -487,9 +488,8 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       }
     }
 
-    val ls = storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add))
-      .filter(b => b._2 != 0).sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
-    JsObject(ls)
+Seq[(AddressString, Long)] = storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add))
+      .filter(b => b._2 != 0).sortBy(_._1)
   }
 
   def assetDistribution(assetId: Array[Byte]): Map[String, Long] = storage.assetDistribution(assetId)

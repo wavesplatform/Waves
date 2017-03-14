@@ -9,9 +9,21 @@ import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredSta
 
 class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
 
-  private def stringToOption(s: String) = Option(s).filter(_.trim.nonEmpty)
+  import BlockStorageImpl._
 
   private val database: MVStore = createMVStore(settings.file)
+
+  protected[this] override val db: MVStore = database
+
+  override val history: History = new StoredBlockchain(db)
+
+  override val state: State = StoredState.fromDB(db, settings.functionalitySettings)
+
+}
+
+object BlockStorageImpl {
+
+  private def stringToOption(s: String) = Option(s).filter(_.trim.nonEmpty)
 
   def createMVStore(fileName: String): MVStore = {
     stringToOption(fileName) match {
@@ -24,11 +36,4 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
         new MVStore.Builder().open()
     }
   }
-
-  protected[this] override val db: MVStore = database
-
-  override val history: History = new StoredBlockchain(db)
-
-  override val state: State = StoredState.fromDB(db, settings.functionalitySettings)
-
 }
