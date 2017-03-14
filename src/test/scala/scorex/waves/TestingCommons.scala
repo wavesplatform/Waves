@@ -80,7 +80,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |      }
       |      genesis {
       |        timestamp: 1478000000000
-      |        signature: "59WJ5L8rPCXpBeAeDF1s6jUraiSpSU2dFsnL1u2oVf44sqFGSZWrf7zwti9XA5rVKR7UGRWzHeaiTUnKyqwmQcoH"
+      |        signature: "2yc3LN9eRedaSzZuaAvxQ3JauH5xb38jzmrhK93NYGSMfyunz1FFbxBYcYrFxAsfaQ5cRaN99Qo4KiQ82o3xzb65"
       |        initial-balance: 10000000000000000
       |        initial-base-target = 153722867
       |        average-block-delay = 5s
@@ -189,7 +189,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |      }
       |      genesis {
       |        timestamp: 1478000000000
-      |        signature: "59WJ5L8rPCXpBeAeDF1s6jUraiSpSU2dFsnL1u2oVf44sqFGSZWrf7zwti9XA5rVKR7UGRWzHeaiTUnKyqwmQcoH"
+      |        signature: "2yc3LN9eRedaSzZuaAvxQ3JauH5xb38jzmrhK93NYGSMfyunz1FFbxBYcYrFxAsfaQ5cRaN99Qo4KiQ82o3xzb65"
       |        initial-balance: 10000000000000000
       |        initial-base-target =153722867
       |        average-block-delay = 5s
@@ -273,7 +273,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |      }
       |      genesis {
       |        timestamp: 1478000000000
-      |        signature: "59WJ5L8rPCXpBeAeDF1s6jUraiSpSU2dFsnL1u2oVf44sqFGSZWrf7zwti9XA5rVKR7UGRWzHeaiTUnKyqwmQcoH"
+      |        signature: "2yc3LN9eRedaSzZuaAvxQ3JauH5xb38jzmrhK93NYGSMfyunz1FFbxBYcYrFxAsfaQ5cRaN99Qo4KiQ82o3xzb65"
       |        initial-balance: 10000000000000000
       |        initial-base-target =153722867
       |        average-block-delay = 5s

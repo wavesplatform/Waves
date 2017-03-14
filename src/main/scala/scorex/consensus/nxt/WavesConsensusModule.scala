@@ -271,6 +271,6 @@ object WavesConsensusModule {
   val MinimalEffectiveBalanceForGenerator: Long = 1000000000000L
   val AvgBlockTimeDepth: Int = 3
   val MaxTimeDrift: FiniteDuration = 15.seconds
-  val EmptySignature: Array[Byte] = Array.fill(EllipticCurveImpl.SignatureLength)(0: Byte)
+  val EmptySignature: Array[Byte] = Array.fill(DigestSize)(0: Byte)
   val Version: Byte = 2
 }
