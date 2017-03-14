@@ -25,12 +25,19 @@ package object state2 {
   }
 
   implicit val diffMonoid = new Monoid[Diff] {
-    override def empty: Diff = Diff(Map.empty, Map.empty, Map.empty, 0)
+    override def empty: Diff = Diff(Map.empty, Map.empty, Map.empty)
 
     override def combine(older: Diff, newer: Diff): Diff = Diff(
       transactions = older.transactions ++ newer.transactions,
       portfolios = older.portfolios.combine(newer.portfolios),
-      issuedAssets = newer.issuedAssets ++ older.issuedAssets,
-      height = newer.height + older.height)
+      issuedAssets = newer.issuedAssets ++ older.issuedAssets)
+  }
+
+  implicit val blockDiffMonoid = new Monoid[BlockDiff] {
+    override def empty: BlockDiff = BlockDiff(diffMonoid.empty, 0)
+
+    override def combine(older: BlockDiff, newer: BlockDiff): BlockDiff = BlockDiff(
+      txsDiff = older.txsDiff.combine(newer.txsDiff),
+      heightDiff = older.heightDiff + newer.heightDiff)
   }
 }

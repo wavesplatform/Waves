@@ -5,18 +5,18 @@ import cats.implicits._
 import cats.Monoid
 
 trait StateWriter {
-  def applyDiff(d: Diff): Unit
+  def applyBlockDiff(blockDiff: BlockDiff): Unit
 }
 
-class StateWriterImpl(p: JavaMapStorage) extends StateWriter {
-  this: StateReader =>
+class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWriter {
 
-  override def applyDiff(d: Diff): Unit = {
-    d.transactions.foreach { case (id, (h, tx)) =>
+  override def applyBlockDiff(blockDiff: BlockDiff): Unit = {
+    val txsDiff = blockDiff.txsDiff
+    txsDiff.transactions.foreach { case (id, (h, tx)) =>
       p.transactions.put(id.arr, (h, tx.bytes))
     }
 
-    d.portfolios.foreach { case (account, portfolioDiff) =>
+    txsDiff.portfolios.foreach { case (account, portfolioDiff) =>
       val updatedPortfolio = accountPortfolio(account).combine(portfolioDiff)
       p.portfolios.put(account.bytes,
         (updatedPortfolio.balance,
@@ -24,11 +24,11 @@ class StateWriterImpl(p: JavaMapStorage) extends StateWriter {
           updatedPortfolio.assets.map { case (k, v) => k.arr -> v }))
     }
 
-    d.issuedAssets.foreach { case (id, assetInfo) =>
+    txsDiff.issuedAssets.foreach { case (id, assetInfo) =>
       p.assets.put(id.arr, (assetInfo.isReissuableOverride, assetInfo.totalVolumeOverride))
     }
 
-    p.setHeight(p.getHeight + d.height)
+    p.setHeight(p.getHeight + blockDiff.heightDiff)
   }
 }
 

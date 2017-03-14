@@ -29,7 +29,7 @@ object StateReader {
       r.nonEmptyAccounts
         .flatMap(acc => r.accountPortfolio(acc).assets.get(assetId).map(acc -> _))
         .toMap
-    }
+  }
 
 }
 
@@ -59,23 +59,25 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
       .toSeq
 }
 
-class CompositeStateReader(s: StateReader, d: Diff) extends StateReader {
+class CompositeStateReader(s: StateReader, blockDiff: BlockDiff) extends StateReader {
+  val txDiff = blockDiff.txsDiff
+
   override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
-    d.transactions.get(id).orElse(s.transactionInfo(id))
+    txDiff.transactions.get(id).orElse(s.transactionInfo(id))
 
   override def accountPortfolio(a: Account): Portfolio =
-    s.accountPortfolio(a).combine(d.portfolios.get(a).orEmpty)
+    s.accountPortfolio(a).combine(txDiff.portfolios.get(a).orEmpty)
 
-  override def assetInfo(id: ByteArray): Option[AssetInfo] = d.issuedAssets.get(id).orElse(s.assetInfo(id))
+  override def assetInfo(id: ByteArray): Option[AssetInfo] = txDiff.issuedAssets.get(id).orElse(s.assetInfo(id))
 
-  override def height: Int = s.height + d.height
+  override def height: Int = s.height + blockDiff.heightDiff
 
   override def accountTransactionIds(a: Account): Seq[ByteArray] = {
-    val newAccTxIds: Seq[ByteArray] = d.transactions.get(EqByteArray(a.bytes)).map(_._2.id).toSeq.map(EqByteArray)
+    val newAccTxIds: Seq[ByteArray] = txDiff.transactions.get(EqByteArray(a.bytes)).map(_._2.id).toSeq.map(EqByteArray)
     s.accountTransactionIds(a) ++ newAccTxIds
   }
 
   override def nonEmptyAccounts: Seq[Account] =
-    s.nonEmptyAccounts ++ d.portfolios.keySet
+    s.nonEmptyAccounts ++ txDiff.portfolios.keySet
 }
 

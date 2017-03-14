@@ -96,7 +96,7 @@ object StateResponseComparisonTests {
     new StoredState(storage, FunctionalitySettings.MAINNET)
   }
 
-  def newState(mVStore: MVStore): State = new StateReaderAdapter(new StateReaderImpl(new MVStorePrimitiveImpl(mVStore)))
+  def newState(mVStore: MVStore): State = new StateWriterAdapter(new StateWriterImpl(new MVStorePrimitiveImpl(mVStore)))
 
   def storedBC(theState: State, theHistory: History): BlockStorage = {
     val settings = BlockchainSettings("", 'W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET)
