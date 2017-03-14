@@ -68,9 +68,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         changes.reason.foreach(id => {
           storage.getTransaction(id) match {
             case Some(t: AssetIssuance) =>
-              assetsExtension.rollbackTo(t.assetId, currentHeight)
+              assetsExtension.rollback(t, currentHeight)
             case Some(t: BurnTransaction) =>
-              assetsExtension.rollbackTo(t.assetId, currentHeight)
+              assetsExtension.rollback(t, currentHeight)
             case Some(t: LeaseTransaction) =>
               leaseExtendedState.cancelLease(t)
             case Some(t: LeaseCancelTransaction) =>
@@ -174,7 +174,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     type IssueId = String
     type IsReissuable = Boolean
 
-    txs.foldLeft((Map.empty[IssueId, IsReissuable], Seq.empty[Transaction])) {
+    val res = txs.foldLeft((Map.empty[IssueId, IsReissuable], Seq.empty[Transaction])) {
       case ((map, seq), tx) =>
         tx match {
           case issue: IssueTransaction =>
@@ -198,7 +198,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
           case tx =>
             (map, seq :+ tx)
         }
-    }._2
+    }
+    res._2
   }
 
 
@@ -208,7 +209,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   override final def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): Seq[Transaction] = {
     val height = heightOpt.getOrElse(storage.stateHeight)
 
-    val txs = trans.filter(t => validateAgainstState(t, height).isRight)
+    val validatedAgainsState = trans.map(t => validateAgainstState(t, height))
+    val txs = validatedAgainsState.filter(_.isRight).map(_.right.get)
 
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty &&
       txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
@@ -336,15 +338,18 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
                                        blockTs: Long = NTP.correctedTime()): Unit = synchronized {
     storage.setStateHeight(storage.stateHeight + 1)
     val h = storage.stateHeight
+
+    // todo pass txs sequence for processing
+    changes.flatMap(_._2._2).toSet.foreach((i:StateChangeReason) => i match {
+      case tx: Transaction =>
+        validators.foreach(_.process(this, tx, blockTs, h))
+      case _ =>
+    })
+
     changes.foreach { ch =>
       val change = Row(ch._2._1, ch._2._2.map(_.id), storage.getLastStates(ch._1.key).getOrElse(0))
       storage.putAccountChanges(ch._1.key, h, change)
       storage.putLastStates(ch._1.key, h)
-      ch._2._2.foreach {
-        case tx: Transaction =>
-          validators.foreach(_.process(this, tx, blockTs, h))
-        case _ =>
-      }
       storage.updateAccountAssets(ch._1.account.address, ch._1.assetId)
     }
   }
