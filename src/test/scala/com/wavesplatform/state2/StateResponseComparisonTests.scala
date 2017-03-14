@@ -2,12 +2,12 @@ package com.wavesplatform.state2
 
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings}
 import org.h2.mvstore.MVStore
-import org.scalatest.{FreeSpec, FunSuite, Matchers}
+import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.Account
-import scorex.transaction.{BlockStorage, State, Transaction}
 import scorex.transaction.state.database.BlockStorageImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 import scorex.transaction.state.database.state.storage._
+import scorex.transaction.{BlockStorage, History, State, Transaction}
 
 import scala.util.Try
 
@@ -15,63 +15,63 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
 
   import StateResponseComparisonTests._
 
-  "provide the same answers to questions after each block from mainnet applied" in {
-    val old = storedBC(oldState)
-    val nev = storedBC(newState)
-    val currentMainnet = storedBC(_ => {
-      val mainnetStorage = BlockStorageImpl.createMVStore("C:\\Users\\ilyas\\.babun\\cygwin\\home\\ilyas\\waves\\data")
-      oldState(mainnetStorage)
-    })
+  val BlocksOnDisk = "C:\\Users\\ilyas\\.babun\\cygwin\\home\\ilyas\\waves\\data\\blockchain.dat"
 
-    Range(0, currentMainnet.history.height()).foreach { blockNumber =>
-      Try {
-        val block = currentMainnet.history.blockAt(blockNumber).get
-        old.appendBlock(block).get
-        nev.appendBlock(block).get
-        assertStates(old, nev.state)
 
-        // should I do this with more ids, like with final state too, to assert negatives too?
-        "[findTransaction]" - {
-          assert(block.transactionData.forall(tx => nev.state.findTransaction[Transaction](tx.id).contains(tx)))
-        }
-        "[included]" - {
-          assert(block.transactionData.forall(tx => nev.state.included(tx.id).contains(nev.state.stateHeight)))
-        }
+  "provide the same answers to questions after each block from mainnet applied" ignore {
+    val oldStore = BlockStorageImpl.createMVStore("")
+    val old = storedBC(oldState(oldStore), new StoredBlockchain(oldStore))
 
-        val aliveAccounts = old.state.wavesDistributionAtHeight(old.state.stateHeight)
-          .map(_._1)
-          .map(Account.fromBase58String(_).right.get)
+    val newStore = BlockStorageImpl.createMVStore("")
+    val nev = storedBC(newState(newStore), new StoredBlockchain(newStore))
 
-        "[accountTransactions]" - {
-          for (acc <- aliveAccounts) {
-            val oldtxs = old.state.accountTransactions(acc, Int.MaxValue)
-            val newtxs = nev.state.accountTransactions(acc, Int.MaxValue)
-            assert(oldtxs.size == newtxs.size)
-            assert(oldtxs.indices.forall(i => oldtxs(i) == newtxs(i)))
-            true
-          }
-        }
-        "[lastAccountPaymentTransaction]" - {
-          for (acc <- aliveAccounts) {
-            assert(old.state.lastAccountPaymentTransaction(acc) == nev.state.lastAccountPaymentTransaction(acc))
-          }
-        }
-        "[balance]" - {
-          for (acc <- aliveAccounts) {
-            assert(old.state.balance(acc) == nev.state.balance(acc))
-          }
-        }
+    val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
+    val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
 
-        ()
-      }.recoverWith {
-        case e: Throwable => Try {
-          println(s"Error applying block #$blockNumber")
-          e.printStackTrace()
-          throw e
+
+    // weird, blocks at 0 and 1 do not exist
+    Range(2, currentMainnet.history.height() + 1).foreach { blockNumber =>
+      val block = currentMainnet.history.blockAt(blockNumber).get
+      old.appendBlock(block).get
+      nev.appendBlock(block).get
+
+      // should I do this with more ids, like with final state too, to assert negatives too?
+      "[findTransaction]" - {
+        assert(block.transactionData.forall(tx => nev.state.findTransaction[Transaction](tx.id).contains(tx)))
+      }
+      "[included]" - {
+        assert(block.transactionData.forall(tx => nev.state.included(tx.id).contains(nev.state.stateHeight)))
+      }
+
+      val aliveAccounts = old.state.wavesDistributionAtHeight(old.state.stateHeight)
+        .map(_._1)
+        .map(Account.fromBase58String(_).right.get)
+
+      "[accountTransactions]" - {
+        for (acc <- aliveAccounts) {
+          val oldtxs = old.state.accountTransactions(acc, Int.MaxValue)
+          val newtxs = nev.state.accountTransactions(acc, Int.MaxValue)
+          assert(oldtxs.size == newtxs.size)
+          assert(oldtxs.indices.forall(i => oldtxs(i) == newtxs(i)))
+          true
         }
       }
+      "[lastAccountPaymentTransaction]" - {
+        for (acc <- aliveAccounts) {
+          assert(old.state.lastAccountPaymentTransaction(acc) == nev.state.lastAccountPaymentTransaction(acc))
+        }
+      }
+      "[balance]" - {
+        for (acc <- aliveAccounts) {
+          assert(old.state.balance(acc) == nev.state.balance(acc))
+        }
+      }
+
+      ()
+
     }
   }
+
 
   "provide the same answers to questions after rollbacks" in {
 
@@ -98,14 +98,12 @@ object StateResponseComparisonTests {
 
   def newState(mVStore: MVStore): State = new StateReaderAdapter(new StateReaderImpl(new MVStorePrimitiveImpl(mVStore)))
 
-  def storedBC(stateProvider: MVStore => State): BlockStorage = {
+  def storedBC(theState: State, theHistory: History): BlockStorage = {
     val settings = BlockchainSettings("", 'W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET)
     new BlockStorageImpl(settings) {
-      override val state: State = stateProvider(db)
+      override val history: History = theHistory
+      override val state: State = theState
     }
   }
 
-  def assertStates(old: BlockStorage, nev: State): Unit = {
-
-  }
 }

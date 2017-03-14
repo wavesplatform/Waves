@@ -352,7 +352,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
   private def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)
 
-  def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
+  def calcNewBalances(trans: scala.collection.Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
     val newBalances: Map[AssetAcc, (AccState, Reasons)] = trans.foldLeft(fees) { case (changes, tx) =>
       val bcs = BalanceChangeCalculator.balanceChanges(this)(tx).right.get
       val newStateAfterBalanceUpdates = bcs.foldLeft(changes) { case (iChanges, bc) =>
@@ -487,8 +487,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
           0L
       }
     }
-
-Seq[(AddressString, Long)] = storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add))
+     storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add))
       .filter(b => b._2 != 0).sortBy(_._1)
   }
 

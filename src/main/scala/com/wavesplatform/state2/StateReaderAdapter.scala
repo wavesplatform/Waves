@@ -63,7 +63,7 @@ class StateReaderAdapter(r: StateReader) extends State {
 
   override def balanceWithConfirmations(account: Account, confirmations: Int): Long = ???
 
-  override def wavesDistributionAtHeight(height: Int): JsObject = ???
+  override def wavesDistributionAtHeight(height: Int): Seq[(AddressString, Long)] = ???
 
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long = ???
 
@@ -90,4 +90,5 @@ class StateReaderAdapter(r: StateReader) extends State {
   override def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit = ???
 
   override def assetRollbackTo(assetId: AssetId, height: Int): Unit = ???
+
 }

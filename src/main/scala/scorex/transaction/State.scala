@@ -83,7 +83,7 @@ trait State {
   def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)], blockTs: Long = NTP.correctedTime()): Unit
 
   // StoredStateUnitTests: 36
-  def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)],
+  def calcNewBalances(trans: scala.collection.Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)],
                       allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)]
 
   // AssetExtendedStateSpecification: 31
