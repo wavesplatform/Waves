@@ -51,17 +51,17 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     val assetAtHeight = s"$asset@$height"
     val assetAtTransaction = s"$asset@$transaction"
 
-    if (!isIssueExists(assetId) ||
+    if (!(
+      !isIssueExists(assetId) ||
       (reissuable && isReissuable(assetId)) ||
-      !reissuable) {
-      storage.setReissuable(assetAtTransaction, reissuable)
-    } else {
+      !reissuable)) {
       throw new RuntimeException("Asset is not reissuable")
     }
+
+    storage.setReissuable(asset, reissuable)
     storage.addHeight(asset, height)
     storage.addTransaction(assetAtHeight, transaction)
     storage.setQuantity(assetAtTransaction, quantity)
-    storage.setReissuable(assetAtTransaction, reissuable)
   }
 
   private[blockchain] def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit = {
@@ -77,7 +77,16 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     storage.setQuantity(assetAtTransaction, quantity)
   }
 
-  def rollbackTo(assetId: AssetId, height: Int): Unit = {
+  def rollback(burn: BurnTransaction, height: Int): Unit = {
+    rollback(burn.assetId, height, Some(true))
+  }
+
+  def rollback(issuance: AssetIssuance, height: Int): Unit = {
+    val asset = Base58.encode(issuance.assetId)
+    rollback(issuance.assetId, height, Some(true))
+  }
+
+  private[blockchain] def rollback(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean] = None): Unit = {
     val asset = Base58.encode(assetId)
 
     val heights = storage.getHeights(asset)
@@ -85,13 +94,15 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     storage.setHeight(asset, heights -- heightsToRemove)
 
     val transactionsToRemove: Seq[String] = heightsToRemove.foldLeft(Seq.empty[String]) { (result, h) =>
-      result ++ storage.getTransactions(s"$asset@$h")
+      result ++ storage.getIssuanceTransactionsIds(s"$asset@$h")
     }
+
+    newReissuable.foreach(newValue => storage.setReissuable(asset, newValue))
 
     val keysToRemove = transactionsToRemove.map(t => s"$asset@$t")
 
     keysToRemove.foreach { key =>
-      storage.removeKey(key)
+      storage.removeQuantities(key)
     }
   }
 
@@ -101,7 +112,7 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
 
     val sortedHeights = heights.toSeq.sorted
     val transactions: Seq[String] = sortedHeights.foldLeft(Seq.empty[String]) { (result, h) =>
-      result ++ storage.getTransactions(s"$asset@$h")
+      result ++ storage.getIssuanceTransactionsIds(s"$asset@$h")
     }
 
     transactions.foldLeft(0L) { (result, transaction) =>
@@ -115,12 +126,15 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
 
     heights.lastOption match {
       case Some(lastHeight) =>
-        val transactions = storage.getTransactions(s"$asset@$lastHeight")
+        val transactions = storage.getIssuanceTransactionsIds(s"$asset@$lastHeight")
         if (transactions.nonEmpty) {
           val transaction = transactions.last
-          storage.isReissuable(s"$asset@$transaction")
-        } else false
-      case None => false
+          storage.isReissuable(asset)
+        } else {
+          false
+        }
+      case None =>
+        false
     }
   }
 

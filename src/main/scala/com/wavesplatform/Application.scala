@@ -87,7 +87,17 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
   actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings.utxSettings, networkController))
 
   override def run(): Unit = {
+//    rollbackOnStart(1000)
+
     super.run()
+
+    def rollbackOnStart(on: Int): Unit = {
+      val height = blockStorage.history.height()
+      if (height > on + 1) {
+        val b = blockStorage.history.blockAt(height - on)
+        blockStorage.removeAfter(b.get.uniqueId)
+      }
+    }
 
     if (matcherSettings.enable) runMatcher()
   }
