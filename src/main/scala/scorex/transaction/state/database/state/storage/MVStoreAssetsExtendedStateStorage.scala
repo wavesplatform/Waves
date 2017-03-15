@@ -3,7 +3,7 @@ package scorex.transaction.state.database.state.storage
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.utils.LogMVMapBuilder
 
-trait MVStoreAssetsExtendedStateStorage extends AssetsExtendedStateStorageI{
+trait MVStoreAssetsExtendedStateStorage extends AssetsExtendedStateStorageI {
   val db: MVStore
 
   // ============= transactions
@@ -23,7 +23,11 @@ trait MVStoreAssetsExtendedStateStorage extends AssetsExtendedStateStorageI{
   private lazy val heightsTable: MVMap[String, Set[Int]] = db.openMap(HeightsTableName,
     new LogMVMapBuilder[String, Set[Int]])
 
-  def setHeight(asset: String, heights: Set[Int]): Unit = heightsTable.put(asset, heights)
+  def setHeight(asset: String, heights: Set[Int]): Unit = if (heights.isEmpty) {
+    heightsTable.remove(asset)
+  } else {
+    heightsTable.put(asset, heights)
+  }
 
   def getHeights(asset: String): Set[Int] = Option(heightsTable.get(asset)).getOrElse(Set.empty[Int])
 
