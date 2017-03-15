@@ -223,11 +223,11 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def isValid(block: Block): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     val transactions = block.transactionDataField.asInstanceOf[TransactionsBlockField].value
-     val txsAreNew = transactions.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
-     val validTransactions = blockStorage.state.validate(transactions, blockStorage.history.heightOf(block),
+    lazy val txsAreNew = transactions.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
+    lazy val validTransactions = blockStorage.state.validate(transactions, blockStorage.history.heightOf(block),
       block.timestampField.value)
-     val txsAreValid = validTransactions.size == transactions.size
-     val txsIdAreUniqueInBlock = transactions.map(tx => Base58.encode(tx.id)).toSet.size == transactions.size
+    lazy val txsAreValid = validTransactions.size == transactions.size
+    lazy val txsIdAreUniqueInBlock = transactions.map(tx => Base58.encode(tx.id)).toSet.size == transactions.size
     if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
     if (!txsIdAreUniqueInBlock) log.debug(s"Invalid txs in block ${block.encodedId}: there are not unique txs")
     if (!txsAreValid) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs" +

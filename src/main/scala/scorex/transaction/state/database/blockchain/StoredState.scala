@@ -174,7 +174,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     type IssueId = String
     type IsReissuable = Boolean
 
-    val res = txs.foldLeft((Map.empty[IssueId, IsReissuable], Seq.empty[Transaction])) {
+    txs.foldLeft((Map.empty[IssueId, IsReissuable], Seq.empty[Transaction])) {
       case ((map, seq), tx) =>
         tx match {
           case issue: IssueTransaction =>
@@ -198,8 +198,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
           case tx =>
             (map, seq :+ tx)
         }
-    }
-    res._2
+    }._2
   }
 
 

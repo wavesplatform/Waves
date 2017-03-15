@@ -248,14 +248,14 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   def isBlockValid(b: Block) : Boolean = {
     if (application.transactionModule.blockStorage.history.contains(b)) true //applied blocks are valid
     else {
-      val history = application.transactionModule.blockStorage.history.contains(b.referenceField.value)
+      def history = application.transactionModule.blockStorage.history.contains(b.referenceField.value)
 
-      val signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
+      def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
         b.signerDataField.value.generator.publicKey)
 
-      val consensus = application.consensusModule.isValid(b)
+      def consensus = application.consensusModule.isValid(b)
 
-      val transaction = application.transactionModule.isValid(b)
+      def transaction = application.transactionModule.isValid(b)
 
       if (!history) log.debug(s"Invalid block ${b.encodedId}: no parent block in history")
       else if (!signature) log.debug(s"Invalid block ${b.encodedId}: signature is not valid")
