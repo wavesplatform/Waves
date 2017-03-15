@@ -34,23 +34,26 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     case _ =>
   }
 
+  def isIssueExists(assetId: AssetId): Boolean = {
+    storage.getHeights(Base58.encode(assetId)).nonEmpty
+  }
+
   def addAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long, reissuable: Boolean): Unit = {
     val asset = Base58.encode(assetId)
     val transaction = Base58.encode(transactionId)
     val assetAtHeight = s"$asset@$height"
     val assetAtTransaction = s"$asset@$transaction"
 
-    if (storage.getHeights(Base58.encode(assetId)).isEmpty ||
+    if (!(!isIssueExists(assetId) ||
       (reissuable && isReissuable(assetId)) ||
-      !reissuable) {
-      storage.setReissuable(assetAtTransaction, reissuable)
-    } else {
+      !reissuable)) {
       throw new RuntimeException("Asset is not reissuable")
     }
+
+    storage.setReissuable(asset, reissuable)
     storage.addHeight(asset, height)
     storage.addTransaction(assetAtHeight, transaction)
     storage.setQuantity(assetAtTransaction, quantity)
-    storage.setReissuable(assetAtTransaction, reissuable)
   }
 
   def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit = {
@@ -66,7 +69,16 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     storage.setQuantity(assetAtTransaction, quantity)
   }
 
-  def assetRollbackTo(assetId: AssetId, height: Int): Unit = {
+  def assetRollbackTo(burn: BurnTransaction, height: Int): Unit = {
+    assetRollbackTo(burn.assetId, height, Some(true))
+  }
+
+  def assetRollbackTo(issuance: AssetIssuance, height: Int): Unit = {
+    val asset = Base58.encode(issuance.assetId)
+    assetRollbackTo(issuance.assetId, height, Some(true))
+  }
+
+  def assetRollbackTo(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean]): Unit = {
     val asset = Base58.encode(assetId)
 
     val heights = storage.getHeights(asset)
@@ -74,12 +86,12 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     storage.setHeight(asset, heights -- heightsToRemove)
 
     val transactionsToRemove: Seq[String] = heightsToRemove.foldLeft(Seq.empty[String]) { (result, h) =>
-      result ++ storage.getTransactions(s"$asset@$h")
+      result ++ storage.getIssuanceTransactionsIds(s"$asset@$h")
     }
 
     val keysToRemove = transactionsToRemove.map(t => s"$asset@$t")
 
-    keysToRemove.foreach(storage.removeKey)
+    keysToRemove.foreach(storage.removeQuantities)
   }
 
   def isReissuable(assetId: AssetId): Boolean = {
@@ -88,7 +100,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
     heights.lastOption match {
       case Some(lastHeight) =>
-        val transactions = storage.getTransactions(s"$asset@$lastHeight")
+        val transactions = storage.getIssuanceTransactionsIds(s"$asset@$lastHeight")
         if (transactions.nonEmpty) {
           val transaction = transactions.last
           storage.isReissuable(s"$asset@$transaction")
@@ -240,9 +252,9 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
         changes.reason.foreach(id => {
           storage.getTransaction(id) match {
             case Some(t: AssetIssuance) =>
-              assetRollbackTo(t.assetId, currentHeight)
+              assetRollbackTo(t, rollbackTo)
             case Some(t: BurnTransaction) =>
-              assetRollbackTo(t.assetId, currentHeight)
+              assetRollbackTo(t, rollbackTo)
             case Some(t: LeaseTransaction) =>
               cancelLease(t)
             case Some(t: LeaseCancelTransaction) =>
@@ -393,7 +405,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
     val sortedHeights = heights.toSeq.sorted
     val transactions: Seq[String] = sortedHeights.foldLeft(Seq.empty[String]) { (result, h) =>
-      result ++ storage.getTransactions(s"$asset@$h")
+      result ++ storage.getIssuanceTransactionsIds(s"$asset@$h")
     }
 
     transactions.foldLeft(0L) { (result, transaction) =>
