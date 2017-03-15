@@ -269,7 +269,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
   def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactionData
-    val fees: Map[AssetAcc, (AccState, Reasons)] = Block.feesDistribution(block)
+    val fees: Map[AssetAcc, (AccState, Reasons)] = block.feesDistribution
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2, effectiveBalance(m._1.account) + m._2), List(FeesStateChange(m._2))))
 
     val newBalances: Map[AssetAcc, (AccState, Reasons)] =

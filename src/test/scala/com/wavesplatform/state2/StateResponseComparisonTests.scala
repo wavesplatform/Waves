@@ -18,7 +18,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
   val BlocksOnDisk = "C:\\Users\\ilyas\\.babun\\cygwin\\home\\ilyas\\waves\\data\\blockchain.dat"
 
 
-  "provide the same answers to questions after each block from mainnet applied" ignore {
+  "provide the same answers to questions after each block from mainnet applied" in {
     val oldStore = BlockStorageImpl.createMVStore("")
     val old = storedBC(oldState(oldStore), new StoredBlockchain(oldStore))
 

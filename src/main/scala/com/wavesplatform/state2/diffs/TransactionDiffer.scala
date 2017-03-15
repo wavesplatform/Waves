@@ -4,7 +4,7 @@ import cats._
 import cats.implicits._
 import cats.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{BlockDiff, Diff, EqByteArray, StateReader}
+import com.wavesplatform.state2.{BlockDiff, CompositeStateReader, Diff, EqByteArray, StateReader}
 import scorex.account.{Account, Alias}
 import scorex.block.Block
 import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
@@ -17,18 +17,11 @@ import scorex.utils.ByteArray
 import scala.util.{Left, Right}
 
 object TransactionDiffer {
-  def apply(s: StateReader)(tx: Transaction): Either[ValidationError, Diff] = {
+  def apply(settings: FunctionalitySettings, time: Long)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
     ???
   }
 }
 
-object BlockDiffer {
-
-  def apply(s: StateReader)(b: Block): Either[ValidationError, BlockDiff] = {
-    // fold txs via TransactionDiffer
-    ???
-  }
-}
 
 object BasicDiff {
 
@@ -115,3 +108,4 @@ object BasicDiff {
       .flatMap(addressAliasExists)
   }
 }
+

@@ -64,6 +64,11 @@ case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signe
   lazy val blockScore: BigInt = (BigInt("18446744073709551616") / consensusData.baseTarget)
     .ensuring(_ > 0) // until we make smart-constructor validate consensusData.baseTarget to be positive
 
+  lazy val feesDistribution: Map[AssetAcc, Long] = {
+    val generator = signerData.generator
+    val assetFees = transactionData.map(_.assetFee)
+    assetFees.map(a => AssetAcc(generator, a._1) -> a._2).groupBy(a => a._1).mapValues(_.map(_._2).sum)
+  }
 
   override def equals(obj: scala.Any): Boolean = {
     import shapeless.syntax.typeable._
@@ -77,12 +82,6 @@ object Block extends ScorexLogging {
   type BlockIds = Seq[BlockId]
 
   val BlockIdLength = SignatureLength
-
-  def feesDistribution(block: Block): Map[AssetAcc, Long] = {
-    val generator = block.signerDataField.value.generator
-    val assetFees = block.transactionDataField.asInstanceOf[TransactionsBlockField].value.map(_.assetFee)
-    assetFees.map(a => AssetAcc(generator, a._1) -> a._2).groupBy(a => a._1).mapValues(_.map(_._2).sum)
-  }
 
   val TransactionSizeLength = 4
 

@@ -79,7 +79,7 @@ class StateWriterAdapter(r: StateWriter with StateReader) extends State {
   override def toJson(heightOpt: Option[Int]): JsObject = ???
 
   override def processBlock(block: Block): Try[State] = Try {
-    BlockDiffer(r)(block) match {
+    BlockDiffer(???, ???, ???)(block) match {
       case Left(m) => ???
       case Right(blockDiff) => {
         r.applyBlockDiff(blockDiff)

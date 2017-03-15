@@ -7,6 +7,11 @@ import scorex.transaction.Transaction
 
 case class BlockDiff(txsDiff: Diff, heightDiff: Int)
 
+object BlockDiff {
+  def apply(txsDiff: Diff): BlockDiff = BlockDiff(txsDiff, 0)
+}
+
+
 case class Diff(transactions: Map[ByteArray, (Int, Transaction)],
                 portfolios: Map[Account, Portfolio],
                 issuedAssets: Map[ByteArray, AssetInfo])
