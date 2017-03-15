@@ -49,7 +49,13 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 
   override def height: Int = p.getHeight
 
-  override def accountTransactionIds(a: Account): Seq[ByteArray] = Option(p.accountTransactionIds.get(a.bytes)).toSeq.map(EqByteArray)
+  override def accountTransactionIds(a: Account): Seq[ByteArray] = {
+    Option(p.accountTransactionIds.get(a.bytes))
+      .map(_.asScala)
+      .map(_.toSeq)
+      .getOrElse(Seq.empty)
+      .map(EqByteArray)
+  }
 
   override def nonEmptyAccounts: Seq[Account] =
     p.portfolios
@@ -60,7 +66,7 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 }
 
 class CompositeStateReader(s: StateReader, blockDiff: BlockDiff) extends StateReader {
-  val txDiff = blockDiff.txsDiff
+  private val txDiff = blockDiff.txsDiff
 
   override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
     txDiff.transactions.get(id).orElse(s.transactionInfo(id))
@@ -73,8 +79,9 @@ class CompositeStateReader(s: StateReader, blockDiff: BlockDiff) extends StateRe
   override def height: Int = s.height + blockDiff.heightDiff
 
   override def accountTransactionIds(a: Account): Seq[ByteArray] = {
-    val newAccTxIds: Seq[ByteArray] = txDiff.transactions.get(EqByteArray(a.bytes)).map(_._2.id).toSeq.map(EqByteArray)
-    s.accountTransactionIds(a) ++ newAccTxIds
+    //    val newAccTxIds: Seq[ByteArray] = txDiff.transactions.get(EqByteArray(a.bytes)).map(_._2.id).toSeq.map(EqByteArray)
+    //    s.accountTransactionIds(a) ++ newAccTxIds
+    ???
   }
 
   override def nonEmptyAccounts: Seq[Account] =

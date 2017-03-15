@@ -7,6 +7,7 @@ import scorex.account.{Account, AddressScheme}
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.transaction._
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.state.database.BlockStorageImpl
 import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
 import scorex.transaction.state.database.state.storage._
@@ -33,43 +34,47 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
 
 
-    // weird, blocks at 0 and 1 do not exist
+    // 0 doesn't exist, 1 is genesis
     val end = currentMainnet.history.height() + 1
-    Range(2, 30).foreach { blockNumber =>
-      val block = currentMainnet.history.blockAt(blockNumber).get
-      old.appendBlock(block).get
-      s"[$blockNumber] Block appended successfully" in {
-        nev.appendBlock(block).get
-      }
-      // should I do this with more ids, like with final state too, to assert negatives too?
-      s"[$blockNumber] findTransaction" in {
-        assert(block.transactionData.forall(tx => nev.state.findTransaction[Transaction](tx.id).contains(tx)))
-      }
-      s"[$blockNumber] included]" in {
-        assert(block.transactionData.forall(tx => nev.state.included(tx.id).contains(nev.state.stateHeight)))
-      }
+    Range(1, 30).foreach { blockNumber =>
+      s"[$blockNumber]" - {
 
-      val aliveAccounts = old.state.wavesDistributionAtHeight(old.state.stateHeight)
-        .map(_._1)
-        .map(Account.fromBase58String(_).right.get)
+        def block = currentMainnet.history.blockAt(blockNumber).get
 
-      s"[$blockNumber] accountTransactions]" in {
-        for (acc <- aliveAccounts) {
-          val oldtxs = old.state.accountTransactions(acc, Int.MaxValue)
-          val newtxs = nev.state.accountTransactions(acc, Int.MaxValue)
-          assert(oldtxs.size == newtxs.size)
-          assert(oldtxs.indices.forall(i => oldtxs(i) == newtxs(i)))
-          true
+        "Block appended successfully" in {
+          old.appendBlock(block).get
+          nev.appendBlock(block).get
         }
-      }
-      s"[$blockNumber] lastAccountPaymentTransaction]" in {
-        for (acc <- aliveAccounts) {
-          assert(old.state.lastAccountPaymentTransaction(acc) == nev.state.lastAccountPaymentTransaction(acc))
+        // should I do this with more ids, like with final state too, to assert negatives too?
+        s"findTransaction" in {
+          assert(block.transactionData.forall(tx => nev.state.findTransaction[Transaction](tx.id).contains(tx)))
         }
-      }
-      s"[$blockNumber] balance]" in {
-        for (acc <- aliveAccounts) {
-          assert(old.state.balance(acc) == nev.state.balance(acc))
+        s"included" in {
+          assert(block.transactionData.forall(tx => nev.state.included(tx.id).contains(nev.state.stateHeight)))
+        }
+
+        val aliveAccounts = old.state.wavesDistributionAtHeight(old.state.stateHeight)
+          .map(_._1)
+          .map(Account.fromBase58String(_).right.get)
+
+        s"accountTransactions" in {
+          for (acc <- aliveAccounts) {
+            val oldtxs = old.state.accountTransactions(acc, Int.MaxValue)
+            val newtxs = nev.state.accountTransactions(acc, Int.MaxValue)
+            assert(oldtxs.size == newtxs.size,s"acc: ${acc.stringRepr}")
+            assert(oldtxs.indices.forall(i => oldtxs(i) == newtxs(i)))
+            true
+          }
+        }
+        s"lastAccountPaymentTransaction" in {
+          for (acc <- aliveAccounts) {
+            assert(old.state.lastAccountPaymentTransaction(acc) == nev.state.lastAccountPaymentTransaction(acc))
+          }
+        }
+        s"balance" in {
+          for (acc <- aliveAccounts) {
+            assert(old.state.balance(acc) == nev.state.balance(acc))
+          }
         }
       }
     }
@@ -119,13 +124,13 @@ object StateResponseComparisonTests {
   def storedBcPlusGenesis(theState: State, theHistory: History): BlockStorage = {
     val bc = storedBC(theState, theHistory)
     val maybeGenesisSignature = Option(settings.genesisSettings.signature).filter(_.trim.nonEmpty)
-
-    val genesisBLock = Block.genesis(
-      NxtLikeConsensusBlockData(settings.genesisSettings.initialBaseTarget, WavesConsensusModule.EmptySignature),
-      SimpleTransactionModule.buildTransactions(settings.genesisSettings),
-      settings.genesisSettings.blockTimestamp, maybeGenesisSignature)
-
-    bc.appendBlock(genesisBLock)
+    //
+    //    val genesisBLock = Block.genesis(
+    //      NxtLikeConsensusBlockData(settings.genesisSettings.initialBaseTarget, WavesConsensusModule.EmptySignature),
+    //      SimpleTransactionModule.buildTransactions(settings.genesisSettings),
+    //      settings.genesisSettings.blockTimestamp, maybeGenesisSignature)
+    //
+    //    bc.appendBlock(genesisBLock)
     bc
   }
 

@@ -4,7 +4,7 @@ import cats._
 import cats.implicits._
 import cats.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{BlockDiff, CompositeStateReader, Diff, EqByteArray, StateReader}
+import com.wavesplatform.state2.{BlockDiff, CompositeStateReader, Diff, EqByteArray, Portfolio, StateReader}
 import scorex.account.{Account, Alias}
 import scorex.block.Block
 import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
@@ -17,15 +17,25 @@ import scorex.utils.ByteArray
 import scala.util.{Left, Right}
 
 object TransactionDiffer {
-  def apply(settings: FunctionalitySettings, time: Long)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
-    ???
+  def apply(settings: FunctionalitySettings, time: Long, h: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
+    for {
+      t <- BasicDiff(s, settings, time, tx)
+    } yield {
+      t match {
+        case gtx: GenesisTransaction =>
+          Diff(transactions = Map(EqByteArray(gtx.id) -> (h, gtx)),
+            portfolios = Map(gtx.recipient -> Portfolio(balance = gtx.amount, effectiveBalance = gtx.amount, assets = Map.empty)),
+            issuedAssets = Map.empty)
+        case _ => ???
+      }
+    }
   }
 }
 
 
 object BasicDiff {
 
-  def apply[T <: Transaction](state: StateReader, settings: FunctionalitySettings, time: Long)(transaction: T): Either[ValidationError, T] = {
+  def apply[T <: Transaction](state: StateReader, settings: FunctionalitySettings, time: Long, transaction: T): Either[ValidationError, T] = {
 
     def disallowDuplicateIds(t: T): Either[StateValidationError, T] = t match {
       case tx: PaymentTransaction if tx.timestamp < settings.requirePaymentUniqueId => Right(t)

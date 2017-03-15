@@ -20,7 +20,7 @@ object BlockDiffer {
     //      TransactionDiffer(new CompositeStateReader(s, BlockDiff(diff)), settings, time)(tx)
     //    }
 
-    val txDiffer = TransactionDiffer(settings, block.timestamp) _
+    val txDiffer = TransactionDiffer(settings, block.timestamp, s.height + 1) _
 
     val txsDiffEi = block.transactionData.foldLeft(rightEmptyDiff) { case (ei, tx) => ei match {
       case Left(error) => Left(error)

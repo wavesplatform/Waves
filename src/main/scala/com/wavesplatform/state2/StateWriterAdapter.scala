@@ -75,7 +75,7 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
 
   override def getAlias(a: Account): Option[Alias] = ???
 
-  override def stateHeight: Int = ???
+  override def stateHeight: Int = r.height
 
   override def toJson(heightOpt: Option[Int]): JsObject = ???
 
