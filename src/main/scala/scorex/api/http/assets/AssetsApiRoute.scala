@@ -145,7 +145,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     Base58.decode(assetIdStr) match {
       case Success(assetId) =>
         (for {
-          acc <- Account.fromBase58String(address)
+          acc <- Account.fromString(address)
         } yield Json.obj(
           "address" -> acc.address,
           "assetId" -> assetIdStr,
@@ -156,7 +156,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
   }
 
   private def balanceJson(address: String): Either[ApiError, JsObject] = (for {
-    acc <- Account.fromBase58String(address)
+    acc <- Account.fromString(address)
   } yield {
     val balances: Seq[JsObject] = state.getAccountBalance(acc).map { p =>
       JsObject(Seq(

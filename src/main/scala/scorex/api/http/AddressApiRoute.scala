@@ -34,7 +34,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def deleteAddress: Route = path(Segment) { address =>
     (delete & withAuth) {
-      if (Account.fromBase58String(address).isLeft) {
+      if (Account.fromString(address).isLeft) {
         complete(InvalidAddress)
       } else {
         val deleted = wallet.findWallet(address).exists(account =>
@@ -178,7 +178,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def validate: Route = (path("validate" / Segment) & get) { address =>
-    complete(Json.obj("address" -> address, "valid" -> Account.fromBase58String(address).isRight))
+    complete(Json.obj("address" -> address, "valid" -> Account.fromString(address).isRight))
   }
 
   @Path("/")
@@ -219,7 +219,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    Account.fromBase58String(address).right.map(acc => ToResponseMarshallable(Json.obj(
+    Account.fromString(address).right.map(acc => ToResponseMarshallable(Json.obj(
       "address" -> acc.address,
       "confirmations" -> confirmations,
       "balance" -> state.balanceWithConfirmations(acc, confirmations))))
@@ -227,7 +227,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    Account.fromBase58String(address).right.map(acc => ToResponseMarshallable(Json.obj(
+    Account.fromString(address).right.map(acc => ToResponseMarshallable(Json.obj(
       "address" -> acc.address,
       "confirmations" -> confirmations,
       "balance" -> state.effectiveBalanceWithConfirmations(acc, confirmations, state.stateHeight))))
@@ -251,7 +251,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 
   private def verifyPath(address: String, decode: Boolean) = withAuth {
     json[SignedMessage] { m =>
-      if (Account.fromBase58String(address).isLeft) {
+      if (Account.fromString(address).isLeft) {
         InvalidAddress
       } else {
         //DECODE SIGNATURE

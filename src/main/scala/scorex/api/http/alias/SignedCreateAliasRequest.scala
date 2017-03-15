@@ -20,7 +20,7 @@ case class SignedCreateAliasRequest(@ApiModelProperty(value = "Base58 encoded se
   def toTx: Either[ValidationError, CreateAliasTransaction] = for {
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
     _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-    _alias <- Alias(alias)
+    _alias <- Alias.buildWithCurrentNetworkByte(alias)
     _t <- CreateAliasTransaction.create(_sender, _alias, fee, timestamp, _signature)
   } yield _t
 }

@@ -110,7 +110,7 @@ object Wallet {
 
   implicit class WalletExtension(w: Wallet) {
     def findWallet(a: AddressString): Either[ValidationError, PrivateKeyAccount] = for {
-      acc <- Account.fromBase58String(a)
+      acc <- Account.fromString(a)
       privKeyAcc <- w.privateKeyAccount(acc)
     } yield privKeyAcc
 

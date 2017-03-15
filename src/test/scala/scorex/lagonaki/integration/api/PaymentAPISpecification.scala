@@ -27,7 +27,7 @@ class PaymentAPISpecification extends FunSuite with Matchers with TransactionTes
     (req \ "timestamp").asOpt[Long].isDefined shouldBe true
     (req \ "signature").asOpt[String].isDefined shouldBe true
     (req \ "sender").as[String] shouldBe s
-    (req \ "recipient").as[String] shouldBe r
+    (req \ "recipient").as[String] shouldBe ("address:" + r)
 
   }
 
