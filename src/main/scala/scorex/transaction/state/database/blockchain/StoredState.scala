@@ -89,9 +89,13 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       result ++ storage.getIssuanceTransactionsIds(s"$asset@$h")
     }
 
+    newReissuable.foreach(newValue => storage.setReissuable(asset, newValue))
+
     val keysToRemove = transactionsToRemove.map(t => s"$asset@$t")
 
-    keysToRemove.foreach(storage.removeQuantities)
+    keysToRemove.foreach { key =>
+      storage.removeQuantities(key)
+    }
   }
 
   def isReissuable(assetId: AssetId): Boolean = {
@@ -103,9 +107,12 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
         val transactions = storage.getIssuanceTransactionsIds(s"$asset@$lastHeight")
         if (transactions.nonEmpty) {
           val transaction = transactions.last
-          storage.isReissuable(s"$asset@$transaction")
-        } else false
-      case None => false
+          storage.isReissuable(asset)
+        } else {
+          false
+        }
+      case None =>
+        false
     }
   }
 
@@ -425,16 +432,20 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       applyExchangeTransaction(blockTs),
       registerTransactionById(height))
 
+    storage.setStateHeight(storage.stateHeight + 1)
+    val h = storage.stateHeight
+
+    // todo pass txs sequence for processing
+    changes.flatMap(_._2._2).toSet.foreach((i:StateChangeReason) => i match {
+      case tx: Transaction =>
+        processors.foreach(_.apply(tx))
+      case _ =>
+    })
+
     changes.foreach { ch =>
       val change = Row(ch._2._1, ch._2._2.map(_.id), storage.getLastStates(ch._1.key).getOrElse(0))
-      storage.putAccountChanges(ch._1.key, height, change)
-      storage.putLastStates(ch._1.key, height)
-      ch._2._2.foreach {
-        case tx: Transaction =>
-
-          processors.foreach(_.apply(tx))
-        case _ =>
-      }
+      storage.putAccountChanges(ch._1.key, h, change)
+      storage.putLastStates(ch._1.key, h)
       storage.updateAccountAssets(ch._1.account.address, ch._1.assetId)
     }
   }
