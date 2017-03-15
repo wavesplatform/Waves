@@ -51,12 +51,13 @@ test in assembly := {}
 dockerfile in docker := {
   val artifact: File = assembly.value
   val artifactTargetPath = s"/opt/waves/${artifact.name}"
+  val configTemplate = (resourceDirectory in IntegrationTest).value / "template.conf"
 
   new Dockerfile {
     from("anapsix/alpine-java:8_server-jre")
     run("apk", "add", "--no-cache", "--update", "iproute2")
-    add(artifact, artifactTargetPath)
-    entryPoint("java", "-jar", artifactTargetPath)
+    add(Seq(artifact, configTemplate), "/opt/waves/")
+    entryPoint("sh", "-c", s"java -Dconfig.trace=loads $$WAVES_OPTS -jar $artifactTargetPath /opt/waves/template.conf")
     expose(16868, 16869)
   }
 }
