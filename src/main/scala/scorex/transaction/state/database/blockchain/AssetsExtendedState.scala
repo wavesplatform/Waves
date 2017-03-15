@@ -51,8 +51,7 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     val assetAtHeight = s"$asset@$height"
     val assetAtTransaction = s"$asset@$transaction"
 
-    if (!(
-      !isIssueExists(assetId) ||
+    if (!(!isIssueExists(assetId) ||
       (reissuable && isReissuable(assetId)) ||
       !reissuable)) {
       throw new RuntimeException("Asset is not reissuable")
@@ -78,7 +77,7 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
   }
 
   def rollback(burn: BurnTransaction, height: Int): Unit = {
-    rollback(burn.assetId, height, Some(true))
+    rollback(burn.assetId, height)
   }
 
   def rollback(issuance: AssetIssuance, height: Int): Unit = {

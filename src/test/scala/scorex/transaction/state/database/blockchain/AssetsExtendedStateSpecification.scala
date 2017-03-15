@@ -209,6 +209,29 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.isReissuable(assetId) shouldBe true
   }
 
+  property("Burn should not changes asset reissue flag") {
+    val mvStore = new MVStore.Builder().open()
+    val storage = new MVStoreStateStorage with MVStoreAssetsExtendedStateStorage {
+      override val db: MVStore = mvStore
+    }
+    val state = new AssetsExtendedState(storage)
+    val assetId0 = getId(0)
+    val assetId1 = getId(1)
+
+    state.addAsset(assetId0, 10, getId(1), 10, reissuable = true)
+    state.addAsset(assetId1, 10, getId(2), 10, reissuable = false)
+
+    state.burnAsset(assetId0, 40, getId(3), -1)
+    state.burnAsset(assetId1, 40, getId(4), -1)
+
+    state.getAssetQuantity(assetId0) shouldBe 9
+    state.isReissuable(assetId0) shouldBe true
+
+    state.getAssetQuantity(assetId1) shouldBe 9
+    state.isReissuable(assetId1) shouldBe false
+  }
+
+
   private def getId(i: Int): Array[Byte] = {
     Longs.toByteArray(0) ++ Longs.toByteArray(0) ++ Longs.toByteArray(0) ++ Longs.toByteArray(i)
   }
