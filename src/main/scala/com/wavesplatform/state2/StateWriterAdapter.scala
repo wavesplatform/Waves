@@ -1,5 +1,6 @@
 package com.wavesplatform.state2
 
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.diffs.BlockDiffer
 import play.api.libs.json.JsObject
 import scorex.account.{Account, Alias}
@@ -12,7 +13,7 @@ import scorex.transaction.state.database.state.{AccState, AddressString, Reasons
 import scala.reflect.ClassTag
 import scala.util.{Failure, Try}
 
-class StateWriterAdapter(r: StateWriter with StateReader) extends State {
+class StateWriterAdapter(r: StateWriter with StateReader, settings: FunctionalitySettings) extends State {
   override def included(signature: Array[Byte]): Option[Int] = r.transactionInfo(EqByteArray(signature)).map(_._1)
 
   override def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
@@ -79,12 +80,11 @@ class StateWriterAdapter(r: StateWriter with StateReader) extends State {
   override def toJson(heightOpt: Option[Int]): JsObject = ???
 
   override def processBlock(block: Block): Try[State] = Try {
-    BlockDiffer(???, ???, ???)(block) match {
-      case Left(m) => ???
-      case Right(blockDiff) => {
+    BlockDiffer(settings)(r, block) match {
+      case Right(blockDiff) =>
         r.applyBlockDiff(blockDiff)
         this
-      }
+      case Left(m) => ???
     }
   }
 

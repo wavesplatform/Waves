@@ -14,15 +14,15 @@ object BlockDiffer {
   val emptyDiff: Diff = implicitly[Monoid[Diff]].empty
   val rightEmptyDiff: Either[ValidationError, Diff] = Right(emptyDiff)
 
-  def apply(s: StateReader, settings: FunctionalitySettings, time: Long)(b: Block): Either[ValidationError, BlockDiff] = {
+  def apply(settings: FunctionalitySettings)(s: StateReader, block: Block): Either[ValidationError, BlockDiff] = {
 
     //    b.transactionData.foldM(emptyDiff) { case (diff: Diff, tx: Transaction) =>
     //      TransactionDiffer(new CompositeStateReader(s, BlockDiff(diff)), settings, time)(tx)
     //    }
 
-    val txDiffer = TransactionDiffer(settings, time) _
+    val txDiffer = TransactionDiffer(settings, block.timestamp) _
 
-    val txsDiffEi = b.transactionData.foldLeft(rightEmptyDiff) { case (ei, tx) => ei match {
+    val txsDiffEi = block.transactionData.foldLeft(rightEmptyDiff) { case (ei, tx) => ei match {
       case Left(error) => Left(error)
       case Right(diff) =>
         txDiffer(new CompositeStateReader(s, BlockDiff(diff)), tx)
@@ -30,7 +30,7 @@ object BlockDiffer {
     }
     }
 
-    lazy val feeDiff: Diff = b.feesDistribution.map { case (AssetAcc(account, maybeAssetId), feeVolume) =>
+    lazy val feeDiff = block.feesDistribution.map { case (AssetAcc(account, maybeAssetId), feeVolume) =>
       account -> (maybeAssetId match {
         case None => Portfolio(feeVolume, feeVolume, Map.empty)
         case Some(assetId) => Portfolio(0L, 0L, Map(EqByteArray(assetId) -> feeVolume))
