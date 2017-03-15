@@ -55,6 +55,8 @@ object PaymentTransaction {
 
       Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes, signature)
     }
+
+    override def toString: String = json.toString()
   }
 
   val RecipientLength = Account.AddressLength

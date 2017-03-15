@@ -27,11 +27,9 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
   override def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] =
     r.accountTransactionIds(account).flatMap(r.transactionInfo).map(_._2)
 
-  override def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] =
-    r.accountTransactionIds(account).toStream
-      .flatMap(id => r.transactionInfo(id))
-      .filter { case (id, t) => t.isInstanceOf[PaymentTransaction] }
-      .collectFirst { case (id, t) => t.asInstanceOf[PaymentTransaction] }
+  override def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
+    r.lastAccountPaymentTransaction(account)
+  }
 
   override def balance(account: Account): Long = r.accountPortfolio(account).balance
 

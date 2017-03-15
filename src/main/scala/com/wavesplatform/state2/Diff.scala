@@ -16,6 +16,14 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction)],
                 portfolios: Map[Account, Portfolio],
                 issuedAssets: Map[ByteArray, AssetInfo])
 
+object Diff {
+  def apply(height: Int, tx: Transaction, portfolios: Map[Account, Portfolio],
+            issuedAssets: Map[ByteArray, AssetInfo]): Diff = Diff(
+    transactions = Map(EqByteArray(tx.id) -> (height, tx)),
+    portfolios = portfolios, issuedAssets = issuedAssets)
+
+}
+
 case class Portfolio(balance: Long, effectiveBalance: Long, assets: Map[ByteArray, Long])
 
 case class AssetInfo(isReissuableOverride: Boolean, totalVolumeOverride: Long)

@@ -3,7 +3,7 @@ package com.wavesplatform.state2
 import cats._
 import cats.implicits._
 import scorex.account.Account
-import scorex.transaction.{Transaction, TransactionParser}
+import scorex.transaction.{PaymentTransaction, Transaction, TransactionParser}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
@@ -29,6 +29,15 @@ object StateReader {
       r.nonEmptyAccounts
         .flatMap(acc => r.accountPortfolio(acc).assets.get(assetId).map(acc -> _))
         .toMap
+
+    def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
+      r.accountTransactionIds(account).toStream
+        .flatMap(id => r.transactionInfo(id))
+        .filter { case (id, t) => t.isInstanceOf[PaymentTransaction] }
+        .map { case (id, t) => t.asInstanceOf[PaymentTransaction] }
+        .filter(t => t.sender.bytes sameElements account.bytes)
+        .collectFirst { case t => t }
+    }
   }
 
 }

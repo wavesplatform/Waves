@@ -19,21 +19,41 @@ import scala.util.{Left, Right}
 object TransactionDiffer {
   def apply(settings: FunctionalitySettings, time: Long, h: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      t <- BasicDiff(s, settings, time, tx)
+      t <- BasicValidation(s, settings, time, tx)
     } yield {
       t match {
         case gtx: GenesisTransaction =>
-          Diff(transactions = Map(EqByteArray(gtx.id) -> (h, gtx)),
-            portfolios = Map(gtx.recipient -> Portfolio(balance = gtx.amount, effectiveBalance = gtx.amount, assets = Map.empty)),
+          Diff(height = h,
+            tx = gtx,
+            portfolios = Map(gtx.recipient -> Portfolio(
+              balance = gtx.amount,
+              effectiveBalance = gtx.amount,
+              assets = Map.empty)),
             issuedAssets = Map.empty)
-        case _ => ???
+        case ptx: PaymentTransaction => {
+          Diff(height = h,
+            tx = ptx,
+            portfolios = Map(
+              ptx.recipient -> Portfolio(
+                balance = ptx.amount,
+                effectiveBalance = ptx.amount,
+                assets = Map.empty),
+              Account.fromPublicKey(ptx.sender.publicKey) -> Portfolio(
+                balance = -ptx.amount - ptx.fee,
+                effectiveBalance = -ptx.amount - ptx.fee,
+                assets = Map.empty
+              )
+            ),
+            issuedAssets = Map.empty
+          )
+        }
       }
     }
   }
 }
 
 
-object BasicDiff {
+object BasicValidation {
 
   def apply[T <: Transaction](state: StateReader, settings: FunctionalitySettings, time: Long, transaction: T): Either[ValidationError, T] = {
 
