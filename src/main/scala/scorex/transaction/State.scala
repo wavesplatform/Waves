@@ -7,7 +7,6 @@ import scorex.block.Block
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.state.{AccState, AddressString, Reasons}
-import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
 import scorex.utils.NTP
 
 import scala.reflect.ClassTag
@@ -78,7 +77,7 @@ trait State {
 
   def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit
 
-  def assetRollbackTo(assetId: AssetId, height: Int): Unit
+  def assetRollbackTo(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean] = None) : Unit
 }
 
 object State {

@@ -73,7 +73,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.totalAssetQuantity(assetId) shouldBe 100
     state.isReissuable(assetId) shouldBe false
 
-    state.assetRollbackTo(assetId, 2)
+    state.assetRollbackTo(assetId, 2, Some(true))
 
     state.totalAssetQuantity(assetId) shouldBe 30
     state.isReissuable(assetId) shouldBe true
@@ -107,7 +107,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.totalAssetQuantity(assetId) shouldBe 40
     state.isReissuable(assetId) shouldBe false
 
-    state.assetRollbackTo(assetId, 2)
+    state.assetRollbackTo(assetId, 2, Some(true))
 
     state.totalAssetQuantity(assetId) shouldBe 20
     state.isReissuable(assetId) shouldBe true
@@ -129,7 +129,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.totalAssetQuantity(assetId) shouldBe 40
     state.isReissuable(assetId) shouldBe false
 
-    state.assetRollbackTo(assetId, 25)
+    state.assetRollbackTo(assetId, 25, Some(true))
 
     state.totalAssetQuantity(assetId) shouldBe 20
     state.isReissuable(assetId) shouldBe true
@@ -153,7 +153,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.totalAssetQuantity(assetId) shouldBe 30
     state.isReissuable(assetId) shouldBe false
 
-    state.assetRollbackTo(assetId, 18)
+    state.assetRollbackTo(assetId, 18, Some(true))
 
     state.totalAssetQuantity(assetId) shouldBe 10
     state.isReissuable(assetId) shouldBe true
@@ -180,11 +180,31 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.totalAssetQuantity(assetId) shouldBe 50
     state.isReissuable(assetId) shouldBe false
 
-    state.assetRollbackTo(assetId, 15)
+    state.assetRollbackTo(assetId, 15, Some(true))
 
     state.totalAssetQuantity(assetId) shouldBe 20
     state.isReissuable(assetId) shouldBe true
   }
+
+  property("Burn should not changes asset reissue flag") {
+
+    val state = newAssetExtendedState()
+    val assetId0 = getId(0)
+    val assetId1 = getId(1)
+
+    state.addAsset(assetId0, 10, getId(1), 10, reissuable = true)
+    state.addAsset(assetId1, 10, getId(2), 10, reissuable = false)
+
+    state.burnAsset(assetId0, 40, getId(3), -1)
+    state.burnAsset(assetId1, 40, getId(4), -1)
+
+    state.totalAssetQuantity(assetId0) shouldBe 9
+    state.isReissuable(assetId0) shouldBe true
+
+    state.totalAssetQuantity(assetId1) shouldBe 9
+    state.isReissuable(assetId1) shouldBe false
+  }
+
 
   private def getId(i: Int): Array[Byte] = {
     Longs.toByteArray(0) ++ Longs.toByteArray(0) ++ Longs.toByteArray(0) ++ Longs.toByteArray(i)

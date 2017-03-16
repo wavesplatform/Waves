@@ -2,7 +2,7 @@ package scorex.transaction.state.database.state.storage
 
 trait AssetsExtendedStateStorageI {
 
-  def getTransactions(key: String): Seq[String]
+  def getIssuanceTransactionsIds(key: String): Seq[String]
 
   def addTransaction(key: String, transaction: String): Unit
 
@@ -20,6 +20,8 @@ trait AssetsExtendedStateStorageI {
 
   def isReissuable(key: String): Boolean
 
-  def removeKey(key: String): Unit
+  def removeQuantities(key: String): Unit
+
+  def removeReissuable(key: String): Unit
 
 }
