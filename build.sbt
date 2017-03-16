@@ -67,5 +67,6 @@ inConfig(IntegrationTest)(Seq(
   javaOptions ++= Seq(
     s"-Ddocker.imageId=${docker.value.id}"
   ),
-  test <<= test.dependsOn(docker)
+  test <<= test.dependsOn(docker),
+  testOptions += Tests.Filter(_.endsWith("Suite"))
 ))

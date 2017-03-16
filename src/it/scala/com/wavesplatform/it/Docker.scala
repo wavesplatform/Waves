@@ -25,7 +25,7 @@ case class NodeInfo(
     containerId: String)
 
 trait Docker extends AutoCloseable {
-  def startNode(config: Config = ConfigFactory.empty()): Future[NodeInfo]
+  def startNode(nodeConfig: Config = ConfigFactory.empty()): Future[NodeInfo]
   def stopNode(containerId: String)
 }
 
@@ -35,7 +35,7 @@ object Docker extends ScorexLogging {
       client.prepareGet(s"http://localhost:${nodeInfo.hostRestApiPort}/node/status")
         .execute()
         .toCompletableFuture
-        .whenCompleteAsync { (r, t) =>
+        .whenCompleteAsync { (_, t) =>
           if (t == null) {
             promise.complete(Success(nodeInfo))
           } else {
@@ -47,7 +47,6 @@ object Docker extends ScorexLogging {
 
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
-  private val confTemplate = ConfigFactory.parseResources("template.conf")
   private val imageId = System.getProperty("docker.imageId")
   private val http = new DefaultAsyncHttpClient()
 
@@ -61,7 +60,9 @@ object Docker extends ScorexLogging {
   private def extractHostPort(m: JMap[String, JList[PortBinding]], containerPort: String) =
     m.get(s"$containerPort/tcp").get(0).hostPort().toInt
 
-  def apply(): Docker = new Docker {
+  final val DefaultConfigTemplate = ConfigFactory.parseResources("template.conf")
+
+  def apply(defaultConfig: Config = DefaultConfigTemplate): Docker = new Docker {
     private val client = DefaultDockerClient.fromEnv().build()
     private val timer = new HashedWheelTimer()
     private var nodes = Map.empty[String, NodeInfo]
@@ -74,7 +75,7 @@ object Docker extends ScorexLogging {
 
     override def startNode(config: Config): Future[NodeInfo] = {
       val configOverrides = s"$knownPeers ${renderProperties(asProperties(config))}"
-      val actualConfig = config.withFallback(confTemplate)
+      val actualConfig = config.withFallback(defaultConfig)
       val restApiPort = actualConfig.getString("waves.rest-api.port")
       val networkPort = actualConfig.getString("waves.network.port")
 
@@ -91,7 +92,7 @@ object Docker extends ScorexLogging {
         .image(imageId)
         .exposedPorts(restApiPort, networkPort)
         .hostConfig(hostConfig)
-        .env(s"""WAVES_OPTS=$configOverrides""")
+        .env(s"WAVES_OPTS=$configOverrides")
         .build()
 
       val containerId = client.createContainer(containerConfig).id()
