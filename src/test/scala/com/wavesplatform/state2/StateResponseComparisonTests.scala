@@ -33,7 +33,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
 
-    val CHECK_FROM = 1
+    val CHECK_FROM = 70
     val CHECK_TO = 300
 
     // 0 doesn't exist, 1 is genesis

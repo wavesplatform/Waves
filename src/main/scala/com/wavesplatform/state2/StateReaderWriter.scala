@@ -45,22 +45,21 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
         case ptx: PaymentTransaction => ptx.recipient.bytes
         case _ => ???
       }
-
       Map(senderBytes -> id, recipientBytes -> id)
     }
 
 
     affectedAccountsToIds.foreach { case (senderBytes, txId) =>
-      val updatedTxIds: util.LinkedList[Array[Byte]] = Option(p.accountTransactionIds.get(senderBytes)) match {
-        case Some(set) =>
-          new util.LinkedList(set)
+      Option(p.accountTransactionIds.get(senderBytes)) match {
+        case Some(ll) =>
+          ll.add(txId.arr)
         case None =>
-          new util.LinkedList[Array[Byte]]()
+          val newList = new util.ArrayList[Array[Byte]]()
+          newList.add(0, txId.arr)
+          p.accountTransactionIds.put(senderBytes, newList)
       }
-      updatedTxIds.addFirst(txId.arr)
-
-      p.accountTransactionIds.put(senderBytes, updatedTxIds)
     }
+
     p.setHeight(p.getHeight + blockDiff.heightDiff)
   }
 
