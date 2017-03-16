@@ -52,7 +52,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
 
     val creatorBalance0 = state.balance(aliasCreator)
     val fee = 100000L
-    val tx = CreateAliasTransaction.create(aliasCreator, Alias("TRANSFER-ALIAS").right.get, fee, 1L).right.get
+    val tx = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("TRANSFER-ALIAS").right.get, fee, 1L).right.get
     val block = TestBlock(Seq(tx))
     shouldBeValid(tx)
     state.processBlock(block) shouldBe a[Success[_]]
@@ -65,7 +65,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
 
     val fee2 = 100001L
     val amount = 1000L
-    val tx2 = TransferTransaction.create(None, sender, Alias("TRANSFER-ALIAS").right.get, amount, 1L, None, fee2, Array()).right.get
+    val tx2 = TransferTransaction.create(None, sender, Alias.buildWithCurrentNetworkByte("TRANSFER-ALIAS").right.get, amount, 1L, None, fee2, Array()).right.get
     shouldBeValid(tx2)
     state.processBlock(TestBlock(Seq(tx2))) shouldBe a[Success[_]]
     state.balance(aliasCreator) shouldBe (creatorBalance + amount)
@@ -76,7 +76,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
 
     val creatorBalance0 = state.balance(aliasCreator)
     val fee = 100000L
-    val tx = CreateAliasTransaction.create(aliasCreator, Alias("LEASE-ALIAS").right.get, fee, 1L).right.get
+    val tx = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("LEASE-ALIAS").right.get, fee, 1L).right.get
     val block = TestBlock(Seq(tx))
     shouldBeValid(tx)
     state.processBlock(block) shouldBe a[Success[_]]
@@ -89,7 +89,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
 
     val fee2 = 100001L
     val amount = 1000L
-    val tx2 = LeaseTransaction.create(sender, amount, fee2, 1L, Alias("LEASE-ALIAS").right.get).right.get
+    val tx2 = LeaseTransaction.create(sender, amount, fee2, 1L, Alias.buildWithCurrentNetworkByte("LEASE-ALIAS").right.get).right.get
     shouldBeValid(tx2)
     state.processBlock(TestBlock(Seq(tx2))) shouldBe a[Success[_]]
     state.effectiveBalance(aliasCreator) shouldBe (creatorEffectiveBalance + amount)
@@ -99,7 +99,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
   test("unable to send to non-issued alias") {
     val senderBalance = state.balance(aliasCreator)
 
-    val tx = TransferTransaction.create(None, aliasCreator, Alias("NON-EXISTING ALIAS").right.get, 1000L, 1L, None, 100000L, Array()).right.get
+    val tx = TransferTransaction.create(None, aliasCreator, Alias.buildWithCurrentNetworkByte("NON-EXISTING ALIAS").right.get, 1000L, 1L, None, 100000L, Array()).right.get
     shouldBeInvalid(tx)
     val block = TestBlock(Seq(tx))
     state.processBlock(block) shouldBe a[Failure[_]]
@@ -109,7 +109,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
   test("unable to lease to non-issued alias") {
     val senderBalance = state.balance(aliasCreator)
 
-    val tx = LeaseTransaction.create(aliasCreator, 10000L, 100000L, 1L, Alias("NON-EXISTING ALIAS").right.get).right.get
+    val tx = LeaseTransaction.create(aliasCreator, 10000L, 100000L, 1L, Alias.buildWithCurrentNetworkByte("NON-EXISTING ALIAS").right.get).right.get
     shouldBeInvalid(tx)
     val block = TestBlock(Seq(tx))
     state.processBlock(block) shouldBe a[Failure[_]]
@@ -120,21 +120,21 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
   test("unable to create the same alias in the next block") {
     val senderBalance = state.balance(aliasCreator)
     val fee = 100000L
-    val tx = CreateAliasTransaction.create(aliasCreator, Alias("THE ALIAS").right.get, fee, 1L).right.get
+    val tx = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("THE ALIAS").right.get, fee, 1L).right.get
     val block = TestBlock(Seq(tx))
     state.processBlock(block)
 
-    val tx2 = CreateAliasTransaction.create(aliasCreator, Alias("THE ALIAS").right.get, fee, 1L).right.get
+    val tx2 = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("THE ALIAS").right.get, fee, 1L).right.get
     shouldBeInvalid(tx2)
 
     val anotherCreator: PrivateKeyAccount = PrivateKeyAccount(randomBytes())
     ensureSenderHasBalance(anotherCreator)
-    val tx3 = CreateAliasTransaction.create(aliasCreator, Alias("THE ALIAS").right.get, fee, 1L).right.get
+    val tx3 = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("THE ALIAS").right.get, fee, 1L).right.get
     shouldBeInvalid(tx3)
   }
 
   test("able to recreate alias after rollback") {
-    val theAlias = Alias("ALIAS")
+    val theAlias = Alias.buildWithCurrentNetworkByte("ALIAS")
     val tx = CreateAliasTransaction.create(aliasCreator, theAlias.right.get, 100000L, 1L).right.get
     val block = TestBlock(Seq(tx))
     state.processBlock(block)

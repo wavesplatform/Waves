@@ -93,7 +93,7 @@ trait State {
   def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit
 
   // AssetExtendedStateSpecification: 5
-  def assetRollbackTo(assetId: AssetId, height: Int): Unit
+  def assetRollbackTo(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean] = None) : Unit
 }
 
 object State {

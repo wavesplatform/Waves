@@ -12,7 +12,7 @@ import scala.util.Success
 
 sealed trait Account extends AccountOrAlias {
   lazy val address: String = Base58.encode(bytes)
-  lazy val stringRepr: String = address
+  lazy val stringRepr: String = Account.Prefix + address
 
   val bytes: Array[Byte]
 
@@ -20,6 +20,8 @@ sealed trait Account extends AccountOrAlias {
 }
 
 object Account extends ScorexLogging {
+
+  val Prefix: String = "address:"
 
   val AddressVersion: Byte = 1
   val ChecksumLength = 4
@@ -43,7 +45,7 @@ object Account extends ScorexLogging {
     else Left(InvalidAddress)
   }
 
-  def fromBase58String(address: String): Either[ValidationError, Account] =
+  private def fromBase58String(address: String): Either[ValidationError, Account] =
     if (address.length > AddressStringLength) {
       Left(InvalidAddress)
     } else {
@@ -52,6 +54,14 @@ object Account extends ScorexLogging {
         case _ => Left(InvalidAddress)
       }
     }
+
+  def fromString(address: String): Either[ValidationError, Account] = {
+    val base58String = if (address.startsWith(Prefix))
+      address.drop(Prefix.length)
+    else address
+    fromBase58String(base58String)
+  }
+
 
   private def isByteArrayValid(addressBytes: Array[Byte]): Boolean = {
     val version = addressBytes.head

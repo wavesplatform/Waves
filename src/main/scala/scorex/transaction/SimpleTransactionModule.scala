@@ -100,7 +100,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
 
   override def createPayment(request: PaymentRequest, wallet: Wallet): Either[ValidationError, PaymentTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    rec <- Account.fromBase58String(request.recipient)
+    rec <- Account.fromString(request.recipient)
     pmt <- createPayment(pk, rec, request.amount, request.fee)
   } yield pmt
 
@@ -148,7 +148,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
 
   override def alias(request: CreateAliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
-    alias <- Alias(request.alias)
+    alias <- Alias.buildWithCurrentNetworkByte(request.alias)
     tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, getTimestamp)
     r <- onNewOffchainTransaction(tx)
   } yield r
@@ -180,6 +180,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
 
 
   override def genesisData: Seq[Transaction] = buildTransactions(genesisSettings)
+
 
   /** Check whether tx is valid on current state and not expired yet
     */
@@ -231,7 +232,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
     for {
       _signature <- Base58.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
-      _recipient <- Account.fromBase58String(payment.recipient)
+      _recipient <- Account.fromString(payment.recipient)
       _t <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)
       t <- onNewOffchainTransaction(_t)
     } yield t
@@ -248,7 +249,7 @@ object SimpleTransactionModule {
 
   def buildTransactions(genesisSettings: GenesisSettings): Seq[GenesisTransaction] = {
     genesisSettings.transactions.map { ts =>
-      val acc = Account.fromBase58String(ts.recipient).right.get
+      val acc = Account.fromString(ts.recipient).right.get
       GenesisTransaction.create(acc, ts.amount, genesisSettings.transactionsTimestamp).right.get
     }
   }

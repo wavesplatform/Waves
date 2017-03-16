@@ -33,7 +33,7 @@ class NxtConsensusApiRoute(application: RunnableApplication) extends ApiRoute wi
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def generatingBalance: Route = (path("generatingbalance" / Segment) & get) { address =>
-    val account = Account.fromBase58String(address)
+    val account = Account.fromString(address)
     if (account.isLeft) {
       complete(InvalidAddress)
     } else {

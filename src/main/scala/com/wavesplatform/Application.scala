@@ -117,8 +117,11 @@ object Application extends ScorexLogging {
       case file => ConfigFactory.parseFile(file)
     }
 
-    val config = maybeUserConfig.foldLeft(ConfigFactory.defaultApplication().withFallback(ConfigFactory.load())) {
-      (default, user) => user.withFallback(default)
+    val config = maybeUserConfig match {
+      // if no user config is supplied, the library will handle overrides/application/reference automatically
+      case None => ConfigFactory.load()
+      // overrides (from system properties) still need to have higher priority than user-supplied config
+      case Some(cfg) => ConfigFactory.defaultOverrides().withFallback(cfg).withFallback(ConfigFactory.load())
     }
 
     val settings = WavesSettings.fromConfig(config.resolve)

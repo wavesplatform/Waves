@@ -57,7 +57,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
 
           def aliveAccounts = old.state.wavesDistributionAtHeight(old.state.stateHeight)
             .map(_._1)
-            .map(Account.fromBase58String(_).right.get)
+            .map(Account.fromString(_).right.get)
 
           s"accountTransactions" in {
             for (acc <- aliveAccounts) {

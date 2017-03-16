@@ -51,7 +51,7 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
   override def effectiveBalance(account: Account): Long = r.accountPortfolio(account).effectiveBalance
 
   override def getLeasedSum(address: AddressString): Long = {
-    val portfolio = r.accountPortfolio(Account.fromBase58String(address).right.get)
+    val portfolio = r.accountPortfolio(Account.fromString(address).right.get)
     portfolio.effectiveBalance - portfolio.balance
   }
 
@@ -97,6 +97,6 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
 
   override def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit = ???
 
-  override def assetRollbackTo(assetId: AssetId, height: Int): Unit = ???
+  override def assetRollbackTo(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean] = None): Unit = ???
 
 }
