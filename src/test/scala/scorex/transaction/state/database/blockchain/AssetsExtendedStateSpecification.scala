@@ -150,7 +150,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.isReissuable(assetId) shouldBe true
   }
 
-  property("Duplicated calls should work correctly") {
+  property("Duplicated reissue = true calls should work correctly") {
     val mvStore = new MVStore.Builder().open()
     val storage = new MVStoreStateStorage with MVStoreAssetsExtendedStateStorage {
       override val db: MVStore = mvStore
@@ -166,9 +166,30 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.isReissuable(assetId) shouldBe true
 
     state.addAsset(assetId, 20, getId(2), 20, reissuable = false)
-    state.addAsset(assetId, 20, getId(2), 20, reissuable = false)
-    state.addAsset(assetId, 20, getId(2), 20, reissuable = false)
 
+    state.rollback(assetId, 18, Some(true))
+
+    state.getAssetQuantity(assetId) shouldBe 10
+    state.isReissuable(assetId) shouldBe true
+  }
+
+  property("Duplicated reissue = false calls should not work correctly") {
+    val mvStore = new MVStore.Builder().open()
+    val storage = new MVStoreStateStorage with MVStoreAssetsExtendedStateStorage {
+      override val db: MVStore = mvStore
+    }
+    val state = new AssetsExtendedState(storage)
+    val assetId = getId(0)
+
+    state.addAsset(assetId, 10, getId(1), 10, reissuable = true)
+
+    state.getAssetQuantity(assetId) shouldBe 10
+    state.isReissuable(assetId) shouldBe true
+
+    state.addAsset(assetId, 20, getId(2), 20, reissuable = false)
+    assertThrows[RuntimeException] {
+      state.addAsset(assetId, 20, getId(2), 20, reissuable = false)
+    }
     state.getAssetQuantity(assetId) shouldBe 30
     state.isReissuable(assetId) shouldBe false
 

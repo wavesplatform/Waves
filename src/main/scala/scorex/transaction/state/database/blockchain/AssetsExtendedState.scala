@@ -51,10 +51,8 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     val assetAtHeight = s"$asset@$height"
     val assetAtTransaction = s"$asset@$transaction"
 
-    if (!(!isIssueExists(assetId) ||
-      (reissuable && isReissuable(assetId)) ||
-      !reissuable)) {
-      throw new RuntimeException("Asset is not reissuable")
+    if (!isReissuable(assetId)) {
+      throw new RuntimeException(s"Asset $asset is not reissuable in tx ${Base58.encode(transactionId)}")
     }
 
     storage.setReissuable(asset, reissuable)
@@ -120,21 +118,7 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
   }
 
   def isReissuable(assetId: AssetId): Boolean = {
-    val asset = Base58.encode(assetId)
-    val heights = storage.getHeights(asset)
-
-    heights.lastOption match {
-      case Some(lastHeight) =>
-        val transactions = storage.getIssuanceTransactionsIds(s"$asset@$lastHeight")
-        if (transactions.nonEmpty) {
-          val transaction = transactions.last
-          storage.isReissuable(asset)
-        } else {
-          false
-        }
-      case None =>
-        false
-    }
+    storage.isReissuable(Base58.encode(assetId))
   }
 
   def isIssueExists(assetId: AssetId): Boolean = {
