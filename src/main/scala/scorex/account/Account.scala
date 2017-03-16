@@ -15,6 +15,8 @@ sealed trait Account extends AccountOrAlias {
   lazy val stringRepr: String = address
 
   val bytes: Array[Byte]
+
+  override def toString : String = stringRepr
 }
 
 object Account extends ScorexLogging {

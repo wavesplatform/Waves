@@ -31,12 +31,32 @@ object StateReader {
         .toMap
 
     def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
+
+      // #1 The old state returns tx with the greatest timestamp of the most recent block
+      // which contains outgoing payment transactions from the account.
+
+      // #2 The 'correct' implementation would be to return the most recent Payment tx of
+      // the accountas the transaction application advances:
+
+      //      r.accountTransactionIds(account).toStream
+      //        .flatMap(id => r.transactionInfo(id))
+      //        .filter { case (id, t) => t.isInstanceOf[PaymentTransaction] }
+      //        .map { case (id, t) => t.asInstanceOf[PaymentTransaction] }
+      //        .filter(t => t.sender.bytes sameElements account.bytes)
+      //        .collectFirst { case t => t }
+
+      // Until we are not sure we can change the logic from #1 to #2,
+      // the temporary fix is to return the most recent outgoing Payment tx by timestamp
+
       r.accountTransactionIds(account).toStream
         .flatMap(id => r.transactionInfo(id))
         .filter { case (id, t) => t.isInstanceOf[PaymentTransaction] }
         .map { case (id, t) => t.asInstanceOf[PaymentTransaction] }
+        .toList
         .filter(t => t.sender.bytes sameElements account.bytes)
+        .sortBy(-_.timestamp)
         .collectFirst { case t => t }
+
     }
   }
 

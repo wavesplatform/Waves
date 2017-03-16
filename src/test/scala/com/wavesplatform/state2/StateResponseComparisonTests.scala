@@ -33,10 +33,12 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
 
+    val CHECK_FROM = 1
+    val CHECK_TO = 300
 
     // 0 doesn't exist, 1 is genesis
     val end = currentMainnet.history.height() + 1
-    Range(1, 29).foreach { blockNumber =>
+    Range(1, CHECK_TO).foreach { blockNumber =>
       s"[$blockNumber]" - {
         def block = currentMainnet.history.blockAt(blockNumber).get
 
@@ -44,7 +46,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
           val oldTime = withTime(old.appendBlock(block).get)._1
           val newTime = withTime(nev.appendBlock(block).get)._1
         }
-        if (blockNumber > 27) {
+        if (blockNumber >= CHECK_FROM) {
           // should I do this with more ids, like with final state too, to assert negatives too?
           s"findTransaction" in {
             assert(block.transactionData.forall(tx => nev.state.findTransaction[Transaction](tx.id).contains(tx)))
@@ -73,7 +75,8 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
             for (acc <- aliveAccounts) {
               val oldPtx = old.state.lastAccountPaymentTransaction(acc)
               val nevPts = nev.state.lastAccountPaymentTransaction(acc)
-              assert(oldPtx == nevPts, acc.stringRepr +" " + nevPts)
+              val areSame = oldPtx == nevPts
+              assert(areSame, acc.stringRepr +" " + nevPts)
             }
           }
           s"balance" in {
