@@ -432,9 +432,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       applyExchangeTransaction(blockTs),
       registerTransactionById(height))
 
-    storage.setStateHeight(storage.stateHeight + 1)
-    val h = storage.stateHeight
-
     // todo pass txs sequence for processing
     changes.flatMap(_._2._2).toSet.foreach((i:StateChangeReason) => i match {
       case tx: Transaction =>
@@ -444,8 +441,8 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
     changes.foreach { ch =>
       val change = Row(ch._2._1, ch._2._2.map(_.id), storage.getLastStates(ch._1.key).getOrElse(0))
-      storage.putAccountChanges(ch._1.key, h, change)
-      storage.putLastStates(ch._1.key, h)
+      storage.putAccountChanges(ch._1.key, height, change)
+      storage.putLastStates(ch._1.key, height)
       storage.updateAccountAssets(ch._1.account.address, ch._1.assetId)
     }
   }
