@@ -70,7 +70,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
   }
 
   def assetRollbackTo(burn: BurnTransaction, height: Int): Unit = {
-    assetRollbackTo(burn.assetId, height, Some(true))
+    assetRollbackTo(burn.assetId, height)
   }
 
   def assetRollbackTo(issuance: AssetIssuance, height: Int): Unit = {
