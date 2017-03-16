@@ -36,7 +36,7 @@ object StateReader {
       // which contains outgoing payment transactions from the account.
 
       // #2 The 'correct' implementation would be to return the most recent Payment tx of
-      // the accountas the transaction application advances:
+      // the account as the transaction application advances:
 
       //      r.accountTransactionIds(account).toStream
       //        .flatMap(id => r.transactionInfo(id))
@@ -46,16 +46,32 @@ object StateReader {
       //        .collectFirst { case t => t }
 
       // Until we are not sure we can change the logic from #1 to #2,
-      // the temporary fix is to return the most recent outgoing Payment tx by timestamp
+      // the temporary fix is to return the most recent outgoing Payment tx by timestamp.
+      // This doesn't work for block #71
 
-      r.accountTransactionIds(account).toStream
+      //      r.accountTransactionIds(account).toStream
+      //        .flatMap(id => r.transactionInfo(id))
+      //        .filter { case (id, t) => t.isInstanceOf[PaymentTransaction] }
+      //        .map { case (id, t) => t.asInstanceOf[PaymentTransaction] }
+      //        .toList
+      //        .filter(t => t.sender.bytes sameElements account.bytes)
+      //        .sortBy(-_.timestamp)
+      //        .collectFirst { case t => t }
+
+      // This is the old-style implementation, at least 80 blocks work fine
+
+      r.accountTransactionIds(account).toList
         .flatMap(id => r.transactionInfo(id))
-        .filter { case (id, t) => t.isInstanceOf[PaymentTransaction] }
-        .map { case (id, t) => t.asInstanceOf[PaymentTransaction] }
+        .filter { case (h, t) => t.isInstanceOf[PaymentTransaction] }
+        .map { case (h, t) => (h, t.asInstanceOf[PaymentTransaction]) }
+        .filter { case (h, t) => t.sender.bytes sameElements account.bytes }
+        .groupBy(_._1)
+        .filter { case (h, ptxs) => ptxs.nonEmpty }
+        .map { case (h, st) => (h, st.map(_._2)) }
         .toList
-        .filter(t => t.sender.bytes sameElements account.bytes)
-        .sortBy(-_.timestamp)
+        .sortBy(-_._1)
         .collectFirst { case t => t }
+        .map(_._2.sortBy(-_.timestamp).head)
 
     }
   }
