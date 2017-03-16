@@ -34,7 +34,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
 
     val CHECK_FROM = 1
-    val CHECK_TO = 80
+    val CHECK_TO = 8000
 
     // 0 doesn't exist, 1 is genesis
     val end = currentMainnet.history.height() + 1
@@ -59,30 +59,47 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
             .map(_._1)
             .map(Account.fromString(_).right.get)
 
-          s"accountTransactions" in {
-            for (acc <- aliveAccounts) {
-              val oldtxs = old.state.accountTransactions(acc, Int.MaxValue).toList
-              val newtxs = nev.state.accountTransactions(acc, Int.MaxValue).toList
-              assert(oldtxs.size == newtxs.size, s"acc: ${acc.stringRepr}")
-              oldtxs.indices.foreach { i =>
-                // we do not assert the actual order here, is it wrong?
-                // assert(oldtxs(i).id sameElements newtxs(i).id, s"i = $i")
-                assert(newtxs.exists(tx => tx.id sameElements oldtxs(i).id))
+          if (Seq(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096).contains(blockNumber)) {
+            s"accountTransactions" in {
+              for (acc <- aliveAccounts) {
+                val oldtxs = old.state.accountTransactions(acc, Int.MaxValue).toList
+                val newtxs = nev.state.accountTransactions(acc, Int.MaxValue).toList
+                assert(oldtxs.size == newtxs.size, s"acc: ${acc.stringRepr}")
+                oldtxs.indices.foreach { i =>
+                  // we do not assert the actual order here, is it wrong?
+                  // assert(oldtxs(i).id sameElements newtxs(i).id, s"i = $i")
+                  assert(newtxs.exists(tx => tx.id sameElements oldtxs(i).id))
+                }
+              }
+            }
+            s"lastAccountPaymentTransaction" in {
+              for (acc <- aliveAccounts) {
+                val oldPtx = old.state.lastAccountPaymentTransaction(acc)
+                val nevPts = nev.state.lastAccountPaymentTransaction(acc)
+                val areSame = oldPtx == nevPts
+                assert(areSame, acc.stringRepr + " " + nevPts)
               }
             }
           }
-          s"lastAccountPaymentTransaction" in {
-            for (acc <- aliveAccounts) {
-              val oldPtx = old.state.lastAccountPaymentTransaction(acc)
-              val nevPts = nev.state.lastAccountPaymentTransaction(acc)
-              val areSame = oldPtx == nevPts
-              assert(areSame, acc.stringRepr +" " + nevPts)
-            }
-          }
-          s"balance" in {
+          s"balance, effectiveBalance, leasedSum" in {
             for (acc <- aliveAccounts) {
               assert(old.state.balance(acc) == nev.state.balance(acc))
               assert(old.state.effectiveBalance(acc) == nev.state.effectiveBalance(acc))
+              assert(old.state.getLeasedSum(acc.stringRepr) == nev.state.getLeasedSum(acc.stringRepr))
+            }
+          }
+
+          s"getAccountBalance, assetBalance" in {
+            for (acc <- aliveAccounts) {
+              val oldAccBalance = old.state.getAccountBalance(acc).map { case (k, v) => EqByteArray(k) -> v }
+              val newAccBalance = nev.state.getAccountBalance(acc).map { case (k, v) => EqByteArray(k) -> v }
+              assert(oldAccBalance == newAccBalance)
+
+              val oldAssetAccs = oldAccBalance.map(_._1.arr).map(aid => AssetAcc(acc, Some(aid)))
+
+              for (assetAcc <- oldAssetAccs) {
+                assert(old.state.assetBalance(assetAcc) == nev.state.assetBalance(assetAcc))
+              }
             }
           }
 

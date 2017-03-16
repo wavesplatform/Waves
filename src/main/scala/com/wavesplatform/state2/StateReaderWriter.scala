@@ -45,7 +45,11 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
         case ptx: PaymentTransaction => ptx.recipient.bytes
         case _ => ???
       }
-      Map(senderBytes -> id, recipientBytes -> id)
+
+      if (senderBytes sameElements recipientBytes)
+        Map(senderBytes -> id)
+      else
+        Map(senderBytes -> id, recipientBytes -> id)
     }
 
 
