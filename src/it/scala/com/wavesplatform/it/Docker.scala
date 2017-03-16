@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import java.util.concurrent.Executors
 import java.util.{Collections, Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -14,7 +15,7 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.SECONDS
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.Success
 
 case class NodeInfo(
@@ -25,21 +26,21 @@ case class NodeInfo(
     containerId: String)
 
 trait Docker extends AutoCloseable {
-  def startNode(nodeConfig: Config = ConfigFactory.empty()): Future[NodeInfo]
+  def startNode(nodeConfig: Config = ConfigFactory.empty()): Future[Node]
   def stopNode(containerId: String)
 }
 
 object Docker extends ScorexLogging {
-  private case class WaitForNode(nodeInfo: NodeInfo, client: AsyncHttpClient, promise: Promise[NodeInfo]) extends TimerTask {
+  private case class WaitForNode(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, promise: Promise[Node]) extends TimerTask {
     override def run(timeout: Timeout): Unit =
       client.prepareGet(s"http://localhost:${nodeInfo.hostRestApiPort}/node/status")
         .execute()
         .toCompletableFuture
         .whenCompleteAsync { (_, t) =>
           if (t == null) {
-            promise.complete(Success(nodeInfo))
+            promise.complete(Success(new Node(config, nodeInfo, client)))
           } else {
-            log.debug(s"Re-requesting node status from container ${nodeInfo.containerId}")
+            log.info(s"Re-requesting node status from container ${nodeInfo.containerId}")
             timeout.timer().newTimeout(this, 1, SECONDS)
           }
         }
@@ -62,7 +63,7 @@ object Docker extends ScorexLogging {
 
   final val DefaultConfigTemplate = ConfigFactory.parseResources("template.conf")
 
-  def apply(defaultConfig: Config = DefaultConfigTemplate): Docker = new Docker {
+  def apply(suiteConfig: Config = ConfigFactory.empty): Docker = new Docker {
     private val client = DefaultDockerClient.fromEnv().build()
     private val timer = new HashedWheelTimer()
     private var nodes = Map.empty[String, NodeInfo]
@@ -73,9 +74,15 @@ object Docker extends ScorexLogging {
       case (ni, index) => s"-Dwaves.network.known-peers.$index=${ni.ipAddress}:${ni.containerNetworkPort}"
     } mkString " "
 
-    override def startNode(config: Config): Future[NodeInfo] = {
-      val configOverrides = s"$knownPeers ${renderProperties(asProperties(config))}"
-      val actualConfig = config.withFallback(defaultConfig)
+    override def startNode(nodeConfig: Config): Future[Node] = {
+      val configOverrides = s"$knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
+      val actualConfig = nodeConfig
+        .withFallback(suiteConfig)
+        .withFallback(DefaultConfigTemplate)
+        .withFallback(ConfigFactory.defaultApplication())
+        .withFallback(ConfigFactory.defaultReference())
+        .resolve()
+
       val restApiPort = actualConfig.getString("waves.rest-api.port")
       val networkPort = actualConfig.getString("waves.network.port")
 
@@ -109,8 +116,11 @@ object Docker extends ScorexLogging {
         containerId)
       nodes += containerId -> nodeInfo
 
-      val p = Promise[NodeInfo]
-      timer.newTimeout(WaitForNode(nodeInfo, http, p), 0, SECONDS)
+      implicit val ec = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
+
+      val p = Promise[Node]
+      timer.newTimeout(WaitForNode(actualConfig, nodeInfo, http, p), 0, SECONDS)
+      p.future.onComplete(_ => log.info(s"Node ${nodeInfo.containerId} started up"))
       p.future
     }
 

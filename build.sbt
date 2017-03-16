@@ -65,7 +65,8 @@ inConfig(IntegrationTest)(Seq(
   fork := true,
   parallelExecution := false,
   javaOptions ++= Seq(
-    s"-Ddocker.imageId=${docker.value.id}"
+    s"-Ddocker.imageId=${docker.value.id}",
+    "-Dlogback.configurationFile=logback-it.xml"
   ),
   test <<= test.dependsOn(docker),
   testOptions += Tests.Filter(_.endsWith("Suite"))
