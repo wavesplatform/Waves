@@ -11,7 +11,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction}
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.state.database.state.extension.IncrementingTimestampValidator
-import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
+import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction, Transaction}
 import scorex.utils._
 
 import scala.util.Random
@@ -196,10 +196,10 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     val applyChanges = PrivateMethod[Unit]('applyChanges)
     state.balance(testAcc) shouldBe 0
     val tx = transactionModule.createPayment(acc, testAcc, 1, 1).right.get
-    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(2L, 0L), Seq(FeesStateChange(1L), tx))), NTP.correctedTime())
+    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(2L, 0L), Seq(FeesStateChange(1L), tx))), Seq(tx), NTP.correctedTime())
     state.balance(testAcc) shouldBe 2
     state.included(tx.id).value shouldBe state.stateHeight
-    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(0L, 0L), Seq(tx))), NTP.correctedTime())
+    state invokePrivate applyChanges(Map(AssetAcc(testAcc, None) -> (AccState(0L, 0L), Seq(tx))), Seq(tx), NTP.correctedTime())
   }
 
   test("validate single transaction") {

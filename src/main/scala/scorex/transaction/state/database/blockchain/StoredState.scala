@@ -101,7 +101,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
-    applyChanges(newBalances, block.timestampField.value)
+    applyChanges(newBalances, trans, block.timestampField.value)
     log.trace(s"New state height is ${storage.stateHeight}, hash: $hash, totalBalance: $totalBalance")
 
     this
@@ -334,16 +334,13 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   private[blockchain] def totalAssetQuantity(assetId: AssetId): Long = assetsExtension.getAssetQuantity(assetId)
 
   private[blockchain] def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)],
-                                       blockTs: Long = NTP.correctedTime()): Unit = synchronized {
+                                       txs: Seq[Transaction],
+                                       blockTs: Long = NTP.correctedTime()
+                                      ): Unit = synchronized {
     storage.setStateHeight(storage.stateHeight + 1)
     val h = storage.stateHeight
 
-    // todo pass txs sequence for processing
-    changes.flatMap(_._2._2).toSet.foreach((i:StateChangeReason) => i match {
-      case tx: Transaction =>
-        validators.foreach(_.process(this, tx, blockTs, h))
-      case _ =>
-    })
+    txs.foreach(tx => validators.foreach(_.process(this, tx, blockTs, h)))
 
     changes.foreach { ch =>
       val change = Row(ch._2._1, ch._2._2.map(_.id), storage.getLastStates(ch._1.key).getOrElse(0))
