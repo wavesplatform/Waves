@@ -57,13 +57,13 @@ dockerfile in docker := {
     from("anapsix/alpine-java:8_server-jre")
     run("apk", "add", "--no-cache", "--update", "iproute2")
     add(Seq(artifact, configTemplate), "/opt/waves/")
-    entryPoint("sh", "-c", s"java -Dconfig.trace=loads $$WAVES_OPTS -jar $artifactTargetPath /opt/waves/template.conf")
-    expose(16868, 16869)
+    entryPoint("sh", "-c", s"java $$WAVES_OPTS -jar $artifactTargetPath /opt/waves/template.conf")
   }
 }
 
 inConfig(IntegrationTest)(Seq(
   fork := true,
+  parallelExecution := false,
   javaOptions ++= Seq(
     s"-Ddocker.imageId=${docker.value.id}"
   ),
