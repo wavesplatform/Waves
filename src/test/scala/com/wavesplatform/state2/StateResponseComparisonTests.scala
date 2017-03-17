@@ -23,7 +23,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
   val BlocksOnDisk = "C:\\Users\\ilyas\\.babun\\cygwin\\home\\ilyas\\waves\\data\\blockchain.dat"
 
 
-  val CHECK_BLOCKS = Seq(10000,20000,28000)
+  val CHECK_BLOCKS = Seq(100)
   val APPLY_TO = 28001
 
 
