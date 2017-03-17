@@ -3,6 +3,7 @@ package com.wavesplatform.state2
 import cats._
 import cats.implicits._
 import scorex.account.Account
+import scorex.consensus.TransactionsOrdering
 import scorex.transaction.{PaymentTransaction, Transaction, TransactionParser}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
@@ -73,7 +74,7 @@ object StateReader {
         .toList
         .sortBy(-_._1)
         .collectFirst { case t => t }
-        .map(_._2.sortBy(-_.timestamp).head)
+        .map(_._2.sorted(TransactionsOrdering.InBlock).head)
 
     }
   }
