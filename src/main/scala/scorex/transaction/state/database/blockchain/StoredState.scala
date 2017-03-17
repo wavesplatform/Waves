@@ -9,7 +9,6 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state._
 import scorex.transaction.state.database.state.extension._
@@ -262,7 +261,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
               }
             }
 
-            val newStateAfterEffectiveBalanceChanges = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(newStateAfterBalanceUpdates) {     case (iChanges, bc) =>
+            val newStateAfterEffectiveBalanceChanges = leaseExtendedState.effectiveBalanceChanges(tx).foldLeft(newStateAfterBalanceUpdates) { case (iChanges, bc) =>
               //update effective balances sheet
               val currentChange = iChanges.getOrElse(AssetAcc(bc.account, None), (AccState(assetBalance(AssetAcc(bc.account, None)), effectiveBalance(bc.account)), List.empty))
               val newEffectiveBalance = safeSum(currentChange._1.effectiveBalance, bc.amount)
@@ -282,7 +281,11 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       validTxs
     }
 
-    val validatedCorrectIssueAndReissueTxs = validateCorrectIssueAndReissueTxs(filteredFromFuture)
+    val validatedCorrectIssueAndReissueTxs = if (blockTime > settings.allowInvalidReissueInSameBlockUntilTimestamp) {
+      validateCorrectIssueAndReissueTxs(filteredFromFuture)
+    } else {
+      filteredFromFuture
+    }
 
     val validWithBlockTxs = validateExchangeTxs(validatedCorrectIssueAndReissueTxs, height)
 

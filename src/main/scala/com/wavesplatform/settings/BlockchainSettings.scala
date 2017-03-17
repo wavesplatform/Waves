@@ -19,7 +19,8 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowBurnTransactionAfterTimestamp: Long,
                                  allowLeaseTransactionAfterTimestamp: Long,
                                  requirePaymentUniqueId: Long,
-                                 allowExchangeTransactionAfterTimestamp: Long)
+                                 allowExchangeTransactionAfterTimestamp: Long,
+                                 allowInvalidReissueInSameBlockUntilTimestamp: Long)
 
 object FunctionalitySettings {
   val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
@@ -32,7 +33,8 @@ object FunctionalitySettings {
     allowBurnTransactionAfterTimestamp = 1491192000000L,
     allowLeaseTransactionAfterTimestamp = 1491192000000L,
     requirePaymentUniqueId = 1491192000000L,
-    allowExchangeTransactionAfterTimestamp = 1491192000000L)
+    allowExchangeTransactionAfterTimestamp = 1491192000000L,
+    allowInvalidReissueInSameBlockUntilTimestamp = Long.MaxValue)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
@@ -45,7 +47,8 @@ object FunctionalitySettings {
     allowBurnTransactionAfterTimestamp = 1481110521000L,
     allowLeaseTransactionAfterTimestamp = Long.MinValue,
     requirePaymentUniqueId = 1485942685000L,
-    allowExchangeTransactionAfterTimestamp = 1483228800000L)
+    allowExchangeTransactionAfterTimestamp = 1483228800000L,
+    allowInvalidReissueInSameBlockUntilTimestamp = Long.MinValue)
 
   val configPath = "waves.blockchain.custom.functionality"
 
@@ -61,11 +64,12 @@ object FunctionalitySettings {
     val allowLeaseTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-lease-transaction-after")
     val requirePaymentUniqueId = config.as[Long](s"$configPath.require-payment-unique-id-after")
     val allowExchangeTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-exchange-transaction-after")
+    val allowInvalidReissueInSameBlockUntilTimestamp = config.as[Long](s"$configPath.allow-invalid-reissue-in-same-block-until-timestamp")
 
     FunctionalitySettings(allowTemporaryNegativeUntil, allowInvalidPaymentTransactionsByTimestamp,
       requireSortedTransactionsAfter, generatingBalanceDepthFrom50To1000AfterHeight,
       minimalGeneratingBalanceAfterTimestamp, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil,
-      allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId, allowExchangeTransactionAfterTimestamp)
+      allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId, allowExchangeTransactionAfterTimestamp,allowInvalidReissueInSameBlockUntilTimestamp)
   }
 }
 
@@ -187,6 +191,8 @@ object BlockchainSettingsExtension {
         override def allowLeaseTransactionAfterTimestamp: Long = blockchainSettings.functionalitySettings.allowLeaseTransactionAfterTimestamp
 
         override def allowExchangeTransactionAfterTimestamp: Long = blockchainSettings.functionalitySettings.allowExchangeTransactionAfterTimestamp
+
+        override def allowInvalidReissueInSameBlockUntilTimestamp: Long = blockchainSettings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp
       }
     }
 

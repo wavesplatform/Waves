@@ -9,8 +9,6 @@ import scorex.transaction.state.database.state.extension.Validator
 import scorex.transaction.state.database.state.storage.{AssetsExtendedStateStorageI, StateStorageI}
 import scorex.utils.ScorexLogging
 
-import scala.util.{Failure, Success}
-
 //TODO move to state.extension package
 class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorageI) extends ScorexLogging
   with Validator {
@@ -50,10 +48,6 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     val transaction = Base58.encode(transactionId)
     val assetAtHeight = s"$asset@$height"
     val assetAtTransaction = s"$asset@$transaction"
-
-    if (!isReissuable(assetId)) {
-      throw new RuntimeException(s"Asset $asset is not reissuable in tx ${Base58.encode(transactionId)}")
-    }
 
     storage.setReissuable(asset, reissuable)
     storage.addHeight(asset, height)

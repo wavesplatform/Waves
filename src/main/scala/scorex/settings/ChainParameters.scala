@@ -13,6 +13,7 @@ trait ChainParameters {
   def allowUnissuedAssetsUntil: Long
   def allowBurnTransactionAfterTimestamp: Long
   def allowLeaseTransactionAfterTimestamp: Long
+  def allowInvalidReissueInSameBlockUntilTimestamp: Long
   def requirePaymentUniqueId: Long
 
   def initialBalance: Long
