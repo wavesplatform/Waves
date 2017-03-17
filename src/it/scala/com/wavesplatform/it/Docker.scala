@@ -10,13 +10,14 @@ import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import io.netty.util.{HashedWheelTimer, Timeout, TimerTask}
-import org.asynchttpclient.{AsyncHttpClient, DefaultAsyncHttpClient}
+import org.asynchttpclient.DefaultAsyncHttpClient
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.SECONDS
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 case class NodeInfo(
     hostRestApiPort: Int,
@@ -31,20 +32,14 @@ trait Docker extends AutoCloseable {
 }
 
 object Docker extends ScorexLogging {
-  private case class WaitForNode(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, promise: Promise[Node]) extends TimerTask {
-    override def run(timeout: Timeout): Unit =
-      client.prepareGet(s"http://localhost:${nodeInfo.hostRestApiPort}/node/status")
-        .execute()
-        .toCompletableFuture
-        .whenCompleteAsync { (_, t) =>
-          if (t == null) {
-            promise.complete(Success(new Node(config, nodeInfo, client)))
-          } else {
-            log.info(s"Re-requesting node status from container ${nodeInfo.containerId}")
-            timeout.timer().newTimeout(this, 1, SECONDS)
-          }
-        }
+  private case class WaitForNode(containerId: String, node: Node, promise: Promise[Node]) extends TimerTask {
+    override def run(timeout: Timeout): Unit = node.status.onComplete {
+      case Success(_) => promise.complete(Success(node))
+      case Failure(_) =>
+        log.info(s"Re-requesting node status from container $containerId")
+        timeout.timer().newTimeout(this, 1, SECONDS)
     }
+  }
 
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
@@ -61,7 +56,8 @@ object Docker extends ScorexLogging {
   private def extractHostPort(m: JMap[String, JList[PortBinding]], containerPort: String) =
     m.get(s"$containerPort/tcp").get(0).hostPort().toInt
 
-  final val DefaultConfigTemplate = ConfigFactory.parseResources("template.conf")
+  val DefaultConfigTemplate = ConfigFactory.parseResources("template.conf")
+  val NodeConfigs = ConfigFactory.parseResources("nodes.conf")
 
   def apply(suiteConfig: Config = ConfigFactory.empty): Docker = new Docker {
     private val client = DefaultDockerClient.fromEnv().build()
@@ -99,7 +95,7 @@ object Docker extends ScorexLogging {
         .image(imageId)
         .exposedPorts(restApiPort, networkPort)
         .hostConfig(hostConfig)
-        .env(s"WAVES_OPTS=$configOverrides")
+        .env(s"WAVES_OPTS=$configOverrides", s"WAVES_PORT=$networkPort")
         .build()
 
       val containerId = client.createContainer(containerConfig).id()
@@ -119,7 +115,7 @@ object Docker extends ScorexLogging {
       implicit val ec = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
       val p = Promise[Node]
-      timer.newTimeout(WaitForNode(actualConfig, nodeInfo, http, p), 0, SECONDS)
+      timer.newTimeout(WaitForNode(containerId, new Node(actualConfig, nodeInfo, http), p), 0, SECONDS)
       p.future.onComplete(_ => log.info(s"Node ${nodeInfo.containerId} started up"))
       p.future
     }
