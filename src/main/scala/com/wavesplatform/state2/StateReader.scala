@@ -7,8 +7,11 @@ import scorex.consensus.TransactionsOrdering
 import scorex.transaction.{PaymentTransaction, Transaction, TransactionParser}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
+import scala.reflect.ClassTag
 
 trait StateReader {
+
+
   def transactionInfo(id: ByteArray): Option[(Int, Transaction)]
 
   def accountPortfolio(a: Account): Portfolio
@@ -77,6 +80,14 @@ object StateReader {
         .map(_._2.sorted(TransactionsOrdering.InBlock).head)
 
     }
+
+    def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
+    = r.transactionInfo(EqByteArray(signature)).map(_._2)
+      .flatMap(tx => {
+        if (ct.runtimeClass.isAssignableFrom(tx.getClass))
+          Some(tx.asInstanceOf[T])
+        else None
+      })
   }
 
 }

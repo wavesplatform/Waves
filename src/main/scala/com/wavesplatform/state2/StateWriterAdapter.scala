@@ -17,12 +17,7 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
   override def included(signature: Array[Byte]): Option[Int] = r.transactionInfo(EqByteArray(signature)).map(_._1)
 
   override def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
-  = r.transactionInfo(EqByteArray(signature)).map(_._2)
-    .flatMap(tx => {
-      if (ct.runtimeClass.isAssignableFrom(tx.getClass))
-        Some(tx.asInstanceOf[T])
-      else None
-    })
+  = r.findTransaction(signature)
 
   override def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] =
     r.accountTransactionIds(account).flatMap(r.transactionInfo).map(_._2)
@@ -41,7 +36,7 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
   override def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] =
     r.accountPortfolio(account).assets.map { case (id, amt) =>
       val assetInfo = r.assetInfo(id).get
-      id.arr -> (amt, assetInfo.isReissuableOverride, assetInfo.totalVolumeOverride, findTransaction[IssueTransaction](id.arr).get)
+      id.arr -> (amt, assetInfo.isReissuable, assetInfo.totalVolume, findTransaction[IssueTransaction](id.arr).get)
     }
 
   override def assetDistribution(assetId: Array[Byte]): Map[String, Long] =
@@ -56,10 +51,10 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
   }
 
   override def isReissuable(id: Array[Byte]): Boolean =
-    r.assetInfo(EqByteArray(id)).get.isReissuableOverride
+    r.assetInfo(EqByteArray(id)).get.isReissuable
 
   override def totalAssetQuantity(assetId: AssetId): Long =
-    r.assetInfo(EqByteArray(assetId)).get.totalVolumeOverride
+    r.assetInfo(EqByteArray(assetId)).get.totalVolume
 
   override def balanceWithConfirmations(account: Account, confirmations: Int): Long = ???
 

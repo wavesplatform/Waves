@@ -30,4 +30,4 @@ case class EffectiveBalanceSnapshot(acc: Account, height: Int, prevEffectiveBala
 
 case class Portfolio(balance: Long, effectiveBalance: Long, assets: Map[ByteArray, Long])
 
-case class AssetInfo(isReissuableOverride: Boolean, totalVolumeOverride: Long)
+case class AssetInfo(isReissuable: Boolean, totalVolume: Long)
