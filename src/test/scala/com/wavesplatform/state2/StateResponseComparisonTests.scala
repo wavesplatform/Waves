@@ -122,8 +122,23 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
               confs <- Seq(50, 1000)
               oldEBWC = old.state.effectiveBalanceWithConfirmations(acc, confs, old.state.stateHeight)
               newEBWC = nev.state.effectiveBalanceWithConfirmations(acc, confs, nev.state.stateHeight)
+
             } yield {
-              assert(oldEBWC == newEBWC,s"acc=$acc old=$oldEBWC new=$newEBWC")
+              if (acc.stringRepr == "address:3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ") {
+
+                println("---")
+                val hhhheight = nev.state.stateHeight
+                val nev2  = nev.state.effectiveBalanceWithConfirmations(acc, confs, hhhheight)
+                println("old balance" + old.state.balance(acc))
+                println("new balance" + nev.state.balance(acc))
+//                Range(1, old.state.stateHeight + 1).foreach { h =>
+//                  val oll = old.state.effectiveBalanceWithConfirmations(acc, confs, h)
+//                  val nee = nev.state.effectiveBalanceWithConfirmations(acc, confs, h)
+//                  println("h=" + h + " " + s"acc=$acc old=$oll new=$nee")
+//                }
+              }
+
+              assert(oldEBWC == newEBWC, s"acc=$acc old=$oldEBWC new=$newEBWC")
             }
           }
 

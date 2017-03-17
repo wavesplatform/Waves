@@ -12,7 +12,7 @@ package object state2 {
       case _ => false
     }
 
-    override def hashCode(): Int = arr.hashCode()
+    override def hashCode(): Int = java.util.Arrays.hashCode(arr)
   }
 
   type ByteArray = EqByteArray

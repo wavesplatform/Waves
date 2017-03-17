@@ -66,8 +66,11 @@ case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signe
 
   lazy val feesDistribution: Map[AssetAcc, Long] = {
     val generator = signerData.generator
-    val assetFees = transactionData.map(_.assetFee)
-    assetFees.map(a => AssetAcc(generator, a._1) -> a._2).groupBy(a => a._1).mapValues(_.map(_._2).sum)
+    val assetFees: Seq[(Option[AssetId], Long)] = transactionData.map(_.assetFee)
+    assetFees
+      .map { case (maybeAssetId, vol) => AssetAcc(generator, maybeAssetId) -> vol }
+      .groupBy(a => a._1)
+      .mapValues((records: Seq[(AssetAcc, Long)]) => records.map(_._2).sum)
   }
 
   override def equals(obj: scala.Any): Boolean = {
