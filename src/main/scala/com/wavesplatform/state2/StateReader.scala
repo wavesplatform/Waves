@@ -20,6 +20,8 @@ trait StateReader {
 
   def nonEmptyAccounts: Seq[Account]
 
+  def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long
+
 }
 
 object StateReader {
@@ -108,6 +110,19 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
       .asScala
       .map(b => Account.fromBytes(b).right.get)
       .toSeq
+
+  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, atHeight: Int, confs: Int): Long = {
+    val bockNumberThatIsConfsOld = Math.max(1, atHeight - confs)
+    val confsOldMinimum: Seq[(Long, Long)] = Range(bockNumberThatIsConfsOld, atHeight + 1).flatMap { height =>
+
+      Option(p.effectiveBalanceSnapshots.get((acc.bytes, height)))
+        .map { case (prev, current) => if (height == 1) (current, current) else (prev, current) }
+    }
+    val minBefore = confsOldMinimum.head._1
+    val minInTheRange = confsOldMinimum.map(_._2).min
+    Math.min(minBefore, minInTheRange)
+  }
+
 }
 
 class CompositeStateReader(s: StateReader, blockDiff: BlockDiff) extends StateReader {
@@ -123,13 +138,11 @@ class CompositeStateReader(s: StateReader, blockDiff: BlockDiff) extends StateRe
 
   override def height: Int = s.height + blockDiff.heightDiff
 
-  override def accountTransactionIds(a: Account): Seq[ByteArray] = {
-    //    val newAccTxIds: Seq[ByteArray] = txDiff.transactions.get(EqByteArray(a.bytes)).map(_._2.id).toSeq.map(EqByteArray)
-    //    s.accountTransactionIds(a) ++ newAccTxIds
-    ???
-  }
-
   override def nonEmptyAccounts: Seq[Account] =
     s.nonEmptyAccounts ++ txDiff.portfolios.keySet
+
+  override def accountTransactionIds(a: Account): Seq[ByteArray] = ???
+
+  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long = ???
 }
 

@@ -33,8 +33,8 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
 
-    val CHECK_FROM = 1
-    val CHECK_TO = 8000
+    val CHECK_FROM = 28
+    val CHECK_TO = 30
 
     // 0 doesn't exist, 1 is genesis
     val end = currentMainnet.history.height() + 1
@@ -103,9 +103,31 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
             }
           }
 
+          s"isReissuable, totalAssetQuantity" in {
+            val eqAssetIds = aliveAccounts.flatMap(acc => old.state.getAccountBalance(acc).keySet.map(EqByteArray))
+            for (eqAssetId <- eqAssetIds) {
+              val assetId = eqAssetId.arr
+              assert(old.state.isReissuable(assetId) == nev.state.isReissuable(assetId))
+              assert(old.state.totalAssetQuantity(assetId) == nev.state.totalAssetQuantity(assetId))
+            }
+          }
+
           "height" in {
             assert(old.state.stateHeight == nev.state.stateHeight)
           }
+
+          s"effectiveBalanceWithConfirmations" in {
+            for {
+              acc <- aliveAccounts
+              confs <- Seq(50, 1000)
+              oldEBWC = old.state.effectiveBalanceWithConfirmations(acc, confs, old.state.stateHeight)
+              newEBWC = nev.state.effectiveBalanceWithConfirmations(acc, confs, nev.state.stateHeight)
+            } yield {
+              assert(oldEBWC == newEBWC,s"acc=$acc old=$oldEBWC new=$newEBWC")
+            }
+          }
+
+
         }
       }
     }

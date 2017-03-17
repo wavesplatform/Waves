@@ -4,7 +4,7 @@ import cats._
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{BlockDiff, CompositeStateReader, Diff, EqByteArray, Portfolio, StateReader}
+import com.wavesplatform.state2.{BlockDiff, CompositeStateReader, Diff, EffectiveBalanceSnapshot, EqByteArray, Portfolio, StateReader}
 import scorex.block.Block
 import scorex.transaction.{AssetAcc, ValidationError}
 
@@ -16,16 +16,12 @@ object BlockDiffer {
 
   def apply(settings: FunctionalitySettings)(s: StateReader, block: Block): Either[ValidationError, BlockDiff] = {
 
-    //    b.transactionData.foldM(emptyDiff) { case (diff: Diff, tx: Transaction) =>
-    //      TransactionDiffer(new CompositeStateReader(s, BlockDiff(diff)), settings, time)(tx)
-    //    }
-
     val txDiffer = TransactionDiffer(settings, block.timestamp, s.height + 1) _
 
     val txsDiffEi = block.transactionData.foldLeft(rightEmptyDiff) { case (ei, tx) => ei match {
       case Left(error) => Left(error)
       case Right(diff) =>
-        txDiffer(new CompositeStateReader(s, BlockDiff(diff)), tx)
+        txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
           .map(newDiff => diff.combine(newDiff))
     }
     }
@@ -39,6 +35,22 @@ object BlockDiffer {
       diff.combine(Diff(Map.empty, Map(acc -> portfolio), Map.empty))
     }
 
-    txsDiffEi.map(diff => BlockDiff(diff.combine(feeDiff), 1))
+    txsDiffEi
+      .map(diff => diff.combine(feeDiff))
+      .map(diff => {
+        val effectiveBalanceSnapshots = diff.portfolios
+          .filter { case (acc, portfolio) => portfolio.effectiveBalance != 0 }
+          .map { case (acc, portfolio) => (acc, s.accountPortfolio(acc).effectiveBalance, portfolio.effectiveBalance) }
+          .map { case (acc, oldEffBalance, effBalanceDiff) =>
+            EffectiveBalanceSnapshot(acc = acc,
+              height = s.height + 1,
+              prevEffectiveBalance = oldEffBalance,
+              effectiveBalance = oldEffBalance + effBalanceDiff)
+          }
+          .toSeq
+
+        BlockDiff(diff, 1, effectiveBalanceSnapshots)
+      }
+      )
   }
 }

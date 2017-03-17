@@ -57,11 +57,16 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       Option(p.accountTransactionIds.get(senderBytes)) match {
         case Some(ll) =>
           ll.add(txId.arr)
+          p.accountTransactionIds.put(senderBytes, ll)
         case None =>
           val newList = new util.ArrayList[Array[Byte]]()
           newList.add(0, txId.arr)
           p.accountTransactionIds.put(senderBytes, newList)
       }
+    }
+
+    blockDiff.effectiveBalanceSnapshots.foreach { ebs =>
+      p.effectiveBalanceSnapshots.put((ebs.acc.bytes, ebs.height), (ebs.prevEffectiveBalance, ebs.effectiveBalance))
     }
 
     p.setHeight(p.getHeight + blockDiff.heightDiff)

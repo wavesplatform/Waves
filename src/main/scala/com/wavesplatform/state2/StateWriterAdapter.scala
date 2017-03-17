@@ -65,7 +65,8 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
 
   override def wavesDistributionAtHeight(height: Int): Seq[(AddressString, Long)] = ???
 
-  override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long = ???
+  override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
+    r.effectiveBalanceAtHeightWithConfirmations(account, height, confirmations)
 
   override def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = ???
 
