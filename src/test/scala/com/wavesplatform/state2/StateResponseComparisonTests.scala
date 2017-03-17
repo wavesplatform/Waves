@@ -23,6 +23,12 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
   val BlocksOnDisk = "C:\\Users\\ilyas\\.babun\\cygwin\\home\\ilyas\\waves\\data\\blockchain.dat"
 
 
+  val CHECK_FROM = 107
+  val CHECK_TO = 108
+  val BLOCK_IDS_TO_CHECK_TXS = Seq(1, 2, 4, 8, 16, 32, 50, 64, 100, 128, 200,
+    256, 300, 512, 600, 800, 1024, 1200, 1500, 1750, 2048, 3011, 3290, 3700, 4096)
+
+
   "provide the same answers to questions after each block from mainnet applied" - {
     val oldStore = BlockStorageImpl.createMVStore("")
     val old = storedBC(oldState(oldStore), new StoredBlockchain(oldStore))
@@ -33,17 +39,16 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
 
-    val CHECK_FROM = 28
-    val CHECK_TO = 30
-
     // 0 doesn't exist, 1 is genesis
     val end = currentMainnet.history.height() + 1
     Range(1, CHECK_TO).foreach { blockNumber =>
       s"[$blockNumber]" - {
         def block = currentMainnet.history.blockAt(blockNumber).get
 
-        "Block appended successfully" in {
+        "[OLD] Block appended successfully" in {
           val oldTime = withTime(old.appendBlock(block).get)._1
+        }
+        "[NEW] New appended successfully" in {
           val newTime = withTime(nev.appendBlock(block).get)._1
         }
         if (blockNumber >= CHECK_FROM) {
@@ -59,7 +64,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
             .map(_._1)
             .map(Account.fromString(_).right.get)
 
-          if (Seq(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096).contains(blockNumber)) {
+          if (BLOCK_IDS_TO_CHECK_TXS.contains(blockNumber)) {
             s"accountTransactions" in {
               for (acc <- aliveAccounts) {
                 val oldtxs = old.state.accountTransactions(acc, Int.MaxValue).toList
@@ -83,7 +88,9 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
           }
           s"balance, effectiveBalance, leasedSum" in {
             for (acc <- aliveAccounts) {
-              assert(old.state.balance(acc) == nev.state.balance(acc))
+              val oldBalance = old.state.balance(acc)
+              val newBalance = nev.state.balance(acc)
+              assert(oldBalance == newBalance, s"old=$oldBalance new=$newBalance acc: $acc")
               assert(old.state.effectiveBalance(acc) == nev.state.effectiveBalance(acc))
               assert(old.state.getLeasedSum(acc.stringRepr) == nev.state.getLeasedSum(acc.stringRepr))
             }
@@ -116,33 +123,19 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
             assert(old.state.stateHeight == nev.state.stateHeight)
           }
 
-          s"effectiveBalanceWithConfirmations" in {
-            for {
-              acc <- aliveAccounts
-              confs <- Seq(50, 1000)
-              oldEBWC = old.state.effectiveBalanceWithConfirmations(acc, confs, old.state.stateHeight)
-              newEBWC = nev.state.effectiveBalanceWithConfirmations(acc, confs, nev.state.stateHeight)
+          if (BLOCK_IDS_TO_CHECK_TXS contains blockNumber) {
+            s"effectiveBalanceWithConfirmations" in {
+              for {
+                acc <- aliveAccounts
+                confs <- Seq(50, 1000)
+                oldEBWC = old.state.effectiveBalanceWithConfirmations(acc, confs, old.state.stateHeight)
+                newEBWC = nev.state.effectiveBalanceWithConfirmations(acc, confs, nev.state.stateHeight)
 
-            } yield {
-              if (acc.stringRepr == "address:3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ") {
-
-                println("---")
-                val hhhheight = nev.state.stateHeight
-                val nev2  = nev.state.effectiveBalanceWithConfirmations(acc, confs, hhhheight)
-                println("old balance" + old.state.balance(acc))
-                println("new balance" + nev.state.balance(acc))
-//                Range(1, old.state.stateHeight + 1).foreach { h =>
-//                  val oll = old.state.effectiveBalanceWithConfirmations(acc, confs, h)
-//                  val nee = nev.state.effectiveBalanceWithConfirmations(acc, confs, h)
-//                  println("h=" + h + " " + s"acc=$acc old=$oll new=$nee")
-//                }
+              } yield {
+                assert(oldEBWC == newEBWC, s"acc=$acc old=$oldEBWC new=$newEBWC")
               }
-
-              assert(oldEBWC == newEBWC, s"acc=$acc old=$oldEBWC new=$newEBWC")
             }
           }
-
-
         }
       }
     }

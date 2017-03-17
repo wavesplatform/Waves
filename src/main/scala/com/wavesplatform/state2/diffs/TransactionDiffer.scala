@@ -37,7 +37,7 @@ object TransactionDiffer {
               ptx.recipient -> Portfolio(
                 balance = ptx.amount,
                 effectiveBalance = ptx.amount,
-                assets = Map.empty),
+                assets = Map.empty)) combine Map(
               Account.fromPublicKey(ptx.sender.publicKey) -> Portfolio(
                 balance = -ptx.amount - ptx.fee,
                 effectiveBalance = -ptx.amount - ptx.fee,
