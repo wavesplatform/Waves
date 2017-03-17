@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
 import com.spotify.docker.client.DefaultDockerClient
+import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import io.netty.util.{HashedWheelTimer, Timeout, TimerTask}
@@ -127,8 +128,7 @@ object Docker extends ScorexLogging {
     override def close(): Unit = {
       timer.stop()
       log.info("Stopping containers")
-      nodes.keys.foreach(client.stopContainer(_, 10))
-      nodes.keys.foreach(client.removeContainer)
+//      nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
       client.close()
       http.close()
     }
