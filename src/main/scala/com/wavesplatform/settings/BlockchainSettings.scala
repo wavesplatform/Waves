@@ -29,10 +29,10 @@ object FunctionalitySettings {
     minimalGeneratingBalanceAfterTimestamp = 1479168000000L,
     allowTransactionsFromFutureUntil = 1479168000000L,
     allowUnissuedAssetsUntil = 1479416400000L,
-    allowBurnTransactionAfterTimestamp = 1482233593000L,
-    allowLeaseTransactionAfterTimestamp = 1458144000000L,
-    requirePaymentUniqueId = 1488361885000L,
-    allowExchangeTransactionAfterTimestamp = 1489708800000L)
+    allowBurnTransactionAfterTimestamp = 1491192000000L,
+    allowLeaseTransactionAfterTimestamp = 1491192000000L,
+    requirePaymentUniqueId = 1491192000000L,
+    allowExchangeTransactionAfterTimestamp = 1491192000000L)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
