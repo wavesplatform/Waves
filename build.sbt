@@ -49,15 +49,15 @@ concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 test in assembly := {}
 
 dockerfile in docker := {
-  val artifact: File = assembly.value
-  val artifactTargetPath = s"/opt/waves/${artifact.name}"
   val configTemplate = (resourceDirectory in IntegrationTest).value / "template.conf"
+  val startWaves = (sourceDirectory in IntegrationTest).value / "container" / "start-waves.sh"
 
   new Dockerfile {
     from("anapsix/alpine-java:8_server-jre")
-    run("apk", "add", "--no-cache", "--update", "iproute2")
-    add(Seq(artifact, configTemplate), "/opt/waves/")
-    entryPoint("sh", "-c", s"java $$WAVES_OPTS -jar $artifactTargetPath /opt/waves/template.conf")
+    add(assembly.value, "/opt/waves/waves.jar")
+    add(Seq(configTemplate, startWaves), "/opt/waves/")
+    run("chmod", "+x", "/opt/waves/start-waves.sh")
+    entryPoint("/opt/waves/start-waves.sh")
   }
 }
 
