@@ -14,10 +14,10 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction)],
 
 object Diff {
   def apply(height: Int, tx: Transaction, portfolios: Map[Account, Portfolio],
-            issuedAssets: Map[ByteArray, AssetInfo]): Diff = Diff(
+            assetInfos: Map[ByteArray, AssetInfo]): Diff = Diff(
     transactions = Map(EqByteArray(tx.id) -> (height, tx)),
     portfolios = portfolios,
-    issuedAssets = issuedAssets
+    issuedAssets = assetInfos
   )
 
   implicit class DiffExt(d: Diff) {

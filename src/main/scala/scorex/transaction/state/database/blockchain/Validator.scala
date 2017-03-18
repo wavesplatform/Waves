@@ -70,6 +70,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     case _ => Right(tx)
   }
 
+  // migrated
   private def genesisTransactionHeightMustBeZero(height: Int)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case gtx: GenesisTransaction if height != 0 => Left(TransactionValidationError(tx, "GenesisTranaction cannot appear in non-initial block"))
     case _ => Right(tx)
@@ -256,7 +257,6 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     }.reverse
   }
 
-
   private def filterByBalanceApplicationErrors(allowUnissuedAssets: Boolean, trans: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     val (_, validatedTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Either[ValidationError, Transaction]])) {
       case ((currentState, seq), tx) =>
@@ -300,7 +300,6 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     }
     validatedTxs
   }
-
 
   def validateCorrectIssueAndReissueTxs(txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     type IssueId = String

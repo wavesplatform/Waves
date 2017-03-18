@@ -19,46 +19,20 @@ import scala.util.{Left, Right}
 object TransactionDiffer {
   def apply(settings: FunctionalitySettings, time: Long, height: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      t0 <- GeneralValidation(s, settings, time, tx)
-      t1 <- PaymentTransactionIncrementingTimestampValidation(s, settings)(t0)
-      t2 <- ReissueBurnTransactionsValidation(s)(t1)
-      t3 <- GenesisTransactionValidation(height)(t2)
-    } yield {
-      t2 match {
-        case gtx: GenesisTransaction =>
-          Diff(height = height,
-            tx = gtx,
-            portfolios = Map(gtx.recipient -> Portfolio(
-              balance = gtx.amount,
-              effectiveBalance = gtx.amount,
-              assets = Map.empty)),
-            issuedAssets = Map.empty)
-        case ptx: PaymentTransaction => {
-          Diff(height = height,
-            tx = ptx,
-            portfolios = Map(
-              ptx.recipient -> Portfolio(
-                balance = ptx.amount,
-                effectiveBalance = ptx.amount,
-                assets = Map.empty)) combine Map(
-              Account.fromPublicKey(ptx.sender.publicKey) -> Portfolio(
-                balance = -ptx.amount - ptx.fee,
-                effectiveBalance = -ptx.amount - ptx.fee,
-                assets = Map.empty
-              )
-            ),
-            issuedAssets = Map.empty
-          )
-        }
+      transaction <- GeneralValidation(s, settings, time, tx)
+      diff <- transaction match {
+        case gtx: GenesisTransaction => GenesisTransactionDiff(height)(gtx)
+        case ptx: PaymentTransaction => PaymentTransactionDiff(s, settings, height)(ptx)
+        case itx: IssueTransaction => AssetTransactionsDiff.issue(s, height)(itx)
+        case rtx: ReissueTransaction => AssetTransactionsDiff.reissue(s, height)(rtx)
+        case btx: BurnTransaction => AssetTransactionsDiff.burn(s, height)(btx)
       }
-    }
+    } yield diff
   }
 }
 
-object GenesisTransactionValidation {
-  def apply(height: Int)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
-    case gtx: GenesisTransaction if height != 1 => Left(TransactionValidationError(tx, "GenesisTranaction cannot appear in non-initial block"))
-    case _ => Right(tx)
+object BalanceDiffValidation {
+  def apply[T <: Transaction](s: StateReader, settings: FunctionalitySettings)(tx: T, d: Diff): Either[TransactionValidationError, Diff] = {
+    ???
   }
-
 }
