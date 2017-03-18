@@ -26,6 +26,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
   private def validAgainstStateOneByOne(height: Int, txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]]
   = txs.map(t => validateAgainstState(t, height))
 
+  // migrated
   private def validateAssetReissueBurnTransactions(tx: Transaction): Either[StateValidationError, Transaction] = {
     def isIssuerAddress(assetId: Array[Byte], tx: SignedTransaction): Either[StateValidationError, SignedTransaction] = {
       s.findTransaction[Transaction](assetId) match {
@@ -88,12 +89,14 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     }
   }
 
+  // migrated
   private def disallowDuplicateIds(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case tx: PaymentTransaction if tx.timestamp < settings.requirePaymentUniqueId => Right(tx)
     case tx: Transaction => if (s.included(tx.id).isEmpty) Right(tx)
     else Left(TransactionValidationError(tx, "(except for some cases of PaymentTransaction) cannot be duplicated"))
   }
 
+  // migrated
   private def disallowBeforeActivationTime(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case tx: BurnTransaction if tx.timestamp <= settings.allowBurnTransactionAfterTimestamp =>
       Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowBurnTransactionAfterTimestamp}"))
@@ -118,6 +121,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
   }
 
+  // migrated
   private def incrementingTimestamp(transaction: Transaction): Either[StateValidationError, Transaction] = {
 
     def isTimestampCorrect(tx: PaymentTransaction): Boolean = {
@@ -176,6 +180,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     }
   }
 
+  // migrated(2)
   private def filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     val allowInvalidPaymentTransactionsByTimestamp = txs.nonEmpty && txs.map(_.timestamp).max < settings.allowInvalidPaymentTransactionsByTimestamp
     if (allowInvalidPaymentTransactionsByTimestamp) {
@@ -188,6 +193,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     }
   }
 
+  // migrated(2)
   private def invalidatePaymentTransactionsByTimestamp(transactions: Seq[Transaction]): Seq[Transaction] = {
     val paymentTransactions = transactions.filter(_.isInstanceOf[PaymentTransaction])
       .map(_.asInstanceOf[PaymentTransaction])
@@ -215,6 +221,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     selection.foldLeft(List[Transaction]()) { (l, s) => l ++ s._2._1 }
   }
 
+  // migrated
   private def filterTransactionsFromFuture(trans: Seq[Transaction], blockTime: Long): Seq[Either[ValidationError, Transaction]] = {
     val allowTransactionsFromFutureByTimestamp = trans.nonEmpty && trans.map(_.timestamp).max < settings.allowTransactionsFromFutureUntil
     if (allowTransactionsFromFutureByTimestamp) {
@@ -231,6 +238,16 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
 
   private def validateExchangeTxs(txs: Seq[Transaction], height: Int): Seq[Either[ValidationError, Transaction]] = {
 
+    def validateWithBlockTxs(tx: Transaction, blockTxs: Seq[Transaction]): Either[StateValidationError, Transaction] = tx match {
+      case om: ExchangeTransaction =>
+        val thisExchanges: Set[ExchangeTransaction] = blockTxs.collect {
+          case a: ExchangeTransaction if a != tx && (a.buyOrder == om.buyOrder || a.sellOrder == om.sellOrder) => a
+        }.toSet
+
+        ExchangeTransactionValidator.isValid(om, s.findPrevOrderMatchTxs(om) ++ thisExchanges)
+      case _ => Right(tx)
+    }
+
     txs.foldLeft(Seq.empty[Either[ValidationError, Transaction]]) {
       case (seq, tx) => validateWithBlockTxs(tx, seq.filter(_.isRight).map(_.right.get)) match {
         case Left(err) => Left(err) +: seq
@@ -239,15 +256,6 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     }.reverse
   }
 
-  private def validateWithBlockTxs(tx: Transaction, blockTxs: Seq[Transaction]): Either[StateValidationError, Transaction] = tx match {
-    case om: ExchangeTransaction =>
-      val thisExchanges: Set[ExchangeTransaction] = blockTxs.collect {
-        case a: ExchangeTransaction if a != tx && (a.buyOrder == om.buyOrder || a.sellOrder == om.sellOrder) => a
-      }.toSet
-
-      ExchangeTransactionValidator.isValid(om, s.findPrevOrderMatchTxs(om) ++ thisExchanges)
-    case _ => Right(tx)
-  }
 
   private def filterByBalanceApplicationErrors(allowUnissuedAssets: Boolean, trans: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     val (_, validatedTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Either[ValidationError, Transaction]])) {

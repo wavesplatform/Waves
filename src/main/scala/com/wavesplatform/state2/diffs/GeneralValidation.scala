@@ -10,6 +10,7 @@ import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTran
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import StateReader._
 import scala.util.{Left, Right}
+import scala.concurrent.duration._
 
 object GeneralValidation {
 
@@ -67,10 +68,23 @@ object GeneralValidation {
       }
     }
 
+    def disallowTxFromFuture(tx: T): Either[StateValidationError, T] = {
+      val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
+      if (allowTransactionsFromFutureByTimestamp) {
+        Right(tx)
+      } else {
+        if ((tx.timestamp - time).millis <= SimpleTransactionModule.MaxTimeTransactionOverBlockDiff)
+          Right(tx)
+        else Left(TransactionValidationError(tx, s"Transaction is from far future. BlockTime: $time"))
+      }
+    }
+
     disallowDuplicateIds(transaction)
       .flatMap(disallowBeforeActivationTime)
       .flatMap(addressAliasExists)
+      .flatMap(disallowTxFromFuture)
   }
+
 }
 
 

@@ -17,15 +17,16 @@ import scorex.utils.ByteArray
 import scala.util.{Left, Right}
 
 object TransactionDiffer {
-  def apply(settings: FunctionalitySettings, time: Long, h: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
+  def apply(settings: FunctionalitySettings, time: Long, height: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
       t0 <- GeneralValidation(s, settings, time, tx)
-      t1 <- PaymentTransactionIncrementingTimestampValidation(s,settings)(t0)
+      t1 <- PaymentTransactionIncrementingTimestampValidation(s, settings)(t0)
       t2 <- ReissueBurnTransactionsValidation(s)(t1)
+      t3 <- GenesisTransactionValidation(height)(t2)
     } yield {
       t2 match {
         case gtx: GenesisTransaction =>
-          Diff(height = h,
+          Diff(height = height,
             tx = gtx,
             portfolios = Map(gtx.recipient -> Portfolio(
               balance = gtx.amount,
@@ -33,7 +34,7 @@ object TransactionDiffer {
               assets = Map.empty)),
             issuedAssets = Map.empty)
         case ptx: PaymentTransaction => {
-          Diff(height = h,
+          Diff(height = height,
             tx = ptx,
             portfolios = Map(
               ptx.recipient -> Portfolio(
@@ -54,3 +55,10 @@ object TransactionDiffer {
   }
 }
 
+object GenesisTransactionValidation {
+  def apply(height: Int)(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
+    case gtx: GenesisTransaction if height != 1 => Left(TransactionValidationError(tx, "GenesisTranaction cannot appear in non-initial block"))
+    case _ => Right(tx)
+  }
+
+}
