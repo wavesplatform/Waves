@@ -33,13 +33,20 @@ package object state2 {
         .toMap)
   }
 
+  implicit val assetInfoMonoid = new Monoid[AssetInfo] {
+    override def empty: AssetInfo = AssetInfo(isReissuable = true, 0)
+
+    override def combine(x: AssetInfo, y: AssetInfo): AssetInfo
+    = AssetInfo(x.isReissuable && y.isReissuable, x.volume + y.volume)
+  }
+
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff(Map.empty, Map.empty, Map.empty)
 
     override def combine(older: Diff, newer: Diff): Diff = Diff(
       transactions = older.transactions ++ newer.transactions,
       portfolios = older.portfolios.combine(newer.portfolios),
-      issuedAssets = newer.issuedAssets ++ older.issuedAssets)
+      issuedAssets = newer.issuedAssets.combine(older.issuedAssets))
   }
 
   implicit val blockDiffMonoid = new Monoid[BlockDiff] {

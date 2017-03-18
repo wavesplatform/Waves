@@ -91,6 +91,7 @@ object StateReader {
         else None
       })
   }
+
 }
 
 class StateReaderImpl(p: JavaMapStorage) extends StateReader {
@@ -149,7 +150,8 @@ class CompositeStateReader(s: StateReader, blockDiff: BlockDiff) extends StateRe
   override def accountPortfolio(a: Account): Portfolio =
     s.accountPortfolio(a).combine(txDiff.portfolios.get(a).orEmpty)
 
-  override def assetInfo(id: ByteArray): Option[AssetInfo] = txDiff.issuedAssets.get(id).orElse(s.assetInfo(id))
+  override def assetInfo(id: ByteArray): Option[AssetInfo] =
+    s.assetInfo(id).map(_.combine(txDiff.issuedAssets.get(id).orEmpty))
 
   override def height: Int = s.height + blockDiff.heightDiff
 

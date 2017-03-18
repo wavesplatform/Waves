@@ -29,7 +29,12 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
     }
 
     txsDiff.issuedAssets.foreach { case (id, assetInfo) =>
-      p.assets.put(id.arr, (assetInfo.isReissuable, assetInfo.totalVolume))
+      val updated = Option(p.assets.get(id.arr)) match {
+        case None => implicitly[Monoid[AssetInfo]].empty
+        case Some(existing) =>
+          AssetInfo(existing._1, existing._2).combine(assetInfo)
+      }
+      p.assets.put(id.arr, (updated.isReissuable, updated.volume))
     }
 
     val affectedAccountsToIds = blockDiff.txsDiff.transactions.flatMap { case (id, (h, tx)) =>

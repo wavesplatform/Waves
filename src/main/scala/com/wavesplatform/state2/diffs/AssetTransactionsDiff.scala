@@ -14,7 +14,7 @@ object AssetTransactionsDiff {
     val assetId = EqByteArray(tx.assetId)
     val info = AssetInfo(
       isReissuable = tx.reissuable,
-      totalVolume = tx.quantity)
+      volume = tx.quantity)
     Right(Diff(height = height,
       tx = tx,
       portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
@@ -35,7 +35,7 @@ object AssetTransactionsDiff {
       val oldInfo = state.assetInfo(assetId).get
       if (oldInfo.isReissuable) {
         val newInfo = AssetInfo(
-          totalVolume = oldInfo.totalVolume + tx.quantity,
+          volume = oldInfo.volume + tx.quantity,
           isReissuable = itx.reissuable)
         Right(Diff(height = height,
           tx = tx,
@@ -59,7 +59,7 @@ object AssetTransactionsDiff {
     issueTxEi.map(itx => {
       val assetId = EqByteArray(tx.assetId)
       val oldInfo = state.assetInfo(assetId).get
-      val newInfo = oldInfo.copy(totalVolume = oldInfo.totalVolume - tx.amount)
+      val newInfo = oldInfo.copy(volume = oldInfo.volume - tx.amount)
       Diff(height = height,
         tx = tx,
         portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
