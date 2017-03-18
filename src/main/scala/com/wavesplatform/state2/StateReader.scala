@@ -30,10 +30,10 @@ trait StateReader {
 
 object StateReader {
 
-  implicit class StateReaderExt(r: StateReader) {
+  implicit class StateReaderExt(s: StateReader) {
     def assetDistribution(assetId: ByteArray): Map[Account, Long] =
-      r.nonEmptyAccounts
-        .flatMap(acc => r.accountPortfolio(acc).assets.get(assetId).map(acc -> _))
+      s.nonEmptyAccounts
+        .flatMap(acc => s.accountPortfolio(acc).assets.get(assetId).map(acc -> _))
         .toMap
 
     def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
@@ -66,8 +66,10 @@ object StateReader {
 
       // This is the old-style implementation, at least 80 blocks work fine
 
-      r.accountTransactionIds(account).toList
-        .flatMap(id => r.transactionInfo(id))
+      // The simplest and the fastest way is to add 'lastPaymentAccountTimestamp' to State and Diff
+
+      s.accountTransactionIds(account).toList
+        .flatMap(id => s.transactionInfo(id))
         .filter { case (h, t) => t.isInstanceOf[PaymentTransaction] }
         .map { case (h, t) => (h, t.asInstanceOf[PaymentTransaction]) }
         .filter { case (h, t) => t.sender.bytes sameElements account.bytes }
@@ -82,14 +84,13 @@ object StateReader {
     }
 
     def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
-    = r.transactionInfo(EqByteArray(signature)).map(_._2)
+    = s.transactionInfo(EqByteArray(signature)).map(_._2)
       .flatMap(tx => {
         if (ct.runtimeClass.isAssignableFrom(tx.getClass))
           Some(tx.asInstanceOf[T])
         else None
       })
   }
-
 }
 
 class StateReaderImpl(p: JavaMapStorage) extends StateReader {

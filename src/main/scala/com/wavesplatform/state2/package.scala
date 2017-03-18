@@ -4,6 +4,8 @@ import cats._
 import cats.implicits._
 import cats.Monoid
 
+import scala.util.Try
+
 package object state2 {
 
   case class EqByteArray(arr: Array[Byte]) {
@@ -17,11 +19,18 @@ package object state2 {
 
   type ByteArray = EqByteArray
 
+  private def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
+
   implicit val portfolioMonoid = new Monoid[Portfolio] {
     override def empty: Portfolio = Portfolio(0L, 0L, Map.empty)
 
     override def combine(older: Portfolio, newer: Portfolio): Portfolio
-    = Portfolio(older.balance + newer.balance, older.effectiveBalance + newer.effectiveBalance, older.assets.combine(newer.assets))
+    = Portfolio(
+      balance = safeSum(older.balance, newer.balance),
+      effectiveBalance = safeSum(older.effectiveBalance, newer.effectiveBalance),
+      assets = (older.assets.keys ++ newer.assets.keys)
+        .map(ba => ba -> safeSum(older.assets(ba), newer.assets(ba)))
+        .toMap)
   }
 
   implicit val diffMonoid = new Monoid[Diff] {

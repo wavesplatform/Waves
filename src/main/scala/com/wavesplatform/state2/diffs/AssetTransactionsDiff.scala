@@ -1,8 +1,8 @@
 package com.wavesplatform.state2.diffs
 
-import com.wavesplatform.state2.{AssetInfo, ByteArray, Diff, EqByteArray, Portfolio, StateReader}
+import com.wavesplatform.state2.{AssetInfo, Diff, EqByteArray, Portfolio, StateReader}
 import scorex.account.Account
-import scorex.transaction.{SignedTransaction, StateValidationError, Transaction}
+import scorex.transaction.StateValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 

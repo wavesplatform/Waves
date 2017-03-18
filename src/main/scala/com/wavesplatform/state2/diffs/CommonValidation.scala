@@ -12,7 +12,7 @@ import StateReader._
 import scala.util.{Left, Right}
 import scala.concurrent.duration._
 
-object GeneralValidation {
+object CommonValidation {
 
   def apply[T <: Transaction](state: StateReader, settings: FunctionalitySettings, time: Long, transaction: T): Either[ValidationError, T] = {
 
