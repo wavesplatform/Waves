@@ -2,7 +2,8 @@ package com.wavesplatform.state2.diffs
 
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{Diff, StateReader}
+import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{Diff}
 import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.TransactionValidationError
 

@@ -4,7 +4,8 @@ import cats._
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{BlockDiff, CompositeStateReader, Diff, EffectiveBalanceSnapshot, EqByteArray, Portfolio, StateReader}
+import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
+import com.wavesplatform.state2.{BlockDiff, Diff, EffectiveBalanceSnapshot, EqByteArray, Portfolio}
 import scorex.block.Block
 import scorex.transaction.{AssetAcc, ValidationError}
 

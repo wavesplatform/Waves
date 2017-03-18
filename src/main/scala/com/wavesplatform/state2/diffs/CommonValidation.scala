@@ -1,14 +1,15 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{EqByteArray, StateReader}
+import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.reader.StateReader
 import scorex.account.{Account, Alias}
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import StateReader._
+
 import scala.util.{Left, Right}
 import scala.concurrent.duration._
 

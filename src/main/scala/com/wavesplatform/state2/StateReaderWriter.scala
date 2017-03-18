@@ -5,6 +5,7 @@ import java.util
 import cats._
 import cats.implicits._
 import cats.Monoid
+import com.wavesplatform.state2.reader.StateReaderImpl
 import org.h2.mvstore.MVMap
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, SignedTransaction}
 

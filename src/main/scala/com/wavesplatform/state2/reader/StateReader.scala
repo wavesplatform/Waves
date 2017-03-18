@@ -1,12 +1,10 @@
-package com.wavesplatform.state2
+package com.wavesplatform.state2.reader
 
-import cats._
-import cats.implicits._
+import com.wavesplatform.state2._
 import scorex.account.Account
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.{PaymentTransaction, Transaction, TransactionParser}
+import scorex.transaction.{PaymentTransaction, Transaction}
 
-import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 import scala.reflect.ClassTag
 
 trait StateReader {
@@ -64,9 +62,7 @@ object StateReader {
       //        .sortBy(-_.timestamp)
       //        .collectFirst { case t => t }
 
-      // This is the old-style implementation, at least 80 blocks work fine
-
-      // The simplest and the fastest way is to add 'lastPaymentAccountTimestamp' to State and Diff
+      // #3 This is the old-style implementation, at least 80 blocks work fine
 
       s.accountTransactionIds(account).toList
         .flatMap(id => s.transactionInfo(id))
@@ -81,6 +77,8 @@ object StateReader {
         .collectFirst { case t => t }
         .map(_._2.sorted(TransactionsOrdering.InBlock).head)
 
+      // #4 The simplest and the fastest way is to add 'lastPaymentAccountTimestamp' to State and Diff
+
     }
 
     def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
@@ -92,74 +90,5 @@ object StateReader {
       })
   }
 
-}
-
-class StateReaderImpl(p: JavaMapStorage) extends StateReader {
-
-  override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] = Option(p.transactions.get(id.arr)).map {
-    case (h, bytes) => (h, TransactionParser.parseBytes(bytes).get)
-  }
-
-  override def accountPortfolio(a: Account): Portfolio = {
-    Option(p.portfolios.get(a.bytes)).map { case (b, e, as) => Portfolio(b, e, as.map { case (k, v) => EqByteArray(k) -> v }) }.orEmpty
-  }
-
-  override def assetInfo(id: ByteArray): Option[AssetInfo] = Option(p.assets.get(id.arr)).map {
-    case (is, amt) => AssetInfo(is, amt)
-  }
-
-  override def height: Int = p.getHeight
-
-  override def accountTransactionIds(a: Account): Seq[ByteArray] = {
-    Option(p.accountTransactionIds.get(a.bytes))
-      .map(_.asScala)
-      .map(_.toSeq)
-      .getOrElse(Seq.empty)
-      .map(EqByteArray)
-  }
-
-  override def nonEmptyAccounts: Seq[Account] =
-    p.portfolios
-      .keySet()
-      .asScala
-      .map(b => Account.fromBytes(b).right.get)
-      .toSeq
-
-  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, atHeight: Int, confs: Int): Long = {
-    val bockNumberThatIsConfsOld = Math.max(1, atHeight - confs)
-    val confsOldMinimum: Seq[(Long, Long)] = Range(bockNumberThatIsConfsOld + 1, atHeight + 1).flatMap { height =>
-
-      Option(p.effectiveBalanceSnapshots.get((acc.bytes, height)))
-        .map { case (prev, current) => if (height == 1) (current, current) else (prev, current) }
-    }
-    confsOldMinimum.headOption match {
-      case None => accountPortfolio(acc).effectiveBalance
-      case Some((prev, cur)) => Math.min(Math.min(prev, cur), confsOldMinimum.map(_._2).min)
-    }
-  }
-
-
-}
-
-class CompositeStateReader(s: StateReader, blockDiff: BlockDiff) extends StateReader {
-  private val txDiff = blockDiff.txsDiff
-
-  override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
-    txDiff.transactions.get(id).orElse(s.transactionInfo(id))
-
-  override def accountPortfolio(a: Account): Portfolio =
-    s.accountPortfolio(a).combine(txDiff.portfolios.get(a).orEmpty)
-
-  override def assetInfo(id: ByteArray): Option[AssetInfo] =
-    s.assetInfo(id).map(_.combine(txDiff.issuedAssets.get(id).orEmpty))
-
-  override def height: Int = s.height + blockDiff.heightDiff
-
-  override def nonEmptyAccounts: Seq[Account] =
-    s.nonEmptyAccounts ++ txDiff.portfolios.keySet
-
-  override def accountTransactionIds(a: Account): Seq[ByteArray] = ???
-
-  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long = ???
 }
 

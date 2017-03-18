@@ -3,9 +3,9 @@ package com.wavesplatform.state2.diffs
 import cats._
 import cats.implicits._
 import cats.Monoid
-
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{Diff, Portfolio, StateReader}
+import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{Diff, Portfolio}
 import scorex.account.Account
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.{PaymentTransaction, StateValidationError}

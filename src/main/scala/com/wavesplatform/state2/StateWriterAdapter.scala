@@ -2,6 +2,7 @@ package com.wavesplatform.state2
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.diffs.BlockDiffer
+import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json.JsObject
 import scorex.account.{Account, Alias}
 import scorex.block.Block
