@@ -9,7 +9,7 @@ class FreeSpecPG extends FreeSpec with Matchers {
 
   val s = "C:\\Users\\ilyas\\Desktop\\file.data"
 
-  "sdf" - {
+  "sdf" ignore {
     "init" in {
       val mVStore = new MVStore.Builder().fileName(s).open()
       val map: MVMap[Int, util.LinkedList[Array[Byte]]] = mVStore.openMap("some0")
