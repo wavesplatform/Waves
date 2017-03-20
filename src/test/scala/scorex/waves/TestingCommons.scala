@@ -365,46 +365,6 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   def matcherUrl(a: Application = application): String =
     "http://" + a.settings.matcherSettings.bindAddress + ":" + a.settings.matcherSettings.port + "/matcher"
 
-  def getRequest(us: String, peer: String = peerUrl(application),
-                 headers: Map[String, String] = Map.empty): JsValue = {
-    val request = Http(url(peer + us).GET <:< headers)
-    val response = Await.result(request, 10.seconds)
-    Json.parse(response.getResponseBody)
-  }
-
-  def matcherGetRequest(path: String, params: Map[String, String] = Map.empty): JsValue = {
-    val request = Http(url(matcherUrl() + path).GET <<? params)
-    val response = Await.result(request, 10.seconds)
-    Json.parse(response.getResponseBody)
-  }
-
-
-  def postRequest(us: String,
-                  params: Map[String, String] = Map.empty,
-                  body: String = "",
-                  headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
-                  peer: String = peerUrl(application)): JsValue = {
-    val response = postRequestWithResponse(us, params, body, headers, peer)
-    Json.parse(response.getResponseBody)
-  }
-
-  def matcherPostRequest(path: String, body: String = "",
-                         params: Map[String, String] = Map.empty,
-                         headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json")): JsValue = {
-    val request = Http(url(matcherUrl() + path).POST <:< headers <<? params << body)
-    val response = Await.result(request, 5.seconds)
-    Json.parse(response.getResponseBody)
-  }
-
-  def postRequestWithResponse(us: String,
-                              params: Map[String, String] = Map.empty,
-                              body: String = "",
-                              headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
-                              peer: String = peerUrl(application)): Response = {
-    val request = Http(url(peer + us).POST << params <:< headers << body)
-    Await.result(request, 5.seconds)
-  }
-
   def startGeneration(nodes: Seq[Application]): Unit = {
     nodes.foreach(_.blockGenerator ! StartGeneration)
   }
@@ -473,13 +433,13 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
                    method: Req => Req): Response = {
       val request = method match {
         case Request.GET =>
-          method(url(peer + us) <:< headers)
+          method(url(peer + us) <:< headers <<? params)
         case Request.POST =>
-          method(url(peer + us) <:< headers << body << params)
+          method(url(peer + us) <:< headers <<? params << body)
         case Request.DELETE =>
-          method(url(peer + us) <:< headers)
+          method(url(peer + us) <:< headers <<? params)
         case Request.OPTIONS =>
-          method(url(peer + us) <:< headers)
+          method(url(peer + us) <:< headers <<? params)
       }
       Await.result(Http(request), timeout)
     }

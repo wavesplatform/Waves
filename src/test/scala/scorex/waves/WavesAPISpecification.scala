@@ -20,7 +20,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val paymentJson = Json.toJson(payment)
     val json = paymentJson.toString
 
-    val response = postRequest(us = "/waves/create-signed-payment", body = json)
+    val response = POST.requestJson(us = "/waves/create-signed-payment", body = json)
     assert(response \ "timestamp" == paymentJson \ "timestamp")
     assert(response \ "amount" == paymentJson \ "amount")
     assert(response \ "fee" == paymentJson \ "fee")
@@ -37,7 +37,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val payment = SignedPayment(timestamp, amount, 100000L, recipient, Base58.encode(senderPublicKey.publicKey), senderPublicKey.address, Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
-    val response = postRequest(us = "/waves/external-payment", body = json)
+    val response = POST.requestJson(us = "/waves/external-payment", body = json)
     assert(response.toString == InvalidAddress.json.toString)
   }
 
@@ -50,7 +50,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val payment = SignedPayment(timestamp, amount, 100000L, recipient, Base58.encode(senderPublicKey.publicKey), senderPublicKey.address, Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
-    val response = postRequest(us = "/waves/external-payment", body = json)
+    val response = POST.requestJson(us = "/waves/external-payment", body = json)
     assert(response == InvalidAddress.json)
   }
 
@@ -63,7 +63,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val payment = SignedPayment(timestamp, amount, 100000L, recipient, Base58.encode(senderPublicKey.publicKey), senderPublicKey.address, Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
-    val response = postRequest(us = "/waves/external-payment", body = json)
+    val response = POST.requestJson(us = "/waves/external-payment", body = json)
     assert(response == InvalidSignature.json)
   }
 
@@ -76,7 +76,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val payment = SignedPayment(timestamp, amount, 100000L, recipient, Base58.encode(senderPublicKey.publicKey), senderPublicKey.address, Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
-    val response = postRequest(us = "/waves/external-payment", body = json)
+    val response = POST.requestJson(us = "/waves/external-payment", body = json)
     assert(response.toString == InvalidSignature.json.toString)
   }
 
@@ -91,7 +91,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val payment = SignedPayment(timestamp, amount, 100000L, recipient, Base58.encode(senderPublicKey.publicKey), senderPublicKey.address, Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
-    val response = postRequestWithResponse(us = "/waves/external-payment", body = json)
+    val response = POST.requestRaw(us = "/waves/external-payment", body = json)
     assert(response.getStatusCode == 400)
   }
 
@@ -104,7 +104,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val payment = SignedPayment(timestamp, amount, 100000L, recipient, Base58.encode(senderPublicKey.publicKey), senderPublicKey.address, Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
-    val response = postRequest(us = "/waves/broadcast-signed-payment", body = json)
+    val response = POST.requestJson(us = "/waves/broadcast-signed-payment", body = json)
     assert(response.toString == InvalidAddress.json.toString)
   }
 
@@ -117,7 +117,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     val payment = SignedPayment(timestamp, amount, 100000L, recipient, Base58.encode(senderPublicKey.publicKey), senderPublicKey.address, Base58.encode(signature))
     val json = Json.toJson(payment).toString
 
-    val response = postRequest(us = "/waves/broadcast-signed-payment", body = json)
+    val response = POST.requestJson(us = "/waves/broadcast-signed-payment", body = json)
     assert(response.toString == InsufficientFee.json.toString)
   }
 
@@ -130,7 +130,7 @@ class WavesAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
       "/waves/payment/signature")
     urls.foreach {
       url => {
-        val response = postRequestWithResponse(us = url)
+        val response = POST.requestRaw(us = url)
         assert(response.getHeaders("Access-Control-Allow-Origin").size == 1, url)
       }
     }

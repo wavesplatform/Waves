@@ -5,7 +5,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 
 class MinerSettingsSpecification extends FlatSpec with Matchers {
-  "MinerSettins" should "read values" in {
+  "MinerSettings" should "read values" in {
     val config = ConfigFactory.parseString(
       """
         |waves {
