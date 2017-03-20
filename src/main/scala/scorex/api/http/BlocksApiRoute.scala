@@ -127,7 +127,9 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   @Path("/last")
   @ApiOperation(value = "Last", notes = "Get last block data", httpMethod = "GET")
   def last: Route = (path("last") & get) {
-    complete(history.lastBlock.json)
+    val lastBlock = history.lastBlock
+    val height = history.heightOf(lastBlock).fold[JsValue](JsNull)(Json.toJson(_))
+    complete(lastBlock.json + ("height" -> height))
   }
 
   @Path("/first")
