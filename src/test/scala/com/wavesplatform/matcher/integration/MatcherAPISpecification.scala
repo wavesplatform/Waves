@@ -29,7 +29,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   private var ABalance = 0L
   private var ABalance1 = 0L
   private val TxFee = 100000L
-  private val storedState = application.storedState
+  private implicit val storedState = application.storedState
   private var orderIdToCancel = Option.empty[String]
 
   private val MatcherPubKey = application.wallet.privateKeyAccount(application.settings.matcherSettings.account).
@@ -63,33 +63,6 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
 
     waitForBalance(amount, from, Some(id))
     id
-  }
-
-  def assetTransfer(from: Account, to: Account, amount: Long, assetId: Option[String] = None) = {
-    val json =
-      s"""
-         |{
-         |  "recipient": "${to.address}",
-         |  "amount": $amount,
-         |  "attachment": "",
-         |  "sender": "${from.address}",
-         |  "fee": 100000
-         |}""".stripMargin
-
-    val req = Json.parse(json).validate[TransferRequest].get
-    val resp = POST.requestJson(us = "/assets/transfer", body = json)
-    (resp \ "id").as[String] should not be empty
-
-    waitForBalance(amount, to, None)
-  }
-
-  def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None): Unit = {
-    val assetId = asset.flatMap(Base58.decode(_).toOption)
-    eventually(timeout(5.seconds), interval(500.millis)) {
-      Thread.sleep(100)
-      storedState.assetBalance(
-        AssetAcc(acc, assetId)) should be(balance)
-    }
   }
 
   def placeBuy(acc: PrivateKeyAccount,
