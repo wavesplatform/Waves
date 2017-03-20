@@ -9,15 +9,12 @@ import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import io.netty.util.{HashedWheelTimer, Timeout, TimerTask}
+import io.netty.util.HashedWheelTimer
 import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.SECONDS
-import scala.concurrent.{Future, Promise}
-import scala.util.{Failure, Success}
+import scala.concurrent.duration._
 
 case class NodeInfo(
     hostRestApiPort: Int,
@@ -27,24 +24,18 @@ case class NodeInfo(
     containerId: String)
 
 trait Docker extends AutoCloseable {
-  def startNode(nodeConfig: Config = ConfigFactory.empty()): Future[Node]
+  def startNode(nodeConfig: Config = ConfigFactory.empty()): Node
   def stopNode(containerId: String)
+  def scheduleOnce(initialDelay: FiniteDuration)(f: => Any): Unit
 }
 
 object Docker extends ScorexLogging {
-  private case class WaitForNode(containerId: String, node: Node, promise: Promise[Node]) extends TimerTask {
-    override def run(timeout: Timeout): Unit = node.status.onComplete {
-      case Success(_) => promise.complete(Success(node))
-      case Failure(_) =>
-        log.info(s"Re-requesting node status from container $containerId")
-        timeout.timer().newTimeout(this, 1, SECONDS)
-    }
-  }
-
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
   private val imageId = System.getProperty("docker.imageId")
-  private val http = asyncHttpClient(config().setMaxConnections(50).setMaxRequestRetry(10))
+  private val http = asyncHttpClient(config()
+    .setMaxConnections(50)
+    .setMaxRequestRetry(1))
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.root().render(ConfigRenderOptions.concise())
@@ -70,7 +61,7 @@ object Docker extends ScorexLogging {
       case (ni, index) => s"-Dwaves.network.known-peers.$index=${ni.ipAddress}:${ni.containerNetworkPort}"
     } mkString " "
 
-    override def startNode(nodeConfig: Config): Future[Node] = {
+    override def startNode(nodeConfig: Config): Node = {
       val configOverrides = s"$knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
       val actualConfig = nodeConfig
         .withFallback(suiteConfig)
@@ -112,15 +103,15 @@ object Docker extends ScorexLogging {
         containerId)
       nodes += containerId -> nodeInfo
 
-      val p = Promise[Node]
-      timer.newTimeout(WaitForNode(containerId, new Node(actualConfig, nodeInfo, http, timer), p), 0, SECONDS)
-      p.future.onComplete(_ => log.info(s"Node ${nodeInfo.containerId} started up"))
-      p.future
+      new Node(actualConfig, nodeInfo, http, timer)
     }
 
     override def stopNode(containerId: String): Unit = {
       client.stopContainer(containerId, 10)
     }
+
+    override def scheduleOnce(initialDelay: FiniteDuration)(f: => Any) =
+      timer.newTimeout(_ => f, initialDelay.toMillis, MILLISECONDS)
 
     override def close(): Unit = {
       timer.stop()
