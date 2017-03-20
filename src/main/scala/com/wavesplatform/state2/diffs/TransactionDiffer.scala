@@ -10,8 +10,10 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 object TransactionDiffer {
   def apply(settings: FunctionalitySettings, time: Long, height: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      transaction <- CommonValidation(s, settings, time, tx)
-      diff <- transaction match {
+      t0 <- CommonValidation.disallowTxFromFuture(s, settings, time, tx)
+      t1 <- CommonValidation.disallowBeforeActivationTime(s, settings, t0)
+      t2 <- CommonValidation.disallowDuplicateIds(s, settings, t1)
+      diff <- t2 match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(height)(gtx)
         case ptx: PaymentTransaction => PaymentTransactionDiff(s, settings, height)(ptx)
         case itx: IssueTransaction => AssetTransactionsDiff.issue(s, height)(itx)
