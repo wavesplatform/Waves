@@ -30,7 +30,7 @@ object BalanceDiffValidation {
     if (time >= settings.allowTemporaryNegativeUntil || leadsToPositiveState) {
       Right(d)
     } else {
-      Left(TransactionValidationError(tx, "Transaction application leads to temporary negative balance"))
+      Left(TransactionValidationError(tx, "Transaction application leads to (temporary) negative balance/effectiveBalance/assetBalance"))
     }
   }
 }

@@ -48,6 +48,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     }
   }
 
+  // migrated
   private def validateLeaseTransactions(tx: Transaction): Either[StateValidationError, Transaction] = tx match {
     case tx: LeaseCancelTransaction =>
       val leaseOpt = s.findTransaction[LeaseTransaction](tx.leaseId)
@@ -257,6 +258,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     }.reverse
   }
 
+  // migrated
   private def filterByBalanceApplicationErrors(allowUnissuedAssets: Boolean, trans: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     val (_, validatedTxs) = trans.foldLeft((Map.empty[AssetAcc, (AccState, ReasonIds)], Seq.empty[Either[ValidationError, Transaction]])) {
       case ((currentState, seq), tx) =>
@@ -301,6 +303,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     validatedTxs
   }
 
+  // migrated
   def validateCorrectIssueAndReissueTxs(txs: Seq[Transaction]): Seq[Either[ValidationError, Transaction]] = {
     type IssueId = String
     type IsReissuable = Boolean

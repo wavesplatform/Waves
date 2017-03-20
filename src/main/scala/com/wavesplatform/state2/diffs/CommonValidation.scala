@@ -47,28 +47,6 @@ object CommonValidation {
       case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
     }
 
-    def addressAliasExists(tx: T): Either[StateValidationError, T] = {
-      val maybeAlias = tx match {
-        case ltx: LeaseTransaction => ltx.recipient match {
-          case a: Account => None
-          case a: Alias => Some(a)
-        }
-        case ttx: TransferTransaction => ttx.recipient match {
-          case a: Account => None
-          case a: Alias => Some(a)
-        }
-        case _ => None
-      }
-
-      maybeAlias match {
-        case None => Right(tx)
-        //        case Some(al) => state.resolveAlias(al) match {
-        //          case Some(add) => Right(tx)
-        //          case None => Left(AliasNotExists(al))
-        //        }
-      }
-    }
-
     def disallowTxFromFuture(tx: T): Either[StateValidationError, T] = {
       val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
       if (allowTransactionsFromFutureByTimestamp) {
@@ -82,7 +60,6 @@ object CommonValidation {
 
     disallowDuplicateIds(transaction)
       .flatMap(disallowBeforeActivationTime)
-      .flatMap(addressAliasExists)
       .flatMap(disallowTxFromFuture)
   }
 

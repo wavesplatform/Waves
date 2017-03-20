@@ -411,7 +411,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     newBalances
   }
 
-  def totalAssetQuantity(assetId: AssetId): Long = {
+  def   totalAssetQuantity(assetId: AssetId): Long = {
     val asset = Base58.encode(assetId)
     val heights = storage.getHeights(asset)
 
