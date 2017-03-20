@@ -44,7 +44,7 @@ package object state2 {
     override def empty: Diff = Diff(Map.empty, Map.empty, Map.empty)
 
     override def combine(older: Diff, newer: Diff): Diff = Diff(
-      transactions = older.transactions ++ newer.transactions,
+      transactions = newer.transactions ++ older.transactions,
       portfolios = older.portfolios.combine(newer.portfolios),
       issuedAssets = newer.issuedAssets.combine(older.issuedAssets))
   }

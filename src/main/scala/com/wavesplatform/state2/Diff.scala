@@ -3,7 +3,7 @@ package com.wavesplatform.state2
 import cats._
 import cats.implicits._
 import scorex.account.Account
-import scorex.transaction.Transaction
+import scorex.transaction.{GenesisTransaction, PaymentTransaction, SignedTransaction, Transaction}
 
 case class BlockDiff(txsDiff: Diff, heightDiff: Int, effectiveBalanceSnapshots: Seq[EffectiveBalanceSnapshot])
 
@@ -22,8 +22,28 @@ object Diff {
 
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)
-  }
 
+    def accountTransactionIds: Map[ByteArray, List[ByteArray]] = {
+      d.transactions.map { case (id, (h, tx)) =>
+        val senderBytes = tx match {
+          case stx: SignedTransaction => stx.sender.bytes
+          case ptx: PaymentTransaction => ptx.sender.bytes
+          case gtx: GenesisTransaction => Array.empty[Byte]
+          case _ => ???
+        }
+
+        val recipientBytes = tx match {
+          case gtx: GenesisTransaction => gtx.recipient.bytes
+          case ptx: PaymentTransaction => ptx.recipient.bytes
+          case _ => ???
+        }
+        //      if (senderBytes sameElements recipientBytes)
+        //        Map(EqByteArray(senderBytes) -> List(id, id))
+        //      else
+        Map(EqByteArray(senderBytes) -> List(id), EqByteArray(recipientBytes) -> List(id))
+      }.foldLeft(Map.empty[ByteArray, List[ByteArray]]){case (agg, m) => m.combine(agg)}
+    }
+  }
 }
 
 case class EffectiveBalanceSnapshot(acc: Account, height: Int, prevEffectiveBalance: Long, effectiveBalance: Long)

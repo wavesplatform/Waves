@@ -38,35 +38,14 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       p.assets.put(id.arr, (updated.isReissuable, updated.volume))
     }
 
-    val affectedAccountsToIds = blockDiff.txsDiff.transactions.flatMap { case (id, (h, tx)) =>
-      val senderBytes = tx match {
-        case stx: SignedTransaction => stx.sender.bytes
-        case ptx: PaymentTransaction => ptx.sender.bytes
-        case gtx: GenesisTransaction => Array.empty[Byte]
-        case _ => ???
-      }
-
-      val recipientBytes = tx match {
-        case gtx: GenesisTransaction => gtx.recipient.bytes
-        case ptx: PaymentTransaction => ptx.recipient.bytes
-        case _ => ???
-      }
-
-      if (senderBytes sameElements recipientBytes)
-        Map(senderBytes -> id)
-      else
-        Map(senderBytes -> id, recipientBytes -> id)
-    }
-
-
-    affectedAccountsToIds.foreach { case (senderBytes, txId) =>
+    blockDiff.txsDiff.accountTransactionIds.foreach { case (EqByteArray(senderBytes), txIds) =>
       Option(p.accountTransactionIds.get(senderBytes)) match {
         case Some(ll) =>
-          ll.add(txId.arr)
+          txIds.reverse.foreach(txId => ll.add(0, txId.arr))
           p.accountTransactionIds.put(senderBytes, ll)
         case None =>
           val newList = new util.ArrayList[Array[Byte]]()
-          newList.add(0, txId.arr)
+          txIds.reverse.foreach(txId => newList.add(0, txId.arr))
           p.accountTransactionIds.put(senderBytes, newList)
       }
     }

@@ -22,7 +22,10 @@ class CompositeStateReader(s: StateReader, blockDiff: BlockDiff) extends StateRe
   override def nonEmptyAccounts: Seq[Account] =
     s.nonEmptyAccounts ++ txDiff.portfolios.keySet
 
-  override def accountTransactionIds(a: Account): Seq[ByteArray] = ???
+  override def accountTransactionIds(a: Account): Seq[ByteArray] = {
+    val fromDiff = txDiff.accountTransactionIds.get(EqByteArray(a.bytes)).orEmpty
+    fromDiff ++ s.accountTransactionIds(a)
+  }
 
   override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long = ???
 }

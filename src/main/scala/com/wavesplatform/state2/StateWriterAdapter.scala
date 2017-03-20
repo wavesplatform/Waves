@@ -79,7 +79,9 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
       case Right(blockDiff) =>
         r.applyBlockDiff(blockDiff)
         this
-      case Left(m) => ???
+      case Left(m) =>
+        println(m)
+        ???
     }
   }
 
