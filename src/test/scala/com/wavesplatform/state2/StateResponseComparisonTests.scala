@@ -56,7 +56,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     applyFirstBlocks(end)
   }
 
-  "assert state" in {
+  "assert state" ignore {
     val (old, nev) = {
       val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
       val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))

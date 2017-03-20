@@ -16,8 +16,8 @@ import scala.concurrent.duration._
 object CommonValidation {
 
   def disallowDuplicateIds[T <: Transaction](state: StateReader, settings: FunctionalitySettings, tx: T): Either[ValidationError, T] = tx match {
-    case tx: PaymentTransaction if tx.timestamp < settings.requirePaymentUniqueId => Right(tx)
-    case tx: Transaction => if (state.transactionInfo(EqByteArray(tx.id)).isEmpty) Right(tx)
+    case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueId => Right(tx)
+    case _: Transaction => if (state.transactionInfo(EqByteArray(tx.id)).isEmpty) Right(tx)
     else Left(TransactionValidationError(tx, "(except for some cases of PaymentTransaction) cannot be duplicated"))
   }
 
