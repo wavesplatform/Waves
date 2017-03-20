@@ -34,7 +34,7 @@ class ValidChainGenerationSpec(docker: Docker) extends FreeSpec with Matchers wi
     }
 
     log.debug("Generating transactions...")
-    Await.result(Future.traverse(1 to 100)(_ => makeTransfer()), 20.seconds)
+    Await.result(Future.traverse(1 to 1000)(_ => makeTransfer()), 20.seconds)
     log.debug("Done")
   }
 }

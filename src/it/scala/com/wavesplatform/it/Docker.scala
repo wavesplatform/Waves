@@ -1,6 +1,5 @@
 package com.wavesplatform.it
 
-import java.util.concurrent.Executors
 import java.util.{Collections, Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -11,13 +10,13 @@ import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import io.netty.util.{HashedWheelTimer, Timeout, TimerTask}
-import org.asynchttpclient.DefaultAsyncHttpClient
+import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.SECONDS
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
 case class NodeInfo(
@@ -45,7 +44,7 @@ object Docker extends ScorexLogging {
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
   private val imageId = System.getProperty("docker.imageId")
-  private val http = new DefaultAsyncHttpClient()
+  private val http = asyncHttpClient(config().setMaxConnections(50).setMaxRequestRetry(10))
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.root().render(ConfigRenderOptions.concise())
@@ -113,10 +112,8 @@ object Docker extends ScorexLogging {
         containerId)
       nodes += containerId -> nodeInfo
 
-      implicit val ec = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
-
       val p = Promise[Node]
-      timer.newTimeout(WaitForNode(containerId, new Node(actualConfig, nodeInfo, http), p), 0, SECONDS)
+      timer.newTimeout(WaitForNode(containerId, new Node(actualConfig, nodeInfo, http, timer), p), 0, SECONDS)
       p.future.onComplete(_ => log.info(s"Node ${nodeInfo.containerId} started up"))
       p.future
     }
@@ -128,7 +125,7 @@ object Docker extends ScorexLogging {
     override def close(): Unit = {
       timer.stop()
       log.info("Stopping containers")
-//      nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
+      nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
       client.close()
       http.close()
     }

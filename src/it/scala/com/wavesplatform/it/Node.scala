@@ -1,15 +1,18 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.Config
+import io.netty.util.HashedWheelTimer
 import org.asynchttpclient.{AsyncHttpClient, BoundRequestBuilder, Response}
 import play.api.libs.json._
+import play.api.libs.json.Json._
+import scorex.api.http.assets.TransferRequest
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, Future}
 
 
-class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient) {
+class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: HashedWheelTimer) {
   import Node._
 
   val privateKey = config.getString("private-key")
@@ -23,10 +26,13 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient) {
       .toScala
 
   def post(path: String, f: BoundRequestBuilder => BoundRequestBuilder = identity): Future[Response] =
-    f(client.preparePost(s"http://localhost:${nodeInfo.hostRestApiPort}$path"))
-      .execute()
-      .toCompletableFuture
-      .toScala
+    f(client
+      .preparePost(s"http://localhost:${nodeInfo.hostRestApiPort}$path")
+      .setHeader("api_key", "integration-test-rest-api")
+      .setHeader("Content-type", "application/json"))
+        .execute()
+        .toCompletableFuture
+        .toScala
 
   def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
@@ -37,16 +43,10 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient) {
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[String] =
     post(
       "/assets/transfer",
-      _.setHeader("api_key", "integration-test-rest-api")
-        .setHeader("Content-type", "application/json")
-        .setBody(Json.stringify(Json.obj(
-        "assetId" -> JsNull,
-        "feeAssetId" -> JsNull,
-        "amount" -> amount,
-        "fee" -> fee,
-        "sender" -> sourceAddress,
-        "recipient" -> recipient,
-        "attachment" -> JsNull)))).map(_.getResponseBody)
+      _.setBody(stringify(toJson(
+          TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)
+        )))
+    ).map(_.getResponseBody)
 }
 
 object Node {
