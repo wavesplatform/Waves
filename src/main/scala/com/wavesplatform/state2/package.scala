@@ -29,7 +29,7 @@ package object state2 {
       balance = safeSum(older.balance, newer.balance),
       effectiveBalance = safeSum(older.effectiveBalance, newer.effectiveBalance),
       assets = (older.assets.keys ++ newer.assets.keys)
-        .map(ba => ba -> safeSum(older.assets(ba), newer.assets(ba)))
+        .map(ba => ba -> safeSum(older.assets.getOrElse(ba, 0), newer.assets.getOrElse(ba, 0)))
         .toMap)
   }
 

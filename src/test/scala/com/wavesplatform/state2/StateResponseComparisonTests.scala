@@ -18,7 +18,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
   }
 
 
-  val CHECK_BLOCKS = Seq(100)
+  val CHECK_BLOCKS = Range(1,100)
   val APPLY_TO = 28001
 
 
@@ -70,7 +70,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
               }
             }
           }
-          s"lastAccountPaymentTransaction" in {
+          s"lastAccountPaymentTransaction" ignore {
             for (acc <- aliveAccounts) {
               val oldPtx = old.state.lastAccountPaymentTransaction(acc)
               val nevPtx = nev.state.lastAccountPaymentTransaction(acc)

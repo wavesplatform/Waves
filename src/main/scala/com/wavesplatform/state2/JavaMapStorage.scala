@@ -11,6 +11,7 @@ trait JavaMapStorage {
   val assets: java.util.Map[Array[Byte], (Boolean, Long)]
   val accountTransactionIds: java.util.Map[Array[Byte], java.util.List[Array[Byte]]]
   val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long)]
+  val paymentTransactionHashes: util.Map[Array[Byte], Array[Byte]]
 
   def getHeight: Int
 
@@ -34,4 +35,6 @@ class MVStorePrimitiveImpl(db: MVStore) extends JavaMapStorage {
   def setHeight(i: Int): Unit = variables.put(heightKey, i)
 
   override val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long)] = db.openMap("effectiveBalanceUpdates")
+
+  override val paymentTransactionHashes: MVMap[Array[Byte], Array[Byte]] = db.openMap("paymentTransactionHashes")
 }

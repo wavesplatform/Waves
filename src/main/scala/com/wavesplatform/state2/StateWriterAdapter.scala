@@ -23,9 +23,7 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
   override def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] =
     r.accountTransactionIds(account).flatMap(r.transactionInfo).map(_._2)
 
-  override def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = {
-    r.lastAccountPaymentTransaction(account)
-  }
+  override def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = ??? // not needed
 
   override def balance(account: Account): Long = r.accountPortfolio(account).balance
 

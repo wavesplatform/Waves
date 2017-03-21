@@ -50,11 +50,16 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       }
     }
 
+    blockDiff.txsDiff.paymentTransactionIdsByHashes.foreach { case (EqByteArray(hash), EqByteArray(id)) =>
+      p.paymentTransactionHashes.put(hash, id)
+    }
+
     blockDiff.effectiveBalanceSnapshots.foreach { ebs =>
       p.effectiveBalanceSnapshots.put((ebs.acc.bytes, ebs.height), (ebs.prevEffectiveBalance, ebs.effectiveBalance))
     }
 
     p.setHeight(p.getHeight + blockDiff.heightDiff)
+
   }
 
 }

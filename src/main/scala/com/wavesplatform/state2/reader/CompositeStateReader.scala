@@ -3,7 +3,7 @@ package com.wavesplatform.state2.reader
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.Account
-import scorex.transaction.Transaction
+import scorex.transaction.{PaymentTransaction, Transaction}
 
 class CompositeStateReader(s: StateReader, blockDiff: BlockDiff) extends StateReader {
   private val txDiff = blockDiff.txsDiff
@@ -28,4 +28,8 @@ class CompositeStateReader(s: StateReader, blockDiff: BlockDiff) extends StateRe
   }
 
   override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long = ???
+
+  override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
+  = blockDiff.txsDiff.paymentTransactionIdsByHashes.get(hash)
+    .orElse(s.paymentTransactionIdByHash(hash))
 }

@@ -49,4 +49,7 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
       case Some((prev, cur)) => Math.min(Math.min(prev, cur), confsOldMinimum.map(_._2).min)
     }
   }
+
+  override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
+  = Option(p.paymentTransactionHashes.get(hash)).map(EqByteArray)
 }

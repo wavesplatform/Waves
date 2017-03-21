@@ -5,7 +5,7 @@ import cats.implicits._
 import cats.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{Diff, Portfolio}
+import com.wavesplatform.state2.{ByteArray, Diff, EqByteArray, Portfolio}
 import scorex.account.Account
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.{PaymentTransaction, StateValidationError}
@@ -13,19 +13,14 @@ import scorex.transaction.{PaymentTransaction, StateValidationError}
 import scala.util.{Left, Right}
 
 object PaymentTransactionDiff {
+
+  private val ExcetionTxIds = Seq.empty[ByteArray]
+
   def apply(stateReader: StateReader, settings: FunctionalitySettings, height: Int)(tx: PaymentTransaction): Either[StateValidationError, Diff] = {
 
-    lazy val isTimestampCorrect: Boolean = {
-      val maybePreviousPmtTx: Option[PaymentTransaction] = stateReader.lastAccountPaymentTransaction(tx.sender)
-      maybePreviousPmtTx match {
-        case Some(lastTransaction) => lastTransaction.timestamp < tx.timestamp
-        case None => true
-      }
-    }
-
-    val isCorrect = tx.timestamp < settings.allowInvalidPaymentTransactionsByTimestamp || isTimestampCorrect
-    if (!isCorrect)
-      Left(TransactionValidationError(tx, s" is earlier than previous transaction after time=${settings.allowInvalidPaymentTransactionsByTimestamp}"))
+    val maybePtxId = stateReader.paymentTransactionIdByHash(EqByteArray(tx.hash))
+    if (maybePtxId.exists(txId => !ExcetionTxIds.contains(txId)))
+      Left(TransactionValidationError(tx, s"PaymentTx hash already registered and is not an exception"))
     else Right(Diff(height = height,
       tx = tx,
       portfolios = Map(
