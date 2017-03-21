@@ -26,13 +26,13 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
   private def last = history.lastBlock
 
   test("GET /blocks/at/{height} API route") {
-    val response = GET.request(s"/blocks/at/1")
+    val response = GET.requestJson(s"/blocks/at/1")
     checkGenesis(response)
     (response \ "height").as[Int] shouldBe 1
   }
 
   test("GET /blocks/seq/{from}/{to} API route") {
-    val response = GET.request(s"/blocks/seq/1/3")
+    val response = GET.requestJson(s"/blocks/seq/1/3")
     checkGenesis(response(0).as[JsValue])
     checkBlock(response(1).as[JsValue])
     (response(1) \ "height").as[Int] shouldBe 2
@@ -40,47 +40,47 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
   }
 
   test("GET /blocks/last API route") {
-    val response = GET.request(s"/blocks/last")
+    val response = GET.requestJson(s"/blocks/last")
     checkBlock(response)
   }
 
   test("GET /blocks/height API route") {
-    val response = GET.request(s"/blocks/height")
+    val response = GET.requestJson(s"/blocks/height")
     (response \ "height").as[Int] shouldBe history.height()
   }
 
   test("GET /blocks/child/{signature} API route") {
-    val response = GET.request(s"/blocks/child/${genesis.encodedId}")
+    val response = GET.requestJson(s"/blocks/child/${genesis.encodedId}")
     checkBlock(response)
     (response \ "signature").as[String] shouldBe history.asInstanceOf[BlockChain].blockAt(2).get.encodedId
   }
 
   test("GET /blocks/delay/{signature}/{blockNum} API route") {
-    val response = GET.request(s"/blocks/delay/${last.encodedId}/1")
+    val response = GET.requestJson(s"/blocks/delay/${last.encodedId}/1")
     (response \ "delay").as[Long] should be > 0L
   }
 
   test("GET /blocks/height/{signature} API route") {
-    val response = GET.request(s"/blocks/height/${genesis.encodedId}")
+    val response = GET.requestJson(s"/blocks/height/${genesis.encodedId}")
     (response \ "height").as[Int] shouldBe 1
   }
 
   test("GET /blocks/signature/{signature} API route") {
     Base58.decode(genesis.encodedId).toOption.map(signature => history.blockById(signature)).isDefined shouldBe true
-    checkGenesis(GET.request(s"/blocks/signature/${genesis.encodedId}"))
-    val response = GET.request(s"/blocks/signature/${last.encodedId}")
+    checkGenesis(GET.requestJson(s"/blocks/signature/${genesis.encodedId}"))
+    val response = GET.requestJson(s"/blocks/signature/${last.encodedId}")
     checkBlock(response)
     (response \ "height").as[Int] shouldBe history.heightOf(last).get
   }
 
   test("GET /blocks/first API route") {
-    val response = GET.request(s"/blocks/first")
+    val response = GET.requestJson(s"/blocks/first")
     checkGenesis(response)
     (response \ "height").as[Int] shouldBe 1
   }
 
   test("GET /blocks/address/{address}/{from}/{to} API route") {
-    checkGenesis(GET.request(s"/blocks/address/3Mp6FarByk73bgv3CFnbrzMzWgLmMHAJnj2/0/1")(0).as[JsValue])
+    checkGenesis(GET.requestJson(s"/blocks/address/3Mp6FarByk73bgv3CFnbrzMzWgLmMHAJnj2/0/1")(0).as[JsValue])
   }
 
 
