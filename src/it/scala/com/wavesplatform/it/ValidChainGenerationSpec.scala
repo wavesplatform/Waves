@@ -16,7 +16,7 @@ class ValidChainGenerationSpec(allNodes: Seq[Node]) extends FreeSpec with ScalaF
     var balances = Await.result(Future.traverse(allNodes)(n => n.balance(n.address))
       .map(_.map(b => b.address -> b.balance).toMap), 30.seconds)
 
-    def makeTransfer(): Future[String] = {
+    def makeTransfer(): Future[Node.Transaction] = {
       val shuffledAddresses = Random.shuffle(addressToNode.keys)
       val sourceAddress = shuffledAddresses.head
       val sourceNode = addressToNode(sourceAddress)

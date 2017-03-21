@@ -1,25 +1,30 @@
 package com.wavesplatform.it
 
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.api.http.alias.CreateAliasRequest
+import scorex.transaction.TransactionParser.TransactionType
 
 import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class AliasTransactionSpec(allNodes: Seq[Node]) extends FreeSpec with Matchers {
   "Able to send money to an alias" in {
     val Seq(creator, sender) = Random.shuffle(allNodes).take(2)
+    val feeSettings = creator.settings.feesSettings.fees
+
+    val createAliasFee = feeSettings(TransactionType.CreateAliasTransaction.id).find(_.asset == "WAVES").get.fee
+    val transferFee = feeSettings(TransactionType.TransferTransaction.id).find(_.asset == "WAVES").get.fee
 
     val transferResult = for {
-      _ <- creator.post("/alias/create", CreateAliasRequest(creator.address, "TEST-ALIAS", 100000))
-      b <- creator.waitForNextBlock
+      fb <- creator.lastBlock
+      t <- creator.createAlias(creator.address, "TEST-ALIAS", createAliasFee)
+      b <- creator.findBlock(_.transactions.exists(_.id == t.id), fb.height)
       _ <- sender.waitForHeight(b.height)
-      t <- sender.transfer(sender.address, "alias:T:TEST_ALIAS", 1000000, 100000)
+      t <- sender.transfer(sender.address, s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:TEST_ALIAS", 1000000, transferFee)
     } yield t
 
-    println(Await.result(transferResult, 10.seconds))
+    println(Await.result(transferResult, 1.minute))
   }
 
   "Able to issue an alias and send money to an alias" in {

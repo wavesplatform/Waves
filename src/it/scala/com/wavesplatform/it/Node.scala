@@ -3,13 +3,16 @@ package com.wavesplatform.it
 import java.io.IOException
 
 import com.typesafe.config.Config
+import com.wavesplatform.settings.WavesSettings
 import io.netty.util.{HashedWheelTimer, Timeout, Timer}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.Json._
 import play.api.libs.json._
+import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets.TransferRequest
+import scorex.utils.ScorexLogging
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -19,12 +22,15 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 
-class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: HashedWheelTimer) {
+class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: HashedWheelTimer) extends ScorexLogging {
   import Node._
 
   val privateKey = config.getString("private-key")
   val publicKey = config.getString("public-key")
   val address = config.getString("address")
+  val settings = WavesSettings.fromConfig(config)
+
+  private val generationDelay = settings.minerSettings.generationDelay
 
   private def retrying(r: Request, interval: FiniteDuration = 200.millis): Future[Response] =
     timer.retryUntil[Response](client.executeRequest(r).toCompletableFuture.toScala, _ => true, interval)
@@ -44,23 +50,59 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
   }
 
-  def height: Future[Long] = get("/blocks/height").as[JsValue].map(v => { println(v); (v \ "height").as[Long]})
+  def height: Future[Long] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Long])
   def blockAt(height: Long) = get(s"/blocks/at/$height").as[Block]
   def lastBlock: Future[Block] = get("/blocks/last").as[Block]
+  def blockSeq(from: Long, to: Long) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
   def status: Future[Status] = get("/node/status").as[Status]
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
-  def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[String] =
-    post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient))
-      .map(_.getResponseBody)
+  def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
+    post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
-  def waitForHeight(targetHeight: Long): Future[Long] = timer.retryUntil[Long](height, _ >= targetHeight, 1.second)
+  def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
+    post("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
+
+  def waitForHeight(targetHeight: Long): Future[Long] =
+    timer.retryUntil[Long](height, _ >= targetHeight, generationDelay)
   def waitForNextBlock: Future[Block] = for {
     currentBlock <- lastBlock
-    actualBlock <- timer.retryUntil[Block](lastBlock, _.height >= currentBlock.height, 1.second)
+    actualBlock <- findBlock(_.height > currentBlock.height, currentBlock.height)
   } yield actualBlock
+
+  def findBlock(cond: Block => Boolean, from: Long = 1, to: Long = Long.MaxValue): Future[Block] = {
+    val p = Promise[Block]
+
+    def reschedule(_from: Long, _to: Long) = try {
+      timer.newTimeout(retrying(_from, _to), generationDelay.toMillis, MILLISECONDS)
+    } catch {
+      case NonFatal(t) => p.failure(t)
+    }
+
+    def retrying(_from: Long, _to: Long)(timeout: Timeout): Unit = blockSeq(_from, _to).onComplete {
+      case Success(blocks) =>
+        blocks.find(cond) match {
+          case Some(b) => p.success(b)
+          case None =>
+            log.info(s"Loaded blocks: $blocks")
+            val newFrom = blocks.lastOption.fold(_from)(_.height + 1)
+            if (newFrom > to) {
+              p.failure(new NoSuchElementException)
+            } else {
+              reschedule(newFrom, (newFrom + 99).min(to))
+            }
+        }
+      case Failure(t) =>
+        log.debug("Error loading blocks", t)
+        reschedule(_from, _to)
+    }
+
+    retrying(from, from + 99)(null)
+
+    p.future
+  }
 }
 
-object Node {
+object Node extends ScorexLogging {
   case class Status(blockGeneratorStatus: String, historySynchronizationStatus: String)
   implicit val statusFormat: Format[Status] = Json.format
 
@@ -70,7 +112,10 @@ object Node {
   case class Balance(address: String, confirmations: Int, balance: Long)
   implicit val balanceFormat: Format[Balance] = Json.format
 
-  case class Block(signature: String, height: Long, timestamp: Long, generator: String)
+  case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long)
+  implicit val transactionFormat: Format[Transaction] = Json.format
+
+  case class Block(signature: String, height: Long, timestamp: Long, generator: String, transactions: Seq[Transaction])
   implicit val blockFormat: Format[Block] = Json.format
 
   implicit class ResponseFutureExt(val f: Future[Response]) extends AnyVal {
@@ -80,7 +125,7 @@ object Node {
           println(r)
           Try(parse(r.getResponseBody).as[A])
         case Success(r) =>
-          println(r)
+          log.debug(s"Error parsing response ${r.getResponseBody}")
           Failure(new IOException(s"Unexpected status code: ${r.getStatusCode}"))
         case Failure(t) => Failure[A](t)
       }(ec)
