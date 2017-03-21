@@ -158,15 +158,5 @@ object BlockchainSettings {
 }
 
 object BlockchainSettingsExtension {
-
-  implicit class BackwardCompatibleBlockchainSettings(val blockchainSettings: BlockchainSettings) extends AnyVal {
-
-//    private def buildTransactions(transactionSettings: List[GenesisTransactionSettings]): Seq[GenesisTransaction] = {
-//      transactionSettings.map { ts =>
-//        GenesisTransaction
-//          .create(Account.fromString(ts.recipient).right.get, ts.amount, blockchainSettings.genesisSettings.timestamp)
-//          .right.get
-//      }
-//    }
-  }
+  implicit class BackwardCompatibleBlockchainSettings(val blockchainSettings: BlockchainSettings) extends AnyVal
 }
