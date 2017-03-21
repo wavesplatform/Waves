@@ -156,7 +156,3 @@ object BlockchainSettings {
     BlockchainSettings(file, addressSchemeCharacter, functionalitySettings, genesisSettings)
   }
 }
-
-object BlockchainSettingsExtension {
-  implicit class BackwardCompatibleBlockchainSettings(val blockchainSettings: BlockchainSettings) extends AnyVal
-}
