@@ -331,7 +331,10 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     val (err1, validAgainstConsecutivePayments) = filterIfPaymentTransactionWithGreaterTimesatampAlreadyPresent(validOneByOne).segregate()
     val (err2, filteredFarFuture) = filterTransactionsFromFuture(validAgainstConsecutivePayments, blockTime).segregate()
     val allowUnissuedAssets = filteredFarFuture.nonEmpty && validOneByOne.map(_.timestamp).max < settings.allowUnissuedAssetsUntil
-    val (err3, filterIncorrectIssueReissue) = validateCorrectIssueAndReissueTxs(filteredFarFuture).segregate()
+    val (err3, filterIncorrectIssueReissue) =
+      if (blockTime > settings.allowInvalidReissueInSameBlockUntilTimestamp)
+        validateCorrectIssueAndReissueTxs(filteredFarFuture).segregate()
+      else (err2, filteredFarFuture)
     val (err4, filteredOvermatch) = validateExchangeTxs(filterIncorrectIssueReissue, height).segregate()
     val (err5, result) = filterByBalanceApplicationErrors(allowUnissuedAssets, filteredOvermatch).segregate()
     (err0 ++ err1 ++ err2 ++ err3 ++ err4 ++ err5, result)

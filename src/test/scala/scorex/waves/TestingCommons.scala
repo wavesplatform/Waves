@@ -77,6 +77,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
       |        allow-createalias-transaction-after: 0
+      |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |      }
       |      genesis {
       |        timestamp: 1478000000000
@@ -185,6 +186,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
+      |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |        allow-createalias-transaction-after: 0
       |      }
       |      genesis {
@@ -270,6 +272,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
       |        allow-createalias-transaction-after: 0
+      |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |      }
       |      genesis {
       |        timestamp: 1478000000000

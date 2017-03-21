@@ -10,7 +10,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.state.AccState
-import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction}
+import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction, Transaction}
 import scorex.utils._
 
 import scala.util.{Left, Random, Right}

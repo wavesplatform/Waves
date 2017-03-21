@@ -44,12 +44,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     val assetAtHeight = s"$asset@$height"
     val assetAtTransaction = s"$asset@$transaction"
 
-    if (!(!isIssueExists(assetId) ||
-      (reissuable && isReissuable(assetId)) ||
-      !reissuable)) {
-      throw new RuntimeException("Asset is not reissuable")
-    }
-
     storage.setReissuable(asset, reissuable)
     storage.addHeight(asset, height)
     storage.addTransaction(assetAtHeight, transaction)
@@ -99,22 +93,9 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
   }
 
   def isReissuable(assetId: AssetId): Boolean = {
-    val asset = Base58.encode(assetId)
-    val heights = storage.getHeights(asset)
-
-    heights.lastOption match {
-      case Some(lastHeight) =>
-        val transactions = storage.getIssuanceTransactionsIds(s"$asset@$lastHeight")
-        if (transactions.nonEmpty) {
-          val transaction = transactions.last
-          storage.isReissuable(asset)
-        } else {
-          false
-        }
-      case None =>
-        false
-    }
+    storage.isReissuable(Base58.encode(assetId))
   }
+
 
   def applyExchangeTransaction(blockTs: Long)(tx: Transaction): Unit = tx match {
     case om: ExchangeTransaction =>
@@ -234,7 +215,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     val address = account.address
     storage.getAccountAssets(address).foldLeft(Map.empty[AssetId, (Long, Boolean, Long, IssueTransaction)]) { (result, asset) =>
       val triedAssetId = Base58.decode(asset)
-      val balance = balanceByKey(address + asset, _.balance, storage.stateHeight)
+      val balance: Long = balanceByKey(address + asset, _.balance, storage.stateHeight)
 
       if (triedAssetId.isSuccess) {
         val assetId = triedAssetId.get
@@ -295,7 +276,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
     applyChanges(newBalances, block.timestampField.value)
-
+    log.trace(s"New state height is ${storage.stateHeight}, hash: $hash")
     this
   }
 
@@ -367,6 +348,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
   private def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
+
     val newBalances: Map[AssetAcc, (AccState, Reasons)] = trans.foldLeft(fees) { case (changes, tx) =>
       val bcs = BalanceChangeCalculator.balanceChanges(this)(tx).right.get
       val newStateAfterBalanceUpdates = bcs.foldLeft(changes) { case (iChanges, bc) =>
@@ -420,6 +402,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     }
   }
 
+
   def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)],
                    blockTs: Long = NTP.correctedTime()): Unit = synchronized {
     storage.setStateHeight(storage.stateHeight + 1)
@@ -431,6 +414,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       registerAlias,
       applyExchangeTransaction(blockTs),
       registerTransactionById(height))
+
 
     // todo pass txs sequence for processing
     changes.flatMap(_._2._2).toSet.foreach((i:StateChangeReason) => i match {
