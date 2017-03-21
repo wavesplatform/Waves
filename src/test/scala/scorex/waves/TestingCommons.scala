@@ -13,7 +13,7 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 import play.api.libs.json._
 import scorex.account.Account
 import scorex.api.http.ApiKeyNotValid
-import scorex.api.http.assets.TransferRequest
+import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
 import scorex.crypto.encode.Base58
@@ -361,38 +361,50 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
     }
   }
 
-  def assetTransfer(from: Account, to: Account, amount: Long, assetId: Option[String] = None, assertSuccess: Boolean = true)(implicit storedState: StoredState): Unit = {
-    val json = Json.toJson(TransferRequest(None, None, amount, 100000, from.address, None, to.address)).toString()
-    val resp = POST.requestRaw(us = "/assets/transfer", body = json)
-    if (assertSuccess) {
-      require(resp.getStatusCode == 200)
-      waitForBalance(amount, to, None)
-    } else {
-      require(resp.getStatusCode != 200)
-    }
+  def assetTransfer(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, feeAssetId: Option[String] = None, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+    val json = Json.toJson(TransferRequest(assetId, feeAssetId, amount, fee, from.address, None, to.address)).toString()
+    makeTxRequest(POST.requestRaw(us = "/assets/transfer", body = json), assertSuccess)
+  }
+
+  def payment(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+    val json = Json.toJson(PaymentRequest(amount, fee, from.address, to.address)).toString()
+    makeTxRequest(POST.requestRaw(us = "/waves/payment", body = json), assertSuccess, idField = "signature")
+  }
+
+  def issue(from: Account, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long = 100000L, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+    val json = Json.toJson(IssueRequest(from.address, name, description, quantity, decimals, reissuable, fee)).toString()
+    makeTxRequest(POST.requestRaw(us = "/assets/issue", body = json), assertSuccess)
+  }
+
+  def reissue(from: Account, assetId: String, quantity: Long, reissuable: Boolean, fee: Long = 100000L, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+    val json = Json.toJson(ReissueRequest(from.address, assetId, quantity, reissuable, fee)).toString()
+    makeTxRequest(POST.requestRaw(us = "/assets/reissue", body = json), assertSuccess)
+  }
+
+  def burn(from: Account, assetId: String, quantity: Long, fee: Long = 100000L, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+    val json = Json.toJson(BurnRequest(from.address, assetId, quantity, fee)).toString()
+    makeTxRequest(POST.requestRaw(us = "/assets/burn", body = json), assertSuccess)
   }
 
   def lease(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
     val json = Json.toJson(LeaseRequest(from.address, amount, fee, to.address)).toString()
-    val resp = POST.requestRaw(us = "/leasing/lease", body = json)
-    if (assertSuccess) {
-      require(resp.getStatusCode == 200)
-      waitForNextBlock(application)
-      (Json.parse(resp.getResponseBody) \ "id").asOpt[String]
-    } else {
-      require(resp.getStatusCode != 200)
-      None
-    }
+    makeTxRequest(POST.requestRaw(us = "/leasing/lease", body = json), assertSuccess)
   }
 
   def cancelLease(from: Account, leaseTxId: String, fee: Long = 100000L, assertSuccess: Boolean = true)(implicit storedState: StoredState): Unit = {
     val json = Json.toJson(LeaseCancelRequest(from.address, leaseTxId, fee)).toString()
-    val resp = POST.requestRaw(us = "/leasing/cancel", body = json)
+    makeTxRequest(POST.requestRaw(us = "/leasing/cancel", body = json), assertSuccess)
+  }
+
+  def makeTxRequest(request: => Response, assertSuccess: Boolean = true, idField: String = "id"): Option[String] = {
+    val response = request
     if (assertSuccess) {
-      require(resp.getStatusCode == 200)
+      require(response.getStatusCode == 200)
       waitForNextBlock(application)
+      Some((Json.parse(response.getResponseBody) \ idField).asOpt[String].get) // id should exists
     } else {
-      require(resp.getStatusCode != 200)
+      require(response.getStatusCode != 200)
+      None
     }
   }
 
