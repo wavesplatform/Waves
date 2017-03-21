@@ -14,7 +14,7 @@ Please read [repo wiki article](https://github.com/wavesplatform/Waves/wiki/How-
 
 It is only possible to create deb and fat jar packages.
 
-#####Install SBT (Scala Build Tool):
+### Install SBT (Scala Build Tool):
 
 For Ubuntu/Debian:
 
@@ -28,7 +28,7 @@ For Ubuntu/Debian:
 
 You can install sbt on Mac OS X using Homebrew.
 
-#####Create package
+### Create package
 
 Clone this repo and execute
 
