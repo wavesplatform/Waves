@@ -138,8 +138,6 @@ class StoredBlockchain(db: MVStore)
 
   override def blockById(blockId: BlockId): Option[Block] = heightOf(blockId).flatMap(blockAt)
 
-  override def children(block: Block): Seq[Block] = heightOf(block).flatMap(h => blockAt(h + 1)).toSeq
-
   override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = {
     (from to to).toStream.flatMap { h =>
       blockAt(h).flatMap { block =>
