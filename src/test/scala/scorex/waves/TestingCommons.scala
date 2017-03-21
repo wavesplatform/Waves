@@ -361,37 +361,37 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
     }
   }
 
-  def assetTransfer(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, feeAssetId: Option[String] = None, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+  def assetTransfer(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, feeAssetId: Option[String] = None, assertSuccess: Boolean = true): Option[String] = {
     val json = Json.toJson(TransferRequest(assetId, feeAssetId, amount, fee, from.address, None, to.address)).toString()
     makeTxRequest(POST.requestRaw(us = "/assets/transfer", body = json), assertSuccess)
   }
 
-  def payment(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+  def payment(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, assertSuccess: Boolean = true): Option[String] = {
     val json = Json.toJson(PaymentRequest(amount, fee, from.address, to.address)).toString()
     makeTxRequest(POST.requestRaw(us = "/waves/payment", body = json), assertSuccess, idField = "signature")
   }
 
-  def issue(from: Account, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long = 100000L, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+  def issue(from: Account, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long = 100000L, assertSuccess: Boolean = true): Option[String] = {
     val json = Json.toJson(IssueRequest(from.address, name, description, quantity, decimals, reissuable, fee)).toString()
     makeTxRequest(POST.requestRaw(us = "/assets/issue", body = json), assertSuccess)
   }
 
-  def reissue(from: Account, assetId: String, quantity: Long, reissuable: Boolean, fee: Long = 100000L, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+  def reissue(from: Account, assetId: String, quantity: Long, reissuable: Boolean, fee: Long = 100000L, assertSuccess: Boolean = true): Option[String] = {
     val json = Json.toJson(ReissueRequest(from.address, assetId, quantity, reissuable, fee)).toString()
     makeTxRequest(POST.requestRaw(us = "/assets/reissue", body = json), assertSuccess)
   }
 
-  def burn(from: Account, assetId: String, quantity: Long, fee: Long = 100000L, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+  def burn(from: Account, assetId: String, quantity: Long, fee: Long = 100000L, assertSuccess: Boolean = true): Option[String] = {
     val json = Json.toJson(BurnRequest(from.address, assetId, quantity, fee)).toString()
     makeTxRequest(POST.requestRaw(us = "/assets/burn", body = json), assertSuccess)
   }
 
-  def lease(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, assertSuccess: Boolean = true)(implicit storedState: StoredState): Option[String] = {
+  def lease(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, assertSuccess: Boolean = true): Option[String] = {
     val json = Json.toJson(LeaseRequest(from.address, amount, fee, to.address)).toString()
     makeTxRequest(POST.requestRaw(us = "/leasing/lease", body = json), assertSuccess)
   }
 
-  def cancelLease(from: Account, leaseTxId: String, fee: Long = 100000L, assertSuccess: Boolean = true)(implicit storedState: StoredState): Unit = {
+  def cancelLease(from: Account, leaseTxId: String, fee: Long = 100000L, assertSuccess: Boolean = true): Unit = {
     val json = Json.toJson(LeaseCancelRequest(from.address, leaseTxId, fee)).toString()
     makeTxRequest(POST.requestRaw(us = "/leasing/cancel", body = json), assertSuccess)
   }
@@ -419,7 +419,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
   def waitForEffectiveBalance(balance: Long, acc: Account)(implicit storedState: StoredState): Unit = {
      eventually(timeout(5.seconds), interval(500.millis)) {
       Thread.sleep(100)
-      require(storedState.effectiveBalance(acc) == balance)
+       require(storedState.effectiveBalance(acc) == balance)
     }
   }
 
