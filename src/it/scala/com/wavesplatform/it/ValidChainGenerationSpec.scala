@@ -30,8 +30,8 @@ class ValidChainGenerationSpec(allNodes: Seq[Node]) extends FreeSpec with ScalaF
         case ((b, reqs), (src, dest)) =>
           val transferAmount = (Random.nextDouble() * 1e-3 * b(src)).toLong
 
-          var adjustedBalances = b + (src -> (b(src) - transferAmount))
-          adjustedBalances += dest -> (b(dest) + transferAmount)
+          b += src -> (b(src) - transferAmount)
+          b += dest -> (b(dest) + transferAmount)
 
           reqs += Req(src, dest, transferAmount, 100000)
 
