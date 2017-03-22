@@ -75,7 +75,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
     val p = Promise[Block]
 
     def reschedule(_from: Long, _to: Long) = try {
-      timer.newTimeout(retrying(_from, _to), generationDelay.toMillis, MILLISECONDS)
+      timer.newTimeout(retrying(_from, _to), (generationDelay.toMillis * 1.5).toLong, MILLISECONDS)
     } catch {
       case NonFatal(t) => p.failure(t)
     }
