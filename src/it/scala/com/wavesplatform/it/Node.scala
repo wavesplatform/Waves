@@ -8,11 +8,12 @@ import io.netty.util.{HashedWheelTimer, Timeout, Timer}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
+import org.slf4j.LoggerFactory
 import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets.TransferRequest
-import scorex.utils.ScorexLogging
+import scorex.utils.{LoggerFacade, ScorexLogging}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -22,7 +23,7 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 
-class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: HashedWheelTimer) extends ScorexLogging {
+class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: HashedWheelTimer) {
   import Node._
 
   val privateKey = config.getString("private-key")
@@ -31,6 +32,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
   val settings = WavesSettings.fromConfig(config)
 
   private val generationDelay = settings.minerSettings.generationDelay
+  private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
   private def retrying(r: Request, interval: FiniteDuration = 200.millis): Future[Response] =
     timer.retryUntil[Response](client.executeRequest(r).toCompletableFuture.toScala, _ => true, interval)
@@ -81,13 +83,15 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
     def retrying(_from: Long, _to: Long)(timeout: Timeout): Unit = blockSeq(_from, _to).onComplete {
       case Success(blocks) =>
         blocks.find(cond) match {
-          case Some(b) => p.success(b)
+          case Some(b) =>
+            log.debug(s"Found matching block ${b.signature}")
+            p.success(b)
           case None =>
-            log.info(s"Loaded blocks: $blocks")
             val newFrom = blocks.lastOption.fold(_from)(_.height + 1)
             if (newFrom > to) {
               p.failure(new NoSuchElementException)
             } else {
+              log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 99}]")
               reschedule(newFrom, (newFrom + 99).min(to))
             }
         }
@@ -122,7 +126,6 @@ object Node extends ScorexLogging {
     def as[A: Format](implicit ec: ExecutionContext): Future[A] =
       f.transform {
         case Success(r) if r.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200 =>
-          println(r)
           Try(parse(r.getResponseBody).as[A])
         case Success(r) =>
           log.debug(s"Error parsing response ${r.getResponseBody}")
