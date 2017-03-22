@@ -19,6 +19,8 @@ import scorex.wallet.Wallet
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
 case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: State) extends ApiRoute {
+  import AddressApiRoute._
+
   val MaxAddressesPerRequest = 1000
 
   override lazy val route =
@@ -178,7 +180,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def validate: Route = (path("validate" / Segment) & get) { address =>
-    complete(Json.obj("address" -> address, "valid" -> Account.fromString(address).isRight))
+    complete(Validity(address, Account.fromString(address).isRight))
   }
 
   @Path("/")
@@ -219,18 +221,18 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    Account.fromString(address).right.map(acc => ToResponseMarshallable(Json.obj(
-      "address" -> acc.address,
-      "confirmations" -> confirmations,
-      "balance" -> state.balanceWithConfirmations(acc, confirmations))))
+    Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
+      acc.address,
+      confirmations,
+      state.balanceWithConfirmations(acc, confirmations))))
       .getOrElse(InvalidAddress)
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    Account.fromString(address).right.map(acc => ToResponseMarshallable(Json.obj(
-      "address" -> acc.address,
-      "confirmations" -> confirmations,
-      "balance" -> state.effectiveBalanceWithConfirmations(acc, confirmations, state.stateHeight))))
+    Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
+      acc.address,
+      confirmations,
+      state.effectiveBalanceWithConfirmations(acc, confirmations, state.stateHeight))))
       .getOrElse(InvalidAddress)
   }
 
@@ -286,4 +288,12 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
       case Failure(e) => complete(InvalidPublicKey)
     }
   }
+}
+
+object AddressApiRoute {
+  case class Balance(address: String, confirmations: Int, balance: Long)
+  implicit val balanceFormat: Format[Balance] = Json.format
+
+  case class Validity(address: String, valid: Boolean)
+  implicit val validityFormat: Format[Validity] = Json.format
 }

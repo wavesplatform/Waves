@@ -19,41 +19,6 @@ class AddressesAPISpecification extends FunSuite with Matchers with scorex.waves
     super.beforeAll()
   }
 
-  test("/addresses/seq/{from}/{to} API route") {
-    val responded = GET.requestJson("/addresses/seq/1/4").as[List[String]]
-    responded.size shouldBe 3
-    responded.foreach(a => addresses should contain(a))
-
-    val r2 = GET.requestJson("/addresses/seq/5/9").as[List[String]]
-    r2.size shouldBe 4
-    r2.foreach(a => addresses should contain(a))
-    responded.intersect(r2).isEmpty shouldBe true
-  }
-
-  test("/addresses/validate/{address} API route") {
-    val toCheck: Seq[(String, Boolean)] = ("wrongA", false) +: addresses.map(a => (a, true))
-    toCheck.foreach { a =>
-      val response = GET.requestJson(s"/addresses/validate/${a._1}")
-      (response \ "address").as[String] shouldBe a._1
-      (response \ "valid").as[Boolean] shouldBe a._2
-    }
-  }
-
-  test("/addresses/seed/{address} API route") {
-    val path = s"/addresses/seed/${account.address}"
-    GET.incorrectApiKeyTest(path)
-
-    val response = GET.requestJson(us = path, headers = Map("api_key" -> "test"))
-    (response \ "address").as[String] shouldBe account.address
-    (response \ "seed").as[String] shouldBe Base58.encode(account.seed)
-  }
-
-  test("/addresses/balance/{address} API route") {
-    val response = GET.requestJson(s"/addresses/balance/$address")
-    (response \ "address").as[String] shouldBe address
-    (response \ "confirmations").as[Int] shouldBe 0
-    (response \ "balance").as[Long] should be >= 0L
-  }
 
   test("POST /addresses/sign/{address} API route") {
     val message = "test"
