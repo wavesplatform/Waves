@@ -12,7 +12,7 @@ Please read [repo wiki article](https://github.com/wavesplatform/Waves/wiki/How-
 
 ## Compilation the packages from source
 
-In the master branch there is a code with functions that is under development. The latest release for each network is in the Releases section, you can switch to the corresponding tag and build the application.
+In the master branch there is a code with functions that is under development. The latest release for each network can be found in the Releases section, you can switch to the corresponding tag and build the application.
 
 It is only possible to create deb and fat jar packages.
 
