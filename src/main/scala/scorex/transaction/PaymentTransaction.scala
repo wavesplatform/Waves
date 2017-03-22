@@ -62,8 +62,6 @@ object PaymentTransaction {
 
     override lazy val bytes: Array[Byte] = Bytes.concat(hashBytes, signature)
 
-
-    override def toString: String = json.toString()
   }
 
   val RecipientLength = Account.AddressLength

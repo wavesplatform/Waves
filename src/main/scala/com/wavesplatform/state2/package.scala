@@ -15,6 +15,7 @@ package object state2 {
     }
 
     override def hashCode(): Int = java.util.Arrays.hashCode(arr)
+
   }
 
   type ByteArray = EqByteArray

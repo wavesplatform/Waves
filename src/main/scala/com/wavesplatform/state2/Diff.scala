@@ -28,7 +28,7 @@ object Diff {
     // TODO: Make part of diff so each Differ could calc this
     lazy val accountTransactionIds: Map[ByteArray, List[ByteArray]] = {
       d.transactions.map { case (id, (h, tx)) =>
-        val senderBytes = tx match {
+        val senderBytes: Array[Byte] = tx match {
           case stx: SignedTransaction => stx.sender.bytes
           case ptx: PaymentTransaction => ptx.sender.bytes
           case gtx: GenesisTransaction => Array.empty[Byte]
@@ -37,7 +37,7 @@ object Diff {
             ???
         }
 
-        val recipientBytes = tx match {
+        val recipientBytes: Array[Byte] = tx match {
           case gtx: GenesisTransaction => gtx.recipient.bytes
           case ptx: PaymentTransaction => ptx.recipient.bytes
           case itx: IssueTransaction => Array.empty[Byte]
@@ -47,13 +47,11 @@ object Diff {
             println(tx)
             ???
         }
-        //      looks like we don't need explicit duplicate entries,
-        //      therefore Map(.->.,.->.) instead of `combine`
 
-        //      if (senderBytes sameElements recipientBytes)
-        //        Map(EqByteArray(senderBytes) -> List(id, id))
-        //      else
-        Map(EqByteArray(senderBytes) -> List(id)).combine(Map(EqByteArray(recipientBytes) -> List(id)))
+        if (senderBytes sameElements recipientBytes)
+          Map(EqByteArray(senderBytes) -> List(id))
+        else
+          Map(EqByteArray(senderBytes) -> List(id), EqByteArray(recipientBytes) -> List(id))
       }.foldLeft(Map.empty[ByteArray, List[ByteArray]]) { case (agg, m) => m.combine(agg) }
     }
 
