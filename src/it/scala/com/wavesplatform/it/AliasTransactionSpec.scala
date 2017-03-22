@@ -10,21 +10,23 @@ import scala.util.Random
 
 class AliasTransactionSpec(allNodes: Seq[Node]) extends FreeSpec with Matchers {
   "Able to send money to an alias" in {
+    val alias = "TEST_ALIAS"
+    val asset = "WAVES"
     val Seq(creator, sender) = Random.shuffle(allNodes).take(2)
     val feeSettings = creator.settings.feesSettings.fees
 
-    val createAliasFee = feeSettings(TransactionType.CreateAliasTransaction.id).find(_.asset == "WAVES").get.fee
-    val transferFee = feeSettings(TransactionType.TransferTransaction.id).find(_.asset == "WAVES").get.fee
+    val createAliasFee = feeSettings(TransactionType.CreateAliasTransaction.id).find(_.asset == asset).get.fee
+    val transferFee = feeSettings(TransactionType.TransferTransaction.id).find(_.asset == asset).get.fee
 
     val transferResult = for {
       fb <- creator.lastBlock
-      t <- creator.createAlias(creator.address, "TEST-ALIAS", createAliasFee)
+      t <- creator.createAlias(creator.address, alias, createAliasFee)
       b <- creator.findBlock(_.transactions.exists(_.id == t.id), fb.height)
-      _ <- sender.waitForHeight(b.height)
-      t <- sender.transfer(sender.address, s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:TEST_ALIAS", 1000000, transferFee)
+      _ <- sender.findBlock(_.transactions.exists(_.id == t.id), b.height)
+      t <- sender.transfer(sender.address, s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$alias", 1000000, transferFee)
     } yield t
 
-    println(Await.result(transferResult, 1.minute))
+    Await.result(transferResult, 1.minute)
   }
 
   "Able to issue an alias and send money to an alias" in {
