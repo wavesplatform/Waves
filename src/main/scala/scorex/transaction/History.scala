@@ -71,6 +71,8 @@ trait History {
 
   def parent(block: Block, back: Int = 1): Option[Block]
 
+  def child(block: Block): Option[Block]
+
   def confirmations(block: Block): Option[Int] =
     heightOf(block).map(height() - _)
 
