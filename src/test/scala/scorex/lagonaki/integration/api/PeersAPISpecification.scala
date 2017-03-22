@@ -13,14 +13,14 @@ class PeersAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
   test("/peers/connect API route") {
     POST.incorrectApiKeyTest("/peers/connect")
 
-    val req = POST.request("/peers/connect", body = "{\"host\":\"127.0.0.1\",\"port\":123}",
+    val req = POST.requestJson("/peers/connect", body = "{\"host\":\"127.0.0.1\",\"port\":123}",
       headers = Map("api_key" -> "test", "Content-type" -> "application/json"))
     (req \ s"status").as[String] shouldBe "Trying to connect"
     (req \ "hostname").asOpt[String].isDefined shouldBe true
   }
 
   test("/peers/connected API route") {
-    val connected = GET.request("/peers/connected")
+    val connected = GET.requestJson("/peers/connected")
     (connected \\ "address").toList.size should be >= 1
     (connected \\ "declaredAddress").toList.size should be >= 1
     (connected \\ "peerName").toList.size should be >= 1
@@ -28,7 +28,7 @@ class PeersAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
   }
 
   test("/peers/all API route") {
-    val all = GET.request("/peers/all")
+    val all = GET.requestJson("/peers/all")
     (all \\ "address").toList.size should be >= 1
     (all \\ "nodeName").toList.size should be >= 1
     (all \\ "nodeNonce").toList.size should be >= 1
@@ -36,7 +36,7 @@ class PeersAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
   }
 
   test("/peers/blacklisted API route") {
-    val blacklisted = GET.request("/peers/blacklisted")
+    val blacklisted = GET.requestJson("/peers/blacklisted")
     blacklisted.as[Seq[String]] shouldBe empty
   }
 

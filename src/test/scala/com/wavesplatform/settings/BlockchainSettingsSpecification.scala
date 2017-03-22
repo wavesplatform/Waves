@@ -28,7 +28,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        require-payment-unique-id-after: 9
         |        allow-lease-transaction-after: 10
         |        allow-exchange-transaction-after: 11
-        |        allow-createalias-transaction-after: 12
+        |        allow-invalid-reissue-in-same-block-until-timestamp: 12
+        |        allow-createalias-transaction-after: 13
         |      }
         |      genesis {
         |        timestamp: 1460678400000
@@ -60,7 +61,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.requirePaymentUniqueId should be(9)
     settings.functionalitySettings.allowLeaseTransactionAfterTimestamp should be(10)
     settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(11)
-    settings.functionalitySettings.allowCreateAliasTransactionAfterTimestamp should be(12)
+    settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(12)
+    settings.functionalitySettings.allowCreateAliasTransactionAfterTimestamp should be(13)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.transactionsTimestamp should be(1460678400000L)
     settings.genesisSettings.signature should be("BASE58BLOCKSIGNATURE")
@@ -95,6 +97,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowTransactionsFromFutureUntil should be(Long.MinValue)
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
     settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(1481110521000L)
+    settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(Long.MinValue)
     settings.functionalitySettings.requirePaymentUniqueId should be(1485942685000L)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.transactionsTimestamp should be(1478000000000L)
@@ -130,8 +133,9 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.minimalGeneratingBalanceAfterTimestamp should be(1479168000000L)
     settings.functionalitySettings.allowTransactionsFromFutureUntil should be(1479168000000L)
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
-    settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(1482233593000L)
-    settings.functionalitySettings.requirePaymentUniqueId should be(1488361885000L)
+    settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(1491192000000L)
+    settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(Long.MaxValue)
+    settings.functionalitySettings.requirePaymentUniqueId should be(1491192000000L)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.transactionsTimestamp should be(1465742577614L)
     settings.genesisSettings.signature should be("FSH8eAAzZNqnG8xgTZtz5xuLqXySsXgAjmFEC25hXMbEufiGjqWPnGCZFt6gLiVLJny16ipxRNAkkzjjhqTjBE2")

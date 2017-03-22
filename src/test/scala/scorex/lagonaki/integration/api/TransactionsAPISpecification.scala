@@ -24,13 +24,13 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
     (1 to 20) foreach (_ => genValidTransaction())
     val unconfirmed = transactionModule.utxStorage.all()
     unconfirmed.size shouldBe 20
-    val tr = GET.request("/transactions/unconfirmed")
+    val tr = GET.requestJson("/transactions/unconfirmed")
     (tr \\ "signature").toList.size shouldBe unconfirmed.size
   }
 
   test("/transactions/address/{address}/limit/{limit} API route") {
     addresses.foreach { a =>
-      val tr = GET.request(s"/transactions/address/$a/limit/2")
+      val tr = GET.requestJson(s"/transactions/address/$a/limit/2")
       (tr \\ "amount").toList.size should be <= 2
       checkTransactionList(tr)
     }
@@ -63,7 +63,7 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
   test("/transactions/info/{signature} API route") {
     val genesisTx = Block.genesis(consensusModule.genesisData, transactionModule.genesisData)
       .transactionDataField.asInstanceOf[TransactionsBlockField].value.head.asInstanceOf[GenesisTransaction]
-    val tr = GET.request(s"/transactions/info/${Base58.encode(genesisTx.signature)}")
+    val tr = GET.requestJson(s"/transactions/info/${Base58.encode(genesisTx.signature)}")
     (tr \ "signature").as[String] shouldBe Base58.encode(genesisTx.signature)
     (tr \ "type").as[Int] shouldBe 1
     (tr \ "fee").as[Int] shouldBe 0

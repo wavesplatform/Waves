@@ -1,6 +1,7 @@
 package scorex.api.http
 
 import javax.ws.rs.Path
+
 import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
@@ -11,12 +12,13 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.network.Checkpoint
 import scorex.network.Coordinator.BroadcastCheckpoint
-import scorex.transaction.{BlockChain, History}
+import scorex.transaction.History
 
 @Path("/blocks")
 @Api(value = "/blocks")
 case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: CheckpointsSettings, history: History, coordinator: ActorRef) extends ApiRoute {
 
+  // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
 
   override lazy val route =
@@ -44,13 +46,8 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   ))
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
     withBlock(history, encodedSignature) { block =>
-      history match {
-        case blockchain: BlockChain =>
-          complete(blockchain.children(block).headOption.map(_.json).getOrElse[JsObject](
-            Json.obj("status" -> "error", "details" -> "No child blocks")))
-        case _ =>
-          complete(Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain"))
-      }
+      complete(history.child(block).map(_.json).getOrElse[JsObject](
+        Json.obj("status" -> "error", "details" -> "No child blocks")))
     }
   }
 
@@ -91,14 +88,9 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
     new ApiImplicitParam(name = "height", value = "Block height", required = true, dataType = "integer", paramType = "path")
   ))
   def at: Route = (path("at" / IntNumber) & get) { height =>
-    history match {
-      case blockchain: BlockChain =>
-        blockchain.blockAt(height).map(_.json) match {
-          case Some(json) => complete(json + ("height" -> JsNumber(height)))
-          case None => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
-        }
-      case _ =>
-        complete(Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain"))
+    history.blockAt(height).map(_.json) match {
+      case Some(json) => complete(json + ("height" -> JsNumber(height)))
+      case None => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
     }
   }
 
@@ -109,25 +101,21 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
     new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path")
   ))
   def seq: Route = (path("seq" / IntNumber / IntNumber) & get) { (start, end) =>
-    history match {
-      case blockchain: BlockChain =>
-        if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
-          complete(JsArray(
-            (start to end).map { height =>
-              blockchain.blockAt(height).map(_.json + ("height" -> Json.toJson(height)))
-                .getOrElse(Json.obj("error" -> s"No block at height $height"))
-            }))
-        } else complete(TooBigArrayAllocation)
-      case _ =>
-        complete(Json.obj("status" -> "error", "details" -> "Not available for other option than linear blockchain"))
-    }
+    if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
+      complete(JsArray(
+        (start to end).flatMap { height =>
+          history.blockAt(height).map(_.json + ("height" -> Json.toJson(height)))
+        }))
+    } else complete(TooBigArrayAllocation)
   }
 
 
   @Path("/last")
   @ApiOperation(value = "Last", notes = "Get last block data", httpMethod = "GET")
   def last: Route = (path("last") & get) {
-    complete(history.lastBlock.json)
+    val lastBlock = history.lastBlock
+    val height = history.heightOf(lastBlock).fold[JsValue](JsNull)(Json.toJson(_))
+    complete(lastBlock.json + ("height" -> height))
   }
 
   @Path("/first")

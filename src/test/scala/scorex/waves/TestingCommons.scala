@@ -1,9 +1,5 @@
 package scorex.waves
 
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.util.Random
 import akka.actor.ActorSystem
 import akka.pattern.ask
 import akka.util.Timeout
@@ -11,14 +7,25 @@ import com.ning.http.client.Response
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.Application
 import com.wavesplatform.settings.WavesSettings
-import dispatch.{Http, url}
+import dispatch.{Http, Req, url}
+import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, Suite}
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+import play.api.libs.json._
+import scorex.account.Account
 import scorex.api.http.ApiKeyNotValid
+import scorex.api.http.assets._
+import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
+import scorex.crypto.encode.Base58
+import scorex.transaction.{AssetAcc, State}
 import scorex.utils._
 
-trait TestingCommons extends Suite with BeforeAndAfterAll {
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.Random
+
+trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -77,6 +84,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
       |        allow-createalias-transaction-after: 0
+      |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |      }
       |      genesis {
       |        timestamp: 1478000000000
@@ -185,6 +193,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
+      |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |        allow-createalias-transaction-after: 0
       |      }
       |      genesis {
@@ -270,6 +279,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
       |        allow-createalias-transaction-after: 0
+      |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |      }
       |      genesis {
       |        timestamp: 1478000000000
@@ -350,7 +360,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   }
 
   def getConnectedPeersCount(app: Application): Int = {
-    val response = GET.request("/peers/connected", peer = peerUrl(app))
+    val response = GET.requestJson("/peers/connected", peer = peerUrl(app))
     val peers = (response \ "peers").asOpt[JsArray]
 
     peers.get.value.size
@@ -359,6 +369,68 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
   def waitForSingleConnection(application: Application): Unit = {
     untilTimeout(30.seconds, 1.second) {
       require(getConnectedPeersCount(application) > 0)
+    }
+  }
+
+  def assetTransfer(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, feeAssetId: Option[String] = None, assertSuccess: Boolean = true): Option[String] = {
+    val json = Json.toJson(TransferRequest(assetId, feeAssetId, amount, fee, from.address, None, to.address)).toString()
+    makeTxRequest(POST.requestRaw(us = "/assets/transfer", body = json), assertSuccess)
+  }
+
+  def payment(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, assertSuccess: Boolean = true): Option[String] = {
+    val json = Json.toJson(PaymentRequest(amount, fee, from.address, to.address)).toString()
+    makeTxRequest(POST.requestRaw(us = "/waves/payment", body = json), assertSuccess, idField = "signature")
+  }
+
+  def issue(from: Account, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long = 100000L, assertSuccess: Boolean = true): Option[String] = {
+    val json = Json.toJson(IssueRequest(from.address, name, description, quantity, decimals, reissuable, fee)).toString()
+    makeTxRequest(POST.requestRaw(us = "/assets/issue", body = json), assertSuccess)
+  }
+
+  def reissue(from: Account, assetId: String, quantity: Long, reissuable: Boolean, fee: Long = 100000L, assertSuccess: Boolean = true): Option[String] = {
+    val json = Json.toJson(ReissueRequest(from.address, assetId, quantity, reissuable, fee)).toString()
+    makeTxRequest(POST.requestRaw(us = "/assets/reissue", body = json), assertSuccess)
+  }
+
+  def burn(from: Account, assetId: String, quantity: Long, fee: Long = 100000L, assertSuccess: Boolean = true): Option[String] = {
+    val json = Json.toJson(BurnRequest(from.address, assetId, quantity, fee)).toString()
+    makeTxRequest(POST.requestRaw(us = "/assets/burn", body = json), assertSuccess)
+  }
+
+  def lease(from: Account, to: Account, amount: Long, fee: Long = 100000L, assetId: Option[String] = None, assertSuccess: Boolean = true): Option[String] = {
+    val json = Json.toJson(LeaseRequest(from.address, amount, fee, to.address)).toString()
+    makeTxRequest(POST.requestRaw(us = "/leasing/lease", body = json), assertSuccess)
+  }
+
+  def cancelLease(from: Account, leaseTxId: String, fee: Long = 100000L, assertSuccess: Boolean = true): Unit = {
+    val json = Json.toJson(LeaseCancelRequest(from.address, leaseTxId, fee)).toString()
+    makeTxRequest(POST.requestRaw(us = "/leasing/cancel", body = json), assertSuccess)
+  }
+
+  def makeTxRequest(request: => Response, assertSuccess: Boolean = true, idField: String = "id"): Option[String] = {
+    val response = request
+    if (assertSuccess) {
+      require(response.getStatusCode == 200)
+      waitForNextBlock(application)
+      Some((Json.parse(response.getResponseBody) \ idField).asOpt[String].get) // id should exists
+    } else {
+      require(response.getStatusCode != 200)
+      None
+    }
+  }
+
+  def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None)(implicit storedState: State): Unit = {
+    val assetId = asset.flatMap(Base58.decode(_).toOption)
+    eventually(timeout(5.seconds), interval(500.millis)) {
+      Thread.sleep(100)
+      require(storedState.assetBalance(AssetAcc(acc, assetId)) == balance)
+    }
+  }
+
+  def waitForEffectiveBalance(balance: Long, acc: Account)(implicit storedState: State): Unit = {
+     eventually(timeout(5.seconds), interval(500.millis)) {
+      Thread.sleep(100)
+       require(storedState.effectiveBalance(acc) == balance)
     }
   }
 
@@ -372,46 +444,6 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
 
   def matcherUrl(a: Application = application): String =
     "http://" + a.settings.matcherSettings.bindAddress + ":" + a.settings.matcherSettings.port + "/matcher"
-
-  def getRequest(us: String, peer: String = peerUrl(application),
-                 headers: Map[String, String] = Map.empty): JsValue = {
-    val request = Http(url(peer + us).GET <:< headers)
-    val response = Await.result(request, 10.seconds)
-    Json.parse(response.getResponseBody)
-  }
-
-  def matcherGetRequest(path: String, params: Map[String, String] = Map.empty): JsValue = {
-    val request = Http(url(matcherUrl() + path).GET <<? params)
-    val response = Await.result(request, 10.seconds)
-    Json.parse(response.getResponseBody)
-  }
-
-
-  def postRequest(us: String,
-                  params: Map[String, String] = Map.empty,
-                  body: String = "",
-                  headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
-                  peer: String = peerUrl(application)): JsValue = {
-    val response = postRequestWithResponse(us, params, body, headers, peer)
-    Json.parse(response.getResponseBody)
-  }
-
-  def matcherPostRequest(path: String, body: String = "",
-                         params: Map[String, String] = Map.empty,
-                         headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json")): JsValue = {
-    val request = Http(url(matcherUrl() + path).POST <:< headers <<? params << body)
-    val response = Await.result(request, 5.seconds)
-    Json.parse(response.getResponseBody)
-  }
-
-  def postRequestWithResponse(us: String,
-                              params: Map[String, String] = Map.empty,
-                              body: String = "",
-                              headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
-                              peer: String = peerUrl(application)): Response = {
-    val request = Http(url(peer + us).POST << params <:< headers << body)
-    Await.result(request, 5.seconds)
-  }
 
   def startGeneration(nodes: Seq[Application]): Unit = {
     nodes.foreach(_.blockGenerator ! StartGeneration)
@@ -427,113 +459,94 @@ trait TestingCommons extends Suite with BeforeAndAfterAll {
     }
   }
 
-  sealed trait RequestType {
+  object Request {
+    type RequestMethodSetter = Req => Req
+
+    val POST: RequestMethodSetter = _.POST
+    val GET: RequestMethodSetter = _.GET
+    val OPTIONS: RequestMethodSetter = _.OPTIONS
+    val DELETE: RequestMethodSetter = _.DELETE
+  }
+
+  sealed trait Request {
+    def t: Request.RequestMethodSetter
+
     def incorrectApiKeyTest(path: String): Unit = {
       Seq(Map[String, String](), Map("api_key" -> "wrong key")) foreach { h =>
-        val resp = request(path, headers = h).toString()
+        val resp = requestJson(path, headers = h).toString()
         assert(resp == ApiKeyNotValid.json.toString(), s"$resp == ${ApiKeyNotValid.json.toString()} is false")
       }
     }
 
-    def request(us: String,
-                params: Map[String, String] = Map.empty,
-                body: String = "",
-                headers: Map[String, String] = Map("api_key" -> "test"),
-                peer: String = peerUrl(application)): JsValue
-
-    def requestRaw(us: String,
-                   params: Map[String, String] = Map.empty,
-                   body: String = "",
-                   headers: Map[String, String] = Map("api_key" -> "test"),
-                   peer: String = peerUrl(application)): Response
-  }
-
-  case object GET extends RequestType {
-    def request(us: String,
-                params: Map[String, String] = Map.empty,
-                body: String = "",
-                headers: Map[String, String] = Map.empty,
-                peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).GET <:< headers)
-      val response: Response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
-    }
-
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
-      val request = Http(url(peer + us).GET <:< headers)
-      Await.result(request, 5.seconds)
-    }
-  }
-
-  case object POST extends RequestType {
-    def requestJson(us: String,
-        params: Map[String, String] = Map.empty,
-        body: String = "",
-        headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
-        peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).POST << params <:< headers << body)
-      val response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
-    }
-
-    def request(us: String,
-                params: Map[String, String] = Map.empty,
-                body: String = "",
-                headers: Map[String, String] = Map("api_key" -> "test"),
-                peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).POST << params <:< headers << body)
-      val response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
-    }
-
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
-      val request = Http(url(peer + us).POST << params <:< headers << body)
-      Await.result(request, 5.seconds)
-    }
-  }
-
-  case object OPTIONS extends RequestType {
     def requestJson(us: String,
                     params: Map[String, String] = Map.empty,
                     body: String = "",
                     headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
-                    peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).OPTIONS << params <:< headers << body)
-      val response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
+                    peer: String = peerUrl(application)): JsValue = _requestJson(us, params, body, headers, peer, t)
+
+    def requestRaw(us: String,
+                   params: Map[String, String] = Map.empty,
+                   body: String = "",
+                   headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
+                   peer: String = peerUrl(application)): Response = _requestRaw(us, params, body, headers, peer, t)
+
+    def requestObject[T](us: String,
+                         params: Map[String, String] = Map.empty,
+                         body: String = "",
+                         headers: Map[String, String] = Map.empty,
+                         peer: String = peerUrl(application))(implicit format: Format[T]): T = _requestObject(us, params, body, headers, peer, t)
+
+    protected def _requestJson(us: String,
+                               params: Map[String, String] = Map.empty,
+                               body: String = "",
+                               headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
+                               peer: String = peerUrl(application),
+                               method: Req => Req): JsValue = {
+      val raw = _requestRaw(us, params, body, headers, peer, method)
+      Json.parse(raw.getResponseBody)
     }
 
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
-      val request = Http(url(peer + us).OPTIONS << params <:< headers << body)
-      Await.result(request, 5.seconds)
+    protected def _requestRaw(us: String,
+                              params: Map[String, String] = Map.empty,
+                              body: String = "",
+                              headers: Map[String, String] = Map("api_key" -> "test", "Content-type" -> "application/json"),
+                              peer: String = peerUrl(application),
+                              method: Req => Req): Response = {
+      val request = method match {
+        case Request.POST =>
+          method(url(peer + us) <:< headers <<? params << body)
+        case _ =>
+          method(url(peer + us) <:< headers <<? params)
+      }
+      Await.result(Http(request), timeout)
     }
 
-    def request(us: String,
-                params: Map[String, String] = Map.empty,
-                body: String = "",
-                headers: Map[String, String] = Map("api_key" -> "test"),
-                peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).OPTIONS << params <:< headers << body)
-      val response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
+    private val timeout = 5.seconds
+
+    protected def _requestObject[T](us: String,
+                                    params: Map[String, String] = Map.empty,
+                                    body: String = "",
+                                    headers: Map[String, String] = Map("api_key" -> "test"),
+                                    peer: String = peerUrl(application),
+                                    method: Req => Req)(implicit format: Format[T]): T = {
+      format.reads(_requestJson(us, params, body, headers, peer, method)).getOrElse(throw new RuntimeException)
     }
   }
 
-  case object DELETE extends RequestType {
-    def request(us: String,
-                params: Map[String, String] = Map.empty,
-                body: String = "",
-                headers: Map[String, String] = Map("api_key" -> "test"),
-                peer: String = peerUrl(application)): JsValue = {
-      val request = Http(url(peer + us).DELETE << params <:< headers << body)
-      val response = Await.result(request, 5.seconds)
-      Json.parse(response.getResponseBody)
-    }
+  case object GET extends Request {
+    override val t: Request.RequestMethodSetter = Request.GET
+  }
 
-    override def requestRaw(us: String, params: Map[String, String], body: String, headers: Map[String, String], peer: String): Response = {
-      val request = Http(url(peer + us).DELETE << params <:< headers << body)
-      Await.result(request, 5.seconds)
-    }
+  case object POST extends Request {
+    override val t: Request.RequestMethodSetter = Request.POST
+  }
+
+  case object OPTIONS extends Request {
+    override val t: Request.RequestMethodSetter = Request.OPTIONS
+  }
+
+  case object DELETE extends Request {
+    override val t: Request.RequestMethodSetter = Request.DELETE
   }
 
 }
