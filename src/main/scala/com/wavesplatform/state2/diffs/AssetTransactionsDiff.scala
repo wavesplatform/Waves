@@ -36,8 +36,8 @@ object AssetTransactionsDiff {
       val oldInfo = state.assetInfo(assetId).get
       if (oldInfo.isReissuable) {
         val newInfo = AssetInfo(
-          volume = oldInfo.volume + tx.quantity,
-          isReissuable = itx.reissuable)
+          volume = tx.quantity,
+          isReissuable = tx.reissuable)
         Right(Diff(height = height,
           tx = tx,
           portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(

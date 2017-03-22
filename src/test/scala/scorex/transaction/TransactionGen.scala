@@ -27,7 +27,7 @@ trait TransactionGen {
   val aliasGen: Gen[Alias] = genBoundedString(Alias.MinLength, Alias.MaxLength).map(ar => new String(ar)).map(Alias.buildWithCurrentNetworkByte(_).right.get
   )
 
-  val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAddress(_)))
+  val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAccount(_)))
 
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 3)
   val positiveIntGen: Gen[Int] = Gen.choose(1, Int.MaxValue / 3)

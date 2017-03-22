@@ -16,7 +16,7 @@ trait PublicKeyAccount {
 
   override def hashCode(): Int = publicKey.hashCode()
 
-  override lazy val toString: String = PublicKeyAccount.toAddress(this).address
+  override lazy val toString: String = this.toAccount.address
 }
 
 object PublicKeyAccount {
@@ -25,7 +25,11 @@ object PublicKeyAccount {
 
   def apply(publicKey: Array[Byte]): PublicKeyAccount = PublicKeyAccountImpl(publicKey)
 
-  implicit def toAddress(publicKeyAccount: PublicKeyAccount): Account = Account.fromPublicKey(publicKeyAccount.publicKey)
+  implicit def toAccount(publicKeyAccount: PublicKeyAccount): Account = Account.fromPublicKey(publicKeyAccount.publicKey)
+
+  implicit class PublicKeyAccountExt(pk: PublicKeyAccount) {
+    def toAccount: Account = PublicKeyAccount.toAccount(pk)
+  }
 
   def fromBase58String(s: String): Either[ValidationError, PublicKeyAccount] =
     if (s.length > TransactionParser.KeyStringLength) Left(InvalidAddress)
