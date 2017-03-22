@@ -18,7 +18,7 @@ class PaymentAPISpecification extends FunSuite with Matchers with TransactionTes
     val fee = 100000
 
     val json = "{\"amount\":" + amount + ",\"fee\":" + fee + ",\"sender\":\"" + s + "\",\"recipient\":\"" + r + "\"\n}"
-    val req = POST.request("/payment", body = json, headers = Map("api_key" -> "test", "Content-type" -> "application/json"))
+    val req = POST.requestJson("/payment", body = json, headers = Map("api_key" -> "test", "Content-type" -> "application/json"))
     (req \ "assetId").asOpt[String] shouldBe None
     (req \ "feeAsset").asOpt[String] shouldBe None
     (req \ "type").as[Int] shouldBe 4

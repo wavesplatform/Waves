@@ -29,7 +29,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   private var ABalance = 0L
   private var ABalance1 = 0L
   private val TxFee = 100000L
-  private val storedState = application.storedState
+  private implicit val storedState = application.storedState
   private var orderIdToCancel = Option.empty[String]
 
   private val MatcherPubKey = application.wallet.findWallet(application.settings.matcherSettings.account).
@@ -57,39 +57,12 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
          |  "fee": 100000000
          |}""".stripMargin
     val req = Json.parse(json).validate[IssueRequest].get
-    val resp = postRequest(us = "/assets/issue", body = json)
+    val resp = POST.requestJson(us = "/assets/issue", body = json)
     val id = (resp \ "id").as[String]
     id should not be empty
 
     waitForBalance(amount, from, Some(id))
     id
-  }
-
-  def assetTransfer(from: Account, to: Account, amount: Long, assetId: Option[String] = None) = {
-    val json =
-      s"""
-         |{
-         |  "recipient": "${to.address}",
-         |  "amount": $amount,
-         |  "attachment": "",
-         |  "sender": "${from.address}",
-         |  "fee": 100000
-         |}""".stripMargin
-
-    val req = Json.parse(json).validate[TransferRequest].get
-    val resp = postRequest(us = "/assets/transfer", body = json)
-    (resp \ "id").as[String] should not be empty
-
-    waitForBalance(amount, to, None)
-  }
-
-  def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None): Unit = {
-    val assetId = asset.flatMap(Base58.decode(_).toOption)
-    eventually(timeout(5.seconds), interval(500.millis)) {
-      Thread.sleep(100)
-      storedState.assetBalance(
-        AssetAcc(acc, assetId)) should be(balance)
-    }
   }
 
   def placeBuy(acc: PrivateKeyAccount,
@@ -124,18 +97,18 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     val signed = Order.sign(order, acc)
     val signedJson = signed.json
 
-    val resp = matcherPostRequest("/orderbook", body = signedJson.toString)
+    val resp = POST.requestJson("/orderbook", body = signedJson.toString, peer = matcherUrl())
 
     (resp \ "status").as[String] shouldBe expectedStatus
     (resp \ "message" \ "id").toOption.map(_.as[String])
   }
 
   def getOrderBook(asset: Option[String]): JsValue = {
-    matcherGetRequest(s"/orderbook/${asset.get}/WAVES")
+    GET.requestJson(s"/orderbook/${asset.get}/WAVES", peer = matcherUrl())
   }
 
   def getOrderStatus(asset: Option[String], id: String): JsValue = {
-    matcherGetRequest(s"/orderbook/${asset.get}/WAVES/$id")
+    GET.requestJson(s"/orderbook/${asset.get}/WAVES/$id", peer = matcherUrl())
   }
 
   def waitForOrderStatus(asset: Option[String], id: String, status: String) = {
@@ -158,7 +131,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     val signed = CancelOrderRequest.sign(orderCancel, acc)
     val signedJson = signed.json
 
-    val resp = matcherPostRequest(s"/orderbook/${TradingPair.amountAssetStr}/${TradingPair.priceAssetStr}/cancel", body = signedJson.toString)
+    val resp = POST.requestJson(s"/orderbook/${TradingPair.amountAssetStr}/${TradingPair.priceAssetStr}/cancel", body = signedJson.toString, peer = matcherUrl())
 
     (resp \ "status").as[String] shouldBe expectedStatus
   }
@@ -172,7 +145,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   }
 
   test("/matcher/") {
-    val resp = matcherGetRequest("/")
+    val resp = GET.requestJson("/", peer = matcherUrl())
     resp.as[String] shouldBe MatcherPubKey
   }
 

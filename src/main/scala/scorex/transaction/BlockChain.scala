@@ -13,6 +13,8 @@ trait BlockChain extends History with ScorexLogging {
     heightOf(block.referenceField.value).flatMap(referenceHeight => blockAt(referenceHeight - back + 1))
   }
 
+  override def child(block: Block): Option[Block] = heightOf(block).flatMap(h => blockAt(h + 1))
+
   private[transaction] def discardBlock(): BlockChain
 
   override def lastBlocks(howMany: Int): Seq[Block] =
@@ -22,8 +24,6 @@ trait BlockChain extends History with ScorexLogging {
     heightOf(parentSignature).map { h =>
       (h + 1).to(Math.min(height(), h + howMany: Int)).flatMap(blockAt).map(_.uniqueId)
     }.getOrElse(Seq())
-
-  def children(block: Block): Seq[Block]
 
   override lazy val genesis: Block = blockAt(1).get
 }

@@ -19,7 +19,7 @@ class NxtConsensusAPISpecification extends FunSuite with Matchers with scorex.wa
   private val address = account.address
 
   test("/consensus/generatingbalance/{address} API route") {
-    val response = GET.request(s"/consensus/generatingbalance/$address")
+    val response = GET.requestJson(s"/consensus/generatingbalance/$address")
     (response \ "address").as[String] shouldBe address
     (response \ "balance").as[Long] should be >= 0L
   }
