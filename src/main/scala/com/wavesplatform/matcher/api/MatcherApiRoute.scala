@@ -1,9 +1,7 @@
 package com.wavesplatform.matcher.api
 
 import javax.ws.rs.Path
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directive1, Route}
@@ -22,6 +20,10 @@ import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
@@ -51,12 +53,12 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
       .getOrElse[JsValue](JsString("")))
   }
 
-  @Path("/orderbook/{asset1}/{asset2}")
+  @Path("/orderbook/{amountAsset}/{priceAsset}")
   @ApiOperation(value = "Get Order Book for a given Asset Pair",
     notes = "Get Order Book for a given Asset Pair", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "asset1", value = "First Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-    new ApiImplicitParam(name = "asset2", value = "Second Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "depth", value = "Limit the number of bid/ask records returned", required = false, dataType = "integer", paramType = "query")
   ))
   def orderBook: Route = (path("orderbook" / Segment / Segment) & get) { (a1, a2) =>
@@ -92,15 +94,15 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
     }
   }
 
-  @Path("/orderbook/{asset1}/{asset2}/cancel")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/cancel")
   @ApiOperation(value = "Cancel order",
     notes = "Cancel previously submitted order if it's not already filled completely",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "asset1", value = "First Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-    new ApiImplicitParam(name = "asset2", value = "Second Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
     new ApiImplicitParam(
       name = "body",
       value = "Json with data",
@@ -119,13 +121,13 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
     }
   }
 
-  @Path("/orderbook/{asset1}/{asset2}/{orderId}")
+  @Path("/orderbook/{amountAsset}/{priceAsset}/{orderId}")
   @ApiOperation(value = "Order Status",
     notes = "Get Order status for a given Asset Pair during the last 30 days",
     httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "asset1", value = "First Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
-    new ApiImplicitParam(name = "asset2", value = "Second Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
   ))
   def orderStatus: Route = (path("orderbook" / Segment / Segment / Segment) & get) { (a1, a2, orderId) =>
