@@ -23,7 +23,7 @@ import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
 import scala.reflect.runtime.universe._
 
-class Application(as: ActorSystem, wavesSettings: WavesSettings, config: Config) extends {
+class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
   val matcherSettings: MatcherSettings = wavesSettings.matcherSettings
   val restAPISettings: RestAPISettings = wavesSettings.restAPISettings
   override implicit val settings = wavesSettings
@@ -55,7 +55,7 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings, config: Config)
     UtilsApiRoute(settings.restAPISettings),
     PeersApiRoute(settings.restAPISettings, peerManager, networkController),
     AddressApiRoute(settings.restAPISettings, wallet, blockStorage.state),
-    DebugApiRoute(settings.restAPISettings, wallet, blockStorage, config),
+    DebugApiRoute(settings.restAPISettings, wallet, blockStorage),
     WavesApiRoute(settings.restAPISettings, wallet, transactionModule),
     AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.state, transactionModule),
     NodeApiRoute(this),

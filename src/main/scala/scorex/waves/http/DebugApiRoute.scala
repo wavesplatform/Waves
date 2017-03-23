@@ -3,7 +3,7 @@ package scorex.waves.http
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.Json
@@ -16,10 +16,10 @@ import scorex.wallet.Wallet
 
 @Path("/debug")
 @Api(value = "/debug")
-case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage: BlockStorage, config: Config) extends ApiRoute {
+case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage: BlockStorage) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ stateAt ~ info ~ getSettings ~ stateWaves
+    blocks ~ state ~ stateAt ~ info ~ stateWaves
   }
 
   @Path("/blocks/{howMany}")
@@ -79,14 +79,5 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
       "stateHeight" -> state.stateHeight,
       "stateHash" -> state.hash
     ))
-  }
-
-  @Path("/settings")
-  @ApiOperation(value = "State", notes = "Settings file", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
-  def getSettings: Route = (path("settings") & get & withAuth) {
-    complete(config.root().render())
   }
 }
