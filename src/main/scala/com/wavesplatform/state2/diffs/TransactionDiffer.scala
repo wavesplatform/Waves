@@ -15,7 +15,7 @@ object TransactionDiffer {
       t2 <- CommonValidation.disallowDuplicateIds(s, settings, t1)
       diff <- t2 match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(height)(gtx)
-        case ptx: PaymentTransaction => PaymentTransactionDiff(s, settings, height)(ptx)
+        case ptx: PaymentTransaction => PaymentTransactionDiff(s, height)(ptx)
         case itx: IssueTransaction => AssetTransactionsDiff.issue(s, height)(itx)
         case rtx: ReissueTransaction => AssetTransactionsDiff.reissue(s, settings, height, time)(rtx)
         case btx: BurnTransaction => AssetTransactionsDiff.burn(s, height)(btx)

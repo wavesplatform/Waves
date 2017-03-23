@@ -42,8 +42,6 @@ object TransferTransaction {
     extends TransferTransaction {
     override val transactionType: TransactionType.Value = TransactionType.TransferTransaction
 
-    lazy val sameAssetForFee: Boolean = feeAssetId.map(fa => assetId.exists(_ sameElements fa)).getOrElse(assetId.isEmpty)
-
     override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
 
     lazy val toSign: Array[Byte] = {

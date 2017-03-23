@@ -31,7 +31,7 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
 
     txsDiff.issuedAssets.foreach { case (id, assetInfo) =>
       val updated = (Option(p.assets.get(id.arr)) match {
-        case None => implicitly[Monoid[AssetInfo]].empty
+        case None => Monoid[AssetInfo].empty
         case Some(existing) => AssetInfo(existing._1, existing._2)
       }).combine(assetInfo)
 

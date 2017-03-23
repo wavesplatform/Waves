@@ -31,7 +31,7 @@ object TransferTransactionDiff {
       tx.feeAssetId match {
         case None => Map(sender -> Portfolio(-tx.fee, -tx.fee, Map.empty))
         case Some(aid) =>
-          Map(sender -> Portfolio(0, 0, Map(EqByteArray(aid) -> tx.fee)))
+          Map(sender -> Portfolio(0, 0, Map(EqByteArray(aid) -> -tx.fee)))
       }
     )
 

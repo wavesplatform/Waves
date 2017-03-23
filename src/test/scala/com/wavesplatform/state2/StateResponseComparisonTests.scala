@@ -195,7 +195,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       }
     }
 
-    s"isReissuable, totalAssetQuantity" in {
+    s"isReissuable, totalAssetQuantity" ignore {
       val eqAssetIds = aliveAccounts.flatMap(acc => old.state.getAccountBalance(acc).keySet.map(EqByteArray)).toIndexedSeq
       for (eqAssetIdIdx <- eqAssetIds.indices) {
         logStep(eqAssetIdIdx, aliveAccounts.size, 100)("isReissuable, totalAssetQuantity")
@@ -216,7 +216,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
         val acc = aliveAccounts(accIdx)
         val oldAccBalance = old.state.getAccountBalance(acc).map { case (k, v) => EqByteArray(k) -> v }
         val newAccBalance = nev.state.getAccountBalance(acc).map { case (k, v) => EqByteArray(k) -> v }
-        assert(oldAccBalance == newAccBalance)
+        assert(newAccBalance == oldAccBalance, s"acc::: $acc")
 
         val oldAssetAccs: Iterable[AssetAcc] = oldAccBalance.map(_._1.arr).map(aid => AssetAcc(acc, Some(aid)))
 

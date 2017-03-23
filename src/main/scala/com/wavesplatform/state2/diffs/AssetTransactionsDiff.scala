@@ -36,16 +36,15 @@ object AssetTransactionsDiff {
       val assetId = EqByteArray(tx.assetId)
       val oldInfo = state.assetInfo(assetId).get
       if (oldInfo.isReissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
-        val newInfo = AssetInfo(
-          volume = tx.quantity,
-          isReissuable = tx.reissuable)
         Right(Diff(height = height,
           tx = tx,
           portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
             balance = -tx.fee,
             effectiveBalance = -tx.fee,
             assets = Map(assetId -> tx.quantity))),
-          assetInfos = Map(assetId -> newInfo)))
+          assetInfos = Map(assetId -> AssetInfo(
+            volume = tx.quantity,
+            isReissuable = tx.reissuable))))
       } else {
         Left(TransactionValidationError(tx, s"Asset is not reissuable and blockTime=$blockTime is greater than " +
           s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
@@ -61,15 +60,13 @@ object AssetTransactionsDiff {
     }
     issueTxEi.map(itx => {
       val assetId = EqByteArray(tx.assetId)
-      val oldInfo = state.assetInfo(assetId).get
-      val newInfo = oldInfo.copy(volume = oldInfo.volume - tx.amount)
       Diff(height = height,
         tx = tx,
         portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
           balance = -tx.fee,
           effectiveBalance = -tx.fee,
           assets = Map(assetId -> -tx.amount))),
-        assetInfos = Map(assetId -> newInfo))
+        assetInfos = Map(assetId -> AssetInfo(isReissuable = true, volume = -tx.amount)))
     })
   }
 }

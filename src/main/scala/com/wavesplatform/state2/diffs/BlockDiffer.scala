@@ -6,13 +6,14 @@ import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{BlockDiff, Diff, EffectiveBalanceSnapshot, EqByteArray, Portfolio}
+import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.{AssetAcc, ValidationError}
 
 
 object BlockDiffer {
 
-  val emptyDiff: Diff = implicitly[Monoid[Diff]].empty
+  val emptyDiff: Diff = Monoid[Diff].empty
   val rightEmptyDiff: Either[ValidationError, Diff] = Right(emptyDiff)
 
   def apply(settings: FunctionalitySettings)(s: StateReader, block: Block): Either[ValidationError, BlockDiff] = {

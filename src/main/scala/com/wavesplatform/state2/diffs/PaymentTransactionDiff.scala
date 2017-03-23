@@ -14,7 +14,7 @@ import scala.util.{Left, Right}
 
 object PaymentTransactionDiff {
 
-  def apply(stateReader: StateReader, settings: FunctionalitySettings, height: Int)(tx: PaymentTransaction): Either[StateValidationError, Diff] = {
+  def apply(stateReader: StateReader, height: Int)(tx: PaymentTransaction): Either[StateValidationError, Diff] = {
 
     stateReader.paymentTransactionIdByHash(EqByteArray(tx.hash)) match {
       case Some(existing) => Left(TransactionValidationError(tx, s"PaymentTx is already registered: $existing"))
