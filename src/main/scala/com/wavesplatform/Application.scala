@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.io.File
 
 import akka.actor.{ActorSystem, Props}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
@@ -23,7 +23,7 @@ import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
 import scala.reflect.runtime.universe._
 
-class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
+class Application(as: ActorSystem, wavesSettings: WavesSettings, config: Config) extends {
   val matcherSettings: MatcherSettings = wavesSettings.matcherSettings
   val restAPISettings: RestAPISettings = wavesSettings.restAPISettings
   override implicit val settings = wavesSettings
@@ -55,7 +55,7 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
     UtilsApiRoute(settings.restAPISettings),
     PeersApiRoute(settings.restAPISettings, peerManager, networkController),
     AddressApiRoute(settings.restAPISettings, wallet, blockStorage.state),
-    DebugApiRoute(settings.restAPISettings, wallet, blockStorage),
+    DebugApiRoute(settings.restAPISettings, wallet, blockStorage, config),
     WavesApiRoute(settings.restAPISettings, wallet, transactionModule),
     AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.state, transactionModule),
     NodeApiRoute(this),
@@ -98,11 +98,9 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 }
 
 object Application extends ScorexLogging {
-  def main(args: Array[String]): Unit = {
-    log.info("Starting...")
-
+  def readConfig(userConfigPath: Option[String]): Config = {
     val maybeConfigFile = for {
-      maybeFilename <- args.headOption
+      maybeFilename <- userConfigPath
       file = new File(maybeFilename)
       if file.exists
     } yield file
@@ -127,9 +125,15 @@ object Application extends ScorexLogging {
           .withFallback(ConfigFactory.defaultApplication())
           .withFallback(ConfigFactory.defaultReference())
           .resolve()
-
     }
 
+    config
+  }
+
+  def main(args: Array[String]): Unit = {
+    log.info("Starting...")
+
+    val config = readConfig(args.headOption)
     val settings = WavesSettings.fromConfig(config)
 
     RootActorSystem.start("wavesplatform", settings.matcherSettings) { actorSystem =>
@@ -142,7 +146,7 @@ object Application extends ScorexLogging {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      val application = new Application(actorSystem, settings)
+      val application = new Application(actorSystem, settings, config)
       application.run()
 
       if (application.wallet.privateKeyAccounts().isEmpty)
