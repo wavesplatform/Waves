@@ -4,8 +4,6 @@ In the master branch there is a code with functions that is under development. T
 
 [How to configure Waves node](https://github.com/wavesplatform/Waves/wiki/How-to-install-Waves-node)
 
-**[How to run Testnet node](https://github.com/wavesplatform/Waves/blob/master/Testnet.md)**
-
 # Installation
 
 Please read [repo wiki article](https://github.com/wavesplatform/Waves/wiki/How-to-install-Waves-node).
