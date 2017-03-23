@@ -72,7 +72,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
       def reversePredefinedPair = AssetPair(Base58.decode("BASE1").toOption, Base58.decode("BASE2").toOption)
       actor ! GetOrderBookRequest(reversePredefinedPair, None)
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid AssetPair ordering, should be reversed: BASE2-BASE1"))
+      expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: BASE2-BASE1"))
     }
 
     "AssetPair with predefined price assets" in {
@@ -82,7 +82,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
       def wrongPriceAsset = AssetPair(Base58.decode("BASE2").toOption, Base58.decode("Some").toOption)
       actor ! GetOrderBookRequest(wrongPriceAsset, None)
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid AssetPair ordering, should be reversed: Some-BASE2"))
+      expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: Some-BASE2"))
     }
 
     "AssetPair with unknown assets" in {
@@ -92,7 +92,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
       def wrongUnknownAssets = AssetPair(Base58.decode("Some1").toOption, Base58.decode("Some2").toOption)
       actor ! GetOrderBookRequest(wrongUnknownAssets, None)
-      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid AssetPair ordering, should be reversed: Some2-Some1"))
+      expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: Some2-Some1"))
     }
 
     "accept orders with AssetPair with same assets" in {

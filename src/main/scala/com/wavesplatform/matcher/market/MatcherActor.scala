@@ -42,8 +42,7 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSe
       msg.assetPair.priceAsset.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
         s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
       msg.assetPair.amountAsset.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
-        s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}" &&
-      checkPairOrdering(msg.assetPair)
+        s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
   }
 
   def checkPairOrdering(aPair: AssetPair): Validation = {
@@ -73,8 +72,16 @@ class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSe
 
   def checkAssetPair[A <: {def assetPair : AssetPair}](msg: A)(f: => Unit): Unit = {
     val v = basicValidation(msg)
-    if (v) f
-    else sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
+    if (!v) {
+      sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
+    } else {
+      val ov = checkPairOrdering(msg.assetPair)
+      if (!ov) {
+        sender() ! StatusCodeMatcherResponse(StatusCodes.Found, ov.messages())
+      } else {
+        f
+      }
+    }
   }
 
   def getMatcherPublicKey: Array[Byte] = {

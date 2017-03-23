@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.api
 import javax.ws.rs.Path
 
 import akka.actor.ActorRef
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{StatusCodes, Uri}
 import akka.http.scaladsl.server.{Directive1, Route}
 import akka.pattern.ask
 import akka.util.Timeout
@@ -63,9 +63,13 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
   ))
   def orderBook: Route = (path("orderbook" / Segment / Segment) & get) { (a1, a2) =>
     withAssetPair(a1, a2) { pair =>
-      complete((matcher ? GetOrderBookRequest(pair, None))
-        .mapTo[MatcherResponse]
-        .map(r => r.code -> r.json))
+      onComplete((matcher ? GetOrderBookRequest(pair, None)).mapTo[MatcherResponse]) {
+        case Success(resp) => resp.code match {
+          case StatusCodes.Found => redirect(Uri(s"/matcher/orderbook/$a2/$a1"), StatusCodes.Found)
+          case code => complete(code -> resp.json)
+        }
+        case Failure(ex)    => complete(StatusCodes.InternalServerError -> s"An error occurred: ${ex.getMessage}")
+      }
     }
   }
 
