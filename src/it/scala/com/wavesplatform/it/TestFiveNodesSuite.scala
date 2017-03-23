@@ -17,7 +17,7 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
 
   override protected def beforeAll() = {
     log.debug("Waiting for nodes to start")
-    Await.result(Future.traverse(allNodes)(_.status), 30.seconds)
+    Await.result(Future.traverse(allNodes)(_.status), 1.minute)
     log.debug("Starting tests")
   }
 

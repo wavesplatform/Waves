@@ -4,7 +4,7 @@ import java.io.IOException
 
 import com.typesafe.config.Config
 import com.wavesplatform.settings.WavesSettings
-import io.netty.util.{HashedWheelTimer, Timeout, Timer}
+import io.netty.util.{Timeout, Timer}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -15,6 +15,7 @@ import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets.TransferRequest
 import scorex.utils.{LoggerFacade, ScorexLogging}
 
+import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -22,7 +23,7 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 
-class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: HashedWheelTimer) {
+class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer) {
   import Node._
 
   val privateKey = config.getString("private-key")
@@ -30,15 +31,26 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
   val address = config.getString("address")
   val settings = WavesSettings.fromConfig(config)
 
-  private val generationDelay = settings.minerSettings.generationDelay
+  private val blockDelay = settings.blockchainSettings.genesisSettings.averageBlockDelay
   private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
-  private def retrying(r: Request, interval: FiniteDuration = 200.millis): Future[Response] =
-    timer.retryUntil[Response]({
+  private def retrying(r: Request, interval: FiniteDuration = 1.second): Future[Response] = {
       val p = Promise[Response]
-      client.executeRequest(r, ResponseFuture(p))
+
+      def retrying(timeout: Timeout): Unit = client.executeRequest(r).toCompletableFuture.toScala.onComplete {
+        case Success(v) => p.success(v)
+        case _ =>
+          try {
+            timer.newTimeout(retrying, interval.toMillis, MILLISECONDS)
+          } catch {
+            case t: Throwable => p.failure(t)
+          }
+      }
+
+      retrying(null)
+
       p.future
-    }, _ => true, interval)
+    }
 
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://localhost:${nodeInfo.hostRestApiPort}$path")).build())
@@ -67,8 +79,6 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     post("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
-  def waitForHeight(targetHeight: Long): Future[Long] =
-    timer.retryUntil[Long](height, _ >= targetHeight, generationDelay)
   def waitForNextBlock: Future[Block] = for {
     currentBlock <- lastBlock
     actualBlock <- findBlock(_.height > currentBlock.height, currentBlock.height)
@@ -78,7 +88,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
     val p = Promise[Block]
 
     def reschedule(_from: Long, _to: Long) = try {
-      timer.newTimeout(retrying(_from, _to), (generationDelay.toMillis * 1.5).toLong, MILLISECONDS)
+      timer.newTimeout(retrying(_from, _to), blockDelay.toMillis, MILLISECONDS)
     } catch {
       case NonFatal(t) => p.failure(t)
     }
@@ -125,18 +135,6 @@ object Node extends ScorexLogging {
   case class Block(signature: String, height: Long, timestamp: Long, generator: String, transactions: Seq[Transaction])
   implicit val blockFormat: Format[Block] = Json.format
 
-  case class ResponseFuture(p: Promise[Response]) extends AsyncCompletionHandlerBase {
-    override def onCompleted(response: Response) = {
-      p.success(response)
-      super.onCompleted(response)
-    }
-
-    override def onThrowable(t: Throwable) = {
-      p.failure(t)
-      super.onThrowable(t)
-    }
-  }
-
   implicit class ResponseFutureExt(val f: Future[Response]) extends AnyVal {
     def as[A: Format](implicit ec: ExecutionContext): Future[A] =
       f.transform {
@@ -147,26 +145,5 @@ object Node extends ScorexLogging {
           Failure(new IOException(s"Unexpected status code: ${r.getStatusCode}"))
         case Failure(t) => Failure[A](t)
       }(ec)
-  }
-
-  implicit class TimerExt(val timer: Timer) extends AnyVal {
-    def retryUntil[A](future: => Future[A], cond: A => Boolean, interval: FiniteDuration): Future[A] = {
-      val p = Promise[A]
-
-      def retrying(timeout: Timeout): Unit = future.onComplete {
-        case Success(v) if cond(v) => p.success(v)
-        case _ => try {
-          timer.newTimeout(retrying, interval.toMillis, MILLISECONDS)
-        } catch {
-          case t: Throwable =>
-            log.debug("Error processing request", t)
-            p.failure(t)
-        }
-      }
-
-      retrying(null)
-
-      p.future
-    }
   }
 }
