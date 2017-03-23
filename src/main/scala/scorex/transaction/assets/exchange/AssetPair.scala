@@ -1,5 +1,6 @@
 package scorex.transaction.assets.exchange
 
+import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction._
@@ -9,8 +10,11 @@ import scorex.transaction.assets.exchange.Validation.booleanOperators
 
 import scala.util.{Success, Try}
 
-case class AssetPair(amountAsset: Option[AssetId], priceAsset: Option[AssetId]) {
+case class AssetPair(@ApiModelProperty(dataType = "java.lang.String") amountAsset: Option[AssetId],
+                     @ApiModelProperty(dataType = "java.lang.String") priceAsset: Option[AssetId]) {
+  @ApiModelProperty(hidden = true)
   lazy val priceAssetStr: String = priceAsset.map(Base58.encode).getOrElse(AssetPair.WavesName)
+  @ApiModelProperty(hidden = true)
   lazy val amountAssetStr: String = amountAsset.map(Base58.encode).getOrElse(AssetPair.WavesName)
 
   override def hashCode(): Int = toString.hashCode()
@@ -45,9 +49,9 @@ object AssetPair {
     case other => Base58.decode(other).map(Option(_))
   }
 
-  def createAssetPair(asset1: String, asset2: String): Try[AssetPair] =
+  def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =
     for {
-      a1 <- extractAssetId(asset1)
-      a2 <- extractAssetId(asset2)
+      a1 <- extractAssetId(amountAsset)
+      a2 <- extractAssetId(priceAsset)
     } yield AssetPair(a1, a2)
 }
