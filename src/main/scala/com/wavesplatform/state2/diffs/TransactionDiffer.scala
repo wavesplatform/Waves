@@ -17,7 +17,7 @@ object TransactionDiffer {
         case gtx: GenesisTransaction => GenesisTransactionDiff(height)(gtx)
         case ptx: PaymentTransaction => PaymentTransactionDiff(s, settings, height)(ptx)
         case itx: IssueTransaction => AssetTransactionsDiff.issue(s, height)(itx)
-        case rtx: ReissueTransaction => AssetTransactionsDiff.reissue(s, height)(rtx)
+        case rtx: ReissueTransaction => AssetTransactionsDiff.reissue(s, settings, height, time)(rtx)
         case btx: BurnTransaction => AssetTransactionsDiff.burn(s, height)(btx)
         case ttx: TransferTransaction => TransferTransactionDiff(s, height)(ttx)
         case ltx: LeaseTransaction => LeaseTransactionsDiff.lease(s, height)(ltx)

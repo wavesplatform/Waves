@@ -140,7 +140,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     getStorages(currentMainnet, "C:\\Users\\ilyas\\Desktop\\old.store", "C:\\Users\\ilyas\\Desktop\\new.store", appl = true)
   }
 
-  "assert state" ignore {
+  "assert state" - {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
     val (old, nev) = getStorages(currentMainnet, "C:\\Users\\ilyas\\Desktop\\old.store", "C:\\Users\\ilyas\\Desktop\\new.store", appl = false)
@@ -228,7 +228,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
 
 
 
-    s"effectiveBalanceWithConfirmations" ignore {
+    s"effectiveBalanceWithConfirmations" in {
       for {
         accIdx <- aliveAccounts.indices
         _ = logStep(accIdx, aliveAccounts.size)("effectiveBalanceWithConfirmations")

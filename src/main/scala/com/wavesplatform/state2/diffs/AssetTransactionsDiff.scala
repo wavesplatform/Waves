@@ -1,5 +1,6 @@
 package com.wavesplatform.state2.diffs
 
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{AssetInfo, Diff, EqByteArray, Portfolio}
 import scorex.account.Account
@@ -25,7 +26,7 @@ object AssetTransactionsDiff {
       assetInfos = Map(assetId -> info)))
   }
 
-  def reissue(state: StateReader, height: Int)(tx: ReissueTransaction): Either[StateValidationError, Diff] = {
+  def reissue(state: StateReader, settings: FunctionalitySettings, height: Int, blockTime: Long)(tx: ReissueTransaction): Either[StateValidationError, Diff] = {
     val issueTxEi = state.findTransaction[IssueTransaction](tx.assetId) match {
       case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
       case Some(itx) if !(itx.sender equals tx.sender) => Left(TransactionValidationError(tx, "Asset was issued by other address"))
@@ -34,7 +35,7 @@ object AssetTransactionsDiff {
     issueTxEi.flatMap(itx => {
       val assetId = EqByteArray(tx.assetId)
       val oldInfo = state.assetInfo(assetId).get
-      if (oldInfo.isReissuable) {
+      if (oldInfo.isReissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
         val newInfo = AssetInfo(
           volume = tx.quantity,
           isReissuable = tx.reissuable)
@@ -46,7 +47,8 @@ object AssetTransactionsDiff {
             assets = Map(assetId -> tx.quantity))),
           assetInfos = Map(assetId -> newInfo)))
       } else {
-        Left(TransactionValidationError(tx, "Asset is not reissuable"))
+        Left(TransactionValidationError(tx, s"Asset is not reissuable and blockTime=$blockTime is greater than " +
+          s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
       }
     })
   }
