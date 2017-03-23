@@ -15,7 +15,6 @@ import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets.TransferRequest
 import scorex.utils.{LoggerFacade, ScorexLogging}
 
-import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -35,7 +34,11 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
   private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
   private def retrying(r: Request, interval: FiniteDuration = 200.millis): Future[Response] =
-    timer.retryUntil[Response](client.executeRequest(r).toCompletableFuture.toScala, _ => true, interval)
+    timer.retryUntil[Response]({
+      val p = Promise[Response]
+      client.executeRequest(r, ResponseFuture(p))
+      p.future
+    }, _ => true, interval)
 
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://localhost:${nodeInfo.hostRestApiPort}$path")).build())
@@ -122,6 +125,18 @@ object Node extends ScorexLogging {
   case class Block(signature: String, height: Long, timestamp: Long, generator: String, transactions: Seq[Transaction])
   implicit val blockFormat: Format[Block] = Json.format
 
+  case class ResponseFuture(p: Promise[Response]) extends AsyncCompletionHandlerBase {
+    override def onCompleted(response: Response) = {
+      p.success(response)
+      super.onCompleted(response)
+    }
+
+    override def onThrowable(t: Throwable) = {
+      p.failure(t)
+      super.onThrowable(t)
+    }
+  }
+
   implicit class ResponseFutureExt(val f: Future[Response]) extends AnyVal {
     def as[A: Format](implicit ec: ExecutionContext): Future[A] =
       f.transform {
@@ -143,7 +158,7 @@ object Node extends ScorexLogging {
         case _ => try {
           timer.newTimeout(retrying, interval.toMillis, MILLISECONDS)
         } catch {
-          case NonFatal(e) => p.failure(e)
+          case t: Throwable => p.failure(t)
         }
       }
 
