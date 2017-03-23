@@ -158,7 +158,9 @@ object Node extends ScorexLogging {
         case _ => try {
           timer.newTimeout(retrying, interval.toMillis, MILLISECONDS)
         } catch {
-          case t: Throwable => p.failure(t)
+          case t: Throwable =>
+            log.debug("Error processing request", t)
+            p.failure(t)
         }
       }
 
