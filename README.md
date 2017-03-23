@@ -41,6 +41,10 @@ sbt packageAll
 sbt packageAll -D=network=testnet
 ```
 
+# Running Tests
+
+`sbt test`
+
 # Running Integration Tests
 
 ## TL;DR
