@@ -11,6 +11,7 @@ import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredSta
 import scorex.transaction.state.database.state.storage._
 
 import scala.collection.immutable.Iterable
+import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
 class StateResponseComparisonTests extends FreeSpec with Matchers {
 
@@ -133,14 +134,14 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       }
     }
   }
-  "block application time measure" ignore {
+  "block application time measure" in {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
     val end = currentMainnet.history.height() + 1
-    getStorages(currentMainnet, "C:\\Users\\ilyas\\Desktop\\old.store", "C:\\Users\\ilyas\\Desktop\\new.store", appl = true)
+    getStorages(currentMainnet, "C:\\Users\\ilyas\\Desktop\\old_f.store", "C:\\Users\\ilyas\\Desktop\\new_f.store", appl = true)
   }
 
-  "assert state" - {
+  "assert state" ignore {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
     val (old, nev) = getStorages(currentMainnet, "C:\\Users\\ilyas\\Desktop\\old.store", "C:\\Users\\ilyas\\Desktop\\new.store", appl = false)
@@ -182,6 +183,11 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
         assert(oldSet.equals(newSet))
       }
     }
+
+    //    "total waves balance" in {
+    //      println ("oldsum" + aliveAccounts.map(acc=>old.state.balance(acc)).sum)
+    //      println ("newsum" + aliveAccounts.map(acc=>nev.state.balance(acc)).sum)
+    //    }
 
     s"balance, effectiveBalance, leasedSum" in {
       for (accIdx <- aliveAccounts.indices) {
@@ -225,7 +231,6 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
         }
       }
     }
-
 
 
     s"effectiveBalanceWithConfirmations" in {
@@ -294,16 +299,46 @@ object StateResponseComparisonTests extends FreeSpec {
     val old = storedBC(oldState(oldStore), new StoredBlockchain(oldStore))
 
     val newStore = BlockStorageImpl.createMVStore(newStorageFile)
-    val nev = storedBC(newState(newStore), new StoredBlockchain(newStore))
-    val end = currentMainnet.history.height() + 1
-
+    val p = new MVStorePrimitiveImpl(newStore)
+    val rrrr: StateWriterImpl = new StateWriterImpl(p)
+    val nev = storedBC(new StateWriterAdapter(
+      rrrr, FunctionalitySettings.MAINNET), new StoredBlockchain(newStore))
+    val start = 1
+    val end = currentMainnet.history.height()+1
     if (appl) {
-      val (t1, _) = withTime(Range(1, end).map {
+      val (t1, _) = withTime(Range(start, end).map {
         blockNumber =>
-          nev.appendBlock(currentMainnet.history.blockAt(blockNumber).get).get
-          if (blockNumber % 10000 == 0) {
+          val block = currentMainnet.history.blockAt(blockNumber).get
+          nev.appendBlock(block).get
+          if (blockNumber % 1000 == 0 || blockNumber > end - 5) {
+
             println(blockNumber)
+
           }
+//          println(blockNumber)
+//          val total = p.portfolios.values.asScala.map(_._1).sum
+//          if (total != 10000000000000000L) {
+//            println(
+//              s"""!!!! bad sum($total) after $blockNumber
+//                 |
+//                   |${block.encodedId}
+//                 |
+//                   |$block""".stripMargin)
+//            throw new Exception()
+//          }
+
+    //      if (blockNumber > 410000) {
+    //        val total = p.portfolios.values.asScala.map(_._1).sum
+    //        if (total != 10000000000000000L) {
+    //          println(
+    //            s"""!!!! bad sum($total) after $blockNumber
+    //               |
+    //               |${block.encodedId}
+    //               |
+    //               |$block""".stripMargin)
+    //          throw new Exception()
+    //        }
+    //      }
           ()
       })
       newStore.commit()
@@ -313,7 +348,7 @@ object StateResponseComparisonTests extends FreeSpec {
 
       val oldValidator = new ValidatorImpl(old.state, FunctionalitySettings.MAINNET)
 
-      val (t0, _) = withTime(Range(1, end).foreach {
+      val (t0, _) = withTime(Range(start, end).foreach {
         blockNumber =>
           val block = currentMainnet.history.blockAt(blockNumber).get
           assert(oldValidator.validate(block.transactionData, None, block.timestamp)._1.isEmpty)

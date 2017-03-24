@@ -30,14 +30,15 @@ object BlockDiffer {
 
     txsDiffEi
       .map(diff => {
-        val feeDiff = block.feesDistribution.map { case (AssetAcc(account, maybeAssetId), feeVolume) =>
-          account -> (maybeAssetId match {
-            case None => Portfolio(feeVolume, feeVolume, Map.empty)
-            case Some(assetId) => Portfolio(0L, 0L, Map(EqByteArray(assetId) -> feeVolume))
-          })
-        }.foldLeft(emptyDiff) { case (combinedDiff, (acc, portfolio)) =>
-          combinedDiff.combine(Diff(Map.empty, Map(acc -> portfolio), Map.empty))
+        val accountPortfolioFeesMap: List[(Account, Portfolio)] = block.feesDistribution.toList.map {
+          case (AssetAcc(account, maybeAssetId), feeVolume) =>
+            account -> (maybeAssetId match {
+              case None => Portfolio(feeVolume, feeVolume, Map.empty)
+              case Some(assetId) => Portfolio(0L, 0L, Map(EqByteArray(assetId) -> feeVolume))
+            })
         }
+        val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) => Diff(Map.empty, Map(acc -> p), Map.empty) }
+        )
         diff.combine(feeDiff)
       })
       .map(diff => {

@@ -5,10 +5,6 @@ import scorex.account.Account
 import scorex.serialization.JsonSerializable
 import scorex.transaction.TransactionParser.TransactionType
 
-
-/**
-  * A transaction is an atomic state modifier
-  */
 trait Transaction extends StateChangeReason with JsonSerializable {
 
   val transactionType: TransactionType.Value
