@@ -8,6 +8,14 @@ import scorex.transaction.{GenesisTransaction, PaymentTransaction, SignedTransac
 
 case class BlockDiff(txsDiff: Diff, heightDiff: Int, effectiveBalanceSnapshots: Seq[EffectiveBalanceSnapshot])
 
+object BlockDiff {
+  implicit class BlockDiffExt(bd:BlockDiff) {
+    lazy val maxPaymentTransactionTimestamp: Map[Account, Long] = bd.txsDiff.transactions.toList
+      .collect({ case (_, (_, ptx: PaymentTransaction)) => ptx.sender.toAccount -> ptx.timestamp })
+      .groupBy(_._1)
+      .map { case (acc, list) => acc -> list.map(_._2).max }
+  }
+}
 
 case class Diff(transactions: Map[ByteArray, (Int, Transaction)],
                 portfolios: Map[Account, Portfolio],
@@ -23,7 +31,6 @@ object Diff {
 
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)
-
 
     // TODO: Make part of diff so each Differ could calc this
     lazy val accountTransactionIds: Map[ByteArray, List[ByteArray]] = {
@@ -48,10 +55,10 @@ object Diff {
             ???
         }
 
-        if (senderBytes sameElements recipientBytes)
-          Map(EqByteArray(senderBytes) -> List(id))
-        else
-          Map(EqByteArray(senderBytes) -> List(id), EqByteArray(recipientBytes) -> List(id))
+        //        if (senderBytes sameElements recipientBytes)
+        //          Map(EqByteArray(senderBytes) -> List(id))
+        //        else
+        Map(EqByteArray(senderBytes) -> List(id), EqByteArray(recipientBytes) -> List(id))
       }.foldLeft(Map.empty[ByteArray, List[ByteArray]]) { case (agg, m) => m.combine(agg) }
     }
 

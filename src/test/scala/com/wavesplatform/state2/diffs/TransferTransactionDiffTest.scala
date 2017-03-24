@@ -22,7 +22,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       val account = transfer.sender.toAccount
       ensureSenderHasEnoughBalance(state)(account, Set(transfer.feeAssetId, transfer.assetId).flatten.toList.map(EqByteArray))
 
-      val diffEi = TransferTransactionDiff.apply(state, 1)(transfer)
+      val diffEi = TransferTransactionDiff.apply(state, ???, ???, 1)(transfer)
       val portfolioChanges: List[Portfolio] = diffEi.right.get.portfolios.values.toList
       val totalDiff = Monoid[Portfolio].combineAll(portfolioChanges)
       totalDiff.balance shouldBe 0

@@ -3,6 +3,7 @@ package com.wavesplatform
 import cats._
 import cats.implicits._
 import cats.Monoid
+import scorex.crypto.encode.Base58
 
 import scala.util.Try
 
@@ -15,6 +16,8 @@ package object state2 {
     }
 
     override def hashCode(): Int = java.util.Arrays.hashCode(arr)
+
+    override lazy val toString: String = "ByteArray:" + Base58.encode(arr)
 
   }
 

@@ -60,8 +60,12 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
 
     p.setHeight(p.getHeight + blockDiff.heightDiff)
 
+    blockDiff.maxPaymentTransactionTimestamp.foreach { case (acc, ts) =>
+      val old = maxPaymentTransactionTimestampInPreviousBlocks(acc)
+      if (ts > old.getOrElse(0L))
+        p.maxPaymentTransactionTimestampInPreviousBlocks.put(acc.bytes, ts)
+    }
   }
-
 }
 
 

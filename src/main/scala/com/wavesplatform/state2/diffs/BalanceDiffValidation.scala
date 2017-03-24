@@ -10,7 +10,7 @@ import scorex.transaction.ValidationError.TransactionValidationError
 import scala.util.{Left, Right}
 
 object BalanceDiffValidation {
-  def apply[T <: Transaction](s: StateReader, settings: FunctionalitySettings, time: Long)(tx: T, d: Diff): Either[TransactionValidationError, Diff] = {
+  def apply[T <: Transaction](s: StateReader, time: Long)(tx: T, d: Diff): Either[TransactionValidationError, Diff] = {
 
     lazy val leadsToPositiveState: Boolean = {
       val changedAccounts = d.portfolios.keySet
@@ -27,7 +27,7 @@ object BalanceDiffValidation {
       allBalancesArePositive
     }
 
-    if (time >= settings.allowTemporaryNegativeUntil || leadsToPositiveState) {
+    if (leadsToPositiveState) {
       Right(d)
     } else {
       Left(TransactionValidationError(tx, "Transaction application leads to (temporary) negative balance/effectiveBalance/assetBalance"))

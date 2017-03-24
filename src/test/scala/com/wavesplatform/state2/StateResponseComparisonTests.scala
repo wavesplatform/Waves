@@ -134,7 +134,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       }
     }
   }
-  "block application time measure" ignore {
+  "block application time measure" in {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
     val end = currentMainnet.history.height() + 1

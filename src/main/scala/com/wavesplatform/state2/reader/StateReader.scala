@@ -9,7 +9,6 @@ import scala.reflect.ClassTag
 
 trait StateReader {
 
-
   def transactionInfo(id: ByteArray): Option[(Int, Transaction)]
 
   def accountPortfolio(a: Account): Portfolio
@@ -25,6 +24,8 @@ trait StateReader {
   def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long
 
   def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
+
+  def maxPaymentTransactionTimestampInPreviousBlocks(a: Account): Option[Long]
 }
 
 object StateReader {

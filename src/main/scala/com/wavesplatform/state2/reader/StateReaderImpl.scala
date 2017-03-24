@@ -52,4 +52,7 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 
   override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
   = Option(p.paymentTransactionHashes.get(hash)).map(EqByteArray)
+
+  override def maxPaymentTransactionTimestampInPreviousBlocks(a: Account): Option[Long] =
+    Option(p.maxPaymentTransactionTimestampInPreviousBlocks.get(a.bytes))
 }

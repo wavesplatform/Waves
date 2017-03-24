@@ -12,21 +12,20 @@ object TransactionDiffer {
     for {
       t0 <- CommonValidation.disallowTxFromFuture(s, settings, time, tx)
       t1 <- CommonValidation.disallowBeforeActivationTime(s, settings, t0)
-      t2 <- CommonValidation.disallowDuplicateIds(s, settings, t1)
-      diff <- t2 match {
+      t2 <- CommonValidation.disallowDuplicateIds(s, settings, height, t1)
+      t3 <- CommonValidation.disallowSendingGreaterThanBalance(s, settings, time, t2)
+      diff <- t3 match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(height)(gtx)
         case ptx: PaymentTransaction => PaymentTransactionDiff(s, height)(ptx)
         case itx: IssueTransaction => AssetTransactionsDiff.issue(s, height)(itx)
         case rtx: ReissueTransaction => AssetTransactionsDiff.reissue(s, settings, height, time)(rtx)
         case btx: BurnTransaction => AssetTransactionsDiff.burn(s, height)(btx)
-        case ttx: TransferTransaction => TransferTransactionDiff(s, height)(ttx)
+        case ttx: TransferTransaction => TransferTransactionDiff(s, settings, time, height)(ttx)
         case ltx: LeaseTransaction => LeaseTransactionsDiff.lease(s, height)(ltx)
         case ltx: LeaseCancelTransaction => LeaseTransactionsDiff.leaseCancel(s, height)(ltx)
         case _ => ???
       }
-      positiveDiff <- BalanceDiffValidation(s, settings, time)(tx, diff)
+      positiveDiff <- BalanceDiffValidation(s, time)(tx, diff)
     } yield positiveDiff
   }
 }
-
-
