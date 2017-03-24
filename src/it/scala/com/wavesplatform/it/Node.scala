@@ -3,8 +3,9 @@ package com.wavesplatform.it
 import java.io.IOException
 
 import com.typesafe.config.Config
+import com.wavesplatform.it.util._
 import com.wavesplatform.settings.WavesSettings
-import io.netty.util.{Timeout, Timer}
+import io.netty.util.Timer
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -18,8 +19,7 @@ import scorex.utils.{LoggerFacade, ScorexLogging}
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.control.NonFatal
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 
@@ -35,22 +35,18 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
   private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
   private def retrying(r: Request, interval: FiniteDuration = 1.second): Future[Response] = {
-      val p = Promise[Response]
-
-      def retrying(timeout: Timeout): Unit = client.executeRequest(r).toCompletableFuture.toScala.onComplete {
-        case Success(v) => p.success(v)
-        case _ =>
-          try {
-            timer.newTimeout(retrying, interval.toMillis, MILLISECONDS)
-          } catch {
-            case t: Throwable => p.failure(t)
-          }
+      def executeRequest: Future[Response] = {
+        log.trace(s"$r")
+        client.executeRequest(r).toCompletableFuture.toScala
+            .recoverWith {
+              case t: Throwable =>
+                log.debug("Retrying request", t)
+                executeRequest
+            }
       }
 
-      retrying(null)
-
-      p.future
-    }
+    executeRequest
+  }
 
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://localhost:${nodeInfo.hostRestApiPort}$path")).build())
@@ -79,43 +75,30 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     post("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
+  def waitFor[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] =
+    timer.retryUntil(f, cond, retryInterval)
+
   def waitForNextBlock: Future[Block] = for {
     currentBlock <- lastBlock
     actualBlock <- findBlock(_.height > currentBlock.height, currentBlock.height)
   } yield actualBlock
 
   def findBlock(cond: Block => Boolean, from: Long = 1, to: Long = Long.MaxValue): Future[Block] = {
-    val p = Promise[Block]
-
-    def reschedule(_from: Long, _to: Long) = try {
-      timer.newTimeout(retrying(_from, _to), blockDelay.toMillis, MILLISECONDS)
-    } catch {
-      case NonFatal(t) => p.failure(t)
-    }
-
-    def retrying(_from: Long, _to: Long)(timeout: Timeout): Unit = blockSeq(_from, _to).onComplete {
-      case Success(blocks) =>
-        blocks.find(cond) match {
-          case Some(b) =>
-            log.debug(s"Found matching block ${b.signature}")
-            p.success(b)
-          case None =>
-            val newFrom = blocks.lastOption.fold(_from)(_.height + 1)
-            if (newFrom > to) {
-              p.failure(new NoSuchElementException)
-            } else {
-              log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 99}]")
-              reschedule(newFrom, (newFrom + 99).min(to))
-            }
+    def load(_from: Long, _to: Long): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
+      blocks.find(cond).fold[Future[Node.Block]] {
+        val maybeLastBlock = blocks.lastOption
+        if (maybeLastBlock.exists(_.height >= to)) {
+          Future.failed(new NoSuchElementException)
+        } else {
+          val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 99L).min(to))
+          val newTo = newFrom + 99
+          log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 99}]")
+          timer.schedule(load(newFrom, newTo), blockDelay)
         }
-      case Failure(t) =>
-        log.debug("Error loading blocks", t)
-        reschedule(_from, _to)
+      }(Future.successful)
     }
 
-    retrying(from, from + 99)(null)
-
-    p.future
+    load(from, (from + 99).min(to))
   }
 }
 
