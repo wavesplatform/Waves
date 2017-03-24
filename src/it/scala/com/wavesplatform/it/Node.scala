@@ -63,12 +63,24 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
   }
 
+  def connectedPeersCount: Future[Int] = get("/peers/connected").map { r =>
+    (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
+  }.map(_.length)
+
+  def waitForPeers(targetPeersCount: Int): Future[Int] = waitFor[Int](connectedPeersCount, _ >= targetPeersCount, 1.second)
+
   def height: Future[Long] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Long])
+
   def blockAt(height: Long) = get(s"/blocks/at/$height").as[Block]
+
   def lastBlock: Future[Block] = get("/blocks/last").as[Block]
+
   def blockSeq(from: Long, to: Long) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
+
   def status: Future[Status] = get("/node/status").as[Status]
+
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
+
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
@@ -90,15 +102,15 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
         if (maybeLastBlock.exists(_.height >= to)) {
           Future.failed(new NoSuchElementException)
         } else {
-          val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 99L).min(to))
-          val newTo = newFrom + 99
-          log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 99}]")
+          val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19L).min(to))
+          val newTo = newFrom + 19
+          log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 19}]")
           timer.schedule(load(newFrom, newTo), blockDelay)
         }
       }(Future.successful)
     }
 
-    load(from, (from + 99).min(to))
+    load(from, (from + 19).min(to))
   }
 }
 

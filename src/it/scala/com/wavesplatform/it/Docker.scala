@@ -17,11 +17,11 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 case class NodeInfo(
-    hostRestApiPort: Int,
-    hostNetworkPort: Int,
-    containerNetworkPort: Int,
-    ipAddress: String,
-    containerId: String)
+                     hostRestApiPort: Int,
+                     hostNetworkPort: Int,
+                     containerNetworkPort: Int,
+                     ipAddress: String,
+                     containerId: String)
 
 class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable with ScorexLogging {
 
@@ -56,6 +56,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
     val hostConfig = HostConfig.builder()
       .portBindings(portBindings)
+      .cpuPeriod(100000L)
+      .cpuQuota(200000L)
+      .memory(1024000000L)
       .build()
 
     val containerConfig = ContainerConfig.builder()
