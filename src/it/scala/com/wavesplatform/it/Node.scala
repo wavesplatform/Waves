@@ -85,6 +85,10 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
 
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
+  def assetBalance(address: String, assetId: String): Future[Balance] = get(s"/assets/balance/$address/$assetId").as[Balance]
+
+  def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
+
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
@@ -93,6 +97,9 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
 
   def waitFor[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] =
     timer.retryUntil(f, cond, retryInterval)
+
+  def createAddress: Future[String] =
+    post("/addresses").as[JsValue].map(v => (v \ "address").as[String])
 
   def waitForNextBlock: Future[Block] = for {
     currentBlock <- lastBlock
