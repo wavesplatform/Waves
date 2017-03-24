@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.io.File
 
 import akka.actor.{ActorSystem, Props}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
@@ -98,11 +98,9 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 }
 
 object Application extends ScorexLogging {
-  def main(args: Array[String]): Unit = {
-    log.info("Starting...")
-
+  def readConfig(userConfigPath: Option[String]): Config = {
     val maybeConfigFile = for {
-      maybeFilename <- args.headOption
+      maybeFilename <- userConfigPath
       file = new File(maybeFilename)
       if file.exists
     } yield file
@@ -127,9 +125,15 @@ object Application extends ScorexLogging {
           .withFallback(ConfigFactory.defaultApplication())
           .withFallback(ConfigFactory.defaultReference())
           .resolve()
-
     }
 
+    config
+  }
+
+  def main(args: Array[String]): Unit = {
+    log.info("Starting...")
+
+    val config = readConfig(args.headOption)
     val settings = WavesSettings.fromConfig(config)
 
     RootActorSystem.start("wavesplatform", settings.matcherSettings) { actorSystem =>
