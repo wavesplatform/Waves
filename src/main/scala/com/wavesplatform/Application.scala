@@ -146,7 +146,7 @@ object Application extends ScorexLogging {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      val application = new Application(actorSystem, settings, config)
+      val application = new Application(actorSystem, settings)
       application.run()
 
       if (application.wallet.privateKeyAccounts().isEmpty)
