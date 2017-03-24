@@ -3,9 +3,8 @@ package com.wavesplatform.it
 import java.io.IOException
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.util._
 import com.wavesplatform.settings.WavesSettings
-import io.netty.util.Timer
+import io.netty.util.{HashedWheelTimer, Timeout, Timer}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -14,16 +13,18 @@ import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets.TransferRequest
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.utils.{LoggerFacade, ScorexLogging}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 
-class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer) {
+class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: HashedWheelTimer) {
   import Node._
 
   val privateKey = config.getString("private-key")
@@ -31,8 +32,11 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
   val address = config.getString("address")
   val settings = WavesSettings.fromConfig(config)
 
-  private val blockDelay = settings.blockchainSettings.genesisSettings.averageBlockDelay
+  private val generationDelay = settings.minerSettings.generationDelay
   private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
+
+  def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long =
+    settings.feesSettings.fees(txValue.id).find(_.asset == asset).get.fee
 
   private def retrying(r: Request, interval: FiniteDuration = 1.second): Future[Response] = {
       def executeRequest: Future[Response] = {

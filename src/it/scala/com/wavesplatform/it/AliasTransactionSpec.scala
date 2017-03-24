@@ -11,12 +11,10 @@ import scala.util.Random
 class AliasTransactionSpec(allNodes: Seq[Node]) extends FreeSpec with Matchers {
   "Able to send money to an alias" in {
     val alias = "TEST_ALIAS"
-    val asset = "WAVES"
     val Seq(creator, sender) = Random.shuffle(allNodes).take(2)
-    val feeSettings = creator.settings.feesSettings.fees
 
-    val createAliasFee = feeSettings(TransactionType.CreateAliasTransaction.id).find(_.asset == asset).get.fee
-    val transferFee = feeSettings(TransactionType.TransferTransaction.id).find(_.asset == asset).get.fee
+    val createAliasFee = creator.fee(TransactionType.CreateAliasTransaction)
+    val transferFee = creator.fee(TransactionType.TransferTransaction)
 
     val transferResult = for {
       fb <- creator.lastBlock
