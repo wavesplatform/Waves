@@ -3,7 +3,6 @@ package scorex.waves.http
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.Json
@@ -11,7 +10,6 @@ import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.BlockStorage
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
 @Path("/debug")

@@ -1,8 +1,6 @@
 package scorex.waves
 
-import com.typesafe.config.ConfigRenderOptions
 import org.scalatest.{FunSuite, Matchers}
-import play.api.libs.json.Json
 
 class DebugAPISpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
 
