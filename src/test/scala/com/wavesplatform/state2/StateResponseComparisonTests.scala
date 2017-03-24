@@ -134,7 +134,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       }
     }
   }
-  "block application time measure" in {
+  "block application time measure" ignore {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
     val end = currentMainnet.history.height() + 1
@@ -144,7 +144,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
   "assert state" ignore {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
-    val (old, nev) = getStorages(currentMainnet, "C:\\Users\\ilyas\\Desktop\\old.store", "C:\\Users\\ilyas\\Desktop\\new.store", appl = false)
+    val (old, nev) = getStorages(currentMainnet, "C:\\Users\\ilyas\\Desktop\\old_f.store", "C:\\Users\\ilyas\\Desktop\\new_f.store", appl = false)
 
     lazy val block = old.history.lastBlock
 
@@ -184,12 +184,11 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       }
     }
 
-    //    "total waves balance" in {
-    //      println ("oldsum" + aliveAccounts.map(acc=>old.state.balance(acc)).sum)
-    //      println ("newsum" + aliveAccounts.map(acc=>nev.state.balance(acc)).sum)
-    //    }
+    "total waves balance" in {
+      assert(aliveAccounts.map(acc => nev.state.balance(acc)).sum == 100000000L)
+    }
 
-    s"balance, effectiveBalance, leasedSum" in {
+    s"balance, effectiveBalance, leasedSum" ignore {
       for (accIdx <- aliveAccounts.indices) {
         logStep(accIdx, aliveAccounts.size)("balance, effectiveBalance, leasedSum")
         val acc = aliveAccounts(accIdx)
@@ -216,7 +215,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       }
     }
 
-    s"getAccountBalance, assetBalance" in {
+    s"getAccountBalance, assetBalance" ignore {
       for (accIdx <- aliveAccounts.indices) {
         logStep(accIdx, aliveAccounts.size)("getAccountBalance, assetBalance")
         val acc = aliveAccounts(accIdx)
@@ -246,7 +245,6 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
         assert(oldEBWC == newEBWC, s"acc=$acc old=$oldEBWC new=$newEBWC")
       }
     }
-
   }
 }
 
@@ -289,7 +287,8 @@ object StateResponseComparisonTests extends FreeSpec {
   }
 
   def logStep(step: Int, total: Int, totalSteps: Int = 10)(descr: String = ""): Unit = {
-    if (step % (total / totalSteps) == 0) {
+    //    if (step % (total / totalSteps) == 0)
+    {
       println(s"$descr: $step of $total..")
     }
   }
@@ -304,7 +303,7 @@ object StateResponseComparisonTests extends FreeSpec {
     val nev = storedBC(new StateWriterAdapter(
       rrrr, FunctionalitySettings.MAINNET), new StoredBlockchain(newStore))
     val start = 1
-    val end = currentMainnet.history.height()+1
+    val end = currentMainnet.history.height() + 1
     if (appl) {
       val (t1, _) = withTime(Range(start, end).map {
         blockNumber =>
@@ -315,30 +314,30 @@ object StateResponseComparisonTests extends FreeSpec {
             println(blockNumber)
 
           }
-//          println(blockNumber)
-//          val total = p.portfolios.values.asScala.map(_._1).sum
-//          if (total != 10000000000000000L) {
-//            println(
-//              s"""!!!! bad sum($total) after $blockNumber
-//                 |
-//                   |${block.encodedId}
-//                 |
-//                   |$block""".stripMargin)
-//            throw new Exception()
-//          }
+          //          println(blockNumber)
+          //          val total = p.portfolios.values.asScala.map(_._1).sum
+          //          if (total != 10000000000000000L) {
+          //            println(
+          //              s"""!!!! bad sum($total) after $blockNumber
+          //                 |
+          //                   |${block.encodedId}
+          //                 |
+          //                   |$block""".stripMargin)
+          //            throw new Exception()
+          //          }
 
-    //      if (blockNumber > 410000) {
-    //        val total = p.portfolios.values.asScala.map(_._1).sum
-    //        if (total != 10000000000000000L) {
-    //          println(
-    //            s"""!!!! bad sum($total) after $blockNumber
-    //               |
-    //               |${block.encodedId}
-    //               |
-    //               |$block""".stripMargin)
-    //          throw new Exception()
-    //        }
-    //      }
+          //      if (blockNumber > 410000) {
+          //        val total = p.portfolios.values.asScala.map(_._1).sum
+          //        if (total != 10000000000000000L) {
+          //          println(
+          //            s"""!!!! bad sum($total) after $blockNumber
+          //               |
+          //               |${block.encodedId}
+          //               |
+          //               |$block""".stripMargin)
+          //          throw new Exception()
+          //        }
+          //      }
           ()
       })
       newStore.commit()
