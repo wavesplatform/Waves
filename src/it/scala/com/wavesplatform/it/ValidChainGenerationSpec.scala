@@ -1,19 +1,18 @@
 package com.wavesplatform.it
 
 import org.scalatest._
-import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{Await, Future, Promise}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
-import Await.result
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 class ValidChainGenerationSpec(allNodes: Seq[Node]) extends FreeSpec with ScalaFutures with IntegrationPatience
-  with Matchers with Eventually {
+  with Matchers {
   import ValidChainGenerationSpec._
 
   "Generate 30 blocks and synchronise" in {
