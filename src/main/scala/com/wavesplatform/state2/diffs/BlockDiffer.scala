@@ -28,19 +28,17 @@ object BlockDiffer {
     }
     }
 
+    lazy val accountPortfolioFeesMap: List[(Account, Portfolio)] = block.feesDistribution.toList.map {
+      case (AssetAcc(account, maybeAssetId), feeVolume) =>
+        account -> (maybeAssetId match {
+          case None => Portfolio(feeVolume, feeVolume, Map.empty)
+          case Some(assetId) => Portfolio(0L, 0L, Map(EqByteArray(assetId) -> feeVolume))
+        })
+    }
+    lazy val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) => Diff(Map.empty, Map(acc -> p), Map.empty) })
+
     txsDiffEi
-      .map(diff => {
-        val accountPortfolioFeesMap: List[(Account, Portfolio)] = block.feesDistribution.toList.map {
-          case (AssetAcc(account, maybeAssetId), feeVolume) =>
-            account -> (maybeAssetId match {
-              case None => Portfolio(feeVolume, feeVolume, Map.empty)
-              case Some(assetId) => Portfolio(0L, 0L, Map(EqByteArray(assetId) -> feeVolume))
-            })
-        }
-        val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) => Diff(Map.empty, Map(acc -> p), Map.empty) }
-        )
-        diff.combine(feeDiff)
-      })
+      .map(_.combine(feeDiff))
       .map(diff => {
         val effectiveBalanceSnapshots = diff.portfolios
           .filter { case (acc, portfolio) => portfolio.effectiveBalance != 0 }

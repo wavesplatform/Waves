@@ -9,12 +9,14 @@ import scorex.transaction.{GenesisTransaction, PaymentTransaction, SignedTransac
 case class BlockDiff(txsDiff: Diff, heightDiff: Int, effectiveBalanceSnapshots: Seq[EffectiveBalanceSnapshot])
 
 object BlockDiff {
-  implicit class BlockDiffExt(bd:BlockDiff) {
+
+  implicit class BlockDiffExt(bd: BlockDiff) {
     lazy val maxPaymentTransactionTimestamp: Map[Account, Long] = bd.txsDiff.transactions.toList
       .collect({ case (_, (_, ptx: PaymentTransaction)) => ptx.sender.toAccount -> ptx.timestamp })
       .groupBy(_._1)
       .map { case (acc, list) => acc -> list.map(_._2).max }
   }
+
 }
 
 case class Diff(transactions: Map[ByteArray, (Int, Transaction)],
@@ -32,34 +34,27 @@ object Diff {
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)
 
-    // TODO: Make part of diff so each Differ could calc this
     lazy val accountTransactionIds: Map[ByteArray, List[ByteArray]] = {
-      d.transactions.map { case (id, (h, tx)) =>
-        val senderBytes: Array[Byte] = tx match {
-          case stx: SignedTransaction => stx.sender.bytes
-          case ptx: PaymentTransaction => ptx.sender.bytes
-          case gtx: GenesisTransaction => Array.empty[Byte]
-          case tx =>
-            println(tx)
-            ???
+      val accTxIds = d.transactions.map { case (id, (h, tx)) =>
+        val senderBytes = tx match {
+          case stx: SignedTransaction => Some(stx.sender.bytes)
+          case ptx: PaymentTransaction => Some(ptx.sender.bytes)
+          case gtx: GenesisTransaction => None
+          case _ => ???
         }
 
-        val recipientBytes: Array[Byte] = tx match {
-          case gtx: GenesisTransaction => gtx.recipient.bytes
-          case ptx: PaymentTransaction => ptx.recipient.bytes
-          case itx: IssueTransaction => Array.empty[Byte]
-          case itx: ReissueTransaction => Array.empty[Byte]
-          case ttx: TransferTransaction => ttx.recipient.asInstanceOf[Account].bytes
-          case tx =>
-            println(tx)
-            ???
+        val recipientBytes = tx match {
+          case gtx: GenesisTransaction => Some(gtx.recipient.bytes)
+          case ptx: PaymentTransaction => Some(ptx.recipient.bytes)
+          case itx: IssueTransaction => None
+          case itx: ReissueTransaction => None
+          case ttx: TransferTransaction => Some(ttx.recipient.asInstanceOf[Account].bytes)
+          case _ => ???
         }
 
-        //        if (senderBytes sameElements recipientBytes)
-        //          Map(EqByteArray(senderBytes) -> List(id))
-        //        else
-        Map(EqByteArray(senderBytes) -> List(id), EqByteArray(recipientBytes) -> List(id))
-      }.foldLeft(Map.empty[ByteArray, List[ByteArray]]) { case (agg, m) => m.combine(agg) }
+        Seq(senderBytes, recipientBytes).flatten.map(bytes => EqByteArray(bytes) -> List(id)).toMap
+      }
+      Monoid[Map[ByteArray, List[ByteArray]]].combineAll(accTxIds)
     }
 
     lazy val paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = d.transactions

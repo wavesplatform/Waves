@@ -134,7 +134,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       }
     }
   }
-  "block application time measure" in {
+  "block application time measure" ignore {
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
     val end = currentMainnet.history.height() + 1
@@ -171,7 +171,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     }
 
 
-    s"accountTransactions" ignore {
+    s"accountTransactions" in {
       for (accIdx <- aliveAccounts.indices) {
         logStep(accIdx, aliveAccounts.size, 100)("accountTransactions")
         val acc = aliveAccounts(accIdx)

@@ -46,7 +46,6 @@ object CommonValidation {
         case _ => Right(tx)
       } else Right(tx)
 
-
   def disallowDuplicateIds[T <: Transaction](state: StateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
     case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueId => Right(tx)
     case _ =>

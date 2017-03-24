@@ -9,7 +9,6 @@ import scala.util.{Left, Right}
 object GenesisTransactionDiff {
   def apply(height: Int)(tx: GenesisTransaction): Either[StateValidationError, Diff] = {
     if (height != 1) Left(TransactionValidationError(tx, "GenesisTranaction cannot appear in non-initial block"))
-      // TODO check sig!
     else
       Right(Diff(height = height,
         tx = tx,
