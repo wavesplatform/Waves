@@ -3,8 +3,9 @@ package com.wavesplatform.it
 import java.io.IOException
 
 import com.typesafe.config.Config
+import com.wavesplatform.it.util._
 import com.wavesplatform.settings.WavesSettings
-import io.netty.util.{HashedWheelTimer, Timeout, Timer}
+import io.netty.util.Timer
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -18,12 +19,11 @@ import scorex.utils.{LoggerFacade, ScorexLogging}
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.control.NonFatal
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 
-class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: HashedWheelTimer) {
+class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer) {
   import Node._
 
   val privateKey = config.getString("private-key")
@@ -31,11 +31,22 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
   val address = config.getString("address")
   val settings = WavesSettings.fromConfig(config)
 
-  private val generationDelay = settings.minerSettings.generationDelay
+  private val blockDelay = settings.blockchainSettings.genesisSettings.averageBlockDelay
   private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
-  private def retrying(r: Request, interval: FiniteDuration = 200.millis): Future[Response] =
-    timer.retryUntil[Response](client.executeRequest(r).toCompletableFuture.toScala, _ => true, interval)
+  private def retrying(r: Request, interval: FiniteDuration = 1.second): Future[Response] = {
+      def executeRequest: Future[Response] = {
+        log.trace(s"$r")
+        client.executeRequest(r).toCompletableFuture.toScala
+            .recoverWith {
+              case t: Throwable =>
+                log.debug("Retrying request", t)
+                executeRequest
+            }
+      }
+
+    executeRequest
+  }
 
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://localhost:${nodeInfo.hostRestApiPort}$path")).build())
@@ -52,57 +63,54 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
   }
 
+  def connectedPeersCount: Future[Int] = get("/peers/connected").map { r =>
+    (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
+  }.map(_.length)
+
+  def waitForPeers(targetPeersCount: Int): Future[Int] = waitFor[Int](connectedPeersCount, _ >= targetPeersCount, 1.second)
+
   def height: Future[Long] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Long])
+
   def blockAt(height: Long) = get(s"/blocks/at/$height").as[Block]
+
   def lastBlock: Future[Block] = get("/blocks/last").as[Block]
+
   def blockSeq(from: Long, to: Long) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
+
   def status: Future[Status] = get("/node/status").as[Status]
+
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
+
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     post("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
-  def waitForHeight(targetHeight: Long): Future[Long] =
-    timer.retryUntil[Long](height, _ >= targetHeight, generationDelay)
+  def waitFor[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] =
+    timer.retryUntil(f, cond, retryInterval)
+
   def waitForNextBlock: Future[Block] = for {
     currentBlock <- lastBlock
     actualBlock <- findBlock(_.height > currentBlock.height, currentBlock.height)
   } yield actualBlock
 
   def findBlock(cond: Block => Boolean, from: Long = 1, to: Long = Long.MaxValue): Future[Block] = {
-    val p = Promise[Block]
-
-    def reschedule(_from: Long, _to: Long) = try {
-      timer.newTimeout(retrying(_from, _to), (generationDelay.toMillis * 1.5).toLong, MILLISECONDS)
-    } catch {
-      case NonFatal(t) => p.failure(t)
-    }
-
-    def retrying(_from: Long, _to: Long)(timeout: Timeout): Unit = blockSeq(_from, _to).onComplete {
-      case Success(blocks) =>
-        blocks.find(cond) match {
-          case Some(b) =>
-            log.debug(s"Found matching block ${b.signature}")
-            p.success(b)
-          case None =>
-            val newFrom = blocks.lastOption.fold(_from)(_.height + 1)
-            if (newFrom > to) {
-              p.failure(new NoSuchElementException)
-            } else {
-              log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 99}]")
-              reschedule(newFrom, (newFrom + 99).min(to))
-            }
+    def load(_from: Long, _to: Long): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
+      blocks.find(cond).fold[Future[Node.Block]] {
+        val maybeLastBlock = blocks.lastOption
+        if (maybeLastBlock.exists(_.height >= to)) {
+          Future.failed(new NoSuchElementException)
+        } else {
+          val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19L).min(to))
+          val newTo = newFrom + 19
+          log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 19}]")
+          timer.schedule(load(newFrom, newTo), blockDelay)
         }
-      case Failure(t) =>
-        log.debug("Error loading blocks", t)
-        reschedule(_from, _to)
+      }(Future.successful)
     }
 
-    retrying(from, from + 99)(null)
-
-    p.future
+    load(from, (from + 19).min(to))
   }
 }
 
@@ -132,24 +140,5 @@ object Node extends ScorexLogging {
           Failure(new IOException(s"Unexpected status code: ${r.getStatusCode}"))
         case Failure(t) => Failure[A](t)
       }(ec)
-  }
-
-  implicit class TimerExt(val timer: Timer) extends AnyVal {
-    def retryUntil[A](future: => Future[A], cond: A => Boolean, interval: FiniteDuration): Future[A] = {
-      val p = Promise[A]
-
-      def retrying(timeout: Timeout): Unit = future.onComplete {
-        case Success(v) if cond(v) => p.success(v)
-        case _ => try {
-          timer.newTimeout(retrying, interval.toMillis, MILLISECONDS)
-        } catch {
-          case NonFatal(e) => p.failure(e)
-        }
-      }
-
-      retrying(null)
-
-      p.future
-    }
   }
 }

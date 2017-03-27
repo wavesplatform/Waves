@@ -5,7 +5,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future, Promise}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import Await.result
@@ -43,14 +43,19 @@ class ValidChainGenerationSpec(allNodes: Seq[Node]) extends FreeSpec with ScalaF
 
     def balanceForNode(n: Node) = n.balance(n.address).map(b => b.address -> b.balance)
     def makeTransfer(r: Req) = addressToNode(r.source).transfer(r.source, r.targetAddress, r.amount, r.fee)
+    def processRequests(reqs: Seq[Req]): Future[Unit] = if (reqs.isEmpty) {
+      Future.successful(())
+    } else {
+      makeTransfer(reqs.head).flatMap(_ => processRequests(reqs.tail))
+    }
 
     val targetBlocks = result(for {
       b      <- traverse(allNodes)(balanceForNode).map(mutable.AnyRefMap[String, Long](_: _*))
-      _      <- traverse(generateRequests(b))(makeTransfer)
+      _      <- processRequests(generateRequests(b))
       height <- traverse(allNodes)(_.height).map(_.max)
       _      <- traverse(allNodes)(_.findBlock(_.height >= height + 40)) // wait a little longer to prevent rollbacks...
       blocks <- traverse(allNodes)(_.findBlock(_.height >= height + 35, height)) // ...before requesting actual blocks
-    } yield blocks, 2.minutes)
+    } yield blocks, 5.minutes)
 
     all(targetBlocks) shouldEqual targetBlocks.head
   }

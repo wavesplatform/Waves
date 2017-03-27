@@ -17,13 +17,14 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 case class NodeInfo(
-    hostRestApiPort: Int,
-    hostNetworkPort: Int,
-    containerNetworkPort: Int,
-    ipAddress: String,
-    containerId: String)
+                     hostRestApiPort: Int,
+                     hostNetworkPort: Int,
+                     containerNetworkPort: Int,
+                     ipAddress: String,
+                     containerId: String)
 
 class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable with ScorexLogging {
+
   import Docker._
 
   private val client = DefaultDockerClient.fromEnv().build()
@@ -55,6 +56,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
     val hostConfig = HostConfig.builder()
       .portBindings(portBindings)
+      .cpuPeriod(100000L)
+      .cpuQuota(200000L)
+      .memory(1024000000L)
       .build()
 
     val containerConfig = ContainerConfig.builder()
@@ -103,7 +107,10 @@ object Docker {
   private val imageId = System.getProperty("docker.imageId")
   private val http = asyncHttpClient(config()
     .setMaxConnections(50)
-    .setMaxRequestRetry(1))
+    .setMaxConnectionsPerHost(10)
+    .setMaxRequestRetry(1)
+    .setReadTimeout(5000)
+    .setRequestTimeout(5000))
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.root().render(ConfigRenderOptions.concise())
