@@ -29,12 +29,16 @@ class AccountOrAliasTests extends PropSpec with PropertyChecks with GeneratorDri
 
   property("Malformed aliases cannot be reconstructed") {
     AccountOrAlias.fromString("alias::sasha") shouldBe 'left
-    AccountOrAlias.fromString("alias:W:s") shouldBe 'left
-    AccountOrAlias.fromString("alias:WWW:sasha") shouldBe 'left
+    AccountOrAlias.fromString("alias:T: sasha") shouldBe 'left
+    AccountOrAlias.fromString("alias:T:sasha\nivanov") shouldBe 'left
+    AccountOrAlias.fromString("alias:T:s") shouldBe 'left
+    AccountOrAlias.fromString("alias:TTT:sasha") shouldBe 'left
 
+    Alias.fromString("alias:T: sasha") shouldBe 'left
+    Alias.fromString("alias:T:sasha\nivanov") shouldBe 'left
     Alias.fromString("alias::sasha") shouldBe 'left
-    Alias.fromString("alias:W:s") shouldBe 'left
-    Alias.fromString("alias:WWW:sasha") shouldBe 'left
+    Alias.fromString("alias:T:s") shouldBe 'left
+    Alias.fromString("alias:TTT:sasha") shouldBe 'left
 
     Alias.fromString("aliaaas:W:sasha") shouldBe 'left
   }
