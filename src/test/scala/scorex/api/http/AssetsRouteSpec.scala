@@ -5,6 +5,7 @@ import java.io.File
 import akka.http.scaladsl.model.headers.RawHeader
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.http.{RouteSpec, api_key}
 import com.wavesplatform.settings.RestAPISettings
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -77,7 +78,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
           val p = Post(currentPath, tr)
 
           p ~> route should produce(ApiKeyNotValid)
-          p.addHeader(RawHeader("api_key", apiKey)) ~> route should produce(ApiError.fromValidationError(e))
+          p ~> api_key(apiKey) ~> route should produce(ApiError.fromValidationError(e))
         }
       }
     }

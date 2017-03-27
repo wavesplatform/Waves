@@ -1,9 +1,10 @@
-package scorex.api.http
+package com.wavesplatform.http
 
 import akka.http.scaladsl.testkit.RouteTest
 import org.scalatest.matchers.{MatchResult, Matcher}
 import play.api.libs.json._
 import com.wavesplatform.http.ApiMarshallers._
+import scorex.api.http.ApiError
 
 trait ApiErrorMatchers { this: RouteTest =>
   class ProduceError(error: ApiError) extends Matcher[RouteTestResult] {
