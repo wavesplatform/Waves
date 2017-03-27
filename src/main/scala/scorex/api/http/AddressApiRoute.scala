@@ -3,9 +3,7 @@ package scorex.api.http
 import java.nio.charset.StandardCharsets
 import javax.ws.rs.Path
 
-import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
@@ -15,6 +13,8 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.State
 import scorex.wallet.Wallet
+
+import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
@@ -242,14 +242,11 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
         val messageBytes = message.getBytes(StandardCharsets.UTF_8)
         val signature = EllipticCurveImpl.sign(pk, messageBytes)
         val msg = if (encode) Base58.encode(messageBytes) else message
-        Json.obj("message" -> msg,
-          "publicKey" -> Base58.encode(pk.publicKey),
-          "signature" -> Base58.encode(signature))
+        Signed(msg, Base58.encode(pk.publicKey), Base58.encode(signature))
       })
       complete(res)
     }
   }
-
 
   private def verifyPath(address: String, decode: Boolean) = withAuth {
     json[SignedMessage] { m =>
@@ -291,6 +288,9 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 }
 
 object AddressApiRoute {
+  case class Signed(message: String, publicKey: String, signature: String)
+  implicit val signedFormat: Format[Signed] = Json.format
+
   case class Balance(address: String, confirmations: Int, balance: Long)
   implicit val balanceFormat: Format[Balance] = Json.format
 
