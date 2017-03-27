@@ -74,6 +74,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
     val txs = utxStorage.all()
       .sorted(TransactionsOrdering.InUTXPool)
       .take(MaxTransactionsPerBlock)
+      .sorted(TransactionsOrdering.InBlock)
 
     val valid = blockStorage.state.validate(txs, heightOpt, NTP.correctedTime())
 
@@ -81,7 +82,7 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
     }
 
-    valid.sorted(TransactionsOrdering.InBlock)
+    valid
   }
 
   override def clearFromUnconfirmed(data: Seq[Transaction]): Unit = synchronized {
