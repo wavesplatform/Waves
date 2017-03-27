@@ -1,13 +1,13 @@
-package scorex.api.http
+package com.wavesplatform.http
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.http.api_key
 import com.wavesplatform.settings.RestAPISettings
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
+import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash

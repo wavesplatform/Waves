@@ -1,5 +1,7 @@
 package scorex.api.http
 
+import com.wavesplatform.http.RouteSpec
+
 class BlocksRouteSpec extends RouteSpec("/blocks/") {
   routePath("address/{address}/{from}/{to}") in pending
   routePath("child/{signature}") in pending

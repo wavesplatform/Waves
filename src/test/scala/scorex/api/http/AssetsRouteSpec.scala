@@ -5,7 +5,7 @@ import java.io.File
 import akka.http.scaladsl.model.headers.RawHeader
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.http.api_key
+import com.wavesplatform.http.{RouteSpec, api_key}
 import com.wavesplatform.settings.RestAPISettings
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
