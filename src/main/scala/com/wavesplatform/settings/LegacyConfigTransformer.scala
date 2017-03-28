@@ -39,7 +39,8 @@ object LegacyConfigTransformer {
     "scoreBroadcastDelay" -> millis,
     "utxRebroadcastInterval" -> seconds,
     "historySynchronizerTimeout" -> seconds,
-    "blockGenerationDelay" -> millis
+    "blockGenerationDelay" -> millis,
+    "walletDir" -> { (cfg, p) => cv(s"${cfg.getString(p)}/wallet.dat")}
   )
 
   private val fieldMap = Map(
