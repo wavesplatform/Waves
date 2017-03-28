@@ -20,15 +20,21 @@ object Alias {
   val MinLength = 4
   val MaxLength = 30
 
+  private val AliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
+
   private def schemeByte: Byte = AddressScheme.current.chainId
 
   private def buildAlias(networkByte: Byte, name: String): Either[ValidationError, Alias] = {
 
     case class AliasImpl(networkByte: Byte, name: String) extends Alias
 
-    if (!(MinLength to MaxLength contains name.length))
+    if (name contains "\n") {
+      Left(TransactionParameterValidationError("Alias cannot be multiline"))
+    } else if (name.trim() != name) {
+      Left(TransactionParameterValidationError("Alias cannot contain leading or trailing whitespaces"))
+    } else if (!(MinLength to MaxLength contains name.length))
       Left(TransactionParameterValidationError(s"Alias '$name' length should be between $MinLength and $MaxLength"))
-    if (networkByte != schemeByte)
+    else if (networkByte != schemeByte)
       Left(TransactionParameterValidationError("Alias network char doesn't match current scheme"))
     else
       Right(AliasImpl(networkByte, name))
@@ -39,12 +45,16 @@ object Alias {
 
   def fromString(str: String): Either[ValidationError, Alias] =
     if (!str.startsWith(Prefix)) {
-      Left(TransactionParameterValidationError("Alias string pattern is 'alias:<chain-id>:<address-alias>"))
+      Left(TransactionParameterValidationError(AliasPatternInfo))
     } else {
       val charSemicolonAlias = str.drop(Prefix.length)
       val networkByte = charSemicolonAlias(0).toByte
       val name = charSemicolonAlias.drop(2)
-      buildAlias(networkByte, name)
+      if (charSemicolonAlias(1) != ':') {
+        Left(TransactionParameterValidationError(AliasPatternInfo))
+      } else {
+        buildAlias(networkByte, name)
+      }
     }
 
   def fromBytes(bytes: Array[Byte]): Either[ValidationError, Alias] = {

@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 
 class WavesSettingsSpecification extends FlatSpec with Matchers {
-  private val home = System.getenv("HOME")
+  private val home = System.getProperty("user.home")
 
   "WavesSettings" should "read values from default config" in {
     val config = ConfigFactory.load()

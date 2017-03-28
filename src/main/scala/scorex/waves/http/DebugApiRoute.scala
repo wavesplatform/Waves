@@ -10,7 +10,6 @@ import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.BlockStorage
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
 @Path("/debug")
@@ -18,7 +17,7 @@ import scorex.wallet.Wallet
 case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage: BlockStorage) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ stateAt ~ info ~ getSettings ~ stateWaves
+    blocks ~ state ~ stateAt ~ info ~ stateWaves
   }
 
   @Path("/blocks/{howMany}")
@@ -79,14 +78,5 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
       "stateHeight" -> state.stateHeight,
       "stateHash" -> state.hash
     ))
-  }
-
-  @Path("/settings")
-  @ApiOperation(value = "State", notes = "Settings file", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
-  def getSettings: Route = (path("settings") & get & withAuth) {
-    complete(Json.obj())
   }
 }
