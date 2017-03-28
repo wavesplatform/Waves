@@ -26,12 +26,13 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
   val APPLY_TO = 28001
 
 
-  "provide the same answers to questions after each block from mainnet applied" ignore {
+  "provide the same answers to questions after each block from mainnet applied" - {
     val oldStore = BlockStorageImpl.createMVStore("")
     val old = storedBC(oldState(oldStore), new StoredBlockchain(oldStore))
 
     val newStore = BlockStorageImpl.createMVStore("")
-    val nev = storedBC(newState(newStore), new StoredBlockchain(newStore))
+    val bc = new StoredBlockchain(newStore)
+    val nev = storedBC(newState(newStore, bc), bc)
 
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
@@ -266,8 +267,8 @@ object StateResponseComparisonTests extends FreeSpec {
     new StoredState(storage, FunctionalitySettings.MAINNET)
   }
 
-  def newState(mVStore: MVStore): State = new StateWriterAdapter(
-    new StateWriterImpl(new MVStorePrimitiveImpl(mVStore)), FunctionalitySettings.MAINNET)
+  def newState(mVStore: MVStore, bc: BlockChain): State = new StateWriterAdapter(
+    new StateWriterImpl(new MVStorePrimitiveImpl(mVStore)), FunctionalitySettings.MAINNET, bc)
 
   val settings = BlockchainSettings("", 'W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET)
 
@@ -300,8 +301,9 @@ object StateResponseComparisonTests extends FreeSpec {
     val newStore = BlockStorageImpl.createMVStore(newStorageFile)
     val p = new MVStorePrimitiveImpl(newStore)
     val rrrr: StateWriterImpl = new StateWriterImpl(p)
+    val bc = new StoredBlockchain(newStore)
     val nev = storedBC(new StateWriterAdapter(
-      rrrr, FunctionalitySettings.MAINNET), new StoredBlockchain(newStore))
+      rrrr, FunctionalitySettings.MAINNET, bc), bc)
     val start = 1
     val end = currentMainnet.history.height() + 1
     if (appl) {
@@ -314,30 +316,6 @@ object StateResponseComparisonTests extends FreeSpec {
             println(blockNumber)
 
           }
-          //          println(blockNumber)
-          //          val total = p.portfolios.values.asScala.map(_._1).sum
-          //          if (total != 10000000000000000L) {
-          //            println(
-          //              s"""!!!! bad sum($total) after $blockNumber
-          //                 |
-          //                   |${block.encodedId}
-          //                 |
-          //                   |$block""".stripMargin)
-          //            throw new Exception()
-          //          }
-
-          //      if (blockNumber > 410000) {
-          //        val total = p.portfolios.values.asScala.map(_._1).sum
-          //        if (total != 10000000000000000L) {
-          //          println(
-          //            s"""!!!! bad sum($total) after $blockNumber
-          //               |
-          //               |${block.encodedId}
-          //               |
-          //               |$block""".stripMargin)
-          //          throw new Exception()
-          //        }
-          //      }
           ()
       })
       newStore.commit()

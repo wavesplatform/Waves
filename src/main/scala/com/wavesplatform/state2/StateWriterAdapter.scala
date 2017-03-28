@@ -1,8 +1,13 @@
 package com.wavesplatform.state2
 
+import cats._
+import cats.implicits._
+import cats.syntax.all._
+import cats.kernel.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.BlockDiffer
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import play.api.libs.json.JsObject
 import scorex.account.{Account, Alias}
 import scorex.block.Block
@@ -14,7 +19,43 @@ import scorex.transaction.state.database.state.{AccState, AddressString, Reasons
 import scala.reflect.ClassTag
 import scala.util.{Failure, Try}
 
-class StateWriterAdapter(r: StateWriter with StateReader, settings: FunctionalitySettings) extends State {
+class StateWriterAdapter(r: StateWriter with StateReader, settings: FunctionalitySettings, bc: BlockChain) extends State {
+
+  private val MinInMemDiff = 100
+  private val MaxInMemDiff = 200
+
+  @volatile var inMemoryDiff: BlockDiff = {
+    val storedBlocks = bc.height()
+    val statedBlocks = r.height
+    if (statedBlocks > storedBlocks) {
+      throw new IllegalArgumentException(s"storedBlocks = $storedBlocks, statedBlocks=$statedBlocks")
+    } else if (statedBlocks == storedBlocks) {
+      Monoid[BlockDiff].empty
+    } else {
+      rebuildDiff(statedBlocks + 1, storedBlocks + 1)
+    }
+  }
+
+  private def rebuildDiff(from: Int, to: Int): BlockDiff =
+    Range(from, to).foldLeft(Monoid[BlockDiff].empty) { (diff, h) =>
+      val block = bc.blockAt(h).get
+      val blockDiff = BlockDiffer(settings)(new CompositeStateReader(r, diff), block).right.get
+      Monoid[BlockDiff].combine(diff, blockDiff)
+    }
+
+  override def processBlock(block: Block): Try[State] = Try {
+    BlockDiffer(settings)(r, block) match {
+      case Right(blockDiff) =>
+        r.applyBlockDiff(blockDiff)
+        this
+      case Left(m) =>
+        println(m)
+        ???
+    }
+  }
+
+  // legacy
+
   override def included(signature: Array[Byte]): Option[Int] = r.transactionInfo(EqByteArray(signature)).map(_._1)
 
   override def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
@@ -71,18 +112,6 @@ class StateWriterAdapter(r: StateWriter with StateReader, settings: Functionalit
   override def stateHeight: Int = r.height
 
   override def toJson(heightOpt: Option[Int]): JsObject = ???
-
-  override def processBlock(block: Block): Try[State] = Try {
-    BlockDiffer(settings)(r, block) match {
-      case Right(blockDiff) =>
-        r.applyBlockDiff(blockDiff)
-        this
-      case Left(m) =>
-        println(m)
-        ???
-    }
-  }
-
 
   override def rollbackTo(height: Int): State = ???
 
