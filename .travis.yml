@@ -1,4 +1,6 @@
 language: scala
+# Use container-based infrastructure
+sudo: false
 jdk:
 - oraclejdk8
 scala:
@@ -12,4 +14,12 @@ script:
 after_success:
   - "[[ $TRAVIS_REPO_SLUG == \"wavesplatform/Scorex\" ]] && [[ $TRAVIS_BRANCH == \"master\" ]] && { sbt publish; };"
   - bash <(curl -s https://codecov.io/bash)
-
+# These directories are cached to S3 at the end of the build
+cache:
+  directories:
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt
+before_cache:
+  # Cleanup the cached directories to avoid unnecessary cache updates
+  - find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete
+  - find $HOME/.sbt        -name "*.lock"               -print -delete
