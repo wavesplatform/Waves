@@ -12,7 +12,8 @@ import org.slf4j.LoggerFactory
 import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http.alias.CreateAliasRequest
-import scorex.api.http.assets.TransferRequest
+import scorex.api.http.assets._
+import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.utils.{LoggerFacade, ScorexLogging}
 
@@ -85,12 +86,30 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
 
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
-  def assetBalance(address: String, assetId: String): Future[Balance] = get(s"/assets/balance/$address/$assetId").as[Balance]
+  def assetBalance(address: String, assetId: String): Future[Long] = get(s"/assets/balance/$address/$assetId").as[JsValue].map(v => (v \ "balance").as[Long])
 
   def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
+
+  def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[String] =
+    post("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[JsValue].map(v => (v \ "signature").as[String])
+
+  def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
+    post("/leasing/lease", LeaseRequest(sourceAddress, amount, fee, recipient)).as[Transaction]
+
+  def leaseCancel(sourceAddress: String, leaseId: String, fee: Long): Future[Transaction] =
+    post("/leasing/cancel", LeaseCancelRequest(sourceAddress, leaseId, fee)).as[Transaction]
+
+  def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Future[Transaction] =
+    post("/assets/issue", IssueRequest(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
+
+  def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
+    post("/assets/reissue", ReissueRequest(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
+
+  def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Future[Transaction] =
+    post("/assets/burn", BurnRequest(sourceAddress, assetId, quantity, fee)).as[Transaction]
 
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     post("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]

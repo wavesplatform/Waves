@@ -33,9 +33,10 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
     log.debug("Starting tests")
   }
 
-  override def nestedSuites: IndexedSeq[Suite] = IndexedSeq(
+  override val nestedSuites: IndexedSeq[Suite] = IndexedSeq(
     new ValidChainGenerationSpec(allNodes),
-    new AliasTransactionSpec(allNodes)
+    new AliasTransactionSpec(allNodes),
+    new BalancesSpecification(allNodes)
   )
 
   override protected def afterAll() = docker.close()
