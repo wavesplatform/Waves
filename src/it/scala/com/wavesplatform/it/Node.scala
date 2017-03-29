@@ -3,8 +3,9 @@ package com.wavesplatform.it
 import java.io.IOException
 
 import com.typesafe.config.Config
+import com.wavesplatform.it.util._
 import com.wavesplatform.settings.WavesSettings
-import io.netty.util.{HashedWheelTimer, Timeout, Timer}
+import io.netty.util.HashedWheelTimer
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -20,12 +21,12 @@ import scorex.utils.{LoggerFacade, ScorexLogging}
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.control.NonFatal
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 
 class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: HashedWheelTimer) {
+
   import Node._
 
   val privateKey = config.getString("private-key")
@@ -33,22 +34,22 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
   val address = config.getString("address")
   val settings = WavesSettings.fromConfig(config)
 
-  private val generationDelay = settings.minerSettings.generationDelay
+  private val blockDelay = settings.blockchainSettings.genesisSettings.averageBlockDelay
   private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
   def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long =
     settings.feesSettings.fees(txValue.id).find(_.asset == asset).get.fee
 
   private def retrying(r: Request, interval: FiniteDuration = 1.second): Future[Response] = {
-      def executeRequest: Future[Response] = {
-        log.trace(s"$r")
-        client.executeRequest(r).toCompletableFuture.toScala
-            .recoverWith {
-              case t: Throwable =>
-                log.debug("Retrying request", t)
-                executeRequest
-            }
-      }
+    def executeRequest: Future[Response] = {
+      log.trace(s"$r")
+      client.executeRequest(r).toCompletableFuture.toScala
+        .recoverWith {
+          case t: Throwable =>
+            log.debug("Retrying request", t)
+            executeRequest
+        }
+    }
 
     executeRequest
   }
@@ -88,10 +89,18 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
 
   def assetBalance(address: String, assetId: String): Future[Long] = get(s"/assets/balance/$address/$assetId").as[JsValue].map(v => (v \ "balance").as[Long])
 
+  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](transactionInfo(txId), t => t.isDefined, 1.second).map(_.get)
+
+  def transactionInfo(txId: String): Future[Option[Transaction]] = get(s"/transactions/info/$txId").as[Transaction].transform {
+    case Success(info) => Success(Some(info))
+    case Failure(_: IOException) => Success(None)
+    case Failure(ex) => Failure(ex)
+  }
+
   def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
-  def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
-    post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
+  def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Future[Transaction] =
+    post("/assets/transfer", TransferRequest(assetId, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
   def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[String] =
     post("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[JsValue].map(v => (v \ "signature").as[String])
@@ -145,19 +154,25 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
 }
 
 object Node extends ScorexLogging {
+
   case class Status(blockGeneratorStatus: String, historySynchronizationStatus: String)
+
   implicit val statusFormat: Format[Status] = Json.format
 
   case class Peer(address: String, declaredAddress: String, peerName: String)
+
   implicit val peerFormat: Format[Peer] = Json.format
 
   case class Balance(address: String, confirmations: Int, balance: Long)
+
   implicit val balanceFormat: Format[Balance] = Json.format
 
   case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long)
+
   implicit val transactionFormat: Format[Transaction] = Json.format
 
   case class Block(signature: String, height: Long, timestamp: Long, generator: String, transactions: Seq[Transaction])
+
   implicit val blockFormat: Format[Block] = Json.format
 
   implicit class ResponseFutureExt(val f: Future[Response]) extends AnyVal {
@@ -171,4 +186,5 @@ object Node extends ScorexLogging {
         case Failure(t) => Failure[A](t)
       }(ec)
   }
+
 }
