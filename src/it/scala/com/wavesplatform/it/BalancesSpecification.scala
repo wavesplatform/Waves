@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import java.io.IOException
 
+import com.wavesplatform.it.Node.Transaction
 import com.wavesplatform.settings.Constants
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers, RecoverMethods}
@@ -29,28 +30,30 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     second = result(sender.createAddress, 5.seconds)
     third = result(sender.createAddress, 5.seconds)
 
-    val f = for {
+    def waitAllTxsFindedInAllNodes(txs: Seq[Transaction]): Future[_] = {
+      val futures = for {
+        tx <- txs
+        node <- allNodes
+      } yield {
+        node.waitForTransaction(tx.id)
+      }
+      Future.sequence(futures)
+    }
+
+    val correctStartBalancesFuture = for {
       txs <- Future.sequence(Seq(
         sender.transfer(richBalance, first, 200 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)),
         sender.transfer(richBalance, second, 100 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)),
-        sender.transfer(richBalance, third, 100 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)))
-      )
-      _ <- {
-        val allNodesAllTxsFindInBlockFutures = for {
-          tx <- txs
-          node <- allNodes
-        } yield {
-          node.waitForTransaction(tx.id)
-        }
-        Future.sequence(allNodesAllTxsFindInBlockFutures)
-      }
+        sender.transfer(richBalance, third, 100 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction))))
+
+      _ <- waitAllTxsFindedInAllNodes(txs)
 
       r1 <- sender.balance(first).map(_.balance == 200 * Constants.UnitsInWave)
       r2 <- sender.balance(second).map(_.balance == 100 * Constants.UnitsInWave)
       r3 <- sender.balance(third).map(_.balance == 100 * Constants.UnitsInWave)
     } yield r1 && r2 && r3
-    val res = result(f, 90 seconds)
-    res shouldBe true
+    val correctStartBalances = result(correctStartBalancesFuture, 90 seconds)
+    correctStartBalances shouldBe true
   }
 
   private def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
@@ -67,7 +70,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     sender.assetBalance(acc, assetIdString).map(_ shouldBe balance)
   }
 
-  test("leasing is works correctly") {
+    test("leasing is working correctly") {
     val f = for {
       _ <- assertBalances(first, 200 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
       _ <- assertBalances(second, 100 * Constants.UnitsInWave, 100 * Constants.UnitsInWave)
@@ -176,7 +179,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
       _ <- assertBalances(first, 180 * Constants.UnitsInWave, 10 * Constants.UnitsInWave)
       _ <- assertBalances(second, 100 * Constants.UnitsInWave, 270 * Constants.UnitsInWave)
 
-      createdCancelLeaseTxId <- sender.leaseCancel(first, createdLeaseTxId, fee = 10 * Constants.UnitsInWave).map(_.id)
+      createdCancelLeaseTxId <- sender.cancelLease(first, createdLeaseTxId, fee = 10 * Constants.UnitsInWave).map(_.id)
 
       _ <- Future.sequence(allNodes.map(_.waitForTransaction(createdCancelLeaseTxId)))
 

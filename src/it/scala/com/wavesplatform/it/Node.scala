@@ -108,7 +108,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
   def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     post("/leasing/lease", LeaseRequest(sourceAddress, amount, fee, recipient)).as[Transaction]
 
-  def leaseCancel(sourceAddress: String, leaseId: String, fee: Long): Future[Transaction] =
+  def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Future[Transaction] =
     post("/leasing/cancel", LeaseCancelRequest(sourceAddress, leaseId, fee)).as[Transaction]
 
   def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Future[Transaction] =
