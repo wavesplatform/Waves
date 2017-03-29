@@ -39,10 +39,10 @@ object Checkpoint {
     def reads(json: JsValue) = json match {
       case JsString(s) => Base58.decode(s) match {
         case Success(bytes) if bytes.length == scorex.transaction.TransactionParser.SignatureLength => JsSuccess(bytes)
-        case Success(bytes) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.signatureLength"))))
-        case Failure(_) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
+        case Success(bytes) => JsError(JsonValidationError("error.incorrect.signatureLength", bytes.length.toString))
+        case Failure(t) => JsError(JsonValidationError(Seq("error.incorrect.base58", t.getLocalizedMessage), s))
       }
-      case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
+      case _ => JsError("error.expected.jsstring")
     }
   }
 
