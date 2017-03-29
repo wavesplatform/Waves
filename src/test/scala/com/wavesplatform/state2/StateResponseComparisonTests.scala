@@ -62,7 +62,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
             .map(_._1)
             .map(Account.fromString(_).right.get)
 
-          s"accountTransactions" in {
+          s"accountTransactions" ignore {
             for (acc <- aliveAccounts) {
               val oldtxs = old.state.accountTransactions(acc, Int.MaxValue).toList
               val newtxs = nev.state.accountTransactions(acc, Int.MaxValue).toList

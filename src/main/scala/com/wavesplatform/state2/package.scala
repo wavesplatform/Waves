@@ -59,6 +59,6 @@ package object state2 {
     override def combine(older: BlockDiff, newer: BlockDiff): BlockDiff = BlockDiff(
       txsDiff = older.txsDiff.combine(newer.txsDiff),
       heightDiff = older.heightDiff + newer.heightDiff,
-      effectiveBalanceSnapshots = newer.effectiveBalanceSnapshots ++ older.effectiveBalanceSnapshots)
+      effectiveBalanceSnapshots = older.effectiveBalanceSnapshots ++ newer.effectiveBalanceSnapshots)
   }
 }

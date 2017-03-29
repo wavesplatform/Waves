@@ -28,35 +28,29 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   }
 
   override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long = {
+    val localEffectiveBalanceSnapshotsOfAccount = blockDiff.effectiveBalanceSnapshots
+      .filter(ebs => ebs.acc == acc)
 
-    val localEffectiveBalanceSnapshotsOfAccount = blockDiff.effectiveBalanceSnapshots.filter(_.acc == acc)
-
-    if (acc.address == "3P8JdJGYc7vaLu4UXUZc1iRLdzrkGtdCyJM") {
-      println(s"acc: $acc")
-      println(s"height: $height")
-      println(s"blockDiff.heightDiff: ${blockDiff.heightDiff}")
-      println(s"confs: $confs")
-      println(s"confs <= blockDiff.heightDiff: ${confs <= blockDiff.heightDiff}")
-      println(s"localEffectiveBalanceSnapshotsOfAccount = $localEffectiveBalanceSnapshotsOfAccount")
-    }
-
+    lazy val relatedUpdates = localEffectiveBalanceSnapshotsOfAccount.filter(_.height > height - confs)
     lazy val storedEffectiveBalance = inner.effectiveBalanceAtHeightWithConfirmations(acc, height - blockDiff.heightDiff, confs - blockDiff.heightDiff)
 
-    if (localEffectiveBalanceSnapshotsOfAccount.isEmpty) {
+    if (localEffectiveBalanceSnapshotsOfAccount.isEmpty)
       storedEffectiveBalance
-    } else {
-      lazy val needToRequestOlderEntities = confs <= blockDiff.heightDiff
-      lazy val canRequestOlderEntities = inner.height >= 1
-
-      val localMinEffectiveBalance = localEffectiveBalanceSnapshotsOfAccount.map(_.effectiveBalance).min
-      if (needToRequestOlderEntities) {
-        if (canRequestOlderEntities) {
-          Math.min(localMinEffectiveBalance, storedEffectiveBalance)
-        } else {
-          Math.min(localMinEffectiveBalance, localEffectiveBalanceSnapshotsOfAccount.last.prevEffectiveBalance)
+    else {
+      if (confs < blockDiff.heightDiff) {
+        relatedUpdates.headOption match {
+          case None => localEffectiveBalanceSnapshotsOfAccount.last.effectiveBalance
+          case Some(relatedUpdate) => Math.min(relatedUpdate.prevEffectiveBalance, relatedUpdates.map(_.effectiveBalance).min)
         }
-      } else {
-        localMinEffectiveBalance
+      }
+      else {
+        val localMin = localEffectiveBalanceSnapshotsOfAccount.map(_.effectiveBalance).min
+        val prevEffBalance = if (inner.height == 0)
+          localEffectiveBalanceSnapshotsOfAccount.head.prevEffectiveBalance
+        else
+          storedEffectiveBalance
+        Math.min(prevEffBalance, localMin)
+
       }
     }
   }

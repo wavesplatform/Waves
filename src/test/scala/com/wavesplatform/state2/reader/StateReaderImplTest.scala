@@ -10,7 +10,7 @@ class StateReaderImplTest extends FunSuite with Matchers {
   val acc: Account = Account.fromPublicKey(Array.emptyByteArray)
   val stateHeight = 100
 
-  test("exposes minimum of 'current' and 'previous' of oldest record") {
+  test("exposes minimum of all 'current' and  one 'previous' of oldest record") {
 
     val storage = new TestStorage
 

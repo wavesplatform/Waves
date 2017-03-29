@@ -42,7 +42,7 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
     val confsOldMinimum: Seq[(Long, Long)] = Range(bockNumberThatIsConfsOld + 1, atHeight + 1)
       .flatMap { height => Option(p.effectiveBalanceSnapshots.get((acc.bytes, height))) }
     confsOldMinimum.headOption match {
-      case None =>accountPortfolio(acc).effectiveBalance
+      case None => accountPortfolio(acc).effectiveBalance
       case Some((oldest, _)) => Math.min(oldest, confsOldMinimum.map(_._2).min)
     }
   }
