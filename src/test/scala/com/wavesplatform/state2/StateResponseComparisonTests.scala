@@ -22,7 +22,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
   }
 
 
-  val CHECK_BLOCKS = Range(1,1000)
+  val CHECK_BLOCKS = Range(200,1000)
   val APPLY_TO = 28001
 
 
@@ -117,7 +117,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
           }
 
           "height" in {
-            assert(old.state.stateHeight == nev.state.stateHeight)
+            assert(nev.state.stateHeight == old.state.stateHeight)
           }
 
           s"effectiveBalanceWithConfirmations" in {

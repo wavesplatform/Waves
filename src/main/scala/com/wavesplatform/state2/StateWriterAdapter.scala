@@ -66,7 +66,7 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
 
   private def persistOldPartOfDiffAndReturnTheNewPart(): BlockDiff = {
     val compositeHeight = composite.height
-    val diffToBePersisted = rebuildDiff(persisted.height + 1, compositeHeight - MinInMemDiff)
+    val diffToBePersisted = rebuildDiff(persisted.height + 1, compositeHeight - MinInMemDiff + 1)
     persisted.applyBlockDiff(diffToBePersisted)
     rebuildDiff(compositeHeight - MinInMemDiff + 1, compositeHeight + 1)
   }
