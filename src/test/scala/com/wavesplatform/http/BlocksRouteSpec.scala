@@ -55,7 +55,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with Transac
 
   routePath("/at/{height}") in {
     // todo: check invalid height
-    // todo: check empty response (404?)
+    // todo: check block not found (404?)
     val g = for {
       h <- Gen.posNum[Int]
       b <- blockGen
