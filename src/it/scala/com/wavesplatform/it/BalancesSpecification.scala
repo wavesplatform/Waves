@@ -2,7 +2,6 @@ package com.wavesplatform.it
 
 import java.io.IOException
 
-import com.wavesplatform.it.Node.Transaction
 import com.wavesplatform.settings.Constants
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers, RecoverMethods}
@@ -30,21 +29,23 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     second = result(sender.createAddress, 5.seconds)
     third = result(sender.createAddress, 5.seconds)
 
-    def waitAllTxsFindedInAllNodes(txs: Seq[Transaction]): Future[_] = {
-      val futures = for {
-        tx <- txs
+    def waitAllTxsFindedInAllNodes(txIds: Seq[String]): Future[_] = {
+      val txNodePairs = for {
+        txId <- txIds
         node <- allNodes
       } yield {
-        node.waitForTransaction(tx.id)
+        (node, txId)
       }
-      Future.sequence(futures)
+      Future.traverse(txNodePairs) { case (node, tx) => node.waitForTransaction(tx) }
     }
 
+    def makeTransfers: Future[Seq[String]] = Future.sequence(Seq(
+      sender.transfer(richBalance, first, 200 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)),
+      sender.transfer(richBalance, second, 100 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)),
+      sender.transfer(richBalance, third, 100 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)))).map(_.map(_.id))
+
     val correctStartBalancesFuture = for {
-      txs <- Future.sequence(Seq(
-        sender.transfer(richBalance, first, 200 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)),
-        sender.transfer(richBalance, second, 100 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)),
-        sender.transfer(richBalance, third, 100 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction))))
+      txs <- makeTransfers
 
       _ <- waitAllTxsFindedInAllNodes(txs)
 
@@ -52,6 +53,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
       r2 <- sender.balance(second).map(_.balance == 100 * Constants.UnitsInWave)
       r3 <- sender.balance(third).map(_.balance == 100 * Constants.UnitsInWave)
     } yield r1 && r2 && r3
+
     val correctStartBalances = result(correctStartBalancesFuture, 90 seconds)
     correctStartBalances shouldBe true
   }
@@ -108,7 +110,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
   test("Can not make transfer without having enough of your own money") {
     val f = for {
-      fb <- Future.sequence(allNodes.map(_.height)).map(_.min)
+      fb <- Future.traverse(allNodes)(_.height).map(_.min)
 
       _ <- assertBalances(first, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
       _ <- assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
@@ -128,7 +130,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
   test("Can not make transfer without having enough of effective balance") {
     val f = for {
-      fb <- Future.sequence(allNodes.map(_.height)).map(_.min)
+      fb <- Future.traverse(allNodes)(_.height).map(_.min)
 
       _ <- assertBalances(first, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
       _ <- assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
@@ -148,7 +150,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
   test("Can not make leasing without having enough waves for fee") {
     val f = for {
-      fb <- Future.sequence(allNodes.map(_.height)).map(_.min)
+      fb <- Future.traverse(allNodes)(_.height).map(_.min)
 
       _ <- assertBalances(first, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
       _ <- assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
@@ -157,7 +159,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
         sender.lease(first, second, 88 * Constants.UnitsInWave, fee = 3 * Constants.UnitsInWave)
       }
 
-      _ <- Future.sequence(allNodes.map(_.findBlock(_.height >= fb + 2)))
+      _ <- Future.traverse(allNodes)(_.findBlock(_.height >= fb + 2))
 
       _ <- assertBalances(first, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
       _ <- assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
@@ -174,14 +176,14 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
       createdLeaseTxId <- sender.lease(first, second, 70 * Constants.UnitsInWave, fee = 10 * Constants.UnitsInWave).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(createdLeaseTxId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(createdLeaseTxId))
 
       _ <- assertBalances(first, 180 * Constants.UnitsInWave, 10 * Constants.UnitsInWave)
       _ <- assertBalances(second, 100 * Constants.UnitsInWave, 270 * Constants.UnitsInWave)
 
       createdCancelLeaseTxId <- sender.cancelLease(first, createdLeaseTxId, fee = 10 * Constants.UnitsInWave).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(createdCancelLeaseTxId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(createdCancelLeaseTxId))
 
       _ <- assertBalances(first, 170 * Constants.UnitsInWave, 70 * Constants.UnitsInWave)
       _ <- assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
@@ -196,7 +198,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
       issuedAssetId <- sender.issue(first, "name", "description", 100000, 2, reissuable = true, fee = 10 * Constants.UnitsInWave).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(issuedAssetId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
       _ <- assertBalances(first, 160 * Constants.UnitsInWave, 60 * Constants.UnitsInWave)
       _ <- assertAssetBalance(first, issuedAssetId, 100000)
@@ -211,11 +213,11 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
       issuedAssetId <- sender.issue(first, "name", "description", 100000, 2, reissuable = true, fee = 10 * Constants.UnitsInWave).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(issuedAssetId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
       reissuedAssetId <- sender.reissue(first, issuedAssetId, 100000, reissuable = true, fee = 10 * Constants.UnitsInWave).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(reissuedAssetId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(reissuedAssetId))
 
       _ <- assertBalances(first, 140 * Constants.UnitsInWave, 40 * Constants.UnitsInWave)
       _ <- assertAssetBalance(first, issuedAssetId, 200000)
@@ -231,11 +233,11 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
       issuedAssetId <- sender.issue(first, "name", "description", 100000, 2, reissuable = false, fee = 10 * Constants.UnitsInWave).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(issuedAssetId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
       transferId <- sender.transfer(first, second, 100000, fee = 10 * Constants.UnitsInWave, Some(issuedAssetId)).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(transferId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(transferId))
 
       _ <- assertBalances(first, 120 * Constants.UnitsInWave, 20 * Constants.UnitsInWave)
       _ <- assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
@@ -249,14 +251,12 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
   test("Waves transfer should lead to a change in the balance and the effective balance and on the fee") {
     val f = for {
-      fb <- Future.sequence(allNodes.map(_.height)).map(_.min)
-
       _ <- assertBalances(first, 120 * Constants.UnitsInWave, 20 * Constants.UnitsInWave)
       _ <- assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
 
       transferId <- sender.transfer(first, second, 1 * Constants.UnitsInWave, fee = 1 * Constants.UnitsInWave).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(transferId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(transferId))
 
       _ <- assertBalances(first, 118 * Constants.UnitsInWave, 18 * Constants.UnitsInWave)
       _ <- assertBalances(second, 101 * Constants.UnitsInWave, 201 * Constants.UnitsInWave)
@@ -267,14 +267,12 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
   test("Waves payment should lead to a change in the balance and the effective balance and the fee") {
     val f = for {
-      fb <- Future.sequence(allNodes.map(_.height)).map(_.min)
-
       _ <- assertBalances(first, 118 * Constants.UnitsInWave, 18 * Constants.UnitsInWave)
       _ <- assertBalances(second, 101 * Constants.UnitsInWave, 201 * Constants.UnitsInWave)
 
       transferId <- sender.payment(first, second, 1 * Constants.UnitsInWave, fee = 1 * Constants.UnitsInWave)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(transferId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(transferId))
 
       _ <- assertBalances(first, 116 * Constants.UnitsInWave, 16 * Constants.UnitsInWave)
       _ <- assertBalances(second, 102 * Constants.UnitsInWave, 202 * Constants.UnitsInWave)
@@ -285,20 +283,18 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
   test("Burn should not lead to a change in the balance and the effective balance, only on the fee") {
     val f = for {
-      fb <- Future.sequence(allNodes.map(_.height)).map(_.min)
-
       _ <- assertBalances(first, 116 * Constants.UnitsInWave, 16 * Constants.UnitsInWave)
 
       issuedAssetId <- sender.issue(first, "name", "description", 100000, 2, reissuable = false, fee = 1 * Constants.UnitsInWave).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(issuedAssetId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
       _ <- assertBalances(first, 115 * Constants.UnitsInWave, 15 * Constants.UnitsInWave)
       _ <- assertAssetBalance(first, issuedAssetId, 100000)
 
       burnId <- sender.burn(first, issuedAssetId, 50000, fee = 1 * Constants.UnitsInWave).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(burnId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(burnId))
 
       _ <- assertBalances(first, 114 * Constants.UnitsInWave, 14 * Constants.UnitsInWave)
 
