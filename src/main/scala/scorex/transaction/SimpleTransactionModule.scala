@@ -55,6 +55,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
     val txs = utxStorage.all()
       .sorted(TransactionsOrdering.InUTXPool)
       .take(MaxTransactionsPerBlock)
+      .sorted(TransactionsOrdering.InBlock)
 
     val valid = validator.validate(txs, heightOpt, NTP.correctedTime())._2
 
@@ -62,7 +63,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
     }
 
-    valid.sorted(TransactionsOrdering.InBlock)
+    valid
   }
 
   override def clearFromUnconfirmed(data: Seq[Transaction]): Unit = synchronized {

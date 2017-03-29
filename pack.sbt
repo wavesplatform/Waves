@@ -99,8 +99,8 @@ val debianSettings = Seq(
          |chown -R ${packageName.value}:${packageName.value} /usr/share/${packageName.value} &&
          |chown -R ${packageName.value}:${packageName.value} /home/${packageName.value} &&
          |(! test -f /etc/${packageName.value}.json ||
-         |java -cp "/usr/share/${packageName.value}/lib/*" com.wavesplatform.settings.LegacyConfigTransformer /etc/${packageName.value}.json > /etc/${packageName.value}.conf &&
-         |rm -f /etc/${packageName.value}.json})""".stripMargin),
+         |su -s /bin/sh -c 'java -cp "/usr/share/${packageName.value}/lib/*" com.wavesplatform.settings.LegacyConfigTransformer /etc/${packageName.value}.json > /etc/${packageName.value}.conf' ${packageName.value} &&
+         |mv -f /etc/${packageName.value}.json /etc/${packageName.value}.json.old)""".stripMargin),
   debianPackageDependencies in Debian += "java8-runtime-headless",
   mappings in Universal ++= {
     if (network == "mainnet") {
