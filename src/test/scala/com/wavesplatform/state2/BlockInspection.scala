@@ -36,11 +36,7 @@ object BlockInspection extends App {
   }
 
 
-  import StateResponseComparisonTests._
 
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = 'W'
-  }
 
   def a1() {
     val maps = new MVStorePrimitiveImpl(new MVStore.Builder().fileName("C:\\Users\\ilyas\\Desktop\\new.store").open())
@@ -70,6 +66,10 @@ object BlockInspection extends App {
     val res = Monoid[Diff].combineAll(map)
     println(res)
   }
+
+
+  import StateResponseComparisonTests._
+  setNetworkByte()
 
   val maps = new MVStorePrimitiveImpl(new MVStore.Builder().fileName("C:\\Users\\ilyas\\Desktop\\new.store").open())
   val inspection = new InspectionStateReader(maps)

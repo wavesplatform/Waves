@@ -17,9 +17,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
 
   import StateResponseComparisonTests._
 
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = 'W'
-  }
+
 
 
   val CHECK_BLOCKS = Range(200, 1000)
@@ -27,6 +25,10 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
 
 
   "provide the same answers to questions after each block from mainnet applied" ignore {
+
+    setNetworkByte()
+
+
     val oldStore = BlockStorageImpl.createMVStore("")
     val old = storedBC(oldState(oldStore), new StoredBlockchain(oldStore))
 
@@ -136,6 +138,9 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     }
   }
   "block application time measure" ignore {
+
+    setNetworkByte()
+
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
     val end = currentMainnet.history.height() + 1
@@ -143,6 +148,9 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
   }
 
   "assert state" ignore {
+
+    setNetworkByte()
+
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
     val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
     val (old, nev) = getStorages(currentMainnet, "C:\\Users\\ilyas\\Desktop\\old_f.store", "C:\\Users\\ilyas\\Desktop\\new_f.store", appl = false)
@@ -249,6 +257,13 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
 }
 
 object StateResponseComparisonTests extends FreeSpec {
+
+  def setNetworkByte(): Unit = {
+    AddressScheme.current = new AddressScheme {
+      override val chainId: Byte = 'W'
+    }
+  }
+
   val BlocksOnDisk = "C:\\Users\\ilyas\\waves\\data\\blockchain.dat"
 
   def oldState(mvStore: MVStore): State = {
