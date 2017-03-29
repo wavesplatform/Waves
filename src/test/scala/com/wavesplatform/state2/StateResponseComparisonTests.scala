@@ -22,7 +22,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
   }
 
 
-  val CHECK_BLOCKS = Range(1, 100)
+  val CHECK_BLOCKS = Range(1,1000)
   val APPLY_TO = 28001
 
 
@@ -39,7 +39,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
 
     // 0 doesn't exist, 1 is genesis
     val end = currentMainnet.history.height() + 1
-    Range(1, 101).foreach { blockNumber =>
+    Range(1, 1001).foreach { blockNumber =>
       s"[$blockNumber]" - {
         def block = currentMainnet.history.blockAt(blockNumber).get
 

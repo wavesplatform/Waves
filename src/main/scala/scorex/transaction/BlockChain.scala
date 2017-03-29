@@ -15,7 +15,7 @@ trait BlockChain extends History with ScorexLogging {
 
   override def child(block: Block): Option[Block] = heightOf(block).flatMap(h => blockAt(h + 1))
 
-  private[transaction] def discardBlock(): BlockChain
+  def discardBlock(): BlockChain
 
   override def lastBlocks(howMany: Int): Seq[Block] =
     (Math.max(1, height() - howMany + 1) to height()).flatMap(blockAt).reverse

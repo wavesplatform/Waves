@@ -39,14 +39,11 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 
   override def effectiveBalanceAtHeightWithConfirmations(acc: Account, atHeight: Int, confs: Int): Long = {
     val bockNumberThatIsConfsOld = Math.max(1, atHeight - confs)
-    val confsOldMinimum: Seq[(Long, Long)] = Range(bockNumberThatIsConfsOld + 1, atHeight + 1).flatMap { height =>
-
-      Option(p.effectiveBalanceSnapshots.get((acc.bytes, height)))
-        .map { case (prev, current) => if (height == 1) (current, current) else (prev, current) }
-    }
+    val confsOldMinimum: Seq[(Long, Long)] = Range(bockNumberThatIsConfsOld + 1, atHeight + 1)
+      .flatMap { height => Option(p.effectiveBalanceSnapshots.get((acc.bytes, height))) }
     confsOldMinimum.headOption match {
-      case None => accountPortfolio(acc).effectiveBalance
-      case Some((prev, cur)) => Math.min(Math.min(prev, cur), confsOldMinimum.map(_._2).min)
+      case None =>accountPortfolio(acc).effectiveBalance
+      case Some((oldest, _)) => Math.min(oldest, confsOldMinimum.map(_._2).min)
     }
   }
 

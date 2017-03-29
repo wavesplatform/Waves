@@ -46,7 +46,7 @@ object BlockDiffer {
           .map { case (acc, oldEffBalance, effBalanceDiff) =>
             EffectiveBalanceSnapshot(acc = acc,
               height = s.height + 1,
-              prevEffectiveBalance = oldEffBalance,
+              prevEffectiveBalance = if (s.height == 0) (oldEffBalance + effBalanceDiff) else oldEffBalance,
               effectiveBalance = oldEffBalance + effBalanceDiff)
           }
           .toSeq

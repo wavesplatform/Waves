@@ -105,7 +105,7 @@ class StoredBlockchain(db: MVStore) extends BlockChain with ScorexLogging {
     }
   }
 
-  override private[transaction] def discardBlock(): BlockChain = synchronized {
+  override def discardBlock(): BlockChain = synchronized {
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
     blockStorage.deleteBlock(h)
