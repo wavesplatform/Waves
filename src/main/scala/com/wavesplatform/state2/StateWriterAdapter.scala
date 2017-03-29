@@ -24,7 +24,6 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
   private val MinInMemDiff = 100
   private val MaxInMemDiff = 200
 
-
   @volatile var inMemoryDiff: BlockDiff = {
     val storedBlocks = bc.height()
     val statedBlocks = persisted.height
@@ -38,7 +37,6 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
   }
 
   private def composite: StateReader = new CompositeStateReader(persisted, inMemoryDiff)
-
 
   private def rebuildDiff(from: Int, to: Int): BlockDiff =
     Range(from, to).foldLeft(Monoid[BlockDiff].empty) { (diff, h) =>

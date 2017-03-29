@@ -14,11 +14,12 @@ import scala.util.{Left, Right}
 
 object PaymentTransactionDiff {
 
-  def apply(stateReader: StateReader, height: Int)(tx: PaymentTransaction): Either[StateValidationError, Diff] = {
+  def apply(stateReader: StateReader, height: Int, settings: FunctionalitySettings, blockTime: Long)
+           (tx: PaymentTransaction): Either[StateValidationError, Diff] = {
 
     stateReader.paymentTransactionIdByHash(EqByteArray(tx.hash)) match {
-      case Some(existing) => Left(TransactionValidationError(tx, s"PaymentTx is already registered: $existing"))
-      case None => Right(Diff(height = height,
+      case Some(existing) if blockTime >= settings.requirePaymentUniqueId => Left(TransactionValidationError(tx, s"PaymentTx is already registered: $existing"))
+      case _ => Right(Diff(height = height,
         tx = tx,
         portfolios = Map(
           tx.recipient -> Portfolio(

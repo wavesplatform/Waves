@@ -22,11 +22,11 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
   }
 
 
-  val CHECK_BLOCKS = Range(200,1000)
+  val CHECK_BLOCKS = Range(200, 1000)
   val APPLY_TO = 28001
 
 
-  "provide the same answers to questions after each block from mainnet applied" - {
+  "provide the same answers to questions after each block from mainnet applied" ignore {
     val oldStore = BlockStorageImpl.createMVStore("")
     val old = storedBC(oldState(oldStore), new StoredBlockchain(oldStore))
 
@@ -176,20 +176,19 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       for (accIdx <- aliveAccounts.indices) {
         logStep(accIdx, aliveAccounts.size, 100)("accountTransactions")
         val acc = aliveAccounts(accIdx)
-        val oldtxs = old.state.accountTransactions(acc, Int.MaxValue).toList
-        val newtxs = nev.state.accountTransactions(acc, Int.MaxValue).toList
-        assert(oldtxs.size == newtxs.size, s"acc: ${acc.stringRepr}, \n\nold:\n $oldtxs\n\nnew:\n$newtxs")
-        val oldSet = oldtxs.map(tx => EqByteArray(tx.id)).toSet
-        val newSet = newtxs.map(tx => EqByteArray(tx.id)).toSet
-        assert(oldSet.equals(newSet))
+        val oldtxs = old.state.accountTransactions(acc, Int.MaxValue).toList.map(_.id).map(EqByteArray).toSet
+        val newtxs = nev.state.accountTransactions(acc, Int.MaxValue).toList.map(_.id).map(EqByteArray).toSet
+        val sameSize = newtxs.size == oldtxs.size
+        assert(sameSize, s"accc: ${acc.stringRepr}, \n\nold:\n ${oldtxs.size}\n\n\nnew:\n${newtxs.size}")
+        assert(oldtxs.equals(newtxs))
       }
     }
 
     "total waves balance" in {
-      assert(aliveAccounts.map(acc => nev.state.balance(acc)).sum == 100000000L)
+      assert(aliveAccounts.map(acc => nev.state.balance(acc)).sum == 10000000000000000L)
     }
 
-    s"balance, effectiveBalance, leasedSum" ignore {
+    s"balance, effectiveBalance, leasedSum" in {
       for (accIdx <- aliveAccounts.indices) {
         logStep(accIdx, aliveAccounts.size)("balance, effectiveBalance, leasedSum")
         val acc = aliveAccounts(accIdx)
@@ -201,7 +200,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       }
     }
 
-    s"isReissuable, totalAssetQuantity" ignore {
+    s"isReissuable, totalAssetQuantity" in {
       val eqAssetIds = aliveAccounts.flatMap(acc => old.state.getAccountBalance(acc).keySet.map(EqByteArray)).toIndexedSeq
       for (eqAssetIdIdx <- eqAssetIds.indices) {
         logStep(eqAssetIdIdx, aliveAccounts.size, 100)("isReissuable, totalAssetQuantity")
@@ -216,7 +215,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       }
     }
 
-    s"getAccountBalance, assetBalance" ignore {
+    s"getAccountBalance, assetBalance" in {
       for (accIdx <- aliveAccounts.indices) {
         logStep(accIdx, aliveAccounts.size)("getAccountBalance, assetBalance")
         val acc = aliveAccounts(accIdx)
@@ -233,7 +232,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     }
 
 
-    s"effectiveBalanceWithConfirmations" in {
+    s"effectiveBalanceWithConfirmations" ignore {
       for {
         accIdx <- aliveAccounts.indices
         _ = logStep(accIdx, aliveAccounts.size)("effectiveBalanceWithConfirmations")

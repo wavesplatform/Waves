@@ -14,8 +14,10 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   override def accountPortfolio(a: Account): Portfolio =
     inner.accountPortfolio(a).combine(txDiff.portfolios.get(a).orEmpty)
 
-  override def assetInfo(id: ByteArray): Option[AssetInfo] =
-    inner.assetInfo(id).map(_.combine(txDiff.issuedAssets.get(id).orEmpty))
+  override def assetInfo(id: ByteArray): Option[AssetInfo] = (inner.assetInfo(id), txDiff.issuedAssets.get(id)) match {
+    case (None, None) => None
+    case (existing, upd) => Some(existing.orEmpty.combine(upd.orEmpty))
+  }
 
   override def height: Int = inner.height + blockDiff.heightDiff
 

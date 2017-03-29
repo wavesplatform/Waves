@@ -16,7 +16,7 @@ object TransactionDiffer {
       t3 <- CommonValidation.disallowSendingGreaterThanBalance(s, settings, time, t2)
       diff <- t3 match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(height)(gtx)
-        case ptx: PaymentTransaction => PaymentTransactionDiff(s, height)(ptx)
+        case ptx: PaymentTransaction => PaymentTransactionDiff(s, height, settings, time)(ptx)
         case itx: IssueTransaction => AssetTransactionsDiff.issue(s, height)(itx)
         case rtx: ReissueTransaction => AssetTransactionsDiff.reissue(s, settings, height, time)(rtx)
         case btx: BurnTransaction => AssetTransactionsDiff.burn(s, height)(btx)
