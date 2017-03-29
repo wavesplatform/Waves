@@ -5,7 +5,6 @@ import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import play.api.libs.functional.syntax._
 
 import scala.collection.immutable.Stream
 import scala.util.{Failure, Success}
@@ -47,18 +46,6 @@ object Checkpoint {
     }
   }
 
-  implicit val blockCheckpoint: Reads[BlockCheckpoint] = {
-    val r = (JsPath \ "height").read[Int] and
-      (JsPath \ "signature").read[Array[Byte]]
-    r(BlockCheckpoint.apply _)
-  }
-
-  implicit val checkpointReads: Reads[Checkpoint] = {
-    val r = (JsPath \ "items").read[Seq[BlockCheckpoint]] and
-      (JsPath \ "signature").read[Array[Byte]]
-    r(Checkpoint.apply _)
-  }
-
+  implicit val blockCheckpointFormat: Reads[BlockCheckpoint] = Json.reads
+  implicit val checkpointFormat: Reads[Checkpoint] = Json.reads
 }
-
-
