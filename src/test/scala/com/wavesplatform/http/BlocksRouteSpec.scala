@@ -43,6 +43,13 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with Transac
     generationSignature <- byteArrayGen(WavesConsensusModule.GeneratorSignatureLength)
   } yield Block.buildAndSign(1, ts, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), txs, signer)
 
+  private val blockSeqGen = for {
+    start <- Gen.posNum[Int].label("from")
+    end <- Gen.chooseNum(start, start + 20).label("to")
+    blockCount <- Gen.choose(0, end - start + 1).label("actualBlockCount")
+    blocks <- Gen.listOfN(blockCount, blockGen).label("blocks")
+  } yield (start, end, blocks)
+
   private def checkBlock(response: JsValue, expected: Block): Unit = {
     (response \ "version").asOpt[Int].isDefined shouldBe true
     (response \ "timestamp").as[Long] should be >= 0L
@@ -82,14 +89,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with Transac
   routePath("/seq/{from}/{to}") in {
     // todo: check to <= from
     // todo: check invalid from/to (not numeric)
-    val g = for {
-      start <- Gen.posNum[Int]
-      end <- Gen.choose(start, start + 10)
-      blockCount <- Gen.choose(0, end - start + 1)
-      blocks <- Gen.listOfN(blockCount, blockGen)
-    } yield (start, end, blocks)
-
-    forAll(g) {
+    forAll(blockSeqGen) {
       case (start, end, blocks) =>
         inSequence {
           for (i <- start to end) {
@@ -149,14 +149,11 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with Transac
     // todo: check if to <= from
     // todo: check empty block sequence
     val g = for {
-      from <- Gen.posNum[Int]
-      to <- Gen.choose(from, from + 100)
       account <- accountGen
-      blockCount <- Gen.choose(0, to - from)
-      blocks <- Gen.listOfN(blockCount, blockGen)
-    } yield (account, from, to, blocks)
+      blockSeq <- blockSeqGen
+    } yield (account, blockSeq)
 
-    forAll(g) { case (address, from, to, blocks) =>
+    forAll(g) { case (address, (from, to, blocks)) =>
       (history.generatedBy _).expects(Account.fromPublicKey(address.publicKey), from, to).returning(blocks).once()
       Get(routePath(s"/address/${address.address}/$from/$to")) ~> route ~> check {
         val response = responseAs[Seq[JsValue]]
