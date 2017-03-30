@@ -1,9 +1,8 @@
 package com.wavesplatform.it
 
-import java.io.IOException
-
+import com.wavesplatform.it.Node.UnexpectedStatusCodeException
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers, RecoverMethods}
+import org.scalatest._
 import scorex.transaction.TransactionParser.TransactionType
 import com.wavesplatform.it.util._
 
@@ -11,12 +10,17 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 
 class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers with ScalaFutures
   with IntegrationPatience with BeforeAndAfterAll with RecoverMethods {
-  val sender = Random.shuffle(allNodes).head
-  val richAddress = sender.address
+  private val sender = Random.shuffle(allNodes).head
+  private val richAddress = sender.address
+
+  private def assertRequestError(f: Future[_]): Future[Assertion] = f transform {
+    case Failure(UnexpectedStatusCodeException(r)) => Success(Assertions.assert(r.getStatusCode == 400))
+    case _ => Failure[Assertion](new RuntimeException("Unexpected state"))
+  }
 
   private val firstAddress: String = Await.result(sender.createAddress, 1.minute)
   private val secondAddress: String = Await.result(sender.createAddress, 1.minute)
@@ -65,7 +69,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     sender.assetBalance(acc, assetIdString).map(_ shouldBe balance)
   }
 
-    test("leasing is working correctly") {
+    test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
     val f = for {
       _ <- assertBalances(firstAddress, 200 waves, 200 waves)
       _ <- assertBalances(secondAddress, 100 waves, 100 waves)
@@ -81,16 +85,14 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     Await.result(f, 1 minute)
   }
 
-  test("сan not make leasing without having enough waves") {
+  test("lease cancellation reverts eff.b. changes; lessor pays fee for both lease and cancellation") {
     val f = for {
       fb <- Future.traverse(allNodes)(_.height).map(_.min)
 
       _ <- assertBalances(firstAddress, 190 waves, 90 waves)
       _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
-      leaseFailureAssertion <- recoverToSucceededIf[IOException] {
-        sender.lease(secondAddress, firstAddress, 101 waves, 10 waves)
-      }
+      leaseFailureAssertion <- assertRequestError(sender.lease(secondAddress, firstAddress, 101 waves, 10 waves))
 
       _ <- Future.traverse(allNodes)(_.waitForHeight(fb + 2))
 
@@ -108,9 +110,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
       _ <- assertBalances(firstAddress, 190 waves, 90 waves)
       _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
-      transferFailureAssertion <- recoverToSucceededIf[IOException] {
-        sender.transfer(secondAddress, firstAddress, 101 waves, fee = 1 waves)
-      }
+      transferFailureAssertion <- assertRequestError(sender.transfer(secondAddress, firstAddress, 101 waves, fee = 1 waves))
 
       _ <- Future.traverse(allNodes)(_.waitForHeight(fb + 2))
 
@@ -128,9 +128,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
       _ <- assertBalances(firstAddress, 190 waves, 90 waves)
       _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
-      transferFailureAssertion <- recoverToSucceededIf[IOException] {
-        sender.transfer(firstAddress, secondAddress, 91 waves, fee = 1 waves)
-      }
+      transferFailureAssertion <- assertRequestError(sender.transfer(firstAddress, secondAddress, 91 waves, fee = 1 waves))
 
       _ <- Future.traverse(allNodes)(_.waitForHeight(fb + 2))
 
@@ -148,9 +146,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
       _ <- assertBalances(firstAddress, 190 waves, 90 waves)
       _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
-      transferFailureAssertion <- recoverToSucceededIf[IOException] {
-        sender.lease(firstAddress, secondAddress, 88 waves, fee = 3 waves)
-      }
+      transferFailureAssertion <- assertRequestError(sender.lease(firstAddress, secondAddress, 88 waves, fee = 3 waves))
 
       _ <- Future.traverse(allNodes)(_.waitForHeight(fb + 2))
 
@@ -185,7 +181,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     Await.result(f, 1 minute)
   }
 
-  test("assets issue should lead to a change in the asset balance and to a change of the waves balance and the effective balance only on the fee") {
+  test("asset issue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     val f = for {
       _ <- assertBalances(firstAddress, 170 waves, 70 waves)
 
@@ -200,7 +196,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     Await.result(f, 1 minute)
   }
 
-  test("assets reissue should lead to a change in the asset balance and a change of the waves balance and the effective balance only on the fee") {
+  test("asset reissue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     val f = for {
       _ <- assertBalances(firstAddress, 160 waves, 60 waves)
 
@@ -219,7 +215,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     Await.result(f, 1 minute)
   }
 
-  test("assets transfer should lead to a change in the asset balance and a change of the waves balance and the effective balance only on the fee") {
+  test("asset transfer changes sender's and recipient's asset balance; issuer's waves balance is decreased by fee") {
     val f = for {
       _ <- assertBalances(firstAddress, 140 waves, 40 waves)
       _ <- assertBalances(secondAddress, 100 waves, 200 waves)
@@ -242,7 +238,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     Await.result(f, 1 minute)
   }
 
-  test("waves transfer should lead to a change in the waves balance and the effective balance") {
+  test("waves transfer changes waves balances and eff.b.") {
     val f = for {
       _ <- assertBalances(firstAddress, 120 waves, 20 waves)
       _ <- assertBalances(secondAddress, 100 waves, 200 waves)
@@ -258,7 +254,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     Await.result(f, 1 minute)
   }
 
-  test("waves payment should lead to a change in the waves balance and the effective balance") {
+  test("waves payment changes waves balances and eff.b.") {
     val f = for {
       _ <- assertBalances(firstAddress, 118 waves, 18 waves)
       _ <- assertBalances(secondAddress, 101 waves, 201 waves)
@@ -274,7 +270,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     Await.result(f, 1 minute)
   }
 
-  test("assets burn should lead to a change in the asset balance and to a change of the waves balance and the effective balance only on the fee") {
+  test("burning assets changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     val f = for {
       _ <- assertBalances(firstAddress, 116 waves, 16 waves)
 

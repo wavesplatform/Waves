@@ -88,15 +88,15 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
 
   def assetBalance(address: String, assetId: String): Future[Long] = get(s"/assets/balance/$address/$assetId").as[JsValue].map(v => (v \ "balance").as[Long])
 
-  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](transactionInfo(txId), t => t.isDefined, 1.second).map(_.get)
+  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](transactionInfo(txId).transform {
+    case Success(tx) => Success(Some(tx))
+    case Failure(UnexpectedStatusCodeException(r)) if r.getStatusCode == 404 => Success(None)
+    case Failure(ex) => Failure(ex)
+  }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
 
   def waitForHeight(expectedHeight: Long): Future[Long] = waitFor[Long](height, h => h >= expectedHeight, 1.second)
 
-  def transactionInfo(txId: String): Future[Option[Transaction]] = get(s"/transactions/info/$txId").as[Transaction].transform {
-    case Success(info) => Success(Some(info))
-    case Failure(_: IOException) => Success(None)
-    case Failure(ex) => Failure(ex)
-  }
+  def transactionInfo(txId: String): Future[Transaction] = get(s"/transactions/info/$txId").as[Transaction]
 
   def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
@@ -132,6 +132,8 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
 }
 
 object Node extends ScorexLogging {
+  case class UnexpectedStatusCodeException(r: Response) extends IOException(s"Unexpected status code: ${r.getStatusCode}")
+
   case class Status(blockGeneratorStatus: String, historySynchronizationStatus: String)
   implicit val statusFormat: Format[Status] = Json.format
 
@@ -154,7 +156,7 @@ object Node extends ScorexLogging {
           Try(parse(r.getResponseBody).as[A])
         case Success(r) =>
           log.debug(s"Error parsing response ${r.getResponseBody}")
-          Failure(new IOException(s"Unexpected status code: ${r.getStatusCode}"))
+          Failure(UnexpectedStatusCodeException(r))
         case Failure(t) => Failure[A](t)
       }(ec)
   }
