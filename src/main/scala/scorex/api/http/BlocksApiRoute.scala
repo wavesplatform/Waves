@@ -102,10 +102,11 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   ))
   def seq: Route = (path("seq" / IntNumber / IntNumber) & get) { (start, end) =>
     if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
-      complete(JsArray(
+      val blocks = JsArray(
         (start to end).flatMap { height =>
           history.blockAt(height).map(_.json + ("height" -> Json.toJson(height)))
-        }))
+        })
+      complete(blocks)
     } else complete(TooBigArrayAllocation)
   }
 
@@ -155,7 +156,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
       }.getOrElse(Some(InvalidMessage))
     }
 
-    path("checkpoint") {
+    (path("checkpoint") & post) {
       json[Checkpoint] { checkpoint =>
         validateCheckpoint(checkpoint) match {
           case Some(apiError) => apiError
