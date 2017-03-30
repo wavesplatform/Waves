@@ -19,7 +19,7 @@ import scorex.transaction.state.database.state.{AccState, AddressString, Reasons
 import scala.reflect.ClassTag
 import scala.util.{Failure, Try}
 
-class StateWriterAdapter(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: BlockChain) extends State {
+class StateWriterAdapter(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: History) extends State {
 
   private val MinInMemDiff = 100
   private val MaxInMemDiff = 200
@@ -39,34 +39,31 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
   private def composite: StateReader = new CompositeStateReader(persisted, inMemoryDiff)
 
   private def rebuildDiff(from: Int, to: Int): BlockDiff =
-    Range(from, to).foldLeft(Monoid[BlockDiff].empty) { (diff, h) =>
+    Range(Math.max(1, from), to).foldLeft(Monoid[BlockDiff].empty) { (diff, h) =>
       val block = bc.blockAt(h).get
       val blockDiff = BlockDiffer(settings)(new CompositeStateReader(persisted, diff), block).right.get
       Monoid[BlockDiff].combine(diff, blockDiff)
     }
 
   override def processBlock(block: Block): Try[State] = Try {
+    val updatedInMemoryDiff =
+      if (inMemoryDiff.heightDiff >= MaxInMemDiff) {
+        val compositeHeight = composite.height
+        val diffToBePersisted = rebuildDiff(persisted.height + 1, compositeHeight - MinInMemDiff + 1)
+        persisted.applyBlockDiff(diffToBePersisted)
+        rebuildDiff(compositeHeight - MinInMemDiff + 1, compositeHeight + 1)
+      } else {
+        inMemoryDiff
+      }
+
     BlockDiffer(settings)(composite, block) match {
       case Right(blockDiff) =>
-        val updatedInMemoryDiff =
-          if (inMemoryDiff.heightDiff >= MaxInMemDiff) {
-            persistOldPartOfDiffAndReturnTheNewPart()
-          } else {
-            inMemoryDiff
-          }
         inMemoryDiff = Monoid[BlockDiff].combine(updatedInMemoryDiff, blockDiff)
         this
       case Left(m) =>
         println(m)
         ???
     }
-  }
-
-  private def persistOldPartOfDiffAndReturnTheNewPart(): BlockDiff = {
-    val compositeHeight = composite.height
-    val diffToBePersisted = rebuildDiff(persisted.height + 1, compositeHeight - MinInMemDiff + 1)
-    persisted.applyBlockDiff(diffToBePersisted)
-    rebuildDiff(compositeHeight - MinInMemDiff + 1, compositeHeight + 1)
   }
 
 
@@ -93,14 +90,17 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
   override def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] =
     composite.accountTransactionIds(account).flatMap(composite.transactionInfo).map(_._2)
 
-  override def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = ??? // not needed
+  override def lastAccountPaymentTransaction(account: Account): Option[PaymentTransaction] = None // not needed
 
   override def balance(account: Account): Long = composite.accountPortfolio(account).balance
 
-  override def assetBalance(account: AssetAcc): Long =
-    composite.accountPortfolio(account.account)
-      .assets
-      .getOrElse(EqByteArray(account.assetId.get), 0)
+  override def assetBalance(account: AssetAcc): Long = {
+    val accountPortfolio = composite.accountPortfolio(account.account)
+    account.assetId match {
+      case Some(assetId) => accountPortfolio.assets.getOrElse(EqByteArray(assetId), 0)
+      case None => accountPortfolio.balance
+    }
+  }
 
   override def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] =
     composite.accountPortfolio(account).assets.map { case (id, amt) =>

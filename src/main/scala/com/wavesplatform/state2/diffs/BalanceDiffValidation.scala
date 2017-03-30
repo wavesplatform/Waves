@@ -12,25 +12,31 @@ import scala.util.{Left, Right}
 object BalanceDiffValidation {
   def apply[T <: Transaction](s: StateReader, time: Long)(tx: T, d: Diff): Either[TransactionValidationError, Diff] = {
 
-    lazy val leadsToPositiveState: Boolean = {
-      val changedAccounts = d.portfolios.keySet
-      val allBalancesArePositive = changedAccounts.toStream.forall(acc => {
-        val oldPortfolio = s.accountPortfolio(acc)
-        val portfolioDiff = d.portfolios(acc)
-        val newPortfolio = oldPortfolio.combine(portfolioDiff)
-        val allBalancesAndAssetsForAccountArePositive = newPortfolio.balance >= 0 &&
-          newPortfolio.effectiveBalance >= 0 &&
-          newPortfolio.assets.values.forall(_ >= 0)
+    val changedAccounts = d.portfolios.keySet
+    val positiveBalanceErrors = changedAccounts.flatMap(acc => {
 
-        allBalancesAndAssetsForAccountArePositive
-      })
-      allBalancesArePositive
-    }
+      val oldPortfolio = s.accountPortfolio(acc)
+      val portfolioDiff = d.portfolios(acc)
+      val newPortfolio = oldPortfolio.combine(portfolioDiff)
 
-    if (leadsToPositiveState) {
+      if(acc.address=="3PESyRqYseiNymihU6PQErafFGyDEDUMVe1") {
+        println(s"!!UP2DATE old: $oldPortfolio,  diff: $portfolioDiff, new: $newPortfolio")
+      }
+
+
+      val allBalancesAndAssetsForAccountArePositive = newPortfolio.balance >= 0 &&
+        newPortfolio.effectiveBalance >= 0 &&
+        newPortfolio.assets.values.forall(_ >= 0)
+      if (!allBalancesAndAssetsForAccountArePositive) {
+        Some(s"$acc, old: $oldPortfolio, new: $newPortfolio")
+      } else None
+
+    })
+    if (positiveBalanceErrors.isEmpty) {
       Right(d)
     } else {
-      Left(TransactionValidationError(tx, "Transaction application leads to (temporary) negative balance/effectiveBalance/assetBalance"))
+      Left(TransactionValidationError(tx, s"Transaction application leads to (temporary) negative" +
+        s" balance/effectiveBalance/assetBalance : $positiveBalanceErrors"))
     }
   }
 }

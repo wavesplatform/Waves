@@ -67,12 +67,15 @@ object BlockInspection extends App {
     println(res)
   }
 
+  def a3() {
+    import StateResponseComparisonTests._
+    setNetworkByte()
+    val maps = new MVStorePrimitiveImpl(new MVStore.Builder().fileName("C:\\Users\\ilyas\\Desktop\\new.store").open())
+    val inspection = new InspectionStateReader(maps)
+    println(inspection.p.portfolios.asScala.values.map(_._1).sum)
+  }
 
-  import StateResponseComparisonTests._
+  def a4(): Unit = {
 
-  setNetworkByte()
-
-  val maps = new MVStorePrimitiveImpl(new MVStore.Builder().fileName("C:\\Users\\ilyas\\Desktop\\new.store").open())
-  val inspection = new InspectionStateReader(maps)
-  println(inspection.p.portfolios.asScala.values.map(_._1).sum)
+  }
 }

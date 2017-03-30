@@ -281,7 +281,7 @@ object StateResponseComparisonTests extends FreeSpec {
     new StoredState(storage, FunctionalitySettings.MAINNET)
   }
 
-  def newState(mVStore: MVStore, bc: BlockChain): State = new StateWriterAdapter(
+  def newState(mVStore: MVStore, bc: History): State = new StateWriterAdapter(
     new StateWriterImpl(new MVStorePrimitiveImpl(mVStore)), FunctionalitySettings.MAINNET, bc)
 
   val settings = BlockchainSettings("", 'W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET)

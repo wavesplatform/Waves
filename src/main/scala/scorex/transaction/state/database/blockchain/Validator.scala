@@ -11,6 +11,7 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
 import scorex.transaction.state.database.state.{AccState, ReasonIds}
 
+import scala.compat.Platform.EOL
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 import scala.util.{Left, Right, Try}
@@ -297,7 +298,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
         } catch {
           case NonFatal(e) =>
             //            log.debug(e.getMessage)
-            (currentState, seq :+ Left(TransactionValidationError(tx, e.getMessage)))
+            (currentState, seq :+ Left(TransactionValidationError(tx, e.getStackTrace.mkString("", EOL, EOL))))
         }
     }
     validatedTxs

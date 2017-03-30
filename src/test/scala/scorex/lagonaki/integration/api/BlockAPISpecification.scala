@@ -4,7 +4,7 @@ import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.JsValue
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
-import scorex.transaction.BlockChain
+import scorex.transaction.History
 
 
 class BlockAPISpecification extends FunSuite with Matchers with TransactionTestingCommons {
@@ -52,7 +52,7 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
   test("GET /blocks/child/{signature} API route") {
     val response = GET.requestJson(s"/blocks/child/${genesis.encodedId}")
     checkBlock(response)
-    (response \ "signature").as[String] shouldBe history.asInstanceOf[BlockChain].blockAt(2).get.encodedId
+    (response \ "signature").as[String] shouldBe history.asInstanceOf[History].blockAt(2).get.encodedId
   }
 
   test("GET /blocks/delay/{signature}/{blockNum} API route") {

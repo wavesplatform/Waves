@@ -1,5 +1,7 @@
 package scorex.transaction
 
+import com.wavesplatform.state2.StateWriterAdapter
+import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -14,6 +16,8 @@ import scala.util.{Failure, Success, Try}
 trait BlockStorage extends ScorexLogging {
 
   def history: History
+
+  def stateReader: StateReader
 
   def state: State
 
@@ -39,16 +43,12 @@ trait BlockStorage extends ScorexLogging {
 
   //Should be used for linear blockchain only
   def removeAfter(blockId: BlockId): Unit = try {
-    history match {
-      case h: BlockChain => h.heightOf(blockId) match {
-        case Some(height) =>
-          while (!h.lastBlock.uniqueId.sameElements(blockId)) h.discardBlock()
-          state.rollbackTo(height)
-        case None =>
-          log.warn(s"RemoveAfter non-existing block ${Base58.encode(blockId)}")
-      }
-      case _ =>
-        // Not available for other option than linear blockchain
+    history.heightOf(blockId) match {
+      case Some(height) =>
+        while (!history.lastBlock.uniqueId.sameElements(blockId)) history.discardBlock()
+        state.rollbackTo(height)
+      case None =>
+        log.warn(s"RemoveAfter non-existing block ${Base58.encode(blockId)}")
     }
   } catch {
     case e: UnsupportedOperationException =>
