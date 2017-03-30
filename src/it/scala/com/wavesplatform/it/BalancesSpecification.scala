@@ -158,7 +158,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
   }
 
 
-  test("leasing cancel is working correctly") {
+  test("lease cancellation reverts eff.b. changes; lessor pays fee for both lease and cancellation") {
     val f = for {
       _ <- assertBalances(firstAddress, 190 waves, 90 waves)
       _ <- assertBalances(secondAddress, 100 waves, 200 waves)
