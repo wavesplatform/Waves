@@ -27,6 +27,7 @@ trait MVStoreAliasExtendedStorage extends AliasExtendedStorageI {
   def persistAlias(address: AddressString, alias: String): Unit = {
     val allAliases = (alias +: aliasesByAddress(address)).mkString("\n")
     addressAliasesMap.put(address, allAliases)
+    aliasAddressMap.put(alias, address)
   }
 
   def removeAlias(alias: String): Unit = {
