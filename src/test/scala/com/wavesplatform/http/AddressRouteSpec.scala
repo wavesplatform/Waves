@@ -14,19 +14,9 @@ import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.State
 import scorex.wallet.Wallet
 
-class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with PropertyChecks {
+class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with PropertyChecks with RestAPISettingsHelper {
   import org.scalacheck.Shrink
   implicit val noShrink: Shrink[String] = Shrink.shrinkAny
-
-  private val apiKey = "test_key"
-
-  private val settings = {
-    val keyHash = Base58.encode(SecureCryptographicHash(apiKey))
-    RestAPISettings.fromConfig(
-      ConfigFactory
-        .parseString(s"waves.rest-api.api-key-hash = $keyHash")
-        .withFallback(ConfigFactory.load()))
-  }
 
   private val wallet = {
     val file = scorex.createTestTemporaryFile("wallet", ".dat")
@@ -45,7 +35,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     m
   }
 
-  private val route = AddressApiRoute(settings, wallet, state).route
+  private val route = AddressApiRoute(restAPISettings, wallet, state).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -159,7 +149,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
         val m = mock[State]
         (m.balanceWithConfirmations _).expects(*, confirmations).returning(balances).once()
-        val r = AddressApiRoute(settings, wallet, m).route
+        val r = AddressApiRoute(restAPISettings, wallet, m).route
 
         Get(routePath(s"/balance/$address/$confirmations")) ~> r ~> check {
           val b = responseAs[AddressApiRoute.Balance]
