@@ -21,6 +21,8 @@ import scala.collection.mutable
 
 object BlockInspection extends App {
 
+  import StateResponseComparisonTests._
+
   class InspectionStateReader(val p: JavaMapStorage) extends StateReaderImpl(p) {
     lazy val allTxs: List[(Int, Transaction)] = p.transactions.asScala
       .map { case (id, (height, txsBytes)) => (height, TransactionParser.parseBytes(txsBytes).get) }
@@ -34,8 +36,6 @@ object BlockInspection extends App {
       case (h, itx: TransferTransaction) if itx.feeAssetId.map(Base58.encode).contains(assetId) => (h, itx)
     }
   }
-
-
 
 
   def a1() {
@@ -69,6 +69,7 @@ object BlockInspection extends App {
 
 
   import StateResponseComparisonTests._
+
   setNetworkByte()
 
   val maps = new MVStorePrimitiveImpl(new MVStore.Builder().fileName("C:\\Users\\ilyas\\Desktop\\new.store").open())
