@@ -33,7 +33,7 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
     log.debug("Starting tests")
   }
 
-  override val nestedSuites: IndexedSeq[Suite] = IndexedSeq(
+  override def nestedSuites: IndexedSeq[Suite] = IndexedSeq(
     new ValidChainGenerationSpec(allNodes),
     new AliasTransactionSpec(allNodes),
     new BalancesSpecification(allNodes)

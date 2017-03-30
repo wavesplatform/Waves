@@ -2,14 +2,15 @@ package com.wavesplatform.it
 
 import java.io.IOException
 
-import com.wavesplatform.settings.Constants
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers, RecoverMethods}
 import scorex.transaction.TransactionParser.TransactionType
+import com.wavesplatform.it.util._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.Random
 
 class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers with ScalaFutures
@@ -17,44 +18,37 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
   val sender = Random.shuffle(allNodes).head
   val richAddress = sender.address
 
-  var firstAddress: String = _
-  var secondAddress: String = _
-  var thirdAddress: String = _
+  private val firstAddress: String = Await.result(sender.createAddress, 1.minute)
+  private val secondAddress: String = Await.result(sender.createAddress, 1.minute)
+  private val thirdAddress: String = Await.result(sender.createAddress, 1.minute)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    firstAddress = Await.result(sender.createAddress, 5.seconds)
-    secondAddress = Await.result(sender.createAddress, 5.seconds)
-    thirdAddress = Await.result(sender.createAddress, 5.seconds)
-
-    def waitAllTxsFindedInAllNodes(txIds: Seq[String]): Future[_] = {
+    def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {
       val txNodePairs = for {
         txId <- txIds
         node <- allNodes
-      } yield {
-        (node, txId)
-      }
+      } yield (node, txId)
       Future.traverse(txNodePairs) { case (node, tx) => node.waitForTransaction(tx) }
     }
 
     def makeTransfers: Future[Seq[String]] = Future.sequence(Seq(
-      sender.transfer(richAddress, firstAddress, 200 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)),
-      sender.transfer(richAddress, secondAddress, 100 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)),
-      sender.transfer(richAddress, thirdAddress, 100 * Constants.UnitsInWave, sender.fee(TransactionType.TransferTransaction)))).map(_.map(_.id))
+      sender.transfer(richAddress, firstAddress, 200 waves, sender.fee(TransactionType.TransferTransaction)),
+      sender.transfer(richAddress, secondAddress, 100 waves, sender.fee(TransactionType.TransferTransaction)),
+      sender.transfer(richAddress, thirdAddress, 100 waves, sender.fee(TransactionType.TransferTransaction)))).map(_.map(_.id))
 
     val correctStartBalancesFuture = for {
       txs <- makeTransfers
 
-      _ <- waitAllTxsFindedInAllNodes(txs)
+      _ <- waitForTxsToReachAllNodes(txs)
 
-      r1 <- sender.balance(firstAddress).map(_.balance == 200 * Constants.UnitsInWave)
-      r2 <- sender.balance(secondAddress).map(_.balance == 100 * Constants.UnitsInWave)
-      r3 <- sender.balance(thirdAddress).map(_.balance == 100 * Constants.UnitsInWave)
-    } yield r1 && r2 && r3
+      _ <- assertBalances(firstAddress, 200 waves, 200 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 100 waves)
+      _ <- assertBalances(thirdAddress, 100 waves, 100 waves)
+    } yield succeed
 
-    val correctStartBalances = Await.result(correctStartBalancesFuture, 90 seconds)
-    correctStartBalances shouldBe true
+    Await.result(correctStartBalancesFuture, 90 seconds)
   }
 
   private def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
@@ -73,173 +67,173 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
 
     test("leasing is working correctly") {
     val f = for {
-      _ <- assertBalances(firstAddress, 200 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 100 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 200 waves, 200 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 100 waves)
 
-      createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 100 * Constants.UnitsInWave, fee = 10 * Constants.UnitsInWave).map(_.id)
+      createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 100 waves, fee = 10 waves).map(_.id)
 
-      _ <- Future.sequence(allNodes.map(_.waitForTransaction(createdLeaseTxId)))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(createdLeaseTxId))
 
-      _ <- assertBalances(firstAddress, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 190 waves, 90 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
     } yield succeed
 
     Await.result(f, 1 minute)
   }
 
-  test("Сan not make leasing without having enough money") {
+  test("сan not make leasing without having enough waves") {
     val f = for {
-      fb <- Future.sequence(allNodes.map(_.height)).map(_.min)
+      fb <- Future.traverse(allNodes)(_.height).map(_.min)
 
-      _ <- assertBalances(firstAddress, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 190 waves, 90 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
       leaseFailureAssertion <- recoverToSucceededIf[IOException] {
-        sender.lease(secondAddress, firstAddress, 101 * Constants.UnitsInWave, 10 * Constants.UnitsInWave)
+        sender.lease(secondAddress, firstAddress, 101 waves, 10 waves)
       }
 
-      _ <- Future.sequence(allNodes.map(_.findBlock(_.height >= fb + 2)))
+      _ <- Future.traverse(allNodes)(_.waitForHeight(fb + 2))
 
-      _ <- assertBalances(firstAddress, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 190 waves, 90 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
     } yield leaseFailureAssertion
 
     Await.result(f, 1 minute)
   }
 
-  test("Can not make transfer without having enough of your own money") {
+  test("can not make transfer without having enough of your own waves") {
     val f = for {
       fb <- Future.traverse(allNodes)(_.height).map(_.min)
 
-      _ <- assertBalances(firstAddress, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 190 waves, 90 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
       transferFailureAssertion <- recoverToSucceededIf[IOException] {
-        sender.transfer(secondAddress, firstAddress, 101 * Constants.UnitsInWave, fee = 1 * Constants.UnitsInWave)
+        sender.transfer(secondAddress, firstAddress, 101 waves, fee = 1 waves)
       }
 
-      _ <- Future.sequence(allNodes.map(_.findBlock(_.height >= fb + 2)))
+      _ <- Future.traverse(allNodes)(_.waitForHeight(fb + 2))
 
-      _ <- assertBalances(firstAddress, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 190 waves, 90 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
     } yield transferFailureAssertion
 
     Await.result(f, 1 minute)
   }
 
-  test("Can not make transfer without having enough of effective balance") {
+  test("can not make transfer without having enough of effective balance") {
     val f = for {
       fb <- Future.traverse(allNodes)(_.height).map(_.min)
 
-      _ <- assertBalances(firstAddress, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 190 waves, 90 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
       transferFailureAssertion <- recoverToSucceededIf[IOException] {
-        sender.transfer(firstAddress, secondAddress, 91 * Constants.UnitsInWave, fee = 1 * Constants.UnitsInWave)
+        sender.transfer(firstAddress, secondAddress, 91 waves, fee = 1 waves)
       }
 
-      _ <- Future.sequence(allNodes.map(_.findBlock(_.height >= fb + 2)))
+      _ <- Future.traverse(allNodes)(_.waitForHeight(fb + 2))
 
-      _ <- assertBalances(firstAddress, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 190 waves, 90 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
     } yield transferFailureAssertion
 
     Await.result(f, 1 minute)
   }
 
-  test("Can not make leasing without having enough waves for fee") {
+  test("can not make leasing without having enough waves for fee") {
     val f = for {
       fb <- Future.traverse(allNodes)(_.height).map(_.min)
 
-      _ <- assertBalances(firstAddress, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 190 waves, 90 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
       transferFailureAssertion <- recoverToSucceededIf[IOException] {
-        sender.lease(firstAddress, secondAddress, 88 * Constants.UnitsInWave, fee = 3 * Constants.UnitsInWave)
+        sender.lease(firstAddress, secondAddress, 88 waves, fee = 3 waves)
       }
 
-      _ <- Future.traverse(allNodes)(_.findBlock(_.height >= fb + 2))
+      _ <- Future.traverse(allNodes)(_.waitForHeight(fb + 2))
 
-      _ <- assertBalances(firstAddress, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 190 waves, 90 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
     } yield transferFailureAssertion
 
     Await.result(f, 1 minute)
   }
 
 
-  test("leasing cancel is works correctly") {
+  test("leasing cancel is working correctly") {
     val f = for {
-      _ <- assertBalances(firstAddress, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 190 waves, 90 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
-      createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 70 * Constants.UnitsInWave, fee = 10 * Constants.UnitsInWave).map(_.id)
+      createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 70 waves, fee = 10 waves).map(_.id)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(createdLeaseTxId))
 
-      _ <- assertBalances(firstAddress, 180 * Constants.UnitsInWave, 10 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 270 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 180 waves, 10 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 270 waves)
 
-      createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = 10 * Constants.UnitsInWave).map(_.id)
+      createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = 10 waves).map(_.id)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(createdCancelLeaseTxId))
 
-      _ <- assertBalances(firstAddress, 170 * Constants.UnitsInWave, 70 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 170 waves, 70 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
     } yield succeed
 
     Await.result(f, 1 minute)
   }
 
-  test("Assets issue should not lead to a change in the balance and the effective balance only on the fee") {
+  test("assets issue should lead to a change in the asset balance and to a change of the waves balance and the effective balance only on the fee") {
     val f = for {
-      _ <- assertBalances(firstAddress, 170 * Constants.UnitsInWave, 70 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 170 waves, 70 waves)
 
-      issuedAssetId <- sender.issue(firstAddress, "name", "description", 100000, 2, reissuable = true, fee = 10 * Constants.UnitsInWave).map(_.id)
+      issuedAssetId <- sender.issue(firstAddress, "name", "description", 100000, 2, reissuable = true, fee = 10 waves).map(_.id)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
-      _ <- assertBalances(firstAddress, 160 * Constants.UnitsInWave, 60 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 160 waves, 60 waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
     } yield succeed
 
     Await.result(f, 1 minute)
   }
 
-  test("Assets reissue should not lead to a change in the balance and the effective balance only on the fee") {
+  test("assets reissue should lead to a change in the asset balance and a change of the waves balance and the effective balance only on the fee") {
     val f = for {
-      _ <- assertBalances(firstAddress, 160 * Constants.UnitsInWave, 60 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 160 waves, 60 waves)
 
-      issuedAssetId <- sender.issue(firstAddress, "name", "description", 100000, 2, reissuable = true, fee = 10 * Constants.UnitsInWave).map(_.id)
+      issuedAssetId <- sender.issue(firstAddress, "name", "description", 100000, 2, reissuable = true, fee = 10 waves).map(_.id)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
-      reissuedAssetId <- sender.reissue(firstAddress, issuedAssetId, 100000, reissuable = true, fee = 10 * Constants.UnitsInWave).map(_.id)
+      reissuedAssetId <- sender.reissue(firstAddress, issuedAssetId, 100000, reissuable = true, fee = 10 waves).map(_.id)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(reissuedAssetId))
 
-      _ <- assertBalances(firstAddress, 140 * Constants.UnitsInWave, 40 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 140 waves, 40 waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 200000)
     } yield succeed
 
     Await.result(f, 1 minute)
   }
 
-  test("Assets transfer should not lead to a change in the balance and the effective balance, only on the fee") {
+  test("assets transfer should lead to a change in the asset balance and a change of the waves balance and the effective balance only on the fee") {
     val f = for {
-      _ <- assertBalances(firstAddress, 140 * Constants.UnitsInWave, 40 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 140 waves, 40 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
-      issuedAssetId <- sender.issue(firstAddress, "name", "description", 100000, 2, reissuable = false, fee = 10 * Constants.UnitsInWave).map(_.id)
+      issuedAssetId <- sender.issue(firstAddress, "name", "description", 100000, 2, reissuable = false, fee = 10 waves).map(_.id)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
-      transferId <- sender.transfer(firstAddress, secondAddress, 100000, fee = 10 * Constants.UnitsInWave, Some(issuedAssetId)).map(_.id)
+      transferId <- sender.transfer(firstAddress, secondAddress, 100000, fee = 10 waves, Some(issuedAssetId)).map(_.id)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(transferId))
 
-      _ <- assertBalances(firstAddress, 120 * Constants.UnitsInWave, 20 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 120 waves, 20 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 0)
       _ <- assertAssetBalance(secondAddress, issuedAssetId, 100000)
@@ -248,54 +242,54 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     Await.result(f, 1 minute)
   }
 
-  test("Waves transfer should lead to a change in the balance and the effective balance and on the fee") {
+  test("waves transfer should lead to a change in the waves balance and the effective balance") {
     val f = for {
-      _ <- assertBalances(firstAddress, 120 * Constants.UnitsInWave, 20 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 120 waves, 20 waves)
+      _ <- assertBalances(secondAddress, 100 waves, 200 waves)
 
-      transferId <- sender.transfer(firstAddress, secondAddress, 1 * Constants.UnitsInWave, fee = 1 * Constants.UnitsInWave).map(_.id)
+      transferId <- sender.transfer(firstAddress, secondAddress, 1 waves, fee = 1 waves).map(_.id)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(transferId))
 
-      _ <- assertBalances(firstAddress, 118 * Constants.UnitsInWave, 18 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 101 * Constants.UnitsInWave, 201 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 118 waves, 18 waves)
+      _ <- assertBalances(secondAddress, 101 waves, 201 waves)
     } yield succeed
 
     Await.result(f, 1 minute)
   }
 
-  test("Waves payment should lead to a change in the balance and the effective balance and the fee") {
+  test("waves payment should lead to a change in the waves balance and the effective balance") {
     val f = for {
-      _ <- assertBalances(firstAddress, 118 * Constants.UnitsInWave, 18 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 101 * Constants.UnitsInWave, 201 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 118 waves, 18 waves)
+      _ <- assertBalances(secondAddress, 101 waves, 201 waves)
 
-      transferId <- sender.payment(firstAddress, secondAddress, 1 * Constants.UnitsInWave, fee = 1 * Constants.UnitsInWave)
+      transferId <- sender.payment(firstAddress, secondAddress, 1 waves, fee = 1 waves)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(transferId))
 
-      _ <- assertBalances(firstAddress, 116 * Constants.UnitsInWave, 16 * Constants.UnitsInWave)
-      _ <- assertBalances(secondAddress, 102 * Constants.UnitsInWave, 202 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 116 waves, 16 waves)
+      _ <- assertBalances(secondAddress, 102 waves, 202 waves)
     } yield succeed
 
     Await.result(f, 1 minute)
   }
 
-  test("Burn should not lead to a change in the balance and the effective balance, only on the fee") {
+  test("assets burn should lead to a change in the asset balance and to a change of the waves balance and the effective balance only on the fee") {
     val f = for {
-      _ <- assertBalances(firstAddress, 116 * Constants.UnitsInWave, 16 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 116 waves, 16 waves)
 
-      issuedAssetId <- sender.issue(firstAddress, "name", "description", 100000, 2, reissuable = false, fee = 1 * Constants.UnitsInWave).map(_.id)
+      issuedAssetId <- sender.issue(firstAddress, "name", "description", 100000, 2, reissuable = false, fee = 1 waves).map(_.id)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
-      _ <- assertBalances(firstAddress, 115 * Constants.UnitsInWave, 15 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 115 waves, 15 waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
 
-      burnId <- sender.burn(firstAddress, issuedAssetId, 50000, fee = 1 * Constants.UnitsInWave).map(_.id)
+      burnId <- sender.burn(firstAddress, issuedAssetId, 50000, fee = 1 waves).map(_.id)
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(burnId))
 
-      _ <- assertBalances(firstAddress, 114 * Constants.UnitsInWave, 14 * Constants.UnitsInWave)
+      _ <- assertBalances(firstAddress, 114 waves, 14 waves)
 
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 50000)
     } yield succeed

@@ -19,8 +19,8 @@ class AliasTransactionSpec(allNodes: Seq[Node]) extends FreeSpec with Matchers {
     val transferResult = for {
       fb <- creator.lastBlock
       t <- creator.createAlias(creator.address, alias, createAliasFee)
-      b <- creator.findBlock(_.transactions.exists(_.id == t.id), fb.height)
-      _ <- sender.findBlock(_.transactions.exists(_.id == t.id), b.height)
+      b <- creator.waitForTransaction(t.id)
+      _ <- sender.waitForTransaction(t.id)
       t <- sender.transfer(sender.address, s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$alias", 1000000, transferFee)
     } yield t
 

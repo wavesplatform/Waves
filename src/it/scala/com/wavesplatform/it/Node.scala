@@ -5,7 +5,7 @@ import java.io.IOException
 import com.typesafe.config.Config
 import com.wavesplatform.it.util._
 import com.wavesplatform.settings.WavesSettings
-import io.netty.util.HashedWheelTimer
+import io.netty.util.Timer
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 
-class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: HashedWheelTimer) {
+class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer) {
 
   import Node._
 
@@ -34,7 +34,6 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
   val address = config.getString("address")
   val settings = WavesSettings.fromConfig(config)
 
-  private val blockDelay = settings.blockchainSettings.genesisSettings.averageBlockDelay
   private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
   def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long =
@@ -91,6 +90,8 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
 
   def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](transactionInfo(txId), t => t.isDefined, 1.second).map(_.get)
 
+  def waitForHeight(expectedHeight: Long): Future[Long] = waitFor[Long](height, h => h >= expectedHeight, 1.second)
+
   def transactionInfo(txId: String): Future[Option[Transaction]] = get(s"/transactions/info/$txId").as[Transaction].transform {
     case Success(info) => Success(Some(info))
     case Failure(_: IOException) => Success(None)
@@ -128,51 +129,22 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: H
 
   def createAddress: Future[String] =
     post("/addresses").as[JsValue].map(v => (v \ "address").as[String])
-
-  def waitForNextBlock: Future[Block] = for {
-    currentBlock <- lastBlock
-    actualBlock <- findBlock(_.height > currentBlock.height, currentBlock.height)
-  } yield actualBlock
-
-  def findBlock(cond: Block => Boolean, from: Long = 1, to: Long = Long.MaxValue): Future[Block] = {
-    def load(_from: Long, _to: Long): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
-      blocks.find(cond).fold[Future[Node.Block]] {
-        val maybeLastBlock = blocks.lastOption
-        if (maybeLastBlock.exists(_.height >= to)) {
-          Future.failed(new NoSuchElementException)
-        } else {
-          val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19L).min(to))
-          val newTo = newFrom + 19
-          log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 19}]")
-          timer.schedule(load(newFrom, newTo), blockDelay)
-        }
-      }(Future.successful)
-    }
-
-    load(from, (from + 19).min(to))
-  }
 }
 
 object Node extends ScorexLogging {
-
   case class Status(blockGeneratorStatus: String, historySynchronizationStatus: String)
-
   implicit val statusFormat: Format[Status] = Json.format
 
   case class Peer(address: String, declaredAddress: String, peerName: String)
-
   implicit val peerFormat: Format[Peer] = Json.format
 
   case class Balance(address: String, confirmations: Int, balance: Long)
-
   implicit val balanceFormat: Format[Balance] = Json.format
 
   case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long)
-
   implicit val transactionFormat: Format[Transaction] = Json.format
 
   case class Block(signature: String, height: Long, timestamp: Long, generator: String, transactions: Seq[Transaction])
-
   implicit val blockFormat: Format[Block] = Json.format
 
   implicit class ResponseFutureExt(val f: Future[Response]) extends AnyVal {
@@ -186,5 +158,4 @@ object Node extends ScorexLogging {
         case Failure(t) => Failure[A](t)
       }(ec)
   }
-
 }
