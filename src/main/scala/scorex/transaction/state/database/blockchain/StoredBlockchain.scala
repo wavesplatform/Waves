@@ -6,11 +6,10 @@ import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.Checkpoint
+import scorex.transaction.BlockChain
 import scorex.transaction.BlockStorage._
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.{BlockChain, TransactionModule}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConverters._
@@ -19,12 +18,7 @@ import scala.util.{Failure, Success, Try}
 /**
   * If no datafolder provided, blockchain lives in RAM (useful for tests)
   */
-class StoredBlockchain(db: MVStore)
-                      (implicit consensusModule: WavesConsensusModule,
-                       transactionModule: TransactionModule)
-  extends BlockChain with ScorexLogging {
-
-  require(consensusModule != null)
+class StoredBlockchain(db: MVStore) extends BlockChain with ScorexLogging {
 
   case class BlockchainPersistence(database: MVStore) {
     val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]])
@@ -111,7 +105,7 @@ class StoredBlockchain(db: MVStore)
     }
   }
 
-  override private[transaction] def discardBlock(): BlockChain = synchronized {
+  override def discardBlock(): BlockChain = synchronized {
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
     blockStorage.deleteBlock(h)

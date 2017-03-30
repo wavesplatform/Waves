@@ -5,7 +5,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
-import play.api.libs.json.Json
+import play.api.libs.json.{JsNumber, JsObject, Json}
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
@@ -63,7 +63,8 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
     new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    complete(blockStorage.state.wavesDistributionAtHeight(height))
+    val by = blockStorage.state.wavesDistributionAtHeight(height)
+    complete(JsObject(by.map(b => b._1 -> JsNumber(b._2))))
   }
 
   @Path("/info")

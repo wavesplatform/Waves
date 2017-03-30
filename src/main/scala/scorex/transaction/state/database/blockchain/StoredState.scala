@@ -6,7 +6,6 @@ import play.api.libs.json.{JsNumber, JsObject}
 import scorex.account.{Account, Alias}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -268,15 +267,15 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
   def processBlock(block: Block): Try[State] = Try {
     val trans = block.transactionData
-    val fees: Map[AssetAcc, (AccState, Reasons)] = Block.feesDistribution(block)
+    val fees: Map[AssetAcc, (AccState, Reasons)] = block.feesDistribution
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2, effectiveBalance(m._1.account) + m._2), List(FeesStateChange(m._2))))
 
     val newBalances: Map[AssetAcc, (AccState, Reasons)] =
-      calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil)
+      calcNewBalances(trans, fees, block.timestamp < settings.allowTemporaryNegativeUntil)
     newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
-    applyChanges(newBalances, block.timestampField.value)
-    log.trace(s"New state height is ${storage.stateHeight}, hash: $hash")
+    applyChanges(newBalances, block.timestamp)
+    log.trace(s"New state height is ${storage.stateHeight}")
     this
   }
 
@@ -292,12 +291,16 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
   def assetBalance(account: AssetAcc): Long = assetBalanceAtHeight(account, Some(storage.stateHeight))
 
-  private def heightWithConfirmations(heightOpt: Option[Int], confirmations: Int): Int = {
-    Math.max(1, heightOpt.getOrElse(storage.stateHeight) - confirmations)
+  private def heightWithConfirmations(confirmations: Int): Int = {
+    Math.max(1, storage.stateHeight - confirmations)
+  }
+
+  private def heightWithConfirmations(height: Int, confirmations: Int): Int = {
+    Math.max(1, height - confirmations)
   }
 
   def balanceWithConfirmations(account: Account, confirmations: Int): Long =
-    balance(account, Some(heightWithConfirmations(None, confirmations)))
+    balance(account, Some(heightWithConfirmations(confirmations)))
 
   def accountTransactions(account: Account, limit: Int): Seq[Transaction] = {
     val accountAssets = storage.getAccountAssets(account.address)
@@ -347,8 +350,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
   private def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)
 
-  def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
-
+  override def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
     val newBalances: Map[AssetAcc, (AccState, Reasons)] = trans.foldLeft(fees) { case (changes, tx) =>
       val bcs = BalanceChangeCalculator.balanceChanges(this)(tx).right.get
       val newStateAfterBalanceUpdates = bcs.foldLeft(changes) { case (iChanges, bc) =>
@@ -417,7 +419,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
 
     // todo pass txs sequence for processing
-    changes.flatMap(_._2._2).toSet.foreach((i:StateChangeReason) => i match {
+    changes.flatMap(_._2._2).toSet.foreach((i: StateChangeReason) => i match {
       case tx: Transaction =>
         processors.foreach(_.apply(tx))
       case _ =>
@@ -463,7 +465,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     JsObject(ls.map(a => a._1 -> JsNumber(a._2)).toMap)
   }
 
-  def wavesDistributionAtHeight(height: Int): JsObject = {
+  def wavesDistributionAtHeight(height: Int): Seq[(AddressString, Long)] = {
 
     def balanceAtHeight(key: String): Long = {
       storage.getLastStates(key) match {
@@ -487,22 +489,16 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       }
     }
 
-    val ls = storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add))
-      .filter(b => b._2 != 0).sortBy(_._1).map(b => b._1 -> JsNumber(b._2))
-    JsObject(ls)
+    storage.lastStatesKeys.filter(a => a.length == 35).map(add => add -> balanceAtHeight(add))
+      .filter(b => b._2 != 0).sortBy(_._1)
   }
 
   def assetDistribution(assetId: Array[Byte]): Map[String, Long] = storage.assetDistribution(assetId)
 
-  //for debugging purposes only
-  def hash: Int = {
-    (BigInt(FastCryptographicHash(toJson(None).toString().getBytes)) % Int.MaxValue).toInt
-  }
-
   def effectiveBalance(account: Account): Long = balanceByKey(account.address, _.effectiveBalance, storage.stateHeight)
 
   def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
-    balanceByKey(account.address, _.effectiveBalance, heightWithConfirmations(Some(height), confirmations))
+    balanceByKey(account.address, _.effectiveBalance, Math.max(1, height - confirmations))
 
   def findTransaction[T <: Transaction](id: Array[Byte])(implicit ct: ClassTag[T]): Option[T] = {
     storage.getTransaction(id) match {

@@ -37,7 +37,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
 
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
 
-  override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)(application.consensusModule, this)
+  override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
   val validator: Validator = new ValidatorImpl(blockStorage.state, settings.blockchainSettings.functionalitySettings)
 
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
@@ -180,14 +180,8 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
       .flatMap(onNewOffchainTransaction)
 
 
-  override def genesisData: Seq[Transaction] = buildTransactions(genesisSettings.transactions)
+  override def genesisData: Seq[Transaction] = buildTransactions(genesisSettings)
 
-  private def buildTransactions(transactionSettings: List[GenesisTransactionSettings]): Seq[GenesisTransaction] = {
-    transactionSettings.map { ts =>
-      val acc = Account.fromString(ts.recipient).right.get
-      GenesisTransaction.create(acc, ts.amount, genesisSettings.transactionsTimestamp).right.get
-    }
-  }
 
   /** Check whether tx is valid on current state and not expired yet
     */
@@ -252,4 +246,13 @@ object SimpleTransactionModule {
   val MaxTimePreviousBlockOverTransactionDiff: FiniteDuration = 90.minutes
   val MaxTimeCurrentBlockOverTransactionDiff: FiniteDuration = 2.hour
   val MaxTransactionsPerBlock: Int = 100
+
+
+  def buildTransactions(genesisSettings: GenesisSettings): Seq[GenesisTransaction] = {
+    genesisSettings.transactions.map { ts =>
+      val acc = Account.fromString(ts.recipient).right.get
+      GenesisTransaction.create(acc, ts.amount, genesisSettings.transactionsTimestamp).right.get
+    }
+  }
+
 }
