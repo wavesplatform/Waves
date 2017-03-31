@@ -20,7 +20,7 @@ class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with Gener
         Map.empty, Map.empty).asBlockDiff)
 
       val diffEi = PaymentTransactionDiff.apply(state, 1, FunctionalitySettings.MAINNET, Long.MaxValue)(payment)
-      diffEi.right.get.accountTransactionIds(EqByteArray(account.bytes)).size shouldBe 1
+      diffEi.right.get.accountTransactionIds(account).size shouldBe 1
     }
   }
 }

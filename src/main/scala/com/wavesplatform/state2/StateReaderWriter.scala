@@ -6,8 +6,6 @@ import cats._
 import cats.implicits._
 import cats.Monoid
 import com.wavesplatform.state2.reader.StateReaderImpl
-import org.h2.mvstore.MVMap
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, SignedTransaction}
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
@@ -17,7 +15,7 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
 
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = {
     val txsDiff = blockDiff.txsDiff
-    txsDiff.transactions.foreach { case (id, (h, tx)) =>
+    txsDiff.transactions.foreach { case (id, (h, tx, _)) =>
       p.transactions.put(id.arr, (h, tx.bytes))
     }
 
@@ -38,15 +36,15 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       p.assets.put(id.arr, (updated.isReissuable, updated.volume))
     }
 
-    blockDiff.txsDiff.accountTransactionIds.foreach { case (EqByteArray(senderBytes), txIds) =>
-      Option(p.accountTransactionIds.get(senderBytes)) match {
+    blockDiff.txsDiff.accountTransactionIds.foreach { case (acc, txIds) =>
+      Option(p.accountTransactionIds.get(acc.bytes)) match {
         case Some(ll) =>
           txIds.reverse.foreach(txId => ll.add(0, txId.arr))
-          p.accountTransactionIds.put(senderBytes, ll)
+          p.accountTransactionIds.put(acc.bytes, ll)
         case None =>
           val newList = new util.ArrayList[Array[Byte]]()
           txIds.reverse.foreach(txId => newList.add(0, txId.arr))
-          p.accountTransactionIds.put(senderBytes, newList)
+          p.accountTransactionIds.put(acc.bytes, newList)
       }
     }
 

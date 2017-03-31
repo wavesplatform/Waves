@@ -9,7 +9,9 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   private val txDiff = blockDiff.txsDiff
 
   override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
-    txDiff.transactions.get(id).orElse(inner.transactionInfo(id))
+    txDiff.transactions.get(id)
+      .map(t => (t._1, t._2))
+      .orElse(inner.transactionInfo(id))
 
   override def accountPortfolio(a: Account): Portfolio =
     inner.accountPortfolio(a).combine(txDiff.portfolios.get(a).orEmpty)
@@ -25,7 +27,7 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     inner.nonEmptyAccounts ++ txDiff.portfolios.keySet
 
   override def accountTransactionIds(a: Account): Seq[ByteArray] = {
-    val fromDiff = txDiff.accountTransactionIds.get(EqByteArray(a.bytes)).orEmpty
+    val fromDiff = txDiff.accountTransactionIds.get(a).orEmpty
     fromDiff ++ inner.accountTransactionIds(a)
   }
 
