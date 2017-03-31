@@ -85,7 +85,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     Await.result(f, 1 minute)
   }
 
-  test("lease cancellation reverts eff.b. changes; lessor pays fee for both lease and cancellation") {
+  test("сan not make leasing without having enough waves") {
     val f = for {
       fb <- Future.traverse(allNodes)(_.height).map(_.min)
 
