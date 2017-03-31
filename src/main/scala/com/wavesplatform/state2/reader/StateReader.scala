@@ -1,11 +1,13 @@
 package com.wavesplatform.state2.reader
 
 import com.wavesplatform.state2._
-import scorex.account.{Account, Alias}
+import scorex.account.{Account, AccountOrAlias, Alias}
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.{PaymentTransaction, Transaction}
+import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.{PaymentTransaction, StateValidationError, Transaction}
 
 import scala.reflect.ClassTag
+import scala.util.Right
 
 trait StateReader {
 
@@ -47,6 +49,16 @@ object StateReader {
           Some(tx.asInstanceOf[T])
         else None
       })
+
+    def resolveAliasEi[T <: Transaction](tx: T, aoa: AccountOrAlias): Either[StateValidationError, Account] = {
+      aoa match {
+        case a: Account => Right(a)
+        case a: Alias => s.resolveAlias(a) match {
+          case None => Left(TransactionValidationError(tx, s"Alias $a is not resolved"))
+          case Some(acc) => Right(acc)
+        }
+      }
+    }
   }
 
 }

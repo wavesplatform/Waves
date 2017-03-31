@@ -4,6 +4,7 @@ import cats._
 import cats.implicits._
 import scorex.account.{Account, Alias}
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, SignedTransaction, Transaction}
 
 case class BlockDiff(txsDiff: Diff, heightDiff: Int, effectiveBalanceSnapshots: Seq[EffectiveBalanceSnapshot])
@@ -53,6 +54,8 @@ object Diff {
           case itx: IssueTransaction => None
           case itx: ReissueTransaction => None
           case ttx: TransferTransaction => Some(ttx.recipient.asInstanceOf[Account].bytes)
+          case ltx: LeaseTransaction => Some(ltx.recipient.asInstanceOf[Account].bytes)
+          case ltx: LeaseCancelTransaction => None
           case _ => ???
         }
 

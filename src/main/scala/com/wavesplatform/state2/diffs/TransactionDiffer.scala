@@ -23,6 +23,7 @@ object TransactionDiffer {
         case ttx: TransferTransaction => TransferTransactionDiff(s, settings, time, height)(ttx)
         case ltx: LeaseTransaction => LeaseTransactionsDiff.lease(s, height)(ltx)
         case ltx: LeaseCancelTransaction => LeaseTransactionsDiff.leaseCancel(s, height)(ltx)
+        case atx: CreateAliasTransaction => CreateAliasTransactionDiff(height)(atx)
         case _ => ???
       }
       positiveDiff <- BalanceDiffValidation(s, time)(tx, diff)
