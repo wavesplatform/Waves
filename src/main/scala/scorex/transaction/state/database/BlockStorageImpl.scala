@@ -17,9 +17,11 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
 
   protected[this] override val db: MVStore = database
 
-  override val history: History = new StoredBlockchain(db)
+  private val h : History = new StoredBlockchain(db)
 
   private val rw = new StateWriterImpl(new MVStorePrimitiveImpl(db))
+
+  override val history: History = h
 
   override val state: State = new StateWriterAdapter(rw, settings.functionalitySettings, history)
 

@@ -24,28 +24,29 @@ trait BlockStorage extends ScorexLogging {
   //Append block to current state
   def appendBlock(block: Block): Try[Unit] = {
     //TODO Rollback state for blocktree
-    history.appendBlock(block).map { blocks =>
-      blocks foreach { b =>
-        state.processBlock(b) match {
-          case Failure(e) =>
-            log.error("Failed to apply block to state", e)
-            db.rollback()
-            throw e
-          case Success(m) =>
-            db.commit()
-        }
-      }
-    } recoverWith { case e =>
-      log.error("Failed to append block:", e)
-      Failure(e)
-    }
+    //    history.appendBlock(block).map { blocks =>
+    //      blocks foreach { b =>
+    state.processBlock(block).map(_ => ())
+    //    match {
+    //      case Failure(e) =>
+    //        log.error("Failed to apply block to state", e)
+    //        db.rollback()
+    //        throw e
+    //      case Success(m) =>
+    //        db.commit()
+    //    }
   }
+
+  //    } recoverWith { case e =>
+  //      log.error("Failed to append block:", e)
+  //      Failure(e)
+  //    }
 
   //Should be used for linear blockchain only
   def removeAfter(blockId: BlockId): Unit = try {
     history.heightOf(blockId) match {
       case Some(height) =>
-        while (!history.lastBlock.uniqueId.sameElements(blockId)) history.discardBlock()
+//        while (!history.lastBlock.uniqueId.sameElements(blockId))c
         state.rollbackTo(height)
       case None =>
         log.warn(s"RemoveAfter non-existing block ${Base58.encode(blockId)}")

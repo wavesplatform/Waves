@@ -92,8 +92,7 @@ class StoredBlockchain(db: MVStore) extends History with ScorexLogging {
 
   override def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
     Try {
-      val parent = block.referenceField
-      if ((height() == 0) || (lastBlock.uniqueId sameElements parent.value)) {
+      if ((height() == 0) || (lastBlock.uniqueId sameElements block.reference)) {
         val h = height() + 1
         blockStorage.writeBlock(h, block) match {
           case Success(_) => Seq(block)

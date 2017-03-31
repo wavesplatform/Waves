@@ -21,9 +21,11 @@ import scala.util.{Failure, Try}
 
 class StateWriterAdapter(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: History) extends State {
 
+  println("Blockchain height: " + bc.height())
+  println("Persisted state height: " + persisted.height)
+
   private val MinInMemDiff = 100
   private val MaxInMemDiff = 200
-
   @volatile var inMemoryDiff: BlockDiff = {
     val storedBlocks = bc.height()
     val statedBlocks = persisted.height
@@ -32,7 +34,10 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
     } else if (statedBlocks == storedBlocks) {
       Monoid[BlockDiff].empty
     } else {
-      rebuildDiff(statedBlocks + 1, storedBlocks + 1)
+      println("rebuilding diff...")
+      val r = rebuildDiff(statedBlocks + 1, storedBlocks + 1)
+      println("diff rebuilt")
+      r
     }
   }
 
@@ -58,7 +63,8 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
 
     BlockDiffer(settings)(composite, block) match {
       case Right(blockDiff) =>
-        inMemoryDiff = Monoid[BlockDiff].combine(updatedInMemoryDiff, blockDiff)
+        bc.appendBlock(block).map(_ =>
+          inMemoryDiff = Monoid[BlockDiff].combine(updatedInMemoryDiff, blockDiff))
         this
       case Left(m) =>
         println(m)
@@ -71,9 +77,12 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
     if (height < persisted.height) {
       throw new IllegalArgumentException(s"cannot rollback to a block with height=$height, which is older than writer.height=${persisted.height}")
     } else {
-      inMemoryDiff = rebuildDiff(persisted.height, height + 1)
       while (bc.height > height) {
         bc.discardBlock()
+      }
+      if (composite.height == height) {
+      } else {
+        inMemoryDiff = rebuildDiff(persisted.height + 1, height + 1)
       }
       this
     }
@@ -141,7 +150,6 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
   override def stateHeight: Int = composite.height
 
   override def toJson(heightOpt: Option[Int]): JsObject = ???
-
 
   override def applyChanges(changes: Map[AssetAcc, (AccState, Reasons)], blockTs: Long): Unit = ???
 

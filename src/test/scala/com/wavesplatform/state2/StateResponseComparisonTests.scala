@@ -17,12 +17,8 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
 
   import StateResponseComparisonTests._
 
-
-
-
   val CHECK_BLOCKS = Range(200, 1000)
   val APPLY_TO = 28001
-
 
   "provide the same answers to questions after each block from mainnet applied" ignore {
 
