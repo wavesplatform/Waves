@@ -35,7 +35,9 @@ object BlockDiffer {
           case Some(assetId) => Portfolio(0L, 0L, Map(EqByteArray(assetId) -> feeVolume))
         })
     }
-    lazy val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) => Diff(Map.empty, Map(acc -> p), Map.empty) })
+    lazy val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) =>
+      new Diff(Map.empty, portfolios = Map(acc -> p), Map.empty, Map.empty)
+    })
 
     txsDiffEi
       .map(_.combine(feeDiff))

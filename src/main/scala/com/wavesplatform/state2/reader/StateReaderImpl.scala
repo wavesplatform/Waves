@@ -2,8 +2,9 @@ package com.wavesplatform.state2.reader
 
 import cats.implicits._
 import com.wavesplatform.state2._
-import scorex.account.Account
+import scorex.account.{Account, Alias}
 import scorex.transaction.{Transaction, TransactionParser}
+
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
 class StateReaderImpl(p: JavaMapStorage) extends StateReader {
@@ -52,4 +53,16 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 
   override def maxPaymentTransactionTimestampInPreviousBlocks(a: Account): Option[Long] =
     Option(p.maxPaymentTransactionTimestampInPreviousBlocks.get(a.bytes))
+
+  override def aliasesOfAddress(a: Account): Seq[Alias] =
+    p.aliasToAddress.entrySet().asScala
+      .filter(_.getValue sameElements a.bytes)
+      .map(_.getKey)
+      .map(aliasStr => Alias.buildWithCurrentNetworkByte(aliasStr).right.get)
+      .toSeq
+
+
+  override def resolveAlias(a: Alias): Option[Account] =
+    Option(p.aliasToAddress.get(a.name))
+      .map(b => Account.fromBytes(b).right.get)
 }

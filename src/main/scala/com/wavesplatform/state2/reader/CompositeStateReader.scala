@@ -2,7 +2,7 @@ package com.wavesplatform.state2.reader
 
 import cats.implicits._
 import com.wavesplatform.state2._
-import scorex.account.Account
+import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
 
 class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {
@@ -65,4 +65,9 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     blockDiff.maxPaymentTransactionTimestamp.get(a)
       .orElse(inner.maxPaymentTransactionTimestampInPreviousBlocks(a))
   }
+
+  override def aliasesOfAddress(a: Account): Seq[Alias] =
+    txDiff.aliases.filter(_._2 == a).keys.toSeq ++ inner.aliasesOfAddress(a)
+
+  override def resolveAlias(a: Alias): Option[Account] = txDiff.aliases.get(a).orElse(inner.resolveAlias(a))
 }

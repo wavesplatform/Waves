@@ -10,6 +10,14 @@ sealed trait Alias extends AccountOrAlias {
 
   val name: String
   val networkByte: Byte
+
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case a: Alias => name.equals(a.name)
+    case _ => false
+  }
+
+  override def hashCode(): Int = name.hashCode
 }
 
 object Alias {

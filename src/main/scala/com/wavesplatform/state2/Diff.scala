@@ -2,7 +2,7 @@ package com.wavesplatform.state2
 
 import cats._
 import cats.implicits._
-import scorex.account.Account
+import scorex.account.{Account, Alias}
 import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, SignedTransaction, Transaction}
 
@@ -21,15 +21,19 @@ object BlockDiff {
 
 case class Diff(transactions: Map[ByteArray, (Int, Transaction)],
                 portfolios: Map[Account, Portfolio],
-                issuedAssets: Map[ByteArray, AssetInfo])
+                issuedAssets: Map[ByteArray, AssetInfo],
+                aliases: Map[Alias, Account])
 
 object Diff {
-  def apply(height: Int, tx: Transaction, portfolios: Map[Account, Portfolio],
-            assetInfos: Map[ByteArray, AssetInfo]): Diff = Diff(
+  def apply(height: Int, tx: Transaction,
+            portfolios: Map[Account, Portfolio],
+            assetInfos: Map[ByteArray, AssetInfo] = Map.empty,
+            aliases: Map[Alias, Account] = Map.empty
+           ): Diff = Diff(
     transactions = Map(EqByteArray(tx.id) -> (height, tx)),
     portfolios = portfolios,
-    issuedAssets = assetInfos
-  )
+    issuedAssets = assetInfos,
+    aliases = aliases)
 
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)

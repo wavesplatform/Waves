@@ -6,9 +6,10 @@ import scorex.account.Account
 
 package object diffs {
   def ensureSenderHasEnoughBalance(s: StateWriter)(sender: Account, assets: List[ByteArray]): Unit = {
-    s.applyBlockDiff(Diff(Map.empty,
+    s.applyBlockDiff(new Diff(Map.empty,
       Map(sender -> Portfolio(Long.MaxValue - 1, Long.MaxValue - 1, assets.map(a => a -> (Long.MaxValue - 1)).toMap)),
-      assets.map(a => a -> AssetInfo(isReissuable = true, Long.MaxValue - 1)).toMap
+      assets.map(a => a -> AssetInfo(isReissuable = true, Long.MaxValue - 1)).toMap,
+      Map.empty
     ).asBlockDiff)
   }
 
@@ -21,6 +22,7 @@ package object diffs {
     override val effectiveBalanceSnapshots = new util.HashMap[(Array[Byte], Int), (Long, Long)]
     override val paymentTransactionHashes = new util.HashMap[Array[Byte], Array[Byte]]
     override val maxPaymentTransactionTimestampInPreviousBlocks = new util.HashMap[Array[Byte], Long]
+    override val aliasToAddress = new util.HashMap[String, Array[Byte]]
 
     var height: Int = 0
 
@@ -29,6 +31,7 @@ package object diffs {
     override def setHeight(i: Int): Unit = {
       height = i
     }
+
   }
 
 }

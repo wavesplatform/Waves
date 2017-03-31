@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.reader
 
 import com.wavesplatform.state2._
-import scorex.account.Account
+import scorex.account.{Account, Alias}
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.{PaymentTransaction, Transaction}
 
@@ -26,6 +26,10 @@ trait StateReader {
   def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
 
   def maxPaymentTransactionTimestampInPreviousBlocks(a: Account): Option[Long]
+
+  def aliasesOfAddress(a: Account): Seq[Alias]
+
+  def resolveAlias(a: Alias): Option[Account]
 }
 
 object StateReader {

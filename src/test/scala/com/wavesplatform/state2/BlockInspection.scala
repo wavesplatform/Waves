@@ -58,7 +58,7 @@ object BlockInspection extends App {
           case Some(assetId) => Portfolio(0L, 0L, Map(EqByteArray(assetId) -> feeVolume))
         })
       }.foldLeft(emptyDiff) { case (combinedDiff, (acc, portfolio)) =>
-        combinedDiff.combine(Diff(Map.empty, Map(acc -> portfolio), Map.empty))
+        combinedDiff.combine(new Diff(Map.empty, Map(acc -> portfolio), Map.empty, Map.empty))
       }
       )
 
