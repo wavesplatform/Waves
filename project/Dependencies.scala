@@ -16,7 +16,7 @@ object Dependencies {
     "org.mockito" % "mockito-all" % "1.10.19",
     "net.databinder.dispatch" %% "dispatch-core" % "+",
     "org.scalamock" %% "scalamock-scalatest-support" % "3.5.+",
-    "com.typesafe.akka" %% "akka-http-testkit" % "10.0.3"
+    "com.typesafe.akka" %% "akka-http-testkit" % "10.0.+"
   )) map (_ % "test")
 
   lazy val itKit = (scalatest ++ Seq(
@@ -31,7 +31,7 @@ object Dependencies {
     "com.typesafe.play" %% "play-json" % "2.6.0-M1"
   )
 
-  def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.14"
+  def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.+"
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
   lazy val p2p = Seq(
@@ -50,7 +50,8 @@ object Dependencies {
   def swaggerModule(module: String) = "io.swagger" % s"swagger-$module" % "1.+"
   lazy val http = Seq("scala-module_2.12", "core", "annotations", "models", "jaxrs").map(swaggerModule) ++ Seq(
     "com.chuusai" %% "shapeless" % "2.+",
-    "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.+"
+    "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.+",
+    "com.typesafe.akka" %% "akka-http" % "10.0.+"
   )
 
   lazy val matcher = Seq(
