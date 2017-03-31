@@ -1,19 +1,20 @@
 package com.wavesplatform.it
 
 import org.scalatest._
-import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.Future.traverse
-import Await.result
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 class ValidChainGenerationSpec(allNodes: Seq[Node]) extends FreeSpec with ScalaFutures with IntegrationPatience
-  with Matchers with Eventually {
+  with Matchers {
+
   import ValidChainGenerationSpec._
 
   "Generate 30 blocks and synchronise" in {
@@ -42,7 +43,9 @@ class ValidChainGenerationSpec(allNodes: Seq[Node]) extends FreeSpec with ScalaF
     }
 
     def balanceForNode(n: Node) = n.balance(n.address).map(b => b.address -> b.balance)
+
     def makeTransfer(r: Req) = addressToNode(r.source).transfer(r.source, r.targetAddress, r.amount, r.fee)
+
     def processRequests(reqs: Seq[Req]): Future[Unit] = if (reqs.isEmpty) {
       Future.successful(())
     } else {
@@ -50,11 +53,11 @@ class ValidChainGenerationSpec(allNodes: Seq[Node]) extends FreeSpec with ScalaF
     }
 
     val targetBlocks = result(for {
-      b      <- traverse(allNodes)(balanceForNode).map(mutable.AnyRefMap[String, Long](_: _*))
-      _      <- processRequests(generateRequests(b))
+      b <- traverse(allNodes)(balanceForNode).map(mutable.AnyRefMap[String, Long](_: _*))
+      _ <- processRequests(generateRequests(b))
       height <- traverse(allNodes)(_.height).map(_.max)
-      _      <- traverse(allNodes)(_.findBlock(_.height >= height + 40)) // wait a little longer to prevent rollbacks...
-      blocks <- traverse(allNodes)(_.findBlock(_.height >= height + 35, height)) // ...before requesting actual blocks
+      _ <- traverse(allNodes)(_.waitForHeight(height + 40)) // wait a little longer to prevent rollbacks...
+      blocks <- traverse(allNodes)(_.waitForHeight(height + 35)) // ...before requesting actual blocks
     } yield blocks, 5.minutes)
 
     all(targetBlocks) shouldEqual targetBlocks.head
@@ -62,5 +65,7 @@ class ValidChainGenerationSpec(allNodes: Seq[Node]) extends FreeSpec with ScalaF
 }
 
 object ValidChainGenerationSpec {
+
   case class Req(source: String, targetAddress: String, amount: Long, fee: Long)
+
 }
