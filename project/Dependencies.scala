@@ -18,6 +18,7 @@ object Dependencies {
     "org.scalacheck" %% "scalacheck" % "1.13.4",
     "org.mockito" % "mockito-all" % "1.10.19",
     "org.scalamock" %% "scalamock-scalatest-support" % "3.5.0",
+    "net.databinder.dispatch" % "dispatch-core_2.12" % "0.12.0",
     akkaHttpModule("akka-http-testkit")
   )) map (_ % "test")
 
