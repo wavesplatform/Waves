@@ -78,6 +78,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
     case _ => Right(tx)
   }
 
+  // migrated
   private def disallowLeaseToSelfAlias(tx: Transaction): Either[StateValidationError, Transaction] = {
     tx match {
       case ltx: LeaseTransaction =>
@@ -142,7 +143,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
       case _ => Right(transaction)
     }
   }
-
+  // migrated
   private def addressAliasExists(tx: Transaction): Either[StateValidationError, Transaction] = {
     val maybeAlias = tx match {
       case ltx: LeaseTransaction => ltx.recipient match {
@@ -164,6 +165,7 @@ class ValidatorImpl(s: State, settings: FunctionalitySettings) extends Validator
       }
     }
   }
+
 
   private def validateAgainstState(transaction: Transaction, height: Int): Either[ValidationError, Transaction] = {
     val validators: Seq[(Transaction) => Either[StateValidationError, Transaction]] = Seq(

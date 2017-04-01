@@ -13,12 +13,14 @@ object LeaseTransactionsDiff {
 
   def lease(s: StateReader, height: Int)(tx: LeaseTransaction): Either[StateValidationError, Diff] = {
     val sender = Account.fromPublicKey(tx.sender.publicKey)
-    s.resolveAliasEi(tx, tx.recipient).map { recipient =>
+    s.resolveAliasEi(tx, tx.recipient).flatMap { recipient =>
+      if(recipient == sender)
+        Left(TransactionValidationError(tx,"Cannot lease to self"))
       val portfolioDiff: Map[Account, Portfolio] = Map(
         sender -> Portfolio(-tx.fee, -tx.fee - tx.amount, Map.empty),
         recipient -> Portfolio(0, tx.amount, Map.empty)
       )
-      Diff(height = height, tx = tx, portfolios = portfolioDiff, assetInfos = Map.empty)
+      Right(Diff(height = height, tx = tx, portfolios = portfolioDiff, assetInfos = Map.empty))
     }
   }
 
