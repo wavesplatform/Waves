@@ -15,18 +15,22 @@ import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.state.database.state.{AccState, AddressString, Reasons}
+import scorex.utils.ScorexLogging
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Try}
 
-class StateWriterAdapter(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: History) extends State {
+class StateWriterAdapter(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: History) extends State with ScorexLogging {
 
-  println("Blockchain height: " + bc.height())
-  println("Persisted state height: " + persisted.height)
+
 
   private val MinInMemDiff = 100
   private val MaxInMemDiff = 200
   @volatile var inMemoryDiff: BlockDiff = {
+
+    log.debug("Blockchain height: " + bc.height())
+    log.debug("Persisted state height: " + persisted.height)
+
     val storedBlocks = bc.height()
     val statedBlocks = persisted.height
     if (statedBlocks > storedBlocks) {
@@ -34,9 +38,9 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
     } else if (statedBlocks == storedBlocks) {
       Monoid[BlockDiff].empty
     } else {
-      println("rebuilding diff...")
+      log.debug("rebuilding diff...")
       val r = rebuildDiff(statedBlocks + 1, storedBlocks + 1)
-      println("diff rebuilt")
+      log.debug("diff rebuilt")
       r
     }
   }
@@ -67,7 +71,7 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
           inMemoryDiff = Monoid[BlockDiff].combine(updatedInMemoryDiff, blockDiff))
         this
       case Left(m) =>
-        println(m)
+        log.error(s"Block $block is not valid: $m")
         ???
     }
   }

@@ -19,11 +19,6 @@ object BalanceDiffValidation {
       val portfolioDiff = d.portfolios(acc)
       val newPortfolio = oldPortfolio.combine(portfolioDiff)
 
-      if(acc.address=="3PCvFnXEqqjcqG2JpCeF1AZWFFeKsPVNDWs") {
-        println(s"!!!!!!!!UP2DATE sh=${s.height} old: $oldPortfolio,  diff: $portfolioDiff, new: $newPortfolio")
-      }
-
-
       val allBalancesAndAssetsForAccountArePositive = newPortfolio.balance >= 0 &&
         newPortfolio.effectiveBalance >= 0 &&
         newPortfolio.assets.values.forall(_ >= 0)
