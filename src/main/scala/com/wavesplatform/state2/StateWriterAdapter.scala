@@ -71,8 +71,7 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
           inMemoryDiff = Monoid[BlockDiff].combine(updatedInMemoryDiff, blockDiff))
         this
       case Left(m) =>
-        log.error(s"Block $block is not valid: $m")
-        ???
+        throw new Exception(s"Block $block is not valid: $m")
     }
   }
 

@@ -60,7 +60,7 @@ object BalanceChangeCalculator {
       case t: CreateAliasTransaction =>
         Right(Seq(BalanceChange(AssetAcc(t.sender, None), -t.fee)))
 
-      case _ => Left(UnsupportedTransactionType)
+      case t => Left(UnsupportedTransactionType(t))
     }
   }
 

@@ -28,7 +28,7 @@ object ApiError {
     case ValidationError.ToSelf => ToSelfError
     case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
     case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
-    case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
+    case ValidationError.UnsupportedTransactionType(tx) => CustomValidationError(s"UnsupportedTransactionType: ${tx.json}")
     case ValidationError.TransactionParameterValidationError(m) => CustomValidationError(m)
     case ValidationError.TransactionValidationError(tx, err) => StateCheckFailed(tx, err)
   }

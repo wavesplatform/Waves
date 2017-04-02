@@ -3,6 +3,7 @@ package com.wavesplatform.state2.diffs
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.Diff
 import com.wavesplatform.state2.reader.StateReader
+import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
@@ -25,7 +26,8 @@ object TransactionDiffer {
         case ltx: LeaseTransaction => LeaseTransactionsDiff.lease(s, height)(ltx)
         case ltx: LeaseCancelTransaction => LeaseTransactionsDiff.leaseCancel(s, height)(ltx)
         case etx: ExchangeTransaction => ExchangeTransactionDiff(s, height)(etx)
-        case _ => ???
+        case atx: CreateAliasTransaction => CreateAliasTransactionDiff(height)(atx)
+        case t => Left(UnsupportedTransactionType(t))
       }
       positiveDiff <- BalanceDiffValidation(s, time)(tx, diff)
     } yield positiveDiff
