@@ -91,6 +91,9 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
 
   // legacy
 
+  override def findPreviousExchangeTxs(order: Order): Set[ExchangeTransaction] =
+      composite.findPreviousExchangeTxs(order)
+
   override def included(signature: Array[Byte]): Option[Int] = composite.transactionInfo(EqByteArray(signature)).map(_._1)
 
   override def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
@@ -141,11 +144,9 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
   override def effectiveBalanceWithConfirmations(account: Account, confirmations: Int, height: Int): Long =
     composite.effectiveBalanceAtHeightWithConfirmations(account, height, confirmations)
 
-  override def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = ???
+  override def resolveAlias(a: Alias): Option[Account] = composite.resolveAlias(a)
 
-  override def resolveAlias(a: Alias): Option[Account] = ???
-
-  override def getAlias(a: Account): Option[Alias] = ???
+  override def getAlias(a: Account): Option[Alias] = composite.aliasesOfAddress(a).headOption
 
   override def stateHeight: Int = composite.height
 

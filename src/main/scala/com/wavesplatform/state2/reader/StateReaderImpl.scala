@@ -3,6 +3,7 @@ package com.wavesplatform.state2.reader
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
@@ -65,4 +66,9 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
   override def resolveAlias(a: Alias): Option[Account] =
     Option(p.aliasToAddress.get(a.name))
       .map(b => Account.fromBytes(b).right.get)
+
+  override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] =
+    Option(p.exchangeTransactionsByOrder.get(orderId.arr))
+      .map(_.asScala.toSet).orEmpty
+      .flatMap(id => this.findTransaction[ExchangeTransaction](id))
 }

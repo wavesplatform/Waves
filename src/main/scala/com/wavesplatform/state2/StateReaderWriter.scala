@@ -6,6 +6,7 @@ import cats._
 import cats.implicits._
 import cats.Monoid
 import com.wavesplatform.state2.reader.StateReaderImpl
+import scorex.transaction.assets.exchange.ExchangeTransaction
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
@@ -15,8 +16,29 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
 
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = {
     val txsDiff = blockDiff.txsDiff
+
     txsDiff.transactions.foreach { case (id, (h, tx, _)) =>
       p.transactions.put(id.arr, (h, tx.bytes))
+    }
+
+    val newOrderEtxs: Map[EqByteArray, Set[Array[Byte]]] = Monoid.combineAll(
+      txsDiff.transactions
+        .collect { case (_, (_, etx: ExchangeTransaction, _)) => etx }
+        .map(etx => Map(
+          EqByteArray(etx.buyOrder.id) -> Set(etx.id),
+          EqByteArray(etx.sellOrder.id) -> Set(etx.id)
+        )))
+
+    newOrderEtxs.foreach { case (oid, txIds) =>
+      Option(p.exchangeTransactionsByOrder.get(oid.arr)) match {
+        case Some(ll) =>
+          txIds.foreach(txId => ll.add(txId))
+          p.exchangeTransactionsByOrder.put(oid.arr, ll)
+        case None =>
+          val newList = new util.ArrayList[Array[Byte]]()
+          txIds.foreach(txId => newList.add(txId))
+          p.accountTransactionIds.put(oid.arr, newList)
+      }
     }
 
     txsDiff.portfolios.foreach { case (account, portfolioDiff) =>

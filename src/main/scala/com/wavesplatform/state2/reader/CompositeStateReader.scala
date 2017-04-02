@@ -4,6 +4,7 @@ import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 
 class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {
   private val txDiff = blockDiff.txsDiff
@@ -72,4 +73,12 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     txDiff.aliases.filter(_._2 == a).keys.toSeq ++ inner.aliasesOfAddress(a)
 
   override def resolveAlias(a: Alias): Option[Account] = txDiff.aliases.get(a).orElse(inner.resolveAlias(a))
+
+  override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] = {
+    val newEtxs = txDiff.transactions
+      .collect { case (_, (_, ets: ExchangeTransaction, _)) => ets }
+      .filter(etx => (etx.buyOrder.id sameElements orderId.arr) || (etx.sellOrder.id sameElements orderId.arr))
+      .toSet
+    newEtxs ++ inner.findPreviousExchangeTxs(orderId)
+  }
 }

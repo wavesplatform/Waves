@@ -60,7 +60,7 @@ trait State {
   // other
 
   // Cleaned up sometimes
-  def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction]
+  def findPreviousExchangeTxs(order: Order): Set[ExchangeTransaction]
 
   def resolveAlias(a: Alias): Option[Account]
 
@@ -101,7 +101,7 @@ object State {
 
   implicit class StateExt(s: State) {
     def findPrevOrderMatchTxs(om: ExchangeTransaction): Set[ExchangeTransaction] = {
-      s.findPrevOrderMatchTxs(om.buyOrder) ++ s.findPrevOrderMatchTxs(om.sellOrder)
+      s.findPreviousExchangeTxs(om.buyOrder) ++ s.findPreviousExchangeTxs(om.sellOrder)
     }
 
     def getAssetName(assetId: AssetId): String = {

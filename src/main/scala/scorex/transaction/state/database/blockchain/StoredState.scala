@@ -132,7 +132,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     case _ =>
   }
 
-  def findPrevOrderMatchTxs(order: Order): Set[ExchangeTransaction] = {
+  def findPreviousExchangeTxs(order: Order): Set[ExchangeTransaction] = {
 
     def parseTxSeq(a: Array[String]): Set[ExchangeTransaction] =
       for {

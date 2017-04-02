@@ -4,6 +4,7 @@ import com.wavesplatform.state2._
 import scorex.account.{Account, AccountOrAlias, Alias}
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.{PaymentTransaction, StateValidationError, Transaction}
 
 import scala.reflect.ClassTag
@@ -32,6 +33,8 @@ trait StateReader {
   def aliasesOfAddress(a: Account): Seq[Alias]
 
   def resolveAlias(a: Alias): Option[Account]
+
+  def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction]
 }
 
 object StateReader {
@@ -59,7 +62,11 @@ object StateReader {
         }
       }
     }
+
+    def findPreviousExchangeTxs(order: Order): Set[ExchangeTransaction] =
+      s.findPreviousExchangeTxs(EqByteArray(order.id))
   }
+
 
 }
 
