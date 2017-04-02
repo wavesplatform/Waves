@@ -42,10 +42,10 @@ object BalanceChangeCalculator {
         val sellFeeChange = Seq(BalanceChange(AssetAcc(t.sellOrder.senderPublicKey, None), -t.sellMatcherFee))
 
         val exchange = Seq(
-          (t.buyOrder.senderPublicKey, (t.buyOrder.assetPair.priceAsset, -t.buyOrder.getSpendAmount(t.price, t.amount).get)),
-          (t.buyOrder.senderPublicKey, (t.buyOrder.assetPair.amountAsset, t.buyOrder.getReceiveAmount(t.price, t.amount).get)),
-          (t.sellOrder.senderPublicKey, (t.sellOrder.assetPair.priceAsset, t.sellOrder.getReceiveAmount(t.price, t.amount).get)),
-          (t.sellOrder.senderPublicKey, (t.sellOrder.assetPair.amountAsset, -t.sellOrder.getSpendAmount(t.price, t.amount).get))
+          (t.buyOrder.senderPublicKey, (t.buyOrder.assetPair.priceAsset, -t.buyOrder.getSpendAmount(t.price, t.amount).right.get)),
+          (t.buyOrder.senderPublicKey, (t.buyOrder.assetPair.amountAsset, t.buyOrder.getReceiveAmount(t.price, t.amount).right.get)),
+          (t.sellOrder.senderPublicKey, (t.sellOrder.assetPair.priceAsset, t.sellOrder.getReceiveAmount(t.price, t.amount).right.get)),
+          (t.sellOrder.senderPublicKey, (t.sellOrder.assetPair.amountAsset, -t.sellOrder.getSpendAmount(t.price, t.amount).right.get))
         )
 
         Right(buyFeeChange ++ sellFeeChange ++ matcherChange ++

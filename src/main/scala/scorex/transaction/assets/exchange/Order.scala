@@ -22,11 +22,13 @@ object OrderType {
 
   case object BUY extends OrderType {
     def bytes: Array[Byte] = Array(0.toByte)
+
     override def toString: String = "buy"
   }
 
   case object SELL extends OrderType {
     def bytes: Array[Byte] = Array(1.toByte)
+
     override def toString: String = "sell"
   }
 
@@ -54,7 +56,7 @@ object OrderType {
 case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
                  @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
                  assetPair: AssetPair,
-                 @ApiModelProperty(dataType = "java.lang.String", example = "buy")orderType: OrderType,
+                 @ApiModelProperty(dataType = "java.lang.String", example = "buy") orderType: OrderType,
                  @ApiModelProperty(value = "Price for AssetPair.second in AssetPair.first * 10^8",
                    example = "100000000") price: Long,
                  @ApiModelProperty("Amount in AssetPair.second") amount: Long,
@@ -75,9 +77,9 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       (price > 0) :| "price should be > 0" &&
       assetPair.isValid &&
       (amount < MaxAmount) :| "amount too large" &&
-      getSpendAmount(price, amount).isSuccess :| "SpendAmount too large" &&
+      getSpendAmount(price, amount).isRight :| "SpendAmount too large" &&
       (getSpendAmount(price, amount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-      getReceiveAmount(price, amount).isSuccess :| "ReceiveAmount too large" &&
+      getReceiveAmount(price, amount).isRight :| "ReceiveAmount too large" &&
       (getReceiveAmount(price, amount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0" &&
       (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
@@ -116,7 +118,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   }
 
   @ApiModelProperty(hidden = true)
-  def getSpendAmount(matchPrice: Long, matchAmount: Long): Try[Long] = Try {
+  def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[Throwable, Long] = Try {
     if (orderType == OrderType.SELL) matchAmount
     else {
       val spend = BigInt(matchAmount) * matchPrice / PriceConstant
@@ -124,15 +126,15 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
         throw new ArithmeticException("BigInteger out of long range")
       } else spend.bigInteger.longValueExact()
     }
-  }
+  }.toEither
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAmount(matchPrice: Long, matchAmount: Long): Try[Long] = Try {
+  def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[Throwable, Long] = Try {
     if (orderType == OrderType.BUY) matchAmount
     else {
-      (BigInt(matchAmount) * matchPrice / PriceConstant ).bigInteger.longValueExact()
+      (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
     }
-  }
+  }.toEither
 
   override def json: JsObject = Json.obj(
     "id" -> Base58.encode(id),
@@ -158,10 +160,10 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
         assetPair == o.assetPair
         orderType == o.orderType
         price == o.price &&
-        amount == o.amount &&
-        expiration == o.expiration &&
-        matcherFee == o.matcherFee &&
-        (signature sameElements o.signature)
+          amount == o.amount &&
+          expiration == o.expiration &&
+          matcherFee == o.matcherFee &&
+          (signature sameElements o.signature)
       case _ => false
     }
   }

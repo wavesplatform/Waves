@@ -601,8 +601,8 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
         }
 
         def amountInWaves(price: Long, amount: Long, order: Order): Long = {
-          if (order.getSpendAssetId.isEmpty) -order.getSpendAmount(price, amount).get
-          else if (order.getReceiveAssetId.isEmpty) order.getReceiveAmount(price, amount).get
+          if (order.getSpendAssetId.isEmpty) -order.getSpendAmount(price, amount).right.get
+          else if (order.getReceiveAssetId.isEmpty) order.getReceiveAmount(price, amount).right.get
           else 0L
         }
 

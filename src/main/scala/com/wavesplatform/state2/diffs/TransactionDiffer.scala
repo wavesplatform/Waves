@@ -4,6 +4,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.Diff
 import com.wavesplatform.state2.reader.StateReader
 import scorex.transaction._
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
@@ -23,7 +24,7 @@ object TransactionDiffer {
         case ttx: TransferTransaction => TransferTransactionDiff(s, settings, time, height)(ttx)
         case ltx: LeaseTransaction => LeaseTransactionsDiff.lease(s, height)(ltx)
         case ltx: LeaseCancelTransaction => LeaseTransactionsDiff.leaseCancel(s, height)(ltx)
-        case atx: CreateAliasTransaction => CreateAliasTransactionDiff(height)(atx)
+        case etx: ExchangeTransaction => ExchangeTransactionDiff(s, height)(etx)
         case _ => ???
       }
       positiveDiff <- BalanceDiffValidation(s, time)(tx, diff)
