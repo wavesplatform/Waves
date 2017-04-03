@@ -16,6 +16,7 @@ import scala.util._
 class AliasTransactionSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
   private val state = application.transactionModule.blockStorage.state
+  private val updater = application.transactionModule.blockStorage.blockchainUpdater
   private val validator = application.transactionModule.validator
   private val history = application.transactionModule.blockStorage.history
   private val aliasCreator: PrivateKeyAccount = applicationNonEmptyAccounts.head
@@ -35,7 +36,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
 
   def ensureSenderHasBalance(sender: PrivateKeyAccount): Unit = {
     val transfer = TransferTransaction.create(None, aliasCreator, sender, 1000000L, TIME, None, 100000L, Array()).right.get
-    state.processBlock(TestBlock(Seq(transfer))).get
+    updater.processBlock(TestBlock(Seq(transfer))).get
     ()
   }
 
@@ -55,7 +56,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val tx = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("TRANSFER-ALIAS").right.get, fee, 1L).right.get
     val block = TestBlock(Seq(tx))
     shouldBeValid(tx)
-    state.processBlock(block) shouldBe a[Success[_]]
+    updater.processBlock(block) shouldBe a[Success[_]]
     state.balance(aliasCreator) shouldBe creatorBalance0 - fee
 
     val sender: PrivateKeyAccount = PrivateKeyAccount(randomBytes())
@@ -67,7 +68,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val amount = 1000L
     val tx2 = TransferTransaction.create(None, sender, Alias.buildWithCurrentNetworkByte("TRANSFER-ALIAS").right.get, amount, 1L, None, fee2, Array()).right.get
     shouldBeValid(tx2)
-    state.processBlock(TestBlock(Seq(tx2))) shouldBe a[Success[_]]
+    updater.processBlock(TestBlock(Seq(tx2))) shouldBe a[Success[_]]
     state.balance(aliasCreator) shouldBe (creatorBalance + amount)
     state.balance(sender) shouldBe (senderBalance - fee2 - amount)
   }
@@ -79,7 +80,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val tx = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("LEASE-ALIAS").right.get, fee, 1L).right.get
     val block = TestBlock(Seq(tx))
     shouldBeValid(tx)
-    state.processBlock(block) shouldBe a[Success[_]]
+    updater.processBlock(block) shouldBe a[Success[_]]
     state.balance(aliasCreator) shouldBe creatorBalance0 - fee
 
     val sender: PrivateKeyAccount = PrivateKeyAccount(randomBytes())
@@ -91,7 +92,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val amount = 1000L
     val tx2 = LeaseTransaction.create(sender, amount, fee2, 1L, Alias.buildWithCurrentNetworkByte("LEASE-ALIAS").right.get).right.get
     shouldBeValid(tx2)
-    state.processBlock(TestBlock(Seq(tx2))) shouldBe a[Success[_]]
+    updater.processBlock(TestBlock(Seq(tx2))) shouldBe a[Success[_]]
     state.effectiveBalance(aliasCreator) shouldBe (creatorEffectiveBalance + amount)
     state.effectiveBalance(sender) shouldBe (senderEffectiveBalance - fee2 - amount)
   }
@@ -102,7 +103,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val tx = TransferTransaction.create(None, aliasCreator, Alias.buildWithCurrentNetworkByte("NON-EXISTING ALIAS").right.get, 1000L, 1L, None, 100000L, Array()).right.get
     shouldBeInvalid(tx)
     val block = TestBlock(Seq(tx))
-    state.processBlock(block) shouldBe a[Failure[_]]
+    updater.processBlock(block) shouldBe a[Failure[_]]
     state.balance(aliasCreator) shouldBe senderBalance
   }
 
@@ -112,7 +113,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val tx = LeaseTransaction.create(aliasCreator, 10000L, 100000L, 1L, Alias.buildWithCurrentNetworkByte("NON-EXISTING ALIAS").right.get).right.get
     shouldBeInvalid(tx)
     val block = TestBlock(Seq(tx))
-    state.processBlock(block) shouldBe a[Failure[_]]
+    updater.processBlock(block) shouldBe a[Failure[_]]
     state.balance(aliasCreator) shouldBe senderBalance
   }
 
@@ -122,7 +123,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val fee = 100000L
     val tx = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("THE ALIAS").right.get, fee, 1L).right.get
     val block = TestBlock(Seq(tx))
-    state.processBlock(block)
+    updater.processBlock(block)
 
     val tx2 = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("THE ALIAS").right.get, fee, 1L).right.get
     shouldBeInvalid(tx2)
@@ -137,11 +138,11 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val theAlias = Alias.buildWithCurrentNetworkByte("ALIAS")
     val tx = CreateAliasTransaction.create(aliasCreator, theAlias.right.get, 100000L, 1L).right.get
     val block = TestBlock(Seq(tx))
-    state.processBlock(block)
-    state.rollbackTo(state.stateHeight - 1)
+    updater.processBlock(block)
+    updater.rollbackTo(state.stateHeight - 1)
 
     shouldBeValid(tx)
-    state.processBlock(block) shouldBe a[Success[_]]
+    updater.processBlock(block) shouldBe a[Success[_]]
   }
 
 }

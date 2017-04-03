@@ -13,6 +13,12 @@ import scorex.utils.NTP
 import scala.reflect.ClassTag
 import scala.util.Try
 
+trait BlockchainUpdater {
+  def processBlock(block: Block): Try[Unit]
+
+  def rollbackTo(height: Int): Unit
+}
+
 trait State {
 
   // tx lookup
@@ -72,9 +78,6 @@ trait State {
 
   // state writes
 
-  def processBlock(block: Block): Try[Unit]
-
-  def rollbackTo(height: Int): Unit
 
   // outside calls from tests only
 
@@ -93,7 +96,7 @@ trait State {
   def burnAsset(assetId: AssetId, height: Int, transactionId: Array[Byte], quantity: Long): Unit
 
   // AssetExtendedStateSpecification: 5
-  def assetRollbackTo(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean] = None) : Unit
+  def assetRollbackTo(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean] = None): Unit
 }
 
 object State {

@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.StateWriterAdapter
+import com.wavesplatform.state2.BlockchainUpdaterImpl
 import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
 import scorex.block.Block
@@ -19,16 +19,18 @@ trait BlockStorage extends ScorexLogging {
 
   def stateReader: StateReader
 
+  def blockchainUpdater: BlockchainUpdater
+
   def state: State
 
   def appendBlock(block: Block): Try[Unit] = {
-    state.processBlock(block).map(_ => ())
+    blockchainUpdater.processBlock(block).map(_ => ())
   }
 
   def removeAfter(blockId: BlockId): Unit = try {
     history.heightOf(blockId) match {
       case Some(height) =>
-        state.rollbackTo(height)
+        blockchainUpdater.rollbackTo(height)
       case None =>
         log.warn(s"RemoveAfter non-existing block ${Base58.encode(blockId)}")
     }
@@ -37,20 +39,9 @@ trait BlockStorage extends ScorexLogging {
       log.debug(s"DB can't find last block because of unexpected modification")
       None
   }
-
-  protected[this] val db: MVStore
 }
 
 object BlockStorage {
 
-  sealed trait Direction
-
-  case object Forward extends Direction
-
-  case object Reversed extends Direction
-
-  /**
-    * Block and direction to process it
-    */
   type BlocksToProcess = Seq[Block]
 }
