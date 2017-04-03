@@ -8,6 +8,8 @@ trait AccountOrAlias {
   def stringRepr: String
 
   def bytes: Array[Byte]
+
+  override def toString = stringRepr
 }
 
 object AccountOrAlias {

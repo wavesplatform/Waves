@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.settings.Constants
 import io.netty.util.Timer
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -20,5 +21,8 @@ package object util {
     def retryUntil[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration)
                      (implicit ec: ExecutionContext): Future[A] =
       f.flatMap(v => if (cond(v)) Future.successful(v) else schedule(retryUntil(f, cond, retryInterval), retryInterval))
+  }
+  implicit class LongExt(val l: Long) extends AnyVal {
+    def waves: Long = l * Constants.UnitsInWave
   }
 }

@@ -123,7 +123,7 @@ trait History {
       (h + 1).to(Math.min(height(), h + howMany: Int)).flatMap(blockAt).map(_.uniqueId)
     }.getOrElse(Seq())
 
-  lazy val genesis: Block = blockAt(1).get
+  def genesis: Block = blockAt(1).get
 }
 
 object History {

@@ -1,5 +1,8 @@
 package scorex.account
 
+import java.util
+import java.util.Collections
+
 import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
@@ -38,17 +41,24 @@ object Account extends ScorexLogging {
 
   private def scheme = AddressScheme.current
 
-  private case class AccountImpl(bytes: Array[Byte]) extends Account
+  private class AccountImpl(val bytes: Array[Byte]) extends Account {
+    override def equals(obj: Any) = obj match {
+      case that: AccountImpl => bytes sameElements that.bytes
+      case _ => false
+    }
+
+    override def hashCode() = util.Arrays.hashCode(bytes)
+  }
 
   def fromPublicKey(publicKey: Array[Byte]): Account = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
     val bytes = withoutChecksum ++ calcCheckSum(withoutChecksum)
-    AccountImpl(bytes)
+    new AccountImpl(bytes)
   }
 
   def fromBytes(addressBytes: Array[Byte]): Either[ValidationError, Account] = {
-    if (isByteArrayValid(addressBytes)) Right(AccountImpl(addressBytes))
+    if (isByteArrayValid(addressBytes)) Right(new AccountImpl(addressBytes))
     else Left(InvalidAddress)
   }
 
@@ -57,7 +67,7 @@ object Account extends ScorexLogging {
       Left(InvalidAddress)
     } else {
       Base58.decode(address) match {
-        case Success(byteArray) if isByteArrayValid(byteArray) => Right(AccountImpl(byteArray))
+        case Success(byteArray) if isByteArrayValid(byteArray) => Right(new AccountImpl(byteArray))
         case _ => Left(InvalidAddress)
       }
     }
