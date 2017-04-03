@@ -12,7 +12,6 @@ import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.State
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success, Try}

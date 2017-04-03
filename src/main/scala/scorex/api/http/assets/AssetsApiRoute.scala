@@ -12,7 +12,7 @@ import scorex.api.http.{ApiError, ApiRoute, InvalidAddress}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.{AssetAcc, AssetIdStringLength, State, TransactionOperations}
+import scorex.transaction.{AssetAcc, AssetIdStringLength, TransactionOperations}
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success}

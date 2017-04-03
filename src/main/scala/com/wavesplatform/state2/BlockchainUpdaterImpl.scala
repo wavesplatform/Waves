@@ -33,7 +33,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     }
   }
 
-  def composite: StateReader = new CompositeStateReader(persisted, inMemoryDiff)
+  def currentState: StateReader = new CompositeStateReader(persisted, inMemoryDiff)
 
   private def updateInMemoryDiffIfNeeded(): Unit = {
     if (inMemoryDiff.heightDiff >= MaxInMemDiff) {
@@ -48,7 +48,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
   }
 
   override def processBlock(block: Block): Either[ValidationError, Unit] = for {
-    blockDiff <- BlockDiffer(settings)(composite, block)
+    blockDiff <- BlockDiffer(settings)(currentState, block)
     _ <- bc.appendBlock(block)
   } yield {
     log.info( s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
@@ -62,7 +62,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
       while (bc.height > height) {
         bc.discardBlock()
       }
-      if (composite.height == height) {
+      if (currentState.height == height) {
       } else {
         inMemoryDiff = unsafeDiffer(persisted, Range(persisted.height + 1, height + 1).map(h => bc.blockAt(h).get))
       }

@@ -17,7 +17,6 @@ import play.api.libs.json._
 import scorex.api.http._
 import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.transaction.State
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.wallet.Wallet

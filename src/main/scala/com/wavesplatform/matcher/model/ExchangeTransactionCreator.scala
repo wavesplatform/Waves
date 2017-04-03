@@ -2,10 +2,8 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.state2.reader.StateReader
-import scorex.api.http.{ApiError, InvalidSender}
-import scorex.transaction.ValidationError.MissingSenderPrivateKey
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import scorex.transaction.{SignedTransaction, State, TransactionModule, ValidationError}
+import scorex.transaction.{SignedTransaction, TransactionModule, ValidationError}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
@@ -36,7 +34,6 @@ trait ExchangeTransactionCreator {
       val p = BigInt(amount) * o.matcherFee / o.amount
       p.toLong
     }
-
     (calcFee(buy, amount), calcFee(sell, amount))
   }
 

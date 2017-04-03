@@ -27,6 +27,8 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
   context.system.scheduler.schedule(rndBroadcastInterval, rndBroadcastInterval, self, BroadcastRandom)
 
   override def receive: Receive = {
+    case _ if transactionModule.blockStorage.stateReader.height <= 400000 =>
+      // Do nothing if less than 400K blocks applied
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
       transactionModule.putUnconfirmedIfNew(tx) match {

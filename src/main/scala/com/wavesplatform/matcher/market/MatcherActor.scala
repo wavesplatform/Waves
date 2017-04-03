@@ -11,7 +11,7 @@ import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.transaction.{AssetId, State, TransactionModule}
+import scorex.transaction.{AssetId, TransactionModule}
 import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
