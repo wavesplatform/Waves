@@ -17,7 +17,7 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
 
   protected[this] override val db: MVStore = database
 
-  private val h : History = new StoredBlockchain(db)
+  private val h: History = new StoredBlockchain(db)
 
   private val rw = new StateWriterImpl(new MVStorePrimitiveImpl(db))
 
@@ -25,7 +25,7 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
 
   override val state: State = new StateWriterAdapter(rw, settings.functionalitySettings, h)
 
-  override def stateReader: StateReader = rw
+  override def stateReader: StateReader = state.asInstanceOf[StateWriterAdapter].composite
 }
 
 object BlockStorageImpl {

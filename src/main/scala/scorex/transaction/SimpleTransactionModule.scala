@@ -2,6 +2,7 @@ package scorex.transaction
 
 import com.google.common.base.Charsets
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings, WavesSettings}
+import com.wavesplatform.state2.diffs.BlockDiffer
 import scorex.account._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._

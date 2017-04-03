@@ -4,8 +4,10 @@ import com.wavesplatform.state2._
 import scorex.account.{Account, AccountOrAlias, Alias}
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import scorex.transaction.{PaymentTransaction, StateValidationError, Transaction}
+import scorex.transaction._
+import scorex.transaction.state.database.state.AddressString
 
 import scala.reflect.ClassTag
 import scala.util.Right
@@ -65,8 +67,48 @@ object StateReader {
 
     def findPreviousExchangeTxs(order: Order): Set[ExchangeTransaction] =
       s.findPreviousExchangeTxs(EqByteArray(order.id))
+
+    def included(signature: Array[Byte]): Option[Int] = s.transactionInfo(EqByteArray(signature)).map(_._1)
+
+    def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] =
+      s.accountTransactionIds(account).flatMap(s.transactionInfo).map(_._2)
+
+    def balance(account: Account): Long = s.accountPortfolio(account).balance
+
+    def assetBalance(account: AssetAcc): Long = {
+      val accountPortfolio = s.accountPortfolio(account.account)
+      account.assetId match {
+        case Some(assetId) => accountPortfolio.assets.getOrElse(EqByteArray(assetId), 0)
+        case None => accountPortfolio.balance
+      }
+    }
+
+    def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] =
+      s.accountPortfolio(account).assets.map { case (id, amt) =>
+        val assetInfo = s.assetInfo(id).get
+        id.arr -> (amt, assetInfo.isReissuable, assetInfo.volume, findTransaction[IssueTransaction](id.arr).get)
+      }
+
+    def assetDistribution(assetId: Array[Byte]): Map[String, Long] =
+      s.assetDistribution(EqByteArray(assetId))
+        .map { case (acc, amt) => (acc.address, amt) }
+
+    def effectiveBalance(account: Account): Long = s.accountPortfolio(account).effectiveBalance
+
+    def getLeasedSum(address: AddressString): Long = {
+      val portfolio = s.accountPortfolio(Account.fromString(address).right.get)
+      portfolio.effectiveBalance - portfolio.balance
+    }
+
+    def isReissuable(id: Array[Byte]): Boolean =
+      s.assetInfo(EqByteArray(id)).get.isReissuable
+
+    def totalAssetQuantity(assetId: AssetId): Long =
+      s.assetInfo(EqByteArray(assetId)).get.volume
+
+    def resolveAlias(a: Alias): Option[Account] = s.resolveAlias(a)
+
+    def getAlias(a: Account): Option[Alias] = s.aliasesOfAddress(a).headOption
   }
 
-
 }
-

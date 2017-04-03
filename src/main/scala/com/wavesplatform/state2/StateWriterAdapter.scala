@@ -44,7 +44,7 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
     }
   }
 
-  private def composite: StateReader = new CompositeStateReader(persisted, inMemoryDiff)
+  def composite: StateReader = new CompositeStateReader(persisted, inMemoryDiff)
 
   override def processBlock(block: Block): Try[Unit] =  Try {
     val updatedInMemoryDiff =
