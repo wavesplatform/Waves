@@ -258,7 +258,7 @@ class WavesConsensusModule(val settings: BlockchainSettings) extends ScorexLoggi
 
   def generatingBalance(account: Account, atHeight: Int)
                        (implicit transactionModule: TransactionModule): Long = {
-    val balanceSheet = transactionModule.blockStorage.stateReader
+    val balanceSheet = transactionModule.blockStorage.upToDateStateReader
     val generatingBalanceDepth =
       if (atHeight >= settings.functionalitySettings.generatingBalanceDepthFrom50To1000AfterHeight) 1000 else 50
     balanceSheet.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)

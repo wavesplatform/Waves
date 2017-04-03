@@ -17,7 +17,6 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Random
 
-//TODO: gagarin55 - Can't move it to appropriate module due to dependancy on some ConsesusModule impl
 class SimpleTransactionModuleSpecification extends FunSuite with MockFactory with Matchers {
 
   private val config = ConfigFactory.parseString(
@@ -54,10 +53,10 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
   // account with money
   val walletSeed = Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get
   val privateKeyAccount = Wallet.generateNewAccount(walletSeed, -1)
-  assert(transactionModule.blockStorage.stateReader.balance(privateKeyAccount) > 0L)
+  assert(transactionModule.blockStorage.upToDateStateReader.balance(privateKeyAccount) > 0L)
   // account without money
   val noBalanceAccount = Wallet.generateNewAccount(walletSeed, 5)
-  assert(transactionModule.blockStorage.stateReader.balance(noBalanceAccount) == 0L)
+  assert(transactionModule.blockStorage.upToDateStateReader.balance(noBalanceAccount) == 0L)
 
 
   test("isValid() checks that tx not too old") {
@@ -80,10 +79,8 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
     transactionModule.utxStorage.putIfNew(oldValidTx, validDelegate)
     assert(transactionModule.utxStorage.all().size == 2)
 
-    // do
     transactionModule.clearIncorrectTransactions()
 
-    // assert
     assert(transactionModule.utxStorage.all().size == 1)
     assert(!transactionModule.utxStorage.all().contains(oldValidTx))
   }
@@ -97,19 +94,10 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
     transactionModule.utxStorage.putIfNew(invalidTx, validDelegate)
     assert(transactionModule.utxStorage.all().size == 2)
 
-    // do
     transactionModule.clearIncorrectTransactions()
 
-    // assert
     assert(transactionModule.utxStorage.all().size == 1)
     assert(!transactionModule.utxStorage.all().contains(invalidTx))
-  }
-
-  test("unique txs by id in one block") {
-    val tx = TransferTransaction.create(None, privateKeyAccount, privateKeyAccount, 1L, genesisTimestamp + 1000, None, 100000L, Array.empty).right.get
-    transactionModule.isValid(TestBlock(Seq(tx))) shouldBe true
-    val replaySeq = Seq(tx, tx)
-    transactionModule.isValid(TestBlock(replaySeq)) shouldBe false
   }
 
   test("packUnconfirmed() packs txs in correct order") {

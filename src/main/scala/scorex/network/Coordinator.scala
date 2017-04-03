@@ -271,12 +271,9 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       def consensus = application.consensusModule.isValid(b)
 
-      def transaction = application.transactionModule.isValid(b)
-
       if (!history) Left(TheError(s"Invalid block ${b.encodedId}: no parent block in history"))
       else if (!signature) Left(TheError(s"Invalid block ${b.encodedId}: signature is not valid"))
       else if (!consensus) Left(TheError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
-      else if (!transaction) Left(TheError(s"Invalid block ${b.encodedId}: transaction data is not valid"))
       else Right(())
     }
   }

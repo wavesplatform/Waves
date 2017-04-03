@@ -60,7 +60,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     state(GettingExtension, acceptSignaturesSpecOnlyFrom(peers.keySet)) {
       case SignaturesFromPeer(blockIds, connectedPeer) =>
 
-        log.info(s"Got blockIds: $blockIds")
+        log.info(s"Got blockIds(count= ${blockIds.size}: ${blockIds.take(2)}, ...}")
 
         blockIdsToStartDownload(blockIds, history) match {
           case None =>
@@ -158,7 +158,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         if peers.active == connectedPeer && forkStorage.containsBlockId(block.uniqueId) =>
 
         if (forkStorage.addIfNotContained(block)) {
-          log.info("Got block: " + block.encodedId)
+          log.debug("Got block: " + block.encodedId)
 
           val author = Some(connectedPeer).filter(_ => !peers.activeChanged)
           val allBlocksAreLoaded = forkStorage.noIdsWithoutBlock

@@ -21,7 +21,7 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
 
   override val history: History = h
 
-  override def stateReader: StateReader = updater.currentState
+  override def upToDateStateReader: StateReader = updater.currentState
 
   override def blockchainUpdater: BlockchainUpdater = updater
 }

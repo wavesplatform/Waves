@@ -8,8 +8,6 @@ trait TransactionModule {
 
   val blockStorage: BlockStorage
 
-  def isValid(block: Block): Boolean
-
   def validate[T <: Transaction](tx: T): Either[ValidationError, T]
 
   def unconfirmedTxs: Seq[Transaction]

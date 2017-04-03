@@ -31,7 +31,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
   private implicit val timeout: Timeout = 5.seconds
 
   val wallet: Wallet = application.wallet
-  val storedState: StateReader = application.blockStorage.stateReader
+  val storedState: StateReader = application.blockStorage.upToDateStateReader
 
   override lazy val route: Route =
     pathPrefix("matcher") {

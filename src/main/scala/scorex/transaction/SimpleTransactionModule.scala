@@ -16,7 +16,7 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.state.database.blockchain.{Validator, ValidatorImpl}
+import scorex.transaction.state.database.blockchain.Validator
 import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
 import scorex.utils._
 import scorex.wallet.Wallet
@@ -35,12 +35,11 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
 
   private val networkController = application.networkController
   private val feeCalculator = new FeeCalculator(settings.feesSettings)
+  private val fs = settings.blockchainSettings.functionalitySettings
 
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
 
   override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
-  //  val validator: Validator = new ValidatorImpl(blockStorage.stateReader, settings.blockchainSettings.functionalitySettings)
-  val validator: Validator = (trans: Seq[Transaction], heightOpt: Option[Int], blockTime: Long) => (Seq.empty, trans)
 
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 
@@ -59,7 +58,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
       .take(MaxTransactionsPerBlock)
       .sorted(TransactionsOrdering.InBlock)
 
-    val valid = validator.validate(txs, heightOpt, NTP.correctedTime())._2
+    val valid = Validator.validate(fs, blockStorage.upToDateStateReader, txs, heightOpt, NTP.correctedTime())._2
 
     if (valid.size != txs.size) {
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
@@ -86,7 +85,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
     val inOrder = notFromFuture.sorted(TransactionsOrdering.InUTXPool)
-    val valid = validator.validate(inOrder, blockTime = currentTime)._2
+    val valid = Validator.validate(fs, blockStorage.upToDateStateReader, inOrder, None, currentTime)._2
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
   }
@@ -191,7 +190,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
     val lastBlockTimestamp = blockStorage.history.lastBlock.timestamp
     val notExpired = (lastBlockTimestamp - tx.timestamp).millis <= MaxTimePreviousBlockOverTransactionDiff
     if (notExpired) {
-      validator.validate(tx, tx.timestamp)
+      Validator.validate(fs, blockStorage.upToDateStateReader, tx)
     } else {
       Left(TransactionValidationError(tx, s"Transaction is too old: Last block timestamp is $lastBlockTimestamp"))
     }
@@ -204,31 +203,11 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
       throw t
   }
 
-  override def isValid(block: Block): Boolean = try {
-    val lastBlockTs = blockStorage.history.lastBlock.timestamp
-    val txs = block.transactionData
-    lazy val txsAreNew = txs.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTimeCurrentBlockOverTransactionDiff }
-    lazy val (errors, validTrans) = validator.validate(block.transactionData, blockStorage.history.heightOf(block), block.timestamp)
-    lazy val txsIdAreUniqueInBlock = txs.map(tx => Base58.encode(tx.id)).toSet.size == txs.size
-    if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
-    if (errors.nonEmpty) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs: $errors")
-    if (!txsIdAreUniqueInBlock) log.debug(s"Invalid txs in block ${block.encodedId}: there are not unique txs")
-
-    txsAreNew && errors.isEmpty && txsIdAreUniqueInBlock
-  } catch {
-    case e: UnsupportedOperationException =>
-      log.debug(s"DB can't find last block because of unexpected modification")
-      false
-    case NonFatal(t) =>
-      log.error(s"Unexpected error during validation", t)
-      throw t
-  }
-
   override def createPayment(sender: PrivateKeyAccount, recipient: Account,
                              amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
     for {
       p1 <- PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
-      p2 <- validator.validate(p1, p1.timestamp)
+      p2 <- Validator.validate(fs, blockStorage.upToDateStateReader, p1)
     } yield p2
   }
 

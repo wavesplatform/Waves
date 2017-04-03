@@ -31,7 +31,7 @@ trait MatcherApplication extends ScorexLogging {
 
   def wallet: Wallet
 
-  def storedState: StateReader = blockStorage.stateReader
+  def storedState: StateReader = blockStorage.upToDateStateReader
 
   lazy val matcherApiRoutes = Seq(
     MatcherApiRoute(this.asInstanceOf[Application], matcher, restAPISettings, matcherSettings)

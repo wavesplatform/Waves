@@ -11,12 +11,10 @@ import scorex.transaction._
 
 import scala.util.{Left, Right, Try}
 
-trait Validator {
-  def validate(trans: Seq[Transaction], heightOpt: Option[Int] = None, blockTime: Long): (Seq[ValidationError], Seq[Transaction])
-}
+object Validator {
 
-class ValidatorImpl(s: StateReader, settings: FunctionalitySettings) extends Validator {
-  override def validate(trans: Seq[Transaction], heightOpt: Option[Int], blockTime: Long): (Seq[ValidationError], Seq[Transaction]) = {
+  def validate(settings: FunctionalitySettings, s: StateReader,
+               trans: Seq[Transaction], heightOpt: Option[Int], blockTime: Long): (Seq[ValidationError], Seq[Transaction]) = {
     val (errs, txs, _) = trans.foldLeft((Seq.empty[ValidationError], Seq.empty[Transaction], Monoid[Diff].empty)) {
       case ((errors, valid, diff), tx) =>
         TransactionDiffer.apply(settings, blockTime, heightOpt.getOrElse(s.height))(new CompositeStateReader(s, diff.asBlockDiff), tx) match {
@@ -26,16 +24,11 @@ class ValidatorImpl(s: StateReader, settings: FunctionalitySettings) extends Val
     }
     (errs.reverse, txs.reverse)
   }
-}
 
-object Validator {
-
-  implicit class ValidatorExt(v: Validator) {
-
-    def validate[T <: Transaction](tx: T, blockTime: Long): Either[ValidationError, T] = v.validate(Seq(tx), None, blockTime) match {
+  def validate[T <: Transaction](settings: FunctionalitySettings, s: StateReader, tx: T): Either[ValidationError, T] =
+    validate(settings, s, Seq(tx), None, tx.timestamp) match {
       case (_, Seq(t)) => Right(t.asInstanceOf[T])
       case (Seq(err), _) => Left(err)
     }
-  }
 
 }
