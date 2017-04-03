@@ -13,7 +13,6 @@ import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
-import scorex.transaction.State
 import scorex.wallet.Wallet
 
 class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with PropertyChecks with RestAPISettingsHelper {

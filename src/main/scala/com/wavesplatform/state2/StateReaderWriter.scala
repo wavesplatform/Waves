@@ -85,6 +85,8 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
     }
 
     p.setHeight(p.getHeight + blockDiff.heightDiff)
+
+    p.commit()
   }
 }
 

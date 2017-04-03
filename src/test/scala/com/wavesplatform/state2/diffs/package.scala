@@ -33,6 +33,7 @@ package object diffs {
       height = i
     }
 
+    override def commit(): Unit = ()
   }
 
 }

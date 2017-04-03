@@ -18,7 +18,7 @@ import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
 import scorex.crypto.encode.Base58
-import scorex.transaction.{AssetAcc, State}
+import scorex.transaction.AssetAcc
 import scorex.utils._
 
 import scala.concurrent.Await

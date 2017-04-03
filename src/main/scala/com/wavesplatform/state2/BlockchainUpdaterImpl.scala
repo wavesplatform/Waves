@@ -23,10 +23,11 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     if (persisted.height > bc.height()) {
       throw new IllegalArgumentException(s"storedBlocks = ${bc.height()}, statedBlocks=${persisted.height}")
     } else {
-      log.debug("Rebuilding diff")
+      log.debug("Resolving blocks to rebuild")
       val blocksToReconcile = Range(persisted.height + 1, bc.height() + 1)
         .map(h => bc.blockAt(h).get)
         .toList
+      log.debug("Rebuilding diff")
       val r = unsafeDiffer(persisted, blocksToReconcile)
       log.debug("Diff rebuilt successfully")
       r
@@ -44,15 +45,19 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
       val diffToBePersisted = unsafeDiffer(persisted, persistBs)
       persisted.applyBlockDiff(diffToBePersisted)
       inMemoryDiff = unsafeDiffer(persisted, inMemBs)
+      log.debug(s"Dumping blocks to persisted state. Last persisted block height: ${persisted.height}. In-memory height diff: ${inMemoryDiff.heightDiff}")
     }
   }
 
-  override def processBlock(block: Block): Either[ValidationError, Unit] = for {
-    blockDiff <- BlockDiffer(settings)(currentState, block)
-    _ <- bc.appendBlock(block)
-  } yield {
-    log.info( s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
-    inMemoryDiff = Monoid[BlockDiff].combine(inMemoryDiff, blockDiff)
+  override def processBlock(block: Block): Either[ValidationError, Unit] = {
+    updateInMemoryDiffIfNeeded()
+    for {
+      blockDiff <- BlockDiffer(settings)(currentState, block)
+      _ <- bc.appendBlock(block)
+    } yield {
+      log.info( s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
+      inMemoryDiff = Monoid[BlockDiff].combine(inMemoryDiff, blockDiff)
+    }
   }
 
   override def rollbackTo(height: Int): Unit = {
