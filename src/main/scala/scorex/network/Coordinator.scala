@@ -1,5 +1,8 @@
 package scorex.network
 
+import cats._
+import cats.syntax.all._
+
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import scorex.app.Application
@@ -15,6 +18,7 @@ import scorex.network.ScoreObserver.{CurrentScore, GetScore}
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
+import scorex.transaction.{TheError, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -26,7 +30,9 @@ import scala.util.{Failure, Success, Try}
 class Coordinator(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   import Coordinator._
+
   private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
+
   import basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq[MessageSpec[_]](CheckpointMessageSpec)
@@ -94,7 +100,8 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
             if (syncStatus == BlockchainSynchronizer.Idle && status == CIdle)
               CIdle.name
             else
-              s"${status.name} (${syncStatus.name})" }
+              s"${status.name} (${syncStatus.name})"
+          }
           .pipeTo(sender())
 
       case AddBlock(block, from) => processSingleBlock(block, from)
@@ -192,22 +199,24 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
     if (isBlockToBeAdded) {
       log.info(s"New block(local: $local): ${newBlock.json}")
-      if (processNewBlock(newBlock)) {
-        application.blockGenerator ! LastBlockChanged
-        if (local) {
-          networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(newBlock), None), Broadcast)
-        } else {
-          self ! BroadcastCurrentScore
-        }
-      } else {
-        from.foreach(_.blacklist())
-        log.warn(s"Can't apply single block, local=$local: ${newBlock.json}")
+      processNewBlock(newBlock) match {
+        case Right(_) =>
+          application.blockGenerator ! LastBlockChanged
+          if (local) {
+            networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(newBlock), None), Broadcast)
+          } else {
+            self ! BroadcastCurrentScore
+          }
+        case Left(err) =>
+          from.foreach(_.blacklist())
+          log.warn(s"Can't apply single block, local=$local: ${newBlock.json}")
       }
     }
   }
 
   private def processFork(lastCommonBlockId: BlockId, blocks: Iterator[Block], from: Option[ConnectedPeer]): Unit = {
     val newBlocks = blocks.toSeq
+
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
       newBlocks.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
     }
@@ -215,7 +224,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     if (application.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
       application.blockStorage.removeAfter(lastCommonBlockId)
 
-      newBlocks.find(!processNewBlock(_)).foreach { failedBlock =>
+      newBlocks.find(processNewBlock(_).isLeft).foreach { failedBlock =>
         log.warn(s"Can't apply block: ${failedBlock.json}")
         if (try {
           history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)
@@ -245,8 +254,15 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
         }
     }
 
-  def isBlockValid(b: Block) : Boolean = {
-    if (application.transactionModule.blockStorage.history.contains(b)) true //applied blocks are valid
+  private def validateWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Either[ValidationError, Unit] = {
+    if (isValidWithRespectToCheckpoint(candidate, estimatedHeight))
+      Right(())
+    else
+      Left(TheError(s"Block ${str(candidate)} [h = $estimatedHeight] is not valid with respect to checkpoint"))
+  }
+
+  def isBlockValid(b: Block): Either[ValidationError, Unit] = {
+    if (application.transactionModule.blockStorage.history.contains(b)) Right(())
     else {
       def history = application.transactionModule.blockStorage.history.contains(b.reference)
 
@@ -257,49 +273,26 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       def transaction = application.transactionModule.isValid(b)
 
-      if (!history) log.debug(s"Invalid block ${b.encodedId}: no parent block in history")
-      else if (!signature) log.debug(s"Invalid block ${b.encodedId}: signature is not valid")
-      else if (!consensus) log.debug(s"Invalid block ${b.encodedId}: consensus data is not valid")
-      else if (!transaction) log.debug(s"Invalid block ${b.encodedId}: transaction data is not valid")
-
-      history && signature && consensus && transaction
+      if (!history) Left(TheError(s"Invalid block ${b.encodedId}: no parent block in history"))
+      else if (!signature) Left(TheError(s"Invalid block ${b.encodedId}: signature is not valid"))
+      else if (!consensus) Left(TheError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
+      else if (!transaction) Left(TheError(s"Invalid block ${b.encodedId}: transaction data is not valid"))
+      else Right(())
     }
   }
 
 
-  private def processNewBlock(block: Block): Boolean = Try {
-    val oldHeight = history.height()
-    val estimatedHeight = oldHeight + 1
-    if (!isValidWithRespectToCheckpoint(block, estimatedHeight)) {
-      log.warn(s"Block ${str(block)} [h = $estimatedHeight] is not valid with respect to checkpoint")
-      false
-    } else if (isBlockValid(block)) {
+  private def processNewBlock(block: Block): Either[ValidationError, Unit] = for {
+    _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
+    _ <- application.blockStorage.blockchainUpdater.processBlock(block)
+  } yield {
+    application.transactionModule.clearFromUnconfirmed(block.transactionData)
+  }
 
-      val oldScore = history.score()
-
-      application.blockStorage.blockchainUpdater.processBlock(block) match {
-        case Success(_) =>
-          log.info(
-            s"""Block ${block.encodedId} appended:
-            (height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})""")
-
-          application.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-          true
-        case Failure(e) => throw e
-      }
-    } else {
-      log.warn(s"Invalid new block: ${str(block)}")
-      false
-    }
-  } recoverWith { case e =>
-    e.printStackTrace()
-    log.warn(s"Failed to append new block ${str(block)}: $e")
-    Failure(e)
-  } getOrElse false
 
   private def str(block: Block) = {
     if (log.logger.isDebugEnabled) block.json
-    else encode(block.uniqueId) + ", parent " + encode(block.referenceField.value)
+    else encode(block.uniqueId) + ", parent " + encode(block.reference)
   }
 }
 
@@ -325,6 +318,7 @@ object Coordinator {
 
   object SyncFinished {
     def unsuccessfully: SyncFinished = SyncFinished(success = false, None)
+
     def withEmptyResult: SyncFinished = SyncFinished(success = true, None)
   }
 
@@ -335,4 +329,5 @@ object Coordinator {
   case class BroadcastCheckpoint(checkpoint: Checkpoint)
 
   case object ClearCheckpoint
+
 }

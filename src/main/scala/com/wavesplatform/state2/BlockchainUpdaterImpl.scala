@@ -8,8 +8,6 @@ import scorex.block.Block
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
-import scala.util.Try
-
 class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: History)
   extends BlockchainUpdater with ScorexLogging {
 
@@ -37,27 +35,24 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
 
   def composite: StateReader = new CompositeStateReader(persisted, inMemoryDiff)
 
-  override def processBlock(block: Block): Try[Unit] = Try {
-    val updatedInMemoryDiff =
-      if (inMemoryDiff.heightDiff >= MaxInMemDiff) {
-        val (persistBs, inMemBs) = Range(persisted.height + 1, persisted.height + inMemoryDiff.heightDiff + 1)
-          .map(h => bc.blockAt(h).get)
-          .toList
-          .splitAt(MaxInMemDiff - MinInMemDiff)
-        val diffToBePersisted = unsafeDiffer(persisted, persistBs)
-        persisted.applyBlockDiff(diffToBePersisted)
-        unsafeDiffer(persisted, inMemBs)
-      } else {
-        inMemoryDiff
-      }
-
-    BlockDiffer(settings)(composite, block) match {
-      case Right(blockDiff) =>
-        bc.appendBlock(block).map(_ =>
-          inMemoryDiff = Monoid[BlockDiff].combine(updatedInMemoryDiff, blockDiff))
-      case Left(m) =>
-        throw new Exception(s"Block $block is not valid: $m")
+  private def updateInMemoryDiffIfNeeded(): Unit = {
+    if (inMemoryDiff.heightDiff >= MaxInMemDiff) {
+      val (persistBs, inMemBs) = Range(persisted.height + 1, persisted.height + inMemoryDiff.heightDiff + 1)
+        .map(h => bc.blockAt(h).get)
+        .toList
+        .splitAt(MaxInMemDiff - MinInMemDiff)
+      val diffToBePersisted = unsafeDiffer(persisted, persistBs)
+      persisted.applyBlockDiff(diffToBePersisted)
+      inMemoryDiff = unsafeDiffer(persisted, inMemBs)
     }
+  }
+
+  override def processBlock(block: Block): Either[ValidationError, Unit] = for {
+    blockDiff <- BlockDiffer(settings)(composite, block)
+    _ <- bc.appendBlock(block)
+  } yield {
+    log.info( s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
+    inMemoryDiff = Monoid[BlockDiff].combine(inMemoryDiff, blockDiff)
   }
 
   override def rollbackTo(height: Int): Unit = {

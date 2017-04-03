@@ -4,10 +4,11 @@ import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.google.common.util.concurrent.UncheckedExecutionException
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
+import scorex.api.http.CustomValidationError
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.network.Checkpoint
-import scorex.transaction.History
+import scorex.transaction.{History, TheError, ValidationError}
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
@@ -49,7 +50,7 @@ class StoredBlockchain(db: MVStore) extends History with ScorexLogging {
     //if there are some uncommitted changes from last run, discard'em
     if (signatures.size() > 0) database.rollback()
 
-    def writeBlock(height: Int, block: Block): Try[Unit] = Try {
+    def writeBlock(height: Int, block: Block): Unit = {
       blocks.put(height, block.bytes)
       scoreMap.put(height, score() + block.blockScore)
       signatures.put(height, block.uniqueId)
@@ -86,17 +87,13 @@ class StoredBlockchain(db: MVStore) extends History with ScorexLogging {
 
   private val blockStorage: BlockchainPersistence = BlockchainPersistence(db)
 
-  override def appendBlock(block: Block): Try[Unit] = synchronized {
-    Try {
-      if ((height() == 0) || (lastBlock.uniqueId sameElements block.reference)) {
-        val h = height() + 1
-        blockStorage.writeBlock(h, block) match {
-          case Success(_) => ()
-          case Failure(e) => throw new Error("Error while storing blockchain a change: " + e, e)
-        }
-      } else {
-        throw new Error(s"Appending block ${block.json} which parent is not last block in blockchain")
-      }
+  override def appendBlock(block: Block): Either[ValidationError, Unit] = synchronized {
+    if ((height() == 0) || (lastBlock.uniqueId sameElements block.reference)) {
+      val h = height() + 1
+      blockStorage.writeBlock(h, block)
+      Right(())
+    } else {
+      Left(TheError(s"Appending block ${block.json} which parent is not last block in blockchain"))
     }
   }
 

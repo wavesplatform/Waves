@@ -39,7 +39,8 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
 
   override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
-  val validator: Validator = new ValidatorImpl(blockStorage.stateReader, settings.blockchainSettings.functionalitySettings)
+  //  val validator: Validator = new ValidatorImpl(blockStorage.stateReader, settings.blockchainSettings.functionalitySettings)
+  val validator: Validator = (trans: Seq[Transaction], heightOpt: Option[Int], blockTime: Long) => (Seq.empty, trans)
 
   override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 

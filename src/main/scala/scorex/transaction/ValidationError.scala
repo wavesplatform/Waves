@@ -3,6 +3,8 @@ package scorex.transaction
 import scorex.account.AccountOrAlias
 
 sealed trait ValidationError
+case class TheError(s: String) extends ValidationError
+
 sealed trait StateValidationError extends ValidationError
 
 object ValidationError {

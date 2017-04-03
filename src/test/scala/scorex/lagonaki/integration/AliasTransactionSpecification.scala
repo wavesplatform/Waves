@@ -36,8 +36,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
 
   def ensureSenderHasBalance(sender: PrivateKeyAccount): Unit = {
     val transfer = TransferTransaction.create(None, aliasCreator, sender, 1000000L, TIME, None, 100000L, Array()).right.get
-    updater.processBlock(TestBlock(Seq(transfer))).get
-    ()
+    updater.processBlock(TestBlock(Seq(transfer))).right.get
   }
 
   def shouldBeValid(t: Transaction): Assertion = {

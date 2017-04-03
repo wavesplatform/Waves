@@ -1,12 +1,9 @@
 package scorex.transaction
 
 import com.wavesplatform.state2.reader.StateReader
-import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.utils.ScorexLogging
-
-import scala.util.Try
 
 trait BlockStorage extends ScorexLogging {
 
@@ -15,10 +12,6 @@ trait BlockStorage extends ScorexLogging {
   def stateReader: StateReader
 
   def blockchainUpdater: BlockchainUpdater
-
-  def appendBlock(block: Block): Try[Unit] = {
-    blockchainUpdater.processBlock(block)
-  }
 
   def removeAfter(blockId: BlockId): Unit = try {
     history.heightOf(blockId) match {
