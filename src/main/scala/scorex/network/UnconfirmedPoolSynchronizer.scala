@@ -11,10 +11,6 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-
-/**
-  * Synchronizing transactions that are not in blockchain yet
-  */
 class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModule, settings: UTXSettings,
                                   networkController: ActorRef)
   extends ViewSynchronizer with ScorexLogging {
@@ -27,8 +23,8 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
   context.system.scheduler.schedule(rndBroadcastInterval, rndBroadcastInterval, self, BroadcastRandom)
 
   override def receive: Receive = {
-    case _ if transactionModule.blockStorage.upToDateStateReader.height <= 400000 =>
-      // Do nothing if less than 400K blocks applied
+    //    case _ if transactionModule.blockStorage.upToDateStateReader.height <= 400000 =>
+    // Do nothing if less than 400K blocks applied
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
       transactionModule.putUnconfirmedIfNew(tx) match {
@@ -44,9 +40,6 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
       }
   }
 
-  /**
-    * Broadcast unconfirmed tx to other connected peers
-    */
   private def broadcast(tx: Transaction): Unit = {
     val spec = TransactionalMessagesRepo.TransactionMessageSpec
     val ntwMsg = Message(spec, Right(tx), None)
