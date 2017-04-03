@@ -4,16 +4,15 @@ import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.google.common.util.concurrent.UncheckedExecutionException
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
-import scorex.api.http.CustomValidationError
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.network.Checkpoint
-import scorex.transaction.{History, TheError, ValidationError}
 import scorex.transaction.History.BlockchainScore
+import scorex.transaction.{History, TheError, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConverters._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
 class StoredBlockchain(db: MVStore) extends History with ScorexLogging {
 

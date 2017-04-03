@@ -151,7 +151,6 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     }
     val initialScore = history.scoreOf(lastCommonBlockId)
     val forkStorage = new InMemoryBlockSeq(blockIds)
-    val consensusModule = application.consensusModule
 
     state(GettingBlocks) {
       case BlockFromPeer(block, connectedPeer)
