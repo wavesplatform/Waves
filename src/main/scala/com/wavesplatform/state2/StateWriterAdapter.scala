@@ -44,6 +44,7 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
     }
   }
 
+
   def composite: StateReader = new CompositeStateReader(persisted, inMemoryDiff)
 
   override def processBlock(block: Block): Try[Unit] =  Try {

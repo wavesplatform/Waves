@@ -10,6 +10,7 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
+import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -37,7 +38,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
   val db = new MVStore.Builder().compress().open()
-  val storedState = fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
+  val storedState : StateReader = ??? // fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
 
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)

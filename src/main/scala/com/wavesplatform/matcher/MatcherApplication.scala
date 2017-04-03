@@ -7,6 +7,7 @@ import akka.stream.ActorMaterializer
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import scorex.api.http.CompositeHttpService
 import scorex.app.Application
 import scorex.transaction.{BlockStorage, State, TransactionModule}
@@ -31,7 +32,7 @@ trait MatcherApplication extends ScorexLogging {
 
   def wallet: Wallet
 
-  def storedState: State = blockStorage.state
+  def storedState: StateReader = blockStorage.stateReader
 
   lazy val matcherApiRoutes = Seq(
     MatcherApiRoute(this.asInstanceOf[Application], matcher, restAPISettings, matcherSettings)

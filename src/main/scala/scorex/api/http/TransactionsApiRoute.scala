@@ -6,6 +6,7 @@ import scala.util.Success
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, JsNumber, Json}
 import scorex.account.Account
@@ -15,10 +16,10 @@ import scorex.transaction.{History, SimpleTransactionModule, State}
 @Path("/transactions")
 @Api(value = "/transactions", description = "Information about transactions")
 case class TransactionsApiRoute(
-    settings: RestAPISettings,
-    state: State,
-    history: History,
-    transactionModule: SimpleTransactionModule) extends ApiRoute with CommonApiFunctions {
+                                   settings: RestAPISettings,
+                                   state: StateReader,
+                                   history: History,
+                                   transactionModule: SimpleTransactionModule) extends ApiRoute with CommonApiFunctions {
   val MaxTransactionsPerRequest = 1000
 
   override lazy val route =

@@ -1,5 +1,6 @@
 package com.wavesplatform.state2.reader
 
+import com.google.common.base.Charsets
 import com.wavesplatform.state2._
 import scorex.account.{Account, AccountOrAlias, Alias}
 import scorex.consensus.TransactionsOrdering
@@ -109,6 +110,12 @@ object StateReader {
     def resolveAlias(a: Alias): Option[Account] = s.resolveAlias(a)
 
     def getAlias(a: Account): Option[Alias] = s.aliasesOfAddress(a).headOption
+
+    def getAssetName(assetId: AssetId): String = {
+      s.findTransaction[IssueTransaction](assetId)
+        .map(tx => new String(tx.name, Charsets.UTF_8))
+        .getOrElse("Unknown")
+    }
   }
 
 }

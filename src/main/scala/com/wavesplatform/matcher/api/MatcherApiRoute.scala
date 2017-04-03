@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.api
 
 import javax.ws.rs.Path
+
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCodes, Uri}
 import akka.http.scaladsl.server.{Directive1, Route}
@@ -10,6 +11,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.api.http._
@@ -31,7 +33,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
   private implicit val timeout: Timeout = 5.seconds
 
   val wallet: Wallet = application.wallet
-  val storedState: State = application.blockStorage.state
+  val storedState: StateReader = application.blockStorage.stateReader
 
   override lazy val route: Route =
     pathPrefix("matcher") {

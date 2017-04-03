@@ -6,6 +6,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
@@ -18,7 +19,8 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: State) extends ApiRoute {
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader) extends ApiRoute {
+
   import AddressApiRoute._
 
   val MaxAddressesPerRequest = 1000
@@ -224,7 +226,9 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      state.balanceWithConfirmations(acc, confirmations))))
+      //      state.balanceWithConfirmations(acc, confirmations)
+      ???
+    )))
       .getOrElse(InvalidAddress)
   }
 
@@ -232,7 +236,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      state.effectiveBalanceWithConfirmations(acc, confirmations, state.stateHeight))))
+      state.effectiveBalanceAtHeightWithConfirmations(acc, state.height, confirmations))))
       .getOrElse(InvalidAddress)
   }
 
@@ -288,12 +292,16 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 }
 
 object AddressApiRoute {
+
   case class Signed(message: String, publicKey: String, signature: String)
+
   implicit val signedFormat: Format[Signed] = Json.format
 
   case class Balance(address: String, confirmations: Int, balance: Long)
+
   implicit val balanceFormat: Format[Balance] = Json.format
 
   case class Validity(address: String, valid: Boolean)
+
   implicit val validityFormat: Format[Validity] = Json.format
 }

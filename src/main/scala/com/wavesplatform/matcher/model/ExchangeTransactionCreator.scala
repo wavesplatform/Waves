@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.state2.reader.StateReader
 import scorex.api.http.{ApiError, InvalidSender}
 import scorex.transaction.ValidationError.MissingSenderPrivateKey
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -10,7 +11,7 @@ import scorex.wallet.Wallet
 
 trait ExchangeTransactionCreator {
   val transactionModule: TransactionModule
-  val storedState: State
+  val storedState: StateReader
   val wallet: Wallet
   val settings: MatcherSettings
   private var txTime: Long = 0

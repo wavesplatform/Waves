@@ -7,6 +7,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.http.{RouteSpec, api_key}
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
@@ -72,7 +73,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     val currentPath = routePath(path)
     currentPath in {
       forAll(errorGen) { e =>
-        val route = AssetsApiRoute(settings, wallet, mock[State], txsOperationsMock(e)).route
+        val route = AssetsApiRoute(settings, wallet, mock[StateReader], txsOperationsMock(e)).route
 
         forAll(gen) { tr =>
           val p = Post(currentPath, tr)

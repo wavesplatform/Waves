@@ -6,6 +6,7 @@ import akka.persistence.{PersistentActor, RecoveryCompleted}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{GetOrderBookResponse, OrderBookRequest}
+import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
@@ -17,7 +18,7 @@ import scorex.wallet.Wallet
 import scala.collection.mutable
 import scala.language.reflectiveCalls
 
-class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings,
+class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
                    transactionModule: TransactionModule
                   ) extends PersistentActor with ScorexLogging {
 
@@ -125,7 +126,7 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
 object MatcherActor {
   def name = "matcher"
 
-  def props(storedState: State, wallet: Wallet, settings: MatcherSettings,
+  def props(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
             transactionModule: TransactionModule): Props =
     Props(new MatcherActor(storedState, wallet, settings, transactionModule))
 

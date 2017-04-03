@@ -9,6 +9,7 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
+import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange._
@@ -21,7 +22,7 @@ import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class OrderBookActor(assetPair: AssetPair, val storedState: State,
+class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
                      val wallet: Wallet, val settings: MatcherSettings,
                      val transactionModule: TransactionModule)
   extends PersistentActor
@@ -163,7 +164,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: State,
 }
 
 object OrderBookActor {
-  def props(assetPair: AssetPair, storedState: State,
+  def props(assetPair: AssetPair, storedState: StateReader,
             wallet: Wallet, settings: MatcherSettings, transactionModule: TransactionModule): Props =
     Props(new OrderBookActor(assetPair, storedState, wallet, settings, transactionModule))
 

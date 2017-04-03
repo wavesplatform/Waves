@@ -2,6 +2,7 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
+import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PublicKeyAccount
 import scorex.transaction.{AssetAcc, State}
 import scorex.transaction.assets.exchange.Validation.booleanOperators
@@ -12,7 +13,7 @@ import scorex.wallet.Wallet
 
 trait OrderValidator {
   this: OrderHistory =>
-  val storedState: State
+  val storedState: StateReader
   val settings: MatcherSettings
   val wallet: Wallet
 

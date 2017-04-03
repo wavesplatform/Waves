@@ -7,6 +7,7 @@ import com.ning.http.client.Response
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.Application
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state2.reader.StateReader
 import dispatch.{Http, Req, url}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -419,7 +420,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
     }
   }
 
-  def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None)(implicit storedState: State): Unit = {
+  def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None)(implicit storedState: StateReader): Unit = {
     val assetId = asset.flatMap(Base58.decode(_).toOption)
     eventually(timeout(5.seconds), interval(500.millis)) {
       Thread.sleep(100)
@@ -427,7 +428,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
     }
   }
 
-  def waitForEffectiveBalance(balance: Long, acc: Account)(implicit storedState: State): Unit = {
+  def waitForEffectiveBalance(balance: Long, acc: Account)(implicit storedState: StateReader): Unit = {
      eventually(timeout(5.seconds), interval(500.millis)) {
       Thread.sleep(100)
        require(storedState.effectiveBalance(acc) == balance)

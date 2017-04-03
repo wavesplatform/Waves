@@ -4,6 +4,7 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
@@ -12,14 +13,14 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.{AssetAcc, State, AssetIdStringLength, TransactionOperations}
+import scorex.transaction.{AssetAcc, AssetIdStringLength, State, TransactionOperations}
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: State, transactionModule: TransactionOperations) extends ApiRoute {
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, transactionModule: TransactionOperations) extends ApiRoute {
   val MaxAddressesPerRequest = 1000
 
   override lazy val route =
