@@ -7,12 +7,12 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
+import scorex.account.PublicKeyAccount._
 
 import scala.util.{Failure, Success, Try}
 
-sealed trait PaymentTransaction extends TypedTransaction {
+sealed trait PaymentTransaction extends Transaction {
   def sender: PublicKeyAccount
 
   def recipient: Account
@@ -24,9 +24,8 @@ sealed trait PaymentTransaction extends TypedTransaction {
   def signature: Array[Byte]
 }
 
-object PaymentTransaction extends Deser[PaymentTransaction] {
+object PaymentTransaction {
 
-  @SerialVersionUID(-4989881425715590828L)
   private case class PaymentTransactionImpl(sender: PublicKeyAccount,
                                             recipient: Account,
                                             amount: Long,
@@ -34,7 +33,6 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
                                             timestamp: Long,
                                             signature: Array[Byte])
     extends PaymentTransaction {
-
     override val transactionType = TransactionType.PaymentTransaction
     override val assetFee: (Option[AssetId], Long) = (None, fee)
     override val id: Array[Byte] = signature
@@ -57,12 +55,8 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
 
       Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes, signature)
     }
-
-    override def balanceChanges(): Seq[BalanceChange] =
-      Seq(BalanceChange(AssetAcc(sender, None), -amount - fee), BalanceChange(AssetAcc(recipient, None), amount))
   }
 
-  val MinimumFee = 1
   val RecipientLength = Account.AddressLength
 
   private val SenderLength = 32
@@ -70,9 +64,7 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
   private val BaseLength = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
   def create(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
-    if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (amount <= 0) {
+    if (amount <= 0) {
       Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
@@ -90,9 +82,7 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
              fee: Long,
              timestamp: Long,
              signature: Array[Byte]): Either[ValidationError, PaymentTransaction] = {
-    if (!Account.isValid(recipient)) {
-      Left(ValidationError.InvalidAddress) //CHECK IF RECIPIENT IS VALID ADDRESS
-    } else if (amount <= 0) {
+    if (amount <= 0) {
       Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
@@ -109,17 +99,8 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
     }
   }
 
-  def parseBytes(data: Array[Byte]): Try[PaymentTransaction] = {
-    data.head match {
-      case transactionType: Byte if transactionType == TransactionType.PaymentTransaction.id =>
-        parseTail(data.tail)
-      case transactionType =>
-        Failure(new Exception(s"Incorrect transaction type '$transactionType' in PaymentTransaction data"))
-    }
-  }
 
-  def parseTail(data: Array[Byte]): Try[PaymentTransaction] =
-    Try {
+  def parseTail(data: Array[Byte]): Try[PaymentTransaction] =    Try {
       require(data.length >= BaseLength, "Data does not match base length")
 
       var position = 0
@@ -131,12 +112,12 @@ object PaymentTransaction extends Deser[PaymentTransaction] {
 
       //READ SENDER
       val senderBytes = util.Arrays.copyOfRange(data, position, position + SenderLength)
-      val sender = new PublicKeyAccount(senderBytes)
+      val sender = PublicKeyAccount(senderBytes)
       position += SenderLength
 
       //READ RECIPIENT
       val recipientBytes = util.Arrays.copyOfRange(data, position, position + RecipientLength)
-      val recipient = new Account(Base58.encode(recipientBytes))
+      val recipient = Account.fromBytes(recipientBytes).right.get
       position += RecipientLength
 
       //READ AMOUNT

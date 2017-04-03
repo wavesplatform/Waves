@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.model
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import scorex.account.PublicKeyAccount
-import scorex.transaction.AssetAcc
+import scorex.transaction.{AssetAcc, State}
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
@@ -12,11 +12,11 @@ import scorex.wallet.Wallet
 
 trait OrderValidator {
   this: OrderHistory =>
-  val storedState: StoredState
+  val storedState: State
   val settings: MatcherSettings
   val wallet: Wallet
 
-  lazy val matcherPubKey: PublicKeyAccount = wallet.privateKeyAccount(settings.account).get
+  lazy val matcherPubKey: PublicKeyAccount = wallet.findWallet(settings.account).right.get
 
   def isBalanceWithOpenOrdersEnough(order: Order): Boolean = {
     val (acc, feeAcc) = (AssetAcc(order.senderPublicKey, order.getSpendAssetId), AssetAcc(order.senderPublicKey, None))

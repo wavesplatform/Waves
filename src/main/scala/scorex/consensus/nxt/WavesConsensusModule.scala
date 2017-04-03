@@ -1,53 +1,67 @@
 package scorex.consensus.nxt
 
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import com.wavesplatform.settings.BlockchainSettings
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
-import scorex.consensus.{ConsensusModule, PoSConsensusModule, TransactionsOrdering}
+import scorex.consensus.TransactionsOrdering
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
-import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging}
 
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: Duration) extends PoSConsensusModule
-  with ScorexLogging {
+class WavesConsensusModule(val settings: BlockchainSettings) extends ScorexLogging {
 
   import WavesConsensusModule._
 
-  implicit val consensusModule: ConsensusModule = this
+  val genesisData = NxtLikeConsensusBlockData(settings.genesisSettings.initialBaseTarget, EmptySignature)
 
-  val version = 2: Byte
+  private val MinBlocktimeLimit = normalize(53)
+  private val MaxBlocktimeLimit = normalize(67)
+  private val BaseTargetGamma = normalize(64)
+  private val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
 
-  val MinBlocktimeLimit = normalize(53)
-  val MaxBlocktimeLimit = normalize(67)
-  val BaseTargetGamma = normalize(64)
-  val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
-
-  private def avgDelayInSeconds: Long = AvgDelay.toSeconds
+  private def avgDelayInSeconds: Long = settings.genesisSettings.averageBlockDelay.toSeconds
 
   private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
-  override def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean = try {
+  def blockOrdering(implicit transactionModule: TransactionModule): Ordering[(Block)] =
+    Ordering.by {
+      block =>
+        val parent = transactionModule.blockStorage.history.blockById(block.reference).get
+        val blockCreationTime = nextBlockGenerationTime(parent, block.signerData.generator)
+          .getOrElse(block.timestamp)
+
+        (block.blockScore, -blockCreationTime)
+    }
+
+  def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean = try {
     val blockTime = block.timestampField.value
 
     require((blockTime - NTP.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
 
     val history = transactionModule.blockStorage.history
 
-    if (block.timestampField.value > forksConfig.requireSortedTransactionsAfter) {
+    if (block.timestampField.value > settings.functionalitySettings.requireSortedTransactionsAfter) {
       require(block.transactionDataField.asInstanceOf[TransactionsBlockField].value.sorted(TransactionsOrdering.InBlock) == block.transactionDataField.asInstanceOf[TransactionsBlockField].value, "Transactions must be sorted correctly")
     }
 
     val parentOpt = history.parent(block)
-    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${Base58.encode(block.referenceField.value)}' of block " +
-      s"'${Base58.encode(block.uniqueId)}'")
+    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${
+      Base58.encode(block.referenceField.value)
+    }' of block " +
+      s"'${
+        Base58.encode(block.uniqueId)
+      }'")
 
     val parent = parentOpt.get
     val parentHeightOpt = history.heightOf(parent.uniqueId)
-    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${Base58.encode(block.referenceField.value)}' height")
+    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${
+      Base58.encode(block.referenceField.value)
+    }' height")
     val parentHeight = parentHeightOpt.get
 
     val prevBlockData = parent.consensusDataField.value
@@ -64,11 +78,15 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     val calcGs = calcGeneratorSignature(prevBlockData, generator)
     val blockGs = blockData.generationSignature
     require(calcGs.sameElements(blockGs),
-      s"Block's generation signature is wrong, calculated: ${calcGs.mkString}, block contains: ${blockGs.mkString}")
+      s"Block's generation signature is wrong, calculated: ${
+        calcGs.mkString
+      }, block contains: ${
+        blockGs.mkString
+      }")
 
-    val effectiveBalance = generatingBalance(generator, Some(parentHeight))
+    val effectiveBalance = generatingBalance(generator, parentHeight)
 
-    if (block.timestampField.value >= forksConfig.minimalGeneratingBalanceAfterTimestamp) {
+    if (block.timestampField.value >= settings.functionalitySettings.minimalGeneratingBalanceAfterTimestamp) {
       require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
     }
 
@@ -83,15 +101,19 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
       throw t
   }
 
-  override def generateNextBlock(account: PrivateKeyAccount)
-                                (implicit tm: TransactionModule): Option[Block] = try {
+  def generateNextBlocks(accounts: Seq[PrivateKeyAccount])
+                        (implicit transactionModule: TransactionModule): Seq[Block] =
+    accounts.flatMap(generateNextBlock(_))
+
+  def generateNextBlock(account: PrivateKeyAccount)
+                       (implicit tm: TransactionModule): Option[Block] = try {
 
     val history = tm.blockStorage.history
 
     val lastBlock = history.lastBlock
 
     val height = history.heightOf(lastBlock).get
-    val balance = generatingBalance(account, Some(height))
+    val balance = generatingBalance(account, height)
 
     if (balance < MinimalEffectiveBalanceForGenerator) {
       throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
@@ -108,12 +130,18 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
 
     val eta = (currentTime - lastBlockTime) / 1000
 
-    log.debug(s"hit: $h, target: $t, generating ${h < t}, eta $eta, " +
+    log.debug(s"hit: $h, target: $t, generating ${
+      h < t
+    }, eta $eta, " +
       s"account:  $account " +
       s"account balance: $balance " +
-      s"last block id: ${lastBlock.encodedId}, " +
+      s"last block id: ${
+        lastBlock.encodedId
+      }, " +
       s"height: $height, " +
-      s"last block target: ${lastBlockKernelData.baseTarget}"
+      s"last block target: ${
+        lastBlockKernelData.baseTarget
+      }"
     )
 
     if (h < t) {
@@ -123,10 +151,12 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
       val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
       val unconfirmed = tm.packUnconfirmed(Some(height))
-      log.debug(s"Build block with ${unconfirmed.size} transactions")
+      log.debug(s"Build block with ${
+        unconfirmed.size
+      } transactions")
       log.debug(s"Block time interval is $eta seconds ")
 
-      Some(Block.buildAndSign(version,
+      Some(Block.buildAndSign(Version,
         currentTime,
         lastBlock.uniqueId,
         consensusData,
@@ -138,37 +168,44 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
       log.debug(s"DB can't find last block because of unexpected modification")
       None
     case e: IllegalStateException =>
-      log.debug(s"Failed to generate new block: ${e.getMessage}")
+      log.debug(s"Failed to generate new block: ${
+        e.getMessage
+      }")
       None
   }
 
-  override def nextBlockGenerationTime(block: Block, account: PublicKeyAccount)
-                                      (implicit tm: TransactionModule): Option[Long] = {
+  def nextBlockGenerationTime(block: Block, account: PublicKeyAccount)
+                             (implicit tm: TransactionModule): Option[Long] = {
     val history = tm.blockStorage.history
 
     history.heightOf(block.uniqueId)
-      .map(height => (height, generatingBalance(account, Some(height)))).filter(_._2 > 0)
-      .flatMap { case (height, balance) =>
-        val cData = block.consensusDataField.value
-        val hit = calcHit(cData, account)
-        val t = cData.baseTarget
+      .map(height => (height, generatingBalance(account, height))).filter(_._2 > 0)
+      .flatMap {
+        case (height, balance) =>
+          val cData = block.consensusDataField.value
+          val hit = calcHit(cData, account)
+          val t = cData.baseTarget
 
-        val result =
-          Some((hit * 1000) / (BigInt(t) * balance) + block.timestampField.value)
-            .filter(_ > 0).filter(_ < Long.MaxValue)
-            .map(_.toLong)
+          val result =
+            Some((hit * 1000) / (BigInt(t) * balance) + block.timestampField.value)
+              .filter(_ > 0).filter(_ < Long.MaxValue)
+              .map(_.toLong)
 
-        log.debug({
-          val currentTime = NTP.correctedTime()
-          s"Next block gen time: $result " +
-            s"in ${result.map(t => (t - currentTime) / 1000)} seconds, " +
-            s"hit: $hit, target: $t, " +
-            s"account:  $account, account balance: $balance " +
-            s"last block id: ${block.encodedId}, " +
-            s"height: $height"
-        })
+          log.debug({
+            val currentTime = NTP.correctedTime()
+            s"Next block gen time: $result " +
+              s"in ${
+                result.map(t => (t - currentTime) / 1000)
+              } seconds, " +
+              s"hit: $hit, target: $t, " +
+              s"account:  $account, account balance: $balance " +
+              s"last block id: ${
+                block.encodedId
+              }, " +
+              s"height: $height"
+          })
 
-        result
+          result
       }
   }
 
@@ -219,12 +256,21 @@ class WavesConsensusModule(override val forksConfig: ChainParameters, AvgDelay: 
     BigInt(prevBlockData.baseTarget) * eta * balance
   }
 
+  def generatingBalance(account: Account, atHeight: Int)
+                       (implicit transactionModule: TransactionModule): Long = {
+    val balanceSheet = transactionModule.blockStorage.state
+    val generatingBalanceDepth =
+      if (atHeight >= settings.functionalitySettings.generatingBalanceDepthFrom50To1000AfterHeight) 1000 else 50
+    balanceSheet.effectiveBalanceWithConfirmations(account, generatingBalanceDepth, atHeight)
+  }
 }
 
 object WavesConsensusModule {
-  val BaseTargetLength = 8
-  val GeneratorSignatureLength = 32
-  val MinimalEffectiveBalanceForGenerator = 1000000000000L
+  val BaseTargetLength: Int = 8
+  val GeneratorSignatureLength: Int = 32
+  val MinimalEffectiveBalanceForGenerator: Long = 1000000000000L
   val AvgBlockTimeDepth: Int = 3
-  val MaxTimeDrift = 15.seconds
+  val MaxTimeDrift: FiniteDuration = 15.seconds
+  val EmptySignature: Array[Byte] = Array.fill(DigestSize)(0: Byte)
+  val Version: Byte = 2
 }

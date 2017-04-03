@@ -7,7 +7,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError
 import scorex.transaction._
 
@@ -20,7 +20,7 @@ sealed trait IssueTransaction extends AssetIssuance {
   def fee: Long
 }
 
-object IssueTransaction extends Deser[IssueTransaction] {
+object IssueTransaction {
 
   private case class IssueTransactionImpl(sender: PublicKeyAccount,
                                   name: Array[Byte],
@@ -57,9 +57,6 @@ object IssueTransaction extends Deser[IssueTransaction] {
         "reissuable"  -> reissuable
       )
 
-    override lazy val balanceChanges: Seq[BalanceChange] =
-      Seq(BalanceChange(AssetAcc(sender, Some(assetId)), quantity), BalanceChange(AssetAcc(sender, assetFee._1), -assetFee._2))
-
     override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
 
   }
@@ -67,10 +64,9 @@ object IssueTransaction extends Deser[IssueTransaction] {
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength   = 16
   val MinAssetNameLength   = 4
-  val MinFee               = 100000000
   val MaxDecimals          = 8
 
-  override def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {
     require(bytes.head == TransactionType.IssueTransaction.id)
     parseTail(bytes.tail).get
   }
@@ -79,9 +75,9 @@ object IssueTransaction extends Deser[IssueTransaction] {
     val signature = bytes.slice(0, SignatureLength)
     val txId      = bytes(SignatureLength)
     require(txId == TransactionType.IssueTransaction.id.toByte, s"Signed tx id is not match")
-    val sender                        = new PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-    val (assetName, descriptionStart) = parseArraySize(bytes, SignatureLength + KeyLength + 1)
-    val (description, quantityStart)  = parseArraySize(bytes, descriptionStart)
+    val sender                        = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
+    val (assetName, descriptionStart) = Deser.parseArraySize(bytes, SignatureLength + KeyLength + 1)
+    val (description, quantityStart)  = Deser.parseArraySize(bytes, descriptionStart)
     val quantity                      = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
     val decimals                      = bytes.slice(quantityStart + 8, quantityStart + 9).head
     val reissuable                    = bytes.slice(quantityStart + 9, quantityStart + 10).head == (1: Byte)
@@ -108,8 +104,6 @@ object IssueTransaction extends Deser[IssueTransaction] {
       Left(ValidationError.InvalidName)
     } else if (decimals < 0 || decimals > MaxDecimals) {
       Left(ValidationError.TooBigArray)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

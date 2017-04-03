@@ -12,12 +12,12 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.{PaymentTransaction, TransactionOperations}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
-import scorex.waves.transaction.SignedPayment
+import scorex.waves.transaction.SignedPaymentRequest
 
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transactionModule: TransactionOperations) extends ApiRoute {
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionModule: TransactionOperations) extends ApiRoute {
 
   override lazy val route = pathPrefix("waves") {
     externalPayment ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
@@ -45,7 +45,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
     (path("payment") & post) {
       json[PaymentRequest] { payment =>
         transactionModule.createPayment(payment, wallet).map { tx =>
-          SignedPayment(tx.timestamp, tx.amount, tx.fee, tx.recipient.address,
+          SignedPaymentRequest(tx.timestamp, tx.amount, tx.fee, tx.recipient.address,
             Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
         }
       }
@@ -72,15 +72,14 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def signPayment: Route = (post & path("payment" / "signature")) {
     json[PaymentRequest] { payment =>
-      wallet
-        .privateKeyAccount(payment.sender).toRight[ApiError](InvalidSender)
-        .flatMap { sender =>
-          PaymentTransaction
-            .create(sender, new Account(payment.recipient), payment.amount, payment.fee, NTP.correctedTime())
-            .left.map(ApiError.fromValidationError)
-        }
+      (for {
+        sender <- wallet.findWallet(payment.sender)
+        recipient <- Account.fromString(payment.recipient)
+        pt <- PaymentTransaction.create(sender, recipient, payment.amount, payment.fee, NTP.correctedTime())
+      } yield pt)
+        .left.map(ApiError.fromValidationError)
         .map { t =>
-          SignedPayment(t.timestamp, t.amount, t.fee, t.recipient.address, Base58.encode(t.sender.publicKey), t.sender.address, Base58.encode(t.signature))
+          SignedPaymentRequest(t.timestamp, t.amount, t.fee, t.recipient.address, Base58.encode(t.sender.publicKey), t.sender.address, Base58.encode(t.signature))
         }
     }
   }
@@ -104,22 +103,24 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
-  def createdSignedPayment: Route = post { path("create-signed-payment")  {
-    json[UnsignedPayment] { payment =>
-      for {
-        _seed <- Base58.decode(payment.senderWalletSeed).toOption.toRight(InvalidSeed)
-        senderAccount = Wallet.generateNewAccount(_seed, payment.senderAddressNonce)
-        recipientAccount = new Account(payment.recipient)
-        _tx <- transactionModule
-          .createSignedPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
-          .left.map(ApiError.fromValidationError)
-      } yield SignedPayment(_tx.timestamp, _tx.amount, _tx.fee, _tx.recipient.address, Base58.encode(_tx.sender.publicKey),
-        _tx.sender.address, Base58.encode(_tx.signature))
+  def createdSignedPayment: Route = post {
+    path("create-signed-payment") {
+      json[UnsignedPayment] { payment =>
+        for {
+          _seed <- Base58.decode(payment.senderWalletSeed).toOption.toRight(InvalidSeed)
+          senderAccount = Wallet.generateNewAccount(_seed, payment.senderAddressNonce)
+          recipientAccount <- Account.fromString(payment.recipient).left.map(ApiError.fromValidationError)
+          _tx <- transactionModule
+            .createPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
+            .left.map(ApiError.fromValidationError)
+        } yield SignedPaymentRequest(_tx.timestamp, _tx.amount, _tx.fee, _tx.recipient.address, Base58.encode(_tx.sender.publicKey),
+          _tx.sender.address, Base58.encode(_tx.signature))
+      }
     }
-  }}
+  }
 
   private def broadcastPaymentRoute(suffix: String): Route = (path(suffix) & post) {
-    json[SignedPayment] { payment =>
+    json[SignedPaymentRequest] { payment =>
       transactionModule.broadcastPayment(payment)
     }
   }
@@ -133,7 +134,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.waves.transaction.SignedPayment",
+      dataType = "scorex.waves.transaction.SignedPaymentRequest",
       defaultValue = "{\n\t\"timestamp\": 0,\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"senderPublicKey\":\"senderPubKey\",\n\t\"recipient\":\"recipientId\",\n\t\"signature\":\"sig\"\n}"
     )
   ))
@@ -151,7 +152,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet,  transaction
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.waves.transaction.SignedPayment",
+      dataType = "scorex.waves.transaction.SignedPaymentRequest",
       defaultValue = "{\n\t\"timestamp\": 0,\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"senderPublicKey\":\"senderPubKey\",\n\t\"senderAddress\":\"senderAddress\",\n\t\"recipient\":\"recipientId\",\n\t\"signature\":\"sig\"\n}"
     )
   ))

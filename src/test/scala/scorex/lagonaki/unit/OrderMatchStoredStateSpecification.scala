@@ -7,11 +7,11 @@ import scorex.account.{Account, PrivateKeyAccount}
 import scorex.api.http.assets.{IssueRequest, TransferRequest}
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestChainParameters
+import scorex.settings.{TestBlockchainSettings, TestFunctionalitySettings}
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
-import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.database.state.extension.OrderMatchStoredState
+import scorex.transaction.state.database.blockchain.{StoredState, Validator, ValidatorImpl}
+import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
 import scorex.transaction.{AssetAcc, AssetId, GenesisTransaction, TransactionGen}
 import scorex.utils.{ByteArrayExtension, NTP}
 import scorex.wallet.Wallet
@@ -26,9 +26,11 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   val ASSET_UNITS = Order.PriceConstant
 
   val db = new MVStore.Builder().open()
-  val state = StoredState.fromDB(db, TestChainParameters.Enabled)
+  val state = StoredState.fromDB(db, TestBlockchainSettings.Enabled.functionalitySettings)
   state.processBlock(TestBlock(Seq(GenesisTransaction.create(acc1, 1000 * ASSET_UNITS, 0).right.get,
     GenesisTransaction.create(acc2, 100 * ASSET_UNITS, 0).right.get)))
+
+  val validator: Validator = new ValidatorImpl(state, TestFunctionalitySettings.Enabled)
 
   override protected def afterAll(): Unit = {
     db.close()
@@ -49,7 +51,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   }
 
   private def issueAsset(request: IssueRequest, wallet: Wallet): IssueTransaction = {
-    val sender = wallet.privateKeyAccount(request.sender).get
+    val sender = wallet.findWallet(request.sender).right.get
     IssueTransaction.create(sender,
       request.name.getBytes,
       request.description.getBytes,
@@ -61,10 +63,10 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
   }
 
   def transferAsset(request: TransferRequest, wallet: Wallet): TransferTransaction = {
-    val sender = wallet.privateKeyAccount(request.sender).get
+    val sender = wallet.findWallet(request.sender).right.get
     TransferTransaction.create(request.assetId.map(s => Base58.decode(s).get),
       sender: PrivateKeyAccount,
-      new Account(request.recipient),
+      Account.fromString(request.recipient).right.get,
       request.amount,
       getTimestamp,
       request.feeAssetId.map(s => Base58.decode(s).get),
@@ -146,19 +148,19 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val buy1Fee = (0.5 * ASSET_UNITS).toLong
     val om1 = createExchangeTransaction(buy1, sell1, price, 5 * ASSET_UNITS, buy1Fee, sell1.matcherFee, matcherTxFee)
 
-    state.isValid(om1, om1.timestamp) should be(true)
+    validator.isValid(om1, om1.timestamp) should be(true)
     state.processBlock(TestBlock(Seq(om1))) should be('success)
 
     //buyAcc buy1
     val (om1buyW, om1buy1, om1buy2) = getBalances(buyAcc, pair)
     om1buyW should be(initBuyW - buy1Fee)
-    om1buy1 should be(initBuy1 - 5 *  price)
+    om1buy1 should be(initBuy1 - 5 * price)
     om1buy2 should be(initBuy2 + 5 * ASSET_UNITS)
 
     //sellAcc sell1
     val (om1sellW, om1sell1, om1sell2) = getBalances(sellAcc, pair)
     om1sellW should be(initSellW - sell1.matcherFee)
-    om1sell1 should be(initSell1 + 5 *  price)
+    om1sell1 should be(initSell1 + 5 * price)
     om1sell2 should be(initSell2 - 5 * ASSET_UNITS)
 
     val sell2 = Order
@@ -166,14 +168,14 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val notEnoughRemainingFromPrevOm = createExchangeTransaction(buy1, sell2, price, 6 * ASSET_UNITS, buy1Fee, sell1.matcherFee,
       matcherTxFee)
 
-    state.isValid(notEnoughRemainingFromPrevOm, notEnoughRemainingFromPrevOm.timestamp) should be(false)
+    validator.isValid(notEnoughRemainingFromPrevOm, notEnoughRemainingFromPrevOm.timestamp) should be(false)
 
     val buy2 = Order.buy(buyAcc, matcher, pair, price, om1buy1 + 1, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * ASSET_UNITS)
     val sell3 = Order
       .sell(sellAcc, matcher, pair, price, om1buy1 + 1, getTimestamp, getTimestamp + Order.MaxLiveTime, 1 * ASSET_UNITS)
     val notEnoughBalOm = createExchangeTransaction(buy2, sell3, price, om1buy1 + 1, matcherTxFee)
 
-    state.isValid(notEnoughBalOm, notEnoughBalOm.timestamp) should be(false)
+    validator.isValid(notEnoughBalOm, notEnoughBalOm.timestamp) should be(false)
     state.processBlock(TestBlock(Seq(notEnoughBalOm))) should be('failure)
 
     val sell4 = Order
@@ -181,7 +183,7 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
     val om2 = createExchangeTransaction(buy1, sell4, price, 5 * ASSET_UNITS, buy1.matcherFee - buy1Fee,
       sell4.matcherFee, matcherTxFee)
 
-    state.isValid(om2, om2.timestamp) should be(true)
+    validator.isValid(om2, om2.timestamp) should be(true)
     state.processBlock(TestBlock(Seq(om2))) should be('success)
 
     //buyAcc buy1 - executed om2
@@ -219,12 +221,12 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
     val validOm = createExchangeTransaction(buy, sell, price, 5 * ASSET_UNITS, buyFee, sellFee, matcherTxFee)
 
-    state.isValid(spendTx, spendTx.timestamp) should be(true)
-    state.isValid(validOm, validOm.timestamp) should be(true)
+    validator.isValid(spendTx, spendTx.timestamp) should be(true)
+    validator.isValid(validOm, validOm.timestamp) should be(true)
     state.processBlock(TestBlock(Seq(spendTx, validOm))) should be('failure)
 
     state.processBlock(TestBlock(Seq(spendTx))) should be('success)
-    state.isValid(validOm, validOm.timestamp) should be(false)
+    validator.isValid(validOm, validOm.timestamp) should be(false)
 
   }
 
@@ -248,10 +250,10 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
       if (i < 11) {
         withCheckBalances(pair, buyAcc, sellAcc, om) {
-          state.isValid(om, om.timestamp) should be(true)
+          validator.isValid(om, om.timestamp) should be(true)
           state.processBlock(TestBlock(Seq(om))) should be('success)
         }
-      } else state.isValid(om, om.timestamp) should be(false)
+      } else validator.isValid(om, om.timestamp) should be(false)
     }
 
 
@@ -293,7 +295,7 @@ class OrderMatchTransactionSpecification extends PropSpec with PropertyChecks wi
           val om2Invalid = ExchangeTransaction.create(acc, buy2, sell, buyPrice, sellAmount - om1.amount,
             mf3, (mf2 - (BigInt(mf2) * buyAmount / sellAmount).toLong) + 1, 1, curTime).right.get
 
-          OrderMatchStoredState.isOrderMatchValid(om2Invalid, Set(om1)) shouldBe an[Left[_,_]]
+          ExchangeTransactionValidator.isValid(om2Invalid, Set(om1)) shouldBe an[Left[_, _]]
         }
     }
 

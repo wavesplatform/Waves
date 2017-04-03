@@ -1,6 +1,7 @@
 package scorex.waves.http
 
 import javax.ws.rs.Path
+
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
@@ -9,7 +10,6 @@ import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.BlockStorage
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
 @Path("/debug")
@@ -17,7 +17,7 @@ import scorex.wallet.Wallet
 case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage: BlockStorage) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ stateAt ~ info ~ getSettings ~ stateWaves
+    blocks ~ state ~ stateAt ~ info ~ stateWaves
   }
 
   @Path("/blocks/{howMany}")
@@ -45,7 +45,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
     new ApiResponse(code = 200, message = "Json state")
   ))
   def state: Route = (path("state") & get) {
-    complete(blockStorage.state.asInstanceOf[StoredState].toJson(None))
+    complete(blockStorage.state.toJson(None))
   }
 
   @Path("/state/{height}")
@@ -54,7 +54,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
     new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateAt: Route = (path("state" / IntNumber) & get) { height =>
-    complete(blockStorage.state.asInstanceOf[StoredState].toJson(Some(height)))
+    complete(blockStorage.state.toJson(Some(height)))
   }
 
   @Path("/stateWaves/{height}")
@@ -63,7 +63,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
     new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    complete(blockStorage.state.asInstanceOf[StoredState].toWavesJson(height))
+    complete(blockStorage.state.wavesDistributionAtHeight(height))
   }
 
   @Path("/info")
@@ -72,19 +72,10 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
     new ApiResponse(code = 200, message = "Json state")
   ))
   def info: Route = (path("info") & get) {
-    val state = blockStorage.state.asInstanceOf[StoredState]
+    val state = blockStorage.state
     complete(Json.obj(
       "stateHeight" -> state.stateHeight,
       "stateHash" -> state.hash
     ))
-  }
-
-  @Path("/settings")
-  @ApiOperation(value = "State", notes = "Settings file", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
-  def getSettings: Route = (path("settings") & get & withAuth) {
-    complete(Json.obj())
   }
 }

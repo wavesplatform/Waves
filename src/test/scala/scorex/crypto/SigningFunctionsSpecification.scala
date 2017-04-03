@@ -14,12 +14,12 @@ with Matchers {
     forAll { (seed1: Array[Byte], seed2: Array[Byte],
               message1: Array[Byte], message2: Array[Byte]) =>
       whenever(!seed1.sameElements(seed2) && !message1.sameElements(message2)) {
-        val acc = new PrivateKeyAccount(seed1)
+        val acc = PrivateKeyAccount(seed1)
         val sig = EllipticCurveImpl.sign(acc, message1)
         val rightKey = acc.publicKey
         EllipticCurveImpl.verify(sig, message1, rightKey) should be (true)
 
-        val wrongKey = new PrivateKeyAccount(seed2).publicKey
+        val wrongKey = PrivateKeyAccount(seed2).publicKey
         EllipticCurveImpl.verify(sig, message1, wrongKey) shouldNot be (true)
 
         EllipticCurveImpl.verify(sig, message2, rightKey) shouldNot be (true)

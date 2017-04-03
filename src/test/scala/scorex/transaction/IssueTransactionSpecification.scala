@@ -18,7 +18,7 @@ class IssueTransactionSpecification extends PropSpec with PropertyChecks with Ma
 
   property("Issue serialization from TypedTransaction") {
     forAll(issueGenerator) { issue: IssueTransaction =>
-      val recovered = TypedTransaction.parseBytes(issue.bytes).get
+      val recovered = TransactionParser.parseBytes(issue.bytes).get
       recovered.bytes shouldEqual issue.bytes
     }
   }

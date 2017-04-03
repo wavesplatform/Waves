@@ -5,20 +5,20 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.block.Block
-import scorex.consensus.ConsensusModule
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.signatures.SigningFunctions
 import scorex.crypto.signatures.SigningFunctions.Signature
 import scorex.network.{BlockCheckpoint, Checkpoint}
 import scorex.network.message.Message._
 import scorex.transaction.{History, TransactionModule}
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 
 import scala.util.Try
 
 
 class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule,
-                          consensusModule: ConsensusModule) {
+                          consensusModule: WavesConsensusModule) {
 
   object GetPeersSpec extends MessageSpec[Unit] {
     override val messageCode: Message.MessageCode = 1: Byte
@@ -67,7 +67,7 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule,
 
   trait SignaturesSeqSpec extends MessageSpec[Seq[SigningFunctions.Signature]] {
 
-    import scorex.transaction.TypedTransaction.SignatureLength
+    import scorex.transaction.TransactionParser.SignatureLength
 
     private val DataLength = 4
 
@@ -109,7 +109,7 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule,
     override def serializeData(signature: Block.BlockId): Array[Byte] = signature
 
     override def deserializeData(bytes: Array[Byte]): Try[Block.BlockId] = Try {
-      require(bytes.length == scorex.transaction.TypedTransaction.SignatureLength, "Data does not match length")
+      require(bytes.length == scorex.transaction.TransactionParser.SignatureLength, "Data does not match length")
       bytes
     }
   }

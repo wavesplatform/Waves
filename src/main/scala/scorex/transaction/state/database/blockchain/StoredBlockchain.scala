@@ -6,7 +6,7 @@ import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.consensus.ConsensusModule
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.Checkpoint
 import scorex.transaction.BlockStorage._
 import scorex.transaction.History.BlockchainScore
@@ -20,7 +20,7 @@ import scala.util.{Failure, Success, Try}
   * If no datafolder provided, blockchain lives in RAM (useful for tests)
   */
 class StoredBlockchain(db: MVStore)
-                      (implicit consensusModule: ConsensusModule,
+                      (implicit consensusModule: WavesConsensusModule,
                        transactionModule: TransactionModule)
   extends BlockChain with ScorexLogging {
 
@@ -35,16 +35,16 @@ class StoredBlockchain(db: MVStore)
     private val blocksCache = CacheBuilder.newBuilder()
       .maximumSize(BlocksCacheSizeLimit)
       .build[Integer, Block](
-        new CacheLoader[Integer, Block]() {
-          def load(height: Integer): Block = {
-            val blockOpt = Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).recoverWith {
-              case t: Throwable =>
-                log.error("Block.parseBytes error", t)
-                Failure(t)
-            }.toOption)
-            blockOpt.get
-          }
-        })
+      new CacheLoader[Integer, Block]() {
+        def load(height: Integer): Block = {
+          val blockOpt = Try(Option(blocks.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).recoverWith {
+            case t: Throwable =>
+              log.error("Block.parseBytes error", t)
+              Failure(t)
+          }.toOption)
+          blockOpt.get
+        }
+      })
     val checkpoint: MVMap[Int, Checkpoint] = database.openMap("checkpoint", new LogMVMapBuilder[Int, Checkpoint])
 
     //TODO: remove when no blockchains without signaturesReverse remains
@@ -140,15 +140,16 @@ class StoredBlockchain(db: MVStore)
 
   override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = {
     (from to to).toStream.flatMap { h =>
-      blockAt(h).flatMap { block =>
-        if (Seq(block.signerDataField.value.generator).contains(account)) Some(block) else None
-      }
+      for {
+        block <- blockAt(h)
+        if block.signerData.generator.address.equals(account.address)
+      } yield block
     }
   }
 
   override def toString: String = ((1 to height()) map { h =>
     val bl = blockAt(h).get
-    s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString }"
+    s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
   }).mkString("\n")
 
   override def getCheckpoint: Option[Checkpoint] = Option(blockStorage.checkpoint.get(0))

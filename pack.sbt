@@ -134,6 +134,7 @@ val upstartSettings = Seq(
 )
 
 lazy val root = project.in(file("."))
+  .enablePlugins(sbtdocker.DockerPlugin)
   .settings(commonSettings)
 
 lazy val upstart = project.in(file("target/upstart")).dependsOn(root)

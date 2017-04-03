@@ -1,8 +1,9 @@
 package scorex.lagonaki.mocks
 
-import scala.concurrent.duration._
 import scorex.consensus.nxt.WavesConsensusModule
-import scorex.settings.TestChainParameters
+import scorex.settings.TestBlockchainSettings
 
-class ConsensusMock extends WavesConsensusModule(TestChainParameters.Disabled, 5.seconds) {
+import scala.concurrent.duration._
+
+class ConsensusMock extends WavesConsensusModule(TestBlockchainSettings.Disabled) {
 }

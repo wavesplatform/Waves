@@ -17,8 +17,7 @@ import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
 import scorex.crypto.encode.Base58
-import scorex.transaction.AssetAcc
-import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.{AssetAcc, State}
 import scorex.utils._
 
 import scala.concurrent.Await
@@ -84,12 +83,15 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
+      |        allow-createalias-transaction-after: 0
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |      }
       |      genesis {
       |        timestamp: 1478000000000
-      |        signature: "s1ohWATVbaej8m8wKC9jec5NjZTGR3f4DUtSUoVnmSBwetPcfwYrBLFuWM4bnRXa8gJKcWgAzdyie6fqxLUuDiY"
+      |        signature: "2yc3LN9eRedaSzZuaAvxQ3JauH5xb38jzmrhK93NYGSMfyunz1FFbxBYcYrFxAsfaQ5cRaN99Qo4KiQ82o3xzb65"
       |        initial-balance: 10000000000000000
+      |        initial-base-target = 153722867
+      |        average-block-delay = 5s
       |        transactions = [
       |          {recipient: "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", amount: 400000000000000}
       |          {recipient: "3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8", amount: 200000000000000}
@@ -192,11 +194,14 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
+      |        allow-createalias-transaction-after: 0
       |      }
       |      genesis {
       |        timestamp: 1478000000000
-      |        signature: "s1ohWATVbaej8m8wKC9jec5NjZTGR3f4DUtSUoVnmSBwetPcfwYrBLFuWM4bnRXa8gJKcWgAzdyie6fqxLUuDiY"
+      |        signature: "2yc3LN9eRedaSzZuaAvxQ3JauH5xb38jzmrhK93NYGSMfyunz1FFbxBYcYrFxAsfaQ5cRaN99Qo4KiQ82o3xzb65"
       |        initial-balance: 10000000000000000
+      |        initial-base-target =153722867
+      |        average-block-delay = 5s
       |        transactions = [
       |          {recipient: "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", amount: 400000000000000}
       |          {recipient: "3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8", amount: 200000000000000}
@@ -273,12 +278,15 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
+      |        allow-createalias-transaction-after: 0
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |      }
       |      genesis {
       |        timestamp: 1478000000000
-      |        signature: "s1ohWATVbaej8m8wKC9jec5NjZTGR3f4DUtSUoVnmSBwetPcfwYrBLFuWM4bnRXa8gJKcWgAzdyie6fqxLUuDiY"
+      |        signature: "2yc3LN9eRedaSzZuaAvxQ3JauH5xb38jzmrhK93NYGSMfyunz1FFbxBYcYrFxAsfaQ5cRaN99Qo4KiQ82o3xzb65"
       |        initial-balance: 10000000000000000
+      |        initial-base-target =153722867
+      |        average-block-delay = 5s
       |        transactions = [
       |          {recipient: "3N3keodUiS8WLEw9W4BKDNxgNdUpwSnpb3K", amount: 400000000000000}
       |          {recipient: "3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8", amount: 200000000000000}
@@ -411,7 +419,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
     }
   }
 
-  def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None)(implicit storedState: StoredState): Unit = {
+  def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None)(implicit storedState: State): Unit = {
     val assetId = asset.flatMap(Base58.decode(_).toOption)
     eventually(timeout(5.seconds), interval(500.millis)) {
       Thread.sleep(100)
@@ -419,7 +427,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
     }
   }
 
-  def waitForEffectiveBalance(balance: Long, acc: Account)(implicit storedState: StoredState): Unit = {
+  def waitForEffectiveBalance(balance: Long, acc: Account)(implicit storedState: State): Unit = {
      eventually(timeout(5.seconds), interval(500.millis)) {
       Thread.sleep(100)
        require(storedState.effectiveBalance(acc) == balance)

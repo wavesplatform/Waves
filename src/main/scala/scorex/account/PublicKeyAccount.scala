@@ -2,13 +2,32 @@ package scorex.account
 
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.InvalidAddress
-import scorex.transaction.{TypedTransaction, ValidationError}
+import scorex.transaction.{TransactionParser, ValidationError}
+import scala.language.implicitConversions
 
-@SerialVersionUID(-5511437096393374460L)
-class PublicKeyAccount(val publicKey: Array[Byte]) extends Account(Account.addressFromPublicKey(publicKey))
+
+trait PublicKeyAccount {
+  def publicKey: Array[Byte]
+
+  override def equals(b: Any): Boolean = b match {
+    case a: PublicKeyAccount => publicKey.sameElements(a.publicKey)
+    case _ => false
+  }
+
+  override def hashCode(): Int = publicKey.hashCode()
+
+  override lazy val toString: String = PublicKeyAccount.toAddress(this).address
+}
 
 object PublicKeyAccount {
+
+  private case class PublicKeyAccountImpl(publicKey: Array[Byte]) extends PublicKeyAccount
+
+  def apply(publicKey: Array[Byte]): PublicKeyAccount = PublicKeyAccountImpl(publicKey)
+
+  implicit def toAddress(publicKeyAccount: PublicKeyAccount): Account = Account.fromPublicKey(publicKeyAccount.publicKey)
+
   def fromBase58String(s: String): Either[ValidationError, PublicKeyAccount] =
-    if (s.length > TypedTransaction.KeyStringLength) Left(InvalidAddress)
-    else Base58.decode(s).toOption.map(new PublicKeyAccount(_)).toRight(InvalidAddress)
+    if (s.length > TransactionParser.KeyStringLength) Left(InvalidAddress)
+    else Base58.decode(s).toOption.map(PublicKeyAccount(_)).toRight(InvalidAddress)
 }

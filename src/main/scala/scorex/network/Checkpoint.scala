@@ -5,16 +5,13 @@ import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import play.api.libs.functional.syntax._
 
 import scala.collection.immutable.Stream
 import scala.util.{Failure, Success}
 
-@SerialVersionUID(-4750343171084108636L)
 case class BlockCheckpoint(height: Int,
                            @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
 
-@SerialVersionUID(-3551519894804767122L)
 case class Checkpoint(items: Seq[BlockCheckpoint],
                       @ApiModelProperty(dataType = "java.lang.String")signature: Array[Byte]) {
   def toSign: Array[Byte] = {
@@ -41,26 +38,14 @@ object Checkpoint {
   implicit val byteArrayReads = new Reads[Array[Byte]] {
     def reads(json: JsValue) = json match {
       case JsString(s) => Base58.decode(s) match {
-        case Success(bytes) if bytes.length == scorex.transaction.TypedTransaction.SignatureLength => JsSuccess(bytes)
-        case Success(bytes) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.signatureLength"))))
-        case Failure(_) => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.incorrect.base58"))))
+        case Success(bytes) if bytes.length == scorex.transaction.TransactionParser.SignatureLength => JsSuccess(bytes)
+        case Success(bytes) => JsError(JsonValidationError("error.incorrect.signatureLength", bytes.length.toString))
+        case Failure(t) => JsError(JsonValidationError(Seq("error.incorrect.base58", t.getLocalizedMessage), s))
       }
-      case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
+      case _ => JsError("error.expected.jsstring")
     }
   }
 
-  implicit val blockCheckpoint: Reads[BlockCheckpoint] = {
-    val r = (JsPath \ "height").read[Int] and
-      (JsPath \ "signature").read[Array[Byte]]
-    r(BlockCheckpoint.apply _)
-  }
-
-  implicit val checkpointReads: Reads[Checkpoint] = {
-    val r = (JsPath \ "items").read[Seq[BlockCheckpoint]] and
-      (JsPath \ "signature").read[Array[Byte]]
-    r(Checkpoint.apply _)
-  }
-
+  implicit val blockCheckpointFormat: Reads[BlockCheckpoint] = Json.reads
+  implicit val checkpointFormat: Reads[Checkpoint] = Json.reads
 }
-
-

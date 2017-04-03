@@ -2,7 +2,7 @@ package scorex.app
 
 import akka.actor.ActorRef
 import com.wavesplatform.settings.WavesSettings
-import scorex.consensus.ConsensusModule
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.message.BasicMessagesRepo
 import scorex.transaction.{BlockStorage, History, TransactionModule}
 import scorex.wallet.Wallet
@@ -13,7 +13,7 @@ import scorex.wallet.Wallet
 trait Application {
 
   //modules
-  implicit def consensusModule: ConsensusModule
+  implicit def consensusModule: WavesConsensusModule
   implicit def transactionModule: TransactionModule
 
   def applicationName: String

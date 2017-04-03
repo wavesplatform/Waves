@@ -6,7 +6,7 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.Deser
-import scorex.transaction.TypedTransaction._
+import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError
 import scorex.transaction._
 
@@ -18,7 +18,7 @@ sealed trait BurnTransaction extends SignedTransaction {
   def fee: Long
 }
 
-object BurnTransaction extends Deser[BurnTransaction] {
+object BurnTransaction {
 
   private case class BurnTransactionImpl(sender: PublicKeyAccount,
                                          assetId: Array[Byte],
@@ -44,20 +44,18 @@ object BurnTransaction extends Deser[BurnTransaction] {
       )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override lazy val balanceChanges: Seq[BalanceChange] =
-      Seq(BalanceChange(AssetAcc(sender, Some(assetId)), -amount), BalanceChange(AssetAcc(sender, assetFee._1), -assetFee._2))
 
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
   }
-  override def parseBytes(bytes: Array[Byte]): Try[BurnTransaction] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[BurnTransaction] = Try {
     require(bytes.head == TransactionType.BurnTransaction.id)
     parseTail(bytes.tail).get
   }
 
   def parseTail(bytes: Array[Byte]): Try[BurnTransaction] = Try {
     import EllipticCurveImpl._
-    val sender        = new PublicKeyAccount(bytes.slice(0, KeyLength))
+    val sender        = PublicKeyAccount(bytes.slice(0, KeyLength))
     val assetId       = bytes.slice(KeyLength, KeyLength + AssetIdLength)
     val quantityStart = KeyLength + AssetIdLength
 
@@ -78,8 +76,6 @@ object BurnTransaction extends Deser[BurnTransaction] {
                                signature: Option[Array[Byte]] = None): Either[ValidationError, BurnTransactionImpl] =
     if (quantity < 0) {
       Left(ValidationError.NegativeAmount)
-    } else if (!Account.isValid(sender)) {
-      Left(ValidationError.InvalidAddress)
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
