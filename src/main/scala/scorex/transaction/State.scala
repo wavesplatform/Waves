@@ -72,9 +72,9 @@ trait State {
 
   // state writes
 
-  def processBlock(block: Block): Try[State]
+  def processBlock(block: Block): Try[Unit]
 
-  def rollbackTo(height: Int): State
+  def rollbackTo(height: Int): Unit
 
   // outside calls from tests only
 

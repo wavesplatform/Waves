@@ -133,7 +133,7 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
       }
     }
   }
-  "block application time measure" ignore {
+  "block application time measure" ignore  {
 
     setNetworkByte()
 
@@ -148,7 +148,9 @@ class StateResponseComparisonTests extends FreeSpec with Matchers {
     setNetworkByte()
 
     val currentMainnetStore = BlockStorageImpl.createMVStore(BlocksOnDisk)
-    val currentMainnet = storedBC(oldState(currentMainnetStore), new StoredBlockchain(currentMainnetStore))
+    val theHistory = new StoredBlockchain(currentMainnetStore)
+    val oldState1 = oldState(currentMainnetStore)
+    val currentMainnet = storedBC(oldState1, theHistory)
     val (old, nev) = getStorages(currentMainnet, "C:\\Users\\ilyas\\Desktop\\old_f.store", "C:\\Users\\ilyas\\Desktop\\new_f.store", appl = false)
 
     lazy val block = old.history.lastBlock
@@ -260,7 +262,7 @@ object StateResponseComparisonTests extends FreeSpec {
     }
   }
 
-  val BlocksOnDisk = "C:\\Users\\ilyas\\waves\\data\\blockchain.dat"
+  val BlocksOnDisk = "C:\\Users\\ilyas\\waves0\\data\\blockchain.dat"
 
   def oldState(mvStore: MVStore): State = {
 

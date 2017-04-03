@@ -22,7 +22,7 @@ import scala.util.{Failure, Try}
 
 class StateWriterAdapter(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: History) extends State with ScorexLogging {
 
-
+  val unsafeDiffer: (StateReader, Seq[Block]) => BlockDiff = BlockDiffer.unsafeDiffMany(settings)
 
   private val MinInMemDiff = 100
   private val MaxInMemDiff = 200
@@ -31,36 +31,31 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
     log.debug("Blockchain height: " + bc.height())
     log.debug("Persisted state height: " + persisted.height)
 
-    val storedBlocks = bc.height()
-    val statedBlocks = persisted.height
-    if (statedBlocks > storedBlocks) {
-      throw new IllegalArgumentException(s"storedBlocks = $storedBlocks, statedBlocks=$statedBlocks")
-    } else if (statedBlocks == storedBlocks) {
-      Monoid[BlockDiff].empty
+    if (persisted.height > bc.height()) {
+      throw new IllegalArgumentException(s"storedBlocks = ${bc.height()}, statedBlocks=${persisted.height}")
     } else {
-      log.debug("rebuilding diff...")
-      val r = rebuildDiff(statedBlocks + 1, storedBlocks + 1)
-      log.debug("diff rebuilt")
+      log.debug("Rebuilding diff")
+      val blocksToReconcile = Range(persisted.height + 1, bc.height() + 1)
+        .map(h => bc.blockAt(h).get)
+        .toList
+      val r = unsafeDiffer(persisted, blocksToReconcile)
+      log.debug("Diff rebuilt successfully")
       r
     }
   }
 
   private def composite: StateReader = new CompositeStateReader(persisted, inMemoryDiff)
 
-  private def rebuildDiff(from: Int, to: Int): BlockDiff =
-    Range(Math.max(1, from), to).foldLeft(Monoid[BlockDiff].empty) { (diff, h) =>
-      val block = bc.blockAt(h).get
-      val blockDiff = BlockDiffer(settings)(new CompositeStateReader(persisted, diff), block).right.get
-      Monoid[BlockDiff].combine(diff, blockDiff)
-    }
-
-  override def processBlock(block: Block): Try[State] = Try {
+  override def processBlock(block: Block): Try[Unit] =  Try {
     val updatedInMemoryDiff =
       if (inMemoryDiff.heightDiff >= MaxInMemDiff) {
-        val compositeHeight = composite.height
-        val diffToBePersisted = rebuildDiff(persisted.height + 1, compositeHeight - MinInMemDiff + 1)
+        val (persistBs, inMemBs) = Range(persisted.height + 1, persisted.height + inMemoryDiff.heightDiff + 1)
+          .map(h => bc.blockAt(h).get)
+          .toList
+          .splitAt(MaxInMemDiff - MinInMemDiff)
+        val diffToBePersisted = unsafeDiffer(persisted, persistBs)
         persisted.applyBlockDiff(diffToBePersisted)
-        rebuildDiff(compositeHeight - MinInMemDiff + 1, compositeHeight + 1)
+        unsafeDiffer(persisted, inMemBs)
       } else {
         inMemoryDiff
       }
@@ -69,14 +64,12 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
       case Right(blockDiff) =>
         bc.appendBlock(block).map(_ =>
           inMemoryDiff = Monoid[BlockDiff].combine(updatedInMemoryDiff, blockDiff))
-        this
       case Left(m) =>
         throw new Exception(s"Block $block is not valid: $m")
     }
   }
 
-
-  override def rollbackTo(height: Int): State = {
+  override def rollbackTo(height: Int): Unit = {
     if (height < persisted.height) {
       throw new IllegalArgumentException(s"cannot rollback to a block with height=$height, which is older than writer.height=${persisted.height}")
     } else {
@@ -85,17 +78,15 @@ class StateWriterAdapter(persisted: StateWriter with StateReader, settings: Func
       }
       if (composite.height == height) {
       } else {
-        inMemoryDiff = rebuildDiff(persisted.height + 1, height + 1)
+        inMemoryDiff = unsafeDiffer(persisted, Range(persisted.height + 1, height + 1).map(h => bc.blockAt(h).get))
       }
-      this
     }
   }
-
 
   // legacy
 
   override def findPreviousExchangeTxs(order: Order): Set[ExchangeTransaction] =
-      composite.findPreviousExchangeTxs(order)
+    composite.findPreviousExchangeTxs(order)
 
   override def included(signature: Array[Byte]): Option[Int] = composite.transactionInfo(EqByteArray(signature)).map(_._1)
 

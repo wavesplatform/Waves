@@ -32,7 +32,6 @@ trait ExchangeTransactionCreator {
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
     def calcFee(o: Order, amount: Long): Long = {
-      storedState.findPreviousExchangeTxs(o)
       val p = BigInt(amount) * o.matcherFee / o.amount
       p.toLong
     }

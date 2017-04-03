@@ -230,7 +230,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     }
   }
 
-  def rollbackTo(rollbackTo: Int): State = synchronized {
+  def rollbackTo(rollbackTo: Int): Unit = synchronized {
     @tailrec
     def deleteNewer(key: AddressString): Unit = {
       val currentHeight = storage.getLastStates(key).getOrElse(0)
@@ -262,10 +262,9 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
       deleteNewer(key)
     }
     storage.setStateHeight(rollbackTo)
-    this
   }
 
-  def processBlock(block: Block): Try[State] = Try {
+  def processBlock(block: Block): Try[Unit] = Try {
     val trans = block.transactionData
     val fees: Map[AssetAcc, (AccState, Reasons)] = block.feesDistribution
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2, effectiveBalance(m._1.account) + m._2), List(FeesStateChange(m._2))))
@@ -276,7 +275,6 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
 
     applyChanges(newBalances, block.timestamp)
     log.trace(s"New state height is ${storage.stateHeight}")
-    this
   }
 
   private def balance(account: Account, atHeight: Option[Int]): Long =

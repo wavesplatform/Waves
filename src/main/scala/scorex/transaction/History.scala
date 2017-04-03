@@ -70,7 +70,7 @@ trait History {
     * @param block - block to append
     * @return Blocks to process in state
     */
-  def appendBlock(block: Block): Try[BlocksToProcess]
+  def appendBlock(block: Block): Try[Unit]
 
 
   def confirmations(block: Block): Option[Int] =

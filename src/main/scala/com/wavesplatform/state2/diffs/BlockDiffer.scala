@@ -57,4 +57,10 @@ object BlockDiffer {
       }
       )
   }
+
+  def unsafeDiffMany(settings: FunctionalitySettings)(s: StateReader, blocks: Seq[Block]): BlockDiff =
+    blocks.foldLeft(Monoid[BlockDiff].empty) { (diff, block) =>
+      val blockDiff = apply(settings)(new CompositeStateReader(s, diff), block).right.get
+      Monoid[BlockDiff].combine(diff, blockDiff)
+    }
 }

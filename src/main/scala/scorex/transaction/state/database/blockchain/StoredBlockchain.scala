@@ -90,12 +90,12 @@ class StoredBlockchain(db: MVStore) extends History with ScorexLogging {
 
   private val blockStorage: BlockchainPersistence = BlockchainPersistence(db)
 
-  override def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
+  override def appendBlock(block: Block): Try[Unit] = synchronized {
     Try {
       if ((height() == 0) || (lastBlock.uniqueId sameElements block.reference)) {
         val h = height() + 1
         blockStorage.writeBlock(h, block) match {
-          case Success(_) => Seq(block)
+          case Success(_) => ()
           case Failure(e) => throw new Error("Error while storing blockchain a change: " + e, e)
         }
       } else {
