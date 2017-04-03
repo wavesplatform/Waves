@@ -10,7 +10,6 @@ import scorex.api.http._
 import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
 import scorex.api.http.leasing.LeaseRequest.leaseCancelRequestFormat
 import scorex.transaction._
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
 @Path("/leasing")

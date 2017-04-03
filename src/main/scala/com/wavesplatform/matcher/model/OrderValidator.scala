@@ -4,10 +4,9 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PublicKeyAccount
-import scorex.transaction.{AssetAcc, State}
+import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{Order, Validation}
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 

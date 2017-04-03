@@ -12,7 +12,6 @@ import scorex.api.http.{ApiError, ApiRoute, InvalidAddress}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.transaction.{AssetAcc, AssetIdStringLength, State, TransactionOperations}
 import scorex.wallet.Wallet
 

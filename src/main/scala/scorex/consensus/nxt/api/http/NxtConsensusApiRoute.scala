@@ -2,16 +2,14 @@ package scorex.consensus.nxt.api.http
 
 import javax.ws.rs.Path
 
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.account.Account
-import scorex.api.http.{ApiError, ApiRoute, CommonApiFunctions, InvalidAddress}
+import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
 import scorex.app.RunnableApplication
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.encode.Base58
-import scorex.transaction.state.database.blockchain.StoredState
 
 
 @Path("/consensus")

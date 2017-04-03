@@ -20,7 +20,6 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.State
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global

@@ -10,8 +10,7 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
 import scorex.api.http.CompositeHttpService
 import scorex.app.Application
-import scorex.transaction.{BlockStorage, State, TransactionModule}
-import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.{BlockStorage, TransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
