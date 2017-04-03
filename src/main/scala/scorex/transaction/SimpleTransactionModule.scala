@@ -204,12 +204,8 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
   }
 
   override def createPayment(sender: PrivateKeyAccount, recipient: Account,
-                             amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
-    for {
-      p1 <- PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
-      p2 <- Validator.validate(fs, blockStorage.upToDateStateReader, p1)
-    } yield p2
-  }
+                             amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] =
+    PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
 
   override def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction] =
     for {
