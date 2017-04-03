@@ -17,7 +17,7 @@ class BlockAPISpecification extends FunSuite with Matchers with TransactionTesti
     stopGeneration(applications)
 
     while (history.height() < 3) {
-      application.blockStorage.appendBlock(genValidBlock())
+      application.blockStorage.blockchainUpdater.processBlock(genValidBlock())
     }
 
     startGeneration(applications)

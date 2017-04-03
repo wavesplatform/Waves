@@ -3,15 +3,10 @@ package com.wavesplatform.matcher
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
-import com.wavesplatform.settings.FunctionalitySettings
-import org.h2.mvstore.MVStore
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.hash.SecureCryptographicHash
-import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.database.state.storage._
 import scorex.utils.{ByteArrayExtension, NTP}
 
 trait MatcherTestData {
@@ -118,18 +113,4 @@ trait MatcherTestData {
     matcherFee: Long <- maxWavesAnountGen
   } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
-  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: FunctionalitySettings): State = {
-    val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage
-      with MVStoreLeaseExtendedStateStorage with MVStoreAliasExtendedStorage {
-      override val db: MVStore = mvStore
-      if (db.getStoreVersion > 0) db.rollback()
-    }
-
-    new StoredState(storage, settings) {
-      override def assetBalance(account: AssetAcc): Long = Long.MaxValue
-
-      override def totalAssetQuantity(assetId: AssetId): Long = Long.MaxValue
-
-    }
-  }
 }

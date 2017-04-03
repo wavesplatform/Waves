@@ -5,7 +5,6 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.network.Checkpoint
-import scorex.transaction.BlockStorage.BlocksToProcess
 
 import scala.util.Try
 

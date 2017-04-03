@@ -5,7 +5,6 @@ import scorex.transaction.ValidationError.{AliasNotExists, UnsupportedTransactio
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.state.database.state.storage.LeaseExtendedStateStorageI
 
 
 object BalanceChangeCalculator {

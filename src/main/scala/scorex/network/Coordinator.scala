@@ -277,7 +277,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       val oldScore = history.score()
 
-      application.blockStorage.appendBlock(block) match {
+      application.blockStorage.blockchainUpdater.processBlock(block) match {
         case Success(_) =>
           log.info(
             s"""Block ${block.encodedId} appended:

@@ -3,11 +3,11 @@ package scorex.transaction.state.database
 import java.io.File
 
 import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{BlockchainUpdaterImpl, MVStorePrimitiveImpl, StateWriterImpl}
-import com.wavesplatform.state2.reader.{StateReader, StateReaderImpl}
 import org.h2.mvstore.MVStore
 import scorex.transaction._
-import scorex.transaction.state.database.blockchain.{StoredBlockchain, StoredState}
+import scorex.transaction.state.database.blockchain.StoredBlockchain
 
 class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
 
@@ -20,8 +20,6 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
   val updater = new BlockchainUpdaterImpl(rw, settings.functionalitySettings, h)
 
   override val history: History = h
-
-  override val state: State = ???
 
   override def stateReader: StateReader = updater.composite
 

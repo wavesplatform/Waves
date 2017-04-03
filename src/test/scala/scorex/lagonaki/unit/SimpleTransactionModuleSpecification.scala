@@ -47,17 +47,17 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
   implicit val transactionModule = new SimpleTransactionModule(TestBlockchainSettings.Enabled.genesisSettings)
   val genesisTimestamp = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
+    transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
   }
   assert(!transactionModule.blockStorage.history.isEmpty)
 
   // account with money
   val walletSeed = Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get
   val privateKeyAccount = Wallet.generateNewAccount(walletSeed, -1)
-  assert(transactionModule.blockStorage.state.balance(privateKeyAccount) > 0L)
+  assert(transactionModule.blockStorage.stateReader.balance(privateKeyAccount) > 0L)
   // account without money
   val noBalanceAccount = Wallet.generateNewAccount(walletSeed, 5)
-  assert(transactionModule.blockStorage.state.balance(noBalanceAccount) == 0L)
+  assert(transactionModule.blockStorage.stateReader.balance(noBalanceAccount) == 0L)
 
 
   test("isValid() checks that tx not too old") {

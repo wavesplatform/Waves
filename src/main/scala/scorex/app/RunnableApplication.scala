@@ -123,7 +123,7 @@ trait RunnableApplication extends Application with ScorexLogging {
 
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
 
-      transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData,
+      transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData,
         settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature))
 
       log.info("Genesis block has been added to the state")

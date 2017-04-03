@@ -15,7 +15,7 @@ import scala.util._
 
 class AliasTransactionSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
-  private val state = application.transactionModule.blockStorage.state
+  private val state = application.transactionModule.blockStorage.stateReader
   private val updater = application.transactionModule.blockStorage.blockchainUpdater
   private val validator = application.transactionModule.validator
   private val history = application.transactionModule.blockStorage.history
@@ -139,7 +139,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val tx = CreateAliasTransaction.create(aliasCreator, theAlias.right.get, 100000L, 1L).right.get
     val block = TestBlock(Seq(tx))
     updater.processBlock(block)
-    updater.rollbackTo(state.stateHeight - 1)
+    updater.rollbackTo(state.height - 1)
 
     shouldBeValid(tx)
     updater.processBlock(block) shouldBe a[Success[_]]
