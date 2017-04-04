@@ -17,7 +17,7 @@ import scorex.crypto.encode.Base58
 class NxtConsensusApiRoute(application: RunnableApplication) extends ApiRoute with CommonApiFunctions {
 
   val settings = application.settings.restAPISettings
-  private val consensusModule = application.consensusModule.asInstanceOf[WavesConsensusModule]
+  private val consensusModule = application.consensusModule
   private val blockStorage = application.blockStorage
 
   override val route: Route =
@@ -37,7 +37,7 @@ class NxtConsensusApiRoute(application: RunnableApplication) extends ApiRoute wi
     } else {
       complete(Json.obj(
         "address" -> account.right.get.address,
-        "balance" -> consensusModule.generatingBalance(account.right.get, blockStorage.upToDateStateReader.height)(application.transactionModule)))
+        "balance" -> consensusModule.generatingBalance(account.right.get, blockStorage.stateReader.height)(application.transactionModule)))
     }
   }
 

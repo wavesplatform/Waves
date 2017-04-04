@@ -9,7 +9,7 @@ trait BlockStorage extends ScorexLogging {
 
   def history: History
 
-  def upToDateStateReader: StateReader
+  def stateReader: StateReader
 
   def blockchainUpdater: BlockchainUpdater
 

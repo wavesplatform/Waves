@@ -14,6 +14,7 @@ import scala.reflect.ClassTag
 import scala.util.Right
 
 trait StateReader {
+
   def accountPortfolios: Map[Account, Portfolio]
 
   def transactionInfo(id: ByteArray): Option[(Int, Transaction)]

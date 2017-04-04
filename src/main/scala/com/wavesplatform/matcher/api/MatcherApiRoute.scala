@@ -15,7 +15,6 @@ import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.api.http._
-import scorex.app.Application
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
@@ -27,11 +26,9 @@ import scala.util.{Failure, Success}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(application: Application, matcher: ActorRef, settings: RestAPISettings, matcherSettings: MatcherSettings) extends ApiRoute {
+case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: ActorRef,
+                           settings: RestAPISettings, matcherSettings: MatcherSettings) extends ApiRoute {
   private implicit val timeout: Timeout = 5.seconds
-
-  val wallet: Wallet = application.wallet
-  val storedState: StateReader = application.blockStorage.upToDateStateReader
 
   override lazy val route: Route =
     pathPrefix("matcher") {

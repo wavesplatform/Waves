@@ -5,7 +5,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
+import scorex.transaction.assets.exchange.ExchangeTransaction
 
 class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {
   private val txDiff = blockDiff.txsDiff
@@ -84,4 +84,48 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   }
 
   override def accountPortfolios: Map[Account, Portfolio] = Monoid.combine(inner.accountPortfolios, txDiff.portfolios)
+}
+
+object CompositeStateReader {
+  def proxy(inner: StateReader, blockDiff: () => BlockDiff): StateReader = new StateReader {
+
+    override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray] =
+      new CompositeStateReader(inner, blockDiff()).paymentTransactionIdByHash(hash)
+
+    override def aliasesOfAddress(a: Account): Seq[Alias] =
+      new CompositeStateReader(inner, blockDiff()).aliasesOfAddress(a)
+
+    override def accountPortfolio(a: Account): Portfolio =
+      new CompositeStateReader(inner, blockDiff()).accountPortfolio(a)
+
+    override def accountTransactionIds(a: Account): Seq[ByteArray] =
+      new CompositeStateReader(inner, blockDiff()).accountTransactionIds(a)
+
+    override def accountPortfolios: Map[Account, Portfolio] =
+      new CompositeStateReader(inner, blockDiff()).accountPortfolios
+
+    override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
+      new CompositeStateReader(inner, blockDiff()).transactionInfo(id)
+
+    override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long =
+      new CompositeStateReader(inner, blockDiff()).effectiveBalanceAtHeightWithConfirmations(acc, height, confs)
+
+    override def nonEmptyAccounts: Seq[Account] =
+      new CompositeStateReader(inner, blockDiff()).nonEmptyAccounts
+
+    override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] =
+      new CompositeStateReader(inner, blockDiff()).findPreviousExchangeTxs(orderId)
+
+    override def resolveAlias(a: Alias): Option[Account] =
+      new CompositeStateReader(inner, blockDiff()).resolveAlias(a)
+
+    override def assetInfo(id: ByteArray): Option[AssetInfo] =
+      new CompositeStateReader(inner, blockDiff()).assetInfo(id)
+
+    override def height: Int =
+      new CompositeStateReader(inner, blockDiff()).height
+
+    override def maxPaymentTransactionTimestampInPreviousBlocks(a: Account): Option[Long] =
+      new CompositeStateReader(inner, blockDiff()).maxPaymentTransactionTimestampInPreviousBlocks(a)
+  }
 }

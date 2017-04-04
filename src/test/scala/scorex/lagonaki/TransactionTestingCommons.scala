@@ -21,14 +21,14 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
     application.wallet.generateNewAccounts(3)
   }
 
-  val ab = applicationNonEmptyAccounts.map(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.upToDateStateReader.height)).sum
+  val ab = applicationNonEmptyAccounts.map(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.stateReader.height)).sum
   require(ab > 2)
 
   def applicationNonEmptyAccounts: Seq[PrivateKeyAccount] =
-    application.wallet.privateKeyAccounts().filter(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.upToDateStateReader.height) > 0)
+    application.wallet.privateKeyAccounts().filter(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.stateReader.height) > 0)
 
   def applicationEmptyAccounts: Seq[PrivateKeyAccount] =
-    application.wallet.privateKeyAccounts().filter(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.upToDateStateReader.height) == 0)
+    application.wallet.privateKeyAccounts().filter(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.stateReader.height) == 0)
 
   def genValidBlock(): Block = {
     application.consensusModule.generateNextBlocks(applicationNonEmptyAccounts)(application.transactionModule).headOption match {
@@ -45,7 +45,7 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
                           senderOpt: Option[PrivateKeyAccount] = None
                          ): Transaction = {
     val senderAcc = senderOpt.getOrElse(randomFrom(applicationNonEmptyAccounts))
-    val senderBalance = application.consensusModule.generatingBalance(senderAcc, transactionModule.blockStorage.upToDateStateReader.height) / 1000
+    val senderBalance = application.consensusModule.generatingBalance(senderAcc, transactionModule.blockStorage.stateReader.height) / 1000
     require(senderBalance > 0)
     val fee = Random.nextInt(5).toLong + 1
     if (senderBalance <= fee) {
@@ -55,7 +55,7 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
       else senderBalance - fee
       val recipient = recipientOpt.getOrElse(randomFrom(applicationNonEmptyAccounts))
       val tx = application.transactionModule.createPayment(senderAcc, recipient, amt, fee).right.get
-      if (Validator.validate(application.settings.blockchainSettings.functionalitySettings, application.transactionModule.blockStorage.upToDateStateReader, tx).isRight) tx
+      if (Validator.validate(application.settings.blockchainSettings.functionalitySettings, application.transactionModule.blockStorage.stateReader, tx).isRight) tx
       else genValidTransaction(randomAmnt, recipientOpt, senderOpt)
     }
   }

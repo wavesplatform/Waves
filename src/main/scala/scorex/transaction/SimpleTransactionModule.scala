@@ -58,7 +58,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
       .take(MaxTransactionsPerBlock)
       .sorted(TransactionsOrdering.InBlock)
 
-    val valid = Validator.validate(fs, blockStorage.upToDateStateReader, txs, heightOpt, NTP.correctedTime())._2
+    val valid = Validator.validate(fs, blockStorage.stateReader, txs, heightOpt, NTP.correctedTime())._2
 
     if (valid.size != txs.size) {
       log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
@@ -85,7 +85,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
     val inOrder = notFromFuture.sorted(TransactionsOrdering.InUTXPool)
-    val valid = Validator.validate(fs, blockStorage.upToDateStateReader, inOrder, None, currentTime)._2
+    val valid = Validator.validate(fs, blockStorage.stateReader, inOrder, None, currentTime)._2
     // remove non valid or expired from storage
     txs.diff(valid).foreach(utxStorage.remove)
   }
@@ -190,7 +190,7 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
     val lastBlockTimestamp = blockStorage.history.lastBlock.timestamp
     val notExpired = (lastBlockTimestamp - tx.timestamp).millis <= MaxTimePreviousBlockOverTransactionDiff
     if (notExpired) {
-      Validator.validate(fs, blockStorage.upToDateStateReader, tx)
+      Validator.validate(fs, blockStorage.stateReader, tx)
     } else {
       Left(TransactionValidationError(tx, s"Transaction is too old: Last block timestamp is $lastBlockTimestamp"))
     }

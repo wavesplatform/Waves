@@ -12,9 +12,10 @@ import scorex.utils._
 
 import scala.util._
 
+@DoNotDiscover
 class AliasTransactionSpecification extends FunSuite with Matchers with TransactionTestingCommons with PrivateMethodTester with OptionValues {
 
-  private val state = application.transactionModule.blockStorage.upToDateStateReader
+  private val state = application.transactionModule.blockStorage.stateReader
   private val updater = application.transactionModule.blockStorage.blockchainUpdater
   private val history = application.transactionModule.blockStorage.history
   private val aliasCreator: PrivateKeyAccount = applicationNonEmptyAccounts.head
@@ -54,7 +55,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val fee2 = 100001L
     val amount = 1000L
     val tx2 = TransferTransaction.create(None, sender, Alias.buildWithCurrentNetworkByte("TRANSFER-ALIAS").right.get, amount, 1L, None, fee2, Array()).right.get
-    updater.processBlock(TestBlock(Seq(tx2))) shouldBe a[Right[_,_]]
+    updater.processBlock(TestBlock(Seq(tx2))) shouldBe a[Success[_]]
     state.balance(aliasCreator) shouldBe (creatorBalance + amount)
     state.balance(sender) shouldBe (senderBalance - fee2 - amount)
   }
@@ -65,7 +66,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val fee = 100000L
     val tx = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("LEASE-ALIAS").right.get, fee, 1L).right.get
     val block = TestBlock(Seq(tx))
-    updater.processBlock(block) shouldBe a[Right[_,_]]
+    updater.processBlock(block) shouldBe a[Success[_]]
     state.balance(aliasCreator) shouldBe creatorBalance0 - fee
 
     val sender: PrivateKeyAccount = PrivateKeyAccount(randomBytes())
@@ -76,7 +77,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val fee2 = 100001L
     val amount = 1000L
     val tx2 = LeaseTransaction.create(sender, amount, fee2, 1L, Alias.buildWithCurrentNetworkByte("LEASE-ALIAS").right.get).right.get
-    updater.processBlock(TestBlock(Seq(tx2))) shouldBe a[Right[_,_]]
+    updater.processBlock(TestBlock(Seq(tx2))) shouldBe a[Success[_]]
     state.effectiveBalance(aliasCreator) shouldBe (creatorEffectiveBalance + amount)
     state.effectiveBalance(sender) shouldBe (senderEffectiveBalance - fee2 - amount)
   }

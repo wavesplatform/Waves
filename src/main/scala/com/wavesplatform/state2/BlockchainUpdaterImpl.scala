@@ -34,7 +34,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     }
   }
 
-  def currentState: StateReader = new CompositeStateReader(persisted, inMemoryDiff)
+  def currentState: StateReader = CompositeStateReader.proxy(persisted, () => inMemoryDiff)
 
   private def updateInMemoryDiffIfNeeded(): Unit = {
     if (inMemoryDiff.heightDiff >= MaxInMemDiff) {

@@ -48,21 +48,21 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
-    TransactionsApiRoute(settings.restAPISettings, blockStorage.upToDateStateReader, history, transactionModule),
+    TransactionsApiRoute(settings.restAPISettings, blockStorage.stateReader, history, transactionModule),
     consensusApiRoute,
     WalletApiRoute(settings.restAPISettings, wallet),
     PaymentApiRoute(settings.restAPISettings, wallet, transactionModule),
     UtilsApiRoute(settings.restAPISettings),
     PeersApiRoute(settings.restAPISettings, peerManager, networkController),
-    AddressApiRoute(settings.restAPISettings, wallet, blockStorage.upToDateStateReader),
-    DebugApiRoute(settings.restAPISettings, wallet, blockStorage),
+    AddressApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader),
+    DebugApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, history),
     WavesApiRoute(settings.restAPISettings, wallet, transactionModule),
-    AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.upToDateStateReader, transactionModule),
-    NodeApiRoute(settings.restAPISettings, this, blockGenerator, coordinator),
+    AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, transactionModule),
+    NodeApiRoute(settings.restAPISettings, () => this.shutdown(), blockGenerator, coordinator),
     AssetsBroadcastApiRoute(settings.restAPISettings, transactionModule),
-    LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.upToDateStateReader, transactionModule),
+    LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, transactionModule),
     LeaseBroadcastApiRoute(settings.restAPISettings, transactionModule),
-    AliasApiRoute(settings.restAPISettings, wallet, transactionModule, blockStorage.upToDateStateReader),
+    AliasApiRoute(settings.restAPISettings, wallet, transactionModule, blockStorage.stateReader),
     AliasBroadcastApiRoute(settings.restAPISettings, transactionModule)
   )
 
