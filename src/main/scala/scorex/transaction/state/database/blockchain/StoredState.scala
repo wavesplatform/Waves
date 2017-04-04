@@ -341,8 +341,8 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
     .addressByAlias(a.name)
     .map(addr => Account.fromString(addr).right.get)
 
-  def getAlias(a: Account): Option[Alias] = storage
-    .aliasByAddress(a.address)
+  def getAliases(a: Account): Seq[Alias] = storage
+    .aliasesByAddress(a.address)
     .map(addr => Alias.fromString(addr).right.get)
 
   private def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)

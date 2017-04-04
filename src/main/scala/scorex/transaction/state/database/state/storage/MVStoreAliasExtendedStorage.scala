@@ -13,24 +13,30 @@ trait MVStoreAliasExtendedStorage extends AliasExtendedStorageI {
 
 
   private lazy val AddressAliasTableName = "AddressAliasMap"
-  private lazy val addressAliasMap: MVMap[String, String] = db.openMap(AddressAliasTableName,
+  // value is aliases concatenated with `\n` separator
+  private lazy val addressAliasesMap: MVMap[String, String] = db.openMap(AddressAliasTableName,
     new LogMVMapBuilder[String, String])
 
 
   def addressByAlias(alias: String): Option[AddressString] = Option(aliasAddressMap.get(alias))
 
-  def aliasByAddress(address: String): Option[AddressString] = Option(addressAliasMap.get(address))
+  def aliasesByAddress(address: String): Seq[String] = Option(addressAliasesMap.get(address))
+    .map(_.split('\n').toSeq)
+    .getOrElse(Seq.empty)
 
   def persistAlias(address: AddressString, alias: String): Unit = {
+    val allAliases = (alias +: aliasesByAddress(address)).mkString("\n")
+    addressAliasesMap.put(address, allAliases)
     aliasAddressMap.put(alias, address)
-    addressAliasMap.put(address, alias)
   }
 
   def removeAlias(alias: String): Unit = {
     addressByAlias(alias) match {
       case Some(address) =>
         aliasAddressMap.remove(alias)
-        addressAliasMap.remove(address)
+        val aliases = aliasesByAddress(address).filterNot(_ == alias).mkString("\n")
+        addressAliasesMap.put(address, aliases)
       case None => ()
-    }  }
+    }
+  }
 }

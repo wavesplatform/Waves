@@ -36,7 +36,7 @@ trait State {
 
   def resolveAlias(a: Alias): Option[Account]
 
-  def getAlias(a: Account): Option[Alias]
+  def getAliases(a: Account): Seq[Alias]
 
   def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
 
