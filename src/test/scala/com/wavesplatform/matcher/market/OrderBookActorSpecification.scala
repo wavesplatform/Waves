@@ -39,7 +39,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
   val db = new MVStore.Builder().compress().open()
-  val storedState: StateReader = stub[StateReader] // fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
+  val storedState: StateReader = stub[StateReader]
   val hugeAmount = Long.MaxValue / 2
   (storedState.accountPortfolio _).when(*).returns(Portfolio(hugeAmount, hugeAmount, Map(
     EqByteArray("BTC".getBytes) -> hugeAmount,
