@@ -15,7 +15,7 @@ import scorex.account.Account
 import scorex.api.http.ApiKeyNotValid
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
-import scorex.consensus.mining.BlockGeneratorController.{GetBlockGenerationStatus, Idle, StartGeneration, StopGeneration}
+import scorex.consensus.mining.BlockGeneratorController.{GetStatus, Idle, StartGeneration, StopGeneration}
 import scorex.crypto.encode.Base58
 import scorex.transaction.{AssetAcc, State}
 import scorex.utils._
@@ -454,7 +454,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
     untilTimeout(5.seconds) {
       Thread.sleep(100)
       nodes.foreach { p =>
-        require(Await.result(p.blockGenerator ? GetBlockGenerationStatus, timeout.duration) == Idle.name)
+        require(Await.result(p.blockGenerator ? GetStatus, timeout.duration) == Idle.name)
       }
     }
   }
