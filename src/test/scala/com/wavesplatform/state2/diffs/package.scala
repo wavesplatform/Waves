@@ -18,12 +18,12 @@ package object diffs {
     override val transactions = new util.HashMap[Array[Byte], (Int, Array[Byte])]
     override val portfolios = new util.HashMap[Array[Byte], (Long, Long, Map[Array[Byte], Long])]
     override val assets = new util.HashMap[Array[Byte], (Boolean, Long)]
-    override val accountTransactionIds = new util.HashMap[Array[Byte], util.List[Array[Byte]]]
+    override val accountTransactionIds = new util.HashMap[Array[Byte], List[Array[Byte]]]
     override val effectiveBalanceSnapshots = new util.HashMap[(Array[Byte], Int), (Long, Long)]
     override val paymentTransactionHashes = new util.HashMap[Array[Byte], Array[Byte]]
     override val maxPaymentTransactionTimestampInPreviousBlocks = new util.HashMap[Array[Byte], Long]
     override val aliasToAddress = new util.HashMap[String, Array[Byte]]
-    override val exchangeTransactionsByOrder = new util.HashMap[Array[Byte], util.List[Array[Byte]]]
+    override val exchangeTransactionsByOrder = new util.HashMap[Array[Byte], List[Array[Byte]]]
 
     var height: Int = 0
 

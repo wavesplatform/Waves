@@ -26,7 +26,6 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 
   override def accountTransactionIds(a: Account): Seq[ByteArray] = {
     Option(p.accountTransactionIds.get(a.bytes))
-      .map(_.asScala)
       .map(_.toSeq)
       .getOrElse(Seq.empty)
       .map(EqByteArray)
@@ -69,7 +68,7 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 
   override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] =
     Option(p.exchangeTransactionsByOrder.get(orderId.arr))
-      .map(_.asScala.toSet).orEmpty
+      .map(_.toSet).orEmpty
       .flatMap(id => this.findTransaction[ExchangeTransaction](id))
 
   override def accountPortfolios: Map[Account, Portfolio] =

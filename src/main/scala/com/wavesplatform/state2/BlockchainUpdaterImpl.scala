@@ -62,7 +62,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
 
   override def rollbackTo(height: Int): Unit = {
     if (height < persisted.height) {
-      throw new IllegalArgumentException(s"cannot rollback to a block with height=$height, which is older than writer.height=${persisted.height}")
+      throw new IllegalArgumentException(s"cannot rollback to a block with height=$height, which is older than persisted height=${persisted.height}")
     } else {
       while (bc.height > height) {
         bc.discardBlock()

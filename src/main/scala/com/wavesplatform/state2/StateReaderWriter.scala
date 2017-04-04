@@ -32,12 +32,9 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
     newOrderEtxs.foreach { case (oid, txIds) =>
       Option(p.exchangeTransactionsByOrder.get(oid.arr)) match {
         case Some(ll) =>
-          txIds.foreach(txId => ll.add(txId))
-          p.exchangeTransactionsByOrder.put(oid.arr, ll)
+          p.exchangeTransactionsByOrder.put(oid.arr, ll ++ txIds)
         case None =>
-          val newList = new util.ArrayList[Array[Byte]]()
-          txIds.foreach(txId => newList.add(txId))
-          p.accountTransactionIds.put(oid.arr, newList)
+          p.accountTransactionIds.put(oid.arr, txIds.toList)
       }
     }
 
@@ -61,12 +58,9 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
     blockDiff.txsDiff.accountTransactionIds.foreach { case (acc, txIds) =>
       Option(p.accountTransactionIds.get(acc.bytes)) match {
         case Some(ll) =>
-          txIds.reverse.foreach(txId => ll.add(0, txId.arr))
-          p.accountTransactionIds.put(acc.bytes, ll)
+          p.accountTransactionIds.put(acc.bytes, txIds.map(_.arr).reverse ++ll)
         case None =>
-          val newList = new util.ArrayList[Array[Byte]]()
-          txIds.reverse.foreach(txId => newList.add(0, txId.arr))
-          p.accountTransactionIds.put(acc.bytes, newList)
+          p.accountTransactionIds.put(acc.bytes, txIds.map(_.arr).reverse)
       }
     }
 
