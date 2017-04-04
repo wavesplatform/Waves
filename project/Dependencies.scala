@@ -2,7 +2,7 @@ import sbt._
 
 object Dependencies {
 
-  def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.16"
+  def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.17"
   def swaggerModule(module: String) = "io.swagger" % s"swagger-$module" % "1.5.13"
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.5"
 
@@ -57,7 +57,7 @@ object Dependencies {
 
   lazy val matcher = Seq(
     akkaModule("persistence"),
-    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.4.16.0" % "test",
+    "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.4.17.3" % "test",
     "org.iq80.leveldb" % "leveldb" % "0.7",
     "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
   )
