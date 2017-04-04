@@ -46,13 +46,8 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, blockStorage
   def state: Route = (path("state") & get) {
     complete(blockStorage.upToDateStateReader.accountPortfolios
       .map { case (k, v) =>
-        val v1 = k.stringRepr -> (v.balance, v.effectiveBalance)
-        Map("account" -> k.stringRepr,
-            "balance" -> v.balance.toString,
-            "effectiveBalance" -> v.effectiveBalance.toString
-          )
+        k.address -> v.balance
       }
-      .toList
     )
   }
 

@@ -211,8 +211,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
-      confirmations,
-      0 // always return 0. the bug has not been fixed when migrating to new state :)
+      0, // always return 0. the bug has not been fixed when migrating to new state :),
+      confirmations
     )))
       .getOrElse(InvalidAddress)
   }
