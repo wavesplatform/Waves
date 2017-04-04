@@ -8,14 +8,14 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.api.http.TransactionsApiRoute
 import scorex.crypto.encode.Base58
-import scorex.transaction.{History, SimpleTransactionModule, State, TransactionGen}
+import scorex.transaction._
 
 class TransactionsRouteSpec extends RouteSpec("/transactions")
   with RestAPISettingsHelper with MockFactory with Matchers with TransactionGen with PropertyChecks {
 
   private val history = mock[History]
   private val state = mock[State]
-  private val stm = mock[SimpleTransactionModule]
+  private val stm = mock[TransactionModule]
   private val route = TransactionsApiRoute(restAPISettings, state, history, stm).route
 
   private val txGen = for {
@@ -39,7 +39,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
   routePath("/unconfirmed") in {
     val g = for {
-      i <- Gen.chooseNum(0, 100)
+      i <- Gen.chooseNum(0, 20)
       t <- Gen.listOfN(i, txGen)
     } yield t
 
@@ -52,7 +52,5 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
         }
       }
     }
-
-
   }
 }
