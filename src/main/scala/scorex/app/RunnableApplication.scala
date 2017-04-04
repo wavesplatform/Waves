@@ -7,10 +7,10 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
+import com.wavesplatform.Shutdownable
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
@@ -25,7 +25,7 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe.Type
 import scala.util.Try
 
-trait RunnableApplication extends Application with ScorexLogging {
+trait RunnableApplication extends Application with Shutdownable with ScorexLogging {
 
   protected val apiRoutes: Seq[ApiRoute]
   protected val apiTypes: Seq[Type]

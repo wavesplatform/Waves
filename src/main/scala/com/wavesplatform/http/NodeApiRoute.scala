@@ -1,25 +1,29 @@
 package com.wavesplatform.http
 
 import javax.ws.rs.Path
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+
+import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.util.Timeout
-import com.wavesplatform.settings.Constants
+import com.wavesplatform.Shutdownable
+import com.wavesplatform.settings.{Constants, RestAPISettings}
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.app.RunnableApplication
-import scorex.consensus.mining.BlockGeneratorController.GetBlockGenerationStatus
-import scorex.network.Coordinator.GetStatus
+import scorex.consensus.mining.{BlockGeneratorController => BGC}
+import scorex.network.{Coordinator => C}
 import scorex.utils.ScorexLogging
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.util.Try
 
 @Path("/node")
 @Api(value = "node")
-case class NodeApiRoute(application: RunnableApplication) extends ApiRoute with CommonApiFunctions with ScorexLogging {
+case class NodeApiRoute(settings: RestAPISettings, application: Shutdownable, blockGenerator: ActorRef, coordinator: ActorRef)
+  extends ApiRoute with CommonApiFunctions with ScorexLogging {
 
-  val settings = application.settings.restAPISettings
   override lazy val route = pathPrefix("node") {
     stop ~ status ~ version
   }
@@ -47,10 +51,10 @@ case class NodeApiRoute(application: RunnableApplication) extends ApiRoute with 
     implicit val timeout = Timeout(5.seconds)
 
     complete(for {
-      bgf <- application.blockGenerator ? GetBlockGenerationStatus
-      hsf <- application.coordinator ? GetStatus
+      bgf <- (blockGenerator ? BGC.GetStatus).mapTo[BGC.Status].transform(f => Try(f.toOption))
+      hsf <- (coordinator ? C.GetStatus).mapTo[C.CoordinatorStatus].transform(f => Try(f.toOption))
     } yield Json.obj(
-      "blockGeneratorStatus" -> bgf.toString,
-      "historySynchronizationStatus" -> hsf.toString))
+      "blockGeneratorStatus" -> bgf.map(_.toString),
+      "historySynchronizationStatus" -> hsf.map(_.toString)))
   }
 }

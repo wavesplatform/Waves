@@ -124,4 +124,29 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     updater.processBlock(block) shouldBe a[Right[_, _]]
   }
 
+  test("able to create 2 aliases for 1 address and use them both") {
+
+    val creatorBalance0 = state.balance(aliasCreator)
+    val afee = 100000L
+    val atx1 = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("ALIAS1").right.get, afee, 1L).right.get
+    val atx2 = CreateAliasTransaction.create(aliasCreator, Alias.buildWithCurrentNetworkByte("ALIAS2").right.get, afee, 1L).right.get
+    val block = TestBlock(Seq(atx1, atx2))
+    updater.processBlock(block) shouldBe a[Success[_]]
+
+    val sender: PrivateKeyAccount = PrivateKeyAccount(randomBytes())
+
+    ensureSenderHasBalance(sender)
+    val senderBalance = state.balance(sender)
+
+    val fee = 100001L
+    val amount = 1500L
+    val tx1 = TransferTransaction.create(None, sender, Alias.buildWithCurrentNetworkByte("ALIAS1").right.get, amount, 1L, None, fee, Array()).right.get
+    val tx2 = TransferTransaction.create(None, sender, Alias.buildWithCurrentNetworkByte("ALIAS2").right.get, amount, 1L, None, fee, Array()).right.get
+
+    val oldBalance = state.balance(aliasCreator)
+    updater.processBlock(TestBlock(Seq(tx1, tx2))) shouldBe a[Success[_]]
+    state.balance(aliasCreator) shouldBe (oldBalance + amount * 2)
+
+  }
+
 }

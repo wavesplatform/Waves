@@ -109,7 +109,7 @@ object StateReader {
 
     def resolveAlias(a: Alias): Option[Account] = s.resolveAlias(a)
 
-    def getAlias(a: Account): Option[Alias] = s.aliasesOfAddress(a).headOption
+    def getAliases(a: Account): Seq[Alias] = s.aliasesOfAddress(a)
 
     def getAssetName(assetId: AssetId): String = {
       s.findTransaction[IssueTransaction](assetId)
