@@ -74,7 +74,7 @@ object StateReader {
     def included(signature: Array[Byte]): Option[Int] = s.transactionInfo(EqByteArray(signature)).map(_._1)
 
     def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] =
-      s.accountTransactionIds(account).flatMap(s.transactionInfo).map(_._2)
+      s.accountTransactionIds(account).take(limit).flatMap(s.transactionInfo).map(_._2)
 
     def balance(account: Account): Long = s.accountPortfolio(account).balance
 
