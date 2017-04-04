@@ -1,6 +1,5 @@
 package com.wavesplatform.matcher.market
 
-import scala.concurrent.duration._
 import akka.actor.{ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
@@ -11,14 +10,16 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{EqByteArray, Portfolio}
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import scorex.settings.TestBlockchainSettings
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
+
+import scala.concurrent.duration._
 
 class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   with WordSpecLike
@@ -38,7 +39,12 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
   val db = new MVStore.Builder().compress().open()
-  val storedState : StateReader = ??? // fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
+  val storedState: StateReader = stub[StateReader] // fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
+  val hugeAmount = Long.MaxValue / 2
+  (storedState.accountPortfolio _).when(*).returns(Portfolio(hugeAmount, hugeAmount, Map(
+    EqByteArray("BTC".getBytes) -> hugeAmount,
+    EqByteArray("WAVES".getBytes) -> hugeAmount
+  )))
 
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
