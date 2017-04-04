@@ -3,7 +3,7 @@ package com.wavesplatform.state2.reader
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
@@ -71,4 +71,11 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
     Option(p.exchangeTransactionsByOrder.get(orderId.arr))
       .map(_.asScala.toSet).orEmpty
       .flatMap(id => this.findTransaction[ExchangeTransaction](id))
+
+  override def accountPortfolios: Map[Account, Portfolio] =
+    p.portfolios.entrySet().asScala
+      .map { entry => entry.getKey -> entry.getValue }
+      .map { case (acc, (b, e, as)) => Account.fromPublicKey(acc) -> Portfolio(b, e, as.map { case (k, v) => EqByteArray(k) -> v }) }
+      .toMap
+
 }

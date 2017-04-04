@@ -1,6 +1,7 @@
 package com.wavesplatform.state2.reader
 
 import cats.implicits._
+import cats.kernel.Monoid
 import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
@@ -81,4 +82,6 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
       .toSet
     newEtxs ++ inner.findPreviousExchangeTxs(orderId)
   }
+
+  override def accountPortfolios: Map[Account, Portfolio] = Monoid.combine(inner.accountPortfolios, txDiff.portfolios)
 }

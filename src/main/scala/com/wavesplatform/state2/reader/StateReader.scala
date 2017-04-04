@@ -3,17 +3,18 @@ package com.wavesplatform.state2.reader
 import com.google.common.base.Charsets
 import com.wavesplatform.state2._
 import scorex.account.{Account, AccountOrAlias, Alias}
-import scorex.consensus.TransactionsOrdering
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import scorex.transaction._
 import scorex.transaction.state.database.state.AddressString
 
 import scala.reflect.ClassTag
 import scala.util.Right
 
 trait StateReader {
+  def accountPortfolios: Map[Account, Portfolio]
 
   def transactionInfo(id: ByteArray): Option[(Int, Transaction)]
 
@@ -116,6 +117,8 @@ object StateReader {
         .map(tx => new String(tx.name, Charsets.UTF_8))
         .getOrElse("Unknown")
     }
+
+    def stateHash(): Int = (BigInt(FastCryptographicHash(s.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt
   }
 
 }

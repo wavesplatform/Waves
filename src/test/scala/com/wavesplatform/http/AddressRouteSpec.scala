@@ -1,8 +1,6 @@
 package com.wavesplatform.http
 
-import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.Portfolio
 import com.wavesplatform.state2.reader.StateReader
 import org.scalacheck.Gen
@@ -12,7 +10,6 @@ import play.api.libs.json._
 import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.SecureCryptographicHash
 import scorex.wallet.Wallet
 
 class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with PropertyChecks with RestAPISettingsHelper {
@@ -136,30 +133,6 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
   routePath("/verifyText/{address}") in testVerify("verifyText", false)
   routePath("/verify/{address}") in testVerify("verify", true)
-
-  routePath("/balance/{address}/{confirmations}") in {
-    val gen = for {
-      address <- Gen.oneOf(allAddresses).label("address")
-      confirmations <- Gen.choose(1, Int.MaxValue).label("confirmations")
-      balances <- Gen.choose(1L, Long.MaxValue).label("balance")
-    } yield (address, confirmations, balances)
-
-    forAll(gen) {
-      case (address, confirmations, balances) =>
-        allAddresses should contain(address)
-
-        val m = mock[StateReader]
-        //        (m.balanceWithConfirmations _).expects(*, confirmations).returning(balances).once()
-        ???
-        val r = AddressApiRoute(restAPISettings, wallet, m).route
-
-        Get(routePath(s"/balance/$address/$confirmations")) ~> r ~> check {
-          val b = responseAs[AddressApiRoute.Balance]
-          b.balance shouldEqual balances
-          b.confirmations shouldEqual confirmations
-        }
-    }
-  }
 
   routePath("") in {
     Post(routePath("")) ~> route should produce(ApiKeyNotValid)

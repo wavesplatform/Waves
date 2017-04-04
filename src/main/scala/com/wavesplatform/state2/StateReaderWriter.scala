@@ -2,11 +2,11 @@ package com.wavesplatform.state2
 
 import java.util
 
-import cats._
-import cats.implicits._
 import cats.Monoid
+import cats.implicits._
 import com.wavesplatform.state2.reader.StateReaderImpl
 import scorex.transaction.assets.exchange.ExchangeTransaction
+
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
