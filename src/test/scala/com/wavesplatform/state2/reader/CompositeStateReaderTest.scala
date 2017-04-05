@@ -3,16 +3,15 @@ package com.wavesplatform.state2.reader
 import cats.kernel.Monoid
 import com.wavesplatform.state2.{BlockDiff, Diff, EffectiveBalanceSnapshot}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FunSuite, Matchers, PropSpec}
+import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.Account
 
-class CompositeStateReaderTest extends PropSpec with MockFactory with Matchers {
+class CompositeStateReaderTest extends FreeSpec with MockFactory with Matchers {
 
   val acc: Account = Account.fromPublicKey(Array.emptyByteArray)
   val innerHeight = 1000
 
-  property("exposes inner effective balance" +
-    " if blockDiff contains no effective balance hanges") {
+  "if blockDiff contains no effective balance changes" in {
     val heightDiff = 100
     val blockDiff = BlockDiff(
       txsDiff = Monoid[Diff].empty,
@@ -28,22 +27,57 @@ class CompositeStateReaderTest extends PropSpec with MockFactory with Matchers {
     composite.effectiveBalanceAtHeightWithConfirmations(acc, innerHeight + heightDiff, 30) shouldBe 10000
   }
 
+  "if blockDiff contains effective balance changes" - {
+    "confirmations required is less than blockDiff height and info is present" in {
+      val heightDiff = 100
+      val blockDiff = BlockDiff(
+        txsDiff = Monoid[Diff].empty,
+        heightDiff = heightDiff,
+        effectiveBalanceSnapshots = Seq(
+          EffectiveBalanceSnapshot(acc, innerHeight + 80, 10000, 50000)))
 
-  property("exposes minimum of all 'current' and  one 'previous' of oldest record of diff" +
-    " if confirmations required is less than blockDiff height and info is present") {
-    val heightDiff = 100
-    val blockDiff = BlockDiff(
-      txsDiff = Monoid[Diff].empty,
-      heightDiff = heightDiff,
-      effectiveBalanceSnapshots = Seq(
-        EffectiveBalanceSnapshot(acc, innerHeight + 80, 10000, 50000)))
+      val inner = stub[StateReader]
+      (inner.height _).when().returns(innerHeight)
 
-    val inner = stub[StateReader]
-    (inner.height _).when().returns(innerHeight)
+      val composite = new CompositeStateReader(inner, blockDiff)
+      composite.effectiveBalanceAtHeightWithConfirmations(acc, innerHeight + heightDiff, 30) shouldBe 10000
+    }
 
-    val composite = new CompositeStateReader(inner, blockDiff)
-    composite.effectiveBalanceAtHeightWithConfirmations(acc, innerHeight + heightDiff, 30) shouldBe 10000
+    "confirmations required is greater or equal blockdiff.height" - {
+
+      "nothing is stored(Genesis block snapshot results are in memory)" in {
+        val heightDiff = 100
+        val blockDiff = BlockDiff(
+          txsDiff = Monoid[Diff].empty,
+          heightDiff = heightDiff,
+          effectiveBalanceSnapshots = Seq(
+            EffectiveBalanceSnapshot(acc, 80, 2000, 10000),
+            EffectiveBalanceSnapshot(acc, 90, 10000, 50000)))
+
+        val inner = stub[StateReader]
+        (inner.height _).when().returns(0)
+
+        val composite = new CompositeStateReader(inner, blockDiff)
+        composite.effectiveBalanceAtHeightWithConfirmations(acc, heightDiff, heightDiff + 100) shouldBe 2000
+      }
+
+      "some history of acc is stored" in {
+        val heightDiff = 100
+        val blockDiff = BlockDiff(
+          txsDiff = Monoid[Diff].empty,
+          heightDiff = heightDiff,
+          effectiveBalanceSnapshots = Seq(
+            EffectiveBalanceSnapshot(acc, 80, 2000, 10000),
+            EffectiveBalanceSnapshot(acc, 90, 10000, 50000)))
+
+        val inner = stub[StateReader]
+        (inner.height _).when().returns(innerHeight)
+        val innerEffectiveBalance = 500
+        (inner.effectiveBalanceAtHeightWithConfirmations _).when(*, *, *).returns(innerEffectiveBalance)
+
+        val composite = new CompositeStateReader(inner, blockDiff)
+        composite.effectiveBalanceAtHeightWithConfirmations(acc, heightDiff, heightDiff + 50) shouldBe 500
+      }
+    }
   }
-
-
 }
