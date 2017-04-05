@@ -16,6 +16,7 @@ import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.transaction.TransactionParser.TransactionType
+import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
 
 import scala.compat.java8.FutureConverters._
@@ -29,11 +30,13 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
 
   import Node._
 
-  val privateKey = config.getString("private-key")
-  val publicKey = config.getString("public-key")
-  val address = config.getString("address")
-  val settings = WavesSettings.fromConfig(config)
+  val privateKey: String = config.getString("private-key")
+  val publicKey: String = config.getString("public-key")
+  val address: String = config.getString("address")
+  val accountSeed: String = config.getString("account-seed")
+  val settings: WavesSettings = WavesSettings.fromConfig(config)
 
+  private val blockDelay = settings.blockchainSettings.genesisSettings.averageBlockDelay
   private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
   def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long =
@@ -56,13 +59,22 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://localhost:${nodeInfo.hostRestApiPort}$path")).build())
 
-  def post(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+  def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+    retrying(f(_get(s"http://localhost:${nodeInfo.hostMatcherApiPort}$path")).build())
+
+  def post(url: String, port: Int, path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(
-      _post(s"http://localhost:${nodeInfo.hostRestApiPort}$path").setHeader("api_key", "integration-test-rest-api")
+      _post(s"$url:$port$path").setHeader("api_key", "integration-test-rest-api")
     ).build())
 
   def post[A: Writes](path: String, body: A): Future[Response] =
-    post(path, (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
+    post("http://localhost", nodeInfo.hostRestApiPort, path,
+      (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
+
+  def matcherPost[A: Writes](path: String, body: A): Future[Response] =
+    post("http://localhost", nodeInfo.hostMatcherApiPort, path,
+      (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
+
 
   def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
@@ -85,8 +97,6 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
   def status: Future[Status] = get("/node/status").as[Status]
 
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
-
-  def assetBalance(address: String, assetId: String): Future[Long] = get(s"/assets/balance/$address/$assetId").as[JsValue].map(v => (v \ "balance").as[Long])
 
   def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](transactionInfo(txId).transform {
     case Success(tx) => Success(Some(tx))
@@ -121,6 +131,12 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
   def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Future[Transaction] =
     post("/assets/burn", BurnRequest(sourceAddress, assetId, quantity, fee)).as[Transaction]
 
+  def assetBalance(address: String, asset: String): Future[AssetBalance] =
+    get(s"/assets/balance/$address/$asset").as[AssetBalance]
+
+  def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
+    post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
+
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     post("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
@@ -128,31 +144,107 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
     timer.retryUntil(f, cond, retryInterval)
 
   def createAddress: Future[String] =
-    post("/addresses").as[JsValue].map(v => (v \ "address").as[String])
+    post("http://localhost", nodeInfo.hostRestApiPort, "/addresses").as[JsValue].map(v => (v \ "address").as[String])
+
+  def waitForNextBlock: Future[Block] = for {
+    currentBlock <- lastBlock
+    actualBlock <- findBlock(_.height > currentBlock.height, currentBlock.height)
+  } yield actualBlock
+
+  def findBlock(cond: Block => Boolean, from: Long = 1, to: Long = Long.MaxValue): Future[Block] = {
+    def load(_from: Long, _to: Long): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
+      blocks.find(cond).fold[Future[Node.Block]] {
+        val maybeLastBlock = blocks.lastOption
+        if (maybeLastBlock.exists(_.height >= to)) {
+          Future.failed(new NoSuchElementException)
+        } else {
+          val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19L).min(to))
+          val newTo = newFrom + 19
+          log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 19}]")
+          timer.schedule(load(newFrom, newTo), blockDelay)
+        }
+      }(Future.successful)
+    }
+
+    load(from, (from + 19).min(to))
+  }
+
+  def getGeneratedBlocks(address: String, from: Long, to: Long): Future[Seq[Block]] =
+    get(s"/blocks/address/$address/$from/$to").as[Seq[Block]]
+
+  def issueAsset(address: String, name: String, description: String, quantity: Long, decimals: Byte, fee: Long,
+                 reissuable: Boolean): Future[Transaction] =
+    post("/assets/issue", IssueRequest(address, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
+
+  def placeOrder(order: Order): Future[MatcherResponse] = {
+    matcherPost("/matcher/orderbook", order.json).as[MatcherResponse]
+  }
+
+  def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
+    matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId").as[MatcherStatusResponse]
+
+  def getOrderBook(asset: String): Future[OrderBookResponse] =
+    matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
 }
 
 object Node extends ScorexLogging {
+
   case class UnexpectedStatusCodeException(r: Response) extends IOException(s"Unexpected status code: ${r.getStatusCode}")
 
   case class Status(blockGeneratorStatus: String, historySynchronizationStatus: String)
+
   implicit val statusFormat: Format[Status] = Json.format
 
   case class Peer(address: String, declaredAddress: String, peerName: String)
+
   implicit val peerFormat: Format[Peer] = Json.format
 
   case class Balance(address: String, confirmations: Int, balance: Long)
+
   implicit val balanceFormat: Format[Balance] = Json.format
 
+  case class AssetBalance(address: String, assetId: String, balance: Long)
+
+  implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
+
   case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long)
+
   implicit val transactionFormat: Format[Transaction] = Json.format
 
-  case class Block(signature: String, height: Long, timestamp: Long, generator: String, transactions: Seq[Transaction])
+  case class Block(signature: String, height: Long, timestamp: Long, generator: String, transactions: Seq[Transaction],
+                   fee: Long)
+
   implicit val blockFormat: Format[Block] = Json.format
+
+  case class MatcherMessage(id: String)
+
+  implicit val matcherMessageFormat: Format[MatcherMessage] = Json.format
+
+  case class MatcherResponse(status: String, message: MatcherMessage)
+
+  implicit val matcherResponseFormat: Format[MatcherResponse] = Json.format
+
+  case class MatcherStatusResponse(status: String)
+
+  implicit val matcherStatusResponseFormat: Format[MatcherStatusResponse] = Json.format
+
+  case class PairResponse(amountAsset: String, priceAsset: String)
+
+  implicit val pairResponseFormat: Format[PairResponse] = Json.format
+
+  case class LevelResponse(price: Long, amount: Long)
+
+  implicit val levelResponseFormat: Format[LevelResponse] = Json.format
+
+  case class OrderBookResponse(timestamp: Long, pair: PairResponse, bids: List[LevelResponse], asks: List[LevelResponse])
+
+  implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
 
   implicit class ResponseFutureExt(val f: Future[Response]) extends AnyVal {
     def as[A: Format](implicit ec: ExecutionContext): Future[A] =
       f.transform {
         case Success(r) if r.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200 =>
+          log.debug(s"Response: ${r.getResponseBody}")
           Try(parse(r.getResponseBody).as[A])
         case Success(r) =>
           log.debug(s"Error parsing response ${r.getResponseBody}")
@@ -160,4 +252,5 @@ object Node extends ScorexLogging {
         case Failure(t) => Failure[A](t)
       }(ec)
   }
+
 }
