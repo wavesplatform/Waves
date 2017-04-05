@@ -40,8 +40,8 @@ object CommonValidation {
           val temporaryStateWhileTransfer = Monoid[Portfolio].combineAll(Seq(s.accountPortfolio(sender), amountDiff, feeDiff))
 
           if (temporaryStateWhileTransfer.balance < 0 || temporaryStateWhileTransfer.assets.values.exists(_ < 0))
-            Left(TransactionValidationError(ttx, s"Attempt to transfer unavailable funds." +
-              s" TransactionApplication leads to temporary negative state: $temporaryStateWhileTransfer"))
+            Left(TransactionValidationError(ttx, s"Attempt to transfer unavailable funds:" +
+              s" TransactionApplication leads from ${s.accountPortfolio(sender)} to temporary negative state: $temporaryStateWhileTransfer"))
           else Right(tx)
         case _ => Right(tx)
       } else Right(tx)

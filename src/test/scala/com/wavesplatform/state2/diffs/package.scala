@@ -2,7 +2,10 @@ package com.wavesplatform.state2
 
 import java.util
 
+import org.h2.mvstore.MVStore
 import scorex.account.Account
+
+import scala.util.{Left, Right}
 
 package object diffs {
   def ensureSenderHasEnoughBalance(s: StateWriter)(sender: Account, assets: List[ByteArray]): Unit = {
@@ -13,6 +16,14 @@ package object diffs {
     ).asBlockDiff)
   }
 
+  implicit class EitherExt[A, B](ei: Either[A, B]) {
+    def explicitGet(): B = ei match {
+      case Left(value) => throw new Exception(value.toString)
+      case Right(value) => value
+    }
+  }
+
+  def newState(): StateWriterImpl = new StateWriterImpl(new MVStorePrimitiveImpl(new MVStore.Builder().open()))
 
   class TestStorage extends JavaMapStorage {
     override val transactions = new util.HashMap[Array[Byte], (Int, Array[Byte])]

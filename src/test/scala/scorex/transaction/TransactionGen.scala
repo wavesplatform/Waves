@@ -12,8 +12,8 @@ import scorex.utils.{ByteArrayExtension, NTP}
 
 trait TransactionGen {
 
-  val MAX_LONG = Long.MaxValue / 10
-  val MAX_INT = Int.MaxValue / 10
+  val MAX_LONG = Long.MaxValue / 100
+  val MAX_INT = Int.MaxValue / 100
 
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray)
   val bytes64gen: Gen[Array[Byte]] = Gen.listOfN(64, Arbitrary.arbitrary[Byte]).map(_.toArray)
@@ -52,11 +52,13 @@ trait TransactionGen {
     suchThat(p => !ByteArrayExtension.sameOption(p._1, p._2)).
     map(p => AssetPair(p._1, p._2))
 
-  val genesisGenerator: Gen[GenesisTransaction] = for {
-    recipient: PrivateKeyAccount <- accountGen
+  val genesisGenerator: Gen[GenesisTransaction] = accountGen.flatMap(genesisGeneratorWithRecipient)
+
+  def genesisGeneratorWithRecipient(recipient: PrivateKeyAccount): Gen[GenesisTransaction] = for {
     amt <- positiveLongGen
     ts <- positiveIntGen
   } yield GenesisTransaction.create(recipient, amt, ts).right.get
+
 
   val paymentGenerator: Gen[PaymentTransaction] = for {
     amount: Long <- Gen.choose(0, MAX_LONG)
@@ -114,12 +116,16 @@ trait TransactionGen {
   } yield PaymentTransaction.create(account, account, amount, fee, timestamp).right.get
 
   val transferGenerator: Gen[TransferTransaction] = for {
-    amount: Long <- Gen.choose(0, MAX_LONG)
-    feeAmount: Long <- Gen.choose(0, MAX_LONG - amount - 1)
     assetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
     feeAssetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
+    account: PrivateKeyAccount <- accountGen
+    tx <- transferGeneratorP(account, assetId, feeAssetId)
+  } yield tx
+
+  def transferGeneratorP(sender: PrivateKeyAccount, assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction] = for {
+    amount: Long <- Gen.choose(0, MAX_LONG)
+    feeAmount: Long <- smallFeeGen
     timestamp: Long <- positiveLongGen
-    sender: PrivateKeyAccount <- accountGen
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
     recipient: AccountOrAlias <- accountOrAliasGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
@@ -181,11 +187,9 @@ trait TransactionGen {
   } yield (Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee), sender)
 
 
-  val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
-    sender: PrivateKeyAccount <- accountGen
+  def issueReissueGeneratorP(quantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
     assetName <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
     description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
-    quantity <- positiveLongGen
     burnAmount <- Gen.choose(0L, quantity)
     decimals <- Gen.choose(0: Byte, 8: Byte)
     reissuable <- Arbitrary.arbitrary[Boolean]
@@ -202,21 +206,11 @@ trait TransactionGen {
     (issue, issue2, reissue, burn)
   }
 
-  val issueWithInvalidReissuesGenerator: Gen[(IssueTransaction, ReissueTransaction, ReissueTransaction)] = for {
+  val issueReissueGenerator: Gen[(IssueTransaction, IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
+    q <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
-    assetName <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-    description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
-    quantity <- positiveLongGen
-    decimals <- Gen.choose(0: Byte, 8: Byte)
-    fee <- Gen.choose(1L, 2000000L)
-    iFee <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
-    timestamp <- positiveLongGen
-  } yield {
-    val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).right.get
-    val reissue1 = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable = false, fee, timestamp).right.get
-    val reissue2 = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable = true, fee, timestamp + 1).right.get
-    (issue, reissue1, reissue2)
-  }
+    r <- issueReissueGeneratorP(q, sender)
+  } yield r
 
   val issueGenerator: Gen[IssueTransaction] = issueReissueGenerator.map(_._1)
   val reissueGenerator: Gen[ReissueTransaction] = issueReissueGenerator.map(_._3)
