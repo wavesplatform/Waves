@@ -30,10 +30,7 @@ object PaymentTransactionDiff {
             balance = -tx.amount - tx.fee,
             effectiveBalance = -tx.amount - tx.fee,
             assets = Map.empty
-          )
-        ),
-        assetInfos = Map.empty
-      ))
+          ))))
     }
   }
 }

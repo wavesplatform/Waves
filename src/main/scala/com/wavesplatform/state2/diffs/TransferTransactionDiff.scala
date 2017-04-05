@@ -35,15 +35,15 @@ object TransferTransactionDiff {
             Map(sender -> Portfolio(0, 0, Map(EqByteArray(aid) -> -tx.fee)))
         }
       )
-      a1 = tx.assetId match {
+      assetIssued = tx.assetId match {
         case None => true
         case Some(aid) => state.assetInfo(EqByteArray(aid)).isDefined
       }
-      a2 = tx.feeAssetId match {
+      feeAssetIssued = tx.feeAssetId match {
         case None => true
         case Some(aid) => state.assetInfo(EqByteArray(aid)).isDefined
       }
-    } yield (portfolios, blockTime > s.allowUnissuedAssetsUntil && !(a1 && a2))
+    } yield (portfolios, blockTime > s.allowUnissuedAssetsUntil && !(assetIssued && feeAssetIssued))
 
     isInvalidEi match {
       case Left(e) => Left(e)
@@ -51,11 +51,7 @@ object TransferTransactionDiff {
         if (invalid)
           Left(TransactionValidationError(tx, s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
         else
-          Right(Diff(height = height,
-            tx = tx,
-            portfolios = portfolios,
-            assetInfos = Map.empty
-          ))
+          Right(Diff(height, tx, portfolios))
     }
   }
 }

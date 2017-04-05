@@ -12,8 +12,8 @@ import scorex.utils.{ByteArrayExtension, NTP}
 
 trait TransactionGen {
 
-  val MAX_LONG = Long.MaxValue / 3
-  val MAX_INT = Int.MaxValue / 3
+  val MAX_LONG = Long.MaxValue / 10
+  val MAX_INT = Int.MaxValue / 10
 
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray)
   val bytes64gen: Gen[Array[Byte]] = Gen.listOfN(64, Arbitrary.arbitrary[Byte]).map(_.toArray)
@@ -25,6 +25,9 @@ trait TransactionGen {
   def genBoundedString(minSize: Int, maxSize: Int): Gen[Array[Byte]] = {
     Gen.choose(minSize, maxSize) flatMap { sz => Gen.listOfN(sz, Gen.choose(0, 0x7f).map(_.toByte)).map(_.toArray) }
   }
+
+  def nelMax[T](g: Gen[T], max: Int = 10): Gen[List[T]] = Gen.choose(1, max).flatMap(Gen.listOfN(_, g))
+
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val aliasGen: Gen[Alias] = genBoundedString(Alias.MinLength, Alias.MaxLength)
@@ -48,6 +51,12 @@ trait TransactionGen {
   val assetPairGen = Gen.zip(assetIdGen, assetIdGen).
     suchThat(p => !ByteArrayExtension.sameOption(p._1, p._2)).
     map(p => AssetPair(p._1, p._2))
+
+  val genesisGenerator: Gen[GenesisTransaction] = for {
+    recipient: PrivateKeyAccount <- accountGen
+    amt <- positiveLongGen
+    ts <- positiveIntGen
+  } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
   val paymentGenerator: Gen[PaymentTransaction] = for {
     amount: Long <- Gen.choose(0, MAX_LONG)
