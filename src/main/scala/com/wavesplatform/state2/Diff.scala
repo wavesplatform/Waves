@@ -40,8 +40,14 @@ object Diff {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)
 
     lazy val accountTransactionIds: Map[Account, List[ByteArray]] = {
-      val map: List[(Account, List[ByteArray])] = d.transactions.toList.flatMap { case (id, (h, tx, accs)) => accs.map(_ -> List(id)) }
-      map.foldLeft(Map.empty[Account, List[ByteArray]]) { case (m, (acc, list)) => m.combine(Map(acc -> list)) }
+      val map: List[(Account, List[(Int, Long, ByteArray)])] = d.transactions.toList
+        .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> List((h, tx.timestamp, id))) }
+      val groupedByAcc = map.foldLeft(Map.empty[Account, List[(Int, Long, ByteArray)]]) { case (m, (acc, list)) =>
+        m.combine(Map(acc -> list))
+      }
+      groupedByAcc
+        .mapValues(l => l.sortBy { case ((h, t, id)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
+        .mapValues(_.map(_._3))
     }
 
     lazy val paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = d.transactions

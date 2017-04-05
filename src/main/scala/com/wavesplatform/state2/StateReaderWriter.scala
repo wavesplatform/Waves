@@ -58,9 +58,11 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
     blockDiff.txsDiff.accountTransactionIds.foreach { case (acc, txIds) =>
       Option(p.accountTransactionIds.get(acc.bytes)) match {
         case Some(ll) =>
-          p.accountTransactionIds.put(acc.bytes, txIds.map(_.arr).reverse ++ll)
+          // [h=12, h=11, h=10] ++ [h=9, ...]
+          p.accountTransactionIds.put(acc.bytes, txIds.map(_.arr) ++ ll)
         case None =>
-          p.accountTransactionIds.put(acc.bytes, txIds.map(_.arr).reverse)
+          // [h=2, h=1, h=0]
+          p.accountTransactionIds.put(acc.bytes, txIds.map(_.arr))
       }
     }
 

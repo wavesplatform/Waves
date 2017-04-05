@@ -30,7 +30,7 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def accountTransactionIds(a: Account): Seq[ByteArray] = {
     val fromDiff = txDiff.accountTransactionIds.get(a).orEmpty
-    fromDiff ++ inner.accountTransactionIds(a)
+    fromDiff ++ inner.accountTransactionIds(a) // fresh head ++ stale tail
   }
 
   override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long = {
@@ -45,14 +45,16 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     else {
       if (confs < blockDiff.heightDiff) {
         relatedUpdates.headOption match {
-          case None => localEffectiveBalanceSnapshotsOfAccount.last.effectiveBalance
-          case Some(relatedUpdate) => Math.min(relatedUpdate.prevEffectiveBalance, relatedUpdates.map(_.effectiveBalance).min)
+          case None =>
+            localEffectiveBalanceSnapshotsOfAccount.maxBy(_.height).effectiveBalance
+          case Some(relatedUpdate) =>
+            Math.min(relatedUpdate.prevEffectiveBalance, relatedUpdates.map(_.effectiveBalance).min)
         }
       }
       else {
         val localMin = localEffectiveBalanceSnapshotsOfAccount.map(_.effectiveBalance).min
         val prevEffBalance = if (inner.height == 0)
-          localEffectiveBalanceSnapshotsOfAccount.head.prevEffectiveBalance
+          localEffectiveBalanceSnapshotsOfAccount.minBy(_.height).prevEffectiveBalance
         else
           storedEffectiveBalance
         Math.min(prevEffBalance, localMin)
