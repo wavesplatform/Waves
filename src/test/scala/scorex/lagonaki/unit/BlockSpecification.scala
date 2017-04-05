@@ -1,21 +1,20 @@
 package scorex.lagonaki.unit
 
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
-import scorex.settings.TestBlockchainSettings
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
-import scala.concurrent.duration._
 import scala.util.Random
 
-class BlockSpecification extends FunSuite with Matchers with scorex.waves.TestingCommons {
+class BlockSpecification extends FunSuite with Matchers with MockFactory with UnitTestConfig {
 
   test("Nxt block with txs bytes/parse roundtrip") {
-    implicit val consensusModule = new WavesConsensusModule(TestBlockchainSettings.Disabled)
-    implicit val transactionModule = new SimpleTransactionModule(TestBlockchainSettings.Disabled.genesisSettings)(application.settings, application)
+    implicit val consensusModule = new WavesConsensusModule(blockchainSettings)
+    implicit val transactionModule = mock[TransactionModule]
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
     val gen = PrivateKeyAccount(reference)
