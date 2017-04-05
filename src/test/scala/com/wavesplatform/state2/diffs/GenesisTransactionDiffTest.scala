@@ -18,16 +18,14 @@ class GenesisTransactionDiffTest extends PropSpec with PropertyChecks with Gener
     }
   }
 
-  property("establishes waves invariant") {
+  property("Diff establishes Waves invariant") {
     forAll(nelMax(genesisGenerator), accountGen) { (gtxs, miner) =>
-      val totalDiff = BlockDiffer(TestFunctionalitySettings.Enabled)(new StateReaderImpl(new TestStorage), TestBlock(gtxs, miner)).right.get
-
-      val totalPortfolioDiff: Portfolio = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
-
-      totalPortfolioDiff.balance shouldBe gtxs.map(_.amount).sum
-      totalPortfolioDiff.effectiveBalance shouldBe gtxs.map(_.amount).sum
-      totalPortfolioDiff.assets shouldBe Map.empty
+      assertDiffEi(Seq.empty, TestBlock(gtxs, miner)) { (blockDiffEi) =>
+        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiffEi.explicitGet().txsDiff.portfolios.values)
+        totalPortfolioDiff.balance shouldBe gtxs.map(_.amount).sum
+        totalPortfolioDiff.effectiveBalance shouldBe gtxs.map(_.amount).sum
+        totalPortfolioDiff.assets shouldBe Map.empty
+      }
     }
   }
-
 }

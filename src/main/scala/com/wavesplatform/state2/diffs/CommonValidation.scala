@@ -24,7 +24,8 @@ object CommonValidation {
     if (blockTime >= settings.allowTemporaryNegativeUntil)
       tx match {
         case ptx: PaymentTransaction if s.accountPortfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
-          Left(TransactionValidationError(ptx, "Attempt to transfer unavailable funds"))
+          Left(TransactionValidationError(ptx, s"Attempt to pay unavailable funds: balance " +
+            s"${s.accountPortfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction =>
           val sender: Account = ttx.sender
 

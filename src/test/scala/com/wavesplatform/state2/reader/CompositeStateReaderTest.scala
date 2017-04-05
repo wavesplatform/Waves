@@ -3,16 +3,16 @@ package com.wavesplatform.state2.reader
 import cats.kernel.Monoid
 import com.wavesplatform.state2.{BlockDiff, Diff, EffectiveBalanceSnapshot}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers, PropSpec}
 import scorex.account.Account
 
-class CompositeStateReaderTest extends FunSuite with MockFactory with Matchers {
+class CompositeStateReaderTest extends PropSpec with MockFactory with Matchers {
 
   val acc: Account = Account.fromPublicKey(Array.emptyByteArray)
   val innerHeight = 1000
 
-  test("exposes inner info" +
-    " if blockDiff contains no related info") {
+  property("exposes inner effective balance" +
+    " if blockDiff contains no effective balance hanges") {
     val heightDiff = 100
     val blockDiff = BlockDiff(
       txsDiff = Monoid[Diff].empty,
@@ -29,7 +29,7 @@ class CompositeStateReaderTest extends FunSuite with MockFactory with Matchers {
   }
 
 
-  test("exposes minimum of all 'current' and  one 'previous' of oldest record of diff" +
+  property("exposes minimum of all 'current' and  one 'previous' of oldest record of diff" +
     " if confirmations required is less than blockDiff height and info is present") {
     val heightDiff = 100
     val blockDiff = BlockDiff(

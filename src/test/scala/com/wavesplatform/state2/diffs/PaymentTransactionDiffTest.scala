@@ -1,26 +1,36 @@
 package com.wavesplatform.state2.diffs
 
-import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{Diff, _}
-import org.h2.mvstore.MVStore
-import org.scalatest.{Matchers, PropSpec}
+import cats.Monoid
+import com.wavesplatform.state2._
+import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import scorex.transaction.TransactionGen
+import org.scalatest.{Matchers, PropSpec}
+import scorex.lagonaki.mocks.TestBlock
+import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction, TransactionGen}
 
 class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
-  property("creates 1(not 2) PaymentTransaction of a sender account if sender when paying to self") {
-    forAll(selfPaymentGenerator) { payment =>
-      val p = new MVStorePrimitiveImpl(new MVStore.Builder().open())
-      val state = new StateWriterImpl(p)
+  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
-      val account = payment.sender.toAccount
-      state.applyBlockDiff(new Diff(Map.empty,
-        Map(account -> Portfolio(payment.amount + payment.fee, payment.amount + payment.fee, Map.empty)),
-        Map.empty, Map.empty).asBlockDiff)
+  val preconditionsAndPayment: Gen[(Seq[Transaction], PaymentTransaction)] = for {
+    master <- accountGen
+    recipient <- recipientGen(master)
+    ts <- positiveIntGen
+    genesis: GenesisTransaction = GenesisTransaction.create(master, enoughAmt, ts).right.get
+    preconditions: Seq[Transaction] = Seq(genesis)
+    transfer: PaymentTransaction <- paymentGeneratorP(master, recipient)
+  } yield (preconditions, transfer)
 
-      val diffEi = PaymentTransactionDiff.apply(state, 1, FunctionalitySettings.MAINNET, Long.MaxValue)(payment)
-      diffEi.right.get.accountTransactionIds(account).size shouldBe 1
+
+  property("Diff doesn't break invariant") {
+    forAll(preconditionsAndPayment, accountGen) { case ((pre, payment), miner) =>
+      assertDiffAndState(Seq(TestBlock(pre)), TestBlock(Seq(payment), miner)) { (blockDiff, newState) =>
+        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
+        totalPortfolioDiff.balance shouldBe 0
+        totalPortfolioDiff.effectiveBalance shouldBe 0
+
+        newState.accountTransactionIds(payment.sender).size shouldBe 2 // genesis and payment
+      }
     }
   }
 }

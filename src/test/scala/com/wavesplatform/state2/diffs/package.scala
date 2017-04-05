@@ -2,8 +2,12 @@ package com.wavesplatform.state2
 
 import java.util
 
+import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import org.h2.mvstore.MVStore
 import scorex.account.Account
+import scorex.block.Block
+import scorex.settings.TestFunctionalitySettings
+import scorex.transaction.ValidationError
 
 import scala.util.{Left, Right}
 
@@ -24,6 +28,40 @@ package object diffs {
   }
 
   def newState(): StateWriterImpl = new StateWriterImpl(new MVStorePrimitiveImpl(new MVStore.Builder().open()))
+
+  val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = BlockDiffer(TestFunctionalitySettings.Enabled)
+  val enoughAmt: Long = Long.MaxValue / 2
+
+  def assertDiffEi(preconditions: Seq[Block], block: Block)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
+    val state = newState()
+    preconditions.foreach { precondition =>
+      val preconditionDiff = differ(state, precondition).explicitGet()
+      state.applyBlockDiff(preconditionDiff)
+    }
+    val totalDiff1 = differ(state, block)
+    assertion(totalDiff1)
+
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(TestFunctionalitySettings.Enabled)(newState(), preconditions)
+    val compositeState = new CompositeStateReader(newState(), preconditionDiff)
+    val totalDiff2 = differ(compositeState, block)
+    assertion(totalDiff2)
+  }
+
+  def assertDiffAndState(preconditions: Seq[Block], block: Block)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
+    val state = newState()
+    preconditions.foreach { precondition =>
+      val preconditionDiff = differ(state, precondition).explicitGet()
+      state.applyBlockDiff(preconditionDiff)
+    }
+    val totalDiff1 = differ(state, block).explicitGet()
+    state.applyBlockDiff(totalDiff1)
+    assertion(totalDiff1, state)
+
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(TestFunctionalitySettings.Enabled)(newState(), preconditions)
+    val compositeState = new CompositeStateReader(newState(), preconditionDiff)
+    val totalDiff2 = differ(compositeState, block).explicitGet()
+    assertion(totalDiff2, new CompositeStateReader(compositeState, totalDiff2))
+  }
 
   class TestStorage extends JavaMapStorage {
     override val transactions = new util.HashMap[Array[Byte], (Int, Array[Byte])]

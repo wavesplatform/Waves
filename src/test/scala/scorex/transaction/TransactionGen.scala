@@ -3,8 +3,8 @@ package scorex.transaction
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.enablers.Containing
 import org.scalatest.matchers.{BeMatcher, MatchResult}
-import scorex.account._
 import scorex.account.PublicKeyAccount._
+import scorex.account._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -28,13 +28,15 @@ trait TransactionGen {
 
   def nelMax[T](g: Gen[T], max: Int = 10): Gen[List[T]] = Gen.choose(1, max).flatMap(Gen.listOfN(_, g))
 
-
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
+
   val aliasGen: Gen[Alias] = genBoundedString(Alias.MinLength, Alias.MaxLength)
     .map(ar => new String(ar))
     .suchThat(!_.contains("\n"))
     .suchThat(s => s.trim == s)
     .map(Alias.buildWithCurrentNetworkByte(_).right.get)
+
+  def recipientGen(sender: PrivateKeyAccount): Gen[PrivateKeyAccount] = accountGen.flatMap(Gen.oneOf(sender, _))
 
   val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAccount(_)))
 
@@ -48,25 +50,28 @@ trait TransactionGen {
   val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
   val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen)))
 
-  val assetPairGen = Gen.zip(assetIdGen, assetIdGen).
+  val assetPairGen: Gen[AssetPair] = Gen.zip(assetIdGen, assetIdGen).
     suchThat(p => !ByteArrayExtension.sameOption(p._1, p._2)).
     map(p => AssetPair(p._1, p._2))
 
-  val genesisGenerator: Gen[GenesisTransaction] = accountGen.flatMap(genesisGeneratorWithRecipient)
+  val genesisGenerator: Gen[GenesisTransaction] = accountGen.flatMap(genesisGeneratorP)
 
-  def genesisGeneratorWithRecipient(recipient: PrivateKeyAccount): Gen[GenesisTransaction] = for {
+  def genesisGeneratorP(recipient: PrivateKeyAccount): Gen[GenesisTransaction] = for {
     amt <- positiveLongGen
     ts <- positiveIntGen
   } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
+  def paymentGeneratorP(sender: PrivateKeyAccount, recipient: PrivateKeyAccount): Gen[PaymentTransaction] = for {
+    amount: Long <- Gen.choose(0, MAX_LONG)
+    fee: Long <- smallFeeGen
+    timestamp: Long <- positiveLongGen
+  } yield PaymentTransaction.create(sender, recipient, amount, fee, timestamp).right.get
 
   val paymentGenerator: Gen[PaymentTransaction] = for {
-    amount: Long <- Gen.choose(0, MAX_LONG)
-    fee: Long <- Gen.choose(0, MAX_LONG - amount - 1)
-    timestamp: Long <- positiveLongGen
-    sender: PrivateKeyAccount <- accountGen
-    recipient: PrivateKeyAccount <- accountGen
-  } yield PaymentTransaction.create(sender, recipient, amount, fee, timestamp).right.get
+    sender <- accountGen
+    rec <- accountGen
+    r <- paymentGeneratorP(sender, rec)
+  } yield r
 
   val leaseAndCancelGenerator: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -119,15 +124,17 @@ trait TransactionGen {
     assetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
     feeAssetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
     account: PrivateKeyAccount <- accountGen
-    tx <- transferGeneratorP(account, assetId, feeAssetId)
+    recipient: PrivateKeyAccount <- accountGen
+    tx <- transferGeneratorP(account, recipient, assetId, feeAssetId)
   } yield tx
 
-  def transferGeneratorP(sender: PrivateKeyAccount, assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction] = for {
+
+  def transferGeneratorP(sender: PrivateKeyAccount, recipient: AccountOrAlias,
+                         assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction] = for {
     amount: Long <- Gen.choose(0, MAX_LONG)
     feeAmount: Long <- smallFeeGen
     timestamp: Long <- positiveLongGen
     attachment: Array[Byte] <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-    recipient: AccountOrAlias <- accountOrAliasGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
 
