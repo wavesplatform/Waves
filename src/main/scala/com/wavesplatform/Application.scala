@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import java.io.File
+import java.security.Security
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.{Config, ConfigFactory}
@@ -131,6 +132,10 @@ object Application extends ScorexLogging {
   }
 
   def main(args: Array[String]): Unit = {
+    // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
+    // http://stackoverflow.com/a/17219327
+    Security.setProperty("networkaddress.cache.ttl" , "0")
+
     log.info("Starting...")
 
     val config = readConfig(args.headOption)

@@ -55,9 +55,7 @@ val commonSettings: Seq[Setting[_]] = Seq(
     // may be can't use with jstack and others tools
     "-J-XX:+PerfDisableSharedMem",
     "-J-XX:+ParallelRefProcEnabled",
-    "-J-XX:+UseStringDeduplication",
-
-    "-J-Dsun.net.inetaddr.ttl=60"),
+    "-J-XX:+UseStringDeduplication"),
   assemblyMergeStrategy in assembly := {
     case "application.conf" => MergeStrategy.concat
     case x =>
