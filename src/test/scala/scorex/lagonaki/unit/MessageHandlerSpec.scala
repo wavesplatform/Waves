@@ -2,13 +2,16 @@ package scorex.lagonaki.unit
 
 import java.nio.ByteBuffer
 
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.FunSuite
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler}
+import scorex.transaction.{SimpleTransactionModule, TransactionModule}
 
-class MessageHandlerSpec extends FunSuite with scorex.waves.TestingCommons {
+class MessageHandlerSpec extends FunSuite with MockFactory with UnitTestConfig {
 
-  implicit val consensusModule = application.consensusModule
-  implicit val transactionModule = application.transactionModule
+  implicit val consensusModule = new WavesConsensusModule(blockchainSettings)
+  implicit val transactionModule = mock[TransactionModule]
 
   private lazy val repo = new BasicMessagesRepo()
   private lazy val handler = new MessageHandler(repo.specs)
