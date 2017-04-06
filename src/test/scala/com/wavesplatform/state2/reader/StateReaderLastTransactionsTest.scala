@@ -7,7 +7,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction, TransactionGen}
 
-class CompositeStateReaderLastTransactionsTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
+class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 

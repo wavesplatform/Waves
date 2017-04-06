@@ -76,16 +76,21 @@ trait TransactionGen {
     r <- paymentGeneratorP(sender, rec)
   } yield r
 
-  val leaseAndCancelGenerator: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
-    sender: PrivateKeyAccount <- accountGen
+
+  def leaseAndCancelGeneratorP(leaseSender: PrivateKeyAccount, recipient: AccountOrAlias, unleaseSender: PrivateKeyAccount): Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     amount <- positiveLongGen
     fee <- smallFeeGen
     timestamp <- positiveLongGen
-    recipient: AccountOrAlias <- accountOrAliasGen
-    lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
+    lease = LeaseTransaction.create(leaseSender, amount, fee, timestamp, recipient).right.get
     fee2 <- smallFeeGen
-    unlease = LeaseCancelTransaction.create(sender, lease.id, fee2, timestamp + 1).right.get
+    unlease = LeaseCancelTransaction.create(unleaseSender, lease.id, fee2, timestamp + 1).right.get
   } yield (lease, unlease)
+
+  val leaseAndCancelGenerator: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
+    sender: PrivateKeyAccount <- accountGen
+    recipient: PrivateKeyAccount <- accountGen
+    r <- leaseAndCancelGeneratorP(sender, recipient, sender)
+  } yield r
 
   val twoLeasesGenerator: Gen[(LeaseTransaction, LeaseTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -102,18 +107,13 @@ trait TransactionGen {
 
   val leaseAndCancelWithOtherSenderGenerator: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     sender: PrivateKeyAccount <- accountGen
-    otherSender: PrivateKeyAccount <- accountGen
-    amount <- positiveLongGen
-    fee <- smallFeeGen
-    timestamp <- positiveLongGen
-    recipient: AccountOrAlias <- accountOrAliasGen
-    lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
-    fee2 <- smallFeeGen
-    timestamp2 <- positiveLongGen
-    unlease = LeaseCancelTransaction.create(otherSender, lease.id, fee2, timestamp2).right.get
-  } yield (lease, unlease)
+    recipient: PrivateKeyAccount <- accountGen
+    unleaseSender: PrivateKeyAccount <- accountGen
+    r <- leaseAndCancelGeneratorP(sender, recipient, unleaseSender)
+  } yield r
 
   val leaseGenerator: Gen[LeaseTransaction] = leaseAndCancelGenerator.map(_._1)
+
   val leaseCancelGenerator: Gen[LeaseCancelTransaction] = leaseAndCancelGenerator.map(_._2)
 
   val selfPaymentGenerator: Gen[PaymentTransaction] = for {
