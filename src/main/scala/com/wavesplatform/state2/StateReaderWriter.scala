@@ -1,7 +1,5 @@
 package com.wavesplatform.state2
 
-import java.util
-
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.state2.reader.StateReaderImpl
