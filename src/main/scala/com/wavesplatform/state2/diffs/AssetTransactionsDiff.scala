@@ -66,7 +66,7 @@ object AssetTransactionsDiff {
           balance = -tx.fee,
           effectiveBalance = -tx.fee,
           assets = Map(assetId -> -tx.amount))),
-        assetInfos = Map(assetId -> AssetInfo(isReissuable = true, volume = -tx.amount)))
+              assetInfos = Map(assetId -> AssetInfo(isReissuable = true, volume = -tx.amount)))
     })
   }
 }

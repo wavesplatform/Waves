@@ -197,10 +197,10 @@ trait TransactionGen {
   } yield (Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee), sender)
 
 
-  def issueReissueGeneratorP(quantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
+  def issueReissueGeneratorP(issueQuantity: Long, reissueQuantity: Long, burnQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
     assetName <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
     description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
-    burnAmount <- Gen.choose(0L, quantity)
+    burnAmount <- Gen.choose(0L, burnQuantity)
     decimals <- Gen.choose(0: Byte, 8: Byte)
     reissuable <- Arbitrary.arbitrary[Boolean]
     reissuable2 <- Arbitrary.arbitrary[Boolean]
@@ -208,16 +208,18 @@ trait TransactionGen {
     iFee <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
     timestamp <- positiveLongGen
   } yield {
-    val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable, iFee, timestamp).right.get
-    val reissue = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable2, fee, timestamp).right.get
+    val issue = IssueTransaction.create(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp).right.get
+    val reissue = ReissueTransaction.create(sender, issue.assetId, reissueQuantity, reissuable2, fee, timestamp).right.get
     val burn = BurnTransaction.create(sender, issue.assetId, burnAmount, fee, timestamp).right.get
     (issue, reissue, burn)
   }
 
+  def issueReissueGeneratorP(quantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] = issueReissueGeneratorP(quantity, quantity, quantity, sender)
+
   val issueReissueGenerator: Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] = for {
     amount <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
-    r <- issueReissueGeneratorP(amount, sender)
+    r <- issueReissueGeneratorP(amount, amount, amount, sender)
   } yield r
 
   val issueGenerator: Gen[IssueTransaction] = issueReissueGenerator.map(_._1)
