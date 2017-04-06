@@ -36,7 +36,7 @@ trait TransactionGen {
     .suchThat(s => s.trim == s)
     .map(Alias.buildWithCurrentNetworkByte(_).right.get)
 
-  def recipientGen(sender: PrivateKeyAccount): Gen[PrivateKeyAccount] = accountGen.flatMap(Gen.oneOf(sender, _))
+  def recipientGen(candidate: PrivateKeyAccount): Gen[PrivateKeyAccount] = accountGen.flatMap(Gen.oneOf(candidate, _))
 
   val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAccount(_)))
 

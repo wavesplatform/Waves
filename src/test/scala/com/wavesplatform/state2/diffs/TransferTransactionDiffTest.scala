@@ -16,7 +16,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Gene
 
   val preconditionsAndTransfer: Gen[(Seq[Transaction], TransferTransaction)] = for {
     master <- accountGen
-    recepient <- recipientGen(master)
+    recepient <- recipientGen(candidate = master)
     ts <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     issue1: IssueTransaction <- issueReissueGeneratorP(ENOUGH_AMT, master).map(_._1)

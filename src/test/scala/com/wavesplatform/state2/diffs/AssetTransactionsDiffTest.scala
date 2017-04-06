@@ -1,34 +1,30 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import com.wavesplatform.state2.{AssetInfo, EffectiveBalanceSnapshot, EqByteArray, Portfolio, portfolioMonoid}
-import org.scalacheck.{Gen, Shrink}
+import com.wavesplatform.state2.{AssetInfo, EqByteArray, portfolioMonoid}
+import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction, Transaction, TransactionGen}
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
+import scorex.transaction.{GenesisTransaction, TransactionGen}
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
-  val irb: Gen[(Long, Long, Long)] = for {
-    i <- positiveLongGen
-    r <- positiveLongGen
-    b <- positiveLongGen.suchThat(x => x < i + r)
-  } yield (i, r, b)
-
-  val issueReissueBurnTxs: Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] = for {
+  def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] = for {
     master <- accountGen
     ts <- positiveLongGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    (ia, ra, ba) <- irb
-    (issue, reissue, burn) <- issueReissueGeneratorP(ia, ra, ba, master) suchThat (_._1.reissuable)
+    ia <- positiveLongGen
+    ra <- positiveLongGen
+    ba <- positiveLongGen.suchThat(x => x < ia + ra)
+    (issue, reissue, burn) <- issueReissueGeneratorP(ia, ra, ba, master) suchThat (_._1.reissuable == isReissuable)
   } yield ((genesis, issue), (reissue, burn))
 
   property("Issue+Reissue+Burn do not break waves invariant and updates state") {
-    forAll(issueReissueBurnTxs, accountGen) { case (((gen, issue), (reissue, burn)), miner) =>
+    forAll(issueReissueBurnTxs(isReissuable = true), accountGen) { case (((gen, issue), (reissue, burn)), miner) =>
       assertDiffAndState(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue, burn), miner)) { case (blockDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
 
@@ -43,24 +39,52 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     }
   }
 
-  property("Cannot reissue non-existing alias") {
+  property("Cannot reissue/burn non-existing alias") {
+    val setup: Gen[(GenesisTransaction, ReissueTransaction, BurnTransaction)] = for {
+      master <- accountGen
+      ts <- positiveLongGen
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      reissue <- reissueGenerator
+      burn <- burnGenerator
+    } yield (genesis, reissue, burn)
 
+    forAll(setup) { case ((gen, reissue, burn)) =>
+      assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(reissue))) { blockDiffEi =>
+        blockDiffEi shouldBe 'left
+      }
+      assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(burn))) { blockDiffEi =>
+        blockDiffEi shouldBe 'left
+      }
+    }
   }
 
-  property("Cannot reissue non-owned alias") {
+  property("Cannot reissue/burn non-owned alias") {
+    val setup = for {
+      ((gen, issue), (_, _)) <- issueReissueBurnTxs(isReissuable = true)
+      other <- accountGen.suchThat(_ != issue.sender.toAccount)
+      quantity <- positiveLongGen
+      reissuable2 <- Arbitrary.arbitrary[Boolean]
+      fee <- Gen.choose(1L, 2000000L)
+      timestamp <- positiveLongGen
+      reissue = ReissueTransaction.create(other, issue.assetId, quantity, reissuable2, fee, timestamp).right.get
+      burn = BurnTransaction.create(other, issue.assetId, quantity, fee, timestamp).right.get
+    } yield ((gen, issue), reissue, burn)
 
+    forAll(setup) { case ((gen, issue), reissue, burn) =>
+      assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue))) { blockDiffEi =>
+        blockDiffEi shouldBe 'left
+      }
+      assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(burn))) { blockDiffEi =>
+        blockDiffEi shouldBe 'left
+      }
+    }
   }
 
   property("Cannot reissue non-reissuable alias") {
-
+    forAll(issueReissueBurnTxs(isReissuable = false)) { case ((gen, issue), (reissue, _)) =>
+      assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue))) { blockDiffEi =>
+        blockDiffEi shouldBe 'left
+      }
+    }
   }
-
-  property("Cannot burn non-existing alias") {
-
-  }
-
-  property("Cannot burn non-owned alias") {
-
-  }
-
 }
