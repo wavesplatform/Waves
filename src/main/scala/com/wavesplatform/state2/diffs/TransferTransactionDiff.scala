@@ -15,7 +15,6 @@ object TransferTransactionDiff {
   def apply(state: StateReader, s: FunctionalitySettings, blockTime: Long, height: Int)(tx: TransferTransaction): Either[StateValidationError, Diff] = {
     val sender = Account.fromPublicKey(tx.sender.publicKey)
 
-
     val isInvalidEi = for {
       recipient <- state.resolveAliasEi(tx, tx.recipient)
       portfolios = (

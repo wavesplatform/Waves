@@ -65,7 +65,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
     val result: Either[ApiError, Seq[AliasInfo]] = Account.fromString(addressString) match {
       case Right(address) =>
-        val aliases = state.getAliases(address)
+        val aliases = state.aliasesOfAddress(address)
         if (aliases.isEmpty)
           Left(AliasNotExists(address))
         else Right(aliases.map(al => AliasInfo(address.stringRepr, al.stringRepr)))

@@ -20,7 +20,7 @@ object LeaseTransactionsDiff {
         sender -> Portfolio(-tx.fee, -tx.fee - tx.amount, Map.empty),
         recipient -> Portfolio(0, tx.amount, Map.empty)
       )
-      Right(Diff(height = height, tx = tx, portfolios = portfolioDiff, assetInfos = Map.empty))
+      Right(Diff(height = height, tx = tx, portfolios = portfolioDiff))
     }
   }
 
@@ -34,7 +34,7 @@ object LeaseTransactionsDiff {
             sender -> Portfolio(-tx.fee, -tx.fee + leaseTx.amount, Map.empty),
             recipient -> Portfolio(0, -leaseTx.amount, Map.empty)
           )
-          Diff(height = height, tx = tx, portfolios = portfolioDiff, assetInfos = Map.empty)
+          Diff(height = height, tx = tx, portfolios = portfolioDiff)
         }
       case Some(leaseTx) => Left(TransactionValidationError(tx, s"LeaseTransaction was leased by other sender"))
       case None => Left(TransactionValidationError(tx, s"Related LeaseTransaction not found"))

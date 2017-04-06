@@ -78,6 +78,10 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
         p.maxPaymentTransactionTimestampInPreviousBlocks.put(acc.bytes, ts)
     }
 
+    blockDiff.txsDiff.aliases.foreach { case (alias, acc) =>
+      p.aliasToAddress.put(alias.name, acc.bytes)
+    }
+
     p.setHeight(p.getHeight + blockDiff.heightDiff)
 
     p.commit()

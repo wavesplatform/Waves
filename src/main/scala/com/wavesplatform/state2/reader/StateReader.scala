@@ -109,10 +109,6 @@ object StateReader {
     def totalAssetQuantity(assetId: AssetId): Long =
       s.assetInfo(EqByteArray(assetId)).get.volume
 
-    def resolveAlias(a: Alias): Option[Account] = s.resolveAlias(a)
-
-    def getAliases(a: Account): Seq[Alias] = s.aliasesOfAddress(a)
-
     def getAssetName(assetId: AssetId): String = {
       s.findTransaction[IssueTransaction](assetId)
         .map(tx => new String(tx.name, Charsets.UTF_8))
