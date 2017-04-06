@@ -18,9 +18,9 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Gene
     master <- accountGen
     recepient <- recipientGen(master)
     ts <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, enoughAmt, ts).right.get
-    issue1: IssueTransaction <- issueReissueGeneratorP(enoughAmt, master).map(_._1)
-    issue2: IssueTransaction <- issueReissueGeneratorP(enoughAmt, master).map(_._1)
+    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+    issue1: IssueTransaction <- issueReissueGeneratorP(ENOUGH_AMT, master).map(_._1)
+    issue2: IssueTransaction <- issueReissueGeneratorP(ENOUGH_AMT, master).map(_._1)
     preconditions = Seq(genesis, issue1, issue2)
     maybeAsset <- Gen.option(issue1)
     maybeAsset2 <- Gen.option(issue2)

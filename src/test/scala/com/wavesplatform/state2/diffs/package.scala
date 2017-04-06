@@ -30,7 +30,7 @@ package object diffs {
   def newState(): StateWriterImpl = new StateWriterImpl(new MVStorePrimitiveImpl(new MVStore.Builder().open()))
 
   val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = BlockDiffer(TestFunctionalitySettings.Enabled)
-  val enoughAmt: Long = Long.MaxValue / 2
+  val ENOUGH_AMT: Long = Long.MaxValue / 2
 
   def assertDiffEi(preconditions: Seq[Block], block: Block)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
     val state = newState()

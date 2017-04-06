@@ -6,7 +6,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.Account
 
-class CompositeStateReaderTest extends FreeSpec with MockFactory with Matchers {
+class CompositeStateReaderEffectiveBalanceTest extends FreeSpec with MockFactory with Matchers {
 
   val acc: Account = Account.fromPublicKey(Array.emptyByteArray)
   val innerHeight = 1000

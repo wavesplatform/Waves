@@ -61,11 +61,14 @@ trait TransactionGen {
     ts <- positiveIntGen
   } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
-  def paymentGeneratorP(sender: PrivateKeyAccount, recipient: PrivateKeyAccount): Gen[PaymentTransaction] = for {
+  def paymentGeneratorP(sender: PrivateKeyAccount, recipient: PrivateKeyAccount): Gen[PaymentTransaction] =
+    positiveLongGen.flatMap(paymentGeneratorP(_, sender, recipient))
+
+  def paymentGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: PrivateKeyAccount): Gen[PaymentTransaction] = for {
     amount: Long <- Gen.choose(0, MAX_LONG)
     fee: Long <- smallFeeGen
-    timestamp: Long <- positiveLongGen
   } yield PaymentTransaction.create(sender, recipient, amount, fee, timestamp).right.get
+
 
   val paymentGenerator: Gen[PaymentTransaction] = for {
     sender <- accountGen
