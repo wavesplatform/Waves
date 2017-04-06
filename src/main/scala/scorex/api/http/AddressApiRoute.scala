@@ -6,7 +6,6 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
@@ -26,7 +25,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 
   override lazy val route =
     pathPrefix("addresses") {
-      validate ~ seed ~ balance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+      validate ~ seed ~ balanceWithConfirmations ~ balance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations
     } ~ root ~ create
 
@@ -121,6 +120,19 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   def balance: Route = (path("balance" / Segment) & get) { address =>
     complete(balanceJson(address, 0))
   }
+
+  @Path("/balance/{address}/{confirmations}")
+  @ApiOperation(value = "Confirmed balance", notes = "Balance of {address} after {confirmations}", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
+  ))
+  def balanceWithConfirmations: Route = {
+    (path("balance" / Segment / IntNumber) & get) { case (address, confirmations) =>
+      complete(balanceJson(address, confirmations))
+    }
+  }
+
 
   @Path("/effectiveBalance/{address}")
   @ApiOperation(value = "Balance", notes = "Account's balance", httpMethod = "GET")
@@ -217,6 +229,19 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
       .getOrElse(InvalidAddress)
   }
 
+  private def balancesDetailsJson(address: String): ToResponseMarshallable = {
+    Account.fromString(address).right.map(acc => {
+      val wavesBalance = state.balance(acc)
+      ToResponseMarshallable(BalanceDetails(
+        acc.address,
+        wavesBalance,
+        consensusModule.generatingBalance(acc, state.stateHeight),
+        wavesBalance - state.getLeasedSum(address),
+        state.effectiveBalance(acc)
+      ))
+    }).getOrElse(InvalidAddress)
+  }
+
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
@@ -285,6 +310,10 @@ object AddressApiRoute {
   case class Balance(address: String, confirmations: Int, balance: Long)
 
   implicit val balanceFormat: Format[Balance] = Json.format
+
+  case class BalanceDetails(address: String, regular: Long, generating: Long, available: Long, effective: Long)
+
+  implicit val balanceDetailsFormat: Format[BalanceDetails] = Json.format
 
   case class Validity(address: String, valid: Boolean)
 
