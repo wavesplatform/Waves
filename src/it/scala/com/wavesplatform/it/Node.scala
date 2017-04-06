@@ -4,11 +4,12 @@ import java.io.IOException
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.util._
+import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.settings.WavesSettings
 import io.netty.util.Timer
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
-import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
+import org.asynchttpclient.{Response, _}
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Json._
 import play.api.libs.json._
@@ -176,8 +177,18 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
                  reissuable: Boolean): Future[Transaction] =
     post("/assets/issue", IssueRequest(address, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
 
-  def placeOrder(order: Order): Future[MatcherResponse] = {
+  def placeOrder(order: Order): Future[MatcherResponse] =
     matcherPost("/matcher/orderbook", order.json).as[MatcherResponse]
+
+  def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
+    matcherPost("/matcher/orderbook", order.json) transform {
+      case Success(r) if r.getStatusCode == expectedStatusCode =>
+        Try(parse(r.getResponseBody).as[MatcherStatusResponse]) match {
+          case Success(mr) if mr.status == expectedStatus => Success(true)
+          case Failure(f) => Failure(new RuntimeException(s"Failed to parse response: $f"))
+        }
+      case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
+      case _ => Failure(new RuntimeException(s"Unexpected failure from matcher"))
   }
 
   def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
@@ -185,6 +196,9 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
 
   def getOrderBook(asset: String): Future[OrderBookResponse] =
     matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
+
+  def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
+    matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
 }
 
 object Node extends ScorexLogging {

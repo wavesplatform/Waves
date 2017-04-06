@@ -1,3 +1,4 @@
+/*
 package com.wavesplatform.it
 
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers, Suite}
@@ -40,4 +41,4 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
   )
 
   override protected def afterAll() = docker.close()
-}
+}*/
