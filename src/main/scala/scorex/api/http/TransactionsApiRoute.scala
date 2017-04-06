@@ -7,22 +7,22 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
-import play.api.libs.json.{JsArray, JsNumber, Json}
+import play.api.libs.json._
 import scorex.account.Account
 import scorex.crypto.encode.Base58
-import scorex.transaction.{History, TransactionModule}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.{History, Transaction, TransactionModule}
 
 import scala.util.Success
 import scala.util.control.Exception
-import scorex.transaction.{History, SimpleTransactionModule}
 
 @Path("/transactions")
 @Api(value = "/transactions", description = "Information about transactions")
 case class TransactionsApiRoute(
-                                   settings: RestAPISettings,
-                                   state: StateReader,
-                                   history: History,
-                                   transactionModule: TransactionModule) extends ApiRoute with CommonApiFunctions {
+                                 settings: RestAPISettings,
+                                 state: StateReader,
+                                 history: History,
+                                 transactionModule: TransactionModule) extends ApiRoute with CommonApiFunctions {
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
 
@@ -51,7 +51,7 @@ case class TransactionsApiRoute(
               path(Segment) { limitStr =>
                 Exception.allCatch.opt(limitStr.toInt) match {
                   case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
-                    complete(JsArray(state.accountTransactions(a, limit).map(_.json)))
+                    complete(JsArray(state.accountTransactions(a, limit).map(txToExtendedJson)))
                   case Some(limit) if limit > MaxTransactionsPerRequest =>
                     complete(TooBigArrayAllocation)
                   case _ =>
@@ -72,34 +72,42 @@ case class TransactionsApiRoute(
     pathEndOrSingleSlash {
       complete(InvalidSignature)
     } ~
-    path(Segment) { encoded =>
-      Base58.decode(encoded) match {
-        case Success(sig) =>
-          state.included(sig) match {
-            case Some(h) =>
-              val jsonOpt = for {
-                b <- history.blockAt(h)
-                tx <- b.transactionData.collectFirst { case t if t.id sameElements sig => t }
-              } yield tx.json + ("height" -> JsNumber(h))
+      path(Segment) { encoded =>
+        Base58.decode(encoded) match {
+          case Success(sig) =>
+            state.included(sig) match {
+              case Some(h) =>
+                val jsonOpt = for {
+                  b <- history.blockAt(h)
+                  tx <- b.transactionData.collectFirst { case t if t.id sameElements sig => t }
+                } yield txToExtendedJson(tx) + ("height" -> JsNumber(h))
 
-              jsonOpt match {
-                case Some(json) => complete(json)
-                case None =>
-                  complete(StatusCodes.InternalServerError -> Json.obj("status" -> "error", "details" -> "Internal error"))
-              }
+                jsonOpt match {
+                  case Some(json) => complete(json)
+                  case None =>
+                    complete(StatusCodes.InternalServerError -> Json.obj("status" -> "error", "details" -> "Internal error"))
+                }
 
-            case None =>
-              complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
-          }
-        case _ => complete(InvalidSignature)
+              case None =>
+                complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
+            }
+          case _ => complete(InvalidSignature)
+        }
       }
-    }
   }
 
   @Path("/unconfirmed")
   @ApiOperation(value = "Unconfirmed", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
   def unconfirmed: Route = (path("unconfirmed") & get) {
-    complete(JsArray(transactionModule.unconfirmedTxs.map(_.json)))
+    complete(JsArray(transactionModule.unconfirmedTxs.map(txToExtendedJson)))
+  }
+
+  private def txToExtendedJson(tx: Transaction): JsObject = {
+    tx match {
+      case leaseCancel: LeaseCancelTransaction =>
+        leaseCancel.json ++ Json.obj("lease" -> state.findTransaction[LeaseTransaction](leaseCancel.leaseId).map(_.json).getOrElse[JsValue](JsNull))
+      case tx => tx.json
+    }
   }
 }
 
