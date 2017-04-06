@@ -71,3 +71,8 @@ inConfig(IntegrationTest)(Seq(
   test <<= test.dependsOn(docker),
   testOptions += Tests.Filter(_.endsWith("Suite"))
 ))
+
+crossPaths := false
+
+publishArtifact in (Compile, packageDoc) := false
+publishArtifact in (Compile, packageSrc) := false

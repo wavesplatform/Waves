@@ -1,44 +1,8 @@
 import com.typesafe.sbt.SbtNativePackager.autoImport._
+import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
 
-addCommandAlias("packageAll", "; clean " +
-  "; systemd/packageDebianSystemd " +
-  "; clean " +
-  "; upstart/packageDebianUpstart " +
-  "; clean" +
-  "; packageJar"
-)
-
 val network = Option(System.getProperty("network")).getOrElse("mainnet")
-
-// see https://github.com/muuki88/sbt-native-packager-examples/blob/master/multiple-package-outputs/build.sbt and https://github.com/muuki88/sbt-native-packager-examples/blob/master/multi-module-build/build.sbt
-lazy val packageDebianUpstart = taskKey[File]("creates deb with upstart loader")
-lazy val packageDebianSystemd = taskKey[File]("creates deb with systemd loader")
-lazy val packageJar = taskKey[File]("creates fat jar")
-
-lazy val packageDebianUpstartTask = packageDebianUpstart := {
-  val output = (baseDirectory in root).value / "package" / s"waves-$network-upstart-${version.value}.deb"
-  val debianFile = (packageBin in Debian).value
-  streams.value.log.info(s"Moving package ${debianFile.getAbsoluteFile} to ${output.getAbsolutePath}")
-  IO.move(debianFile, output)
-  output
-}
-
-lazy val packageDebianSystemdTask = packageDebianSystemd := {
-  val output = (baseDirectory in root).value / "package" / s"waves-$network-systemd-${version.value}.deb"
-  val debianFile = (packageBin in Debian).value
-  streams.value.log.info(s"Moving package ${debianFile.getAbsoluteFile} to ${output.getAbsolutePath}")
-  IO.move(debianFile, output)
-  output
-}
-
-lazy val packageJarTask = packageJar := {
-  val output = baseDirectory.value / "package" / s"waves-${version.value}.jar"
-  val jarFile = (assembly in Compile).value
-  streams.value.log.info(s"Moving package ${jarFile.getAbsoluteFile} to ${output.getAbsolutePath}")
-  IO.move(jarFile, output)
-  output
-}
 
 val commonSettings: Seq[Setting[_]] = Seq(
   javaOptions in Universal ++= Seq(
@@ -56,93 +20,51 @@ val commonSettings: Seq[Setting[_]] = Seq(
     "-J-XX:+PerfDisableSharedMem",
     "-J-XX:+ParallelRefProcEnabled",
     "-J-XX:+UseStringDeduplication"),
-  assemblyMergeStrategy in assembly := {
-    case "application.conf" => MergeStrategy.concat
-    case x =>
-      val oldStrategy = (assemblyMergeStrategy in assembly).value
-      oldStrategy(x)
-  },
-  mainClass in Compile := Some("com.wavesplatform.Application"),
-  packageJarTask
+  mainClass in Compile := Some("com.wavesplatform.Application")
 )
 
-import com.typesafe.sbt.SbtNativePackager.autoImport.NativePackagerHelper._
+
+val upstartScript = TaskKey[File]("upstartScript")
+val packageSource = SettingKey[File]("packageSource")
 
 val debianSettings = Seq(
   maintainer in Linux := "wavesplatform.com",
   packageName := {
-    if (network == "mainnet") {
-      "waves"
-    } else if (network == "testnet") {
-      "waves-testnet"
-    } else if (network == "devnet") {
-      "waves-devnet"
-    } else {
-      throw new IllegalStateException("invalid network")
+    network match {
+      case "mainnet" => "waves"
+      case "testnet" => "waves-testnet"
+      case "devnet" => "waves-devnet"
     }
   },
-  packageSummary in Linux := "Waves node implementation on top of Scorex",
+  packageSummary in Linux := "Waves node",
   packageDescription in Linux := "Waves node",
-  maintainerScripts in Debian := maintainerScriptsAppend((maintainerScripts in Debian).value)(
-    DebianConstants.Postinst ->
-      s"""
-         |mkdir -p /home/${packageName.value} &&
-         |(mv -n /usr/share/${packageName.value}/settings.conf /etc/${packageName.value}.conf 2>/dev/null || (rm -f /usr/share/${packageName.value}/settings.conf && cp -n /usr/share/${packageName.value}/settings.conf.default /etc/${packageName.value}.conf)) &&
-         |ln -sv /etc/${packageName.value}.conf /usr/share/${packageName.value}/settings.conf &&
-         |chmod -R 750 /home/${packageName.value} &&
-         |chmod -R 750 /usr/share/${packageName.value} &&
-         |chmod -R 750 /etc/${packageName.value} &&
-         |chmod 750 /etc/${packageName.value}.conf &&
-         |chown -R ${packageName.value}:${packageName.value} /etc/${packageName.value}.conf &&
-         |chown -R ${packageName.value}:${packageName.value} /usr/share/${packageName.value} &&
-         |chown -R ${packageName.value}:${packageName.value} /home/${packageName.value} &&
-         |(! test -f /etc/${packageName.value}.json ||
-         |su -s /bin/sh -c 'java -cp "/usr/share/${packageName.value}/lib/*" com.wavesplatform.settings.LegacyConfigTransformer /etc/${packageName.value}.json > /etc/${packageName.value}.conf' ${packageName.value} &&
-         |mv -f /etc/${packageName.value}.json /etc/${packageName.value}.json.old)""".stripMargin),
   debianPackageDependencies in Debian += "java8-runtime-headless",
-  mappings in Universal ++= {
-    if (network == "mainnet") {
-      Seq((baseDirectory in root).value / "waves-mainnet.conf" -> "settings.conf.default")
-    } else if (network == "testnet") {
-      Seq((baseDirectory in root).value / "waves-testnet.conf" -> "settings.conf.default")
-    } else if (network == "devnet") {
-      Seq((baseDirectory in root).value / "waves-devnet.conf" -> "settings.conf.default")
-    }else {
-      throw new IllegalStateException("invalid network")
-    }
+  mappings in Universal += (baseDirectory.value / s"waves-$network.conf" -> "conf/waves.conf"),
+  packageSource := sourceDirectory.value / "package",
+  upstartScript := {
+    val src = packageSource.value / "upstart.conf"
+    val dest = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
+    val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
+    IO.write(dest, result)
+    dest
   },
-  bashScriptExtraDefines += s"""addApp "/etc/${packageName.value}.conf"""",
-  mappings in Universal ++= contentOf((baseDirectory in root).value / "src" / "main" / "resources").map(to => (to._1, "conf/" + to._2)),
+  linuxPackageMappings ++= Seq(
+    packageMapping((upstartScript.value, s"/usr/share/${packageName.value}/conf/upstart.conf")),
+    packageMapping((packageSource.value / "logback-overrides.xml", s"/usr/share/${packageName.value}/conf/logback-overrides.xml"))
+  ).map(_.withConfig().withPerms("644").withUser(packageName.value).withGroup(packageName.value)),
   serviceAutostart in Debian := false,
-  executableScriptName := packageName.value
+  executableScriptName := packageName.value,
+  maintainerScripts in Debian := maintainerScriptsFromDirectory(
+    sourceDirectory.value / "package" / "debian",
+    Seq("preinst", "postinst", "postrm", "prerm")
+  )
 )
 
-val systemdSettings = Seq(
-  packageDebianSystemdTask,
-  packageBin <<= packageDebianSystemd
-)
-
-val upstartSettings = Seq(
-  javaOptions in Universal ++= Seq(
-    s"-Dlogback.configurationFile=/usr/share/${packageName.value}/conf/logback-to-file.xml",
-    s"-Dlogpath=/var/log/${packageName.value}/"
-  ),
-  packageDebianUpstartTask,
-  packageBin <<= packageDebianUpstart
-)
-
-lazy val root = project.in(file("."))
-  .enablePlugins(sbtdocker.DockerPlugin)
-  .settings(commonSettings)
-
-lazy val upstart = project.in(file("target/upstart")).dependsOn(root)
-  .settings(commonSettings ++ debianSettings ++ upstartSettings)
-  .enablePlugins(JavaServerAppPackaging, JDebPackaging, UpstartPlugin)
-
-lazy val systemd = project.in(file("target/systemd")).dependsOn(root)
-  .settings(commonSettings ++ debianSettings ++ systemdSettings)
-  .enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin)
+lazy val waves = project.in(file("."))
+  .enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin)
+  .settings(commonSettings ++ debianSettings)
 
 //assembly settings
 assemblyJarName in assembly := "waves.jar"
 test in assembly := {}
+
